@@ -88,3 +88,24 @@ export function nonEchoWords(heard: string, homeowner: string): string[] {
 
 /** This many words of the rep's own while the homeowner talks: they're talking over them, and the homeowner stops. */
 export const BARGE_IN_WORDS = 3;
+
+/**
+ * How far apart two versions of a line are, in words (each word in one and
+ * not the other). Hands-free sends the line on the words heard at the pause;
+ * when the finished transcript is further off than SPECULATION_SLACK, the
+ * answer is thrown away and the line sent again.
+ */
+export function wordsApart(a: string, b: string): number {
+  const counts = new Map<string, number>();
+  for (const word of words(a)) counts.set(word, (counts.get(word) ?? 0) + 1);
+  let apart = 0;
+  for (const word of words(b)) {
+    const n = counts.get(word) ?? 0;
+    if (n > 0) counts.set(word, n - 1);
+    else apart += 1;
+  }
+  for (const n of counts.values()) apart += n;
+  return apart;
+}
+
+export const SPECULATION_SLACK = 2;

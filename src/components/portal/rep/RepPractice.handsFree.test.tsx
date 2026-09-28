@@ -144,7 +144,8 @@ describe('RepPractice hands-free', () => {
     expect(text()).toContain('Homeowner talking.');
     await until(() => text().includes('Listening. Just talk.'));
 
-    // A pause ends the line: the server is told to finish the words, and the line goes.
+    // A pause ends the line: the server is told to finish the words, and the answer starts at once on the
+    // words heard so far; the finished words match, so it stands (no second request).
     practiceAnswers.push(json(says("Okay, I'm listening. What is it?")));
     await say((e) => e.onSpeech(true, performance.now()));
     await say((e) => e.onInterim("Hi, I'm Sam"));
@@ -152,9 +153,10 @@ describe('RepPractice hands-free', () => {
     expect(text()).toContain("Hi, I'm Sam with 3C.");
     await say((e) => e.onSpeech(false, performance.now()));
     expect(mic.finish).toHaveBeenCalledTimes(1);
-    await until(() => text().includes('Homeowner talking.'));
     expect(practiceBodies()[1]).toMatchObject({ action: 'turn', sessionId: 's1' });
     expect(practiceBodies()[1].history.at(-1)).toEqual({ role: 'rep', text: "Hi, I'm Sam with 3C." });
+    await until(() => text().includes('Homeowner talking.'));
+    expect(practiceBodies()).toHaveLength(2);
 
     // The homeowner's own words coming back through the speaker aren't the rep...
     await say((e) => e.onFinal("I'm listening what is it"));
@@ -185,5 +187,26 @@ describe('RepPractice hands-free', () => {
     const feedback = practiceBodies().at(-1);
     expect(feedback.action).toBe('feedback');
     expect(feedback.replyMs.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('sends the line again when the finished words differ from what the early answer was started on', async () => {
+    window.localStorage.setItem('ask3c-practice-hands-free', 'on');
+    await act(async () => root.render(<RepPractice uid="r1" active canPick={false} onResume={() => {}} />));
+    practiceAnswers.push(json({ ...says('Hi?'), sessionId: 's1', ring: false, ambient: null }));
+    await act(async () => button('Knock')!.click());
+    await until(() => text().includes('Listening. Just talk.'));
+
+    practiceAnswers.push(json(says('Pay for what?')), json(says("Spectrum's about ninety a month. Why?")));
+    await say((e) => e.onSpeech(true, performance.now()));
+    await say((e) => e.onInterim('so what do you pay'));
+    await say((e) => e.onSpeech(false, performance.now()));
+    // Started on the words at the pause...
+    expect(practiceBodies()[1].history.at(-1)).toEqual({ role: 'rep', text: 'so what do you pay' });
+    await say((e) => e.onFinal('So what do you pay for Spectrum right now each month?'));
+    // ...then sent again on the finished line, and only that answer shows.
+    await until(() => practiceBodies().length === 3);
+    expect(practiceBodies()[2].history.at(-1)).toEqual({ role: 'rep', text: 'So what do you pay for Spectrum right now each month?' });
+    await until(() => text().includes("Spectrum's about ninety a month. Why?"));
+    expect(text()).not.toContain('Pay for what?');
   });
 });

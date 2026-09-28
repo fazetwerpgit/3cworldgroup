@@ -183,35 +183,38 @@ describe('POST /api/portal/ask/practice', () => {
   });
 
   it('owns patience: the judge reports, the server counts, and closes the door at 0', async () => {
+    // Each line a step further on (a line sent again at the same spot counts once).
+    let history = PITCH;
+    const next = (said: string, line: string) => (history = [...history, { role: 'customer', text: said }, { role: 'rep', text: line }]);
     verdicts.push('WEAK');
     modelAnswers('Hmm.');
-    let res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    let res = await POST(req({ action: 'turn', ...SESSION, history }));
     expect(await res.json()).toEqual(says('Hmm.'));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(4);
 
     // An answer that isn't one of the four words counts as weak.
     verdicts.push('Not sure.');
     modelAnswers('Uh huh.');
-    await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    await POST(req({ action: 'turn', ...SESSION, history: next('Hmm.', 'So yeah.') }));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(3);
 
     // A caught lie halves what is left (rounded up) and takes one more: 3 -> 1, the door stays open.
     verdicts.push('LIE');
     modelAnswers('Free? Nothing is free.');
-    res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    res = await POST(req({ action: 'turn', ...SESSION, history: next('Uh huh.', "It's free forever.") }));
     expect(await res.json()).toEqual(says('Free? Nothing is free.'));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(1);
 
     // One more weak line: 0, and the server shuts the door.
     verdicts.push('WEAK');
     modelAnswers('Uh huh.');
-    res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    res = await POST(req({ action: 'turn', ...SESSION, history: next('Free? Nothing is free.', 'Anyway.') }));
     expect(await res.json()).toEqual(says("Look, I'm not interested. I've got to go.", 'slam'));
     expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(0);
 
     // At 0 the door is shut whatever the homeowner says next.
     modelAnswers('Yeah, probably.');
-    res = await POST(req({ action: 'turn', ...SESSION, history: PITCH }));
+    res = await POST(req({ action: 'turn', ...SESSION, history: next("Look, I'm not interested.", 'Wait!') }));
     expect(await res.json()).toEqual(says("Look, I'm not interested. I've got to go.", 'slam'));
   });
 
@@ -528,6 +531,17 @@ describe('POST /api/portal/ask/practice', () => {
     modelAnswers('Hello?');
     await POST(req({ action: 'turn', history: [] }));
     expect(fake.docs('practiceSessions').get('r1')?.persona).not.toBe('elderly');
+  });
+
+  it('counts a line once when the same spot is sent again (hands-free re-sending firmer words, Try again)', async () => {
+    verdicts = ['WEAK', 'WEAK'];
+    modelAnswers('Uh huh.');
+    await POST(req({ action: 'turn', ...SESSION, history: [PITCH[0], { role: 'rep', text: 'so what do you' }] }));
+    expect(fake.docs('practiceSessions').get('r1')?.patience).toBe(4);
+    modelAnswers('Spectrum, why?');
+    await POST(req({ action: 'turn', ...SESSION, history: [PITCH[0], { role: 'rep', text: 'So what do you have for internet?' }] }));
+    expect(fake.docs('practiceSessions').get('r1')).toMatchObject({ patience: 4, lastLines: [{ speaker: 'homeowner', text: 'Spectrum, why?' }] });
+    expect(fake.docs('practiceSessions').get('r1')?.steps).toHaveLength(1);
   });
 
   it('hands-free: writes the cut-in ahead, then plays it on the cut turn with only the judge, once', async () => {

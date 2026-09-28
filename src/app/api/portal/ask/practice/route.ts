@@ -252,6 +252,10 @@ export async function POST(request: NextRequest) {
     door = saved.door ? parseDoor(saved.door) : STANDARD_DOOR;
     const start = practiceCustomer(personaId, seed).persona.patience;
     patienceBefore = Number.isInteger(saved.patience) ? Math.min(start, Math.max(0, saved.patience as number)) : start;
+    // The same spot again (hands-free re-sending a line the transcript firmed up, Try again): it starts
+    // from the patience the first try started from, so a line never counts twice.
+    const again = action === 'turn' ? parseSteps(saved.steps).find((step) => step.at === history.length) : undefined;
+    if (again) patienceBefore = Math.min(start, again.patience);
   }
 
   if (action === 'feedback') {

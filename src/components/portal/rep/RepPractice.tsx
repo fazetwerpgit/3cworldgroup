@@ -33,6 +33,7 @@ import pr from './rep-practice.module.css';
 import { PracticeFeedback } from './PracticeFeedback';
 import { PracticeMine } from './PracticeMine';
 import { openVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type VoicePlayer } from './practiceAudio';
+import { SPECULATION_SLACK, wordsApart } from '@/lib/ask/practiceHandsFree';
 import { askForMic, canHandsFree } from './handsFreeMic';
 import { useHandsFree } from './useHandsFree';
 
@@ -229,6 +230,18 @@ function readHandsFree(): boolean {
   }
 }
 
+type TurnPost = Awaited<ReturnType<typeof post<PracticeTurnReply & Partial<PracticeKnockReply>>>>;
+
+/** Hands-free: an answer started at the rep's pause, on the words heard by then. */
+interface Speculation {
+  text: string;
+  sessionId: string;
+  /** The conversation's length before the line. */
+  at: number;
+  result: Promise<TurnPost>;
+  dropped: boolean;
+}
+
 /** A hands-free interruption, written and its voice fetched ahead of the moment it plays. */
 interface PreparedCut {
   sessionId: string;
@@ -288,6 +301,8 @@ export function RepPractice({
   const deliveryRef = useRef<PracticeDelivery | null>(null);
   /** The line the mic just heard and how long the rep spoke it, until it's sent (unchanged). */
   const spokenRef = useRef<{ text: string; ms: number } | null>(null);
+  /** Hands-free: the answer started early at the rep's last pause, if any. */
+  const specRef = useRef<Speculation | null>(null);
 
   const canSpeak = useSyncExternalStore(noSubscribe, () => 'speechSynthesis' in window, () => false);
   const canListen = useSyncExternalStore(noSubscribe, () => recognitionClass() !== undefined, () => false);
@@ -298,6 +313,24 @@ export function RepPractice({
     onLine: (text, ms) => {
       spokenRef.current = { text, ms: Math.max(MIN_LINE_MS, ms) };
       sendRef.current(text);
+    },
+    speculate: (text) => {
+      const sessionId = session?.sessionId;
+      if (!session || !sessionId || session.ended || busy || text.length > MAX_REP_CHARS) return;
+      specRef.current = {
+        text,
+        sessionId,
+        at: session.turns.length,
+        result: post<PracticeTurnReply & Partial<PracticeKnockReply>>({
+          action: 'turn',
+          sessionId,
+          history: [...session.turns, { role: 'rep', text }],
+        }),
+        dropped: false,
+      };
+    },
+    dropSpeculation: () => {
+      if (specRef.current) specRef.current.dropped = true;
     },
     prepareCut: async (partial) => {
       const sessionId = session?.sessionId;
@@ -453,18 +486,22 @@ export function RepPractice({
    * the rep's last line, or a reaction to the price card just pulled up. With
    * Talk on, the line waits (orb showing) for its voice, then shows and plays.
    */
-  const requestTurn = async (current: Session) => {
+  const requestTurn = async (current: Session, early?: { answer?: Promise<TurnPost>; settle?: Promise<TurnPost> }) => {
     setBusy('turn');
     setFailed(null);
     setNotice('');
     scrollDown('smooth');
     const quiet = speechRef.current;
     const knocked = current.turns.length === 0;
-    const result = await post<PracticeTurnReply & Partial<PracticeKnockReply>>(
-      knocked
-        ? { action: 'turn', history: [], ...(canPick ? { persona: current.pick } : {}) }
-        : { action: 'turn', sessionId: current.sessionId, history: current.turns }
-    );
+    // An early answer that's being thrown away finishes first, so it can't land after this one.
+    if (early?.settle) await early.settle;
+    const result = early?.answer
+      ? await early.answer
+      : await post<PracticeTurnReply & Partial<PracticeKnockReply>>(
+          knocked
+            ? { action: 'turn', history: [], ...(canPick ? { persona: current.pick } : {}) }
+            : { action: 'turn', sessionId: current.sessionId, history: current.turns }
+        );
     const lines = result.ok && Array.isArray(result.data.lines) ? result.data.lines.filter((line) => line?.text) : [];
     if (result.ok && lines.length && (!knocked || result.data.sessionId)) {
       const { ended, close, beat } = result.data;
@@ -590,7 +627,17 @@ export function RepPractice({
     const next: Session = { ...session, turns: [...session.turns, { role: 'rep', text }] };
     save(next);
     hands.thinking();
-    void requestTurn(next);
+    // Hands-free started the answer at the pause: it stands if the finished words are close enough to what
+    // it was started on; otherwise it's dropped (and done first) and the line goes again.
+    const early = specRef.current;
+    specRef.current = null;
+    const fits =
+      early &&
+      !early.dropped &&
+      early.sessionId === session.sessionId &&
+      early.at === session.turns.length &&
+      wordsApart(early.text, text) <= SPECULATION_SLACK;
+    void requestTurn(next, early ? (fits ? { answer: early.result } : { settle: early.result }) : undefined);
   };
 
   /**
@@ -786,6 +833,7 @@ export function RepPractice({
     playerRef.current?.quiet();
     stopListening(false);
     hands.stop();
+    specRef.current = null;
     deliveryRef.current = null;
     save(null);
     setChoice('surprise');

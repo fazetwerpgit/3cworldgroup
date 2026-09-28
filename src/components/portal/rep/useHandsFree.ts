@@ -31,6 +31,13 @@ const DEFAULT_BUDGET_MS = 15_000;
 export interface HandsFreeHandlers<Prepared> {
   /** The rep's line, heard in full: send it. `ms` is how long they spoke. */
   onLine(text: string, ms: number): void;
+  /**
+   * The rep paused: start the answer now on the words heard so far, before the
+   * transcript is final (onLine then decides whether it still fits).
+   */
+  speculate(text: string): void;
+  /** They went on talking after all: that early answer is for a line that isn't over. */
+  dropSpeculation(): void;
   /** The rep has talked most of their budget: write the interruption from what they've said so far. */
   prepareCut(partial: string): Promise<Prepared | null>;
   /** The budget is up and they're still talking: play it over them. `partial` is what they'd said, over `ms`. */
@@ -67,6 +74,8 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
     budgetMs: DEFAULT_BUDGET_MS,
     /** When the line went, for how long the homeowner took to answer. */
     sentAt: 0,
+    /** An answer was started early at this pause. */
+    speculated: false,
     replyMs: [] as number[],
   });
 
@@ -96,8 +105,13 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
     const s = state.current;
     const line = text();
     const ms = Math.max(0, s.speechEnd - s.speechStart);
+    const speculated = s.speculated;
+    s.speculated = false;
     clearLine();
-    if (!line) return;
+    if (!line) {
+      if (speculated) handlersRef.current.dropSpeculation();
+      return;
+    }
     set('thinking');
     s.sentAt = s.speechEnd || performance.now();
     handlersRef.current.onLine(line, ms);
@@ -178,10 +192,14 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
     const s = state.current;
     if (s.status !== 'listening') return;
     if (speaking) {
-      // Talking again before the last words came back: it's all one line.
+      // Talking again before the last words came back: it's all one line, and an early answer is moot.
       window.clearTimeout(s.ending);
       window.clearTimeout(s.settle);
       s.ending = 0;
+      if (s.speculated) {
+        s.speculated = false;
+        handlersRef.current.dropSpeculation();
+      }
       if (!s.speechStart) {
         s.speechStart = at;
         armBudget();
@@ -191,6 +209,12 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
     if (!s.speechStart) return;
     s.speechEnd = at;
     micRef.current?.finish();
+    // The answer starts on what's been heard; the finished words arrive while it's being written.
+    const guess = text();
+    if (guess && !s.speculated) {
+      s.speculated = true;
+      handlersRef.current.speculate(guess);
+    }
     s.ending = window.setTimeout(commit, FINAL_WAIT_MS);
     // Words already in and nothing pending: no need to wait the whole time.
     if (s.finals.length && !s.interim) s.settle = window.setTimeout(commit, NOTHING_PENDING_MS);
