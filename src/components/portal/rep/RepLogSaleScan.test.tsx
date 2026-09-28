@@ -125,7 +125,8 @@ beforeEach(() => {
       return json(await reply);
     })
   );
-  window.matchMedia ??= ((query: string) => ({ matches: false, media: query }) as MediaQueryList);
+  window.matchMedia ??= ((query: string) =>
+    ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList);
   Element.prototype.scrollIntoView ??= () => {};
 });
 
