@@ -13,10 +13,10 @@ import {
   History,
   ImageUp,
   Keyboard,
-  Loader2,
   RotateCw,
   WifiOff,
 } from 'lucide-react';
+import { ThinkingOrb } from 'thinking-orbs';
 import { FIBER_COMPANIES, SALE_TYPES, getPlanById, getPlansByCompany } from '@/types';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useSaleFormState, type SaleFieldKey, type SaleFormFields } from '@/hooks/useSaleFormState';
@@ -468,7 +468,12 @@ export function RepLogSale() {
         )
       ) : null}
       <form id={FORM_ID} ref={formRef} className={l.reviewGrid} onSubmit={onSubmit} noValidate>
-        <ProofCapture uploads={uploads} orderRequired={orderRequired && proofTiles === 0} autofill={scanOn} />
+        <ProofCapture
+          uploads={uploads}
+          orderRequired={orderRequired && proofTiles === 0}
+          autofill={scanOn}
+          reading={scan.status === 'reading'}
+        />
 
         <div className={l.reviewMain}>
           <header>
@@ -476,7 +481,7 @@ export function RepLogSale() {
             {scan.status === 'reading' ? (
               <div className={l.scanRow}>
                 <p className={`${l.lede} ${l.scanReading}`} role="status">
-                  <Loader2 size={16} strokeWidth={2.25} className={l.spin} aria-hidden="true" />
+                  <ThinkingOrb state="working" size={20} theme="dark" aria-hidden="true" />
                   Reading your screenshot…
                 </p>
                 <button type="button" className={l.scanSkip} onClick={scan.skip}>

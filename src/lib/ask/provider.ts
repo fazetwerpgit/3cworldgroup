@@ -8,17 +8,24 @@ export const DEFAULT_ASK_BASE_URL = 'https://api.deepseek.com';
 export const DEFAULT_ASK_MODEL = 'deepseek-flash';
 export const ASK_TIMEOUT_MS = 30_000;
 /** The answer is a few lines; thinking tokens count here too, so this leaves room for both. */
-const MAX_ANSWER_TOKENS = 3000;
+const MAX_ANSWER_TOKENS = 6000;
 const DEFAULT_TEMPERATURE = 0.5;
 
-/** How one call runs. Defaults are Ask 3C's: short thinking, 0.5 without it, 3000 tokens, 30 s. */
+/**
+ * How one call runs. Defaults are Ask 3C's: thinking at high effort (0.5 without it), 6000 tokens, 30 s,
+ * no self-check.
+ */
 export interface AskCallOptions {
-  /** Thinking on (DeepSeek, low effort). Off skips the empty-answer retry: there's nothing to fall back to. */
+  /** Thinking on (DeepSeek). Off skips the empty or cut-off answer retry: there's nothing to fall back to. */
   think?: boolean;
+  /** DeepSeek's reasoning effort while thinking. */
+  effort?: 'low' | 'high';
   /** Used whenever thinking is off (DeepSeek ignores it while thinking). */
   temperature?: number;
   maxTokens?: number;
   timeoutMs?: number;
+  /** Sent back with the draft for a cleaned copy (see callAskModel). */
+  selfCheck?: string;
 }
 
 export type AskContentPart =
@@ -70,23 +77,100 @@ function isDeepSeek(baseUrl: string): boolean {
 const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
 /**
- * One completion. Field tests saw thinking mode occasionally return an empty
- * answer, so an empty reply is retried once with thinking off before failing.
- * Throws AskProviderError on a timeout, a non-2xx, or an empty answer.
+ * One answer. With `selfCheck`, the draft is sent back in the same conversation
+ * with that instruction (thinking off, so it rides the cached prompt and adds
+ * ~1.5s) and the model returns a cleaned copy: in an A/B on 21 cases that kept
+ * slipping (10/1), this cut answers with an invented claim from 5 of 21 to 1.
+ * Any failure of the check keeps the draft.
  */
 export async function callAskModel(
   config: AskProviderConfig,
   messages: AskMessage[],
   options: AskCallOptions = {}
-): Promise<{ answer: string; usage: AskUsage }> {
-  const { think = true, timeoutMs = ASK_TIMEOUT_MS } = options;
+): Promise<{ answer: string; usage: AskUsage; draft?: string }> {
+  const { timeoutMs = ASK_TIMEOUT_MS, selfCheck } = options;
   const started = Date.now();
+  const draft = await draftAnswer(config, messages, timeoutMs, options);
+  const left = timeoutMs - (Date.now() - started);
+  if (!selfCheck || left < 4_000) return draft;
   try {
-    return await requestAnswer(config, messages, timeoutMs, think, options);
+    const checked = await requestAnswer(
+      config,
+      [...messages, { role: 'assistant', content: draft.answer }, { role: 'user', content: selfCheck }],
+      Math.min(left, 12_000),
+      false,
+      options
+    );
+    // The check only cuts or softens. A cut-off, a comment about the check, a gutted reply, a reply
+    // that grew (in live use it sometimes pasted an earlier turn's reply in front of the draft), or a
+    // different reply (it sometimes answered with an earlier turn's reply outright) keeps the draft.
+    if (
+      checked.truncated ||
+      /^(looks|no changes|the reply|this reply|checked|all good)/i.test(checked.answer) ||
+      checked.answer.length < draft.answer.length * 0.4 ||
+      checked.answer.length > draft.answer.length * 1.15 + 20 ||
+      !revisesDraft(checked.answer, draft.answer)
+    ) {
+      return draft;
+    }
+    const u = draft.usage;
+    const c = checked.usage;
+    return {
+      answer: checked.answer,
+      ...(checked.answer !== draft.answer ? { draft: draft.answer } : {}),
+      usage: {
+        promptTokens: u.promptTokens + c.promptTokens,
+        cachedTokens: u.cachedTokens + c.cachedTokens,
+        completionTokens: u.completionTokens + c.completionTokens,
+      },
+    };
+  } catch {
+    return draft;
+  }
+}
+
+/** Whether `checked` is an edit of `draft`: most of its words come from the draft. */
+function revisesDraft(checked: string, draft: string): boolean {
+  const inDraft = new Set(draft.toLowerCase().match(/[a-z0-9']+/g) ?? []);
+  const out = checked.toLowerCase().match(/[a-z0-9']+/g) ?? [];
+  if (out.length === 0) return false;
+  return out.filter((word) => inDraft.has(word)).length / out.length >= 0.7;
+}
+
+/**
+ * The draft. Field tests saw thinking mode occasionally return an empty
+ * answer, or run out of tokens mid-sentence; either is retried once with
+ * thinking off. A cut-off answer is still returned if that retry fails, since a
+ * trimmed reply beats an error at the door.
+ * Throws AskProviderError on a timeout, a non-2xx, or an empty answer.
+ */
+async function draftAnswer(
+  config: AskProviderConfig,
+  messages: AskMessage[],
+  timeoutMs: number,
+  options: AskCallOptions
+): Promise<{ answer: string; usage: AskUsage }> {
+  if (options.think === false) return requestAnswer(config, messages, timeoutMs, false, options);
+  const started = Date.now();
+  let cutOff: { answer: string; usage: AskUsage } | null = null;
+  try {
+    const first = await requestAnswer(config, messages, timeoutMs, true, options);
+    if (!first.truncated) return first;
+    cutOff = first;
   } catch (error) {
-    const left = timeoutMs - (Date.now() - started);
-    if (!think || !(error instanceof AskProviderError) || error.kind !== 'bad_response' || left < 5_000) throw error;
-    return requestAnswer(config, messages, left, false, options);
+    if (!(error instanceof AskProviderError) || error.kind !== 'bad_response') throw error;
+  }
+  const left = timeoutMs - (Date.now() - started);
+  if (left < 5_000) {
+    if (cutOff) return cutOff;
+    throw new AskProviderError('bad_response');
+  }
+  try {
+    const retry = await requestAnswer(config, messages, left, false, options);
+    return retry.truncated && cutOff ? cutOff : retry;
+  } catch (error) {
+    if (cutOff) return cutOff;
+    throw error;
   }
 }
 
@@ -96,7 +180,7 @@ async function requestAnswer(
   timeoutMs: number,
   think: boolean,
   options: AskCallOptions
-): Promise<{ answer: string; usage: AskUsage }> {
+): Promise<{ answer: string; usage: AskUsage; truncated: boolean }> {
   const temperature = options.temperature ?? DEFAULT_TEMPERATURE;
   const body: Record<string, unknown> = {
     model: config.model,
@@ -104,13 +188,14 @@ async function requestAnswer(
     max_tokens: options.maxTokens ?? MAX_ANSWER_TOKENS,
     stream: false,
   };
-  // Field tests (9/25): with short thinking the model stopped guessing where the
+  // Field tests (9/25): with thinking the model stopped guessing where the
   // notes are silent, did the Central/Eastern hours math and led with the
-  // decision; median answer 2.8s vs 2.4s. Only DeepSeek knows these fields, so
+  // decision; median answer 2.8s vs 2.4s. A later A/B on 27 flaky cases x3
+  // (10/1) had 'high' invent less than 'low' (13 vs 17 of 81) at the same speed and length. Only DeepSeek knows these fields, so
   // another provider behind ASK_BASE_URL never sees them.
   if (isDeepSeek(config.baseUrl)) {
     body.thinking = { type: think ? 'enabled' : 'disabled' };
-    if (think) body.reasoning_effort = 'low';
+    if (think) body.reasoning_effort = options.effort ?? 'high';
     else body.temperature = temperature;
   } else {
     body.temperature = temperature;
@@ -131,7 +216,7 @@ async function requestAnswer(
   if (!res.ok) throw new AskProviderError('http', res.status);
 
   const json = (await res.json().catch(() => null)) as {
-    choices?: { message?: { content?: unknown } }[];
+    choices?: { message?: { content?: unknown }; finish_reason?: unknown }[];
     usage?: {
       prompt_tokens?: unknown;
       completion_tokens?: unknown;
@@ -144,6 +229,7 @@ async function requestAnswer(
   const usage = json?.usage;
   return {
     answer: answer.trim(),
+    truncated: json?.choices?.[0]?.finish_reason === 'length',
     usage: {
       promptTokens: count(usage?.prompt_tokens),
       // DeepSeek names it prompt_cache_hit_tokens; OpenAI-style APIs nest it.

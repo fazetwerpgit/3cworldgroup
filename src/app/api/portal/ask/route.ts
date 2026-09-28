@@ -4,8 +4,9 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isAllowedImageMime } from '@/lib/chat/media';
 import { MAX_FORM_FILE_BYTES, resolveUploadMime } from '@/lib/forms/formUploads';
 import { MAX_QUESTION_CHARS, parseHistory, type AskReply, type AskTurnMessage } from '@/lib/ask/chat';
-import { askAudience } from '@/lib/ask/flag';
-import { buildSystemPrompt } from '@/lib/ask/prompt';
+import { askAudience, askEarlyUids } from '@/lib/ask/flag';
+import { loadRepSnapshot } from '@/lib/ask/liveData';
+import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
 import { AskProviderError, askProviderConfig, callAskModel, type AskContentPart, type AskMessage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
 import { ASK_DAILY_LIMIT, ASK_LOG, loadNotes, ownDealerCodes, repHome, takeDailyAsk } from '@/lib/ask/store';
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
 
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return fail(gate.error, gate.status);
-  if (audience === 'owners' && !gate.isOwner) return fail('Ask 3C is not turned on yet.', 404);
+  if (audience === 'owners' && !gate.isOwner && !askEarlyUids().includes(gate.uid)) return fail('Ask 3C is not turned on yet.', 404);
   if (!adminDb) return fail('Database not configured', 500);
   const db = adminDb;
 
@@ -81,10 +82,13 @@ export async function POST(request: NextRequest) {
     return fail(`You've asked ${ASK_DAILY_LIMIT} questions today, the daily limit. Call Jeremy or Jacob.`, 429);
   }
 
-  const [notes, dealerCodes, home] = await Promise.all([
+  // The rep's own portal data loads alongside the notes (it has its own time
+  // budget and fails soft); the sandbox stub never calls a model, so skips it.
+  const [notes, dealerCodes, home, live] = await Promise.all([
     loadNotes(db),
     ownDealerCodes(db, gate.uid),
     repHome(db, gate.uid).catch(() => ''),
+    stub ? Promise.resolve('') : loadRepSnapshot(db, gate.uid, now),
   ]);
   const firstName = gate.name.includes('@') || gate.name === gate.uid ? '' : gate.name.split(/\s+/)[0];
   const redacted = redactContact(question);
@@ -93,6 +97,7 @@ export async function POST(request: NextRequest) {
   const prevQuestion = previous ? redactContact(previous.text).slice(0, PREV_QUESTION_CHARS) : null;
 
   let answer: string;
+  let draft: string | undefined;
   let usage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
   const started = Date.now();
   if (stub) {
@@ -104,7 +109,7 @@ export async function POST(request: NextRequest) {
       content.push({ type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.bytes.toString('base64')}` } });
     }
     const messages: AskMessage[] = [
-      { role: 'system', content: buildSystemPrompt(notes, { firstName, dealerCodes, now, home }) },
+      { role: 'system', content: buildSystemPrompt(notes, { firstName, dealerCodes, now, home, live }) },
       ...history.map((turn) => ({
         role: turn.role,
         content: turn.role === 'user' ? redactContact(turn.text) : turn.text,
@@ -112,7 +117,7 @@ export async function POST(request: NextRequest) {
       { role: 'user', content },
     ];
     try {
-      ({ answer, usage } = await callAskModel(config, messages));
+      ({ answer, usage, draft } = await callAskModel(config, messages, { selfCheck: SELF_CHECK }));
     } catch (error) {
       const kind = error instanceof AskProviderError ? error.kind : 'unknown';
       const status = error instanceof AskProviderError ? error.status ?? 0 : 0;
@@ -131,6 +136,7 @@ export async function POST(request: NextRequest) {
     prevQuestion,
     hadPhoto: image !== null,
     answer,
+    ...(draft ? { draft } : {}),
     model: stub ? STUB_MODEL : config.model,
     promptTokens: usage.promptTokens,
     cachedTokens: usage.cachedTokens,

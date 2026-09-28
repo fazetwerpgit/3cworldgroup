@@ -1,0 +1,518 @@
+/* B — Native · Dashboard. All values come from the tokens in native.module.css. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ---------- Large-title header ------------------------------------------- */
+.header {
+  align-items: flex-end;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px 0;
+}
+
+.eyebrow {
+  color: var(--label-2);
+  font: 600 var(--fs-foot) / 18px var(--font);
+}
+
+.largeTitle {
+  font: 700 var(--fs-large) / 41px var(--font);
+  letter-spacing: -0.03em;
+}
+
+.headerAvatar {
+  margin-bottom: 2px;
+}
+
+@media (min-width: 1024px) {
+  .headerAvatar {
+    display: none;
+  }
+}
+
+/* ---------- Layout -------------------------------------------------------- */
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+@media (min-width: 1024px) {
+  .page {
+    gap: 28px;
+  }
+
+  .grid {
+    column-gap: 28px;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    row-gap: 40px;
+  }
+
+  .payArea {
+    grid-column: 1 / span 7;
+  }
+
+  .standArea {
+    display: flex;
+    flex-direction: column;
+    grid-column: 8 / span 5;
+  }
+
+  .salesArea {
+    grid-column: 1 / span 8;
+    grid-row: 2;
+  }
+
+  .todayArea {
+    grid-column: 9 / span 4;
+    grid-row: 2;
+  }
+}
+
+/* ---------- Pay card (the hero) ------------------------------------------ */
+.payCard {
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--elevation);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.payTop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 20px 20px 22px;
+}
+
+.payLabel {
+  color: var(--label-2);
+  font: 500 var(--fs-sub) / 20px var(--font);
+}
+
+.payAmount {
+  font: 700 var(--fs-hero) / 1 var(--font);
+  letter-spacing: -0.045em;
+  margin-left: -2px;
+}
+
+.payTrend {
+  align-items: center;
+  color: var(--lime);
+  display: flex;
+  font: 500 var(--fs-sub) / 20px var(--font);
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.payday {
+  align-items: center;
+  border-top: 1px solid var(--separator);
+  display: flex;
+  gap: 12px;
+  padding: 14px 20px;
+}
+
+.paydayLabel {
+  color: var(--label-2);
+  font: 400 var(--fs-sub) / 20px var(--font);
+}
+
+.paydayDate {
+  font: 600 var(--fs-headline) / 22px var(--font);
+  letter-spacing: -0.01em;
+}
+
+.paydayAmount {
+  font: 700 var(--fs-title) / 28px var(--font);
+  letter-spacing: -0.02em;
+}
+
+.mix {
+  border-top: 1px solid var(--separator);
+  display: flex;
+  gap: 3px;
+  padding: 16px 20px 0;
+}
+
+.mix i {
+  background: currentColor;
+  border-radius: 3px;
+  flex: 1;
+  height: 8px;
+}
+
+.mix i:first-child {
+  border-radius: 4px 3px 3px 4px;
+}
+
+.counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  margin-top: auto;
+}
+
+.counts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 20px 16px;
+}
+
+.counts > div + div {
+  border-left: 1px solid var(--separator);
+}
+
+.counts dt {
+  align-items: center;
+  color: var(--label-2);
+  display: flex;
+  font: 400 var(--fs-foot) / 18px var(--font);
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.counts dd {
+  font: 700 var(--fs-title) / 28px var(--font);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+@media (max-width: 400px) {
+  .counts > div {
+    padding-left: 16px;
+    padding-right: 12px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .payTop {
+    gap: 8px;
+    padding: 28px 28px 32px;
+  }
+
+  .payAmount {
+    font-size: 80px;
+  }
+
+  .payMain {
+    align-items: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 300px);
+    padding-right: 28px;
+  }
+
+  .payday {
+    background: rgba(163, 184, 214, 0.06);
+    border: 1px solid var(--separator);
+    border-radius: var(--r-group);
+    padding: 16px 20px;
+  }
+
+  .mix {
+    padding: 22px 28px 0;
+  }
+
+  .counts > div {
+    padding: 14px 28px 22px;
+  }
+
+  .counts > div + div {
+    border-left: 0;
+  }
+}
+
+/* Status colours — used by dots and status text */
+.dot {
+  background: currentColor;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+  height: 8px;
+  width: 8px;
+}
+
+.stInstalled {
+  color: var(--lime);
+}
+
+.stScheduled {
+  color: var(--blue);
+}
+
+.stNeeds {
+  color: var(--amber);
+}
+
+.stCancelled {
+  color: var(--label-3);
+}
+
+/* ---------- Standing ------------------------------------------------------ */
+.tiles {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.statTile {
+  background: var(--surface);
+  border-radius: var(--r-group);
+  box-shadow: var(--elevation);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+
+.statLabel {
+  align-items: center;
+  color: var(--label-2);
+  display: flex;
+  font: 500 var(--fs-sub) / 20px var(--font);
+  gap: 6px;
+}
+
+.statLabel svg {
+  color: var(--lime);
+}
+
+.statValue {
+  font: 700 var(--fs-large) / 38px var(--font);
+  letter-spacing: -0.03em;
+}
+
+.statOf {
+  color: var(--label-2);
+  font: 500 var(--fs-headline) / 22px var(--font);
+  letter-spacing: 0;
+}
+
+.gap {
+  color: var(--label-2);
+  font: 400 var(--fs-sub) / 20px var(--font);
+  grid-column: 1 / -1;
+  padding: 0 4px;
+}
+
+.gap strong {
+  color: var(--label);
+  font-weight: 600;
+}
+
+.challenge {
+  align-items: center;
+  background: var(--surface);
+  border-radius: var(--r-group);
+  box-shadow: var(--elevation);
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 16px;
+}
+
+@media (min-width: 1024px) {
+  .challenge {
+    flex: 1;
+  }
+}
+
+.ringWrap {
+  flex: none;
+  height: 68px;
+  position: relative;
+  width: 68px;
+}
+
+.ring {
+  display: block;
+  height: 68px;
+  width: 68px;
+}
+
+.ringTrack {
+  fill: none;
+  stroke: var(--lime-tint);
+  stroke-width: 9;
+}
+
+.ringFill {
+  fill: none;
+  stroke: var(--lime);
+  stroke-linecap: round;
+  stroke-width: 9;
+}
+
+.ringText {
+  align-items: baseline;
+  display: flex;
+  font: 700 var(--fs-headline) / 1 var(--font);
+  inset: 0;
+  justify-content: center;
+  padding-top: 25px;
+  position: absolute;
+}
+
+.ringOf {
+  color: var(--label-2);
+  font: 500 var(--fs-foot) / 1 var(--font);
+}
+
+.challengeEyebrow {
+  color: var(--lime);
+  font: 600 var(--fs-foot) / 18px var(--font);
+}
+
+.challengeMeta {
+  align-items: center;
+  color: var(--label-2);
+  display: flex;
+  flex-wrap: wrap;
+  font: 400 var(--fs-sub) / 20px var(--font);
+  gap: 4px 12px;
+}
+
+.challengeTime {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* ---------- Today -------------------------------------------------------- */
+.todayNow {
+  color: var(--amber);
+  font-weight: 600;
+}
+
+/* ---------- Recent sales: list on phone, table on desktop ---------------- */
+.salesHead {
+  display: none;
+}
+
+.sale {
+  column-gap: 12px;
+  display: grid;
+  grid-template-areas:
+    'name name pay'
+    'status status when'
+    'plan addr addr';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding-bottom: 14px;
+  padding-top: 12px;
+  row-gap: 2px;
+}
+
+.saleName {
+  font: 600 var(--fs-headline) / 22px var(--font);
+  grid-area: name;
+  letter-spacing: -0.01em;
+}
+
+.saleAddr {
+  color: var(--label-2);
+  font: 400 var(--fs-foot) / 18px var(--font);
+  grid-area: addr;
+  margin-left: -12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saleAddr::before {
+  content: '·';
+  padding: 0 6px;
+}
+
+.salePlan {
+  color: var(--label-2);
+  font: 400 var(--fs-foot) / 18px var(--font);
+  grid-area: plan;
+  white-space: nowrap;
+}
+
+.saleStatus {
+  align-items: center;
+  display: flex;
+  font: 500 var(--fs-sub) / 20px var(--font);
+  gap: 7px;
+  grid-area: status;
+  white-space: nowrap;
+}
+
+.salePay {
+  font: 600 var(--fs-headline) / 22px var(--font);
+  grid-area: pay;
+  text-align: right;
+}
+
+.salePayVoid {
+  color: var(--label-3);
+  text-decoration: line-through;
+}
+
+.saleWhen {
+  color: var(--label-2);
+  font: 400 var(--fs-sub) / 20px var(--font);
+  grid-area: when;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.right {
+  text-align: right;
+}
+
+@media (min-width: 1024px) {
+  .salesHead,
+  .sale {
+    column-gap: 20px;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.1fr) minmax(136px, 1.2fr) 64px 112px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .salesHead {
+    border-bottom: 1px solid var(--separator);
+    color: var(--label-2);
+    display: grid;
+    font: 500 var(--fs-foot) / 18px var(--font);
+    padding-bottom: 10px;
+    padding-top: 14px;
+  }
+
+  .sale {
+    --sep-inset: 20px;
+    grid-template-areas:
+      'name plan status pay when'
+      'addr plan status pay when';
+    min-height: 68px;
+  }
+
+  .saleAddr {
+    margin-left: 0;
+  }
+
+  .saleAddr::before {
+    content: none;
+  }
+
+  .salePlan {
+    align-self: center;
+    font-size: var(--fs-sub);
+    line-height: 20px;
+  }
+
+  .saleStatus,
+  .salePay,
+  .saleWhen {
+    align-self: center;
+  }
+}

@@ -429,7 +429,7 @@ export async function POST(request: NextRequest) {
       { role: 'user', content: `Grade this practice.${redoNote}\n\nTranscript:\n${transcript}` },
     ];
     try {
-      ({ answer: feedback, usage } = await callAskModel(config, messages, { timeoutMs: COACH_TIMEOUT_MS }));
+      ({ answer: feedback, usage } = await callAskModel(config, messages, { timeoutMs: COACH_TIMEOUT_MS, effort: 'low' }));
       // One retry when the shape is off (an extra section, a missing one, a price in the Try line), or when it
       // puts words in someone's mouth (a pain point the homeowner never said).
       const invented = unbackedClaims(feedback, turns);
@@ -449,7 +449,7 @@ export async function POST(request: NextRequest) {
             { role: 'assistant', content: feedback },
             { role: 'user', content: `That broke the format (${problem}). Write it again in exactly the required shape, nothing else.` },
           ],
-          { timeoutMs: Math.min(COACH_TIMEOUT_MS, left) }
+          { timeoutMs: Math.min(COACH_TIMEOUT_MS, left), effort: 'low' }
         ).catch(() => null);
         if (retry) feedback = retry.answer;
       }

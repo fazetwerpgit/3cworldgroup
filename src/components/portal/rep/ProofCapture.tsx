@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, FileText, ImageIcon, ImagePlus, Loader2, RotateCcw, X } from 'lucide-react';
+import { BorderBeam } from 'border-beam';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isPdfUrl, openAttachmentInNewTab } from '@/lib/forms/openAttachment';
 import {
@@ -245,21 +247,25 @@ function Thumb({ preview, label }: { preview: Preview | null; label: string }) {
 /**
  * Thumbnails with remove buttons plus an add tile until the cap is reached.
  * `autofill`: the screenshot reader is on, so an empty card says a screenshot
- * fills in the details.
+ * fills in the details. `reading`: the reader is working on it, so a beam runs
+ * around the card.
  */
 export function ProofCapture({
   uploads,
   orderRequired,
   autofill = false,
+  reading = false,
 }: {
   uploads: ProofUploads;
   orderRequired: boolean;
   autofill?: boolean;
+  reading?: boolean;
 }) {
   const { tiles, room } = uploads;
   const count = tiles.filter((t) => t.kind === 'done').length;
 
   const viewer = useAttachmentViewer();
+  const reducedMotion = usePrefersReducedMotion();
 
   // Images open in the in-app viewer: a new tab strands a rep in the home-screen
   // app with no way back. PDFs have no reliable inline preview on iOS, so they
@@ -275,102 +281,104 @@ export function ProofCapture({
   };
 
   return (
-    <section className={l.proofCard} aria-labelledby="proof-h">
-      <div className={l.proofMeta}>
-        <h2 id="proof-h" className={s.kicker}>
-          {count > 0 ? 'Proof attached' : 'Proof'}
-        </h2>
-        <p className={l.proofName} aria-live="polite">
-          {count > 0
-            ? `${count} screenshot${count === 1 ? '' : 's'} attached`
-            : orderRequired
-              ? 'No screenshot, order number needed'
-              : 'No screenshot yet'}
-        </p>
-        {autofill && tiles.length === 0 ? (
-          <p className={l.proofHint}>Add the order confirmation screenshot and we&apos;ll fill in the details for you.</p>
-        ) : null}
-      </div>
-      <ul className={l.thumbs}>
-        {tiles.map((tile, index) => {
-          const label = `Screenshot ${index + 1}`;
-          return (
-            <li key={tile.key} className={`${l.thumb} ${tile.kind === 'failed' ? l.thumbFailed : ''}`}>
-              {tile.kind === 'done' ? (
-                <button type="button" className={l.thumbView} onClick={(event) => view(tile, label, event.currentTarget)} aria-label={`View ${label.toLowerCase()}`}>
-                  <Thumb preview={tile.preview} label={label} />
-                </button>
-              ) : (
-                <span className={l.thumbView}>
-                  <Thumb preview={tile.preview} label={label} />
-                  {tile.kind === 'uploading' ? (
-                    <span className={l.thumbState} role="status">
-                      <Loader2 size={20} className={l.spin} aria-hidden="true" />
-                      <span className={s.srOnly}>Uploading {label.toLowerCase()}</span>
-                    </span>
-                  ) : (
-                    <span className={l.thumbState}>
-                      <AlertTriangle size={18} aria-hidden="true" />
-                      <button
-                        type="button"
-                        className={l.thumbRetry}
-                        onClick={() => uploads.retry(tile.key)}
-                        aria-label={`Retry ${label.toLowerCase()}`}
-                      >
-                        <RotateCcw size={14} aria-hidden="true" />
-                        Retry
-                      </button>
-                    </span>
-                  )}
-                </span>
-              )}
-              <button
-                type="button"
-                className={l.thumbRemove}
-                aria-label={
-                  tile.kind === 'uploading' ? `Cancel upload of ${label.toLowerCase()}` : `Remove ${label.toLowerCase()}`
-                }
-                onClick={() => (tile.kind === 'done' ? uploads.remove(tile.path) : uploads.discard(tile.key))}
-              >
-                <X size={14} strokeWidth={2.75} aria-hidden="true" />
-              </button>
-            </li>
-          );
-        })}
-        {room > 0 ? (
-          <li className={l.thumb}>
-            <label className={l.thumbAdd}>
-              <input
-                type="file"
-                accept={PROOF_ACCEPT}
-                multiple
-                className={s.srOnly}
-                onChange={(e) => {
-                  const files = Array.from(e.target.files ?? []);
-                  // Clear so picking the same file again still fires.
-                  e.target.value = '';
-                  uploads.addFiles(files);
-                }}
-              />
-              <ImagePlus size={20} aria-hidden="true" />
-              {tiles.length > 0 ? 'Add another' : 'Add screenshot'}
-            </label>
-          </li>
-        ) : null}
-      </ul>
-      {tiles.map((tile, index) =>
-        tile.kind === 'failed' ? (
-          <p key={tile.key} className={l.proofError} role="alert">
-            Screenshot {index + 1}: {tile.error}
+    <BorderBeam size="md" active={reading && !reducedMotion} theme="dark" strength={0.6} className={l.proofBeam}>
+      <section className={l.proofCard} aria-labelledby="proof-h">
+        <div className={l.proofMeta}>
+          <h2 id="proof-h" className={s.kicker}>
+            {count > 0 ? 'Proof attached' : 'Proof'}
+          </h2>
+          <p className={l.proofName} aria-live="polite">
+            {count > 0
+              ? `${count} screenshot${count === 1 ? '' : 's'} attached`
+              : orderRequired
+                ? 'No screenshot, order number needed'
+                : 'No screenshot yet'}
           </p>
-        ) : null
-      )}
-      {uploads.overCap ? (
-        <p className={l.proofError} role="status">
-          Only {MAX_PROOF_SCREENSHOTS} screenshots per sale. The extra ones were left off.
-        </p>
-      ) : null}
-      {viewer.viewer}
-    </section>
+          {autofill && tiles.length === 0 ? (
+            <p className={l.proofHint}>Add the order confirmation screenshot and we&apos;ll fill in the details for you.</p>
+          ) : null}
+        </div>
+        <ul className={l.thumbs}>
+          {tiles.map((tile, index) => {
+            const label = `Screenshot ${index + 1}`;
+            return (
+              <li key={tile.key} className={`${l.thumb} ${tile.kind === 'failed' ? l.thumbFailed : ''}`}>
+                {tile.kind === 'done' ? (
+                  <button type="button" className={l.thumbView} onClick={(event) => view(tile, label, event.currentTarget)} aria-label={`View ${label.toLowerCase()}`}>
+                    <Thumb preview={tile.preview} label={label} />
+                  </button>
+                ) : (
+                  <span className={l.thumbView}>
+                    <Thumb preview={tile.preview} label={label} />
+                    {tile.kind === 'uploading' ? (
+                      <span className={l.thumbState} role="status">
+                        <Loader2 size={20} className={l.spin} aria-hidden="true" />
+                        <span className={s.srOnly}>Uploading {label.toLowerCase()}</span>
+                      </span>
+                    ) : (
+                      <span className={l.thumbState}>
+                        <AlertTriangle size={18} aria-hidden="true" />
+                        <button
+                          type="button"
+                          className={l.thumbRetry}
+                          onClick={() => uploads.retry(tile.key)}
+                          aria-label={`Retry ${label.toLowerCase()}`}
+                        >
+                          <RotateCcw size={14} aria-hidden="true" />
+                          Retry
+                        </button>
+                      </span>
+                    )}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className={l.thumbRemove}
+                  aria-label={
+                    tile.kind === 'uploading' ? `Cancel upload of ${label.toLowerCase()}` : `Remove ${label.toLowerCase()}`
+                  }
+                  onClick={() => (tile.kind === 'done' ? uploads.remove(tile.path) : uploads.discard(tile.key))}
+                >
+                  <X size={14} strokeWidth={2.75} aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
+          {room > 0 ? (
+            <li className={l.thumb}>
+              <label className={l.thumbAdd}>
+                <input
+                  type="file"
+                  accept={PROOF_ACCEPT}
+                  multiple
+                  className={s.srOnly}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    // Clear so picking the same file again still fires.
+                    e.target.value = '';
+                    uploads.addFiles(files);
+                  }}
+                />
+                <ImagePlus size={20} aria-hidden="true" />
+                {tiles.length > 0 ? 'Add another' : 'Add screenshot'}
+              </label>
+            </li>
+          ) : null}
+        </ul>
+        {tiles.map((tile, index) =>
+          tile.kind === 'failed' ? (
+            <p key={tile.key} className={l.proofError} role="alert">
+              Screenshot {index + 1}: {tile.error}
+            </p>
+          ) : null
+        )}
+        {uploads.overCap ? (
+          <p className={l.proofError} role="status">
+            Only {MAX_PROOF_SCREENSHOTS} screenshots per sale. The extra ones were left off.
+          </p>
+        ) : null}
+        {viewer.viewer}
+      </section>
+    </BorderBeam>
   );
 }

@@ -265,6 +265,9 @@ const ALLOWED_SUBPATHS = [
   // onboarding/signed-pdf has requireVerifiedManagement before reading the
   // completed document or storage object.
   '/api/portal/onboarding/signed-pdf',
+  // onboarding/files has requireVerifiedManagement; sensitive items also need
+  // an admin/owner caller and an audit row before any file is signed.
+  '/api/portal/onboarding/files',
   // onboarding/activate has requireVerifiedManagement before activation.
   '/api/portal/onboarding/activate',
   // onboarding/esign-embed-error has requireVerifiedUser and only raises a

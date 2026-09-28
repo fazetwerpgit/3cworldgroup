@@ -1,0 +1,13 @@
+import { chromium } from 'playwright';
+const b = await chromium.launch();
+const pg = await b.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+await pg.goto('http://localhost:3120/design-lab/logsale-c', { waitUntil: 'networkidle' });
+await pg.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
+await pg.evaluate(() => [...document.querySelectorAll('button')].find((b) => /Enter manually/.test(b.textContent)).click());
+await pg.waitForTimeout(400);
+await pg.focus('#plan');
+await pg.keyboard.press('Shift+Tab');
+await pg.screenshot({ path: process.argv[2] + '/focus-chip.png', clip: { x: 0, y: 280, width: 390, height: 260 } });
+await pg.focus('#orderNumberOrBtn');
+await pg.screenshot({ path: process.argv[2] + '/focus-input.png', clip: { x: 0, y: 380, width: 390, height: 360 } });
+await b.close();

@@ -7,7 +7,7 @@ const et = (iso: string) => new Date(`${iso}-04:00`);
 describe('supportStatus', () => {
   it('is open inside the day window and names the close in both zones', () => {
     expect(supportStatus(et('2026-09-25T21:59'))).toBe(
-      'Sales Support is OPEN right now, until 10pm Eastern (9pm Central) today.'
+      'Sales Support is OPEN right now, until 10pm Eastern (9pm Central) today. After that it opens Saturday at 9am Eastern (8am Central).'
     );
   });
 
@@ -30,6 +30,15 @@ describe('supportStatus', () => {
     expect(supportStatus(et('2026-09-28T08:50'))).toBe(
       'Sales Support is CLOSED right now; it opens today at 9am Eastern (8am Central).'
     );
+  });
+
+  it("leads with the rep's own time when their home is known", () => {
+    // Sunday 5:30 PM Eastern: closed, opens Monday 9am Eastern.
+    expect(supportStatus(et('2026-09-27T17:30'), 'Des Moines, IA')).toBe(
+      'Sales Support is CLOSED right now; it opens Monday at 8am their time (Central).'
+    );
+    expect(supportStatus(et('2026-09-27T12:00'), 'Fresno, CA')).toContain('until 2pm their time (Pacific)');
+    expect(supportStatus(et('2026-09-27T12:00'), 'Lansing, MI')).toContain('until 5pm Eastern today.');
   });
 });
 

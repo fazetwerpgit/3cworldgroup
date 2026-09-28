@@ -44,7 +44,8 @@ beforeEach(() => {
   createSale.mockReset();
   push.mockReset();
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ url: null }), { status: 200 })));
-  window.matchMedia ??= ((query: string) => ({ matches: false, media: query }) as MediaQueryList);
+  window.matchMedia ??= ((query: string) =>
+    ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }) as unknown as MediaQueryList);
   Element.prototype.scrollIntoView ??= () => {};
 });
 

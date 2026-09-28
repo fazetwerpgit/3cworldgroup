@@ -1,0 +1,86 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { callAskModel } from './provider';
+
+const config = { apiKey: 'k', baseUrl: 'https://api.deepseek.com', model: 'deepseek-flash' };
+const reply = (content: string, finish_reason = 'stop') =>
+  new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason }], usage: {} }), { status: 200 });
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('callAskModel with a cut-off answer', () => {
+  it('uses the retry when it finishes', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply('Try another card, or', 'length')).mockResolvedValueOnce(reply('Try another card.'));
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await callAskModel(config, [{ role: 'user', content: 'declined' }])).answer).toBe('Try another card.');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('falls back to the cut-off text when the retry fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply('Try another card, or', 'length')).mockResolvedValueOnce(new Response('', { status: 500 })));
+    expect((await callAskModel(config, [{ role: 'user', content: 'declined' }])).answer).toBe('Try another card, or');
+  });
+});
+
+describe('callAskModel self-check', () => {
+  it('returns the checked copy, and keeps the draft when the check fails', async () => {
+    const draft = 'Tell her to try another card, and fiber fixes her lag for sure.';
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply('Tell her to try another card.'));
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await callAskModel(config, [{ role: 'user', content: 'q' }], { selfCheck: 'check it' })).answer).toBe('Tell her to try another card.');
+    const sent = JSON.parse(fetchMock.mock.calls[1][1].body).messages;
+    expect(sent.slice(-2)).toEqual([{ role: 'assistant', content: draft }, { role: 'user', content: 'check it' }]);
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply('Draft.')).mockResolvedValueOnce(new Response('', { status: 500 })));
+    expect((await callAskModel(config, [{ role: 'user', content: 'q' }], { selfCheck: 'check it' })).answer).toBe('Draft.');
+  });
+});
+
+describe('callAskModel self-check guards', () => {
+  const ask = () => callAskModel(config, [{ role: 'user', content: 'q' }], { selfCheck: 'check it' });
+  const draft = 'Step 1: close everything. Step 2: clear cache and cookies. Step 3: start over in a new private window.';
+
+  it('keeps the draft when the check answers with a comment or guts the reply', async () => {
+    for (const bad of ['Looks clean, no changes needed.', 'Step 1.']) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(bad)));
+      const out = await ask();
+      expect(out.answer).toBe(draft);
+      expect(out.draft).toBeUndefined();
+    }
+  });
+
+  it('reports the draft only when the check changed the answer', async () => {
+    const trimmed = draft.replace(' Step 3: start over in a new private window.', '');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(trimmed)));
+    expect(await ask()).toMatchObject({ answer: trimmed, draft });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(draft)));
+    expect((await ask()).draft).toBeUndefined();
+  });
+});
+
+describe('callAskModel self-check drift', () => {
+  it("keeps the draft when the check answers with an earlier turn's reply", async () => {
+    const earlier = 'Not sure on that one. Run the second address as its own order in a fresh private window and let the screen tell you.';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply('Anytime. Go get one on the board.')).mockResolvedValueOnce(reply(earlier)));
+    const out = await callAskModel(
+      config,
+      [{ role: 'user', content: 'two houses?' }, { role: 'assistant', content: earlier }, { role: 'user', content: 'Thanks dude' }],
+      { selfCheck: 'check it' }
+    );
+    expect(out.answer).toBe('Anytime. Go get one on the board.');
+    expect(out.draft).toBeUndefined();
+  });
+});
+
+describe('callAskModel self-check growth', () => {
+  it('keeps the draft when the check pastes an earlier reply in front of it', async () => {
+    const earlier = 'No, Tim Schuitema is Monday, Oct 12. Tomorrow (Sep 28) is Jordan Stahr at 2221 Swensberg.';
+    const draft = 'Text: "Hey Tim, quick heads up, your install is Monday, Oct 12, not the 28th. My bad."';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply(`${earlier}\n\n${draft}`)));
+    const out = await callAskModel(
+      config,
+      [{ role: 'user', content: 'tim is tmrw?' }, { role: 'assistant', content: earlier }, { role: 'user', content: 'write me the text to tim' }],
+      { selfCheck: 'check it' }
+    );
+    expect(out.answer).toBe(draft);
+  });
+});

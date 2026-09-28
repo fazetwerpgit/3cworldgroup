@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
         prevQuestion: typeof data.prevQuestion === 'string' && data.prevQuestion ? data.prevQuestion : null,
         hadPhoto: data.hadPhoto === true,
         answer: typeof data.answer === 'string' ? data.answer : '',
+        draft: typeof data.draft === 'string' ? data.draft : null,
         rating: data.rating === 'up' || data.rating === 'down' ? data.rating : null,
         createdAt: isoTime(data.createdAt),
       };

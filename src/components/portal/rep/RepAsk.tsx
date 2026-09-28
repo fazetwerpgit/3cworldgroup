@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Camera, MessageCircleQuestion, RotateCw, SendHorizontal, SquarePen, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { BorderBeam } from 'border-beam';
+import { ThinkingOrb } from 'thinking-orbs';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { askOpenTo } from '@/lib/ask/flag';
 import { isOwner } from '@/types';
@@ -140,7 +143,7 @@ export function RepAsk() {
   const [mode, setMode] = useState<Mode>('ask');
   const showPractice = useCallback(() => setMode('practice'), []);
 
-  if (!askOpenTo(user?.role)) {
+  if (!askOpenTo(user?.role, user?.uid)) {
     return (
       <div className={p.page}>
         <header className={p.head}>
@@ -199,6 +202,7 @@ function AskChat({ uid }: { uid: string }) {
   const [fileKey, setFileKey] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
+  const reducedMotion = usePrefersReducedMotion();
 
   /** Bring the whole composer into view; its scroll margin keeps it above the phone tab bar. */
   const showComposer = useCallback((behavior: ScrollBehavior) => {
@@ -410,6 +414,7 @@ function AskChat({ uid }: { uid: string }) {
                 </div>
               ) : (
                 <p className={`${a.answer} ${a.pending}`} role="status">
+                  <ThinkingOrb state="breathing" size={20} theme="dark" aria-hidden="true" />
                   Thinking…
                 </p>
               )}
@@ -420,85 +425,87 @@ function AskChat({ uid }: { uid: string }) {
 
       {answered ? <p className={a.stuck}>Still stuck? Call Jeremy or Jacob.</p> : null}
 
-      <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={send}>
-        {failed ? (
-          <div className={a.failed} role="alert">
-            <p>{failed}</p>
-            <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={() => void send()}>
-              <RotateCw size={18} aria-hidden="true" />
-              Try again
-            </button>
-          </div>
-        ) : null}
-        <label htmlFor="ask-question" className={s.srOnly}>
-          Your question
-        </label>
-        <textarea
-          id="ask-question"
-          ref={inputRef}
-          className={`${p.input} ${p.textarea} ${a.input}`}
-          placeholder="What's going on?"
-          value={question}
-          maxLength={MAX_QUESTION_CHARS}
-          rows={3}
-          enterKeyHint="send"
-          readOnly={sending}
-          onChange={(event) => setQuestion(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void send();
-          }}
-        />
-        {photo ? (
-          <div className={a.attached}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL preview */}
-            <img src={photo.url} alt="Photo to send" className={a.attachedPhoto} />
-            <button
-              type="button"
-              className={s.iconBtn}
-              aria-label="Remove photo"
-              onClick={() => {
-                URL.revokeObjectURL(photo.url);
-                setPhoto(null);
-              }}
-            >
-              <X size={20} aria-hidden="true" />
-            </button>
-          </div>
-        ) : null}
-        {notice ? (
-          <p className={`${p.hint} ${p.hintError}`} role="alert">
-            {notice}
-          </p>
-        ) : null}
-        <div className={a.actions}>
-          <label className={`${s.btnSecondary} ${a.photoBtn}`} aria-disabled={preparing || sending || undefined}>
-            <Camera size={20} aria-hidden="true" />
-            {preparing ? 'Adding…' : photo ? 'Change photo' : 'Photo'}
-            <input
-              key={fileKey}
-              type="file"
-              accept="image/*"
-              className={s.srOnly}
-              disabled={preparing || sending}
-              onChange={(event) => void pickPhoto(event.target.files?.[0])}
-            />
-          </label>
-          {turns.length > 0 && !sending ? (
-            <button type="button" className={`${s.btnSecondary} ${a.newBtn}`} onClick={startOver}>
-              <SquarePen size={20} aria-hidden="true" />
-              New chat
-            </button>
+      <BorderBeam size="line" active={sending && !reducedMotion} theme="dark" strength={0.7} className={a.composerBeam}>
+        <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={send}>
+          {failed ? (
+            <div className={a.failed} role="alert">
+              <p>{failed}</p>
+              <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={() => void send()}>
+                <RotateCw size={18} aria-hidden="true" />
+                Try again
+              </button>
+            </div>
           ) : null}
-          <button
-            type="submit"
-            className={`${s.btnPrimary} ${a.sendBtn}`}
-            disabled={sending || preparing || (!question.trim() && !photo)}
-          >
-            <SendHorizontal size={20} aria-hidden="true" />
-            {sending ? 'Asking…' : 'Ask'}
-          </button>
-        </div>
-      </form>
+          <label htmlFor="ask-question" className={s.srOnly}>
+            Your question
+          </label>
+          <textarea
+            id="ask-question"
+            ref={inputRef}
+            className={`${p.input} ${p.textarea} ${a.input}`}
+            placeholder="What's going on?"
+            value={question}
+            maxLength={MAX_QUESTION_CHARS}
+            rows={3}
+            enterKeyHint="send"
+            readOnly={sending}
+            onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void send();
+            }}
+          />
+          {photo ? (
+            <div className={a.attached}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a local object URL preview */}
+              <img src={photo.url} alt="Photo to send" className={a.attachedPhoto} />
+              <button
+                type="button"
+                className={s.iconBtn}
+                aria-label="Remove photo"
+                onClick={() => {
+                  URL.revokeObjectURL(photo.url);
+                  setPhoto(null);
+                }}
+              >
+                <X size={20} aria-hidden="true" />
+              </button>
+            </div>
+          ) : null}
+          {notice ? (
+            <p className={`${p.hint} ${p.hintError}`} role="alert">
+              {notice}
+            </p>
+          ) : null}
+          <div className={a.actions}>
+            <label className={`${s.btnSecondary} ${a.photoBtn}`} aria-disabled={preparing || sending || undefined}>
+              <Camera size={20} aria-hidden="true" />
+              {preparing ? 'Adding…' : photo ? 'Change photo' : 'Photo'}
+              <input
+                key={fileKey}
+                type="file"
+                accept="image/*"
+                className={s.srOnly}
+                disabled={preparing || sending}
+                onChange={(event) => void pickPhoto(event.target.files?.[0])}
+              />
+            </label>
+            {turns.length > 0 && !sending ? (
+              <button type="button" className={`${s.btnSecondary} ${a.newBtn}`} onClick={startOver}>
+                <SquarePen size={20} aria-hidden="true" />
+                New chat
+              </button>
+            ) : null}
+            <button
+              type="submit"
+              className={`${s.btnPrimary} ${a.sendBtn}`}
+              disabled={sending || preparing || (!question.trim() && !photo)}
+            >
+              <SendHorizontal size={20} aria-hidden="true" />
+              {sending ? 'Asking…' : 'Ask'}
+            </button>
+          </div>
+        </form>
+      </BorderBeam>
     </>
   );
 }

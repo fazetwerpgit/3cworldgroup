@@ -11,7 +11,7 @@ import d from './rep-dashboard.module.css';
 /** Home's compact way into Ask 3C. Hidden while the feature is off, or not yet open to this user. */
 export function AskEntryCard() {
   const { user } = useAuth();
-  if (!askOpenTo(user?.role)) return null;
+  if (!askOpenTo(user?.role, user?.uid)) return null;
   return (
     <section className={`${s.panel} ${d.askEntry}`} aria-label="Ask 3C">
       <Link href="/portal/ask" className={p.row}>

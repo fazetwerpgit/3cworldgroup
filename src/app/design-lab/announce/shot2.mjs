@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const out = '/tmp/claude-1000/-home-fazetwerpnerd69-dev-3cworldgroup/a1360a2f-1e42-41eb-b8f9-11f3322ff49d/scratchpad';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 390, height: 844 } });
+await p.goto('http://localhost:3120/design-lab/announce', { waitUntil: 'networkidle', timeout: 90000 });
+await p.addStyleTag({ content: 'nextjs-portal{display:none!important}' });
+await p.fill('#announce-title', 'New: log a sale from a screenshot');
+await p.fill('#announce-body', 'Snap the order confirmation and the form fills itself. Check the details, then submit.');
+await p.click('button:has-text("Send now")');
+await p.waitForTimeout(400);
+await p.waitForTimeout(200);
+await p.waitForTimeout(300);
+await p.setViewportSize({ width: 390, height: 1300 });
+await p.screenshot({ path: `${out}/announce-phone2.png`, fullPage: true });
+await b.close();
