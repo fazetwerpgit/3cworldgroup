@@ -411,9 +411,10 @@ async function formsSection(db: Db, uid: string, now: Date, zone: Zone): Promise
 
 // Only types about the rep's own sales and installs. alert_task and
 // announcement are about other people (a hire who stalled, a manager's
-// field-train note), and onboarding lives in its own section.
+// field-train note), and so is sale_pending ("New Sale Needs Approval. <rep>
+// submitted…", sent to managers). Onboarding lives in its own section.
 const NOTIFICATION_TYPES: Record<string, true> = {
-  sale_submitted: true, sale_approved: true, sale_rejected: true, sale_pending: true,
+  sale_submitted: true, sale_approved: true, sale_rejected: true,
   install_date_changed: true, carrier_order_issue: true, install_reminder: true,
 };
 
@@ -430,7 +431,8 @@ async function notificationsSection(db: Db, uid: string, zone: Zone): Promise<st
   if (items.length === 0) return '';
   const lines = items.map(
     (item) =>
-      `- ${item.at ? dayLabel(item.at, zone) : ''}: ${item.title}${item.message === REASON_ON_FILE ? ` (${REASON_ON_FILE})` : item.message ? `. ${item.message}` : ''}${item.read ? '' : ' (unread)'}`
+      // A message that touches pay (even "You earned 10 points") is dropped; the title says enough.
+      `- ${item.at ? dayLabel(item.at, zone) : ''}: ${item.title}${item.message && item.message !== REASON_ON_FILE ? `. ${item.message}` : ''}${item.read ? '' : ' (unread)'}`
   );
   return `Latest notifications (the bell):\n${lines.join('\n')}`;
 }

@@ -162,6 +162,7 @@ describe('loadRepSnapshot', () => {
   it('never shows a notification about someone else, even one addressed to this rep', async () => {
     const data = seed();
     const notes = data.notifications as Record<string, Record<string, unknown>>;
+    notes.p1 = { userId: 'r1', type: 'sale_pending', title: 'New Sale Needs Approval', message: 'Jamie Stall submitted a new sale for review.', read: false, createdAt: noon('2026-09-27') };
     notes.a1 = { userId: 'r1', type: 'alert_task', title: 'Jamie Stall has stalled in onboarding', message: 'Jamie Stall self-registered 5 days ago', read: false, createdAt: noon('2026-09-27') };
     notes.a2 = { userId: 'r1', type: 'announcement', title: 'Riley Quinn - You\'re Cleared!', message: 'Manager note: Riley talks too fast, watch the close', read: false, createdAt: noon('2026-09-27') };
     const text = await load(createFakeAskDb(data).db);
@@ -184,7 +185,7 @@ describe('loadRepSnapshot', () => {
     // A reason that touches pay is replaced whole, not half-redacted.
     expect(text).not.toMatch(/chargeback/i);
     expect(text).toMatch(/Tom Baker[^\n]*in the portal: cancelled \(reason on file, ask Jeremy or Jacob\)/);
-    expect(text).toContain('Install tomorrow (reason on file, ask Jeremy or Jacob)');
+    expect(text).toMatch(/: Install tomorrow( \(unread\))?$/m);
   });
 
   it('replaces any reason or message that mentions pay or money, in every spelling', async () => {
@@ -197,9 +198,9 @@ describe('loadRepSnapshot', () => {
     };
     const text = await load(createFakeAskDb(data).db);
     for (const leak of ['USD', '150', 'too much', 'Wrong rate', 'Bonus', 'Nice work']) expect(text).not.toContain(leak);
-    expect(text).toContain('Install date changed (reason on file, ask Jeremy or Jacob)');
-    expect(text).toContain('Install missed (reason on file, ask Jeremy or Jacob)');
-    expect(text).toContain('Sale rejected (reason on file, ask Jeremy or Jacob)');
+    expect(text).toMatch(/: Install date changed( \(unread\))?$/m);
+    expect(text).toMatch(/: Install missed( \(unread\))?$/m);
+    expect(text).toMatch(/: Sale rejected( \(unread\))?$/m);
   });
 
   it('redacts phone numbers and emails, and never reads the contact fields', async () => {
