@@ -14,6 +14,8 @@ import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens'
 import { sendEmail, onboardingFrom } from '@/lib/email/sendEmail';
 import { inviteEmail } from '@/lib/email/templates';
 
+const APPLICATION_LIMIT = 1000;
+
 function clean(value: unknown, max = 200) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
@@ -103,10 +105,12 @@ export async function GET(request: NextRequest) {
       .filter((doc) => requester.canViewAll || doc.data().ownerId === userId)
       .map(serializeInvite);
 
+    // Every application, newest first. The cap is only a safety net; the
+    // panel filters and searches the whole list client-side.
     const applicationSnapshot = await adminDb
       .collection('applications')
       .orderBy('createdAt', 'desc')
-      .limit(50)
+      .limit(APPLICATION_LIMIT)
       .get();
 
     return NextResponse.json({

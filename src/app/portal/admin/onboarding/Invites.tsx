@@ -9,6 +9,7 @@ import {
   Link2,
   Loader2,
   RotateCw,
+  Search,
   Send,
   UserPlus,
   XCircle,
@@ -83,9 +84,40 @@ const APPLICATION_COLUMNS = [
   { key: 'city', label: 'City' },
   { key: 'phone', label: 'Phone' },
   { key: 'email', label: 'Email' },
+  { key: 'referredBy', label: 'Referred by' },
   { key: 'status', label: 'Status' },
   { key: 'createdAt', label: 'Submitted' },
 ];
+
+type ApplicationView = 'new' | 'invited' | 'onboarded' | 'all';
+
+const APPLICATION_VIEWS: { value: ApplicationView; label: string; status?: ApplicationStatus }[] = [
+  { value: 'new', label: 'New', status: 'applied' },
+  { value: 'invited', label: 'Invited', status: 'invited' },
+  { value: 'onboarded', label: 'Onboarded', status: 'converted' },
+  { value: 'all', label: 'All' },
+];
+
+function inView(application: ApplicationRecord, view: ApplicationView): boolean {
+  const status = APPLICATION_VIEWS.find((option) => option.value === view)?.status;
+  return !status || application.status === status;
+}
+
+/** Case-insensitive match on name, city, email or phone. Digits also match the
+ * phone ignoring its punctuation, so "5125550100" finds "(512) 555-0100". */
+function matchesSearch(application: ApplicationRecord, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+  const haystack = [application.name, application.city, application.email, application.phone]
+    .map((value) => (value ?? '').toLowerCase());
+  if (haystack.some((value) => value.includes(needle))) return true;
+  const digits = needle.replace(/\D/g, '');
+  return digits.length >= 3 && (application.phone ?? '').replace(/\D/g, '').includes(digits);
+}
+
+function telHref(phone: string): string {
+  return `tel:${phone.replace(/[^0-9+]/g, '')}`;
+}
 
 /** Split from the previously-conflated single lookup (B-4) — ApplicationStatus and
  * OnboardingInviteStatus are distinct enums with only partial overlap. */
@@ -102,7 +134,7 @@ const applicationStatusLabel: Record<ApplicationStatus, string> = {
   contacted: 'Contacted',
   invited: 'Invited',
   not_selected: 'Not selected',
-  converted: 'Converted',
+  converted: 'Onboarded',
 };
 
 const inviteStatusTone: Record<OnboardingInviteStatus, Tone> = {
@@ -138,6 +170,8 @@ export function Invites() {
   const [latestInviteUrl, setLatestInviteUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const [applicationView, setApplicationView] = useState<ApplicationView>('new');
+  const [applicationQuery, setApplicationQuery] = useState('');
 
   const canAccess =
     hasPermission('recruiting:read') ||
@@ -191,6 +225,12 @@ export function Invites() {
       candidatePhone: application.phone,
       candidateCity: application.city,
     }));
+  };
+
+  const inviteFromApplication = (applicationId: string) => {
+    fillFromApplication(applicationId);
+    document.getElementById('invite-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('invite-name')?.focus({ preventScroll: true });
   };
 
   const createInvite = async (event: React.FormEvent) => {
@@ -276,7 +316,19 @@ export function Invites() {
   const inProgressCount = invites.filter((invite) =>
     ['invited', 'in_progress'].includes(invite.status)
   ).length;
-  const waitingApplications = applications.length;
+  const applicationCounts = Object.fromEntries(
+    APPLICATION_VIEWS.map((option) => [
+      option.value,
+      applications.filter((application) => inView(application, option.value)).length,
+    ])
+  ) as Record<ApplicationView, number>;
+  const visibleApplications = applications.filter(
+    (application) => inView(application, applicationView) && matchesSearch(application, applicationQuery)
+  );
+  // The form's picker offers applicants not yet invited, plus whichever one is filled in.
+  const pickableApplications = applications.filter(
+    (application) => application.status === 'applied' || application.id === form.applicationId
+  );
   const showCounts = !loading && !loadFailed;
 
   return (
@@ -284,7 +336,13 @@ export function Invites() {
       <div className={u.page}>
         <AdminPageHead
           title="Recruiting"
-          meta={showCounts ? <><b>{waitingApplications}</b> applications</> : null}
+          meta={
+            showCounts ? (
+              <a href="#applications" className={r.jump}>
+                <b>{applicationCounts.new}</b> new {applicationCounts.new === 1 ? 'application' : 'applications'}
+              </a>
+            ) : null
+          }
           actions={
             <>
               <button
@@ -457,7 +515,7 @@ export function Invites() {
             </div>
             <div className={u.panelBody}>
               <form onSubmit={createInvite} className={u.formGrid}>
-                {applications.length > 0 && (
+                {pickableApplications.length > 0 && (
                   <div className={u.field}>
                     <label htmlFor="invite-application" className={u.label}>Use website application</label>
                     <span className={u.selectWrap}>
@@ -468,7 +526,7 @@ export function Invites() {
                         onChange={(event) => fillFromApplication(event.target.value)}
                       >
                         <option value="">Manual entry</option>
-                        {applications.map((application) => (
+                        {pickableApplications.map((application) => (
                           <option key={application.id} value={application.id}>
                             {application.name} - {application.city}
                           </option>
@@ -587,17 +645,21 @@ export function Invites() {
             </div>
           </section>
 
-          <section className={s.panel} aria-labelledby="recruiting-apps-heading">
+          <section
+            className={`${s.panel} ${r.appsPanel}`}
+            id="applications"
+            aria-labelledby="recruiting-apps-heading"
+          >
             <div className={`${s.panelHead} ${u.band}`}>
               <h2 id="recruiting-apps-heading" className={s.kicker}>Website applications</h2>
               <button
                 type="button"
                 className={`${s.btnSecondary} ${u.sm} ${u.quiet} ${r.export}`}
-                disabled={applications.length === 0}
+                disabled={visibleApplications.length === 0}
                 onClick={() =>
                   downloadCsv(
                     'applications.csv',
-                    toCsv(APPLICATION_COLUMNS, applications as unknown as Record<string, unknown>[])
+                    toCsv(APPLICATION_COLUMNS, visibleApplications as unknown as Record<string, unknown>[])
                   )
                 }
               >
@@ -612,42 +674,112 @@ export function Invites() {
             ) : applications.length === 0 ? (
               <AdminEmpty title="No website applications yet" />
             ) : (
-              <ul className={`${u.rows} ${r.appCols}`}>
-                {applications.map((application) => (
-                  <li key={application.id} className={`${u.row} ${r.app}`}>
-                    <span className={`${u.cellMain} ${u.person}`}>
-                      <span className={u.personText}>
-                        <span className={u.personName}>
-                          <span>{application.name}</span>
+              <>
+                <div className={`${u.toolbar} ${r.filters}`}>
+                  <label className={`${u.search} ${r.searchBox}`}>
+                    <Search size={18} aria-hidden="true" />
+                    <input
+                      className={u.input}
+                      type="search"
+                      placeholder="Search name, city, email, phone"
+                      aria-label="Search applications"
+                      value={applicationQuery}
+                      onChange={(event) => setApplicationQuery(event.target.value)}
+                    />
+                  </label>
+                  <div className={`${u.segmented} ${r.status}`} role="group" aria-label="Filter applications">
+                    {APPLICATION_VIEWS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={applicationView === option.value}
+                        onClick={() => setApplicationView(option.value)}
+                      >
+                        {option.label}
+                        <span className={r.segCount}>{applicationCounts[option.value]}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {visibleApplications.length === 0 ? (
+                  <AdminEmpty
+                    title={applicationQuery.trim() ? 'No applications match' : 'Nothing here'}
+                  >
+                    {applicationQuery.trim() ? 'Try another name, city, email or phone.' : null}
+                  </AdminEmpty>
+                ) : (
+                  <ul className={`${u.rows} ${r.appCols}`}>
+                    <li className={u.tHead} aria-hidden="true">
+                      <span>Applicant</span>
+                      <span>Contact</span>
+                      <span>Submitted</span>
+                      <span>Status</span>
+                      <span />
+                    </li>
+                    {visibleApplications.map((application) => (
+                      <li key={application.id} className={`${u.row} ${r.app}`}>
+                        <span className={`${u.cellMain} ${u.person}`}>
+                          <span className={u.personText}>
+                            <span className={u.personName}>
+                              <span>{application.name}</span>
+                            </span>
+                            <span className={u.personSub}>{application.city}</span>
+                            {application.referredBy ? (
+                              <span className={u.personSub}>Referred by {application.referredBy}</span>
+                            ) : null}
+                          </span>
                         </span>
-                        <span className={u.personSub}>{application.city}</span>
-                      </span>
-                    </span>
-                    <span className={`${u.cellEnd} ${r.appStatus}`}>
-                      <StatusDot tone={applicationStatusTone[application.status] ?? 'blue'}>
-                        {applicationStatusLabel[application.status] ?? application.status}
-                      </StatusDot>
-                    </span>
-                    <span className={`${u.cell} ${r.phoneOnly}`} data-label="Phone">
-                      <span className={u.num}>{application.phone}</span>
-                    </span>
-                    <span className={`${u.cell} ${r.phoneOnly}`} data-label="Email">
-                      <span className={r.ellipsis}>{application.email}</span>
-                    </span>
-                    <span className={`${u.cell} ${r.deskOnly}`}>
-                      <span className={r.stackValue}>
-                        <span className={u.num}>{application.phone}</span>
-                        <span className={`${u.cellSub} ${r.ellipsis}`}>{application.email}</span>
-                      </span>
-                    </span>
-                    <span className={u.cell} data-label="Submitted">
-                      <span className={u.num}>
-                        {formatDate(application.createdAt ? application.createdAt.toString() : null)}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+                        <span className={`${u.cellEnd} ${r.appStatus}`}>
+                          <StatusDot tone={applicationStatusTone[application.status] ?? 'blue'}>
+                            {applicationStatusLabel[application.status] ?? application.status}
+                          </StatusDot>
+                        </span>
+                        <span className={`${u.cell} ${r.phoneOnly}`} data-label="Phone">
+                          <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
+                            {application.phone}
+                          </a>
+                        </span>
+                        <span className={`${u.cell} ${r.phoneOnly}`} data-label="Email">
+                          <a className={`${r.ellipsis} ${r.contact}`} href={`mailto:${application.email}`}>
+                            {application.email}
+                          </a>
+                        </span>
+                        <span className={`${u.cell} ${r.deskOnly}`}>
+                          <span className={r.stackValue}>
+                            <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
+                              {application.phone}
+                            </a>
+                            <a
+                              className={`${u.cellSub} ${r.ellipsis} ${r.contact}`}
+                              href={`mailto:${application.email}`}
+                            >
+                              {application.email}
+                            </a>
+                          </span>
+                        </span>
+                        <span className={u.cell} data-label="Submitted">
+                          <span className={u.num}>
+                            {formatDate(application.createdAt ? application.createdAt.toString() : null)}
+                          </span>
+                        </span>
+                        {application.status === 'applied' ? (
+                          <span className={`${u.btnRow} ${r.appAction}`}>
+                            <button
+                              type="button"
+                              className={`${s.btnSecondary} ${u.sm}`}
+                              aria-label={`Invite ${application.name}`}
+                              onClick={() => inviteFromApplication(application.id)}
+                            >
+                              <UserPlus size={16} aria-hidden="true" />
+                              Invite
+                            </button>
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </section>
         </div>
