@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { askAudience } from '@/lib/ask/flag';
 import {
@@ -33,6 +34,7 @@ import {
   type PracticeFeedbackReply,
   type PracticeKnockReply,
   type PracticePriceReply,
+  type PracticeRedoReply,
   type PracticeTurn,
   type PracticeTurnReply,
 } from '@/lib/ask/practice';
@@ -57,7 +59,25 @@ import {
 } from '@/lib/ask/practiceDoor';
 import { AskProviderError, askProviderConfig, callAskModel, type AskMessage, type AskUsage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
-import { PRACTICE_LOG, PRACTICE_SESSIONS, loadNotes, takeDailyPractice } from '@/lib/ask/store';
+import {
+  assignedPersona,
+  correctionsBlock,
+  openAssignmentsFor,
+  parseDelivery,
+  parseSkills,
+  parseSteps,
+  redoPoint,
+  type PracticeStep,
+} from '@/lib/ask/practiceCoaching';
+import {
+  PRACTICE_LOG,
+  PRACTICE_SESSIONS,
+  loadAssignments,
+  loadCorrections,
+  loadCountedSessions,
+  loadNotes,
+  takeDailyPractice,
+} from '@/lib/ask/store';
 
 // POST /api/portal/ask/practice
 //   { action: 'turn', history: [], persona? }          the knock: the server picks who is
@@ -65,8 +85,11 @@ import { PRACTICE_LOG, PRACTICE_SESSIONS, loadNotes, takeDailyPractice } from '@
 //   { action: 'turn', sessionId, history }             the homeowner's next line (history ends
 //                                                      with the rep's line or the price card)
 //   { action: 'price', sessionId }                     the door's order screen card (Pull up price)
-//   { action: 'feedback', sessionId, history, endedBy: 'homeowner'|'rep' }
+//   { action: 'feedback', sessionId, history, endedBy: 'homeowner'|'rep', delivery? }
 //                                                      the coach's grade; logs the session once
+//                                                      (delivery: talk mode's timing and words)
+//   { action: 'redo', logId }                          "Redo that moment": a new session at the
+//                                                      same door, up to its weakest line
 // Ask 3C Practice: the rep pitches, the model plays a homeowner, then grades
 // the pitch against the owner's notes. Reps never choose or see the persona:
 // the knock draws it from the rep's shuffle bag (all nine before any repeat)
@@ -74,7 +97,9 @@ import { PRACTICE_LOG, PRACTICE_SESSIONS, loadNotes, takeDailyPractice } from '@
 // drawn from it, the homeowner's patience and the bag. The page holds only the
 // session id until the feedback reveals who it was. Owners may pick a persona
 // (persona, default 'surprise') to demo one. The server owns patience: a line
-// judge, called beside the homeowner, says how each rep line landed. Same gate as Ask 3C, its own daily
+// judge, called beside the homeowner, says how each rep line landed (kept as the session's steps, so the
+// weakest can be redone). An open assignment of the owner's that names a homeowner type decides a rep's
+// knock until it's done. Same gate as Ask 3C, its own daily
 // count and its own log (practiceLog). Typed emails and phone numbers are
 // redacted before the model or the log sees them.
 
@@ -103,17 +128,24 @@ function log(event: Record<string, string | number | boolean>) {
   console.info('[ask-3c-practice]', JSON.stringify(event));
 }
 
-interface StoredFeedback {
-  id: string;
-  feedback: string;
-  score: number | null;
+function storedFeedback(value: unknown): PracticeFeedbackReply | null {
+  const stored = value as Partial<PracticeFeedbackReply> | null | undefined;
+  return stored && typeof stored.id === 'string' && typeof stored.feedback === 'string'
+    ? {
+        id: stored.id,
+        feedback: stored.feedback,
+        score: typeof stored.score === 'number' ? stored.score : null,
+        skills: parseSkills(stored.feedback),
+        canRedo: stored.canRedo === true,
+      }
+    : null;
 }
 
-function storedFeedback(value: unknown): StoredFeedback | null {
-  const stored = value as Partial<StoredFeedback> | null | undefined;
-  return stored && typeof stored.id === 'string' && typeof stored.feedback === 'string'
-    ? { id: stored.id, feedback: stored.feedback, score: typeof stored.score === 'number' ? stored.score : null }
-    : null;
+/** The rep's lines as the model saw them: typed contacts redacted, a screen card always this door's own. */
+function cleanTurns(history: PracticeTurn[], card: string): PracticeTurn[] {
+  return history.map((turn) =>
+    turn.role === 'rep' ? { role: 'rep', text: redactContact(turn.text) } : turn.role === 'screen' ? { role: 'screen', text: card } : turn
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -128,7 +160,7 @@ export async function POST(request: NextRequest) {
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const action = body?.action;
-  if (action !== 'turn' && action !== 'feedback' && action !== 'price') return fail('Unknown practice action', 400);
+  if (action !== 'turn' && action !== 'feedback' && action !== 'price' && action !== 'redo') return fail('Unknown practice action', 400);
 
   const sessionRef = db.collection(PRACTICE_SESSIONS).doc(gate.uid);
   const saved = (await sessionRef.get()).data() ?? {};
@@ -147,6 +179,8 @@ export async function POST(request: NextRequest) {
       card: practiceScreenCard(practiceCustomer(current.personaId, current.seed).persona),
     });
   }
+
+  if (action === 'redo') return startRedo(db, gate.uid, body?.logId, saved, sessionRef);
 
   const history = parsePracticeHistory(body?.history);
   if (!history) return fail('Bad practice conversation', 400);
@@ -176,8 +210,14 @@ export async function POST(request: NextRequest) {
     const previous = typeof saved.persona === 'string' ? saved.persona : null;
     sessionId = randomUUID();
     seed = randomInt(0, 2 ** 32 - 1);
-    const doorKind = choice === 'surprise' ? drawDoorKind(seed, previous) : 'standard';
-    if (doorKind === 'landlord') {
+    // A rep with an open assignment for one homeowner type gets that type (a normal or Ring door).
+    const assigned = gate.isOwner ? null : await assignedFor(db, gate.uid);
+    const drawnKind = choice === 'surprise' ? drawDoorKind(seed, previous) : 'standard';
+    const doorKind = assigned ? (drawnKind === 'ring' ? 'ring' : 'standard') : drawnKind;
+    if (assigned) {
+      personaId = assigned;
+      bag = Array.isArray(saved.bag) ? saved.bag.filter(isPersonaId) : [];
+    } else if (doorKind === 'landlord') {
       personaId = 'renter';
       bag = Array.isArray(saved.bag) ? saved.bag.filter(isPersonaId) : [];
     } else {
@@ -235,13 +275,7 @@ export async function POST(request: NextRequest) {
   // The rep's lines lose typed contacts before the model or the log; the homeowner's are the model's own.
   // A screen card is always this door's own card, whatever the page sent.
   const card = practiceScreenCard(customer.persona);
-  const turns: PracticeTurn[] = history.map((turn) =>
-    turn.role === 'rep'
-      ? { role: 'rep', text: redactContact(turn.text) }
-      : turn.role === 'screen'
-        ? { role: 'screen', text: card }
-        : turn
-  );
+  const turns = cleanTurns(history, card);
   const started = Date.now();
 
   if (action === 'turn') {
@@ -316,8 +350,11 @@ export async function POST(request: NextRequest) {
     };
     log({ outcome: 'ok', action, stub, turns: turns.length, ended, patience, event: event ?? 'knock', door: door.kind, ms: Date.now() - started, ...usage });
     if (!knock) {
-      // lastLines: the lines POST .../practice/voice will speak.
-      await sessionRef.update({ patience, lastLines: lines, updatedAt: now });
+      // lastLines: the lines POST .../practice/voice will speak. The step (how this line landed) replaces
+      // one from a retried request for the same line.
+      const step: PracticeStep = { at: turns.length, event: event ?? 'ok', patience: patienceBefore };
+      const steps = [...parseSteps(saved.steps).filter((kept) => kept.at < turns.length), step];
+      await sessionRef.update({ patience, lastLines: lines, steps, updatedAt: now });
       return NextResponse.json<PracticeTurnReply>(outcome);
     }
     // The session exists once the door has opened; a knock that got no answer leaves the last one as it
@@ -330,6 +367,7 @@ export async function POST(request: NextRequest) {
       patience,
       bag,
       lastLines: lines,
+      steps: [],
       homeowner: homeownerPicks(customer),
       door,
       startedAt: now,
@@ -345,13 +383,31 @@ export async function POST(request: NextRequest) {
 
   let feedback: string;
   let usage: AskUsage = { promptTokens: 0, cachedTokens: 0, completionTokens: 0 };
+  const redoOf = typeof saved.redoOf === 'string' ? saved.redoOf : null;
   if (stub) {
-    feedback = 'Score: 7/10\nResult: No sale\nWhat worked:\n- "Sandbox: no model was called."\nFix next time: Nothing yet.\nTry this line: "Hi, I\'m with 3C."';
+    feedback = 'Score: 7/10\nResult: No sale\nSkills: Opener 7/10, Discovery 6/10, Objections 6/10, Close 5/10\nWhat worked:\n- "Sandbox: no model was called."\nFix next time: Nothing yet.\nTry this line: "Hi, I\'m with 3C."';
   } else {
-    const notes = await loadNotes(db);
+    const [notes, corrections] = await Promise.all([loadNotes(db), loadCorrections(db)]);
+    // A redo: the lines before the marker are the first try, replayed; the rep is graded on what follows.
+    const redoFrom = redoOf && Number.isInteger(saved.redoFrom) ? Math.min(saved.redoFrom as number, turns.length) : 0;
+    const transcript = redoFrom
+      ? `${transcriptText(turns.slice(0, redoFrom))}\n--- The rep redoes the moment from here ---\n${transcriptText(turns.slice(redoFrom))}`
+      : transcriptText(turns);
+    const redoNote = redoFrom
+      ? '\n\nThis is a redo: the rep went back to the line that went worst and tried it again. The lines above the marker are the earlier try, replayed as it happened. Grade what the rep says after the marker; quote only those lines. The Skills line still scores the whole door as it stands.'
+      : '';
     const messages: AskMessage[] = [
-      { role: 'system', content: buildFeedbackPrompt(notes, customer, endedBy, { block: doorCoachBlock(door, customer), ...resultRules(customer, door) }) },
-      { role: 'user', content: `Grade this practice.\n\nTranscript:\n${transcriptText(turns)}` },
+      {
+        role: 'system',
+        content: buildFeedbackPrompt(
+          notes,
+          customer,
+          endedBy,
+          { block: doorCoachBlock(door, customer), ...resultRules(customer, door) },
+          correctionsBlock(corrections)
+        ),
+      },
+      { role: 'user', content: `Grade this practice.${redoNote}\n\nTranscript:\n${transcript}` },
     ];
     try {
       ({ answer: feedback, usage } = await callAskModel(config, messages, { timeoutMs: COACH_TIMEOUT_MS }));
@@ -393,6 +449,9 @@ export async function POST(request: NextRequest) {
   const summary = doorSummary(door, customer);
   feedback = revealFeedback(feedback, customer.persona, summary);
   const score = parseScore(feedback);
+  const skills = parseSkills(feedback);
+  const steps = parseSteps(saved.steps);
+  const delivery = parseDelivery(body?.delivery);
   const result = /^\s*result\s*:\s*(.+)$/im.exec(feedback)?.[1].trim() ?? null;
   const ref = await db.collection(PRACTICE_LOG).add({
     uid: gate.uid,
@@ -407,11 +466,15 @@ export async function POST(request: NextRequest) {
     endedBy,
     score,
     result,
+    skills,
+    steps,
+    delivery,
+    ...(redoOf ? { redoOf, redoFrom: saved.redoFrom } : {}),
     feedback,
     model: stub ? STUB_MODEL : config.model,
     createdAt: now,
   });
-  const reply: PracticeFeedbackReply = { id: ref.id, feedback, score };
+  const reply: PracticeFeedbackReply = { id: ref.id, feedback, score, skills, canRedo: redoPoint(steps) !== null };
   await sessionRef.update({ feedback: reply, gradingAt: 0, updatedAt: now });
   log({ outcome: 'ok', action, stub, turns: turns.length, score: score ?? -1, ms: Date.now() - started, ...usage });
   return NextResponse.json<PracticeFeedbackReply>(reply);
@@ -441,4 +504,75 @@ function providerFailure(error: unknown, action: string, started: number) {
   return kind === 'timeout'
     ? fail(`${who} took too long to answer. ${TRY_AGAIN}`, 504)
     : fail(`${who} couldn't answer right now. ${TRY_AGAIN}`, 502);
+}
+
+/** The homeowner type an open assignment asks the rep's next knock to be; null leaves it to the bag. */
+async function assignedFor(db: FirebaseFirestore.Firestore, uid: string): Promise<PersonaId | null> {
+  const now = new Date();
+  const today = chicagoDayKey(now);
+  const assignments = (await loadAssignments(db)).filter(
+    (assignment) => assignment.persona !== 'any' && assignment.due >= today && (assignment.repUid === null || assignment.repUid === uid)
+  );
+  if (!assignments.length) return null;
+  const since = new Date(assignments.reduce((min, assignment) => (assignment.createdAt < min ? assignment.createdAt : min), now.toISOString()));
+  const sessions = await loadCountedSessions(db, since, uid);
+  return assignedPersona(openAssignmentsFor(uid, assignments, sessions, today));
+}
+
+/**
+ * "Redo that moment": a new session at the same door (same homeowner, same
+ * picks, same surprise), with the conversation up to the finished practice's
+ * worst line and the homeowner's patience as it was then. It counts as a new
+ * short practice: it needs a knock's headroom, and is logged on its own.
+ */
+async function startRedo(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+  logId: unknown,
+  saved: FirebaseFirestore.DocumentData,
+  sessionRef: FirebaseFirestore.DocumentReference
+) {
+  if (typeof logId !== 'string' || !logId || logId.includes('/')) return fail('Bad practice to redo', 400);
+  const logged = (await db.collection(PRACTICE_LOG).doc(logId).get()).data();
+  if (!logged || logged.uid !== uid || !isPersonaId(logged.persona) || !isPracticeSeed(logged.seed)) {
+    return fail('That practice is gone. Knock again to start a new one.', 404);
+  }
+  const point = redoPoint(parseSteps(logged.steps));
+  const history = parsePracticeHistory(logged.turns);
+  const kept = history?.slice(0, point?.keep ?? 0) ?? [];
+  if (!point || kept.at(-1)?.role !== 'customer') return fail('Nothing in that one to redo. Knock again.', 409);
+  const now = new Date();
+  if (!(await takeDailyPractice(db, uid, now, 0, KNOCK_HEADROOM))) {
+    return fail("That's today's practice limit. Back at it tomorrow.", 429);
+  }
+  const customer = practiceCustomer(logged.persona, logged.seed);
+  const door = logged.door ? parseDoor(logged.door) : STANDARD_DOOR;
+  // The homeowner's lines just before the moment: the ones Talk mode replays.
+  let from = kept.length;
+  while (from > 0 && kept[from - 1].role === 'customer') from -= 1;
+  const lastLines = kept.slice(from).map((turn) => ({ speaker: turn.speaker ?? (door.kind === 'kid' ? 'kid' : 'homeowner'), text: turn.text }));
+  const sessionId = randomUUID();
+  await sessionRef.set({
+    uid,
+    sessionId,
+    persona: logged.persona,
+    seed: logged.seed,
+    patience: Math.min(customer.persona.patience, point.patience),
+    bag: Array.isArray(saved.bag) ? saved.bag.filter(isPersonaId) : [],
+    lastLines,
+    steps: [],
+    homeowner: homeownerPicks(customer),
+    door,
+    redoOf: logId,
+    redoFrom: kept.length,
+    startedAt: now,
+    updatedAt: now,
+  });
+  log({ outcome: 'ok', action: 'redo', turns: kept.length });
+  return NextResponse.json<PracticeRedoReply>({
+    sessionId,
+    history: kept,
+    ring: door.kind === 'ring',
+    ambient: ambientFor(customer, door),
+  });
 }

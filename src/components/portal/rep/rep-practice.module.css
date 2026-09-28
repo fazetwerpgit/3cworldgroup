@@ -308,6 +308,154 @@
   overflow-wrap: anywhere;
 }
 
+/* The coach's four skill scores (out of 10), four across. */
+.skills {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s2);
+  margin: 0;
+}
+.skill {
+  display: grid;
+  gap: 2px;
+  padding: var(--s2);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  text-align: center;
+}
+.skill dt {
+  color: var(--c-text-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+.skill dd {
+  margin: 0;
+  color: var(--c-text);
+  font: 600 var(--t-body) / 1.2 var(--f-ui);
+}
+/* Talk mode's plain delivery facts under the feedback. */
+.delivery {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+/* Where a "Redo that moment" practice picks up. */
+.redoMark {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--c-lime-hi);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+.redoMark::before,
+.redoMark::after {
+  content: '';
+  flex: 1;
+  border-top: 1px dashed var(--c-lime);
+}
+/* ---------- assignments and My practice ---------- */
+.assignments {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.assignment {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+.assignment strong {
+  color: var(--c-lime-hi);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mine {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+.mineHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+.trend {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+}
+.trendRow {
+  display: grid;
+  grid-template-columns: 6.5em 2.5em 1fr;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--t-sm);
+}
+.trendRow dt {
+  color: var(--c-text-2);
+}
+.trendRow dd {
+  margin: 0;
+}
+.trendAvg {
+  color: var(--c-text);
+  font-weight: 600;
+}
+/* One bar per session, oldest to newest, height by score. */
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 24px;
+}
+.bars span {
+  flex: 0 1 8px;
+  min-width: 3px;
+  border-radius: 2px 2px 0 0;
+  background: var(--c-lime);
+  opacity: 0.8;
+}
+.recent {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.recent details {
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+}
+.recent summary {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-height: var(--tap);
+  align-items: center;
+  padding: var(--s2) var(--s3);
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+.recent summary span:last-child {
+  color: var(--c-text-2);
+  white-space: nowrap;
+}
+.recentBody {
+  display: grid;
+  gap: var(--s2);
+  padding: 0 var(--s3) var(--s3);
+}
 /* Scrolled into view after each line; on phones it stops above the fixed tab bar.
    The negative margin takes back the page grid's gap it would add. */
 .anchor {

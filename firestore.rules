@@ -196,6 +196,12 @@ service cloud.firestore {
     match /practiceSessions/{uid} {
       allow read, write: if false;
     }
+    match /practiceAssignments/{assignmentId} {
+      allow read, write: if false;
+    }
+    match /practiceCorrections/{correctionId} {
+      allow read, write: if false;
+    }
     match /askUsage/{usageId} {
       allow read, write: if false;
     }

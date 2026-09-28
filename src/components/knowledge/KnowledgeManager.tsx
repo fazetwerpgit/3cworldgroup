@@ -4,7 +4,15 @@ import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { Camera, ChevronDown, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { AskLogView } from '@/lib/ask/chat';
-import type { PracticeLogView } from '@/lib/ask/practice';
+import { PERSONAS, type PracticeLogView } from '@/lib/ask/practice';
+import {
+  CORRECTION_LABELS,
+  CORRECTION_PARTS,
+  MAX_CORRECTION_CHARS,
+  deliveryLine,
+  type AssignmentView,
+  type CorrectionPart,
+} from '@/lib/ask/practiceCoaching';
 import {
   MAX_NOTE_FILE_BYTES,
   NOTE_FILE_ACCEPT,
@@ -220,7 +228,10 @@ export function KnowledgeManager() {
       ) : null}
 
       {view === 'practice' ? (
-        <PracticeSessions />
+        <>
+          <PracticeAssignments />
+          <PracticeSessions />
+        </>
       ) : view === 'questions' ? (
         <Questions
           onAddToKnowledge={(row) =>
@@ -550,15 +561,30 @@ function PracticeSessions() {
                   <div className={k.sessionBody}>
                     {row.homeowner ? <p className={k.qMeta}>Homeowner: {row.homeowner}</p> : null}
                     {row.door ? <p className={k.qMeta}>At the door: {row.door}</p> : null}
+                    {row.redo ? <p className={k.qMeta}>A redo of the moment that went worst in an earlier practice.</p> : null}
                     <div className={k.aText}>
                       <PracticeFeedback text={row.feedback} />
                     </div>
+                    {row.delivery ? <p className={k.qMeta}>Delivery: {deliveryLine(row.delivery)}</p> : null}
+                    <CoachWasWrong row={row} onChange={() => void load()} />
                     <details className={k.transcript}>
                       <summary>Transcript ({plural(row.turns.length, 'line')})</summary>
                       <ol>
                         {row.turns.map((turn, index) => (
                           <li key={index}>
-                            <b>{turn.role === 'rep' ? 'Rep' : turn.role === 'screen' ? 'Screen' : 'Homeowner'}:</b> {turn.text}
+                            <b>
+                              {turn.role === 'rep'
+                                ? 'Rep'
+                                : turn.role === 'screen'
+                                  ? 'Screen'
+                                  : turn.speaker === 'spouse'
+                                    ? 'Spouse'
+                                    : turn.speaker === 'kid'
+                                      ? 'Kid'
+                                      : 'Homeowner'}
+                              :
+                            </b>{' '}
+                            {turn.text}
                           </li>
                         ))}
                       </ol>
@@ -571,5 +597,270 @@ function PracticeSessions() {
         </ul>
       )}
     </section>
+  );
+}
+
+const DUE = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+const dueLabel = (day: string) => DUE.format(new Date(`${day}T12:00:00Z`));
+/** Today in Chicago as YYYY-MM-DD, for the date picker's floor. */
+const todayKey = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(new Date());
+
+/** "3 practices with Skeptic by Fri, Oct 3" asks, to one rep or everyone, with who has done them. */
+function PracticeAssignments() {
+  const [rows, setRows] = useState<Load<{ assignments: AssignmentView[]; reps: { uid: string; name: string }[] }>>({ status: 'loading' });
+  const [form, setForm] = useState({ repUid: 'all', persona: 'any', count: '3', due: '' });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      setRows({ status: 'ready', data: await api('/api/portal/knowledge/practice/assignments') });
+    } catch {
+      setRows({ status: 'error' });
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- load once on open
+    void load();
+  }, [load]);
+
+  const assign = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api('/api/portal/knowledge/practice/assignments', {
+        method: 'POST',
+        body: { repUid: form.repUid, persona: form.persona, count: Number(form.count), due: form.due },
+      });
+      setForm((current) => ({ ...current, due: '' }));
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That did not save.');
+    }
+    setBusy(false);
+  };
+
+  const remove = async (id: string) => {
+    setBusy(true);
+    try {
+      await api(`/api/portal/knowledge/practice/assignments?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await load();
+    } catch {
+      setError('That did not delete. Try again.');
+    }
+    setBusy(false);
+  };
+
+  const today = todayKey();
+  return (
+    <section className={s.panel} aria-labelledby="assign-h">
+      <div className={`${s.panelHead} ${u.band}`}>
+        <h2 id="assign-h" className={s.kicker}>
+          Assignments
+        </h2>
+        <span className={u.panelMeta}>Reps see these on Practice</span>
+      </div>
+      <div className={u.panelBody}>
+        {rows.status === 'loading' ? (
+          <AdminSkeletonRows rows={1} label="Loading assignments" />
+        ) : rows.status === 'error' ? (
+          <AdminFailed what="the assignments" onRetry={() => void load()} />
+        ) : (
+          <div className={k.assign}>
+            {rows.data.assignments.length ? (
+              <ul className={k.questions}>
+                {rows.data.assignments.map((assignment) => {
+                  const done = assignment.reps.filter((rep) => rep.done >= assignment.count).length;
+                  const past = assignment.due < today;
+                  return (
+                    <li key={assignment.id} className={k.question}>
+                      <p className={k.qMeta}>
+                        <b>{assignment.repUid ? assignment.repName : 'Everyone'}</b>
+                        <span>
+                          {plural(assignment.count, 'practice')} with {assignment.personaLabel} by {dueLabel(assignment.due)}
+                        </span>
+                        <span className={done === assignment.reps.length ? u.toneLime : past ? u.toneAmber : ''}>
+                          {assignment.repUid
+                            ? `${assignment.reps[0]?.done ?? 0} of ${assignment.count}`
+                            : `${done} of ${plural(assignment.reps.length, 'rep')} done`}
+                          {past ? ' · past due' : ''}
+                        </span>
+                      </p>
+                      {assignment.repUid ? null : (
+                        <details className={k.transcript}>
+                          <summary>Who has done it</summary>
+                          <ol>
+                            {assignment.reps.map((rep) => (
+                              <li key={rep.uid}>
+                                <b>{rep.name}:</b> {rep.done} of {assignment.count}
+                              </li>
+                            ))}
+                          </ol>
+                        </details>
+                      )}
+                      <div className={u.btnRow}>
+                        <button type="button" className={`${s.btnSecondary} ${u.sm}`} disabled={busy} onClick={() => void remove(assignment.id)}>
+                          Remove
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+            <div className={k.assignForm}>
+              <label className={u.field}>
+                <span className={u.label}>Who</span>
+                <span className={u.selectWrap}>
+                  <select className={u.input} value={form.repUid} onChange={(event) => setForm({ ...form, repUid: event.target.value })}>
+                    <option value="all">Everyone</option>
+                    {rows.data.reps.map((rep) => (
+                      <option key={rep.uid} value={rep.uid}>
+                        {rep.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={16} aria-hidden="true" />
+                </span>
+              </label>
+              <label className={u.field}>
+                <span className={u.label}>Homeowner</span>
+                <span className={u.selectWrap}>
+                  <select className={u.input} value={form.persona} onChange={(event) => setForm({ ...form, persona: event.target.value })}>
+                    <option value="any">Any homeowner</option>
+                    {PERSONAS.map((persona) => (
+                      <option key={persona.id} value={persona.id}>
+                        {persona.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={16} aria-hidden="true" />
+                </span>
+              </label>
+              <label className={u.field}>
+                <span className={u.label}>Practices</span>
+                <input
+                  className={u.input}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={50}
+                  value={form.count}
+                  onChange={(event) => setForm({ ...form, count: event.target.value })}
+                />
+              </label>
+              <label className={u.field}>
+                <span className={u.label}>By</span>
+                <input className={u.input} type="date" min={today} value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} />
+              </label>
+            </div>
+            {error ? <p className={`${u.hint} ${u.hintError}`} role="alert">{error}</p> : null}
+            <div className={u.btnRow}>
+              <button type="button" className={s.btnPrimary} disabled={busy || !form.due || !form.count} onClick={() => void assign()}>
+                Assign
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** "Coach was wrong": the owner's right take on one part of a session's feedback, which the coach learns from. */
+function CoachWasWrong({ row, onChange }: { row: PracticeLogView; onChange: () => void }) {
+  const [part, setPart] = useState<CorrectionPart>('score');
+  const [take, setTake] = useState('');
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const save = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api('/api/portal/knowledge/practice/corrections', { method: 'POST', body: { logId: row.id, part, take } });
+      setTake('');
+      setOpen(false);
+      onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'That did not save.');
+    }
+    setBusy(false);
+  };
+
+  const remove = async (id: string) => {
+    setBusy(true);
+    try {
+      await api(`/api/portal/knowledge/practice/corrections?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      onChange();
+    } catch {
+      setError('That did not delete. Try again.');
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className={k.correct}>
+      {row.corrections.map((correction) => (
+        <div key={correction.id} className={k.correction}>
+          <p className={k.qMeta}>
+            <b>You corrected {CORRECTION_LABELS[correction.part]}</b>
+            {correction.original ? <span>Coach said: {correction.original}</span> : null}
+          </p>
+          <p className={k.qText}>{correction.take}</p>
+          <div className={u.btnRow}>
+            <button type="button" className={`${s.btnSecondary} ${u.sm}`} disabled={busy} onClick={() => void remove(correction.id)}>
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+      {open ? (
+        <div className={u.formGrid}>
+          <label className={u.field}>
+            <span className={u.label}>What was wrong</span>
+            <span className={u.selectWrap}>
+              <select className={u.input} value={part} onChange={(event) => setPart(event.target.value as CorrectionPart)}>
+                {CORRECTION_PARTS.map((candidate) => (
+                  <option key={candidate} value={candidate}>
+                    {CORRECTION_LABELS[candidate]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} aria-hidden="true" />
+            </span>
+          </label>
+          <label className={u.field}>
+            <span className={u.label}>The right take</span>
+            <textarea
+              className={`${u.input} ${u.textarea}`}
+              value={take}
+              maxLength={MAX_CORRECTION_CHARS}
+              rows={3}
+              placeholder="Say what the coach should have said, and why."
+              onChange={(event) => setTake(event.target.value)}
+            />
+          </label>
+          {error ? <p className={`${u.hint} ${u.hintError}`} role="alert">{error}</p> : null}
+          <div className={u.btnRow}>
+            <button type="button" className={`${s.btnPrimary} ${u.sm}`} disabled={busy || !take.trim()} onClick={() => void save()}>
+              Save
+            </button>
+            <button type="button" className={`${s.btnSecondary} ${u.sm}`} disabled={busy} onClick={() => setOpen(false)}>
+              Cancel
+            </button>
+          </div>
+          <p className={u.hint}>The coach reads your last 20 corrections before it grades.</p>
+        </div>
+      ) : (
+        <div className={u.btnRow}>
+          <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setOpen(true)}>
+            Coach was wrong
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

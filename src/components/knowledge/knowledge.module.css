@@ -194,3 +194,30 @@
   min-width: 0;
   max-width: 220px;
 }
+
+/* Practice: the owner's assignments and "Coach was wrong". */
+.assign {
+  display: grid;
+  gap: var(--s4);
+}
+.assignForm {
+  display: grid;
+  gap: var(--s3);
+}
+@media (min-width: 720px) {
+  .assignForm {
+    grid-template-columns: 2fr 2fr 1fr 1.4fr;
+    align-items: end;
+  }
+}
+.correct {
+  display: grid;
+  gap: var(--s3);
+}
+.correction {
+  display: grid;
+  gap: var(--s1);
+  padding: var(--s3);
+  border-left: 2px solid var(--c-amber);
+  background: var(--c-well);
+}

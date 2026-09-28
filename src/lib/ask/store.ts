@@ -1,5 +1,13 @@
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 import { KNOWLEDGE_NOTES, sortNotes, type KnowledgeNote } from './notes';
+import {
+  CORRECTIONS_IN_PROMPT,
+  CORRECTION_PARTS,
+  type CoachCorrection,
+  type CountedSession,
+  type PracticeAssignment,
+} from './practiceCoaching';
+import { isPersonaId } from './practice';
 
 // Ask 3C's Firestore, server side only (firestore.rules deny every client
 // read and write on these collections):
@@ -10,12 +18,16 @@ import { KNOWLEDGE_NOTES, sortNotes, type KnowledgeNote } from './notes';
 //   askUsage/{uid}_{day}_practice_voice   Practice lines spoken by the TTS voice that day
 //   practiceLog/{id}           one doc per finished Practice (with its feedback)
 //   practiceSessions/{uid}     the rep's current Practice: who is behind the door (hidden from the rep)
+//   practiceAssignments/{id}   the owner's "N sessions by <day>" asks, for one rep or everyone
+//   practiceCorrections/{id}   the owner's "Coach was wrong" takes; the coach reads the latest as calibration
 
 export const ASK_LOG = 'askLog';
 export const ASK_USAGE = 'askUsage';
 export const ASK_DAILY_LIMIT = 60;
 export const PRACTICE_LOG = 'practiceLog';
 export const PRACTICE_SESSIONS = 'practiceSessions';
+export const PRACTICE_ASSIGNMENTS = 'practiceAssignments';
+export const PRACTICE_CORRECTIONS = 'practiceCorrections';
 /**
  * Practice model calls a rep may make in a day: a knock is 1, each rep line 2
  * (the homeowner and the line judge), feedback 1 (2 with a format retry).
@@ -117,4 +129,62 @@ export async function repHome(db: FirebaseFirestore.Firestore, uid: string): Pro
   const city = typeof data.city === 'string' ? data.city.trim() : '';
   const state = typeof data.state === 'string' ? data.state.trim() : '';
   return [city, state].filter(Boolean).join(', ');
+}
+
+/** Every practice assignment the owner has set, newest first (a handful: the owner deletes old ones). */
+export async function loadAssignments(db: FirebaseFirestore.Firestore): Promise<PracticeAssignment[]> {
+  const snap = await db.collection(PRACTICE_ASSIGNMENTS).orderBy('createdAt', 'desc').limit(200).get();
+  return snap.docs.flatMap((doc) => {
+    const data = doc.data();
+    const createdAt = isoTime(data.createdAt);
+    const persona = data.persona === 'any' ? 'any' : isPersonaId(data.persona) ? data.persona : null;
+    if (!createdAt || !persona || !Number.isInteger(data.count) || typeof data.due !== 'string') return [];
+    return [
+      {
+        id: doc.id,
+        repUid: typeof data.repUid === 'string' ? data.repUid : null,
+        repName: typeof data.repName === 'string' ? data.repName : '',
+        persona,
+        count: data.count as number,
+        due: data.due,
+        createdAt,
+      },
+    ];
+  });
+}
+
+/** Finished practices since `since`, as assignments count them: one rep's, or everyone's. */
+export async function loadCountedSessions(
+  db: FirebaseFirestore.Firestore,
+  since: Date,
+  uid: string | null
+): Promise<CountedSession[]> {
+  const base = db.collection(PRACTICE_LOG);
+  const query = uid ? base.where('uid', '==', uid).where('createdAt', '>=', since) : base.where('createdAt', '>=', since);
+  const snap = await query.limit(2000).get();
+  return snap.docs.flatMap((doc) => {
+    const data = doc.data();
+    const createdAt = isoTime(data.createdAt);
+    return createdAt && typeof data.uid === 'string'
+      ? [{ uid: data.uid, persona: typeof data.persona === 'string' ? data.persona : '', createdAt, redo: typeof data.redoOf === 'string' }]
+      : [];
+  });
+}
+
+/** The owner's latest corrections to the coach, newest first, for its prompt. */
+export async function loadCorrections(db: FirebaseFirestore.Firestore): Promise<CoachCorrection[]> {
+  const snap = await db.collection(PRACTICE_CORRECTIONS).orderBy('createdAt', 'desc').limit(CORRECTIONS_IN_PROMPT).get();
+  return snap.docs.flatMap((doc) => {
+    const data = doc.data();
+    const part = CORRECTION_PARTS.find((candidate) => candidate === data.part);
+    if (!part || typeof data.take !== 'string' || !data.take) return [];
+    return [
+      {
+        part,
+        original: typeof data.original === 'string' ? data.original : '',
+        take: data.take,
+        personaLabel: typeof data.personaLabel === 'string' ? data.personaLabel : '',
+      },
+    ];
+  });
 }

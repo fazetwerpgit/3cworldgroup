@@ -272,7 +272,7 @@ describe('priceNote', () => {
 });
 
 describe('feedbackProblem', () => {
-  const good = 'Score: 6/10\nResult: No sale\nWhat worked:\n- "Who\'s your internet with?"\nFix next time: Ask about the bill.\nTry this line: "What bugs you most about it?"';
+  const good = 'Score: 6/10\nResult: No sale\nSkills: Opener 7/10, Discovery 5/10, Objections 4/10, Close 3/10\nWhat worked:\n- "Who\'s your internet with?"\nFix next time: Ask about the bill.\nTry this line: "What bugs you most about it?"';
 
   it('passes the exact shape', () => {
     expect(feedbackProblem(good)).toBeNull();
@@ -294,7 +294,14 @@ describe('feedbackProblem', () => {
 
   it('asks for a retry past 130 words', () => {
     const padded = (words: number) => good.replace('Ask about the bill.', `Ask ${'more '.repeat(words)}about the bill.`);
-    const count = (text: string) => text.split(/\s+/).filter(Boolean).length;
+    // The Skills line doesn't count toward the 130.
+    const count = (text: string) =>
+      text
+        .split('\n')
+        .filter((line) => !line.startsWith('Skills:'))
+        .join(' ')
+        .split(/\s+/)
+        .filter(Boolean).length;
     const at130 = padded(130 - count(good));
     expect(count(at130)).toBe(130);
     expect(feedbackProblem(at130)).toBeNull();

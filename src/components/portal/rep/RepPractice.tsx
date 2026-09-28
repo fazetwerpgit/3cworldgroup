@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import { DoorClosed, DoorOpen, Mic, MonitorSmartphone, RotateCw, SendHorizontal, Shuffle, Volume2, VolumeX } from 'lucide-react';
+import { DoorClosed, DoorOpen, Mic, MonitorSmartphone, RotateCw, SendHorizontal, Shuffle, Undo2, Volume2, VolumeX } from 'lucide-react';
 import { BorderBeam } from 'border-beam';
 import { ThinkingOrb } from 'thinking-orbs';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
@@ -18,16 +18,19 @@ import {
   type PracticeFeedbackReply,
   type PracticeKnockReply,
   type PracticePriceReply,
+  type PracticeRedoReply,
   type PracticeTurn,
   type PracticeTurnReply,
 } from '@/lib/ask/practice';
 import type { Ambient, BeatKind, PracticeLine } from '@/lib/ask/practiceDoor';
+import { deliveryLine, fillerCount, parseDelivery, type PracticeDelivery } from '@/lib/ask/practiceCoaching';
 import { pickVoice, spokenText } from '@/lib/ask/practiceVoice';
 import s from './rep.module.css';
 import p from './rep-page.module.css';
 import a from './rep-ask.module.css';
 import pr from './rep-practice.module.css';
 import { PracticeFeedback } from './PracticeFeedback';
+import { PracticeMine } from './PracticeMine';
 import { openVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type VoicePlayer } from './practiceAudio';
 
 // Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
@@ -43,6 +46,10 @@ import { openVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type
 // (SpeechRecognition) on the phone; typing always works.
 // The session lives in sessionStorage under its own key, tagged with the uid,
 // with the same idle reset as Ask.
+// Over time: the feedback carries four skill scores and, with Talk on, plain
+// delivery facts (talk share, pace, fillers from the dictated lines); "Redo
+// that moment" restarts the same door just before the line that went worst;
+// below Knock, the owner's assignments and My practice (PracticeMine).
 
 interface Session {
   /** Set when the door opens (the knock's reply); null while the knock is in flight or failed. */
@@ -54,7 +61,17 @@ interface Session {
   ended: boolean;
   /** Who ended it; the coach grades the Result by it. */
   endedBy?: PracticeEndedBy;
-  feedback: { text: string; score: number | null } | null;
+  feedback: {
+    text: string;
+    score: number | null;
+    /** The practiceLog id: what "Redo that moment" starts from. */
+    id?: string;
+    canRedo?: boolean;
+  } | null;
+  /** Talk mode's timing and words over this practice, shown with the feedback; none when the rep typed. */
+  delivery?: PracticeDelivery | null;
+  /** A "Redo that moment" practice: the turns before this index are the first try, replayed. */
+  redoFrom?: number;
   /** The homeowner only talks through a Ring doorbell camera (from the knock). */
   ring?: boolean;
   /** The sound from inside the house (from the knock). */
@@ -66,7 +83,7 @@ interface StoredSession extends Session {
   lastAt: number;
 }
 
-type Busy = 'turn' | 'feedback' | null;
+type Busy = 'turn' | 'feedback' | 'redo' | null;
 /** null: nothing to retry today (the daily limit). */
 type Retry = 'turn' | 'send' | 'feedback' | null;
 
@@ -84,6 +101,10 @@ const customerTurn = (line: PracticeLine): PracticeTurn =>
   line.speaker === 'spouse' || line.speaker === 'kid'
     ? { role: 'customer', text: line.text, speaker: line.speaker }
     : { role: 'customer', text: line.text };
+const noDelivery = (): PracticeDelivery => ({ talkMs: 0, listenMs: 0, words: 0, fillers: {}, lines: 0 });
+/** A spoken line's length when the mic heard only a word or two (its first and last words came together). */
+const MIN_LINE_MS = 600;
+
 /** Talk mode: this long without new words ends the rep's line and sends it. */
 const SILENCE_MS = 1600;
 /** And this long with no words at all gives up listening. */
@@ -120,6 +141,8 @@ export function readStoredPractice(uid: string): Session | null {
       ended: raw.ended === true,
       endedBy: raw.endedBy === 'homeowner' || raw.endedBy === 'rep' ? raw.endedBy : undefined,
       feedback: raw.feedback && typeof raw.feedback.text === 'string' ? raw.feedback : null,
+      delivery: parseDelivery(raw.delivery),
+      redoFrom: Number.isInteger(raw.redoFrom) ? raw.redoFrom : undefined,
       ring: raw.ring === true,
       ambient: raw.ambient === 'dog' || raw.ambient === 'kids' || raw.ambient === 'tv' || raw.ambient === 'kitchen' ? raw.ambient : null,
     };
@@ -231,6 +254,13 @@ export function RepPractice({
   const playerRef = useRef<VoicePlayer | null>(null);
   /** Bumped whenever speech should stop: a voice that arrives after that stays quiet. */
   const speechRef = useRef(0);
+  /**
+   * Talk mode's delivery over the practice under way: counted from the knock
+   * (or redo), so none after a reload, when part of it would be missing.
+   */
+  const deliveryRef = useRef<PracticeDelivery | null>(null);
+  /** The line the mic just heard and how long the rep spoke it, until it's sent (unchanged). */
+  const spokenRef = useRef<{ text: string; ms: number } | null>(null);
 
   const canSpeak = useSyncExternalStore(noSubscribe, () => 'speechSynthesis' in window, () => false);
   const canListen = useSyncExternalStore(noSubscribe, () => recognitionClass() !== undefined, () => false);
@@ -333,15 +363,18 @@ export function RepPractice({
     setBusy('feedback');
     setFailed(null);
     scrollDown('smooth');
+    const delivery = current.delivery ?? (deliveryRef.current?.lines ? deliveryRef.current : null);
     const result = await post<PracticeFeedbackReply>({
       action: 'feedback',
       sessionId: current.sessionId,
       history: current.turns,
       endedBy: current.endedBy ?? 'rep',
+      ...(delivery ? { delivery } : {}),
     });
     setBusy(null);
     if (result.ok && result.data.feedback) {
-      save({ ...current, ended: true, feedback: { text: result.data.feedback, score: result.data.score } });
+      const { feedback: text, score, id, canRedo } = result.data;
+      save({ ...current, ended: true, delivery, feedback: { text, score, id, canRedo: canRedo === true } });
     } else {
       setFailed({
         message: result.ok ? 'No feedback came back. Try again.' : result.error,
@@ -437,13 +470,20 @@ export function RepPractice({
     close: 'slam' | 'shut' | null
   ) => {
     const quiet = speechRef.current;
-    await player.play(first, { delay: current.turns.length === lines.length && !current.ring ? DOOR_OPEN_S : 0 });
+    const delay = current.turns.length === lines.length && !current.ring ? DOOR_OPEN_S : 0;
+    // The rep's delivery counts the homeowner's voice as time spent listening, as long as it played.
+    const tally = deliveryRef.current;
+    const started = performance.now() + delay * 1000;
+    const heard = () => {
+      if (tally && tally === deliveryRef.current) tally.listenMs += Math.max(0, Math.round(performance.now() - started));
+    };
+    await player.play(first, { delay });
     for (const line of lines.slice(1)) {
-      if (speechRef.current !== quiet || !current.sessionId) return;
-      const voice = await openVoice(current.sessionId, line.text);
-      if (!voice || speechRef.current !== quiet) return;
+      const voice = speechRef.current === quiet && current.sessionId ? await openVoice(current.sessionId, line.text) : null;
+      if (!voice || speechRef.current !== quiet) return heard();
       await player.queue(voice);
     }
+    heard();
     if (close && speechRef.current === quiet) player.closeDoor(current.ring ? null : close === 'slam' ? 'door-slam' : 'door-close');
   };
 
@@ -458,6 +498,16 @@ export function RepPractice({
     if (talk) unlockAudio();
     setDraft('');
     setNotice('');
+    // A line the mic heard and the rep sent as it was counts toward delivery; typed or edited ones don't.
+    const spoken = spokenRef.current;
+    spokenRef.current = null;
+    const tally = deliveryRef.current;
+    if (tally && spoken?.text === text) {
+      tally.talkMs += spoken.ms;
+      tally.words += text.split(/\s+/).filter(Boolean).length;
+      tally.lines += 1;
+      for (const [word, n] of Object.entries(fillerCount(text))) tally.fillers[word] = (tally.fillers[word] ?? 0) + n;
+    }
     const next: Session = { ...session, turns: [...session.turns, { role: 'rep', text }] };
     save(next);
     void requestTurn(next);
@@ -479,6 +529,7 @@ export function RepPractice({
       window.speechSynthesis.speak(unlock);
     }
     setNotice('');
+    deliveryRef.current = noDelivery();
     const next: Session = {
       sessionId: null,
       pick: canPick ? choice : 'surprise',
@@ -525,10 +576,62 @@ export function RepPractice({
     await requestTurn(next);
   };
 
+  /**
+   * "Redo that moment": the same door again, up to the line that went worst,
+   * as a new short practice. With Talk on, the homeowner's last words play
+   * again so the rep can answer them.
+   */
+  const redo = async () => {
+    const logId = session?.feedback?.id;
+    if (!logId || busy) return;
+    stopSpeaking();
+    playerRef.current?.quiet();
+    if (talk) unlockAudio();
+    setBusy('redo');
+    setFailed(null);
+    const result = await post<PracticeRedoReply>({ action: 'redo', logId });
+    setBusy(null);
+    if (!result.ok || !result.data.sessionId || !Array.isArray(result.data.history) || !result.data.history.length) {
+      setFailed({ message: result.ok ? "That didn't go through. Try again." : result.error, retry: null });
+      return;
+    }
+    const { sessionId, history, ring, ambient } = result.data;
+    deliveryRef.current = noDelivery();
+    const next: Session = {
+      sessionId,
+      pick: 'surprise',
+      turns: history,
+      ended: false,
+      feedback: null,
+      ring: ring === true,
+      ambient: ambient ?? null,
+      redoFrom: history.length,
+    };
+    setDraft('');
+    setNotice('');
+    save(next);
+    scrollDown('smooth');
+    const player = playerRef.current;
+    if (!talk || !player) return;
+    let from = history.length;
+    while (from > 0 && history[from - 1].role === 'customer') from -= 1;
+    const lines: PracticeLine[] = history.slice(from).map((turn) => ({
+      speaker: turn.speaker ?? 'homeowner',
+      text: turn.text,
+    }));
+    const quiet = speechRef.current;
+    player.setRing(next.ring === true);
+    if (!next.ring) player.ambient(next.ambient ?? null);
+    const first = lines.length ? await openVoice(sessionId, lines[0].text) : null;
+    if (first && speechRef.current === quiet) void speakLines(player, first, lines, next, null);
+    else void first?.reader.cancel().catch(() => {});
+  };
+
   const reset = () => {
     stopSpeaking();
     playerRef.current?.quiet();
     stopListening(false);
+    deliveryRef.current = null;
     save(null);
     setChoice('surprise');
     setDraft('');
@@ -555,6 +658,10 @@ export function RepPractice({
     recognition.continuous = true;
     heardRef.current = '';
     skipSendRef.current = false;
+    spokenRef.current = null;
+    // From the mic's first words to its last: how long the rep spoke the line.
+    let firstAt = 0;
+    let lastAt = 0;
     const armSilence = (ms: number) => {
       clearSilence();
       silenceRef.current = window.setTimeout(() => recognition.stop(), ms);
@@ -564,6 +671,8 @@ export function RepPractice({
       for (let i = 0; i < event.results.length; i += 1) heard += event.results[i][0]?.transcript ?? '';
       heardRef.current = heard.trim();
       setDraft(heardRef.current);
+      lastAt = performance.now();
+      if (!firstAt) firstAt = lastAt;
       armSilence(SILENCE_MS);
     };
     recognition.onerror = (event) => {
@@ -582,7 +691,10 @@ export function RepPractice({
       recognitionRef.current = null;
       setListening(false);
       if (skipSendRef.current) return;
-      if (heardRef.current) sendRef.current(heardRef.current);
+      if (heardRef.current) {
+        spokenRef.current = { text: heardRef.current, ms: Math.max(MIN_LINE_MS, Math.round(lastAt - firstAt)) };
+        sendRef.current(heardRef.current);
+      }
       else setNotice("Didn't catch that — tap to try again.");
     };
     recognitionRef.current = recognition;
@@ -680,6 +792,7 @@ export function RepPractice({
             Someone different answers each time. Pitch it like a real door; you find out who it was in your feedback.
           </p>
         </div>
+        <PracticeMine />
         <div ref={bottomRef} className={pr.anchor} aria-hidden="true" />
       </>
     );
@@ -694,7 +807,12 @@ export function RepPractice({
     <>
       {talkToggle}
       <ol className={a.thread} aria-live="polite" aria-label="Practice conversation">
-        {session.turns.map((turn, index) =>
+        {session.turns.flatMap((turn, index) => [
+          index === session.redoFrom ? (
+            <li key={`redo-${index}`} className={pr.redoMark}>
+              Your redo starts here
+            </li>
+          ) : null,
           turn.role === 'screen' ? (
             <li key={index} className={pr.screen}>
               <MonitorSmartphone size={18} aria-hidden="true" />
@@ -709,8 +827,9 @@ export function RepPractice({
               <span className={pr.speaker}>{speakerLabel(turn, session.ring === true)}</span>
               <p className={`${a.answer} ${a.answerText} ${pr.line}`}>{turn.text}</p>
             </li>
-          )
-        )}
+          ),
+        ])}
+        {session.redoFrom === session.turns.length ? <li className={pr.redoMark}>Your redo starts here</li> : null}
         {busy === 'turn' ? (
           <li className={pr.customer}>
             <span className={pr.speaker}>Homeowner</span>
@@ -737,7 +856,7 @@ export function RepPractice({
                     ) : null}
                   </div>
                   <PracticeFeedback text={session.feedback.text} />
-
+                  {session.delivery ? <p className={pr.delivery}>{deliveryLine(session.delivery)}</p> : null}
                 </section>
               ) : (
                 <section className={`${s.panel} ${pr.feedback}`} aria-busy="true">
@@ -764,8 +883,14 @@ export function RepPractice({
               ) : null}
             </div>
           ) : null}
+          {session.feedback?.canRedo && session.feedback.id ? (
+            <button type="button" className={`${s.btnSecondary} ${pr.knock}`} onClick={() => void redo()} disabled={busy !== null}>
+              <Undo2 size={20} aria-hidden="true" />
+              {busy === 'redo' ? 'Going back…' : 'Redo that moment'}
+            </button>
+          ) : null}
           {session.feedback || failed ? (
-            <button type="button" className={`${s.btnPrimary} ${pr.knock}`} onClick={reset}>
+            <button type="button" className={`${s.btnPrimary} ${pr.knock}`} onClick={reset} disabled={busy === 'redo'}>
               <RotateCw size={20} aria-hidden="true" />
               Practice again
             </button>

@@ -67,7 +67,7 @@ const says = (text: string, close?: 'slam' | 'shut') => ({
 
 /** A coach answer in the exact shape (no format retry). */
 const coach = (score: number, result = 'No sale') =>
-  `Score: ${score}/10\nResult: ${result}\nWhat worked:\n- "Hi, I'm with 3C."\nFix next time: Ask about their bill.\nTry this line: "What are you paying now?"`;
+  `Score: ${score}/10\nResult: ${result}\nSkills: Opener 7/10, Discovery 5/10, Objections 4/10, Close 3/10\nWhat worked:\n- "Hi, I'm with 3C."\nFix next time: Ask about their bill.\nTry this line: "What are you paying now?"`;
 
 /** The n-th homeowner or coach request (judge calls left out). */
 const sentBody = (call = 0) => JSON.parse(fetchMock.mock.calls.filter((c) => !isJudge(c))[call][1].body as string);
@@ -433,6 +433,99 @@ describe('POST /api/portal/ask/practice', () => {
       turns: [PITCH[0], { role: 'rep', text: "Hi, I'm with 3C. Text me at [phone] or [email]." }],
     });
     expect(fake.docs('askLog').size).toBe(0);
+  });
+
+  it('keeps how each line landed, and redoes the worst one: the same door, up to that line, patience as it was', async () => {
+    // Line 1 fair, line 2 weak (patience 5 -> 4), line 3 fair.
+    const lines = ["Hi, I'm with 3C.", 'So yeah, internet.', 'What do you pay now?'];
+    let history: Array<{ role: string; text: string; speaker?: string }> = [PITCH[0]];
+    verdicts = ['OK', 'WEAK', 'OK'];
+    for (const [i, line] of lines.entries()) {
+      history = [...history, { role: 'rep', text: line }];
+      modelAnswers(`Answer ${i + 1}.`);
+      await POST(req({ action: 'turn', ...SESSION, history }));
+      history = [...history, { role: 'customer', text: `Answer ${i + 1}.` }];
+    }
+    expect(fake.docs('practiceSessions').get('r1')?.steps).toEqual([
+      { at: 2, event: 'ok', patience: 5 },
+      { at: 4, event: 'weak', patience: 5 },
+      { at: 6, event: 'ok', patience: 4 },
+    ]);
+    modelAnswers(coach(4));
+    const graded = await (await POST(req({ action: 'feedback', ...SESSION, history, endedBy: 'rep' }))).json();
+    expect(graded).toMatchObject({ canRedo: true, skills: { opener: 7, discovery: 5, objections: 4, close: 3 } });
+
+    // Someone else's practice can't be redone.
+    mockUser.mockResolvedValueOnce({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false });
+    expect((await POST(req({ action: 'redo', logId: graded.id }))).status).toBe(404);
+
+    const res = await POST(req({ action: 'redo', logId: graded.id }));
+    expect(res.status).toBe(200);
+    const redo = await res.json();
+    expect(redo).toMatchObject({ history: history.slice(0, 3), ring: false });
+    expect(redo.sessionId).not.toBe('s1');
+    expect(fake.docs('practiceSessions').get('r1')).toMatchObject({
+      sessionId: redo.sessionId,
+      persona: 'price-shopper',
+      seed: 42,
+      patience: 5,
+      steps: [],
+      redoOf: graded.id,
+      redoFrom: 3,
+      lastLines: [{ speaker: 'homeowner', text: 'Answer 1.' }],
+    });
+
+    // Graded as a redo: the coach sees where it starts, and the log says so.
+    const again = [...redo.history, { role: 'rep', text: 'Who do you have for internet now?' }];
+    modelAnswers(coach(7));
+    const second = await (await POST(req({ action: 'feedback', sessionId: redo.sessionId, history: again, endedBy: 'rep' }))).json();
+    expect(sentBody(4).messages[1].content).toMatch(
+      /This is a redo[\s\S]*Rep: Hi, I'm with 3C\.\nHomeowner: Answer 1\.\n--- The rep redoes the moment from here ---\nRep: Who do you have/
+    );
+    expect(fake.docs('practiceLog').get(second.id)).toMatchObject({ redoOf: graded.id, redoFrom: 3 });
+  });
+
+  it('logs the skill scores and the delivery talk mode sent, and teaches the coach the owner\'s corrections', async () => {
+    fake.docs('practiceCorrections').set('c1', {
+      logId: 'old',
+      part: 'score',
+      original: '8/10',
+      take: 'A 5 at most: they never asked a question.',
+      personaLabel: 'Skeptic',
+      createdAt: new Date('2026-09-01T00:00:00Z'),
+    });
+    modelAnswers(coach(6));
+    const delivery = { talkMs: 30_000, listenMs: 45_000, words: 75, fillers: { um: 3 }, lines: 4 };
+    const { id } = await (await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep', delivery }))).json();
+    expect(sentBody().messages[0].content).toContain('the owner says: "A 5 at most: they never asked a question."');
+    expect(fake.docs('practiceLog').get(id)).toMatchObject({ skills: { opener: 7, discovery: 5, objections: 4, close: 3 }, delivery });
+
+    // A delivery that makes no sense isn't kept.
+    fake.docs('practiceSessions').set('r1', SAVED);
+    modelAnswers(coach(6));
+    const bad = await (await POST(req({ action: 'feedback', ...SESSION, history: PITCH, endedBy: 'rep', delivery: { talkMs: -1 } }))).json();
+    expect(fake.docs('practiceLog').get(bad.id)?.delivery).toBeNull();
+  });
+
+  it("knocks a rep the homeowner type an open assignment asks for, until it's done", async () => {
+    const today = chicagoDayKey(new Date());
+    fake.docs('practiceAssignments').set('a1', {
+      repUid: null,
+      repName: 'Everyone',
+      persona: 'elderly',
+      count: 1,
+      due: today,
+      createdAt: new Date(Date.now() - 60_000),
+    });
+    fake.docs('practiceSessions').delete('r1');
+    modelAnswers('Hello?');
+    await POST(req({ action: 'turn', history: [] }));
+    expect(fake.docs('practiceSessions').get('r1')?.persona).toBe('elderly');
+
+    fake.docs('practiceLog').set('l1', { uid: 'r1', persona: 'elderly', createdAt: new Date() });
+    modelAnswers('Hello?');
+    await POST(req({ action: 'turn', history: [] }));
+    expect(fake.docs('practiceSessions').get('r1')?.persona).not.toBe('elderly');
   });
 
   it('never lets a sellable homeowner end as "walked away the right way"', async () => {

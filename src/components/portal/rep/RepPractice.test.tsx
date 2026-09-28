@@ -21,6 +21,8 @@ const fetchMock = vi.fn();
 /** Answers for POST /api/portal/ask/practice and .../practice/voice, in order. */
 let practiceAnswers: Array<Response | Promise<Response>> = [];
 let voiceAnswers: Array<Response | Promise<Response>> = [];
+/** GET /api/portal/ask/practice/mine: the rep's own practice and assignments. */
+let mine: unknown = { sessions: [], assignments: [] };
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -31,7 +33,8 @@ function replies(...bodies: unknown[]) {
 
 const isVoice = (call: unknown[]) => String(call[0]).endsWith('/voice');
 const isSound = (call: unknown[]) => String(call[0]).startsWith('/sounds/');
-const practiceCalls = () => fetchMock.mock.calls.filter((call) => !isVoice(call) && !isSound(call));
+const isMine = (call: unknown[]) => String(call[0]).endsWith('/mine');
+const practiceCalls = () => fetchMock.mock.calls.filter((call) => !isVoice(call) && !isSound(call) && !isMine(call));
 const soundCalls = () => fetchMock.mock.calls.filter(isSound).map((call) => String(call[0]));
 const voiceCalls = () => fetchMock.mock.calls.filter(isVoice).map((call) => JSON.parse(call[1].body as string));
 const sent = (call: number) => JSON.parse(practiceCalls()[call][1].body as string);
@@ -69,8 +72,10 @@ beforeEach(() => {
   fetchMock.mockReset();
   practiceAnswers = [];
   voiceAnswers = [];
+  mine = { sessions: [], assignments: [] };
   fetchMock.mockImplementation(async (url: string) => {
     if (url.startsWith('/sounds/')) return new Response('', { status: 404 });
+    if (url.endsWith('/mine')) return json(mine);
     const next = (url.endsWith('/voice') ? voiceAnswers : practiceAnswers).shift();
     return next ?? new Response('', { status: 503 });
   });
@@ -341,11 +346,56 @@ describe('RepPractice', () => {
     expect(text()).toContain('Hm.');
     expect(voiceCalls()).toHaveLength(voices);
 
+    // Delivery goes with the feedback: the dictated line counts, the typed one doesn't. Shown plainly, never scored.
+    replies({
+      id: 'p3',
+      feedback: 'Score: 6/10\nResult: No sale\nSkills: Opener 7/10, Discovery 5/10, Objections 4/10, Close 3/10\nWhat worked:\n- "Hi, I am with 3C."',
+      score: 6,
+      canRedo: false,
+    });
+    await click('End');
+    expect(sent(practiceCalls().length - 1).delivery).toMatchObject({ words: 5, lines: 1, fillers: {}, talkMs: 600 });
+    expect(text()).toContain('Opener7');
+    expect(text()).toMatch(/500 words a minute · no fillers heard/);
+    expect(button('Redo that moment')).toBeUndefined();
+
     // Talk off sticks on this phone across visits.
     act(() => root.unmount());
     root = createRoot(container);
     await render();
     expect(button('Talk off')?.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('redoes the weakest moment: the same door up to that line, marked, then pitched on from there', async () => {
+    await render();
+    replies(door('Yeah?'));
+    await click('Knock');
+    replies(says('Bye.', true), { id: 'p9', feedback: 'Score: 3/10\nResult: No sale', score: 3, canRedo: true });
+    await type('Wanna buy internet?');
+    await click('Send');
+    // Typed only: no delivery to send.
+    expect(sent(2).delivery).toBeUndefined();
+
+    const history = [
+      { role: 'customer', text: 'Yeah?' },
+      { role: 'rep', text: 'Hi, I am with 3C.' },
+      { role: 'customer', text: 'Okay, and?' },
+    ];
+    replies({ sessionId: 's2', history, ring: false, ambient: null });
+    await click('Redo that moment');
+    expect(sent(3)).toEqual({ action: 'redo', logId: 'p9' });
+    expect(text()).toContain('Okay, and?');
+    expect(text()).toContain('Your redo starts here');
+    expect(text()).not.toContain('Session over');
+
+    replies(says('Huh, go on.'));
+    await type('Who do you have for internet now?');
+    await click('Send');
+    expect(sent(4)).toMatchObject({ action: 'turn', sessionId: 's2' });
+    expect(sent(4).history).toEqual([...history, { role: 'rep', text: 'Who do you have for internet now?' }]);
+    // The marker stays where the redo began.
+    const items = [...container.querySelectorAll('ol[aria-label="Practice conversation"] > li')].map((li) => li.textContent);
+    expect(items.indexOf('Your redo starts here')).toBe(3);
   });
 
   it('tells the coach the rep ended it when they tap End', async () => {
