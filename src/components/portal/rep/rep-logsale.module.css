@@ -1239,7 +1239,8 @@ span.thumbView {
     gap: var(--s5) var(--s7);
   }
 
-  .proofBeam {
+  /* Two classes: the beam's own `[data-beam] { position: relative }` loads later. */
+  .reviewGrid > .proofBeam {
     position: sticky;
     top: calc(var(--topbar-h) + var(--s5));
     grid-area: proof;
