@@ -139,12 +139,87 @@
   padding: 0 var(--s2);
 }
 
+/* The page-head count doubles as a jump to the applications panel. */
+.jump {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--c-line);
+  text-underline-offset: 4px;
+}
+
+@media (hover: hover) {
+  .jump:hover {
+    color: var(--c-text);
+    text-decoration-color: currentColor;
+  }
+}
+
+.appsPanel {
+  scroll-margin-top: calc(var(--topbar-h, 64px) + var(--s4));
+}
+
+/* Search + status filter inside the applications panel. */
+.filters {
+  padding: var(--s4);
+  border-bottom: 1px solid var(--c-line);
+}
+
+.filters .status {
+  flex: 1 1 100%;
+}
+
+.segCount {
+  margin-left: 6px;
+  color: var(--c-text-3);
+  font-weight: 600;
+}
+
+.status > button[aria-pressed='true'] .segCount {
+  color: inherit;
+}
+
+.contact {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .contact:hover {
+    color: var(--c-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
 .appCols {
-  --cols: minmax(0, 0.9fr) minmax(0, 1.3fr) 108px 104px;
+  --cols: minmax(0, 1fr) minmax(0, 1fr) 96px 96px;
+}
+
+.appAction {
+  grid-column: 1 / -1;
+}
+
+.appAction > button {
+  flex: 1 1 auto;
 }
 
 @media (min-width: 1024px) {
+  .filters {
+    padding: var(--s4) var(--s5);
+  }
+
   .app > .appStatus {
     order: 9;
+    justify-content: flex-start;
+  }
+
+  .app > .appAction {
+    order: 10;
+    grid-column: auto;
+    justify-content: flex-end;
+  }
+
+  .appAction > button {
+    flex: none;
   }
 }
