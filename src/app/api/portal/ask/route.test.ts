@@ -30,6 +30,11 @@ function seed() {
       n1: { title: 'First thing', body: 'Call the widget desk at 555-010-0199.', order: 1 },
     },
     config: { fiberRepMap: { map: { 'DLR-OWN': 'r1', 'DLR-OTHER': 'r2', 'DLR-THIRD': 'r3' } } },
+    users: { r1: { city: 'Des Moines', state: 'IA', status: 'active' } },
+    sales: {
+      s1: { salesRepId: 'r1', salesRepName: 'Dana Rep', customerName: 'Pat Oakley', customerAddress: '10 Birch St', status: 'pending', saleDate: new Date('2026-09-24T12:00:00Z'), createdAt: new Date('2026-09-24T20:00:00Z'), estimatedPay: 4321 },
+      s2: { salesRepId: 'r2', salesRepName: 'Other Rep', customerName: 'Not Yours', customerAddress: '11 Birch St', status: 'pending', saleDate: new Date('2026-09-24T12:00:00Z') },
+    },
   });
   state.db = fake.db;
 }
@@ -128,6 +133,17 @@ describe('POST /api/portal/ask', () => {
     expect(system).toContain('First name: Dana');
     expect(system).not.toContain('DLR-OTHER');
     expect(system).not.toContain('DLR-THIRD');
+  });
+
+  it("puts the rep's own portal data last, after the rep block, and nobody else's", async () => {
+    modelAnswers();
+    await POST(req({ question: 'Did the Oakley sale install?' }));
+    const system: string = sentBody().messages[0].content;
+    const live = system.indexOf("=== This rep's portal right now (as of ");
+    expect(live).toBeGreaterThan(system.indexOf('Their dealer code: DLR-OWN'));
+    expect(system.indexOf('Pat Oakley, 10 Birch St')).toBeGreaterThan(live);
+    expect(system).not.toContain('Not Yours');
+    expect(system).not.toContain('4321');
   });
 
   it("tells the model the code is unknown when the rep isn't mapped", async () => {
