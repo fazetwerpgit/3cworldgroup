@@ -26,13 +26,15 @@ import { redactContact } from './redact';
 // Owner rule (Jacob): NOTHING about pay. Every line is built from an explicit
 // allow-list of fields, never by spreading a document, so no pay, commission,
 // estimate, rate, value or chargeback field can ride along; free text that is
-// passed through (reasons, notification lines) is stripped of dollar amounts
-// and customer contact details. Only this rep's documents are read, except the
-// Board, which every rep already sees.
+// passed through is stripped of dollar amounts and customer contact details,
+// and a reason or notification line that mentions pay or money at all is
+// replaced whole (see reasonText). Only this rep's documents are read, and
+// only notifications about their own sales and installs, except the Board,
+// which every rep already sees.
 //
 // Reads mirror the portal's own: sales by salesRepId ordered by saleDate (the
-// Sales page), fiberOrders by matchedUserId (install status), approved sales
-// (the Board), scheduledCalls (Calls), the form collections by repUid,
+// Sales page), fiberOrders by matchedUserId (install status), this week's and
+// month's sales with a field mask (the Board, cached for a minute), scheduledCalls (Calls), the form collections by repUid,
 // notifications by userId, userOnboarding by {uid}_{item}. Each section fails
 // soft, and the whole load has a time budget so a slow read never holds up
 // the answer.
@@ -42,6 +44,7 @@ export const LIVE_BUDGET_MS = 1500;
 const SALES_SHOWN = 10;
 const SALES_FETCH = 50;
 const BOARD_FETCH = 5000;
+const BOARD_CACHE_MS = 60_000;
 const CALLS_SHOWN = 4;
 const FORMS_SHOWN = 6;
 const FORM_HANDLED_DAYS = 30;
@@ -62,12 +65,30 @@ function toDate(value: unknown): Date | null {
   return null;
 }
 
-const MONEY = /\$\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:dollars|bucks|usd)\b/gi;
+// $150, $ 1,200.50, 150$, 150 dollars, 150 bucks, 150 USD, USD 150.
+const MONEY = /\$\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:\$|dollars?\b|bucks\b|usd\b)|\busd\s?\d[\d,]*(?:\.\d+)?/gi;
+const PAY_WORDS =
+  /\b(?:pay|pays|paid|paying|payout|payouts|payroll|payment|payments|commissions?|charge-?backs?|charge backs?|claw-?backs?|claw backs?|bonus(?:es)?|rates?|earn(?:s|ed|ing|ings)?)\b/i;
+
+/** Stands in for a reason or message that touches pay (owner rule: nothing about pay). */
+export const REASON_ON_FILE = 'reason on file, ask Jeremy or Jacob';
 
 /** Free text safe for the prompt: no contact details, no dollar amounts, one short line. */
 function clean(value: unknown, max = TEXT_MAX): string {
   const text = redactContact(str(value).replace(/\s+/g, ' ')).replace(MONEY, '[amount]');
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+/**
+ * A reason or message someone else wrote (a cancel reason, a carrier reason, a
+ * notification line): cleaned, or REASON_ON_FILE when it mentions pay or money
+ * at all, since a half-redacted pay sentence still says something about pay.
+ */
+function reasonText(value: unknown, max = TEXT_MAX): string {
+  const raw = str(value);
+  MONEY.lastIndex = 0;
+  if (PAY_WORDS.test(raw) || MONEY.test(raw)) return REASON_ON_FILE;
+  return clean(raw, max);
 }
 
 function dayLabel(date: Date, zone: Zone): string {
@@ -160,11 +181,11 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
       `install: ${installLine(status, sale.installDate ?? null, zone)}`,
     ];
     if (SALE_STATUS[sale.status]) {
-      parts.push(`in the portal: ${SALE_STATUS[sale.status]}${sale.reason ? ` (${clean(sale.reason, 80)})` : ''}`);
+      parts.push(`in the portal: ${SALE_STATUS[sale.status]}${str(sale.reason) ? ` (${reasonText(sale.reason, 80)})` : ''}`);
     }
     if (order) {
       const reason = order.status === 'breakage' ? carrierReasonLabel(order.breakageReason) : null;
-      parts.push(`carrier report: ${CARRIER_STATUS[order.status] ?? 'unknown'}${reason ? ` (${clean(reason, 60)})` : ''}`);
+      parts.push(`carrier report: ${CARRIER_STATUS[order.status] ?? 'unknown'}${reason ? ` (${reasonText(reason, 60)})` : ''}`);
     } else {
       parts.push('carrier report: no match yet');
     }
@@ -179,11 +200,10 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
 
 // ---------- Board ----------
 
+// The two periods reps ask about; the Board's Year and All time stay on the Board.
 const BOARD_PERIODS: Array<[LeaderboardPeriod, string]> = [
   ['week', 'This week'],
   ['month', 'This month'],
-  ['year', 'This year'],
-  ['all', 'All time'],
 ];
 
 interface BoardRow {
@@ -197,21 +217,39 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const rowText = (row: BoardRow, rank: number) =>
   `#${rank} ${clean(row.name, 40) || 'Unknown'} (${plural(row.sales, 'sale')}, ${plural(row.points, 'point')})`;
 
-/** The Board as GET /api/portal/leaderboard builds it: approved sales since the period start, ranked by points. */
-async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
-  const snap = await db.collection('sales').where('status', '==', 'approved').limit(BOARD_FETCH).get();
-  const sales = snap.docs.map((doc) => {
-    const data = doc.data() as Data;
-    return {
+/** Each period's ranking, company-wide, kept for a minute per db so back-to-back questions don't re-read. */
+const boardCache = new WeakMap<Db, { key: string; expires: number; ranked: BoardRow[][] }>();
+
+/**
+ * The Board as GET /api/portal/leaderboard builds it: approved sales since the
+ * period start, ranked by points. Only sales since the earlier of the week and
+ * month starts are read, with a field mask. Filtering status in memory keeps
+ * this a single-field range on saleDate (Firestore's automatic index); status
+ * + saleDate in the query would need a composite index that doesn't exist.
+ */
+async function boardRankings(db: Db, now: Date): Promise<BoardRow[][]> {
+  const starts = BOARD_PERIODS.map(([period]) => periodBounds(period, now)?.start.getTime() ?? 0);
+  const key = starts.join('|');
+  const cached = boardCache.get(db);
+  if (cached && cached.key === key && cached.expires > now.getTime()) return cached.ranked;
+
+  const snap = await db
+    .collection('sales')
+    .where('saleDate', '>=', new Date(Math.min(...starts)))
+    .orderBy('saleDate', 'desc')
+    .select('salesRepId', 'salesRepName', 'totalPoints', 'saleDate', 'status')
+    .limit(BOARD_FETCH)
+    .get();
+  const sales = snap.docs
+    .map((doc) => doc.data() as Data)
+    .filter((data) => data.status === 'approved')
+    .map((data) => ({
       repId: str(data.salesRepId),
       name: str(data.salesRepName) || 'Unknown',
       points: typeof data.totalPoints === 'number' ? data.totalPoints : 0,
       at: toDate(data.saleDate)?.getTime() ?? 0,
-    };
-  });
-
-  const lines = BOARD_PERIODS.map(([period, label]) => {
-    const start = periodBounds(period, now)?.start.getTime() ?? 0;
+    }));
+  const ranked = starts.map((start) => {
     const byRep = new Map<string, BoardRow>();
     for (const sale of sales) {
       if (sale.at < start || !sale.repId) continue;
@@ -220,18 +258,27 @@ async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
       row.points += sale.points;
       byRep.set(sale.repId, row);
     }
-    const ranked = [...byRep.values()].sort((a, b) => b.points - a.points);
+    return [...byRep.values()].sort((a, b) => b.points - a.points);
+  });
+  boardCache.set(db, { key, expires: now.getTime() + BOARD_CACHE_MS, ranked });
+  return ranked;
+}
+
+async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
+  const rankings = await boardRankings(db, now);
+  const lines = BOARD_PERIODS.map(([, label], i) => {
+    const ranked = rankings[i];
     const at = ranked.findIndex((row) => row.id === uid);
     if (at === -1) {
       const last = ranked.at(-1);
-      return `- ${label}: not on the Board yet (no approved sales)${last ? `; last on the Board is ${rowText(last, ranked.length)}` : ''}.`;
+      return `- ${label}: not on the Board yet (no sales)${last ? `; last on the Board is ${rowText(last, ranked.length)}` : ''}.`;
     }
     const me = ranked[at];
     const above = at > 0 ? `; just above: ${rowText(ranked[at - 1], at)}` : '; that is first place';
     const below = at < ranked.length - 1 ? `; just below: ${rowText(ranked[at + 1], at + 2)}` : '';
     return `- ${label}: #${at + 1} of ${ranked.length} with ${plural(me.sales, 'sale')}, ${plural(me.points, 'point')}${above}${below}.`;
   });
-  return `Board (ranked by points like the Board's default view; cancelled sales don't count):\n${lines.join('\n')}`;
+  return `Board (ranked by points like the Board's default view; cancelled sales don't count; Year and All time are on the Board):\n${lines.join('\n')}`;
 }
 
 // ---------- Calls ----------
@@ -314,7 +361,7 @@ const FORM_SOURCES: Array<{ collection: string; name: string; detail?: (data: Da
   {
     collection: 'expediteOrders',
     name: 'Expedite order',
-    detail: (data) => [clean(data.customerName, 60) && `for ${clean(data.customerName, 60)}`, clean(data.reason, 60) && `reason: ${clean(data.reason, 60)}`].filter(Boolean).join(', '),
+    detail: (data) => [clean(data.customerName, 60) && `for ${clean(data.customerName, 60)}`, str(data.reason) && `reason: ${reasonText(data.reason, 60)}`].filter(Boolean).join(', '),
   },
   {
     collection: 'leadsRequests',
@@ -357,11 +404,12 @@ async function formsSection(db: Db, uid: string, now: Date, zone: Zone): Promise
 
 // ---------- Notifications ----------
 
-// Types that say something about the rep's sales, installs, Board or account.
+// Only types about the rep's own sales and installs. alert_task and
+// announcement are about other people (a hire who stalled, a manager's
+// field-train note), and onboarding lives in its own section.
 const NOTIFICATION_TYPES: Record<string, true> = {
-  sale_approved: true, sale_rejected: true, sale_pending: true, install_date_changed: true, carrier_order_issue: true,
-  install_reminder: true, leaderboard_rank: true, announcement: true, onboarding_approved: true, onboarding_rejected: true,
-  esign_completed: true, activation_ready: true, rep_activated: true, alert_task: true,
+  sale_submitted: true, sale_approved: true, sale_rejected: true, sale_pending: true,
+  install_date_changed: true, carrier_order_issue: true, install_reminder: true,
 };
 
 async function notificationsSection(db: Db, uid: string, zone: Zone): Promise<string> {
@@ -369,12 +417,15 @@ async function notificationsSection(db: Db, uid: string, zone: Zone): Promise<st
   const items = snap.docs
     .map((doc) => doc.data() as Data)
     .filter((data) => data.userId === uid && NOTIFICATION_TYPES[str(data.type)])
-    .map((data) => ({ title: clean(data.title, 60), message: clean(data.message, 100), read: data.read === true, at: toDate(data.createdAt) }))
+    .map((data) => ({ title: reasonText(data.title, 60), message: reasonText(data.message, 100), read: data.read === true, at: toDate(data.createdAt) }))
+    // A pay notification (the title itself is about pay) is left out whole.
+    .filter((item) => item.title !== REASON_ON_FILE)
     .sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0))
     .slice(0, NOTIFICATIONS_SHOWN);
   if (items.length === 0) return '';
   const lines = items.map(
-    (item) => `- ${item.at ? dayLabel(item.at, zone) : ''}: ${item.title}${item.message ? `. ${item.message}` : ''}${item.read ? '' : ' (unread)'}`
+    (item) =>
+      `- ${item.at ? dayLabel(item.at, zone) : ''}: ${item.title}${item.message === REASON_ON_FILE ? ` (${REASON_ON_FILE})` : item.message ? `. ${item.message}` : ''}${item.read ? '' : ' (unread)'}`
   );
   return `Latest notifications (the bell):\n${lines.join('\n')}`;
 }

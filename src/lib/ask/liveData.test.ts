@@ -130,8 +130,43 @@ describe('loadRepSnapshot', () => {
   it('ranks the rep on the Board with the names just above them', async () => {
     const text = await load(createFakeAskDb(seed()).db);
     // Sunday starts a new Board week, so these Thursday/Friday sales are this month's only.
-    expect(text).toContain('- This week: not on the Board yet (no approved sales).');
+    expect(text).toContain('- This week: not on the Board yet (no sales).');
     expect(text).toContain('- This month: #2 of 3 with 1 sale, 10 points; just above: #1 Jordan Price (1 sale, 30 points); just below: #3 Sam Lee (1 sale, 5 points).');
+  });
+
+  it('reads the Board once a minute, however many questions come in', async () => {
+    const { db } = createFakeAskDb(seed());
+    let boardReads = 0;
+    const counting = {
+      ...db,
+      collection: (name: string) => {
+        const ref = db.collection(name) as unknown as { where: (...args: unknown[]) => unknown };
+        return name === 'sales'
+          ? {
+              ...ref,
+              where: (field: string, ...rest: unknown[]) => {
+                if (field === 'saleDate') boardReads += 1;
+                return ref.where(field, ...rest);
+              },
+            }
+          : ref;
+      },
+    };
+    await loadRepSnapshot(counting as unknown as Firestore, 'r1', NOW);
+    await loadRepSnapshot(counting as unknown as Firestore, 'r2', new Date(NOW.getTime() + 30_000));
+    expect(boardReads).toBe(1);
+    await loadRepSnapshot(counting as unknown as Firestore, 'r1', new Date(NOW.getTime() + 61_000));
+    expect(boardReads).toBe(2);
+  });
+
+  it('never shows a notification about someone else, even one addressed to this rep', async () => {
+    const data = seed();
+    const notes = data.notifications as Record<string, Record<string, unknown>>;
+    notes.a1 = { userId: 'r1', type: 'alert_task', title: 'Jamie Stall has stalled in onboarding', message: 'Jamie Stall self-registered 5 days ago', read: false, createdAt: noon('2026-09-27') };
+    notes.a2 = { userId: 'r1', type: 'announcement', title: 'Riley Quinn - You\'re Cleared!', message: 'Manager note: Riley talks too fast, watch the close', read: false, createdAt: noon('2026-09-27') };
+    const text = await load(createFakeAskDb(data).db);
+    for (const leak of ['Jamie Stall', 'self-registered', 'Riley', 'talks too fast', 'Cleared']) expect(text).not.toContain(leak);
+    expect(text).toContain('Install tomorrow');
   });
 
   it("never shows another rep's sales, carrier orders, forms or notifications", async () => {
@@ -145,9 +180,26 @@ describe('loadRepSnapshot', () => {
     const text = await load(createFakeAskDb(seed()).db);
     expect(text).not.toContain('$');
     for (const value of MONEY) expect(text).not.toContain(value);
-    expect(text).not.toMatch(/commission|payout|estimated ?pay|expected ?pay|you earn \d/i);
-    // The dollar figure in free text is cut; the rest of the line stays.
-    expect(text).toContain('Customer backed out, [amount] chargeback');
+    expect(text).not.toMatch(/commission|payout|estimated ?pay|expected ?pay|you earn/i);
+    // A reason that touches pay is replaced whole, not half-redacted.
+    expect(text).not.toMatch(/chargeback/i);
+    expect(text).toMatch(/Tom Baker[^\n]*in the portal: cancelled \(reason on file, ask Jeremy or Jacob\)/);
+    expect(text).toContain('Install tomorrow (reason on file, ask Jeremy or Jacob)');
+  });
+
+  it('replaces any reason or message that mentions pay or money, in every spelling', async () => {
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
+    data.notifications = {
+      m1: { userId: 'r1', type: 'install_date_changed', title: 'Install date changed', message: 'Refund of USD 150 to the customer', read: false, createdAt: noon('2026-09-26') },
+      m2: { userId: 'r1', type: 'carrier_order_issue', title: 'Install missed', message: 'Customer said 150$ was too much', read: false, createdAt: noon('2026-09-25') },
+      m3: { userId: 'r1', type: 'sale_rejected', title: 'Sale rejected', message: 'Wrong rate on this one', read: false, createdAt: noon('2026-09-24') },
+      m4: { userId: 'r1', type: 'install_reminder', title: 'Bonus earned', message: 'Nice work', read: false, createdAt: noon('2026-09-23') },
+    };
+    const text = await load(createFakeAskDb(data).db);
+    for (const leak of ['USD', '150', 'too much', 'Wrong rate', 'Bonus', 'Nice work']) expect(text).not.toContain(leak);
+    expect(text).toContain('Install date changed (reason on file, ask Jeremy or Jacob)');
+    expect(text).toContain('Install missed (reason on file, ask Jeremy or Jacob)');
+    expect(text).toContain('Sale rejected (reason on file, ask Jeremy or Jacob)');
   });
 
   it('redacts phone numbers and emails, and never reads the contact fields', async () => {

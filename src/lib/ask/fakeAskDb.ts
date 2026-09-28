@@ -48,17 +48,23 @@ export function createFakeAskDb(seed: Record<string, Record<string, DocData>> = 
     },
   });
 
-  const query = (name: string, filters: Filter[], order: Order | null, max: number | null): Record<string, unknown> => ({
-    where: (field: string, op: string, value: unknown) => query(name, [...filters, { field, op, value }], order, max),
-    orderBy: (field: string, dir: 'asc' | 'desc' = 'asc') => query(name, filters, { field, dir }, max),
-    limit: (n: number) => query(name, filters, order, n),
+  type Shape = { filters: Filter[]; order: Order | null; max: number | null; fields: string[] | null };
+  const matches = (data: DocData, { field, op, value }: Filter) => {
+    if (op === 'in') return (value as unknown[]).includes(data[field]);
+    if (op === '==') return data[field] === value;
+    if (op === '>=') return data[field] !== undefined && sortKey(data[field]) >= sortKey(value);
+    return false;
+  };
+  const query = (name: string, shape: Shape): Record<string, unknown> => ({
+    where: (field: string, op: string, value: unknown) =>
+      query(name, { ...shape, filters: [...shape.filters, { field, op, value }] }),
+    orderBy: (field: string, dir: 'asc' | 'desc' = 'asc') => query(name, { ...shape, order: { field, dir } }),
+    limit: (n: number) => query(name, { ...shape, max: n }),
+    select: (...fields: string[]) => query(name, { ...shape, fields }),
     get: async () => {
       if (failing.includes(name)) throw new Error(`fake read failure: ${name}`);
-      let rows = [...table(name).entries()].filter(([, data]) =>
-        filters.every(({ field, op, value }) =>
-          op === 'in' ? (value as unknown[]).includes(data[field]) : op === '==' ? data[field] === value : false
-        )
-      );
+      const { filters, order, max, fields } = shape;
+      let rows = [...table(name).entries()].filter(([, data]) => filters.every((filter) => matches(data, filter)));
       if (order) {
         rows = rows
           .filter(([, data]) => data[order.field] !== undefined)
@@ -68,14 +74,16 @@ export function createFakeAskDb(seed: Record<string, Record<string, DocData>> = 
           });
       }
       if (max !== null) rows = rows.slice(0, max);
-      const docs = rows.map(([id, data]) => snap(id, data));
+      const docs = rows.map(([id, data]) =>
+        snap(id, fields ? Object.fromEntries(fields.filter((f) => f in data).map((f) => [f, data[f]])) : data)
+      );
       return { docs, size: docs.length, empty: docs.length === 0 };
     },
   });
 
   const db = {
     collection: (name: string) => ({
-      ...query(name, [], null, null),
+      ...query(name, { filters: [], order: null, max: null, fields: null }),
       doc: (id: string) => docRef(name, id),
       add: async (data: DocData) => {
         autoId += 1;
