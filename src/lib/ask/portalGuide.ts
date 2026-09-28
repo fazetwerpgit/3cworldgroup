@@ -11,7 +11,7 @@ export const PORTAL_GUIDE = `Portal guide (the 3C portal at 3cworldgroup.com/por
 - Board: the leaderboard. Week, Month, Year or All time; ranked by Points or Sales (Week and Points by default). Week resets Sunday, Month on the 1st. Top 3 on the podium, then everyone else, and a Recent sales feed. The Board has no arrows to earlier weeks or months.
 - Chat: team channels only (All Company, New Reps, Training Updates, Managers for managers). No private messages. Photos can be attached. No @mentions or tagging. Keep customer details out of chat.
 - Calls: the weekly team call schedule, in Central time. Next call on top, a day picker for the week, Join opens Google Meet (no dial-in). Managers-only calls don't show for reps.
-- Forms (send a request to the office; after sending you get a reference number, and the office marks it handled):
+- Forms (five in all: Payroll dispute, Expedite order, Fiber report, Leads request, and Manager interview for managers; send a request to the office; after sending you get a reference number, and the office marks it handled):
   Payroll dispute: an install missing from your pay or paid wrong. Contractor name and email, campaign, type of order, date of install, and a screenshot or proof.
   Expedite order: customer name, phone, order number, the dates you want, and a reason: Install too far out; Tech missed install need install asap; Customer no showed need it rescheduled asap.
   Fiber report: log a lead pack's door knocking and fiber sales (date knocked, pack number, doors, contacts, sales).
