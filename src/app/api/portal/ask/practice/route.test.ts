@@ -354,6 +354,8 @@ describe('POST /api/portal/ask/practice', () => {
 
   it("draws a rep's homeowner server side from a shuffle bag: all nine before a repeat, never twice in a row", async () => {
     const drawn: string[] = [];
+    // Every door in order, landlord doors included: a landlord door between two bag draws breaks a repeat.
+    const doors: string[] = [];
     for (let i = 0; drawn.length < 27; i += 1) {
       modelAnswers('Yeah?');
       // A rep asking for a persona is ignored.
@@ -374,12 +376,14 @@ describe('POST /api/portal/ask/practice', () => {
         details: customer.details,
       });
       // A landlord door is a renter drawn outside the bag.
-      if ((saved.door as { kind: string }).kind !== 'landlord') drawn.push(saved.persona as string);
+      const kind = (saved.door as { kind: string }).kind;
+      if (kind !== 'landlord') drawn.push(saved.persona as string);
+      doors.push(kind === 'landlord' ? 'landlord' : (saved.persona as string));
     }
     for (let round = 0; round < 3; round += 1) {
       expect(new Set(drawn.slice(round * 9, round * 9 + 9)).size).toBe(9);
     }
-    for (let i = 1; i < drawn.length; i += 1) expect(drawn[i]).not.toBe(drawn[i - 1]);
+    for (let i = 1; i < doors.length; i += 1) expect(doors[i]).not.toBe(doors[i - 1]);
     // The first knock replaced the saved session: its id no longer works.
     expect((await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).status).toBe(409);
   });
