@@ -476,6 +476,11 @@ describe('the coach held to the transcript and the rules', () => {
       expect({ ...cable, provider: '' }).toEqual({ ...practiceCustomer('tmobile-customer', seed), provider: '' });
       expect(practiceCustomer('elderly', seed, 'IA').provider).toMatch(/CenturyLink|Windstream/);
     }
+    for (let seed = 1; seed < 80; seed += 1) {
+      expect(['Xfinity', 'Spectrum']).toContain(practiceCustomer('tmobile-customer', seed, 'MI').provider);
+      expect(practiceCustomer('elderly', seed, 'MI').provider).toMatch(/AT&T|Frontier/);
+    }
+    expect(regionOf(' MI')).toBe('MI');
     expect(regionOf(' Iowa')).toBe('IA');
     expect(regionOf('TX')).toBe('');
     expect(['Xfinity', 'Spectrum', 'Cox']).toContain(practiceCustomer('tmobile-customer', 3).provider);

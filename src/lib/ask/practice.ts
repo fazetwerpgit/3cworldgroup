@@ -740,8 +740,10 @@ export function freshSeed(personaId: PersonaId, seed: number, recent: readonly s
  */
 const REGIONAL_PROVIDERS: Record<string, { cable: readonly string[]; dsl: readonly string[] }> = {
   IA: { cable: ['Mediacom', 'Mediacom', 'CenturyLink'], dsl: ['CenturyLink DSL', 'CenturyLink', 'Windstream DSL'] },
+  // Lansing and Grand Rapids, where 3C knocks most: Xfinity is the main cable company, Spectrum in parts.
+  MI: { cable: ['Xfinity', 'Xfinity', 'Spectrum'], dsl: ['AT&T DSL', 'AT&T', 'Frontier DSL'] },
 };
-const STATE_CODES: Record<string, string> = { iowa: 'IA', ia: 'IA' };
+const STATE_CODES: Record<string, string> = { iowa: 'IA', ia: 'IA', michigan: 'MI', mi: 'MI' };
 
 /** A rep's state as REGIONAL_PROVIDERS keys it ('IA'), or '' when it's unknown. */
 export const regionOf = (state: unknown) => (typeof state === 'string' ? (STATE_CODES[state.trim().toLowerCase()] ?? '') : '');
