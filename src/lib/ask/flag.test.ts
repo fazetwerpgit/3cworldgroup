@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { askOpenTo } from './flag';
+import { askOpenTo, practiceOpenTo } from './flag';
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -17,5 +17,18 @@ describe('askOpenTo', () => {
     vi.stubEnv('ASK_3C_ENABLED', '');
     vi.stubEnv('ASK_3C_ALSO', 'rep-1');
     expect(askOpenTo('entry_rep', 'rep-1')).toBe(false);
+  });
+});
+
+describe('practiceOpenTo', () => {
+  it("is owners only while it's 'owners', even for the Ask early list; everyone once it's on", () => {
+    vi.stubEnv('ASK_3C_ENABLED', 'owners');
+    vi.stubEnv('ASK_3C_ALSO', 'rep-1');
+    expect(practiceOpenTo('owner')).toBe(true);
+    expect(practiceOpenTo('entry_rep')).toBe(false);
+    vi.stubEnv('ASK_3C_ENABLED', 'true');
+    expect(practiceOpenTo('entry_rep')).toBe(true);
+    vi.stubEnv('ASK_3C_ENABLED', '');
+    expect(practiceOpenTo('owner')).toBe(false);
   });
 });

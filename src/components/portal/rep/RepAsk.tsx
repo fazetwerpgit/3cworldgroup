@@ -7,7 +7,7 @@ import { ThinkingOrb } from 'thinking-orbs';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { askOpenTo } from '@/lib/ask/flag';
+import { askOpenTo, practiceOpenTo } from '@/lib/ask/flag';
 import { isOwner } from '@/types';
 import {
   ASK_CONVERSATION_KEY,
@@ -142,6 +142,7 @@ export function RepAsk() {
   const uid = user?.uid ?? '';
   const [mode, setMode] = useState<Mode>('ask');
   const showPractice = useCallback(() => setMode('practice'), []);
+  const canPractice = practiceOpenTo(user?.role);
 
   if (!askOpenTo(user?.role, user?.uid)) {
     return (
@@ -171,21 +172,25 @@ export function RepAsk() {
             : 'Pitch a homeowner at the door, then get coached on it.'}
         </p>
       </header>
-      <div className={p.tabs} role="group" aria-label="Ask 3C mode">
-        <button type="button" className={p.tab} aria-pressed={mode === 'ask'} onClick={() => setMode('ask')}>
-          Ask
-        </button>
-        <button type="button" className={p.tab} aria-pressed={mode === 'practice'} onClick={() => setMode('practice')}>
-          Practice
-        </button>
-      </div>
+      {canPractice && (
+        <div className={p.tabs} role="group" aria-label="Ask 3C mode">
+          <button type="button" className={p.tab} aria-pressed={mode === 'ask'} onClick={() => setMode('ask')}>
+            Ask
+          </button>
+          <button type="button" className={p.tab} aria-pressed={mode === 'practice'} onClick={() => setMode('practice')}>
+            Practice
+          </button>
+        </div>
+      )}
       <div className={a.mode} hidden={mode !== 'ask'}>
         <AskChat uid={uid} />
       </div>
-      <div className={a.mode} hidden={mode !== 'practice'}>
-        {/* A practice in progress (a reload mid-pitch) opens on Practice. */}
-        <RepPractice uid={uid} active={mode === 'practice'} canPick={isOwner(user?.role ?? undefined)} onResume={showPractice} />
-      </div>
+      {canPractice && (
+        <div className={a.mode} hidden={mode !== 'practice'}>
+          {/* A practice in progress (a reload mid-pitch) opens on Practice. */}
+          <RepPractice uid={uid} active={mode === 'practice'} canPick={isOwner(user?.role ?? undefined)} onResume={showPractice} />
+        </div>
+      )}
     </div>
   );
 }
