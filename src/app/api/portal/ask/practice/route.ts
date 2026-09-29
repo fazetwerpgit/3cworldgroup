@@ -15,7 +15,9 @@ import {
   enforceScore,
   feedbackProblem,
   calendarNote,
+  fallbackFix,
   freshSeed,
+  parseStoredTurns,
   openerHint,
   OUT_OF_PATIENCE,
   isSelfHarm,
@@ -76,7 +78,7 @@ import {
   type PracticeDoor,
   type PracticeLine,
 } from '@/lib/ask/practiceDoor';
-import { talkBudgetMs } from '@/lib/ask/practiceHandsFree';
+import { SPECULATION_SLACK, nonEchoWords, talkBudgetMs } from '@/lib/ask/practiceHandsFree';
 import { AskProviderError, askProviderConfig, callAskModel, type AskMessage, type AskUsage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
 import {
@@ -112,6 +114,7 @@ import {
 //                                                      rep still talking (partial: their words so far),
 //                                                      written ahead; { action: 'turn', ..., cut: true }
 //                                                      then plays it (history ends with the cut-off line)
+//     (a turn may carry replacing: the rep's last line it sends again, reworded; see sameLineAgain)
 //   { action: 'sync', sessionId }                      the conversation as the server has it (resume)
 //   { action: 'redo', logId }                          "Redo that moment": a new session at the
 //                                                      same door, up to its weakest line
@@ -144,6 +147,8 @@ const CUSTOMER_CALL = { think: false, temperature: 0.8, maxTokens: 400 } as cons
 const JUDGE_CALL = { think: false, temperature: 0, maxTokens: 5 } as const;
 /** Model calls a knock must leave room for: two rep lines (2 each) and the feedback (1). */
 const KNOCK_HEADROOM = 5;
+/** A reply still being written after this long has failed: sync stops showing its line as answering. */
+const ANSWERING_MS = 60_000;
 /** A rep doesn't meet the same full name twice within this many doors. */
 const RECENT_NAMES = 20;
 /** The coach gets one retry when its answer breaks the format; both fit in maxDuration. */
@@ -176,8 +181,28 @@ function storedFeedback(value: unknown): PracticeFeedbackReply | null {
 /** The rep's lines as the model saw them: typed contacts redacted, a screen card always this door's own. */
 function cleanTurns(history: PracticeTurn[], card: string): PracticeTurn[] {
   return history.map((turn) =>
-    turn.role === 'rep' ? { role: 'rep', text: redactContact(turn.text) } : turn.role === 'screen' ? { role: 'screen', text: card } : turn
+    turn.role === 'rep'
+      ? { role: 'rep', text: redactContact(turn.text).slice(0, MAX_REP_CHARS) }
+      : turn.role === 'screen'
+        ? { role: 'screen', text: card }
+        : turn
   );
+}
+
+/**
+ * The rep's last line sent again at its own spot, and nothing else: it replaces that line and its answer.
+ * Only while the answer was the last thing said, not abuse (that stays on record), and only the same line:
+ * every word of the stored one (but a couple) in the new one (retried, or firmed up by hands-free), or the
+ * page names the line it replaces (hands-free sent it on the words heard at the pause and the finished
+ * transcript came out different). A second screen that never sent that line can't do either.
+ */
+function sameLineAgain(stored: PracticeTurn[], tail: number, added: PracticeTurn[], steps: PracticeStep[], replacing: unknown): boolean {
+  const line = stored[tail];
+  if (added.length !== 1 || added[0].role !== 'rep' || line?.role !== 'rep') return false;
+  if (!stored.slice(tail + 1).every((turn) => turn.role === 'customer')) return false;
+  if (steps.some((step) => step.at === tail + 1 && step.event === 'abuse')) return false;
+  if (typeof replacing === 'string' && redactContact(replacing).slice(0, MAX_REP_CHARS) === line.text) return true;
+  return nonEchoWords(line.text, redactContact(added[0].text)).length <= SPECULATION_SLACK;
 }
 
 /** A reply line as a turn of the conversation: the homeowner's own lines carry no speaker. */
@@ -232,7 +257,8 @@ export async function POST(request: NextRequest) {
   // The conversation as the server wrote it: the homeowner's lines are only ever the server's own. The
   // page's copy adds nothing but the rep's new line (or the price card) at the end. Null for a session
   // started before it was kept.
-  const stored = current ? parsePracticeHistory(saved.turns) : null;
+  const keptTurns = current !== null && Array.isArray(saved.turns);
+  const stored = keptTurns ? parseStoredTurns(saved.turns) : null;
 
   if (action === 'price') {
     if (!current) return over();
@@ -243,11 +269,20 @@ export async function POST(request: NextRequest) {
 
   if (action === 'redo') return startRedo(db, gate.uid, body?.logId, saved, sessionRef);
 
+  // A session whose transcript is kept but unreadable is never graded from the page's copy.
+  if (keptTurns && !stored) return over();
+
   if (action === 'sync') {
     // A reload or Back mid-practice: the conversation as the server has it (a reply that landed while the
-    // page was away included), and whether the door has closed.
+    // page was away included), whether the door has closed, and the rep's line still being answered.
     if (!current) return over();
-    return NextResponse.json<PracticeSyncReply>({ turns: stored ?? [], ended: saved.ended === true });
+    const answering = saved.answering as { text?: unknown; since?: unknown } | null | undefined;
+    const live = answering && typeof answering.text === 'string' && Number(answering.since) > Date.now() - ANSWERING_MS;
+    return NextResponse.json<PracticeSyncReply>({
+      turns: stored ?? [],
+      ended: saved.ended === true,
+      answering: live ? { text: answering.text as string } : null,
+    });
   }
 
   const sent = parsePracticeHistory(body?.history);
@@ -256,11 +291,18 @@ export async function POST(request: NextRequest) {
   if (stored) {
     if (action === 'feedback') history = stored;
     else {
-      // What the page adds after the homeowner's last line (the rep's line, the price card) goes on the
-      // server's own conversation up to that point; the page's homeowner lines are never used.
+      // The server's conversation only ever grows. The page adds its new line (the rep's words, the price
+      // card) at the end of the conversation it has, which must be the server's whole conversation (its last
+      // homeowner line the same); the page's homeowner lines are never used. The one exception: the rep's
+      // last line again, firmed up (hands-free) or retried, which replaces it and its answer.
+      if (saved.ended === true) return fail("That door's closed. Get your feedback.", 409);
       const tail = sent.findLastIndex((turn) => turn.role === 'customer') + 1;
-      if (stored.length < tail || (tail > 0 && stored[tail - 1].role !== 'customer')) return over();
-      history = [...stored.slice(0, tail), ...sent.slice(tail)];
+      const added = sent.slice(tail);
+      const lined = tail === 0 ? stored.length === 0 : stored[tail - 1]?.role === 'customer' && stored[tail - 1].text === sent[tail - 1].text;
+      if (!lined || (tail !== stored.length && !sameLineAgain(stored, tail, added, parseSteps(saved.steps), body?.replacing))) {
+        return NextResponse.json({ error: 'That practice is over. Knock again to start a new one.', turns: stored }, { status: 409 });
+      }
+      history = [...stored.slice(0, tail), ...added];
     }
   }
   const knock = action === 'turn' && history.length === 0;
@@ -377,6 +419,13 @@ export async function POST(request: NextRequest) {
   const card = practiceScreenCard(customer.persona);
   const turns = cleanTurns(history, card);
   const started = Date.now();
+  // A rep line being answered: a reload meanwhile shows it and waits for the answer (sync).
+  const answered = action === 'turn' && !knock && turns.at(-1)?.role === 'rep';
+  if (answered) await updateIfCurrent(db, sessionRef, sessionId, { answering: { text: turns.at(-1)!.text, since: Date.now() } });
+  const unanswered = (error: unknown) => {
+    if (answered) void updateIfCurrent(db, sessionRef, sessionId, { answering: null }).catch(() => {});
+    return providerFailure(error, action, started);
+  };
 
   if (action === 'cutin') {
     let reply: string;
@@ -449,7 +498,7 @@ export async function POST(request: NextRequest) {
         ({ answer: reply, usage } = homeowner);
         event = verdict && note && verdict !== 'abuse' && !screenOnly ? 'lie' : verdict;
       } catch (error) {
-        return providerFailure(error, action, started);
+        return unanswered(error);
       }
     }
     const first = readCustomerReply(reply, patienceBefore, event, seed, kid);
@@ -502,6 +551,7 @@ export async function POST(request: NextRequest) {
         steps,
         turns: [...turns, ...lines.map(asTurn)],
         ended,
+        answering: null,
         pendingCut: null,
         ...(hurting ? { selfHarm: true } : {}),
         updatedAt: now,
@@ -611,7 +661,7 @@ export async function POST(request: NextRequest) {
       const still = [...stray(feedback), ...lieQuotes(feedback, lieLines)];
       if (still.length) {
         log({ outcome: 'coach_claims_stripped', count: still.length });
-        feedback = stripSentences(feedback, still);
+        feedback = stripSentences(feedback, still, fallbackFix(feedback, steps.filter((step) => step.event === 'lie').length));
       }
       feedback = enforceResult(feedback, resultRules(customer, door));
       // The number is counted in code: the skills' average, capped by what the judge caught line by line.

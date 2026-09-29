@@ -113,6 +113,9 @@ const customerTurn = (line: PracticeLine): PracticeTurn =>
     ? { role: 'customer', text: line.text, speaker: line.speaker }
     : { role: 'customer', text: line.text };
 const REPLACED = 'This practice was replaced on another screen. Knock to start a new one.';
+/** After a reload mid-reply: check back this often, this many times, for the answer. */
+const SYNC_POLL_MS = 1500;
+const SYNC_POLLS = 40;
 /** From here on, the composer shows how many characters are left. */
 const COUNTER_FROM = MAX_REP_CHARS - 150;
 
@@ -410,35 +413,59 @@ export function RepPractice({
     onResume();
     scrollDown('instant');
     if (!restored.sessionId || restored.feedback) return;
-    // A reload or Back mid-practice: catch up with the server's copy (a reply that landed meanwhile), or put
-    // a line that never got its answer back in the box.
+    // A reload or Back mid-practice: catch up with the server's copy. A line still being answered shows
+    // (orb and all) until its answer is written, checked again every little while; a line that never got
+    // its answer goes back in the box.
     let live = true;
-    void post<PracticeSyncReply>({ action: 'sync', sessionId: restored.sessionId }).then((result) => {
-      if (!live) return;
-      if (!result.ok) {
-        if (result.status === 409) {
-          storeSession(uid, null);
-          setSession(null);
-          setNotice(REPLACED);
+    let timer = 0;
+    let polls = 0;
+    let waited = '';
+    const check = () => {
+      void post<PracticeSyncReply>({ action: 'sync', sessionId: restored.sessionId }).then((result) => {
+        if (!live) return;
+        if (!result.ok) {
+          setBusy(null);
+          if (result.status === 409) {
+            storeSession(uid, null);
+            setSession(null);
+            setNotice(REPLACED);
+          }
+          return;
         }
-        return;
-      }
-      const server = Array.isArray(result.data.turns) ? result.data.turns : [];
-      if (!server.length) return;
-      const pending = restored.turns.length > server.length ? restored.turns.at(-1) : undefined;
-      const next: Session = {
-        ...restored,
-        turns: server,
-        ended: restored.ended || result.data.ended === true,
-        endedBy: restored.endedBy ?? (result.data.ended ? 'homeowner' : undefined),
-      };
-      storeSession(uid, next);
-      setSession(next);
-      if (pending?.role === 'rep') setDraft(pending.text);
-      scrollDown('instant');
-    });
+        const server = Array.isArray(result.data.turns) ? result.data.turns : [];
+        if (!server.length) return;
+        const waiting = result.data.answering;
+        if (waiting && polls < SYNC_POLLS) {
+          polls += 1;
+          waited = waiting.text;
+          setSession({ ...restored, turns: [...server, { role: 'rep', text: waiting.text }] });
+          setBusy('turn');
+          timer = window.setTimeout(check, SYNC_POLL_MS);
+          scrollDown('instant');
+          return;
+        }
+        setBusy(null);
+        const pending = restored.turns.length > server.length ? restored.turns.at(-1) : undefined;
+        const next: Session = {
+          ...restored,
+          turns: server,
+          ended: restored.ended || result.data.ended === true,
+          endedBy: restored.endedBy ?? (result.data.ended ? 'homeowner' : undefined),
+        };
+        storeSession(uid, next);
+        setSession(next);
+        // Nothing answered it: back in the box to send again.
+        const lost = polls
+          ? !server.some((turn) => turn.role === 'rep' && turn.text === waited) && waited
+          : pending?.role === 'rep' && server.at(-1)?.role !== 'rep' && pending.text;
+        if (lost) setDraft(lost);
+        scrollDown('instant');
+      });
+    };
+    check();
     return () => {
       live = false;
+      window.clearTimeout(timer);
     };
   }, [uid, scrollDown, onResume]);
 
@@ -574,7 +601,10 @@ export function RepPractice({
    * the rep's last line, or a reaction to the price card just pulled up. With
    * Talk on, the line waits (orb showing) for its voice, then shows and plays.
    */
-  const requestTurn = async (current: Session, early?: { answer?: Promise<TurnPost>; settle?: Promise<TurnPost> }) => {
+  const requestTurn = async (
+    current: Session,
+    early?: { answer?: Promise<TurnPost>; settle?: Promise<TurnPost>; replacing?: string }
+  ) => {
     setBusy('turn');
     setFailed(null);
     setNotice('');
@@ -588,7 +618,12 @@ export function RepPractice({
       : await post<PracticeTurnReply & Partial<PracticeKnockReply>>(
           knocked
             ? { action: 'turn', history: [], ...(canPick ? { persona: current.pick } : {}) }
-            : { action: 'turn', sessionId: current.sessionId, history: current.turns }
+            : {
+              action: 'turn',
+              sessionId: current.sessionId,
+              history: current.turns,
+              ...(early?.replacing ? { replacing: early.replacing } : {}),
+            }
         );
     const lines = result.ok && Array.isArray(result.data.lines) ? result.data.lines.filter((line) => line?.text) : [];
     if (result.ok && lines.length && (!knocked || result.data.sessionId)) {
@@ -732,7 +767,7 @@ export function RepPractice({
       early.sessionId === session.sessionId &&
       early.at === session.turns.length &&
       wordsApart(early.text, text) <= SPECULATION_SLACK;
-    void requestTurn(next, early ? (fits ? { answer: early.result } : { settle: early.result }) : undefined);
+    void requestTurn(next, early ? (fits ? { answer: early.result } : { settle: early.result, replacing: early.text }) : undefined);
   };
 
   /**

@@ -445,6 +445,23 @@ describe('RepPractice', () => {
     expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Who do you have for internet?');
   });
 
+  it('after a reload mid-reply, shows the line being answered and then the answer, without a second reload', async () => {
+    window.sessionStorage.setItem(
+      PRACTICE_SESSION_KEY,
+      JSON.stringify({ uid: 'r1', sessionId: 's1', pick: 'surprise', turns: [{ role: 'customer', text: 'Hi?' }], ended: false, feedback: null, lastAt: Date.now() })
+    );
+    const line = { role: 'rep', text: 'Who do you have for internet?' };
+    replies({ turns: [{ role: 'customer', text: 'Hi?' }], ended: false, answering: { text: line.text } });
+    replies({ turns: [{ role: 'customer', text: 'Hi?' }, line, { role: 'customer', text: 'Spectrum.' }], ended: false, answering: null });
+    await render();
+    expect(container.querySelector('ol')?.textContent).toContain('Who do you have for internet?');
+    expect(container.querySelector('[aria-label="The homeowner is answering"]')).not.toBeNull();
+    await act(async () => new Promise((done) => setTimeout(done, 1600)));
+    expect(text()).toContain('Spectrum.');
+    expect(container.querySelector('[aria-label="The homeowner is answering"]')).toBeNull();
+    expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');
+  });
+
   it('tells the coach the rep ended it when they tap End', async () => {
     await render();
     replies(door('Hi?'));

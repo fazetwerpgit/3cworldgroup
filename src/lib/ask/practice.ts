@@ -58,6 +58,8 @@ export interface PracticeSyncReply {
   turns: PracticeTurn[];
   /** The homeowner closed the door or signed up. */
   ended: boolean;
+  /** The rep's line the homeowner is still answering (a reload mid-reply); null when none. */
+  answering: { text: string } | null;
 }
 
 /** POST /api/portal/ask/practice {action:'cutin'} answers 200 with this: the interruption, not yet played. */
@@ -1117,6 +1119,8 @@ The Score is the whole door and must agree with the Skills: within 1 of their av
 
 Check every claim the rep made about T-Mobile Fiber, the install, the equipment, switching or the old provider against the playbook. Anything not in it (the tech sets up or connects their devices, video calls or Wi-Fi or gaming will be fixed, they can keep the old service running) is an honesty flag. What worked never quotes any part of a line that had a lie or an unbacked claim in it.
 
+3C World Group is an authorized T-Mobile dealer: a rep saying so is true, never an honesty flag. The practice order screen shows only the fiber plan and its monthly price: never tell the rep to check it for anything else (phone plans, fees, discounts, their account).
+
 Guessing the provider as a tie down ("Quick question, you have Spectrum, right?") is 3C's own pitch intro: never dock it or tell the rep to ask it as an open question instead.
 
 Before you write the Fix next time, check it against the transcript line by line: never say the homeowner didn't say something they did (if they said it and the rep ignored it, say the rep ignored it), and never tell the rep to do something they already did. If the transcript has a "Screen:" line, the price is already up: never suggest pulling up the screen or the price again, in the Fix or the Try line.
@@ -1241,7 +1245,7 @@ export function unbackedClaims(feedback: string, turns: PracticeTurn[]): string[
 }
 
 /** The feedback without those sentences (a What worked bullet that loses its quote becomes "nothing to quote"). */
-export function stripSentences(feedback: string, sentences: string[]): string {
+export function stripSentences(feedback: string, sentences: string[], fallbackFix: string): string {
   const hit = (line: string) => sentences.some((sentence) => sentence && line.includes(sentence));
   const lines = feedback.split('\n');
   const bullets = lines.filter((line) => /^\s*[-•*]\s+/.test(line));
@@ -1263,7 +1267,31 @@ export function stripSentences(feedback: string, sentences: string[]): string {
       return [out.replace(/\s+$/, '')];
     })
     .join('\n')
-    .replace(/^(\s*fix next time\s*:)[ \t]*$/im, '$1 Keep every claim to what the playbook backs, and keep asking about what bugs them.');
+    .replace(/^(\s*fix next time\s*:)[ \t]*$/im, `$1 ${fallbackFix}`);
+}
+
+/** The honest general Fix after a rep line the judge caught as untrue. */
+export const CLAIMS_FIX = 'Keep every claim to what the playbook backs, and keep asking about what bugs them.';
+
+/** A Fix aimed at the weakest skill, for when the coach's own Fix had to go. */
+const SKILL_FIX: Record<'opener' | 'discovery' | 'objections' | 'close', string> = {
+  opener: "Open with who you are, who you're with and why you're at their door, then ask them a question.",
+  discovery: "Ask more about their internet and what they pay before you pitch, and listen for what bugs them.",
+  objections: 'When they push back, acknowledge it first, then answer it plainly before you move on.',
+  close: 'Once they sound interested, ask for the install day plainly: "Does Thursday or Saturday work better?"',
+};
+
+/**
+ * What takes the place of a Fix next time the checks removed: the claims line
+ * only when the rep really said something untrue, otherwise a line about the
+ * weakest skill.
+ */
+export function fallbackFix(feedback: string, lies: number): string {
+  if (lies > 0) return CLAIMS_FIX;
+  const skills = parseSkills(feedback);
+  if (!skills) return SKILL_FIX.discovery;
+  const order = ['discovery', 'objections', 'close', 'opener'] as const;
+  return SKILL_FIX[order.reduce((worst, skill) => (skills[skill] < skills[worst] ? skill : worst), order[0])];
 }
 
 /** The coach talking about the grading or instructions instead of the pitch (after an injection attempt). */
@@ -1390,12 +1418,13 @@ export function lieQuotes(feedback: string, lieLines: readonly string[]): string
  */
 export function transcriptProblem(feedback: string, turns: PracticeTurn[], lieLines: readonly string[] = []): string | null {
   const tryLine = /^\s*try this line\s*:\s*(.*)$/im.exec(feedback)?.[1] ?? '';
+  const fixLine = /^\s*fix next time\s*:\s*(.*)$/im.exec(feedback)?.[1] ?? '';
   if (TRY_PROMISE.test(tryLine)) return 'the Try this line promises something the playbook does not back (device setup, fixed calls, video, lag or Wi-Fi)';
   if (
     turns.some((turn) => turn.role === 'screen') &&
-    /\bpull(?:ing)? (?:it |that |the (?:price|screen) )?up\b|\b(?:show|pull up) (?:you )?the (?:screen|price)\b/i.test(tryLine)
+    /\bpull(?:ing)? (?:it |that |the (?:price|screen|order screen) )?up\b|\b(?:show|pull up|open) (?:you |them )?the (?:order )?(?:screen|price)\b/i.test(`${tryLine} ${fixLine}`)
   ) {
-    return 'the Try this line offers the price screen, which is already up';
+    return 'it tells the rep to pull up or open the price screen, which is already up';
   }
   if (lieQuotes(feedback, lieLines).length) return 'a What worked bullet quotes a line that had a lie in it';
   return null;
@@ -1480,6 +1509,25 @@ export function enforceResult(feedback: string, rules: { walkAway: boolean; sale
  * too long, an unknown role, an empty line, or a line over its length limit.
  * The transcript is graded and logged, so a bad one is refused, not trimmed.
  */
+/**
+ * The server's own transcript read back from practiceSessions: the same
+ * shape, without the limits on what a page may send (a redacted line can
+ * grow past them, and a spouse's reply can take a practice one past the
+ * turn cap). Null only when it's not a transcript at all.
+ */
+export function parseStoredTurns(raw: unknown): PracticeTurn[] | null {
+  if (!Array.isArray(raw) || raw.length > MAX_PRACTICE_TURNS * 3) return null;
+  const turns: PracticeTurn[] = [];
+  for (const item of raw) {
+    const role = (item as { role?: unknown } | null)?.role;
+    const text = (item as { text?: unknown } | null)?.text;
+    const speaker = (item as { speaker?: unknown } | null)?.speaker;
+    if ((role !== 'rep' && role !== 'customer' && role !== 'screen') || typeof text !== 'string' || !text.trim()) return null;
+    turns.push((speaker === 'spouse' || speaker === 'kid') && role === 'customer' ? { role, text, speaker } : { role, text });
+  }
+  return turns;
+}
+
 export function parsePracticeHistory(raw: unknown): PracticeTurn[] | null {
   if (!Array.isArray(raw) || raw.length > MAX_PRACTICE_TURNS) return null;
   const turns: PracticeTurn[] = [];

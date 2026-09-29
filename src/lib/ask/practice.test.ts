@@ -22,6 +22,8 @@ import {
   enforceScore,
   aboutThem,
   isSelfHarm,
+  fallbackFix,
+  parseStoredTurns,
   NAMES,
   OLDER_NAMES,
   calendarNote,
@@ -390,14 +392,12 @@ describe('unbackedClaims', () => {
     expect(unbackedClaims(card('You asked who they have for internet.'), turns)).toEqual([]);
   });
 
-  it('never leaves a fragment behind: a Fix with a made-up sentence becomes an honest general line, a bullet goes whole', () => {
+  it('never leaves a fragment behind: a cut Fix gets the fallback whole, a bullet goes whole', () => {
     const fb = card('Acknowledge it. They mentioned their work video calls freeze.');
-    expect(stripSentences(fb, unbackedClaims(fb, turns))).toBe(
-      card('Keep every claim to what the playbook backs, and keep asking about what bugs them.')
-    );
+    expect(stripSentences(fb, unbackedClaims(fb, turns), 'FALLBACK')).toBe(card('FALLBACK'));
     const two = 'What worked:\n- "Who do you have for internet?" opened it. They loved it.\n- "Has the bill gone up at all?" found the pain.\nFix next time: Ask sooner.';
-    expect(stripSentences(two, ['They loved it.'])).toBe('What worked:\n- "Has the bill gone up at all?" found the pain.\nFix next time: Ask sooner.');
-    expect(stripSentences('What worked:\n- "x y z" was great. Truly.\nFix next time: Ask.', ['Truly.'])).toBe(
+    expect(stripSentences(two, ['They loved it.'], 'x')).toBe('What worked:\n- "Has the bill gone up at all?" found the pain.\nFix next time: Ask sooner.');
+    expect(stripSentences('What worked:\n- "x y z" was great. Truly.\nFix next time: Ask.', ['Truly.'], 'x')).toBe(
       'What worked:\n- Nothing in this one to quote back.\nFix next time: Ask.'
     );
   });
@@ -431,6 +431,7 @@ describe('the coach held to the transcript and the rules', () => {
     expect(transcriptProblem(fb('Ask more.', '"The tech connects your devices before he leaves."'), turns)).toMatch(/promises/);
     expect(transcriptProblem(fb('Ask more.', '"Fiber means your video calls come through clear."'), turns)).toMatch(/promises/);
     expect(transcriptProblem(fb('Ask more.', '"Want me to pull up the price for your address?"'), turns)).toMatch(/already up/);
+    expect(transcriptProblem(fb('Open the order screen and show them the phone plan.'), turns)).toMatch(/already up/);
     expect(transcriptProblem(fb('Ask more.'), turns, [turns[1].text])).toMatch(/quotes a line that had a lie/);
     expect(lieQuotes(fb('Ask more.'), [turns[1].text])).toEqual(['"Want an install tomorrow?" asked for the close.']);
   });
@@ -483,6 +484,21 @@ describe('the coach held to the transcript and the rules', () => {
     const pitched = enforceScore(kid, { lies: 0, abuse: false, pitchedNoSaleDoor: true, kidDoor: true });
     expect(parseSkills(pitched)).toEqual({ opener: 3, discovery: 3, objections: 3, close: 3 });
     expect(parseScore(pitched)).toBe(3);
+  });
+
+  it("puts the claims line in a removed Fix only after a caught lie; otherwise one about the weakest skill", () => {
+    const skills = (o: number, d: number, b: number, c: number) => `Score: 5/10\nSkills: Opener ${o}/10, Discovery ${d}/10, Objections ${b}/10, Close ${c}/10`;
+    expect(fallbackFix(skills(7, 7, 7, 7), 1)).toMatch(/^Keep every claim/);
+    expect(fallbackFix(skills(7, 7, 7, 3), 0)).toMatch(/install day/);
+    expect(fallbackFix(skills(2, 7, 7, 7), 0)).toMatch(/^Open with who you are/);
+    expect(fallbackFix('Score: 3/10', 0)).toMatch(/^Ask more about their internet/);
+  });
+
+  it("reads the server's own transcript back even where a page's copy would be refused", () => {
+    const long = { role: 'rep', text: 'x'.repeat(MAX_REP_CHARS + 120) };
+    expect(parsePracticeHistory([long])).toBeNull();
+    expect(parseStoredTurns([long, ...Array.from({ length: MAX_PRACTICE_TURNS }, () => ({ role: 'customer', text: 'Hm.' }))])).toHaveLength(MAX_PRACTICE_TURNS + 1);
+    expect(parseStoredTurns([{ role: 'wizard', text: 'hi' }])).toBeNull();
   });
 
   it('knows a line about self-harm from a figure of speech', () => {

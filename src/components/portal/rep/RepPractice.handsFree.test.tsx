@@ -209,6 +209,7 @@ describe('RepPractice hands-free', () => {
     // ...then sent again on the finished line, and only that answer shows.
     await until(() => practiceBodies().length === 3);
     expect(practiceBodies()[2].history.at(-1)).toEqual({ role: 'rep', text: 'So what do you pay for Spectrum right now each month?' });
+    expect(practiceBodies()[2].replacing).toBe('so what do you pay');
     await until(() => text().includes("Spectrum's about ninety a month. Why?"));
     expect(text()).not.toContain('Pay for what?');
   });
