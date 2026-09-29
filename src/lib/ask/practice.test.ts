@@ -28,6 +28,7 @@ import {
   OLDER_NAMES,
   calendarNote,
   freshSeed,
+  regionOf,
   lieQuotes,
   screenForHomeowner,
   strayCoachSentences,
@@ -466,6 +467,25 @@ describe('the coach held to the transcript and the rules', () => {
     const fresh = freshSeed('skeptic', 5, [first], () => (n += 1));
     expect(practiceCustomer('skeptic', fresh).name).not.toBe(first);
     expect(freshSeed('skeptic', 5, [], () => 1)).toBe(5);
+  });
+
+  it("gives an Iowa rep's homeowners the providers at Iowa doors, and leaves everything else about the door as drawn", () => {
+    for (let seed = 1; seed < 80; seed += 1) {
+      const cable = practiceCustomer('tmobile-customer', seed, 'IA');
+      expect(['Mediacom', 'CenturyLink']).toContain(cable.provider);
+      expect({ ...cable, provider: '' }).toEqual({ ...practiceCustomer('tmobile-customer', seed), provider: '' });
+      expect(practiceCustomer('elderly', seed, 'IA').provider).toMatch(/CenturyLink|Windstream/);
+    }
+    expect(regionOf(' Iowa')).toBe('IA');
+    expect(regionOf('TX')).toBe('');
+    expect(['Xfinity', 'Spectrum', 'Cox']).toContain(practiceCustomer('tmobile-customer', 3).provider);
+  });
+
+  it('has enough names that 20 doors in a row can all be new', () => {
+    for (const pool of [NAMES.f, NAMES.m, OLDER_NAMES.f, OLDER_NAMES.m]) {
+      expect(pool.length).toBeGreaterThan(20);
+      expect(new Set(pool).size).toBe(pool.length);
+    }
   });
 
   it('only ever names real dates, with their weekdays', () => {

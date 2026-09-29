@@ -55,6 +55,15 @@ describe('drawSurprise', () => {
     }
   });
 
+  it("gives the spouse a voice of their own: never a kid's, never the homeowner's", () => {
+    for (const seed of seeds.slice(0, 600)) {
+      const customer = practiceCustomer('busy-parent', seed);
+      const surprise = drawSurprise(seed, customer, 'standard');
+      if (surprise?.kind !== 'spouse') continue;
+      expect(['Achernar', 'Erinome', 'Leda', 'Zephyr', customer.ttsVoice]).not.toContain(surprise.voice);
+    }
+  });
+
   it('brings a spouse only where one fits, in the other gender, at rep line 2 or 3', () => {
     for (const id of PERSONA_IDS) {
       for (const seed of seeds.slice(0, 400)) {
@@ -130,6 +139,13 @@ describe("the spouse's own lines", () => {
   };
   const homeownersLine = customer.persona.objections[0];
 
+  it('splits a speaker label that starts mid-line', () => {
+    expect(splitSpeakers("This is my wife. We've got Mediacom. SPOUSE: We read every word first.", spouse, true)).toEqual([
+      { speaker: 'homeowner', text: "This is my wife. We've got Mediacom." },
+      { speaker: 'spouse', text: 'We read every word first.' },
+    ]);
+  });
+
   it("catches a spouse line carrying the homeowner's words, or a spouse walking up with no lead-in", () => {
     const mixed = [{ speaker: 'spouse' as const, text: `The last time we switched, the install guy never showed up. ${homeownersLine}` }];
     expect(spouseLinesProblem(mixed, spouse, customer, true)).toBe(true);
@@ -144,9 +160,13 @@ describe("the spouse's own lines", () => {
   it("puts it right: the homeowner's words back with the homeowner, a lead-in first", () => {
     const mixed = [{ speaker: 'spouse' as const, text: `The last time we switched, the install guy never showed up. ${homeownersLine}` }];
     const fixed = fixSpouseLines(mixed, spouse, customer, true);
-    expect(fixed[0].speaker).toBe('homeowner');
-    expect(fixed[0].text).toContain(homeownersLine);
-    expect(fixed.at(-1)).toEqual({ speaker: 'spouse', text: 'The last time we switched, the install guy never showed up.' });
+    // A lead-in first, the spouse's own worry, then the homeowner's words after it, as said.
+    expect(fixed.map((line) => line.speaker)).toEqual(['homeowner', 'spouse', 'homeowner']);
+    expect(fixed[1]).toEqual({ speaker: 'spouse', text: 'The last time we switched, the install guy never showed up.' });
+    expect(fixed[2].text).toBe(homeownersLine);
+    // Nothing after the spouse: the homeowner reacts.
+    const bare = fixSpouseLines([{ speaker: 'spouse', text: 'The install guy never showed up last time.' }], spouse, customer, true);
+    expect(bare.map((line) => line.speaker)).toEqual(['homeowner', 'spouse', 'homeowner']);
     expect(spouseLinesProblem(fixed, spouse, customer, true)).toBe(false);
   });
 });

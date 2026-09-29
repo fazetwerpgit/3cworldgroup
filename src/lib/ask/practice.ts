@@ -520,22 +520,30 @@ export const NAMES = {
   f: [
     'Jennifer Olson', 'Ashley Nguyen', 'Keisha Robinson', 'Lauren Schmidt', 'Priya Shah', 'Megan Hansen',
     'Rosa Hernandez', 'Tanya Brooks', 'Nicole Peterson', 'Amanda Larson', 'Maria Gonzalez', 'Jessica Kim',
-    'Brittany Meyer', 'Sarah Johnson', 'Danielle Carter', 'Emily Nelson',
+    'Brittany Meyer', 'Sarah Johnson', 'Danielle Carter', 'Emily Nelson', 'Kayla Wright', 'Heather Lindgren',
+    'Monique Harris', 'Stephanie Vu', 'Rachel Bauer', 'Tiffany Moore', 'Alicia Torres', 'Megan Sorensen',
+    'Crystal Evans', 'Nina Patel', 'Holly Jacobsen', 'Vanessa Cruz', 'Kristen Dahl', 'Jasmine Reed',
   ],
   m: [
     'Mike Schultz', 'Chris Anderson', 'Marcus Williams', 'Dave Jorgensen', 'Luis Ramirez', 'Kevin Tran',
     'Brian Miller', 'Andre Jackson', 'Tom Becker', 'Raj Mehta', 'Jason Christensen', 'Tyler Wagner',
-    'Carlos Mendoza', 'Eric Thompson', 'Derek Coleman', 'Matt Hoffman',
+    'Carlos Mendoza', 'Eric Thompson', 'Derek Coleman', 'Matt Hoffman', 'Ryan Lindquist', 'Josh Fischer',
+    'Darnell Walker', 'Kyle Petersen', 'Nate Vang', 'Anthony Russo', 'Jeremy Klein', 'Sean Murphy',
+    'Omar Haddad', 'Dustin Schmitt', 'Marcus Greene', 'Adam Nguyen', 'Travis Holm', 'Victor Salazar',
   ],
 } as const;
 export const OLDER_NAMES = {
   f: [
     'Dorothy Hansen', 'Barbara Schroeder', 'Joyce Miller', 'Marlene Olson', 'Shirley Peterson', 'Carol Jensen',
-    'Patricia Davis', 'Linda Kowalski', 'Judy Nelson', 'Gloria Martinez',
+    'Patricia Davis', 'Linda Kowalski', 'Judy Nelson', 'Gloria Martinez', 'Betty Thompson', 'Donna Fischer',
+    'Sandra Lund', 'Nancy Wagner', 'Evelyn Brooks', 'Margaret Holm', 'Beverly Carlson', 'Janet Moore',
+    'Ruth Hansen', 'Diane Schulte', 'Arlene Becker', 'Lorraine Vogel',
   ],
   m: [
     'Harold Schmidt', 'Walter Johnson', 'Eugene Larson', 'Frank Novak', 'Gerald Anderson', 'Richard Meyer',
-    'Donald Brooks', 'Roger Wilson', 'Jim Kowalski', 'Ray Hernandez',
+    'Donald Brooks', 'Roger Wilson', 'Jim Kowalski', 'Ray Hernandez', 'Dale Christensen', 'Larry Fisher',
+    'Ken Swanson', 'Bob Lindgren', 'Dennis Moore', 'Gary Wolfe', 'Ron Jacobs', 'Lloyd Evans',
+    'Howard Kim', 'Earl Washington', 'Norm Heller', 'Duane Olsen',
   ],
 } as const;
 
@@ -725,7 +733,20 @@ export function freshSeed(personaId: PersonaId, seed: number, recent: readonly s
   return fresh;
 }
 
-export function practiceCustomer(personaId: PersonaId, seed: number): PracticeCustomer {
+/**
+ * The providers actually at the doors a rep knocks, by the rep's state: a
+ * cable homeowner in Iowa has Mediacom, not Cox. States not listed keep the
+ * persona's own list.
+ */
+const REGIONAL_PROVIDERS: Record<string, { cable: readonly string[]; dsl: readonly string[] }> = {
+  IA: { cable: ['Mediacom', 'Mediacom', 'CenturyLink'], dsl: ['CenturyLink DSL', 'CenturyLink', 'Windstream DSL'] },
+};
+const STATE_CODES: Record<string, string> = { iowa: 'IA', ia: 'IA' };
+
+/** A rep's state as REGIONAL_PROVIDERS keys it ('IA'), or '' when it's unknown. */
+export const regionOf = (state: unknown) => (typeof state === 'string' ? (STATE_CODES[state.trim().toLowerCase()] ?? '') : '');
+
+export function practiceCustomer(personaId: PersonaId, seed: number, region = ''): PracticeCustomer {
   const random = seededRandom(seed);
   const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)];
   const persona = PERSONAS.find((p) => p.id === personaId)!;
@@ -734,7 +755,11 @@ export function practiceCustomer(personaId: PersonaId, seed: number): PracticeCu
   const name = pick(namesFor(persona)[gender]);
   const [low, high] = persona.bill;
   const bill = low + Math.floor(random() * (high - low + 1));
-  const provider = persona.providers ? pick(persona.providers) : '';
+  const drawn = persona.providers ? pick(persona.providers) : '';
+  // The same draw (the seed fixes everything after it), from the rep's area's providers where known.
+  const local = REGIONAL_PROVIDERS[region];
+  const pool = local && persona.providers ? (persona.providers.some((p) => /dsl|centurylink|frontier|windstream/i.test(p)) ? local.dsl : local.cable) : null;
+  const provider = pool ? pool[persona.providers!.indexOf(drawn) % pool.length] : drawn;
   const first = Math.floor(random() * persona.details.length);
   const details = [persona.details[first]];
   if (random() < 0.5) details.push(persona.details[(first + 1 + Math.floor(random() * (persona.details.length - 1))) % persona.details.length]);
@@ -776,6 +801,7 @@ How to play it:
 - Raise your objections one at a time, naturally. A good answer moves you along; a weak or pushy one makes you dig in.
 - Once the rep has answered a worry well enough for you (you accepted it, or they gave you a way to check it), drop it: don't bring the same question back later. Move on to your next concern, or to deciding.
 - Your bill is exactly $${customer.bill} a month: if it comes up, it's always that same number (never a different amount, never "extra" on top of it).
+- You're talking at your door right now: never say you don't open the door for people (you already did), unless you're only on the doorbell camera.
 - Once the rep has said who they are and who they're with (a name, 3C, T-Mobile Fiber, a badge), you know it: don't ask who they're with again. A skeptic can still ask to see ID or how to check.
 - Only refer back to what was actually said in this conversation, by you or the rep. Never claim you said something you didn't ("like I said...", "I told you I don't give out my info") unless you really said it above.
 - Pressure, pushing or repeating the pitch never makes you agree to anything, not even a "yeah, probably". Only good questions and straight answers move you.

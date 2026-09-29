@@ -18,6 +18,7 @@ import {
   fallbackFix,
   freshSeed,
   parseStoredTurns,
+  regionOf,
   openerHint,
   OUT_OF_PATIENCE,
   isSelfHarm,
@@ -98,6 +99,7 @@ import {
   loadCorrections,
   loadCountedSessions,
   loadNotes,
+  repHome,
   takeDailyPractice,
 } from '@/lib/ask/store';
 
@@ -332,6 +334,8 @@ export async function POST(request: NextRequest) {
   let patienceBefore: number;
   let bag: PersonaId[] = [];
   let recentNames: string[] = [];
+  // The rep's state, for the providers at their doors: read at the knock, kept with the session.
+  let region = typeof saved.region === 'string' ? saved.region : '';
   let door: PracticeDoor;
   if (knock) {
     // Only an owner picks; a rep's knock is always a surprise, and so is the kind of door. A landlord door
@@ -358,7 +362,8 @@ export async function POST(request: NextRequest) {
     const recent = Array.isArray(saved.recentNames) ? saved.recentNames.filter((name): name is string => typeof name === 'string') : [];
     seed = freshSeed(personaId, seed, recent, () => randomInt(0, 2 ** 32 - 1));
     recentNames = [practiceCustomer(personaId, seed).name, ...recent].slice(0, RECENT_NAMES);
-    const drawn = practiceCustomer(personaId, seed);
+    region = regionOf((await repHome(db, gate.uid)).split(',').at(-1));
+    const drawn = practiceCustomer(personaId, seed, region);
     // An owner's picked homeowner is a plain door (to demo that homeowner); the clock still counts.
     door = choice === 'surprise' ? drawDoor(seed, drawn, doorKind, new Date()) : { ...drawDoor(seed, drawn, 'standard', new Date()), surprise: null };
     patienceBefore = drawn.persona.patience;
@@ -413,7 +418,7 @@ export async function POST(request: NextRequest) {
     return fail("That's today's practice limit. Tap End to get your feedback.", 429);
   }
 
-  const customer = practiceCustomer(personaId, seed);
+  const customer = practiceCustomer(personaId, seed, region);
   // The rep's lines lose typed contacts before the model or the log; the homeowner's are the model's own.
   // A screen card is always this door's own card, whatever the page sent.
   const card = practiceScreenCard(customer.persona);
@@ -573,6 +578,7 @@ export async function POST(request: NextRequest) {
       turns: lines.map(asTurn),
       ended,
       recentNames,
+      region,
       homeowner: homeownerPicks(customer),
       door,
       startedAt: now,
@@ -693,6 +699,7 @@ export async function POST(request: NextRequest) {
     personaLabel: customer.persona.label,
     seed,
     homeowner: homeownerPicks(customer),
+    region,
     door,
     doorSummary: summary,
     turns,
@@ -782,7 +789,8 @@ async function startRedo(
   if (!(await takeDailyPractice(db, uid, now, 0, KNOCK_HEADROOM))) {
     return fail("That's today's practice limit. Back at it tomorrow.", 429);
   }
-  const customer = practiceCustomer(logged.persona, logged.seed);
+  const region = typeof logged.region === 'string' ? logged.region : '';
+  const customer = practiceCustomer(logged.persona, logged.seed, region);
   const door = logged.door ? parseDoor(logged.door) : STANDARD_DOOR;
   // The homeowner's lines just before the moment: the ones Talk mode replays.
   let from = kept.length;
@@ -800,6 +808,9 @@ async function startRedo(
     steps: [],
     turns: kept,
     homeowner: homeownerPicks(customer),
+    region,
+    // The rep's recent homeowners carry on, so names don't start repeating after a redo.
+    recentNames: Array.isArray(saved.recentNames) ? saved.recentNames : [],
     door,
     redoOf: logId,
     redoFrom: kept.length,
@@ -821,7 +832,7 @@ const LAST_STRAW_NOTE =
 
 /** A spouse reply that mixed the two people up: how to write it. */
 const SPOUSE_FORMAT_NOTE =
-  '(Write each person on their own line. Your own words first, as the homeowner. Then your spouse on a line of their own starting "SPOUSE:", saying only their own worry, never your words or your situation.)';
+  '(Write each person on their own line. Your own words first, as the homeowner. Then your spouse on a line of their own starting "SPOUSE:", saying only their own worry, never your words or your situation. Anything you say after them goes on a line starting "HOMEOWNER:".)';
 
 /** The hidden note that makes the homeowner cut in on a rep who won't stop talking. */
 const CUT_IN_NOTE =

@@ -123,7 +123,10 @@ function spouseVoice(customer: PracticeCustomer, random: () => number): GeminiVo
   const other = customer.gender === 'f' ? 'm' : 'f';
   const age = VOICE_BOOK[customer.ttsVoice].age;
   // The spouse speaks in the wary tone: only voices that read as their gender in it.
-  const fits = GEMINI_VOICES.filter((voice) => VOICE_BOOK[voice].gender === other && voiceFits(voice, 'wary'));
+  // Never one of the kid voices (a spouse shouldn't sound like the kid at another door) or the homeowner's.
+  const fits = GEMINI_VOICES.filter(
+    (voice) => VOICE_BOOK[voice].gender === other && voiceFits(voice, 'wary') && !KID_VOICES.includes(voice) && voice !== customer.ttsVoice
+  );
   const sameAge = fits.filter((voice) => VOICE_BOOK[voice].age === age);
   const pool = sameAge.length ? sameAge : fits;
   return pool[Math.floor(random() * pool.length)];
@@ -268,7 +271,7 @@ export function surpriseNote(door: PracticeDoor, turns: PracticeTurn[], customer
     return `[Right now: ${BEAT_NOTES[surprise.beat]}. React to it in this reply in a few words, and you're more distracted and short with the rep for this line.]`;
   }
   const who = customer.gender === 'f' ? 'husband' : 'wife';
-  return `[Right now: your ${who} ${surprise.name} walks up behind you and joins in. They speak in this reply, on their own line starting "SPOUSE:", with their own worry: "${surprise.objection}"]`;
+  return `[Right now: your ${who} ${surprise.name} walks up behind you and joins in. In this reply: first you, a few words letting the rep know who this is; then your ${who} on their own line starting "SPOUSE:", with only their own worry: "${surprise.objection}"; then you again, on a line starting "HOMEOWNER:", one short line reacting to what they said.]`;
 }
 
 /** The part of the homeowner's system prompt this door adds. */
@@ -337,7 +340,9 @@ export function splitSpeakers(text: string, door: PracticeDoor, spouseIsHere: bo
   const spouseName = door.surprise?.kind === 'spouse' ? door.surprise.name.toLowerCase() : '';
   const lines: PracticeLine[] = [];
   let speaker: Speaker = main;
-  for (const raw of text.split(/\n+/)) {
+  // A label mid-line ("...We've got Mediacom. SPOUSE: We read every word...") starts a line of its own.
+  const labelled = spouseIsHere ? text.replace(/(?<=[.!?…])\s+((?:spouse|husband|wife|homeowner)\s*:)/gi, '\n$1') : text;
+  for (const raw of labelled.split(/\n+/)) {
     let line = raw.trim();
     if (!line) continue;
     const label = /^([A-Za-z' ]{2,24}):\s*/.exec(line);
@@ -392,18 +397,21 @@ export function spouseLinesProblem(lines: PracticeLine[], door: PracticeDoor, cu
   return spouse.some((line) => spouseSentences(line.text, door, customer).theirs.length > 0);
 }
 
-/** A spouse line's sentences: the spouse's own, and the homeowner's that slipped in. */
-function spouseSentences(text: string, door: PracticeDoor, customer: PracticeCustomer): { own: string[]; theirs: string[] } {
+/** A spouse line's sentences in order, each marked the spouse's own or the homeowner's that slipped in. */
+function spouseSentences(text: string, door: PracticeDoor, customer: PracticeCustomer): { own: string[]; theirs: string[]; order: PracticeLine[] } {
   const objection = door.surprise?.kind === 'spouse' ? door.surprise.objection : '';
   const homeowner = [...customer.details, ...customer.persona.objections, customer.persona.situation, customer.persona.pain].join(' ');
   const own: string[] = [];
   const theirs: string[] = [];
+  const order: PracticeLine[] = [];
   for (const sentence of text.split(/(?<=[.!?])\s+/).filter(Boolean)) {
     const mine = overlap(sentence, objection);
     const homeowners = overlap(sentence, homeowner);
-    (homeowners >= 0.4 && homeowners > mine ? theirs : own).push(sentence);
+    const isTheirs = homeowners >= 0.4 && homeowners > mine;
+    (isTheirs ? theirs : own).push(sentence);
+    order.push({ speaker: isTheirs ? 'homeowner' : 'spouse', text: sentence });
   }
-  return { own, theirs };
+  return { own, theirs, order };
 }
 
 /**
@@ -419,11 +427,13 @@ export function fixSpouseLines(lines: PracticeLine[], door: PracticeDoor, custom
       fixed.push(line);
       continue;
     }
-    const { own, theirs } = spouseSentences(line.text, door, customer);
-    if (theirs.length) fixed.push({ speaker: 'homeowner', text: theirs.join(' ') });
-    fixed.push({ speaker: 'spouse', text: own.length ? own.join(' ') : door.surprise.objection });
+    // Each sentence goes to whoever said it, in the order said (the homeowner's reaction stays after).
+    const { own, order } = spouseSentences(line.text, door, customer);
+    if (!own.length) fixed.push({ speaker: 'spouse', text: door.surprise.objection });
+    fixed.push(...order);
   }
   if (joining && !fixed.some((line) => line.speaker === 'spouse')) fixed.push({ speaker: 'spouse', text: door.surprise.objection });
+  if (joining && fixed.at(-1)?.speaker === 'spouse') fixed.push({ speaker: 'homeowner', text: "Yeah, that's a real worry for us." });
   if (joining && fixed[0]?.speaker !== 'homeowner') {
     fixed.unshift({ speaker: 'homeowner', text: `Oh, hang on. This is my ${customer.gender === 'f' ? 'husband' : 'wife'}, ${door.surprise.name}.` });
   }

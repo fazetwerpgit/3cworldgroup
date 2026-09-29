@@ -787,7 +787,8 @@ describe('POST /api/portal/ask/practice', () => {
     modelAnswers('SPOUSE: We read every word before we sign anything.');
     const fixed = await (await POST(req({ action: 'turn', ...SESSION, history: PITCH }))).json();
     expect(fixed.lines[0].speaker).toBe('homeowner');
-    expect(fixed.lines.at(-1)).toEqual({ speaker: 'spouse', text: 'We read every word before we sign anything.' });
+    expect(fixed.lines.at(-2)).toEqual({ speaker: 'spouse', text: 'We read every word before we sign anything.' });
+    expect(fixed.lines.at(-1).speaker).toBe('homeowner');
   });
 
   it('never lets a sellable homeowner end as "walked away the right way"', async () => {
