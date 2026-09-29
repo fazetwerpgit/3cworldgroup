@@ -109,3 +109,115 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+
+/* ---------- practice: the transcript under a session's feedback ---------- */
+.transcript summary {
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  color: var(--c-lime);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.transcript ol {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.transcript b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+/* One line per practice session; tap to open it. */
+.session + .session {
+  border-top: 1px solid var(--c-line);
+}
+
+.sessionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s1) var(--s3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--s3) var(--s4);
+  border: 0;
+  background: transparent;
+  color: var(--c-text-3);
+  font: 500 var(--t-sm) / 1.35 var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sessionRow b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.sessionRow:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .sessionRow:hover {
+    background: var(--c-panel-hi);
+  }
+}
+
+.chev {
+  margin-left: auto;
+  transition: transform 140ms ease;
+}
+
+.sessionRow[aria-expanded='true'] .chev {
+  transform: rotate(180deg);
+}
+
+.sessionBody {
+  display: grid;
+  gap: var(--s2);
+  padding: 0 var(--s4) var(--s4);
+}
+
+.repFilter {
+  min-width: 0;
+  max-width: 220px;
+}
+
+/* Practice: the owner's assignments and "Coach was wrong". */
+.assign {
+  display: grid;
+  gap: var(--s4);
+}
+.assignForm {
+  display: grid;
+  gap: var(--s3);
+}
+@media (min-width: 720px) {
+  .assignForm {
+    grid-template-columns: 2fr 2fr 1fr 1.4fr;
+    align-items: end;
+  }
+}
+.correct {
+  display: grid;
+  gap: var(--s3);
+}
+.correction {
+  display: grid;
+  gap: var(--s1);
+  padding: var(--s3);
+  border-left: 2px solid var(--c-amber);
+  background: var(--c-well);
+}

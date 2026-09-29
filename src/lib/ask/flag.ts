@@ -32,3 +32,10 @@ export function askOpenTo(
   if (audience !== 'owners') return false;
   return isOwner(role ?? undefined) || (!!uid && askEarlyUids().includes(uid));
 }
+
+/** Whether this user gets Practice. While the audience is 'owners' it's owners only: the
+ *  ASK_3C_ALSO early users get Ask, not Practice (the practice routes enforce the same). */
+export function practiceOpenTo(role: PlatformRole | FieldRole | null | undefined): boolean {
+  const audience = askAudience();
+  return audience === 'all' || (audience === 'owners' && isOwner(role ?? undefined));
+}

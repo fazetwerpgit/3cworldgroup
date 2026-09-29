@@ -7,6 +7,20 @@
   max-width: 720px;
 }
 
+/* Ask and Practice, each a column of the page; the one not shown stays mounted.
+   minmax(0, 1fr) and min-width: 0 keep a wide child (a long word, a button row)
+   from stretching the column past the phone's width. */
+.mode {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s3);
+  min-width: 0;
+}
+
+.mode[hidden] {
+  display: none;
+}
+
 /* ---------- empty state: example questions ---------- */
 .examples {
   display: grid;

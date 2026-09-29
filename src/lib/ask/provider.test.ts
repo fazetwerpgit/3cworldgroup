@@ -26,17 +26,17 @@ describe('callAskModel self-check', () => {
     const draft = 'Tell her to try another card, and fiber fixes her lag for sure.';
     const fetchMock = vi.fn().mockResolvedValueOnce(reply(draft)).mockResolvedValueOnce(reply('Tell her to try another card.'));
     vi.stubGlobal('fetch', fetchMock);
-    expect((await callAskModel(config, [{ role: 'user', content: 'q' }], undefined, 'check it')).answer).toBe('Tell her to try another card.');
+    expect((await callAskModel(config, [{ role: 'user', content: 'q' }], { selfCheck: 'check it' })).answer).toBe('Tell her to try another card.');
     const sent = JSON.parse(fetchMock.mock.calls[1][1].body).messages;
     expect(sent.slice(-2)).toEqual([{ role: 'assistant', content: draft }, { role: 'user', content: 'check it' }]);
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(reply('Draft.')).mockResolvedValueOnce(new Response('', { status: 500 })));
-    expect((await callAskModel(config, [{ role: 'user', content: 'q' }], undefined, 'check it')).answer).toBe('Draft.');
+    expect((await callAskModel(config, [{ role: 'user', content: 'q' }], { selfCheck: 'check it' })).answer).toBe('Draft.');
   });
 });
 
 describe('callAskModel self-check guards', () => {
-  const ask = () => callAskModel(config, [{ role: 'user', content: 'q' }], undefined, 'check it');
+  const ask = () => callAskModel(config, [{ role: 'user', content: 'q' }], { selfCheck: 'check it' });
   const draft = 'Step 1: close everything. Step 2: clear cache and cookies. Step 3: start over in a new private window.';
 
   it('keeps the draft when the check answers with a comment or guts the reply', async () => {
@@ -64,8 +64,7 @@ describe('callAskModel self-check drift', () => {
     const out = await callAskModel(
       config,
       [{ role: 'user', content: 'two houses?' }, { role: 'assistant', content: earlier }, { role: 'user', content: 'Thanks dude' }],
-      undefined,
-      'check it'
+      { selfCheck: 'check it' }
     );
     expect(out.answer).toBe('Anytime. Go get one on the board.');
     expect(out.draft).toBeUndefined();
@@ -80,8 +79,7 @@ describe('callAskModel self-check growth', () => {
     const out = await callAskModel(
       config,
       [{ role: 'user', content: 'tim is tmrw?' }, { role: 'assistant', content: earlier }, { role: 'user', content: 'write me the text to tim' }],
-      undefined,
-      'check it'
+      { selfCheck: 'check it' }
     );
     expect(out.answer).toBe(draft);
   });

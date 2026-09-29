@@ -1,6 +1,6 @@
 // TEST-ONLY in-memory stand-in for the slice of Firestore Ask 3C touches
-// (collection get/add, where '=='/'in', orderBy, limit, doc get/set/update,
-// runTransaction with get/set). Collections listed in `failing` reject every
+// (collection get/add, where '=='/'in'/'>='/'<=', orderBy, limit, select, doc get/set/update/delete,
+// runTransaction with get/set/update). Collections listed in `failing` reject every
 // read, to test fail-soft paths.
 // Imported by tests only; nothing in the app imports it.
 
@@ -46,6 +46,9 @@ export function createFakeAskDb(seed: Record<string, Record<string, DocData>> = 
       if (!current) throw new Error('NOT_FOUND');
       table(name).set(id, { ...current, ...data });
     },
+    delete: async () => {
+      table(name).delete(id);
+    },
   });
 
   type Shape = { filters: Filter[]; order: Order | null; max: number | null; fields: string[] | null };
@@ -53,6 +56,7 @@ export function createFakeAskDb(seed: Record<string, Record<string, DocData>> = 
     if (op === 'in') return (value as unknown[]).includes(data[field]);
     if (op === '==') return data[field] === value;
     if (op === '>=') return data[field] !== undefined && sortKey(data[field]) >= sortKey(value);
+    if (op === '<=') return data[field] !== undefined && sortKey(data[field]) <= sortKey(value);
     return false;
   };
   const query = (name: string, shape: Shape): Record<string, unknown> => ({
@@ -98,6 +102,9 @@ export function createFakeAskDb(seed: Record<string, Record<string, DocData>> = 
         get: (ref: { get: () => Promise<unknown> }) => ref.get(),
         set: (ref: { set: (data: DocData) => Promise<void> }, data: DocData) => {
           pending.push(() => ref.set(data));
+        },
+        update: (ref: { update: (data: DocData) => Promise<void> }, data: DocData) => {
+          pending.push(() => ref.update(data));
         },
       });
       for (const write of pending) await write();

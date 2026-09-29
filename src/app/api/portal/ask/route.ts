@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       { role: 'user', content },
     ];
     try {
-      ({ answer, usage, draft } = await callAskModel(config, messages, undefined, SELF_CHECK));
+      ({ answer, usage, draft } = await callAskModel(config, messages, { selfCheck: SELF_CHECK }));
     } catch (error) {
       const kind = error instanceof AskProviderError ? error.kind : 'unknown';
       const status = error instanceof AskProviderError ? error.status ?? 0 : 0;

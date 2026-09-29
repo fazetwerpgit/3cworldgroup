@@ -11,6 +11,8 @@ const MAX_HISTORY_CHARS = 4000;
  * sends) one rep's conversation to the next.
  */
 export const ASK_CONVERSATION_KEY = 'ask3c-conversation';
+/** After this long unused, Ask 3C (and Practice) start fresh: the next door. */
+export const ASK_IDLE_RESET_MS = 30 * 60_000;
 
 export interface AskTurnMessage {
   role: 'user' | 'assistant';

@@ -9,6 +9,24 @@ export const DEFAULT_ASK_MODEL = 'deepseek-flash';
 export const ASK_TIMEOUT_MS = 30_000;
 /** The answer is a few lines; thinking tokens count here too, so this leaves room for both. */
 const MAX_ANSWER_TOKENS = 6000;
+const DEFAULT_TEMPERATURE = 0.5;
+
+/**
+ * How one call runs. Defaults are Ask 3C's: thinking at high effort (0.5 without it), 6000 tokens, 30 s,
+ * no self-check.
+ */
+export interface AskCallOptions {
+  /** Thinking on (DeepSeek). Off skips the empty or cut-off answer retry: there's nothing to fall back to. */
+  think?: boolean;
+  /** DeepSeek's reasoning effort while thinking. */
+  effort?: 'low' | 'high';
+  /** Used whenever thinking is off (DeepSeek ignores it while thinking). */
+  temperature?: number;
+  maxTokens?: number;
+  timeoutMs?: number;
+  /** Sent back with the draft for a cleaned copy (see callAskModel). */
+  selfCheck?: string;
+}
 
 export type AskContentPart =
   | { type: 'text'; text: string }
@@ -68,11 +86,11 @@ const count = (value: unknown) => (typeof value === 'number' && Number.isFinite(
 export async function callAskModel(
   config: AskProviderConfig,
   messages: AskMessage[],
-  timeoutMs = ASK_TIMEOUT_MS,
-  selfCheck?: string
+  options: AskCallOptions = {}
 ): Promise<{ answer: string; usage: AskUsage; draft?: string }> {
+  const { timeoutMs = ASK_TIMEOUT_MS, selfCheck } = options;
   const started = Date.now();
-  const draft = await draftAnswer(config, messages, timeoutMs);
+  const draft = await draftAnswer(config, messages, timeoutMs, options);
   const left = timeoutMs - (Date.now() - started);
   if (!selfCheck || left < 4_000) return draft;
   try {
@@ -80,7 +98,8 @@ export async function callAskModel(
       config,
       [...messages, { role: 'assistant', content: draft.answer }, { role: 'user', content: selfCheck }],
       Math.min(left, 12_000),
-      false
+      false,
+      options
     );
     // The check only cuts or softens. A cut-off, a comment about the check, a gutted reply, a reply
     // that grew (in live use it sometimes pasted an earlier turn's reply in front of the draft), or a
@@ -128,12 +147,14 @@ function revisesDraft(checked: string, draft: string): boolean {
 async function draftAnswer(
   config: AskProviderConfig,
   messages: AskMessage[],
-  timeoutMs: number
+  timeoutMs: number,
+  options: AskCallOptions
 ): Promise<{ answer: string; usage: AskUsage }> {
+  if (options.think === false) return requestAnswer(config, messages, timeoutMs, false, options);
   const started = Date.now();
   let cutOff: { answer: string; usage: AskUsage } | null = null;
   try {
-    const first = await requestAnswer(config, messages, timeoutMs, true);
+    const first = await requestAnswer(config, messages, timeoutMs, true, options);
     if (!first.truncated) return first;
     cutOff = first;
   } catch (error) {
@@ -145,7 +166,7 @@ async function draftAnswer(
     throw new AskProviderError('bad_response');
   }
   try {
-    const retry = await requestAnswer(config, messages, left, false);
+    const retry = await requestAnswer(config, messages, left, false, options);
     return retry.truncated && cutOff ? cutOff : retry;
   } catch (error) {
     if (cutOff) return cutOff;
@@ -157,12 +178,14 @@ async function requestAnswer(
   config: AskProviderConfig,
   messages: AskMessage[],
   timeoutMs: number,
-  think: boolean
+  think: boolean,
+  options: AskCallOptions
 ): Promise<{ answer: string; usage: AskUsage; truncated: boolean }> {
+  const temperature = options.temperature ?? DEFAULT_TEMPERATURE;
   const body: Record<string, unknown> = {
     model: config.model,
     messages,
-    max_tokens: MAX_ANSWER_TOKENS,
+    max_tokens: options.maxTokens ?? MAX_ANSWER_TOKENS,
     stream: false,
   };
   // Field tests (9/25): with thinking the model stopped guessing where the
@@ -172,10 +195,10 @@ async function requestAnswer(
   // another provider behind ASK_BASE_URL never sees them.
   if (isDeepSeek(config.baseUrl)) {
     body.thinking = { type: think ? 'enabled' : 'disabled' };
-    if (think) body.reasoning_effort = 'high';
-    else body.temperature = 0.5;
+    if (think) body.reasoning_effort = options.effort ?? 'high';
+    else body.temperature = temperature;
   } else {
-    body.temperature = 0.5;
+    body.temperature = temperature;
   }
 
   let res: Response;
