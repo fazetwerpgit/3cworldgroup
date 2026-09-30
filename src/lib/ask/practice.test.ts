@@ -28,7 +28,6 @@ import {
   OLDER_NAMES,
   calendarNote,
   freshSeed,
-  regionOf,
   lieQuotes,
   screenForHomeowner,
   strayCoachSentences,
@@ -469,20 +468,13 @@ describe('the coach held to the transcript and the rules', () => {
     expect(freshSeed('skeptic', 5, [], () => 1)).toBe(5);
   });
 
-  it("gives an Iowa rep's homeowners the providers at Iowa doors, and leaves everything else about the door as drawn", () => {
+  it("gives Practice doors the providers in 3C's Michigan territory, and leaves everything else about the door as drawn", () => {
     for (let seed = 1; seed < 80; seed += 1) {
-      const cable = practiceCustomer('tmobile-customer', seed, 'IA');
-      expect(['Mediacom', 'CenturyLink']).toContain(cable.provider);
+      const cable = practiceCustomer('tmobile-customer', seed, 'MI');
+      expect(['Xfinity', 'Spectrum']).toContain(cable.provider);
       expect({ ...cable, provider: '' }).toEqual({ ...practiceCustomer('tmobile-customer', seed), provider: '' });
-      expect(practiceCustomer('elderly', seed, 'IA').provider).toMatch(/CenturyLink|Windstream/);
-    }
-    for (let seed = 1; seed < 80; seed += 1) {
-      expect(['Xfinity', 'Spectrum']).toContain(practiceCustomer('tmobile-customer', seed, 'MI').provider);
       expect(practiceCustomer('elderly', seed, 'MI').provider).toMatch(/AT&T|Frontier/);
     }
-    expect(regionOf(' MI')).toBe('MI');
-    expect(regionOf(' Iowa')).toBe('IA');
-    expect(regionOf('TX')).toBe('');
     expect(['Xfinity', 'Spectrum', 'Cox']).toContain(practiceCustomer('tmobile-customer', 3).provider);
   });
 

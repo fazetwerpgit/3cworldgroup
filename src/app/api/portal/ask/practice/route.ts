@@ -18,7 +18,7 @@ import {
   fallbackFix,
   freshSeed,
   parseStoredTurns,
-  regionOf,
+  PRACTICE_REGION,
   openerHint,
   OUT_OF_PATIENCE,
   isSelfHarm,
@@ -99,7 +99,6 @@ import {
   loadCorrections,
   loadCountedSessions,
   loadNotes,
-  repHome,
   takeDailyPractice,
 } from '@/lib/ask/store';
 
@@ -362,7 +361,7 @@ export async function POST(request: NextRequest) {
     const recent = Array.isArray(saved.recentNames) ? saved.recentNames.filter((name): name is string => typeof name === 'string') : [];
     seed = freshSeed(personaId, seed, recent, () => randomInt(0, 2 ** 32 - 1));
     recentNames = [practiceCustomer(personaId, seed).name, ...recent].slice(0, RECENT_NAMES);
-    region = regionOf((await repHome(db, gate.uid)).split(',').at(-1));
+    region = PRACTICE_REGION;
     const drawn = practiceCustomer(personaId, seed, region);
     // An owner's picked homeowner is a plain door (to demo that homeowner); the clock still counts.
     door = choice === 'surprise' ? drawDoor(seed, drawn, doorKind, new Date()) : { ...drawDoor(seed, drawn, 'standard', new Date()), surprise: null };

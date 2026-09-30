@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createFakeAskDb } from '@/lib/ask/fakeAskDb';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
-import { ABUSE_CLOSES, LINE_JUDGE_PROMPT, PERSONAS, practiceCustomer } from '@/lib/ask/practice';
+import { ABUSE_CLOSES, LINE_JUDGE_PROMPT, PERSONAS, PRACTICE_REGION, practiceCustomer } from '@/lib/ask/practice';
 
 // POST /api/portal/ask/practice: the Ask 3C gate, its own daily count, the
 // homeowner call (fast settings, [END] stripped) and the graded, logged
@@ -367,7 +367,7 @@ describe('POST /api/portal/ask/practice', () => {
       expect(saved.sessionId).toBe(reply.sessionId);
       expect(saved.patience).toBe(PERSONAS.find((p) => p.id === saved.persona)!.patience);
       // The picks are kept with the session, and are what the seed draws.
-      const customer = practiceCustomer(saved.persona as never, saved.seed as number);
+      const customer = practiceCustomer(saved.persona as never, saved.seed as number, PRACTICE_REGION);
       expect(saved.homeowner).toEqual({
         name: customer.name,
         voice: customer.ttsVoice,
