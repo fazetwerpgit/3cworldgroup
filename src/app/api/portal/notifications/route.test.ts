@@ -12,12 +12,21 @@ const db = vi.hoisted(() => {
     }),
   }));
   const where = () => ({
-    orderBy: () => ({
+    // Honour the field and direction like Firestore, so ascending or a wrong field
+    // returns the OLDEST window and the newest-first test fails.
+    orderBy: (field: string, direction: 'asc' | 'desc' = 'asc') => ({
       limit: (n: number) => ({
         get: async () => {
           state.orderedCalls++;
           if (state.missingIndex) throw Object.assign(new Error('The query requires an index'), { code: 9 });
-          return { docs: [...docs].reverse().slice(0, n) };
+          const time = (doc: (typeof docs)[number]) => {
+            const value = (doc.data() as Record<string, unknown>)[field];
+            return value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function'
+              ? value.toDate().getTime()
+              : 0;
+          };
+          const sorted = [...docs].sort((a, b) => (direction === 'desc' ? time(b) - time(a) : time(a) - time(b)));
+          return { docs: sorted.slice(0, n) };
         },
       }),
     }),

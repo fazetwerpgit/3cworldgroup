@@ -241,4 +241,18 @@ describe('PUT /api/portal/comp-plan', () => {
 
     expect(writeAdminAudit).not.toHaveBeenCalled();
   });
+
+  it('diffs the first save against the committed plan, not against nothing', async () => {
+    mockManagement.mockResolvedValue({ ok: true, uid: 'o1', name: 'Owner', isAdmin: true, isOwner: true });
+    // No config docs yet: the committed plan is what was in effect.
+    const rates = structuredClone(COMP_PLAN_RATES);
+    rates.ae_tier_1!.att!['att-1gig'] = COMP_PLAN_RATES.ae_tier_1!.att!['att-1gig'] + 10;
+
+    await PUT(put({ rates }));
+
+    const details = vi.mocked(writeAdminAudit).mock.calls[0][0].details;
+    expect(details?.rates).toEqual([
+      { path: 'ae_tier_1.att.att-1gig', from: COMP_PLAN_RATES.ae_tier_1!.att!['att-1gig'], to: COMP_PLAN_RATES.ae_tier_1!.att!['att-1gig'] + 10 },
+    ]);
+  });
 });

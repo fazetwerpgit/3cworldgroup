@@ -46,8 +46,8 @@ const ROWS: RecentSaleRow[] = [
 
 const TODAY: TodayItem[] = [
   { kind: 'call', call: { id: 'c1', title: 'Team huddle', day: 'wednesday' as never, time: '10:30', meetLink: 'https://meet.example.com/x' } },
-  { kind: 'date', row: { id: '3', customer: 'Ada Okafor', plan: 'TFiber 2 Gig', missed: false, missedDay: null, missedNote: null } },
-  { kind: 'date', row: { id: '4', customer: 'Lee Whitfield', plan: 'Frontier Fiber 1 Gig', missed: true, missedDay: '2026-09-19', missedNote: 'Sep 19 · Customer not home' } },
+  { kind: 'date', row: { id: '3', customer: 'Ada Okafor', plan: 'TFiber 2 Gig', missed: false, missedDay: null } },
+  { kind: 'date', row: { id: '4', customer: 'Lee Whitfield', plan: 'Frontier Fiber 1 Gig', missed: true, missedDay: '2026-09-19', missedDayLabel: 'Sep 19', missedReason: 'Customer not home' } },
 ];
 
 function Shell({ children }: { children: ReactNode }) {

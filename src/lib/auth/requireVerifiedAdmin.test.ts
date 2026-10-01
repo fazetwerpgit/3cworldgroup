@@ -401,7 +401,7 @@ describe('requireVerifiedFieldManagerOrManagement', () => {
   });
 });
 
-// requireVerifiedRequester backs sales GET, sales/[id] GET+PUT, sales/stats GET, and
+// requireVerifiedRequester backs sales GET, sales/[id] GET+PUT, and
 // notifications PUT. Unlike the hard-gates above it never 403s on role — it hands the
 // route a resolved isManagement / isAdmin / isManagerOrAbove triple and lets the route
 // decide how much to scope the query. Nothing else in this file pins down that triple.

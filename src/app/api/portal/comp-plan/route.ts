@@ -154,12 +154,9 @@ export async function PUT(request: NextRequest) {
       if (problem) return NextResponse.json({ error: problem }, { status: 400 });
     }
 
-    const [previousRatesSnap, previousMarginSnap] = await Promise.all([
-      adminDb.collection('config').doc(RATES_DOC).get(),
-      adminDb.collection('config').doc(MARGIN_DOC).get(),
-    ]);
-    const previousRates = previousRatesSnap.data()?.rates;
-    const previousMargin = previousMarginSnap.data()?.margin;
+    // Diff against the plan that was in effect, which is the committed plan
+    // until the first save; the same loaders GET uses.
+    const [{ rates: previousRates }, previousMargin] = await Promise.all([loadRates(), loadMargin()]);
 
     const updatedAt = new Date();
     await adminDb.collection('config').doc(RATES_DOC).set({

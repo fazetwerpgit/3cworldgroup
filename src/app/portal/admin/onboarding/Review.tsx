@@ -140,7 +140,8 @@ function itemDetail(item: ChecklistItem): string | null {
   }
 }
 
-export function Review() {
+/** `onChanged` runs after each action that changes the queue, so the hub's tab counts follow. */
+export function Review({ onChanged }: { onChanged?: () => void } = {}) {
   const { user } = useAuth();
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -262,6 +263,7 @@ export function Review() {
       closeReject();
       if (status === 'approved') setNotice(`${item.itemLabel} approved for ${repName}.`);
       await fetchQueue(true);
+      onChanged?.();
     } catch (err) {
       fail(err instanceof Error ? err.message : 'Failed to review submission');
     } finally {
@@ -287,6 +289,7 @@ export function Review() {
           : `Sent ${item.itemLabel} to ${repName}. They can sign it in their portal.`
       );
       await fetchQueue(true);
+      onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send for signature');
     } finally {
@@ -685,6 +688,7 @@ export function Review() {
             setNotice(`${markTarget.itemLabel} marked complete for ${markTarget.repName}.`);
             setMarkTarget(null);
             void fetchQueue(true);
+            onChanged?.();
           }}
         />
       ) : null}

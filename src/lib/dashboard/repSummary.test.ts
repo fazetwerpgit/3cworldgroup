@@ -226,28 +226,44 @@ describe('needsDateRows', () => {
     expect(rows.map((r) => r.missedDay)).toEqual([null, '2026-09-14']);
   });
 
-  it("puts the carrier's reason on a missed install's row, dated by the carrier's day", () => {
-    const byCarrierDay = sale({ installDate: d(2026, 9, 12) });
-    const bySaleDay = sale({ installDate: d(2026, 9, 12) });
+  it("gives a missed install's row the carrier's day, its reason and the sale date", () => {
+    const byCarrierDay = sale({ installDate: d(2026, 9, 12), saleDate: d(2026, 9, 4) });
+    const bySaleDay = sale({ installDate: d(2026, 9, 12), saleDate: d(2026, 9, 3) });
     const fiber = new Map<string, FiberOrder>([
       [byCarrierDay.id!, { status: 'breakage', estInstallDate: '2026-09-19', breakageReason: 'CX Missed — Customer Not Home' } as FiberOrder],
       [bySaleDay.id!, { status: 'breakage', estInstallDate: null, breakageReason: ' — Tech No Show' } as FiberOrder],
     ]);
     const rows = needsDateRows([byCarrierDay, bySaleDay], fiber, NOW);
-    expect(rows.map((r) => r.missedNote)).toEqual(['Sep 19 · Customer not home', 'Sep 12 · Tech no show']);
+    const carrier = rows.find((r) => r.id === byCarrierDay.id)!;
+    const fromSale = rows.find((r) => r.id === bySaleDay.id)!;
+    expect([carrier.missedDayLabel, carrier.missedReason, carrier.soldDate?.getTime()]).toEqual([
+      'Sep 19',
+      'Customer not home',
+      d(2026, 9, 4).getTime(),
+    ]);
+    expect([fromSale.missedDayLabel, fromSale.missedReason, fromSale.soldDate?.getTime()]).toEqual([
+      'Sep 12',
+      'Tech no show',
+      d(2026, 9, 3).getTime(),
+    ]);
   });
 
-  it('adds no note without a reason, or when the sale never had a date', () => {
-    const noReason = sale({ installDate: d(2026, 9, 12) });
-    const undated = sale();
+  it('gives no reason without a carrier reason, and no missed day or reason when the sale never had a date', () => {
+    const noReason = sale({ installDate: d(2026, 9, 12), saleDate: d(2026, 9, 6) });
+    const undated = sale({ saleDate: d(2026, 9, 5) });
     const fiber = new Map<string, FiberOrder>([
       [noReason.id!, { status: 'breakage', estInstallDate: '2026-09-12', breakageReason: null } as FiberOrder],
       [undated.id!, { status: 'breakage', estInstallDate: '2026-09-12', breakageReason: 'CX Missed — Customer Not Home' } as FiberOrder],
     ]);
     const rows = needsDateRows([noReason, undated], fiber, NOW);
-    expect(rows.map((r) => [r.missed, r.missedNote])).toEqual([
-      [true, null],
-      [false, null],
+    const missed = rows.find((r) => r.id === noReason.id)!;
+    const needsDate = rows.find((r) => r.id === undated.id)!;
+    expect([missed.missed, missed.missedDayLabel, missed.missedReason]).toEqual([true, 'Sep 12', null]);
+    expect([needsDate.missed, needsDate.missedDayLabel, needsDate.missedReason, needsDate.soldDate?.getTime()]).toEqual([
+      false,
+      null,
+      null,
+      d(2026, 9, 5).getTime(),
     ]);
   });
 });

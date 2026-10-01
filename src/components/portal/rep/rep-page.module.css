@@ -148,7 +148,7 @@
 
 .chip {
   flex: none;
-  min-height: 40px;
+  min-height: var(--tap);
   padding: 0 14px;
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
@@ -159,7 +159,6 @@
   cursor: pointer;
 }
 
-/* 40px chip + the 2px row padding keeps a >=44px touch band. */
 .chip[aria-pressed='true'] {
   border-color: var(--c-lime);
   background: var(--c-lime-wash);

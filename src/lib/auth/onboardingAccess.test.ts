@@ -99,10 +99,9 @@ describe('isOnboardingAllowedApi', () => {
     expect(isOnboardingAllowedApi('api/portal/training')).toBe(false);
   });
 
-  it('blocks the three routes that must close', () => {
+  it('blocks the routes that must close', () => {
     expect(isOnboardingAllowedApi('/api/portal/leaderboard')).toBe(false);
     expect(isOnboardingAllowedApi('/api/portal/sales')).toBe(false);
-    expect(isOnboardingAllowedApi('/api/portal/sales/stats')).toBe(false);
   });
 
   it('blocks chat administration but allows chat participation', () => {

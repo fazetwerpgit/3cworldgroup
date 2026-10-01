@@ -178,8 +178,6 @@ export interface NeedsDateRow {
   missed: boolean;
   /** The carrier's missed install day (its breakage row), when it gave one. */
   missedDay: string | null;
-  /** "Sep 19 · Customer not home": the missed day and the carrier's reason, else null. */
-  missedNote: string | null;
   /** The missed install's day alone ("Sep 19"): the carrier's day, else the sale's old install date. */
   missedDayLabel?: string | null;
   /** The carrier's reason alone ("Customer not home"), else null. */
@@ -201,14 +199,6 @@ function missedReason(order: FiberOrder | undefined): string | null {
   return carrierReasonLabel(order.breakageReason) || null;
 }
 
-/** "Sep 19 · Customer not home" (the row is titled Missed install), or null when the carrier gave no reason. */
-function missedNote(sale: Sale, order: FiberOrder | undefined): string | null {
-  const reason = missedReason(order);
-  if (!reason || order?.status !== 'breakage') return null;
-  const day = dayLabel(missedInstallDay(order.estInstallDate, sale.installDate));
-  return day ? `${day} · ${reason}` : reason;
-}
-
 /** Counted sales that still need an install date on the calendar, newest first. */
 export function needsDateRows(sales: Sale[], fiberBySale: FiberMap, now: Date = new Date()): NeedsDateRow[] {
   return countedSales(sales, fiberBySale)
@@ -222,7 +212,6 @@ export function needsDateRows(sales: Sale[], fiberBySale: FiberMap, now: Date = 
         plan: planLabel(sale),
         missed,
         missedDay: order?.status === 'breakage' ? order.estInstallDate ?? null : null,
-        missedNote: missed ? missedNote(sale, order) : null,
         missedDayLabel: missed ? dayLabel(missedInstallDay(order?.status === 'breakage' ? order.estInstallDate : null, sale.installDate)) : null,
         missedReason: missed ? missedReason(order) : null,
         soldDate: toDate(sale.saleDate),

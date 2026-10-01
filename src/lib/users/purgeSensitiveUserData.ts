@@ -6,6 +6,9 @@ const SENSITIVE_UPLOAD_ITEMS = ONBOARDING_ITEMS.filter(
   (item) => item.sensitive && item.referenceKind === 'storage'
 ).map((item) => item.id);
 
+/** An invite id is one path segment: anything with a slash or dots is ignored, never deleted. */
+const SAFE_INVITE_ID = /^[A-Za-z0-9_-]+$/;
+
 /** What a purge removed; `failures` names every step that did not complete. */
 export interface PurgeResult {
   userSensitive: number;
@@ -14,15 +17,21 @@ export interface PurgeResult {
 }
 
 /**
- * Removes the identity data of a hard-deleted account: the encrypted SSN and
- * driver's-licence number (userSensitive) and the uploaded licence photos.
+ * Removes the identity data of an account being hard-deleted: the encrypted SSN
+ * and driver's-licence number (userSensitive) and the uploaded licence photos.
+ * Call it BEFORE the users doc is deleted: it reads that doc for the invite the
+ * hire came through.
  *
  * Where the photos live depends on how the person joined. Someone who signed up
  * directly uploaded to onboarding/{uid}/{item}/. Someone who came through an
  * invite link uploaded before they had an account, to
- * onboarding/invite_{inviteId}/{item}/, and the files were never moved: the
- * checklist item just carries that folder as its `reference`. So the folders to
- * clear are the item's recorded reference plus the uid folder.
+ * onboarding/invite_{inviteId}/{item}/, and the files were never moved. If that
+ * hire's item was later rejected and re-uploaded from the portal, the checklist
+ * reference now points at the uid folder and nothing points at the invite folder
+ * any more. So the invite ids come from the account itself (users.onboardingInviteId
+ * and candidateOnboarding.convertedUserId), and every one of their folders is
+ * cleared, plus the uid folder. The checklist's recorded reference is only
+ * followed when it is exactly one of those folders.
  *
  * Deliberately NOT removed: the signed W-9, contract, direct-deposit and
  * compensation envelopes and their PDFs, the onboarding checklist history, and
@@ -30,9 +39,8 @@ export interface PurgeResult {
  * normally has to retain, and Decommission preserves them too; the access log
  * records who viewed the data and holds no document content.
  *
- * Best-effort per step. The account is already gone when this runs, so a failed
- * step is reported and logged, never thrown; the caller decides what to tell
- * the admin.
+ * Best-effort per step: a failed step is reported in `failures` and logged, never
+ * thrown. Safe to run again: everything it deletes is gone-or-deleted.
  */
 export async function purgeSensitiveUserData(uid: string): Promise<PurgeResult> {
   const result: PurgeResult = { userSensitive: 0, files: 0, failures: [] };
@@ -56,24 +64,40 @@ export async function purgeSensitiveUserData(uid: string): Promise<PurgeResult> 
     fail('userSensitive', error);
   }
 
+  // The invite(s) this person joined through. Without them an invited hire's
+  // original licence photos could be left behind, so a failed lookup is a failure.
+  const inviteIds = new Set<string>();
+  try {
+    const [profile, converted] = await Promise.all([
+      db.collection('users').doc(uid).get(),
+      db.collection('candidateOnboarding').where('convertedUserId', '==', uid).get(),
+    ]);
+    const fromProfile = profile.data()?.onboardingInviteId;
+    if (typeof fromProfile === 'string') inviteIds.add(fromProfile);
+    for (const doc of converted.docs) inviteIds.add(doc.id);
+  } catch (error) {
+    fail('invite lookup', error);
+  }
+  const inviteFolders = [...inviteIds]
+    .filter((id) => SAFE_INVITE_ID.test(id))
+    .map((id) => `onboarding/invite_${id}/`);
+
   for (const itemId of SENSITIVE_UPLOAD_ITEMS) {
     try {
-      const folders = new Set<string>([`onboarding/${uid}/${itemId}/`]);
+      // Trailing slashes everywhere: "onboarding/abc/x/" must never match "onboarding/abcd/x/".
+      const allowed = [`onboarding/${uid}/${itemId}/`, ...inviteFolders.map((base) => `${base}${itemId}/`)];
+      const folders = new Set<string>(allowed);
+
       const stored = (await db.collection('userOnboarding').doc(`${uid}_${itemId}`).get()).data()?.reference;
       // Older references were saved without the trailing slash (signFolderFiles
-      // handles the same case); normalise so those hires' photos are not skipped.
-      const recorded = typeof stored === 'string' ? (stored.endsWith('/') ? stored : `${stored}/`) : null;
-      // The reference is stored data, so only trust it if it is exactly this item's
-      // folder under this person's own uid or an invite folder; anything else is
-      // ignored, never deleted.
-      const ownFolder =
-        recorded !== null &&
-        recorded.endsWith(`/${itemId}/`) &&
-        (recorded.startsWith(`onboarding/${uid}/`) || recorded.startsWith('onboarding/invite_'));
-      if (recorded !== null && ownFolder) folders.add(recorded);
+      // handles the same case). A reference that is not exactly one of this
+      // person's folders is ignored, never deleted.
+      if (typeof stored === 'string') {
+        const recorded = stored.endsWith('/') ? stored : `${stored}/`;
+        if (allowed.includes(recorded)) folders.add(recorded);
+      }
 
       for (const prefix of folders) {
-        // Trailing slash on the prefix: "onboarding/abc/x/" must never match "onboarding/abcd/x/".
         const [files] = await getOnboardingBucket().getFiles({ prefix });
         for (const file of files) {
           await file.delete({ ignoreNotFound: true });

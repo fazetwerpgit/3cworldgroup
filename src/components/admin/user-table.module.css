@@ -1,7 +1,8 @@
 /* Member directory (direction D). Rows and cells come from admin-ui.module.css.
    Phone: a compact two-line row. Line one is the name with a role chip, line two
-   the email; the status dot and approved-sales count sit right-aligned. Desktop
-   keeps the table. Overrides use `.cols .x` so they beat admin-ui's single classes. */
+   the email; the status (dot alone for Active, dot and word otherwise) and the
+   approved-sales count sit right-aligned. Desktop keeps the table. Overrides use
+   `.cols .x` so they beat admin-ui's single classes. */
 
 .cols {
   --cols: minmax(0, 1.5fr) minmax(0, 1.25fr) 100px 116px 48px 56px 124px 20px;

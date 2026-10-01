@@ -162,7 +162,7 @@ export default function SettingsPage() {
     ['Email', email || 'Not on file'],
     ...(showRole ? [['Role', roleLabel || 'Not assigned'] as [string, string]] : []),
     ['Status', user?.status === 'active' ? 'Active' : 'Inactive'],
-    ['Start date', formatDate(user?.hireDate ?? user?.createdAt)],
+    ['Start date', user?.hireDate ? formatDate(user.hireDate) : 'Not on file'],
     ...(user?.territoryId ? [['Territory', user.territoryId] as [string, string]] : []),
     ['Address', fullAddress],
   ];

@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, type ReactNode } from 'react';
+import { Suspense, useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { AdminGate, AdminHubContext, AdminPageHead, AdminSkeletonRows, AdminTabs } from './AdminUi';
@@ -16,11 +16,15 @@ interface AdminHubProps {
   counts?: Record<string, number | undefined>;
   /**
    * With no explicit ?tab=, open the first tab that has open items (else the
-   * first tab), waiting for `counts` to load. Decided once per visit, so
-   * clearing the last item in a tab does not move the page under the viewer.
+   * first tab), waiting up to COUNTS_WAIT_MS for `counts` to load. Decided once
+   * per visit, so clearing the last item in a tab does not move the page under
+   * the viewer.
    */
   landOnWork?: boolean;
 }
+
+/** How long a bare visit waits for tab counts before opening the first tab. */
+const COUNTS_WAIT_MS = 1200;
 
 /**
  * One admin page hosting several old pages as tabs (?tab= or ?type=). The
@@ -35,9 +39,19 @@ function Hub({ hub, title, panels, counts, landOnWork = false }: AdminHubProps) 
   const askedTab = tabs.find((tab) => tab.key === asked);
 
   const [landed, setLanded] = useState<string | null>(null);
+  // The counts load every queue; past the wait, land without them rather than
+  // hold the page on a skeleton.
+  const [waitedOut, setWaitedOut] = useState(false);
+  const waiting = landOnWork && !counts && !askedTab && !landed && !waitedOut;
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setTimeout(() => setWaitedOut(true), COUNTS_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [waiting]);
+
   if (askedTab) {
     if (landed) setLanded(null);
-  } else if (!landed && (!landOnWork || counts)) {
+  } else if (!landed && (!landOnWork || counts || waitedOut)) {
     const withWork = landOnWork ? tabs.find((tab) => (counts?.[tab.key] ?? 0) > 0) : undefined;
     const pick = withWork ?? tabs[0];
     if (pick) setLanded(pick.key);

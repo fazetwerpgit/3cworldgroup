@@ -247,6 +247,7 @@ describe('GET /api/portal/onboarding/review', () => {
     queryGetMock.mockResolvedValueOnce({
       docs: [progress('user-1', 'dl_photos', { status: 'approved', reference: 'onboarding/user-1/dl_photos' })],
     });
+    getAllMock.mockResolvedValueOnce([{ exists: true, id: 'user-1', data: () => ({ displayName: 'One' }) }]);
 
     const json = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
 
@@ -278,6 +279,7 @@ describe('GET /api/portal/onboarding/review', () => {
         }],
       });
       queryGetMock.mockResolvedValueOnce({ docs: [] });
+      getAllMock.mockResolvedValue([{ exists: true, id: 'user-1', data: () => ({ displayName: 'One', fieldRole: 'entry_level_rep' }) }]);
     });
 
     it('gives operations the item but no signed URLs, and writes no audit row', async () => {
@@ -328,8 +330,14 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
     data: () => ({ userId, itemId, status: 'submitted', ...(submittedAt ? { submittedAt: { toDate: () => new Date(submittedAt) } } : {}) }),
   });
   const summary = () => GET(new NextRequest('http://localhost/api/portal/onboarding/review?summary=1'));
+  // getAll answers per requested ref, like Firestore: unknown ids come back as missing docs.
+  const accounts = (byId: Record<string, Record<string, unknown>>) =>
+    getAllMock.mockImplementation(async (...refs: Array<{ id: string }>) =>
+      refs.map((ref) => ({ exists: ref.id in byId, id: ref.id, data: () => byId[ref.id] }))
+    );
 
-  it('returns one row per item waiting on management, and leaves e-sign items out', async () => {
+  it('returns one row per item waiting on management, and leaves e-sign and unknown items out', async () => {
+    accounts({ u1: { fieldRole: 'entry_level_rep' }, u2: { fieldRole: 'entry_level_rep' }, u3: { fieldRole: 'entry_level_rep' } });
     queryGetMock.mockResolvedValueOnce({
       docs: [
         waiting('u1', 'onboarding_submission', '2026-07-27T00:00:00.000Z'),
@@ -348,13 +356,25 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
     });
   });
 
-  it('reads only the submitted items: no review history, no user scan, no signed files', async () => {
+  it('does not count items of an account that has been deleted', async () => {
+    accounts({ u1: { fieldRole: 'entry_level_rep' } });
+    queryGetMock.mockResolvedValueOnce({
+      docs: [waiting('u1', 'dl_photos', '2026-07-27T00:00:00.000Z'), waiting('ghost', 'dl_photos', '2026-07-24T00:00:00.000Z')],
+    });
+
+    const json = await (await summary()).json();
+
+    expect(json.submissions).toEqual([{ submittedAt: '2026-07-27T00:00:00.000Z' }]);
+  });
+
+  it('reads only the submitted items and their accounts: no review history, no pending scan, no signed files', async () => {
+    accounts({ u2: { fieldRole: 'entry_level_rep' } });
     queryGetMock.mockResolvedValueOnce({ docs: [waiting('u2', 'dl_photos', '2026-07-26T00:00:00.000Z')] });
 
     await summary();
 
     expect(queryGetMock).toHaveBeenCalledTimes(1);
-    expect(getAllMock).not.toHaveBeenCalled();
+    expect(getAllMock).toHaveBeenCalledTimes(1);
     expect(getOnboardingBucket).not.toHaveBeenCalled();
     expect(logAddMock).not.toHaveBeenCalled();
   });
@@ -376,16 +396,14 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
         waiting('u3', 'not_a_real_item', '2026-07-23T00:00:00.000Z'),
       ],
     };
-    const users = [
-      { exists: true, id: 'u1', data: () => ({ displayName: 'One', fieldRole: 'entry_level_rep' }) },
-      { exists: true, id: 'u2', data: () => ({ displayName: 'Two', fieldRole: 'entry_level_rep' }) },
-      { exists: false, id: 'ghost', data: () => undefined },
-      { exists: true, id: 'u3', data: () => ({ displayName: 'Three', fieldRole: 'entry_level_rep' }) },
-    ];
+    accounts({
+      u1: { displayName: 'One', fieldRole: 'entry_level_rep' },
+      u2: { displayName: 'Two', fieldRole: 'entry_level_rep' },
+      u3: { displayName: 'Three', fieldRole: 'entry_level_rep' },
+    });
 
     // Full response: submitted, reviewed history, pending users.
     queryGetMock.mockResolvedValueOnce(submitted).mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({ docs: [] });
-    getAllMock.mockResolvedValueOnce(users);
     const full = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
 
     // Summary response: submitted only.
@@ -393,7 +411,8 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
     const counted = await (await summary()).json();
 
     const times = (rows: Array<{ submittedAt: string | null }>) => rows.map((row) => row.submittedAt).sort();
-    expect(counted.submissions).toHaveLength(full.submissions.length);
+    expect(full.submissions).toHaveLength(2);
+    expect(full.people.map((p: { userId: string }) => p.userId)).not.toContain('ghost');
     expect(times(counted.submissions)).toEqual(times(full.submissions));
   });
 });

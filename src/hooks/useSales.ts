@@ -12,18 +12,6 @@ interface SalesFilters {
   limit?: number;
 }
 
-interface SalesStats {
-  totalSales: number;
-  totalValue: number;
-  totalCommission: number;
-  pendingCount: number;
-  approvedCount: number;
-  rejectedCount: number;
-  averageValue: number;
-  salesChange: number;
-  valueChange: number;
-}
-
 export const NO_SIGNAL_SALE_MESSAGE = 'No signal. Your entry is saved, tap Submit to retry.';
 
 /**
@@ -63,7 +51,6 @@ export function useSales() {
   // missing from every month AND their carrier orders come back as red "never
   // logged" rows, so the board has to be able to say the figures are partial.
   const [truncated, setTruncated] = useState(false);
-  const [stats, setStats] = useState<SalesStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -291,43 +278,9 @@ export function useSales() {
     }
   }, []);
 
-  const fetchStats = useCallback(async (
-    period?: 'day' | 'week' | 'month' | 'year',
-    salesRepId?: string
-  ) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const params = new URLSearchParams();
-      if (period) params.append('period', period);
-      // salesRepId is the TARGET filter; management may pass any rep, everyone
-      // else is checked against the token uid server-side.
-      if (salesRepId) params.append('salesRepId', salesRepId);
-
-      const token = await getIdToken();
-      const response = await fetch(`/api/portal/sales/stats?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch stats');
-      }
-
-      setStats(data.stats);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch stats';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   return {
     sales,
     truncated,
-    stats,
     loading,
     error,
     fetchSales,
@@ -336,6 +289,5 @@ export function useSales() {
     updateSale,
     deleteSale,
     setSaleCancelled,
-    fetchStats,
   };
 }

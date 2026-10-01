@@ -5,40 +5,31 @@
    then recruiting.
    ========================================================================== */
 
+.banners,
 .grid {
   /* Pinned to the D values (40421300): the rep base moved to C, the owner view
      stays as it is live. */
   --c-lift: 0 1px 2px rgba(0, 0, 0, 0.3);
   --c-panel-hi: #1a2840;
+}
 
+.grid {
   display: grid;
   gap: var(--s3);
 }
 
-/* Phone: one column in answer order (set below). Desktop: money and recruiting
-   share the first row, Needs attention runs full width under them. */
+/* Phone: one column in DOM order (money, Needs attention, Recruiting). Desktop:
+   money and Recruiting share the first row, Needs attention runs full width
+   under them. Placement is by explicit grid lines, so reading order stays the
+   DOM order. */
 
-@media (max-width: 1023px) {
-  .banners {
-    order: 0;
-  }
-  .board {
-    order: 1;
-  }
-  .attention {
-    order: 2;
-  }
-  .recruiting {
-    order: 3;
-  }
+/* The banners sit above the grid so an empty slot leaves no grid track. */
+.banners {
+  margin-bottom: var(--s3);
 }
 
 .banners:empty {
   display: none;
-}
-
-.side {
-  display: contents;
 }
 
 /* ---------- money: the score panel ---------- */
@@ -314,19 +305,22 @@
   }
 
   .banners {
-    grid-column: 1 / -1;
+    margin-bottom: var(--s4);
   }
 
   .board {
     grid-column: 1 / span 8;
+    grid-row: 1;
   }
 
-  .side {
-    display: flex;
-    flex-direction: column;
+  .recruiting {
     grid-column: 9 / span 4;
-    gap: var(--s4);
-    min-width: 0;
+    grid-row: 1;
+  }
+
+  .attention {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .cellMargin,
@@ -392,8 +386,8 @@
     padding: var(--s4) var(--s5);
   }
 
-  /* Money fills the left 8 columns; the side column (Recruiting, then Needs
-     attention) fills the right 4, and the money table stretches to match. */
+  /* The money table takes the board's spare height; Recruiting stretches to
+     the board's height beside it. */
   .board {
     grid-template-rows: auto 1fr auto;
   }
@@ -404,11 +398,5 @@
 
   .table {
     height: 100%;
-  }
-
-  /* The side column stacks Recruiting over Needs attention; Needs attention
-     takes the leftover height so both columns end level. */
-  .attention {
-    flex: 1;
   }
 }

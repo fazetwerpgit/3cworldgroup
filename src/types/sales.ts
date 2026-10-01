@@ -112,18 +112,6 @@ export interface Sale {
   notes?: string;
 }
 
-export interface SalesStats {
-  totalSales: number;
-  totalValue: number;
-  totalPoints: number;
-  pendingCount: number;
-  approvedCount: number;
-  rejectedCount: number;
-  averageSaleValue: number;
-  periodStart: Date;
-  periodEnd: Date;
-}
-
 // Sale type display names
 export const SALE_TYPES: { value: SaleType; label: string }[] = [
   { value: 'new_service', label: 'New Service' },

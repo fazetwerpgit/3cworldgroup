@@ -35,7 +35,7 @@ export function PayAndLinks() {
     <>
       <div className={`${l.layout} ${l.hub}`}>
         <div className={l.col}>
-          {total > 0 ? (
+          {loading || total > 0 ? (
             <ProgressCard
               completed={Math.min(completed, total)}
               total={total}

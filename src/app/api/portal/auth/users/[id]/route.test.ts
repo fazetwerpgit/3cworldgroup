@@ -247,6 +247,11 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
 
     expect(response.status).toBe(200);
     expect(firestore.updates[0]?.data).toMatchObject({ status: 'active', decommission: '__DELETE__' });
+    // The record is deleted, so the audit keeps what it said (never its notes).
+    expect((writeAdminAudit as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0].details.decommissionCleared).toEqual({
+      previousReason: 'quit',
+      decommissionedBy: null,
+    });
   });
 
   it('leaves decommission alone when the save does not reactivate', async () => {
@@ -310,25 +315,64 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
     expect(firestore.users.get('pending-user')).toBeDefined();
   });
 
-  it('purges the person\'s SSN/licence data after the account is gone', async () => {
+  it('purges the person\'s SSN/licence data while the profile still exists, then removes the profile', async () => {
     firestore.users.set('pending-user', { status: 'inactive' });
+    let profileAtPurge: unknown;
+    (purgeSensitiveUserData as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => {
+      profileAtPurge = firestore.users.get('pending-user');
+      return { userSensitive: 1, files: 0, failures: [] };
+    });
 
     const response = await DELETE(request({}), params());
 
     expect(response.status).toBe(200);
     expect(purgeSensitiveUserData).toHaveBeenCalledWith('pending-user');
+    expect(profileAtPurge).toBeDefined();
+    expect(firestore.users.get('pending-user')).toBeUndefined();
   });
 
-  it('still succeeds, and says what was left behind, when part of the purge fails', async () => {
+  it('keeps the profile and tells the admin to retry when part of the purge fails', async () => {
     firestore.users.set('pending-user', { status: 'inactive' });
     (purgeSensitiveUserData as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       userSensitive: 0, files: 0, failures: ['dl_photos files'],
     });
 
     const response = await DELETE(request({}), params());
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.error).toMatch(/Press Delete again/);
+    expect(body.purgeFailures).toEqual(['dl_photos files']);
+    expect(firestore.users.get('pending-user')).toBeDefined();
+    expect(mockResolveAlertTasks).not.toHaveBeenCalled();
+    expect((writeAdminAudit as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0].details.completed).toBe(false);
+  });
+
+  it('finishes on the retry, once the Auth account is already gone', async () => {
+    firestore.users.set('pending-user', { status: 'inactive' });
+    (purgeSensitiveUserData as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      userSensitive: 0, files: 0, failures: ['dl_photos files'],
+    });
+    await DELETE(request({}), params());
+
+    firestore.adminAuth.deleteUser.mockRejectedValueOnce({ code: 'auth/user-not-found' });
+    const retry = await DELETE(request({}), params());
+
+    expect(retry.status).toBe(200);
+    expect(firestore.users.get('pending-user')).toBeUndefined();
+  });
+
+  it('does not turn a finished delete into an error when closing alerts fails', async () => {
+    firestore.users.set('pending-user', { status: 'pending' });
+    mockResolveAlertTasks.mockRejectedValueOnce(new Error('firestore down'));
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const response = await DELETE(request({}), params());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, purgeFailures: ['dl_photos files'] });
+    expect(firestore.users.get('pending-user')).toBeUndefined();
+    expect((writeAdminAudit as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0].details.completed).toBe(true);
+    spy.mockRestore();
   });
 
   it('does not purge when the caller is refused', async () => {
@@ -376,7 +420,7 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
       actorUid: 'admin-1',
       targetUid: 'pending-user',
       targetName: 'Rep One',
-      details: { role: 'entry_rep', status: 'inactive', purge: { userSensitive: 1, files: 2, failures: [] } },
+      details: { completed: true, role: 'entry_rep', status: 'inactive', purge: { userSensitive: 1, files: 2, failures: [] } },
     });
     expect(JSON.stringify(entry)).not.toContain('rep@x.test');
   });

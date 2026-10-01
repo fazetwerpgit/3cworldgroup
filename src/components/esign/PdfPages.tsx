@@ -39,6 +39,13 @@ export function PdfPages({ src, authHeaders, onError }: Props) {
   useEffect(() => {
     onErrorRef.current = onError;
   });
+  // A load failure and a paint failure can both fire; the parent hears it once.
+  const reportedRef = useRef(false);
+  const reportErrorRef = useRef(() => {
+    if (reportedRef.current) return;
+    reportedRef.current = true;
+    onErrorRef.current?.();
+  });
   /** The horizontal scroller. Its width is the fit-width measurement. */
   const frameRef = useRef<HTMLDivElement>(null);
   /** Holds the canvases; grows past the frame when zoomed. */
@@ -100,7 +107,7 @@ export function PdfPages({ src, authHeaders, onError }: Props) {
       if (cancelled) return;
       setState('error');
       setMessage(error instanceof Error ? error.message : 'We could not load this document.');
-      onErrorRef.current?.();
+      reportErrorRef.current();
     });
 
     return () => {
@@ -158,6 +165,8 @@ export function PdfPages({ src, authHeaders, onError }: Props) {
       if (cancelled) return;
       setState('error');
       setMessage(error instanceof Error ? error.message : 'We could not display this document.');
+      // e.g. iOS's canvas memory cap: let the parent fall back to another viewer.
+      reportErrorRef.current();
     });
 
     return () => {

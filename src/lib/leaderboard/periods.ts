@@ -60,12 +60,3 @@ export function periodBounds(period: LeaderboardPeriod, now = new Date()) {
 
   return { start: chicagoMidnight(toParts(startDate)), end: chicagoMidnight(toParts(endDate)) };
 }
-
-/** Today in Chicago: midnight to the next midnight (23 or 25 hours on a DST change). */
-export function chicagoDayBounds(now = new Date()) {
-  const local = chicagoParts(now);
-  return {
-    start: chicagoMidnight({ year: local.year, month: local.month, day: local.day }),
-    end: chicagoMidnight({ year: local.year, month: local.month, day: local.day + 1 }),
-  };
-}

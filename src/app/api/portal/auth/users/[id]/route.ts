@@ -272,7 +272,15 @@ export async function PUT(
         ...(role !== undefined || fieldRole !== undefined
           ? { role: { from: existingRole ?? existingFieldRole ?? null, to: role ?? fieldRole } }
           : {}),
-        ...(updateData.decommission !== undefined ? { decommissionCleared: true } : {}),
+        ...(updateData.decommission !== undefined
+          ? {
+              // The record is deleted by this save; keep what it said (never its notes).
+              decommissionCleared: {
+                previousReason: doc.get('decommission')?.reason ?? null,
+                decommissionedBy: doc.get('decommission')?.decommissionedBy ?? null,
+              },
+            }
+          : {}),
       },
     });
 
@@ -431,37 +439,58 @@ export async function DELETE(
       if (!authGone) throw error;
     }
 
-    // Delete user document from Firestore
+    // The person's encrypted SSN / licence number and their licence photos go
+    // BEFORE the profile does. Signed paperwork (W-9, contract, direct deposit)
+    // and the checklist history stay: they are business records, and
+    // Decommission keeps them too. The purge needs the profile (it records the
+    // invite the hire came through), and if any step fails the profile is kept
+    // so pressing Delete again finishes the job: the Auth step above already
+    // tolerates an account that is gone.
+    const purge = await purgeSensitiveUserData(id);
+    const deletedRole = doc.get('fieldRole') ?? doc.get('role') ?? null;
+    const auditDelete = (completed: boolean) =>
+      writeAdminAudit({
+        action: 'user.delete',
+        actorUid: gate.uid,
+        actorName: gate.name,
+        targetUid: id,
+        targetName: doc.get('displayName') || undefined,
+        details: {
+          completed,
+          role: deletedRole,
+          status: doc.get('status') ?? null,
+          purge: { userSensitive: purge.userSensitive, files: purge.files, failures: purge.failures },
+        },
+      });
+
+    if (purge.failures.length > 0) {
+      await auditDelete(false);
+      return NextResponse.json(
+        {
+          error:
+            "The account is closed, but some ID documents could not be removed yet. Press Delete again to finish.",
+          purgeFailures: purge.failures,
+        },
+        { status: 500 }
+      );
+    }
+
     await docRef.delete();
-    const existingRoleOnDelete = doc.get('fieldRole') ?? doc.get('role');
 
     // Their open alerts go with them. A "needs a position" task re-nags every
     // admin daily until resolved, and nothing else resolves it once the
     // account is gone — one deleted bot signup emailed Jacob for ten days.
-    await resolveAlertTasks(id);
+    // Best-effort: the account is already deleted, so a failure here must not
+    // turn a finished delete into an error.
+    try {
+      await resolveAlertTasks(id);
+    } catch (error) {
+      console.error('Delete user: failed to resolve open alerts', id, error);
+    }
 
-    // A hard delete removes the person's encrypted SSN / licence number and their
-    // licence photos. Signed paperwork (W-9, contract, direct deposit) and the
-    // checklist history stay: they are business records, and Decommission keeps
-    // them too.
-    const purge = await purgeSensitiveUserData(id);
+    await auditDelete(true);
 
-    await writeAdminAudit({
-      action: 'user.delete',
-      actorUid: gate.uid,
-      actorName: gate.name,
-      targetUid: id,
-      targetName: doc.get('displayName') || undefined,
-      details: {
-        role: existingRoleOnDelete ?? null,
-        status: doc.get('status') ?? null,
-        purge: { userSensitive: purge.userSensitive, files: purge.files, failures: purge.failures },
-      },
-    });
-
-    return NextResponse.json(
-      purge.failures.length ? { success: true, purgeFailures: purge.failures } : { success: true }
-    );
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting user:', error);
     return NextResponse.json(

@@ -156,7 +156,8 @@ function formatMissingItems(missing: unknown): string {
     : '';
 }
 
-export function Invites() {
+/** `onChanged` runs after each action that changes the recruits, so the hub's tab counts follow. */
+export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
   const { user, hasPermission, isRole } = useAuth();
   const [invites, setInvites] = useState<InviteView[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
@@ -253,6 +254,7 @@ export function Invites() {
       setForm(emptyForm);
       setSuccess('Invite link created. Copy it and send it by text, call follow-up, or manager chat.');
       await fetchRecruiting();
+      onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create invite');
     } finally {
@@ -295,6 +297,7 @@ export function Invites() {
       setSuccess(action === 'approved' ? 'Recruit activated.' : 'Recruit rejected.');
       setRejectConfirmId(null);
       await fetchRecruiting();
+      onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update recruit');
     } finally {

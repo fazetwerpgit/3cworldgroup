@@ -260,11 +260,9 @@ const RECRUITING_TILES: Array<{ key: keyof RecruitingSummary; label: string }> =
   { key: 'firstInstalls', label: 'First installs' },
 ];
 
-/** The tile's two figures read as a change: "+3 vs last week", "Same as last week (4)", "2 fewer than last week (6)". */
-function weekChange({ thisWeek, lastWeek }: WeekCount): string {
-  const diff = thisWeek - lastWeek;
-  if (diff === 0) return lastWeek === 0 ? '0 last week' : `Same as last week (${count(lastWeek)})`;
-  return diff > 0 ? `+${count(diff)} vs last week` : `${count(-diff)} fewer than last week (${count(lastWeek)})`;
+/** Last week's full figure, stated plainly: this week is still running, so a difference would mislead. */
+function lastWeekLine({ lastWeek }: WeekCount): string {
+  return `${count(lastWeek)} last week`;
 }
 
 function RecruitingTile({ label, value }: { label: string; value: WeekCount }) {
@@ -272,7 +270,7 @@ function RecruitingTile({ label, value }: { label: string; value: WeekCount }) {
     <div className={o.stat}>
       <p className={o.statLabel}>{label}</p>
       <p className={o.statValue}>{count(value.thisWeek)}</p>
-      <p className={o.statPrior}>{weekChange(value)}</p>
+      <p className={o.statPrior}>{lastWeekLine(value)}</p>
     </div>
   );
 }
@@ -314,12 +312,14 @@ export function OwnerDashboard() {
     <>
       <h1 className={s.srOnly}>Company dashboard</h1>
 
-      <div className={o.grid}>
-        <div className={o.banners}>
-          <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
-          {pushPromptVisible === false && <AddToHomeScreenBanner pushPromptVisible={pushPromptVisible} />}
-        </div>
+      <div className={o.banners}>
+        <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
+        {pushPromptVisible === false && <AddToHomeScreenBanner pushPromptVisible={pushPromptVisible} />}
+      </div>
 
+      {/* DOM order is the phone reading order: money, Needs attention, Recruiting.
+          Desktop places each panel with explicit grid lines. */}
+      <div className={o.grid}>
         {data.money.status === 'loading' ? (
           <MoneySkeleton />
         ) : data.money.status === 'error' ? (
@@ -333,26 +333,24 @@ export function OwnerDashboard() {
           <MoneyBoard data={data.money.data} />
         )}
 
-        <div className={o.side}>
-          {data.recruiting.status === 'loading' ? (
-            <SkeletonPanel label="Loading recruiting" title="Recruiting · this week" rows={2} className={o.recruiting} />
-          ) : data.recruiting.status === 'error' ? (
-            <section className={`${s.panel} ${o.recruiting}`} aria-labelledby="recruit-h">
-              <PanelHead id="recruit-h" title="Recruiting · this week" />
-              <Failed what="recruiting" onRetry={() => retry('recruiting')} />
-            </section>
-          ) : (
-            <Recruiting data={data.recruiting.data} />
-          )}
+        <OpsQueuesPanel
+          title="Needs attention"
+          className={o.attention}
+          extra={companyRows(data.problems)}
+          extraLoading={data.problems.status === 'loading'}
+          onRefresh={() => retry('problems')}
+        />
 
-          <OpsQueuesPanel
-            title="Needs attention"
-            className={o.attention}
-            extra={companyRows(data.problems)}
-            extraLoading={data.problems.status === 'loading'}
-            onRefresh={() => retry('problems')}
-          />
-        </div>
+        {data.recruiting.status === 'loading' ? (
+          <SkeletonPanel label="Loading recruiting" title="Recruiting · this week" rows={2} className={o.recruiting} />
+        ) : data.recruiting.status === 'error' ? (
+          <section className={`${s.panel} ${o.recruiting}`} aria-labelledby="recruit-h">
+            <PanelHead id="recruit-h" title="Recruiting · this week" />
+            <Failed what="recruiting" onRetry={() => retry('recruiting')} />
+          </section>
+        ) : (
+          <Recruiting data={data.recruiting.data} />
+        )}
       </div>
     </>
   );

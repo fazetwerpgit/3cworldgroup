@@ -52,12 +52,21 @@ export async function GET(request: NextRequest) {
     // `submissions` the full response would contain, one per waiting item.
     if (request.nextUrl.searchParams.get('summary') === '1') {
       const waiting = await adminDb.collection('userOnboarding').where('status', '==', 'submitted').get();
-      const submissions = waiting.docs.flatMap((doc) => {
+      const rows = waiting.docs.flatMap((doc) => {
         const data = doc.data();
         const known = ONBOARDING_ITEMS.some((item) => item.id === data.itemId);
         if (!data.userId || !known || isEsignItem(data.itemId)) return [];
-        return [{ submittedAt: data.submittedAt?.toDate?.() ?? null }];
+        return [{ userId: String(data.userId), submittedAt: data.submittedAt?.toDate?.() ?? null }];
       });
+      // Same rule as the full queue: a deleted account's items are not waiting on anyone.
+      const ids = [...new Set(rows.map((row) => row.userId))];
+      const accounts = ids.length
+        ? await adminDb.getAll(...ids.map((id) => adminDb!.collection('users').doc(id)))
+        : [];
+      const existing = new Set(accounts.filter((doc) => doc.exists).map((doc) => doc.id));
+      const submissions = rows
+        .filter((row) => existing.has(row.userId))
+        .map((row) => ({ submittedAt: row.submittedAt }));
       return NextResponse.json({ submissions });
     }
 
@@ -160,7 +169,11 @@ export async function GET(request: NextRequest) {
       };
     };
 
-    const userIds = new Set([...users.keys(), ...progressByUser.keys()]);
+    // Only people whose account still exists. A hard-deleted hire's history is
+    // kept on purpose, but an item of theirs "waiting on review" can never be
+    // acted on and would hold the badge up forever. `users` holds every pending
+    // hire plus every existing account that has progress (loaded above).
+    const userIds = new Set(users.keys());
     const people = await Promise.all(
       [...userIds].map(async (userId) => {
         const user = users.get(userId);

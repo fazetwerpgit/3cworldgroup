@@ -109,8 +109,12 @@ export function UserTable({
             </span>
 
             <span className={`${u.cellEnd} ${t.statusCell}`}>
+              {/* Phone: Active is the dot alone (the word stays for screen readers);
+                  any other status shows its word, as colour alone does not carry it. */}
               <StatusDot tone={STATUS_TONE[status] ?? 'muted'}>
-                <span className={t.statusWord}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                <span className={status === 'active' ? t.statusWord : undefined}>
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </span>
               </StatusDot>
             </span>
 
