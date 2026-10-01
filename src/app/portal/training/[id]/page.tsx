@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { storage } from '@/lib/firebase/config';
 import { TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 import { LoadFailed } from '@/components/portal/rep/RepLearn';
+import { TrainingPdf } from '@/components/portal/rep/TrainingPdf';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import l from '@/components/portal/rep/rep-learn.module.css';
@@ -160,7 +161,7 @@ export default function TrainingDetailPage() {
                     ) : currentResource.type === 'video' ? (
                       <video controls playsInline preload="metadata" src={fileUrl} className={l.video} />
                     ) : currentResource.mimeType === 'application/pdf' ? (
-                      <iframe src={fileUrl} title={currentResource.title} className={l.pdf} />
+                      <TrainingPdf src={fileUrl} title={currentResource.title} />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={fileUrl} alt={currentResource.title} className={l.image} />

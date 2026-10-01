@@ -77,6 +77,11 @@ import { after } from 'next/server';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
+import { purgeUserData } from '@/lib/users/purgeUserData';
+
+vi.mock('@/lib/users/purgeUserData', () => ({
+  purgeUserData: vi.fn(async () => ({ userSensitive: 0, onboardingItems: 0, envelopes: 0, files: 0, failures: [] })),
+}));
 
 const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
 const mockResolveAlertTasks = resolveAlertTasks as unknown as ReturnType<typeof vi.fn>;
@@ -230,6 +235,23 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(response.status).toBe(403);
     expect(firestore.updates).toHaveLength(0);
   });
+
+  it('clears the decommission marker when a decommissioned rep is set active here', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', decommission: { reason: 'quit' } });
+
+    const response = await PUT(request({ status: 'active' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.updates[0]?.data).toMatchObject({ status: 'active', decommission: '__DELETE__' });
+  });
+
+  it('leaves decommission alone when the save does not reactivate', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', decommission: { reason: 'quit' } });
+
+    await PUT(request({ displayName: 'Renamed Rep' }), params());
+
+    expect(firestore.updates[0]?.data).not.toHaveProperty('decommission');
+  });
 });
 
 describe('DELETE /api/portal/auth/users/[id]', () => {
@@ -252,5 +274,35 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
 
     expect(response.status).toBe(403);
     expect(firestore.users.get('pending-user')).toBeDefined();
+  });
+
+  it('purges the person\'s sensitive onboarding records after the account is gone', async () => {
+    firestore.users.set('pending-user', { status: 'inactive' });
+
+    const response = await DELETE(request({}), params());
+
+    expect(response.status).toBe(200);
+    expect(purgeUserData).toHaveBeenCalledWith('pending-user');
+  });
+
+  it('still succeeds, and says what was left behind, when part of the purge fails', async () => {
+    firestore.users.set('pending-user', { status: 'inactive' });
+    (purgeUserData as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      userSensitive: 0, onboardingItems: 0, envelopes: 0, files: 0, failures: ['onboarding files'],
+    });
+
+    const response = await DELETE(request({}), params());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, purgeFailures: ['onboarding files'] });
+  });
+
+  it('does not purge when the caller is refused', async () => {
+    firestore.users.set('pending-user', { status: 'active', role: 'operations' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    await DELETE(request({}), params());
+
+    expect(purgeUserData).not.toHaveBeenCalled();
   });
 });

@@ -22,6 +22,8 @@ interface Props {
   src: string;
   /** Returns the Authorization header for `src`. Must be referentially stable. */
   authHeaders?: () => Promise<Record<string, string>>;
+  /** Called once if the bytes cannot be fetched or parsed (e.g. a cross-origin block), so a parent can fall back. */
+  onError?: () => void;
 }
 
 type LoadState = 'loading' | 'ready' | 'error';
@@ -31,7 +33,12 @@ type LoadState = 'loading' | 'ready' | 'error';
  * effect (never at module scope) because the library touches DOM globals at
  * import time and this component is rendered by a server-rendered route.
  */
-export function PdfPages({ src, authHeaders }: Props) {
+export function PdfPages({ src, authHeaders, onError }: Props) {
+  // Held in a ref so a parent's inline callback never re-runs the load effect.
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  });
   /** The horizontal scroller. Its width is the fit-width measurement. */
   const frameRef = useRef<HTMLDivElement>(null);
   /** Holds the canvases; grows past the frame when zoomed. */
@@ -93,6 +100,7 @@ export function PdfPages({ src, authHeaders }: Props) {
       if (cancelled) return;
       setState('error');
       setMessage(error instanceof Error ? error.message : 'We could not load this document.');
+      onErrorRef.current?.();
     });
 
     return () => {

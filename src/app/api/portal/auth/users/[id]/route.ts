@@ -18,6 +18,7 @@ import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { kickoffOnboardingChecklist } from '@/lib/onboarding/kickoff';
 import { restampAuthor } from '@/lib/chat/restampAuthor';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
+import { purgeUserData } from '@/lib/users/purgeUserData';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -236,6 +237,13 @@ export async function PUT(
     if (updateData.status === 'active' && doc.get('status') === 'pending') {
       updateData.activatedAt = FieldValue.serverTimestamp();
     }
+    // Reactivating a decommissioned rep here (instead of through the pipeline's
+    // Reinstate) must clear the decommission marker too: left set, the pipeline
+    // keeps showing them as decommissioned and a later decommission is refused
+    // as "already decommissioned".
+    if (updateData.status === 'active' && doc.get('decommission')) {
+      updateData.decommission = FieldValue.delete();
+    }
 
     // Update displayName in Firebase Auth if changed
     if (trimmedDisplayName) {
@@ -400,7 +408,12 @@ export async function DELETE(
     // account is gone — one deleted bot signup emailed Jacob for ten days.
     await resolveAlertTasks(id);
 
-    return NextResponse.json({ success: true });
+    // A hard delete means the person's SSN, licence and signed tax forms go too.
+    const purge = await purgeUserData(id);
+
+    return NextResponse.json(
+      purge.failures.length ? { success: true, purgeFailures: purge.failures } : { success: true }
+    );
   } catch (error) {
     console.error('Error deleting user:', error);
     return NextResponse.json(

@@ -53,7 +53,9 @@ const getHeaders = async (): Promise<HeadersInit> => {
 function PayrollDisputeForm() {
   const { user } = useAuth();
   const { options } = useFormOptions();
-  const [form, setForm] = useState(EMPTY);
+  // "Who you are" starts as the signed-in rep's own name and email (still editable).
+  const identity = { contractorName: user?.displayName ?? '', contractorEmail: user?.email ?? '' };
+  const [form, setForm] = useState({ ...EMPTY, ...identity });
   // One upload folder per dispute (form-attachments/{uid}/payroll-dispute/{uploadId}/),
   // so a second dispute can never overwrite the proof on an earlier open one.
   const [uploadId, setUploadId] = useState(newFormUploadId);
@@ -97,7 +99,7 @@ function PayrollDisputeForm() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to submit');
       setReferenceId(json.id);
-      setForm(EMPTY);
+      setForm({ ...EMPTY, ...identity });
       setUploadId(newFormUploadId()); // next dispute gets a fresh folder (and a fresh upload widget)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
