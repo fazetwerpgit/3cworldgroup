@@ -6,6 +6,7 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, CircleAlert, RotateCw, X } fr
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import type { UserRole } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
 import u from './admin-ui.module.css';
 
 /**
@@ -224,12 +225,12 @@ export function AdminTabs({
 
   return (
     <div className={`${u.tabsWrap} ${fade.start ? u.tabsFadeStart : ''} ${fade.end ? u.tabsFadeEnd : ''}`}>
-      <div ref={scroller} className={u.tabs} role="group" aria-label={label} onScroll={measure}>
+      <div ref={scroller} className={`${p.tabs} ${u.tabsScroll}`} role="group" aria-label={label} onScroll={measure}>
         {options.map((option) => (
           <button
             key={option.value}
             type="button"
-            className={u.tab}
+            className={`${p.tab} ${u.tabItem}`}
             aria-pressed={value === option.value}
             onClick={() => onChange(option.value)}
           >

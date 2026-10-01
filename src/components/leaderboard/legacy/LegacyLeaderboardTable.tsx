@@ -237,7 +237,7 @@ function ChaseTable({ entries, zeros, currentUser, metric }: { entries: Leaderbo
   return (
     <section className="mb-[25px]" aria-labelledby="chase-heading">
       <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
-        <h2 id="chase-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">{lastRank === 4 ? 'Rank 4' : `Ranks 4-${lastRank}`}</h2>
+        <h2 id="chase-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">{lastRank <= 4 ? 'Rank 4' : `Ranks 4-${lastRank}`}</h2>
         <p className="text-right text-[12px] uppercase tracking-[0.14em] text-[#687384]">Movement since yesterday</p>
       </div>
       <div className="border-b border-[#0A1F44] dark:border-[#e7edf4]">

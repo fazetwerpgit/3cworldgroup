@@ -21,17 +21,10 @@ const STORAGE_KEY = '3c-theme';
 function getInitialTheme(): Theme {
   if (typeof window === 'undefined') return 'system';
 
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light' || stored === 'system') return stored;
-  } catch {
-    // Fall through to the device-size default when storage is unavailable.
-  }
-
-  // Dark everywhere until the user says otherwise. Desktop used to default to
-  // 'system', which handed most laptops the light palette; Jacob, 2026-09-03:
-  // "make the default mode on desktop dark mode as well... we can keep it the
-  // way it is but still" — light stays available, it just is not the default.
+  // Every portal screen is dark-only now and Settings no longer offers a theme
+  // choice, so a 'light' or 'system' value saved by the old toggle must not
+  // strand someone in a mode they can no longer change. The few pre-D screens
+  // that still carry `dark:` variants (the desktop leaderboard) render dark.
   return 'dark';
 }
 
