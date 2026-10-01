@@ -90,11 +90,16 @@ export async function purgeSensitiveUserData(uid: string): Promise<PurgeResult> 
 
       const stored = (await db.collection('userOnboarding').doc(`${uid}_${itemId}`).get()).data()?.reference;
       // Older references were saved without the trailing slash (signFolderFiles
-      // handles the same case). A reference that is not exactly one of this
-      // person's folders is ignored, never deleted.
+      // handles the same case). The recorded reference is followed when it is one
+      // of this person's known folders, or exactly an invite folder for this item:
+      // hires from before the invite link was stored on the profile are only
+      // findable that way. References are written by the server only, each invite
+      // folder belongs to one invitee, and the exact shape rules out `..` and other
+      // items. Anything else is ignored, never deleted.
       if (typeof stored === 'string') {
         const recorded = stored.endsWith('/') ? stored : `${stored}/`;
-        if (allowed.includes(recorded)) folders.add(recorded);
+        const inviteFolder = new RegExp(`^onboarding/invite_[A-Za-z0-9_-]+/${itemId}/$`).test(recorded);
+        if (allowed.includes(recorded) || inviteFolder) folders.add(recorded);
       }
 
       for (const prefix of folders) {

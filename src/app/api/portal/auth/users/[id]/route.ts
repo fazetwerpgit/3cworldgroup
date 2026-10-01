@@ -464,6 +464,14 @@ export async function DELETE(
       });
 
     if (purge.failures.length > 0) {
+      // The login is already gone; take the profile out of People, the Board and
+      // chat counts until the retry finishes, and say why. Best-effort: the
+      // admin is told to press Delete again either way.
+      try {
+        await docRef.update({ status: 'inactive', deleteIncomplete: true, updatedAt: new Date() });
+      } catch (error) {
+        console.error('Delete user: failed to mark the incomplete delete', id, error);
+      }
       await auditDelete(false);
       return NextResponse.json(
         {

@@ -110,13 +110,25 @@ describe('purgeSensitiveUserData', () => {
     expect(store.deletedFiles).not.toContain('onboarding/invite_zzz/dl_photos/front.jpg');
   });
 
-  it('never follows a reference to another invite, another person or another item', async () => {
+  it('follows a recorded invite folder even when the profile has no invite link (older hires)', async () => {
+    // No onboardingInviteId, no candidateOnboarding row: the reference is the only trace.
+    store.col('userOnboarding').u1_dl_photos = { userId: 'u1', reference: 'onboarding/invite_abc/dl_photos/' };
+
+    await purgeSensitiveUserData('u1');
+
+    expect(store.deletedFiles).toContain('onboarding/invite_abc/dl_photos/front.jpg');
+    expect(store.deletedFiles).not.toContain('onboarding/invite_abc/llc_sos/articles.pdf');
+    expect(store.deletedFiles).not.toContain('onboarding/invite_zzz/dl_photos/front.jpg');
+  });
+
+  it('never follows a reference to another person, another item, or one with path tricks', async () => {
     store.col('users').u1 = { displayName: 'Rep One', onboardingInviteId: 'abc' };
     for (const reference of [
-      'onboarding/invite_zzz/dl_photos/',
       'onboarding/u10/dl_photos/',
       'onboarding/u1/llc_sos/',
+      'onboarding/invite_abc/llc_sos/',
       'onboarding/invite_abc/../invite_zzz/dl_photos/',
+      'onboarding/invite_/dl_photos/',
     ]) {
       store.col('userOnboarding').u1_dl_photos = { userId: 'u1', reference };
       await purgeSensitiveUserData('u1');

@@ -331,8 +331,8 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
     expect(firestore.users.get('pending-user')).toBeUndefined();
   });
 
-  it('keeps the profile and tells the admin to retry when part of the purge fails', async () => {
-    firestore.users.set('pending-user', { status: 'inactive' });
+  it('keeps the profile, marks it inactive, and tells the admin to retry when part of the purge fails', async () => {
+    firestore.users.set('pending-user', { status: 'active' });
     (purgeSensitiveUserData as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       userSensitive: 0, files: 0, failures: ['dl_photos files'],
     });
@@ -343,7 +343,7 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
     expect(response.status).toBe(500);
     expect(body.error).toMatch(/Press Delete again/);
     expect(body.purgeFailures).toEqual(['dl_photos files']);
-    expect(firestore.users.get('pending-user')).toBeDefined();
+    expect(firestore.users.get('pending-user')).toMatchObject({ status: 'inactive', deleteIncomplete: true });
     expect(mockResolveAlertTasks).not.toHaveBeenCalled();
     expect((writeAdminAudit as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0].details.completed).toBe(false);
   });
