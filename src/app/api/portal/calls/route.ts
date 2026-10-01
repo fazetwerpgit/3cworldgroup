@@ -8,7 +8,7 @@ import {
   CALL_DAY_ORDER,
   CallAudience,
   CallDay,
-  IBO_FIELD_ROLES,
+  MANAGEMENT_FIELD_ROLES,
   isManagementRole,
   PlatformRole,
   resolveRoles,
@@ -54,11 +54,9 @@ export async function GET(request: NextRequest) {
       userDoc.data()?.role,
       userDoc.data()?.fieldRole
     );
-    const seesManagerCalls =
-      !!role ||
-      fieldRole === 'l1_manager' ||
-      fieldRole === 'l2_manager' ||
-      (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
+    // Same list the Managers chat channel and the alert broadcast use: L1/L2,
+    // IBO levels, general / office / regional managers and directors.
+    const seesManagerCalls = !!role || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false);
 
     const snapshot = await adminDb.collection('scheduledCalls').get();
     const calls = snapshot.docs

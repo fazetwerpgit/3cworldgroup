@@ -77,10 +77,10 @@ import { after } from 'next/server';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
-import { purgeUserData } from '@/lib/users/purgeUserData';
+import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
 
-vi.mock('@/lib/users/purgeUserData', () => ({
-  purgeUserData: vi.fn(async () => ({ userSensitive: 0, onboardingItems: 0, envelopes: 0, files: 0, failures: [] })),
+vi.mock('@/lib/users/purgeSensitiveUserData', () => ({
+  purgeSensitiveUserData: vi.fn(async () => ({ userSensitive: 0, files: 0, failures: [] })),
 }));
 
 const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
@@ -276,25 +276,25 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
     expect(firestore.users.get('pending-user')).toBeDefined();
   });
 
-  it('purges the person\'s sensitive onboarding records after the account is gone', async () => {
+  it('purges the person\'s SSN/licence data after the account is gone', async () => {
     firestore.users.set('pending-user', { status: 'inactive' });
 
     const response = await DELETE(request({}), params());
 
     expect(response.status).toBe(200);
-    expect(purgeUserData).toHaveBeenCalledWith('pending-user');
+    expect(purgeSensitiveUserData).toHaveBeenCalledWith('pending-user');
   });
 
   it('still succeeds, and says what was left behind, when part of the purge fails', async () => {
     firestore.users.set('pending-user', { status: 'inactive' });
-    (purgeUserData as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      userSensitive: 0, onboardingItems: 0, envelopes: 0, files: 0, failures: ['onboarding files'],
+    (purgeSensitiveUserData as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      userSensitive: 0, files: 0, failures: ['dl_photos files'],
     });
 
     const response = await DELETE(request({}), params());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ success: true, purgeFailures: ['onboarding files'] });
+    expect(await response.json()).toEqual({ success: true, purgeFailures: ['dl_photos files'] });
   });
 
   it('does not purge when the caller is refused', async () => {
@@ -303,6 +303,28 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
 
     await DELETE(request({}), params());
 
-    expect(purgeUserData).not.toHaveBeenCalled();
+    expect(purgeSensitiveUserData).not.toHaveBeenCalled();
+  });
+
+  it('still removes a profile whose Auth account is already gone, then purges', async () => {
+    firestore.users.set('pending-user', { status: 'pending' });
+    firestore.adminAuth.deleteUser.mockRejectedValueOnce({ code: 'auth/user-not-found' });
+
+    const response = await DELETE(request({}), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.users.get('pending-user')).toBeUndefined();
+    expect(purgeSensitiveUserData).toHaveBeenCalledWith('pending-user');
+  });
+
+  it('keeps every other Auth failure fatal and leaves the profile alone', async () => {
+    firestore.users.set('pending-user', { status: 'pending' });
+    firestore.adminAuth.deleteUser.mockRejectedValueOnce({ code: 'auth/internal-error' });
+
+    const response = await DELETE(request({}), params());
+
+    expect(response.status).toBe(500);
+    expect(firestore.users.get('pending-user')).toBeDefined();
+    expect(purgeSensitiveUserData).not.toHaveBeenCalled();
   });
 });

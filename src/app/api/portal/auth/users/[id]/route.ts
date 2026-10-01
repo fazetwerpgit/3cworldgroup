@@ -18,7 +18,7 @@ import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { kickoffOnboardingChecklist } from '@/lib/onboarding/kickoff';
 import { restampAuthor } from '@/lib/chat/restampAuthor';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
-import { purgeUserData } from '@/lib/users/purgeUserData';
+import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -397,8 +397,15 @@ export async function DELETE(
       );
     }
 
-    // Delete user from Firebase Auth
-    await adminAuth.deleteUser(id);
+    // Delete user from Firebase Auth. An account whose Auth record is already gone
+    // (a failed signup, a half-finished earlier delete) must still be removable, so
+    // only "user not found" is tolerated; every other Auth error stays fatal.
+    try {
+      await adminAuth.deleteUser(id);
+    } catch (error) {
+      const authGone = typeof error === 'object' && error !== null && 'code' in error && error.code === 'auth/user-not-found';
+      if (!authGone) throw error;
+    }
 
     // Delete user document from Firestore
     await docRef.delete();
@@ -408,8 +415,11 @@ export async function DELETE(
     // account is gone — one deleted bot signup emailed Jacob for ten days.
     await resolveAlertTasks(id);
 
-    // A hard delete means the person's SSN, licence and signed tax forms go too.
-    const purge = await purgeUserData(id);
+    // A hard delete removes the person's encrypted SSN / licence number and their
+    // licence photos. Signed paperwork (W-9, contract, direct deposit) and the
+    // checklist history stay: they are business records, and Decommission keeps
+    // them too.
+    const purge = await purgeSensitiveUserData(id);
 
     return NextResponse.json(
       purge.failures.length ? { success: true, purgeFailures: purge.failures } : { success: true }

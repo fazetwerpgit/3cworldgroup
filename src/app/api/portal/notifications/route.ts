@@ -36,15 +36,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    // Simple query without ordering to avoid index requirements
-    // We'll sort in memory instead
-    const query = adminDb
-      .collection('notifications')
-      .where('userId', '==', userId);
+    // Newest first AT THE QUERY, so the window we read is the newest 2x the limit.
+    // (Unordered, a user with more than that many notifications could get an
+    // arbitrary slice and the bell would miss the newest ones.) Needs the
+    // notifications userId + createdAt composite in firestore.indexes.json; until
+    // that index is built the query fails with FAILED_PRECONDITION, so fall back
+    // to the old unordered read rather than break the bell during the deploy.
+    const byUser = adminDb.collection('notifications').where('userId', '==', userId);
+    let snapshot;
+    try {
+      snapshot = await byUser.orderBy('createdAt', 'desc').limit(limit * 2).get();
+    } catch (error) {
+      // FAILED_PRECONDITION (gRPC 9): the composite index is not built yet.
+      const indexNotBuilt = typeof error === 'object' && error !== null && 'code' in error && error.code === 9;
+      if (!indexNotBuilt) throw error;
+      console.warn('notifications: userId+createdAt index not built yet, reading unordered');
+      snapshot = await byUser.limit(limit * 2).get();
+    }
 
-    const snapshot = await query.limit(limit * 2).get();
-
-    // Sort and filter in memory to avoid compound index requirements
+    // Unread filtering and the final newest-first trim still happen in memory.
     interface NotificationData {
       id: string;
       userId: string;
