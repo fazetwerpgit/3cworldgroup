@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
-import { askAudience } from '@/lib/ask/flag';
+import { practiceAudience } from '@/lib/ask/flag';
 import { PERSONAS } from '@/lib/ask/practice';
 import {
   openAssignmentsFor,
@@ -23,7 +23,7 @@ const DAYS = 30;
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
 
 export async function GET(request: NextRequest) {
-  const audience = askAudience();
+  const audience = practiceAudience();
   if (audience === 'off') return fail('Ask 3C is not turned on yet.', 404);
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return fail(gate.error, gate.status);

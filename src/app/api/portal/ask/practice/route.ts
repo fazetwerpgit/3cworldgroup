@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { askAudience } from '@/lib/ask/flag';
+import { practiceAudience } from '@/lib/ask/flag';
 import {
   MAX_PRACTICE_TURNS,
   MAX_REP_CHARS,
@@ -230,7 +230,7 @@ function updateIfCurrent(
 }
 
 export async function POST(request: NextRequest) {
-  const audience = askAudience();
+  const audience = practiceAudience();
   if (audience === 'off') return fail('Ask 3C is not turned on yet.', 404);
 
   const gate = await requireVerifiedUser(request);

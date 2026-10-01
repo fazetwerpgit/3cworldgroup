@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { askAudience } from '@/lib/ask/flag';
+import { practiceAudience } from '@/lib/ask/flag';
 import { isPersonaId, isPracticeSeed, practiceCustomer } from '@/lib/ask/practice';
 import { STANDARD_DOOR, parseDoor, voiceFor, type Speaker } from '@/lib/ask/practiceDoor';
 import { streamLine } from '@/lib/ask/practiceTts';
@@ -28,7 +28,7 @@ function log(event: Record<string, string | number | boolean>) {
 }
 
 export async function POST(request: NextRequest) {
-  const audience = askAudience();
+  const audience = practiceAudience();
   if (audience === 'off') return fail('Ask 3C is not turned on yet.', 404);
 
   const gate = await requireVerifiedUser(request);

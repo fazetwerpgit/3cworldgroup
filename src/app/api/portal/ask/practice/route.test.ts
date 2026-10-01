@@ -76,6 +76,7 @@ const practiceLogs = () => [...fake.docs('practiceLog').values()];
 
 beforeEach(() => {
   vi.stubEnv('ASK_3C_ENABLED', 'true');
+  vi.stubEnv('PRACTICE_ENABLED', 'true');
   vi.stubEnv('ASK_API_KEY', 'test-key');
   vi.stubEnv('ASK_BASE_URL', '');
   vi.stubEnv('ASK_MODEL', '');
@@ -117,6 +118,17 @@ describe('POST /api/portal/ask/practice', () => {
     expect((await POST(req({ action: 'turn', ...SESSION, history: [] }))).status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(fake.docs('askUsage').size).toBe(0);
+
+    mockUser.mockResolvedValue({ ok: true, uid: 'o1', name: 'Jacob Owner', email: '', isOwner: true });
+    modelAnswers('Yeah?');
+    expect((await POST(req({ action: 'turn', ...SESSION, history: [] }))).status).toBe(200);
+  });
+
+  it('stays owners-only when Ask is open to everyone but PRACTICE_ENABLED is not set', async () => {
+    vi.stubEnv('ASK_3C_ENABLED', 'true');
+    vi.stubEnv('PRACTICE_ENABLED', '');
+    expect((await POST(req({ action: 'turn', ...SESSION, history: [] }))).status).toBe(404);
+    expect(fetchMock).not.toHaveBeenCalled();
 
     mockUser.mockResolvedValue({ ok: true, uid: 'o1', name: 'Jacob Owner', email: '', isOwner: true });
     modelAnswers('Yeah?');

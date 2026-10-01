@@ -33,9 +33,22 @@ export function askOpenTo(
   return isOwner(role ?? undefined) || (!!uid && askEarlyUids().includes(uid));
 }
 
-/** Whether this user gets Practice. While the audience is 'owners' it's owners only: the
- *  ASK_3C_ALSO early users get Ask, not Practice (the practice routes enforce the same). */
+/**
+ * Who gets Practice. It rides on Ask 3C (off when Ask is off) but has its own
+ * switch, PRACTICE_ENABLED, so Ask can go to the whole team while Practice
+ * (voices, hands-free) stays with the owners:
+ *   PRACTICE_ENABLED='true' and Ask on -> every user Ask is open to
+ *   otherwise, Ask on                  -> owners only
+ * The ASK_3C_ALSO early users get Ask, not Practice. Inlined like ASK_3C_ENABLED.
+ */
+export function practiceAudience(): AskAudience {
+  const ask = askAudience();
+  if (ask === 'off') return 'off';
+  return ask === 'all' && process.env.PRACTICE_ENABLED === 'true' ? 'all' : 'owners';
+}
+
+/** Whether this user gets Practice (the practice routes enforce the same rule via practiceAudience). */
 export function practiceOpenTo(role: PlatformRole | FieldRole | null | undefined): boolean {
-  const audience = askAudience();
+  const audience = practiceAudience();
   return audience === 'all' || (audience === 'owners' && isOwner(role ?? undefined));
 }

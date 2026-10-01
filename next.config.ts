@@ -39,6 +39,7 @@ const nextConfig: NextConfig = {
     SALE_SCAN_ENABLED: process.env.SALE_SCAN_ENABLED ?? '',
     ASK_3C_ENABLED: process.env.ASK_3C_ENABLED ?? '',
     ASK_3C_ALSO: process.env.ASK_3C_ALSO ?? '',
+    PRACTICE_ENABLED: process.env.PRACTICE_ENABLED ?? '',
   },
   // Dev only: lets a phone on the LAN load the dev server through the
   // firewall-forwarded port without Next blocking /_next/* as cross-origin.

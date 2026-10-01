@@ -29,6 +29,7 @@ const feedback = (opener: number) =>
 
 beforeEach(() => {
   vi.stubEnv('ASK_3C_ENABLED', 'true');
+  vi.stubEnv('PRACTICE_ENABLED', 'true');
   mockUser.mockReset();
   mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Ana', email: '', isOwner: false });
   const now = Date.now();

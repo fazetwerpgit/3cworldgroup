@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { askAudience } from '@/lib/ask/flag';
+import { practiceAudience } from '@/lib/ask/flag';
 import {
   LISTEN_OPEN_MS,
   LISTEN_SESSION_MS,
@@ -23,7 +23,7 @@ export const runtime = 'nodejs';
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
 
 export async function POST(request: NextRequest) {
-  const audience = askAudience();
+  const audience = practiceAudience();
   if (audience === 'off') return fail('Ask 3C is not turned on yet.', 404);
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return fail(gate.error, gate.status);

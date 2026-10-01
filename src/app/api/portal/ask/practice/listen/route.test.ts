@@ -23,6 +23,7 @@ const req = () => new NextRequest('http://localhost/api/portal/ask/practice/list
 
 beforeEach(() => {
   vi.stubEnv('ASK_3C_ENABLED', 'true');
+  vi.stubEnv('PRACTICE_ENABLED', 'true');
   vi.stubEnv('GEMINI_API_KEY', 'secret-key');
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();

@@ -75,6 +75,7 @@ const prompt = (call = 0) => JSON.parse(fetchMock.mock.calls[call][1].body).cont
 
 beforeEach(() => {
   vi.stubEnv('ASK_3C_ENABLED', 'true');
+  vi.stubEnv('PRACTICE_ENABLED', 'true');
   vi.stubEnv('GEMINI_API_KEY', 'gem-key');
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();

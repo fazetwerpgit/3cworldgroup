@@ -21,14 +21,26 @@ describe('askOpenTo', () => {
 });
 
 describe('practiceOpenTo', () => {
-  it("is owners only while it's 'owners', even for the Ask early list; everyone once it's on", () => {
+  it("is owners only while Ask is 'owners', even for the Ask early list", () => {
     vi.stubEnv('ASK_3C_ENABLED', 'owners');
     vi.stubEnv('ASK_3C_ALSO', 'rep-1');
+    vi.stubEnv('PRACTICE_ENABLED', 'true');
     expect(practiceOpenTo('owner')).toBe(true);
     expect(practiceOpenTo('entry_rep')).toBe(false);
+  });
+
+  it('stays owners only when Ask opens to everyone, until PRACTICE_ENABLED is set', () => {
     vi.stubEnv('ASK_3C_ENABLED', 'true');
+    expect(askOpenTo('entry_rep', 'rep-9')).toBe(true);
+    expect(practiceOpenTo('owner')).toBe(true);
+    expect(practiceOpenTo('entry_rep')).toBe(false);
+    vi.stubEnv('PRACTICE_ENABLED', 'true');
     expect(practiceOpenTo('entry_rep')).toBe(true);
+  });
+
+  it('is off for everyone while Ask is off, whatever PRACTICE_ENABLED says', () => {
     vi.stubEnv('ASK_3C_ENABLED', '');
+    vi.stubEnv('PRACTICE_ENABLED', 'true');
     expect(practiceOpenTo('owner')).toBe(false);
   });
 });
