@@ -140,6 +140,9 @@ service cloud.firestore {
     match /userSensitive/{uid} {
       allow read, write: if false;
     }
+    match /adminAuditLog/{logId} {
+      allow read, write: if false;
+    }
     match /sensitiveAccessLog/{logId} {
       allow read, write: if false;
     }

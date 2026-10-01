@@ -1,7 +1,7 @@
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
 
-/** Storage folders (under onboarding/{uid}/) holding identity documents: today the licence photos. */
+/** Items whose uploads are identity documents: today the licence photos. */
 const SENSITIVE_UPLOAD_ITEMS = ONBOARDING_ITEMS.filter(
   (item) => item.sensitive && item.referenceKind === 'storage'
 ).map((item) => item.id);
@@ -16,6 +16,13 @@ export interface PurgeResult {
 /**
  * Removes the identity data of a hard-deleted account: the encrypted SSN and
  * driver's-licence number (userSensitive) and the uploaded licence photos.
+ *
+ * Where the photos live depends on how the person joined. Someone who signed up
+ * directly uploaded to onboarding/{uid}/{item}/. Someone who came through an
+ * invite link uploaded before they had an account, to
+ * onboarding/invite_{inviteId}/{item}/, and the files were never moved: the
+ * checklist item just carries that folder as its `reference`. So the folders to
+ * clear are the item's recorded reference plus the uid folder.
  *
  * Deliberately NOT removed: the signed W-9, contract, direct-deposit and
  * compensation envelopes and their PDFs, the onboarding checklist history, and
@@ -33,13 +40,14 @@ export async function purgeSensitiveUserData(uid: string): Promise<PurgeResult> 
     result.failures.push('database not configured');
     return result;
   }
+  const db = adminDb;
   const fail = (step: string, error: unknown) => {
     result.failures.push(step);
     console.error(`purgeSensitiveUserData(${uid}): ${step} failed`, error);
   };
 
   try {
-    const ref = adminDb.collection('userSensitive').doc(uid);
+    const ref = db.collection('userSensitive').doc(uid);
     if ((await ref.get()).exists) {
       await ref.delete();
       result.userSensitive = 1;
@@ -50,11 +58,24 @@ export async function purgeSensitiveUserData(uid: string): Promise<PurgeResult> 
 
   for (const itemId of SENSITIVE_UPLOAD_ITEMS) {
     try {
-      // Exact folder with a trailing slash: "onboarding/abc/" must never match "onboarding/abcd/".
-      const [files] = await getOnboardingBucket().getFiles({ prefix: `onboarding/${uid}/${itemId}/` });
-      for (const file of files) {
-        await file.delete({ ignoreNotFound: true });
-        result.files++;
+      const folders = new Set<string>([`onboarding/${uid}/${itemId}/`]);
+      const recorded = (await db.collection('userOnboarding').doc(`${uid}_${itemId}`).get()).data()?.reference;
+      // The reference is stored data, so only trust it if it is exactly this item's
+      // folder under this person's own uid or an invite folder; anything else is
+      // ignored, never deleted.
+      const ownFolder =
+        typeof recorded === 'string' &&
+        recorded.endsWith(`/${itemId}/`) &&
+        (recorded.startsWith(`onboarding/${uid}/`) || recorded.startsWith('onboarding/invite_'));
+      if (ownFolder) folders.add(recorded);
+
+      for (const prefix of folders) {
+        // Trailing slash on the prefix: "onboarding/abc/x/" must never match "onboarding/abcd/x/".
+        const [files] = await getOnboardingBucket().getFiles({ prefix });
+        for (const file of files) {
+          await file.delete({ ignoreNotFound: true });
+          result.files++;
+        }
       }
     } catch (error) {
       fail(`${itemId} files`, error);

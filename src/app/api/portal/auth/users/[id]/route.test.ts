@@ -83,6 +83,10 @@ vi.mock('@/lib/users/purgeSensitiveUserData', () => ({
   purgeSensitiveUserData: vi.fn(async () => ({ userSensitive: 0, files: 0, failures: [] })),
 }));
 
+import { writeAdminAudit } from '@/lib/audit/adminAudit';
+
+vi.mock('@/lib/audit/adminAudit', () => ({ writeAdminAudit: vi.fn(async () => undefined) }));
+
 const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
 const mockResolveAlertTasks = resolveAlertTasks as unknown as ReturnType<typeof vi.fn>;
 
@@ -252,6 +256,36 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
 
     expect(firestore.updates[0]?.data).not.toHaveProperty('decommission');
   });
+
+  it('audits an edit by field name and status/role transition, never by personal value', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', fieldRole: 'entry_rep', displayName: 'Rep One' });
+
+    await PUT(request({ phone: '555-867-5309', status: 'active', fieldRole: 'l1_manager' }), params());
+
+    expect(writeAdminAudit).toHaveBeenCalledTimes(1);
+    const entry = (writeAdminAudit as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(entry).toMatchObject({
+      action: 'user.update',
+      actorUid: 'admin-1',
+      targetUid: 'pending-user',
+      targetName: 'Rep One',
+      details: {
+        status: { from: 'inactive', to: 'active' },
+        role: { from: 'entry_rep', to: 'l1_manager' },
+      },
+    });
+    expect(entry.details.fields).toEqual(expect.arrayContaining(['phone', 'status', 'fieldRole']));
+    expect(JSON.stringify(entry)).not.toContain('555-867-5309');
+  });
+
+  it('writes no audit row when the caller is refused', async () => {
+    firestore.users.set('pending-user', { status: 'active', role: 'admin' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    await PUT(request({ displayName: 'Attempted rewrite' }), params());
+
+    expect(writeAdminAudit).not.toHaveBeenCalled();
+  });
 });
 
 describe('DELETE /api/portal/auth/users/[id]', () => {
@@ -326,5 +360,33 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
     expect(response.status).toBe(500);
     expect(firestore.users.get('pending-user')).toBeDefined();
     expect(purgeSensitiveUserData).not.toHaveBeenCalled();
+  });
+
+  it('audits the delete with who, whom, their role and what the purge removed', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', fieldRole: 'entry_rep', displayName: 'Rep One', email: 'rep@x.test' });
+    (purgeSensitiveUserData as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      userSensitive: 1, files: 2, failures: [],
+    });
+
+    await DELETE(request({}), params());
+
+    const entry = (writeAdminAudit as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(entry).toMatchObject({
+      action: 'user.delete',
+      actorUid: 'admin-1',
+      targetUid: 'pending-user',
+      targetName: 'Rep One',
+      details: { role: 'entry_rep', status: 'inactive', purge: { userSensitive: 1, files: 2, failures: [] } },
+    });
+    expect(JSON.stringify(entry)).not.toContain('rep@x.test');
+  });
+
+  it('writes no audit row when the delete itself fails', async () => {
+    firestore.users.set('pending-user', { status: 'pending' });
+    firestore.adminAuth.deleteUser.mockRejectedValueOnce({ code: 'auth/internal-error' });
+
+    await DELETE(request({}), params());
+
+    expect(writeAdminAudit).not.toHaveBeenCalled();
   });
 });

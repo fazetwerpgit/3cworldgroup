@@ -19,6 +19,7 @@ import { kickoffOnboardingChecklist } from '@/lib/onboarding/kickoff';
 import { restampAuthor } from '@/lib/chat/restampAuthor';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
 import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
+import { writeAdminAudit } from '@/lib/audit/adminAudit';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -252,6 +253,29 @@ export async function PUT(
 
     await docRef.update(updateData);
 
+    // Personal data (phone, address ...) is logged by field name only; status
+    // and role are not personal, so their before/after is recorded.
+    const changedFields = Object.keys(updateData).filter(
+      (key) => key !== 'updatedAt' && key !== 'activatedAt' && key !== 'decommission'
+    );
+    await writeAdminAudit({
+      action: 'user.update',
+      actorUid: gate.uid,
+      actorName: gate.name,
+      targetUid: id,
+      targetName: doc.get('displayName') || undefined,
+      details: {
+        fields: changedFields,
+        ...(updateData.status !== undefined
+          ? { status: { from: doc.get('status') ?? null, to: updateData.status } }
+          : {}),
+        ...(role !== undefined || fieldRole !== undefined
+          ? { role: { from: existingRole ?? existingFieldRole ?? null, to: role ?? fieldRole } }
+          : {}),
+        ...(updateData.decommission !== undefined ? { decommissionCleared: true } : {}),
+      },
+    });
+
     // Flipping the Firestore flag does not end the session: the account's refresh
     // token keeps minting valid ID tokens, so the API status gate would be the
     // only thing standing between a deactivated admin and their old admin access.
@@ -409,6 +433,7 @@ export async function DELETE(
 
     // Delete user document from Firestore
     await docRef.delete();
+    const existingRoleOnDelete = doc.get('fieldRole') ?? doc.get('role');
 
     // Their open alerts go with them. A "needs a position" task re-nags every
     // admin daily until resolved, and nothing else resolves it once the
@@ -420,6 +445,19 @@ export async function DELETE(
     // checklist history stay: they are business records, and Decommission keeps
     // them too.
     const purge = await purgeSensitiveUserData(id);
+
+    await writeAdminAudit({
+      action: 'user.delete',
+      actorUid: gate.uid,
+      actorName: gate.name,
+      targetUid: id,
+      targetName: doc.get('displayName') || undefined,
+      details: {
+        role: existingRoleOnDelete ?? null,
+        status: doc.get('status') ?? null,
+        purge: { userSensitive: purge.userSensitive, files: purge.files, failures: purge.failures },
+      },
+    });
 
     return NextResponse.json(
       purge.failures.length ? { success: true, purgeFailures: purge.failures } : { success: true }

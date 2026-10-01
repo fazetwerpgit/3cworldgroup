@@ -4,6 +4,7 @@ import {
   requireVerifiedManagement,
   requireVerifiedRequester,
 } from '@/lib/auth/requireVerifiedAdmin';
+import { changedLeaves, writeAdminAudit } from '@/lib/audit/adminAudit';
 import { COMP_PLAN_MARGIN, COMP_PLAN_RATES, COMP_PLAN_VERSION } from '@/data/compPlan.generated';
 import {
   COMP_PLAN_ROLES,
@@ -153,6 +154,13 @@ export async function PUT(request: NextRequest) {
       if (problem) return NextResponse.json({ error: problem }, { status: 400 });
     }
 
+    const [previousRatesSnap, previousMarginSnap] = await Promise.all([
+      adminDb.collection('config').doc(RATES_DOC).get(),
+      adminDb.collection('config').doc(MARGIN_DOC).get(),
+    ]);
+    const previousRates = previousRatesSnap.data()?.rates;
+    const previousMargin = previousMarginSnap.data()?.margin;
+
     const updatedAt = new Date();
     await adminDb.collection('config').doc(RATES_DOC).set({
       rates,
@@ -168,6 +176,19 @@ export async function PUT(request: NextRequest) {
         updatedAt,
       });
     }
+
+    // Each save replaces the whole document, so without this row nothing records
+    // what a rate used to be. Rates and margin are pay terms, not personal data;
+    // the log is server-only.
+    await writeAdminAudit({
+      action: 'compPlan.update',
+      actorUid: gate.uid,
+      actorName: gate.name,
+      details: {
+        rates: changedLeaves(previousRates, rates),
+        ...(margin !== undefined ? { margin: changedLeaves(previousMargin, margin) } : {}),
+      },
+    });
 
     return NextResponse.json({ success: true, message: 'Comp plan updated' });
   } catch (error) {

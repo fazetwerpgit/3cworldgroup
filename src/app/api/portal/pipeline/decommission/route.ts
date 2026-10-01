@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { writeAdminAudit } from '@/lib/audit/adminAudit';
 import { DecommissionReason, DecommissionReasonLabels, isManagementRole } from '@/types';
 
 const VALID_REASONS: DecommissionReason[] = ['non_activity', 'wrongdoing', 'manager_fire'];
@@ -92,6 +93,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await writeAdminAudit({
+      action: 'user.decommission',
+      actorUid: gate.uid,
+      actorName: gate.name,
+      targetUid: userId,
+      targetName: data?.displayName || undefined,
+      details: { reason },
+    });
+
     return NextResponse.json({
       success: true,
       message: `${data?.displayName ?? 'User'} decommissioned (${DecommissionReasonLabels[reason as DecommissionReason]})`,
@@ -159,6 +169,17 @@ export async function DELETE(request: NextRequest) {
         console.error('Reinstate: failed to re-enable auth account', userId, err);
       }
     }
+
+    // Reinstating deletes the decommission record from the user doc, so this row
+    // is the only lasting trace of who reinstated them and what it undid.
+    await writeAdminAudit({
+      action: 'user.reinstate',
+      actorUid: gate.uid,
+      actorName: gate.name,
+      targetUid: userId,
+      targetName: doc.data()?.displayName || undefined,
+      details: { previousReason: doc.data()?.decommission?.reason ?? null },
+    });
 
     return NextResponse.json({ success: true, message: 'User reinstated' });
   } catch (error) {

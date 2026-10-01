@@ -78,7 +78,8 @@ const SOURCES: QueueSource[] = [
     hub: ONBOARDING_HUB,
     tab: 'review',
     load: async () => {
-      const json = await authedJson('/api/portal/onboarding/review');
+      // Counts only: the summary read skips the review history and signed file URLs.
+      const json = await authedJson('/api/portal/onboarding/review?summary=1');
       const rows: { submittedAt?: string | null }[] = Array.isArray(json.submissions) ? json.submissions : [];
       return figuresFrom(rows.map((row) => row.submittedAt));
     },

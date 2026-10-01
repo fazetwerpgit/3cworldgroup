@@ -27,7 +27,8 @@ type ProgressData = FirebaseFirestore.DocumentData;
 // `people`: every rep with onboarding progress or still pending, each with
 // their whole checklist (items never started included), reps with something
 // waiting first. `submissions`: the flat review queue (submitted, not e-sign),
-// oldest first; the admin dashboard counts it.
+// oldest first; the admin dashboard counts it. `?summary=1` returns only the
+// waiting items' submittedAt, for counts.
 export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
@@ -43,6 +44,21 @@ export async function GET(request: NextRequest) {
     const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    // ?summary=1 is the admin badge / Needs-attention count: just when each item
+    // under review was submitted. It reads only the submitted items, skipping the
+    // whole approved/rejected history, the pending-user scan and every signed file
+    // URL, none of which a count needs. The rows it returns are exactly the
+    // `submissions` the full response would contain, one per waiting item.
+    if (request.nextUrl.searchParams.get('summary') === '1') {
+      const waiting = await adminDb.collection('userOnboarding').where('status', '==', 'submitted').get();
+      const submissions = waiting.docs.flatMap((doc) => {
+        const data = doc.data();
+        const known = ONBOARDING_ITEMS.some((item) => item.id === data.itemId);
+        if (!data.userId || !known || isEsignItem(data.itemId)) return [];
+        return [{ submittedAt: data.submittedAt?.toDate?.() ?? null }];
+      });
+      return NextResponse.json({ submissions });
     }
 
     const [submittedSnap, reviewedSnap, pendingSnap] = await Promise.all([

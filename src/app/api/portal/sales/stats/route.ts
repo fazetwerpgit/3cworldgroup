@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { chicagoDayBounds, periodBounds } from '@/lib/leaderboard/periods';
+
+const STATS_PERIODS = ['day', 'week', 'month', 'year'] as const;
+type StatsPeriod = (typeof STATS_PERIODS)[number];
+
+/**
+ * The period containing `at`, on Chicago's calendar like the leaderboard and
+ * the rest of the portal (a Sunday-start week, calendar month and year). The
+ * server's own timezone must not decide which month a sale belongs to.
+ */
+function boundsFor(period: StatsPeriod, at: Date) {
+  if (period === 'day') return chicagoDayBounds(at);
+  // periodBounds is null only for the all-time period, which StatsPeriod excludes.
+  const bounds = periodBounds(period, at);
+  if (!bounds) throw new Error(`No bounds for period ${period}`);
+  return bounds;
+}
 
 // GET /api/portal/sales/stats - Get sales statistics
 export async function GET(request: NextRequest) {
@@ -24,7 +41,8 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const salesRepId = searchParams.get('salesRepId');
-    const period = searchParams.get('period') || 'month'; // day, week, month, year
+    const requested = searchParams.get('period') || 'month';
+    const period: StatsPeriod = STATS_PERIODS.find((candidate) => candidate === requested) ?? 'month';
 
     if (!requester.isAdmin && salesRepId !== requester.uid) {
       return NextResponse.json(
@@ -33,28 +51,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Calculate date range
-    const now = new Date();
-    let startDate: Date;
-
-    switch (period) {
-      case 'day':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        break;
-      case 'week':
-        const dayOfWeek = now.getDay();
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - dayOfWeek);
-        startDate.setHours(0, 0, 0, 0);
-        break;
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        break;
-      case 'month':
-      default:
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-    }
+    const current = boundsFor(period, new Date());
+    // One millisecond before this period starts is, by definition, in the previous one.
+    const previous = boundsFor(period, new Date(current.start.getTime() - 1));
 
     // Get all sales and filter in memory to avoid index requirements
     const salesRef = adminDb.collection('sales');
@@ -62,7 +61,6 @@ export async function GET(request: NextRequest) {
     const snapshot = salesRepId
       ? await salesRef.where('salesRepId', '==', salesRepId).get()
       : await salesRef.get();
-    const startTimestamp = startDate.getTime();
 
     let totalSales = 0;
     let totalValue = 0;
@@ -71,71 +69,37 @@ export async function GET(request: NextRequest) {
     let approvedCount = 0;
     let rejectedCount = 0;
     let approvedPoints = 0;
-
-    snapshot.forEach((doc) => {
-      const data = doc.data();
-
-      // Filter by date in memory
-      const saleDate = data.saleDate?.toDate ? data.saleDate.toDate() : new Date(data.saleDate);
-      if (saleDate.getTime() < startTimestamp) {
-        return; // Skip sales before the period
-      }
-
-      totalSales++;
-      totalValue += data.totalValue || 0;
-      totalPoints += data.totalPoints || 0;
-
-      switch (data.status) {
-        case 'pending':
-          pendingCount++;
-          break;
-        case 'approved':
-          approvedCount++;
-          approvedPoints += data.totalPoints || 0;
-          break;
-        case 'rejected':
-          rejectedCount++;
-          break;
-      }
-    });
-
-    // Get previous period stats for comparison
-    let previousStartDate: Date;
-    const previousEndDate = startDate;
-
-    switch (period) {
-      case 'day':
-        previousStartDate = new Date(startDate);
-        previousStartDate.setDate(previousStartDate.getDate() - 1);
-        break;
-      case 'week':
-        previousStartDate = new Date(startDate);
-        previousStartDate.setDate(previousStartDate.getDate() - 7);
-        break;
-      case 'year':
-        previousStartDate = new Date(startDate);
-        previousStartDate.setFullYear(previousStartDate.getFullYear() - 1);
-        break;
-      case 'month':
-      default:
-        previousStartDate = new Date(startDate);
-        previousStartDate.setMonth(previousStartDate.getMonth() - 1);
-        break;
-    }
-
-    // Use the same snapshot and filter for previous period in memory
-    const previousStartTimestamp = previousStartDate.getTime();
-    const previousEndTimestamp = previousEndDate.getTime();
-    let previousTotalPoints = 0;
     let previousTotalSales = 0;
+    let previousTotalPoints = 0;
 
     snapshot.forEach((doc) => {
       const data = doc.data();
-      const saleDate = data.saleDate?.toDate ? data.saleDate.toDate() : new Date(data.saleDate);
-      const saleDateTimestamp = saleDate.getTime();
 
-      // Check if sale is in previous period
-      if (saleDateTimestamp >= previousStartTimestamp && saleDateTimestamp < previousEndTimestamp) {
+      // A cancelled sale is not a sale: it counts toward nothing, here or in the
+      // previous period it is compared against.
+      if (data.status === 'cancelled') return;
+
+      const saleDate = data.saleDate?.toDate ? data.saleDate.toDate() : new Date(data.saleDate);
+      const soldAt = saleDate.getTime();
+
+      if (soldAt >= current.start.getTime() && soldAt < current.end.getTime()) {
+        totalSales++;
+        totalValue += data.totalValue || 0;
+        totalPoints += data.totalPoints || 0;
+
+        switch (data.status) {
+          case 'pending':
+            pendingCount++;
+            break;
+          case 'approved':
+            approvedCount++;
+            approvedPoints += data.totalPoints || 0;
+            break;
+          case 'rejected':
+            rejectedCount++;
+            break;
+        }
+      } else if (soldAt >= previous.start.getTime() && soldAt < previous.end.getTime()) {
         previousTotalSales++;
         if (data.status === 'approved') {
           previousTotalPoints += data.totalPoints || 0;
@@ -154,7 +118,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       period,
-      startDate,
+      startDate: current.start,
       stats: {
         totalSales,
         totalValue,

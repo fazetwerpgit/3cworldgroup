@@ -22,6 +22,14 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
 }));
 
+import type * as AdminAuditModule from '@/lib/audit/adminAudit';
+
+vi.mock('@/lib/audit/adminAudit', async (importOriginal) => ({
+  ...(await importOriginal<typeof AdminAuditModule>()),
+  writeAdminAudit: vi.fn(async () => undefined),
+}));
+
+import { writeAdminAudit } from '@/lib/audit/adminAudit';
 import { GET, PUT } from './route';
 import {
   requireVerifiedManagement,
@@ -47,6 +55,7 @@ beforeEach(() => {
   mockManagement.mockReset();
   setSpy.mockClear();
   docs.clear();
+  vi.mocked(writeAdminAudit).mockClear();
 });
 
 describe('GET /api/portal/comp-plan', () => {
@@ -200,5 +209,36 @@ describe('PUT /api/portal/comp-plan', () => {
     const [marginDoc, marginValue] = setSpy.mock.calls[1];
     expect(marginDoc).toBe('compPlanMargin');
     expect(marginValue).toMatchObject({ margin: { att: { 'att-1gig': 520 } } });
+  });
+
+  it('audits a save with exactly the rates that moved, before and after', async () => {
+    mockManagement.mockResolvedValue({ ok: true, uid: 'o1', name: 'Owner', isAdmin: true, isOwner: true });
+    docs.set('compPlan', { rates: { ae_tier_1: { att: { 'att-1gig': 150, 'att-2gig': 200 } } } });
+    docs.set('compPlanMargin', { margin: { att: { 'att-1gig': 500 } } });
+
+    await PUT(put({
+      rates: { ae_tier_1: { att: { 'att-1gig': 175, 'att-2gig': 200 } } },
+      margin: { att: { 'att-1gig': 520 } },
+    }));
+
+    expect(writeAdminAudit).toHaveBeenCalledTimes(1);
+    expect(writeAdminAudit).toHaveBeenCalledWith({
+      action: 'compPlan.update',
+      actorUid: 'o1',
+      actorName: 'Owner',
+      details: {
+        rates: [{ path: 'ae_tier_1.att.att-1gig', from: 150, to: 175 }],
+        margin: [{ path: 'att.att-1gig', from: 500, to: 520 }],
+      },
+    });
+  });
+
+  it('writes no audit row when the save is refused or invalid', async () => {
+    mockManagement.mockResolvedValue({ ok: true, uid: 'a1', name: 'Admin', isAdmin: true, isOwner: false });
+    await PUT(put(VALID));
+    mockManagement.mockResolvedValue({ ok: true, uid: 'o1', name: 'Owner', isAdmin: true, isOwner: true });
+    await PUT(put({ rates: { ae_tier_1: { att: { 'att-1gig': -5 } } } }));
+
+    expect(writeAdminAudit).not.toHaveBeenCalled();
   });
 });

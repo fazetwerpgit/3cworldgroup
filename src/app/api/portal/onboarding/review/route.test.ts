@@ -321,3 +321,48 @@ describe('GET /api/portal/onboarding/review', () => {
     });
   });
 });
+
+describe('GET /api/portal/onboarding/review?summary=1', () => {
+  const waiting = (userId: string, itemId: string, submittedAt?: string) => ({
+    id: `${userId}_${itemId}`,
+    data: () => ({ userId, itemId, status: 'submitted', ...(submittedAt ? { submittedAt: { toDate: () => new Date(submittedAt) } } : {}) }),
+  });
+  const summary = () => GET(new NextRequest('http://localhost/api/portal/onboarding/review?summary=1'));
+
+  it('returns one row per item waiting on management, and leaves e-sign items out', async () => {
+    queryGetMock.mockResolvedValueOnce({
+      docs: [
+        waiting('u1', 'onboarding_submission', '2026-07-27T00:00:00.000Z'),
+        waiting('u2', 'dl_photos', '2026-07-26T00:00:00.000Z'),
+        waiting('u2', 'w9', '2026-07-26T00:00:00.000Z'), // out for signature, not waiting on management
+        waiting('u3', 'not_a_real_item', '2026-07-26T00:00:00.000Z'),
+      ],
+    });
+
+    const response = await summary();
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toEqual({
+      submissions: [{ submittedAt: '2026-07-27T00:00:00.000Z' }, { submittedAt: '2026-07-26T00:00:00.000Z' }],
+    });
+  });
+
+  it('reads only the submitted items: no review history, no user scan, no signed files', async () => {
+    queryGetMock.mockResolvedValueOnce({ docs: [waiting('u2', 'dl_photos', '2026-07-26T00:00:00.000Z')] });
+
+    await summary();
+
+    expect(queryGetMock).toHaveBeenCalledTimes(1);
+    expect(getAllMock).not.toHaveBeenCalled();
+    expect(getOnboardingBucket).not.toHaveBeenCalled();
+    expect(logAddMock).not.toHaveBeenCalled();
+  });
+
+  it('still requires management', async () => {
+    gateMock.mockResolvedValueOnce({ ok: false, error: 'Forbidden', status: 403 });
+
+    expect((await summary()).status).toBe(403);
+    expect(queryGetMock).not.toHaveBeenCalled();
+  });
+});
