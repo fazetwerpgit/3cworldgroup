@@ -675,6 +675,10 @@ export function RepHomeView(p: RepHomeViewProps) {
             ) : null}
           </div>
 
+          {/* Ask 3C right under pay: on a phone that is the first screen, where a
+              rep stuck at a door sees it without scrolling. */}
+          {p.askEntry}
+
           <WeekStrip
             standing={p.standing}
             challenge={p.challenge}
@@ -698,7 +702,6 @@ export function RepHomeView(p: RepHomeViewProps) {
           ) : null}
 
           {p.scanIntro ? <div className={d.scanSlot}>{p.scanIntro}</div> : null}
-          {p.askEntry}
 
           {p.payStatus === 'ready' && p.rows.length > 0 ? <RecentSales rows={p.rows} /> : null}
         </div>

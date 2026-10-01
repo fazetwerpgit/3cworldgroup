@@ -22,6 +22,9 @@ export const REP_TABS: RepTab[] = [
 
 export const LOG_SALE_HREF = '/portal/sales/new';
 
+/** Ask 3C: one tap from the top bar for whoever it is open to. */
+export const ASK_HREF = '/portal/ask';
+
 /** Owners do not sell: their phone bar swaps the Log sale tab for Admin, which opens on Onboarding (the busiest queue). */
 export const ADMIN_TAB: RepTab = {
   label: 'Admin',

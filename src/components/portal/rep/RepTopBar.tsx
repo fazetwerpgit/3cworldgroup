@@ -4,14 +4,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, BellOff, Bug, ChevronDown, ChevronLeft, LogOut, Menu, Plus, Settings, X } from 'lucide-react';
+import { Bell, BellOff, Bug, ChevronDown, ChevronLeft, LogOut, Menu, MessageCircleQuestion, Plus, Settings, X } from 'lucide-react';
+import { askOpenTo } from '@/lib/ask/flag';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { NavGroupsList, NavSheet, useNavAccess, type NavSheetClasses } from '@/components/portal/NavSheet';
 import { BodyLayer } from './BodyLayer';
 import { ClearNotes } from './ClearNotes';
-import { LOG_SALE_HREF, REP_PRIMARY_HREFS, REP_TABS, activeRepHref } from './repNav';
+import { ASK_HREF, LOG_SALE_HREF, REP_PRIMARY_HREFS, REP_TABS, activeRepHref } from './repNav';
 import { isOwner } from '@/types';
 import type { PortalNavGroup, PortalNavItem } from '@/components/portal/CommandPalette';
 import s from './rep.module.css';
@@ -78,8 +79,8 @@ function timeAgo(date: Date | string) {
 }
 
 /**
- * D top bar. Phone: brand, bell, menu (the full grouped nav sheet). Desktop:
- * brand, Dashboard / Sales / Leaderboard / Chat, More, bell, avatar, Log sale.
+ * D top bar. Phone: brand, Ask 3C, bell, menu (the full grouped nav sheet). Desktop:
+ * brand, Dashboard / Sales / Leaderboard / Chat, More, Ask 3C, bell, avatar, Log sale.
  * No role line (it would expose IBO / tier / manager titles). Every panel it
  * opens is portaled to <body>.
  */
@@ -206,6 +207,10 @@ export function RepTopBar({
   const brandHref = isOnboardingUser(user) ? '/portal/onboarding' : '/portal/dashboard';
   const backLink = back ?? { href: brandHref, label: 'dashboard' };
   const waiting = Object.values(navCounts).reduce((sum, n) => sum + n, 0);
+  // One tap to Ask 3C from any page, for whoever it is open to. Not on the Ask page
+  // itself, and not for new hires still onboarding (they have no orders to ask about).
+  const showAsk =
+    askOpenTo(user?.role, user?.uid) && !isOnboardingUser(user) && !pathname.startsWith(ASK_HREF);
 
   return (
     <>
@@ -252,6 +257,12 @@ export function RepTopBar({
               </li>
             ) : null}
           </ul>
+
+          {showAsk ? (
+            <Link href={ASK_HREF} className={s.iconBtn} aria-label="Ask 3C" title="Ask 3C">
+              <MessageCircleQuestion size={22} strokeWidth={1.75} aria-hidden="true" />
+            </Link>
+          ) : null}
 
           <button
             type="button"
