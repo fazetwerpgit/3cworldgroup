@@ -3,7 +3,7 @@
 import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { SalesTable } from '@/components/sales/SalesTable';
+import { SalesTable, SalesViewTabs } from '@/components/sales/SalesTable';
 import { PayoutCard } from '@/app/portal/sales/PayoutCard';
 import { PayHelpSheet } from '@/components/portal/rep/PayHelpSheet';
 import { nextPayout } from '@/lib/pay/payoutWindow';
@@ -13,6 +13,7 @@ import type { Sale } from '@/types';
 import type { FiberOrder, FiberOrderStatus } from '@/types/fiberOrder';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
 
 // Temporary harness (untracked, never committed): rep Sales C on mock data.
 const d = (day: number, month = 8) => new Date(2026, month, day, 12);
@@ -97,8 +98,8 @@ function Harness() {
       <main className={s.scroller} id="rep-main">
         <div className={s.main}>
           <div className={x.page}>
-            <header className={x.head}>
-              <h1 className={x.title}>Sales</h1>
+            <header className={p.head}>
+              <h1 className={p.title}>Sales</h1>
               <div className={x.month}>
                 <button type="button" className={x.monthBtn} aria-label="Previous month">‹</button>
                 <span className={x.monthLabel}>September 2026</span>
@@ -117,11 +118,11 @@ function Harness() {
                 onHelp={() => setHelp(true)}
               />
               <div className={x.ledgerCol}>
+                <SalesViewTabs payView={pay} onChange={setPay} />
                 <SalesTable
                   sales={SALES}
                   month={{ year: 2026, month: 8 }}
                   payView={pay}
-                  onPayViewChange={setPay}
                   payPlan={{ rates: noPlan ? null : rates, payDelayDays: 14, hasPlan: !noPlan }}
                   fiber={fiber}
                 />

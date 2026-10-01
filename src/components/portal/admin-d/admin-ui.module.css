@@ -1122,3 +1122,92 @@
 .sheetFoot > * {
   flex: 1 1 0;
 }
+
+/* ---------- hub tabs: the canonical segmented tabs (rep-page.module.css .tabs /
+   .tab: same colours, radius, height, lime-wash + 2px lime underline when
+   selected), plus a sideways scroll with edge fades for the six Requests types. ---------- */
+.tabsWrap {
+  position: relative;
+  min-width: 0;
+  --fade-l: 0px;
+  --fade-r: 0px;
+}
+
+.tabs {
+  position: relative;
+  display: flex;
+  gap: 1px;
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-line-strong);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tabsFadeStart {
+  --fade-l: 28px;
+}
+
+.tabsFadeEnd {
+  --fade-r: 28px;
+}
+
+.tab {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 0;
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab[aria-pressed='true'] {
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+  box-shadow: inset 0 -2px 0 var(--c-lime);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.tabCount {
+  color: var(--c-text-3);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.tabCountOpen {
+  color: var(--c-amber);
+}
+
+@media (min-width: 1024px) {
+  .tabsWrap {
+    align-self: flex-start;
+    max-width: 100%;
+  }
+  .tabs {
+    display: inline-flex;
+    max-width: 100%;
+  }
+  .tab {
+    flex: none;
+    min-width: 140px;
+  }
+}

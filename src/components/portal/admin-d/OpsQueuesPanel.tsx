@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { ChevronRight, RotateCw } from 'lucide-react';
 import { AdminEmpty, AdminFailed } from './AdminUi';
@@ -54,6 +55,11 @@ export function OpsQueuesPanel({
     : null;
   const shown = cards?.filter((card) => card.error || card.count > 0) ?? [];
   const loading = queues.loading || extraLoading;
+  // A column no queue has a figure for (the pipeline and signups carry no timestamps) is left out, not a column of dashes.
+  const live = shown.filter((card) => !card.error);
+  const showNew = live.some((card) => card.newToday !== null);
+  const showOldest = live.some((card) => card.count > 0 && card.oldestWaitMs !== null);
+  const deskCols = ['64px', 'minmax(0, 1fr)', showNew && '104px', showOldest && '96px', '24px'].filter(Boolean).join(' ');
 
   const failedCount = cards?.filter((card) => card.error).length ?? 0;
   const allFailed = !!cards && cards.length > 0 && failedCount === cards.length;
@@ -106,12 +112,12 @@ export function OpsQueuesPanel({
       ) : shown.length === 0 ? (
         <AdminEmpty title="Nothing waiting" />
       ) : (
-        <ul className={`${u.rows} ${h.cols}`}>
+        <ul className={`${u.rows} ${h.cols}`} style={{ '--cols': deskCols } as CSSProperties}>
           <li className={u.tHead} aria-hidden="true">
             <span className={u.alignEnd}>Open</span>
             <span>Queue</span>
-            <span className={u.alignEnd}>New today</span>
-            <span className={u.alignEnd}>Oldest</span>
+            {showNew ? <span className={u.alignEnd}>New today</span> : null}
+            {showOldest ? <span className={u.alignEnd}>Oldest</span> : null}
             <span />
           </li>
           {shown.map((card) => (
@@ -125,8 +131,8 @@ export function OpsQueuesPanel({
                     <strong className={h.queueName}>{card.label}</strong>
                     <span className={h.queueFail}>Couldn&apos;t load this queue</span>
                   </span>
-                  <span className={`${u.cell} ${h.deskCell}`} />
-                  <span className={`${u.cell} ${h.deskCell}`} />
+                  {showNew ? <span className={`${u.cell} ${h.deskCell}`} /> : null}
+                  {showOldest ? <span className={`${u.cell} ${h.deskCell}`} /> : null}
                   <Link href={card.href} className={h.open} aria-label={`Open ${card.label}`}>
                     <ChevronRight size={20} aria-hidden="true" />
                   </Link>
@@ -147,12 +153,16 @@ export function OpsQueuesPanel({
                       </span>
                     ) : null}
                   </span>
-                  <span className={`${u.cell} ${u.alignEnd} ${h.deskCell} ${u.num}`}>
-                    {card.newToday === null ? '—' : card.newToday}
-                  </span>
-                  <span className={`${u.cell} ${u.alignEnd} ${h.deskCell} ${u.num} ${isBacked(card) ? u.toneAmber : ''}`}>
-                    {card.count > 0 ? waitAge(card.oldestWaitMs) : '—'}
-                  </span>
+                  {showNew ? (
+                    <span className={`${u.cell} ${u.alignEnd} ${h.deskCell} ${u.num}`}>
+                      {card.newToday === null ? '—' : card.newToday}
+                    </span>
+                  ) : null}
+                  {showOldest ? (
+                    <span className={`${u.cell} ${u.alignEnd} ${h.deskCell} ${u.num} ${isBacked(card) ? u.toneAmber : ''}`}>
+                      {card.count > 0 ? waitAge(card.oldestWaitMs) : '—'}
+                    </span>
+                  ) : null}
                   <ChevronRight size={20} className={u.chev} aria-hidden="true" />
                 </Link>
               )}

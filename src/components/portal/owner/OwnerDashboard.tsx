@@ -242,6 +242,7 @@ function companyRows(problems: Section<ProblemRow[]>): QueueCard[] {
       label: check.label,
       href: row?.href ?? check.href,
       hub: '',
+      tab: '',
       count: row?.count ?? 0,
       oldestWaitMs: null,
       newToday: null,
@@ -259,14 +260,19 @@ const RECRUITING_TILES: Array<{ key: keyof RecruitingSummary; label: string }> =
   { key: 'firstInstalls', label: 'First installs' },
 ];
 
+/** The tile's two figures read as a change: "+3 vs last week", "Same as last week (4)", "2 fewer than last week (6)". */
+function weekChange({ thisWeek, lastWeek }: WeekCount): string {
+  const diff = thisWeek - lastWeek;
+  if (diff === 0) return lastWeek === 0 ? '0 last week' : `Same as last week (${count(lastWeek)})`;
+  return diff > 0 ? `+${count(diff)} vs last week` : `${count(-diff)} fewer than last week (${count(lastWeek)})`;
+}
+
 function RecruitingTile({ label, value }: { label: string; value: WeekCount }) {
   return (
     <div className={o.stat}>
       <p className={o.statLabel}>{label}</p>
       <p className={o.statValue}>{count(value.thisWeek)}</p>
-      <p className={o.statPrior}>
-        <strong>{count(value.lastWeek)}</strong> all last week
-      </p>
+      <p className={o.statPrior}>{weekChange(value)}</p>
     </div>
   );
 }
@@ -314,30 +320,20 @@ export function OwnerDashboard() {
           {pushPromptVisible === false && <AddToHomeScreenBanner pushPromptVisible={pushPromptVisible} />}
         </div>
 
-        <div className={o.colMain}>
-          {data.money.status === 'loading' ? (
-            <MoneySkeleton />
-          ) : data.money.status === 'error' ? (
-            <section className={`${s.panel} ${o.board} ${o.boardFailed}`} aria-label="Company money">
-              <div className={o.cellMargin}>
-                <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
-                <Failed what="company money" onRetry={() => retry('money')} className={o.cellFailed} />
-              </div>
-            </section>
-          ) : (
-            <MoneyBoard data={data.money.data} />
-          )}
+        {data.money.status === 'loading' ? (
+          <MoneySkeleton />
+        ) : data.money.status === 'error' ? (
+          <section className={`${s.panel} ${o.board} ${o.boardFailed}`} aria-label="Company money">
+            <div className={o.cellMargin}>
+              <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+              <Failed what="company money" onRetry={() => retry('money')} className={o.cellFailed} />
+            </div>
+          </section>
+        ) : (
+          <MoneyBoard data={data.money.data} />
+        )}
 
-          <OpsQueuesPanel
-            title="Needs attention"
-            className={o.attention}
-            extra={companyRows(data.problems)}
-            extraLoading={data.problems.status === 'loading'}
-            onRefresh={() => retry('problems')}
-          />
-        </div>
-
-        <div className={o.colSide}>
+        <div className={o.side}>
           {data.recruiting.status === 'loading' ? (
             <SkeletonPanel label="Loading recruiting" title="Recruiting · this week" rows={2} className={o.recruiting} />
           ) : data.recruiting.status === 'error' ? (
@@ -348,6 +344,14 @@ export function OwnerDashboard() {
           ) : (
             <Recruiting data={data.recruiting.data} />
           )}
+
+          <OpsQueuesPanel
+            title="Needs attention"
+            className={o.attention}
+            extra={companyRows(data.problems)}
+            extraLoading={data.problems.status === 'loading'}
+            onRefresh={() => retry('problems')}
+          />
         </div>
       </div>
     </>

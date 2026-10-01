@@ -15,12 +15,8 @@
   gap: var(--s3);
 }
 
-/* Phone: one column in answer order. Desktop: money and needs attention (the
-   onboarding queue rows, which need the width) on the left, recruiting on the right. */
-.colMain,
-.colSide {
-  display: contents;
-}
+/* Phone: one column in answer order (set below). Desktop: money and recruiting
+   share the first row, Needs attention runs full width under them. */
 
 @media (max-width: 1023px) {
   .banners {
@@ -39,6 +35,10 @@
 
 .banners:empty {
   display: none;
+}
+
+.side {
+  display: contents;
 }
 
 /* ---------- money: the score panel ---------- */
@@ -282,11 +282,6 @@
   font-size: var(--t-sm);
 }
 
-.statPrior strong {
-  color: var(--c-text);
-  font-weight: 600;
-}
-
 /* ---------- skeletons ---------- */
 .skelScore {
   width: 62%;
@@ -322,23 +317,16 @@
     grid-column: 1 / -1;
   }
 
-  .colMain,
-  .colSide {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s4);
-    min-width: 0;
-  }
-
-  .colMain {
+  .board {
     grid-column: 1 / span 8;
   }
 
-  .colSide {
+  .side {
+    display: flex;
+    flex-direction: column;
     grid-column: 9 / span 4;
-    /* Money and the queue list make the left column the long one; recruiting
-       keeps its own height instead of stretching down beside the queues. */
-    align-self: start;
+    gap: var(--s4);
+    min-width: 0;
   }
 
   .cellMargin,
@@ -404,13 +392,13 @@
     padding: var(--s4) var(--s5);
   }
 
-  /* The two columns end level: whichever is shorter stretches its last panel. */
-  .colMain .board {
-    flex: 1;
+  /* Money fills the left 8 columns; the side column (Recruiting, then Needs
+     attention) fills the right 4, and the money table stretches to match. */
+  .board {
     grid-template-rows: auto 1fr auto;
   }
 
-  .colMain .boardFailed {
+  .boardFailed {
     grid-template-rows: auto;
   }
 
@@ -418,27 +406,9 @@
     height: 100%;
   }
 
-  /* When the column stretches, a tile keeps its label on top and its figures
-     on the bottom edge, like the score cells, instead of floating mid-air. */
-  .stat {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: var(--s3);
-  }
-
-  .stat .statValue {
-    margin-top: auto;
-  }
-
-  /* Recruiting closes the right column level with the money panel. */
-  .recruiting {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-  }
-
-  .recruiting .stats {
+  /* The side column stacks Recruiting over Needs attention; Needs attention
+     takes the leftover height so both columns end level. */
+  .attention {
     flex: 1;
   }
 }

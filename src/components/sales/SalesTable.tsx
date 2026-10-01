@@ -17,11 +17,22 @@ import { countedSales, isCarrierCancelled } from '@/lib/sales/installBucket';
 import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { SalesDialog } from './SalesDialog';
 import { InstallStatusLine } from './InstallStatusLine';
 import { FiberRows, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
+
+/** Sales | Pay: switches the VIEW of the page, so it is the canonical page tabs. */
+export function SalesViewTabs({ payView, onChange }: { payView: boolean; onChange: (payView: boolean) => void }) {
+  return (
+    <div className={p.tabs} role="tablist" aria-label="Sales views">
+      <button className={p.tab} role="tab" type="button" aria-selected={!payView} onClick={() => onChange(false)}>Sales</button>
+      <button className={p.tab} role="tab" type="button" aria-selected={payView} onClick={() => onChange(true)}>Pay</button>
+    </div>
+  );
+}
 
 // A rep's own ledger. Management no longer renders this at all — they get
 // AdminSalesBoard, which groups the whole company by rep. Splitting the two
@@ -30,9 +41,8 @@ interface SalesTableProps {
   sales: Sale[];
   onDelete?: (saleId: string) => void | Promise<boolean>;
   loading?: boolean;
-  /** The [All | Pay] selection, held by the page. */
+  /** The [Sales | Pay] selection, held by the page (see SalesViewTabs). */
   payView?: boolean;
-  onPayViewChange?: (payView: boolean) => void;
   /** The month the page's picker is on. Omitted, the whole book is listed. */
   month?: MonthKey;
   /**
@@ -144,7 +154,6 @@ export function SalesTable({
   onDelete,
   loading = false,
   payView = false,
-  onPayViewChange,
   month,
   payPlan,
   fiber,
@@ -266,7 +275,8 @@ export function SalesTable({
       return order.status === 'breakage';
     }));
   }, [fiberOrders, fiberView]);
-  const showFiberView = fiberView !== null;
+  // The fiber filter only shows on the Sales tab; Pay keeps it parked for the way back.
+  const showFiberView = fiberView !== null && !showPay;
 
   const moveSelection = useCallback((direction: number) => {
     if (!listSales.length) return;
@@ -339,40 +349,34 @@ export function SalesTable({
     );
   };
 
-  const selectView = (view: FiberBucket | null, pay: boolean) => {
+  const selectView = (view: FiberBucket | null) => {
     setSelectedId(null);
     setFiberView(view);
-    onPayViewChange?.(pay);
   };
 
   return (
     <>
       <section className={`${s.panel} ${x.ledger}`} aria-labelledby="ledger-h">
-        <div className={x.boardHead}>
+        <div className={`${s.panelHead} ${x.boardHead}`}>
           {/* NOT "What you get paid". The owner's words, via Jacob
               (2026-09-03): "if claims and final chargebacks are not accounted
               for I will have to pay that out", and "if final reports don't
               show that on the site I can be sued". The portal does not hold
               chargebacks or claims, so it must never state a rep's pay — only
               estimate it, and say so where the figure is. */}
-          <h2 id="ledger-h" className={x.boardTitle}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
+          <h2 id="ledger-h" className={s.kicker}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
           <p className={x.boardMeta}>{showPay
             ? `${datedPayCount} ${datedPayCount === 1 ? 'sale' : 'sales'}`
             : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · tap a row for detail`}</p>
-        </div>
-
-        <div className={x.segWell} role="tablist" aria-label="Sales views">
-          <button className={x.segTab} role="tab" type="button" aria-selected={!showPay} onClick={() => selectView(null, false)}>Sales</button>
-          <button className={x.segTab} role="tab" type="button" aria-selected={showPay} onClick={() => selectView(null, true)}>Pay</button>
         </div>
 
         {fiberOrders.length > 0 && !showPay && (
           <div className={x.chips} role="group" aria-label="Fiber status views">
             <button
               type="button"
-              className={x.chip}
+              className={`${p.chip} ${x.chip}`}
               aria-pressed={fiberView === null}
-              onClick={() => selectView(null, false)}
+              onClick={() => selectView(null)}
             >
               Sent in <b>{monthSales.length}</b>
             </button>
@@ -387,9 +391,9 @@ export function SalesTable({
                 <button
                   key={key}
                   type="button"
-                  className={x.chip}
+                  className={`${p.chip} ${x.chip}`}
                   aria-pressed={fiberView === key}
-                  onClick={() => selectView(key, false)}
+                  onClick={() => selectView(key)}
                 >
                   <span className={`${x.dot} ${fiberTone(key)}`} aria-hidden="true" />
                   {label} <b>{fiberBucketCounts[key]}</b>
@@ -407,7 +411,7 @@ export function SalesTable({
             <FiberRows orders={fiberBucketOrders} />
           </div>
         ) : showPay ? (
-          <div>
+          <div className={x.ledgerBody}>
             {payPlan?.error ? (
               <div className={`${s.failed} ${x.planFailed}`} role="alert">
                 <span>Couldn&apos;t load pay rates</span>
@@ -502,6 +506,9 @@ export function SalesTable({
                 {month && <> Earlier months are behind the previous-month arrow above.</>}
               </p>
             )}
+            {payGroups.length > 0 && (
+              <p className={x.listEnd}>{month ? `Nothing else installs in ${monthLabel(month)}.` : 'That is every install date.'}</p>
+            )}
             <div className={x.ledgerTotals}>
               <span><b>{datedPayCount}</b> by install date{month ? ` in ${monthLabel(month)}` : ''}</span>
               {hasPlan && (
@@ -512,7 +519,7 @@ export function SalesTable({
             </div>
           </div>
         ) : (
-          <div>
+          <div className={x.ledgerBody}>
             <div className={`${x.lhead} ${x.sale} ${isAdmin ? x.hasAct : ''}`} aria-hidden="true">
               <span className={x.lhStamp}>Sold</span>
               <span>Customer</span>
@@ -558,6 +565,9 @@ export function SalesTable({
                 {month ? `No sales sold in ${monthLabel(month)}.` : 'No sales yet.'}
                 {month && <> Your earlier sales are still here — use the previous-month arrow above.</>}
               </p>
+            )}
+            {listSales.length > 0 && (
+              <p className={x.listEnd}>{month ? `Nothing else sold in ${monthLabel(month)}.` : 'That is every sale.'}</p>
             )}
             <div className={x.ledgerTotals}>
               <span>

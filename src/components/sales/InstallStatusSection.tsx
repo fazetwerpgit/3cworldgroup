@@ -9,6 +9,7 @@ import { SubmittedRows } from './SubmittedSales';
 import { submittedByRep, submissionMatches } from '@/lib/sales/submittedByRep';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
 import { Collapse } from '@/components/portal/Collapse';
 
 type FiberFilter = 'all' | 'pending' | 'active' | 'cancelled' | 'attention';
@@ -476,7 +477,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
   return (
     <section className={s.panel} aria-label="Install status">
       <div className={`${s.panelHead} ${x.panelHead}`}>
-        <h2 className={x.panelTitle}>Install status by rep</h2>
+        <h2 className={s.kicker}>Install status by rep</h2>
         {updated && <p className={x.panelMeta}>Updated {updated}</p>}
       </div>
 
@@ -501,7 +502,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
               <button
                 key={key}
                 type="button"
-                className={x.chip}
+                className={`${p.chip} ${x.chip}`}
                 aria-pressed={filter === key}
                 onClick={() => setFilter(key)}
               >
@@ -566,7 +567,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
               {unmatchedAssignmentGroups.length > 0 && (
                 <>
                   <div className={x.divider}>
-                    <span className={x.panelTitle}>Not linked to an account yet</span>
+                    <span className={s.kicker}>Not linked to an account yet</span>
                     <button type="button" className={x.actBtn} onClick={() => void handleRematch()} disabled={rematching || Boolean(assigningKey)}>
                       {rematching ? 'Matching…' : 'Re-run matching'}
                     </button>

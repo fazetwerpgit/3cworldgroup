@@ -1,4 +1,4 @@
-/* Settings on the D shell. Phone: profile, then app/notifications, theme,
+/* Settings on the D shell. Phone: profile, then app/notifications,
    password, bug report. Desktop: profile left, the rest stacked right. */
 
 .layout {
@@ -194,11 +194,47 @@
   text-align: right;
 }
 
-/* ---------- theme ---------- */
-.theme {
+/* ---------- install steps (iPhone) ---------- */
+.steps {
   display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps li {
+  display: flex;
+  align-items: center;
   gap: var(--s3);
-  padding: var(--s4);
+  min-height: 44px;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.35;
+  counter-increment: step;
+}
+
+.steps li::before {
+  content: counter(step);
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 50%;
+  color: var(--c-lime);
+  font-size: var(--t-sm);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.steps svg {
+  display: inline-block;
+  flex: none;
+  color: var(--c-lime);
+  vertical-align: -3px;
 }
 
 /* ---------- collapsible rows (password, bug report) ---------- */

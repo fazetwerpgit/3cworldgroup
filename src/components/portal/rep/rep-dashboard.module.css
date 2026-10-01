@@ -473,7 +473,7 @@
 /* ---------- today ---------- */
 .tRow {
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr) auto;
+  grid-template-columns: 80px minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--s3);
   width: 100%;
@@ -492,8 +492,11 @@
     transform 120ms ease-out;
 }
 
-/* A time stamp, not an icon tile: the condensed numeral carries the row. */
+/* The left tag says what is true of this row: a call's time, or how it is late. */
 .stamp {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   color: var(--c-text-2);
   font-family: var(--f-display);
   font-size: 20px;
@@ -502,8 +505,30 @@
   white-space: nowrap;
 }
 
-.stampNow {
+.stampLabel {
+  font-size: 18px;
+}
+
+.stampSub {
+  color: var(--c-text-3);
+  font-family: var(--f-ui);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.2;
+}
+
+.stampMissed {
+  color: var(--c-red);
+}
+
+.stampNeeds {
   color: var(--c-amber);
+}
+
+/* A row with no tag (an onboarding task) gives its column back to the text. */
+.tRowPlain {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .tText {

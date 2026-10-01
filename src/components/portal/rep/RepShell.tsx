@@ -44,7 +44,7 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
         <main className={s.scroller} id="rep-main">
           <div className={s.main}>{children}</div>
         </main>
-        {tabBarHidden ? null : <RepTabBar chatUnread={anyUnread} />}
+        {tabBarHidden ? null : <RepTabBar chatUnread={anyUnread} navCounts={navCounts} />}
         {/* Keeps the portal-wide Ctrl/Cmd+K search working on D pages. */}
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>

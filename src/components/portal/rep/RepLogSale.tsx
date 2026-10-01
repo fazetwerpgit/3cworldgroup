@@ -372,7 +372,7 @@ export function RepLogSale() {
 
   if (!onDetails) {
     return (
-      <div className={l.main} data-step-move={stepMove ?? undefined}>
+      <div className={`${l.main} ${l.mainEntry}`} data-step-move={stepMove ?? undefined}>
         <Steps onDetails={false} />
         <div className={l.defaultGrid}>
           <section className={l.entry} aria-labelledby="entry-h">

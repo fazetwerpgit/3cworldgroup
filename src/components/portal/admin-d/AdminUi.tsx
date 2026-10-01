@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, CircleAlert, RotateCw, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -170,5 +170,76 @@ export function AdminGate({ roles, children }: { roles?: UserRole[]; children: R
     <ProtectedRoute roles={roles} fallback={<AdminSkeletonRows rows={3} />}>
       {children}
     </ProtectedRoute>
+  );
+}
+
+export interface AdminTabOption {
+  value: string;
+  label: string;
+  /** Open items in this tab, shown after its label. */
+  count?: number;
+}
+
+/**
+ * A hub's tab strip: the portal's canonical segmented tabs. Wider than the
+ * screen (Requests has six) it scrolls sideways with a fade at each edge that
+ * has more, and keeps the selected tab in view.
+ */
+export function AdminTabs({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: AdminTabOption[];
+  onChange: (value: string) => void;
+}) {
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const [fade, setFade] = useState({ start: false, end: false });
+
+  const measure = useCallback(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const start = el.scrollLeft > 2;
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
+    setFade((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+  }, []);
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const selected = el.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (selected) {
+      el.scrollTo({ left: selected.offsetLeft - (el.clientWidth - selected.offsetWidth) / 2, behavior: 'smooth' });
+    }
+    measure();
+  }, [value, measure]);
+
+  useEffect(() => {
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+
+  return (
+    <div className={`${u.tabsWrap} ${fade.start ? u.tabsFadeStart : ''} ${fade.end ? u.tabsFadeEnd : ''}`}>
+      <div ref={scroller} className={u.tabs} role="group" aria-label={label} onScroll={measure}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={u.tab}
+            aria-pressed={value === option.value}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+            {option.count != null ? (
+              <span className={`${u.tabCount} ${option.count > 0 ? u.tabCountOpen : ''}`}>{option.count}</span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }

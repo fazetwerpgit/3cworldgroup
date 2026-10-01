@@ -79,6 +79,7 @@ describe('RepPayStructure (a rep, own tier)', () => {
     await flush();
     expect(container.textContent).not.toContain('0%');
     expect(container.textContent).not.toMatch(/placeholder/i);
+    expect(container.textContent).toContain('Your rate will show here once leadership confirms it.');
 
     act(() => button('How pay works').click());
     expect(document.body.textContent).toContain('How T-Fiber pay works');

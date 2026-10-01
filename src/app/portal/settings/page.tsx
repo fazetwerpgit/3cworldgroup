@@ -6,7 +6,6 @@ import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ChevronDown, KeyRound, Lock } from 'lucide-react';
 import ReportBugCard from '@/components/portal/ReportBugCard';
-import ThemeToggleCard from '@/components/portal/ThemeToggleCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
 import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
 import { getEffectiveRole, repFacingRoleLabel, SHIRT_SIZES } from '@/types';
@@ -148,11 +147,6 @@ export default function SettingsPage() {
     return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  const formatShortDate = (date: Date | string | undefined) => {
-    if (!date) return 'Not available';
-    return new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
-  };
-
   const addressLine = [user?.city, user?.state].filter(Boolean).join(', ') + (user?.zip ? ` ${user.zip}` : '');
   const fullAddress = user?.address ? `${user.address}${addressLine ? `, ${addressLine}` : ''}` : addressLine || 'Not on file';
   const email = user?.email || auth?.currentUser?.email || '';
@@ -168,10 +162,8 @@ export default function SettingsPage() {
     ['Email', email || 'Not on file'],
     ...(showRole ? [['Role', roleLabel || 'Not assigned'] as [string, string]] : []),
     ['Status', user?.status === 'active' ? 'Active' : 'Inactive'],
-    ['Start date', formatDate(user?.hireDate)],
-    ['Member since', formatShortDate(user?.createdAt)],
-    ['Territory', user?.territoryId || 'Not assigned'],
-    ['Employee ID', user?.uid ? user.uid.slice(-6) : 'Not available'],
+    ['Start date', formatDate(user?.hireDate ?? user?.createdAt)],
+    ...(user?.territoryId ? [['Territory', user.territoryId] as [string, string]] : []),
     ['Address', fullAddress],
   ];
 
@@ -281,7 +273,9 @@ export default function SettingsPage() {
               ))}
             </dl>
             <div className={st.factsNote}>
-              <p className={p.hint}>Locked details come from your admin. Ask them to change your role, territory or address.</p>
+              <p className={p.hint}>
+                Locked details come from your admin. Ask them to change your role{user?.territoryId ? ', territory' : ''} or address.
+              </p>
             </div>
           </section>
         </div>
@@ -293,13 +287,6 @@ export default function SettingsPage() {
             </div>
             <PushNotificationsCard />
             <InstallAppCard />
-          </section>
-
-          <section className={s.panel} aria-labelledby="theme-title">
-            <div className={s.panelHead}>
-              <h2 id="theme-title" className={s.kicker}>Theme</h2>
-            </div>
-            <ThemeToggleCard />
           </section>
 
           <section className={s.panel} aria-label="Password">

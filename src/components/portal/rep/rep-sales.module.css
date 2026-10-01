@@ -13,22 +13,6 @@
   gap: var(--s4);
 }
 
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s3) var(--s4);
-}
-
-.title {
-  margin: 0;
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-}
-
 /* ‹ September 2026 › — the month picker: two icon buttons around the month. */
 .month {
   display: inline-flex;
@@ -130,20 +114,13 @@
 }
 
 /* ---------- panels ---------- */
+/* Heads are the shared .panelHead + .kicker, like the Home panels. */
 .panelHead {
   flex-wrap: wrap;
   row-gap: 2px;
   min-height: 0;
-  padding-block: 11px;
-  border-radius: calc(var(--r-panel) - 1px) calc(var(--r-panel) - 1px) 0 0;
-  background: var(--c-well);
-}
-
-.panelTitle {
-  margin: 0;
-  color: var(--c-text-2);
-  font: 400 20px / 1 var(--f-display);
-  letter-spacing: 0.08em;
+  padding: 14px var(--s4) 10px;
+  border-bottom: 0;
 }
 
 .panelMeta {
@@ -157,61 +134,10 @@
 .mgmt > section,
 .ledgerCol > section {
   overflow: hidden;
+  border-radius: var(--r-card);
 }
 
-/* ---------- the one selection control: segmented tabs + filter chips ---------- */
-.seg {
-  display: flex;
-  gap: 4px;
-  margin: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--c-well);
-  box-shadow: var(--c-sink);
-}
-
-.segBtn {
-  flex: 1 1 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 88px;
-  min-height: 40px;
-  padding: 0 var(--s4);
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--c-text-3);
-  font: 600 var(--t-ui) / 1 var(--f-ui);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 140ms, color 140ms, transform 120ms ease-out;
-}
-
-.segBtn:active {
-  transform: scale(0.97);
-}
-
-.segBtn[aria-selected='true'],
-.segBtn[aria-pressed='true'] {
-  background: var(--c-panel-hi);
-  box-shadow: var(--c-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
-  color: var(--c-text);
-}
-
-.segBtn:focus-visible {
-  outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
-}
-
-@media (hover: hover) {
-  .segBtn:not([aria-selected='true']):not([aria-pressed='true']):hover {
-    color: var(--c-text-2);
-  }
-}
-
+/* ---------- filter chips (the look is rep-page .chip; this adds the dot and count) ---------- */
 .chips {
   display: flex;
   gap: var(--s2);
@@ -226,24 +152,9 @@
 }
 
 .chip {
-  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  min-height: 36px;
-  padding: 0 var(--s3);
-  border: 1px solid var(--c-line-strong);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--c-text-2);
-  font: 500 var(--t-sm) / 1 var(--f-ui);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 140ms, color 140ms, transform 120ms ease-out;
-}
-
-.chip:active {
-  transform: scale(0.97);
 }
 
 .chip .dot {
@@ -257,26 +168,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-.chip[aria-pressed='true'] {
-  border-color: var(--c-text);
-  background: var(--c-text);
-  color: var(--c-ground);
-}
-
 .chip[aria-pressed='true'] b {
-  color: var(--c-ground);
+  color: inherit;
 }
 
 .chip:focus-visible {
   outline: 2px solid var(--c-lime-hi);
   outline-offset: 2px;
-}
-
-@media (hover: hover) {
-  .chip:not([aria-pressed='true']):hover {
-    border-color: var(--c-text-2);
-    color: var(--c-text);
-  }
 }
 
 /* ---------- status language (same as the dashboard) ---------- */
@@ -829,22 +727,13 @@
   border-radius: var(--r-card);
 }
 
-.boardHead {
-  display: flex;
+/* Head: the shared .panelHead + .kicker, set like the Home panels' heads. */
+.ledger .boardHead {
   flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 2px var(--s3);
-  padding: 11px var(--s4);
-  border-bottom: 1px solid var(--c-line);
-  background: var(--c-well);
-}
-
-.boardTitle {
-  margin: 0;
-  color: var(--c-text-2);
-  font: 400 20px / 1 var(--f-display);
-  letter-spacing: 0.08em;
+  row-gap: 2px;
+  min-height: 0;
+  padding: 14px var(--s4) 10px;
+  border-bottom: 0;
 }
 
 .boardMeta {
@@ -853,52 +742,7 @@
   font-size: var(--t-sm);
 }
 
-/* Sales | Pay, set in a well. */
-.segWell {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  margin: 12px var(--s4) 0;
-  padding: 4px;
-  border-radius: 10px;
-  background: var(--c-well);
-  box-shadow: var(--c-sink);
-}
-
-.segTab {
-  min-height: 40px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--c-text-3);
-  font: 600 14px / 1 var(--f-ui);
-  cursor: pointer;
-  transition: background 140ms, color 140ms, transform 120ms ease-out;
-}
-
-.segTab:active {
-  transform: scale(0.97);
-}
-
-.segTab[aria-selected='true'] {
-  background: var(--c-panel-hi);
-  box-shadow: var(--c-lift);
-  color: var(--c-text);
-}
-
-.segTab:focus-visible {
-  outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
-}
-
-@media (hover: hover) {
-  .segTab:not([aria-selected='true']):hover {
-    color: var(--c-text-2);
-  }
-}
-
-/* Carrier-status chips: the selected one inverts to white. */
+/* Carrier-status filter chips sit under the head. */
 .ledger .chips {
   padding: 12px var(--s4);
   border-bottom: 0;
@@ -1214,7 +1058,7 @@
   color: var(--c-text-3);
 }
 
-/* Totals ride in a well band at the foot of the ledger. */
+/* Totals close the ledger, a hairline above them like any Home row. */
 .ledgerTotals {
   display: flex;
   flex-wrap: wrap;
@@ -1223,7 +1067,6 @@
   gap: var(--s2) var(--s4);
   padding: var(--s3) var(--s4);
   border-top: 1px solid var(--c-line);
-  background: var(--c-well);
   color: var(--c-text-2);
   font-size: var(--t-sm);
 }
@@ -1235,6 +1078,32 @@
 
 .ledgerTotals .amt {
   font-size: var(--t-sm);
+}
+
+/* The list body fills a tall panel: the totals ride at the foot, the end note under the rows. */
+.ledgerBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.ledgerBody > .ledgerTotals {
+  margin-top: auto;
+}
+
+.listEnd {
+  display: none;
+  margin: 0;
+  padding: var(--s4);
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+@media (min-width: 1024px) {
+  .listEnd {
+    display: block;
+  }
 }
 
 /* First load: blocks rise in like a sheet, staggered. */
@@ -2456,15 +2325,17 @@ a.dLine {
 
 /* ---------- C · Split on desktop: pay on the left, the ledger beside it ---------- */
 @media (min-width: 1024px) {
-  .title {
-    font-size: 32px;
+  /* A short list still fills the panel, so the page does not end in a void. */
+  .ledger {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(560px / var(--pz, 1));
   }
 
   .payNum {
     font-size: 68px;
   }
 
-  .boardHead,
   .srcNote,
   .pgHead,
   .ledgerTotals,
@@ -2475,11 +2346,6 @@ a.dLine {
   .ledger .chips {
     flex-wrap: wrap;
     overflow: visible;
-  }
-
-  .segWell {
-    max-width: 320px;
-    margin-inline: var(--s5);
   }
 
   .payNote {

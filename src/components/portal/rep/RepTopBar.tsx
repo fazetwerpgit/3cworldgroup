@@ -12,6 +12,8 @@ import { NavGroupsList, NavSheet, useNavAccess, type NavSheetClasses } from '@/c
 import { BodyLayer } from './BodyLayer';
 import { ClearNotes } from './ClearNotes';
 import { LOG_SALE_HREF, REP_PRIMARY_HREFS, REP_TABS, activeRepHref } from './repNav';
+import { isOwner } from '@/types';
+import type { PortalNavGroup, PortalNavItem } from '@/components/portal/CommandPalette';
 import s from './rep.module.css';
 
 type Panel = 'menu' | 'more' | 'account' | 'notes' | null;
@@ -24,6 +26,14 @@ const DESKTOP_QUERY = '(min-width: 1024px)';
 /** Viewport margin a drop panel never crosses, and its gap under the top bar. */
 const DROP_MARGIN = 16;
 const DROP_GAP = 8;
+
+/** Owners reach Log a sale from the menu instead of a primary button. */
+const OWNER_LOG_SALE: PortalNavItem = {
+  label: 'Log a sale',
+  href: LOG_SALE_HREF,
+  icon: Plus,
+  permissions: ['sales:write'],
+};
 
 export const repSheetClasses: NavSheetClasses = {
   backdrop: s.backdrop,
@@ -182,9 +192,16 @@ export function RepTopBar({
   };
 
   const active = activeRepHref(pathname);
+  const owner = isOwner(user?.role ?? undefined);
   const deskLinks = REP_TABS.filter((tab) => !tab.log && canAccess(tab));
-  const canLog = REP_TABS.some((tab) => tab.log && canAccess(tab));
-  const groups = sheetGroups(REP_PRIMARY_HREFS);
+  // Owners do not sell: no primary Log sale button, just a menu entry for the rare case.
+  const canLog = !owner && REP_TABS.some((tab) => tab.log && canAccess(tab));
+  const baseGroups = sheetGroups(REP_PRIMARY_HREFS);
+  const groups: PortalNavGroup[] = owner
+    ? baseGroups.length
+      ? [{ ...baseGroups[0], items: [OWNER_LOG_SALE, ...baseGroups[0].items] }, ...baseGroups.slice(1)]
+      : [{ items: [OWNER_LOG_SALE] }]
+    : baseGroups;
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'You';
   const brandHref = isOnboardingUser(user) ? '/portal/onboarding' : '/portal/dashboard';
   const backLink = back ?? { href: brandHref, label: 'dashboard' };

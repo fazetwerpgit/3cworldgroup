@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import Link from 'next/link';
-import { ChevronRight, ExternalLink } from 'lucide-react';
-import { ProgressCard, RESOURCE_QUICK_LINKS, ShortsEmpty } from '@/components/portal/rep/RepLearn';
+import { ExternalLink } from 'lucide-react';
+import { ProgressCard, RESOURCE_QUICK_LINKS } from '@/components/portal/rep/RepLearn';
 import { RepPayStructure } from '@/components/portal/rep/RepPayStructure';
 import { CompPlanMatrix } from '@/components/resources/CompPlanMatrix';
 import { useTraining } from '@/hooks/useTraining';
@@ -36,53 +35,46 @@ export function PayAndLinks() {
     <>
       <div className={`${l.layout} ${l.hub}`}>
         <div className={l.col}>
-          <ProgressCard
-            completed={Math.min(completed, total)}
-            total={total}
-            requiredLeft={getIncompleteRequired().length}
-            loading={loading}
-            link={{ href: '/portal/learn?tab=training', label: 'Open training' }}
-          />
+          {total > 0 ? (
+            <ProgressCard
+              completed={Math.min(completed, total)}
+              total={total}
+              requiredLeft={getIncompleteRequired().length}
+              loading={loading}
+            />
+          ) : null}
 
-          <section className={s.panel} aria-labelledby="tools-title">
-            <div className={s.panelHead}>
-              <h2 id="tools-title" className={s.kicker}>Field tools</h2>
-            </div>
-            <ul className={p.rows}>
-              {RESOURCE_QUICK_LINKS.map((link) => {
-                const Icon = link.icon;
-                return (
-                  <li key={link.title}>
-                    <a className={p.row} href={link.url} target="_blank" rel="noopener noreferrer">
-                      <span className={p.tile}>
-                        <Icon size={20} aria-hidden="true" />
-                      </span>
-                      <span className={p.rowText}>
-                        <span className={p.rowTitle}>{link.title}</span>
-                        <span className={p.rowSub}>{link.description}</span>
-                      </span>
-                      <ExternalLink size={18} className={l.toolIcon} aria-label="Opens in a new tab" />
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+          {RESOURCE_QUICK_LINKS.length > 0 ? (
+            <section className={s.panel} aria-labelledby="tools-title">
+              <div className={s.panelHead}>
+                <h2 id="tools-title" className={s.kicker}>Field tools</h2>
+              </div>
+              <ul className={p.rows}>
+                {RESOURCE_QUICK_LINKS.map((link) => {
+                  const Icon = link.icon;
+                  return (
+                    <li key={link.title}>
+                      <a className={p.row} href={link.url} target="_blank" rel="noopener noreferrer">
+                        <span className={p.tile}>
+                          <Icon size={20} aria-hidden="true" />
+                        </span>
+                        <span className={p.rowText}>
+                          <span className={p.rowTitle}>{link.title}</span>
+                          <span className={p.rowSub}>{link.description}</span>
+                        </span>
+                        <ExternalLink size={18} className={l.toolIcon} aria-label="Opens in a new tab" />
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
 
         </div>
 
         <div className={l.col}>
           <RepPayStructure />
-
-          <section className={s.panel} aria-labelledby="shorts-title">
-            <div className={s.panelHead}>
-              <h2 id="shorts-title" className={s.kicker}>Short videos</h2>
-              <Link href="/portal/learn?tab=training&view=shorts" className={p.headLink}>
-                See all <ChevronRight size={16} aria-hidden="true" />
-              </Link>
-            </div>
-            <ShortsEmpty />
-          </section>
         </div>
       </div>
 

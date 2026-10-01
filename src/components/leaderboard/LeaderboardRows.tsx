@@ -26,7 +26,7 @@ export function LeaderboardRows({ entries, metric, currentUser, zeros = [] }: Le
   return (
     <section aria-label="Ranking" className={styles.rows}>
       <header className={styles.band}>
-        <h2 className={styles.bandTitle}>Ranks 4–{rows[rows.length - 1].rank}</h2>
+        <h2 className={styles.bandTitle}>{rows.length === 1 ? `Rank ${rows[0].rank}` : `Ranks 4–${rows[rows.length - 1].rank}`}</h2>
         <span className={styles.bandMeta}>{metricHead(metric)}</span>
       </header>
       {rows.map((entry, index) => {

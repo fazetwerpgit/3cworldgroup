@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Share } from 'lucide-react';
+import { isIosSafari } from '@/lib/pwa/addToHomeScreen';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import st from '@/components/portal/rep/rep-settings.module.css';
@@ -12,12 +13,15 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-// "Install app" card for Settings. Shows a one-tap install on supported browsers,
-// and iOS instructions (Safari has no install event — users use Share → Add to Home Screen).
+// "Install app" card for Settings. One-tap install where the browser supports it,
+// numbered Share steps on iPhone Safari (no install event there), and nothing at
+// all once the portal is running as an installed app.
 export default function InstallAppCard() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [iosSafari, setIosSafari] = useState(false);
+  const [checked, setChecked] = useState(false);
   const [promptFailed, setPromptFailed] = useState(false);
 
   useEffect(() => {
@@ -31,8 +35,10 @@ export default function InstallAppCard() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setInstalled(standalone);
 
-    const ua = window.navigator.userAgent.toLowerCase();
-    setIsIOS(/iphone|ipad|ipod/.test(ua));
+    const ua = window.navigator.userAgent;
+    setIsIOS(/iPhone|iPad|iPod/.test(ua));
+    setIosSafari(isIosSafari(ua));
+    setChecked(true);
 
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -68,10 +74,29 @@ export default function InstallAppCard() {
   };
 
   const manualSteps = isIOS ? (
-    <p className={`${p.hint} ${st.settingWide}`}>
-      On iPhone: open this site in <strong>Safari</strong>, tap <strong>Share</strong>, then{' '}
-      <strong>Add to Home Screen</strong>.
-    </p>
+    iosSafari ? (
+      <ol className={`${st.steps} ${st.settingWide}`}>
+        <li>
+          <span>
+            Tap <strong>Share</strong> <Share size={16} aria-label="the Share icon" /> at the bottom of Safari
+          </span>
+        </li>
+        <li>
+          <span>
+            Tap <strong>Add to Home Screen</strong>
+          </span>
+        </li>
+        <li>
+          <span>
+            Tap <strong>Add</strong>
+          </span>
+        </li>
+      </ol>
+    ) : (
+      <p className={`${p.hint} ${st.settingWide}`}>
+        Open this page in <strong>Safari</strong> to add it to your home screen.
+      </p>
+    )
   ) : (
     <p className={`${p.hint} ${st.settingWide}`}>
       Or use the browser menu, then <strong>Add to Home screen</strong> (or <strong>Install app</strong>). Chrome
@@ -79,27 +104,27 @@ export default function InstallAppCard() {
     </p>
   );
 
+  // Before the client check runs, and once the app is installed, there is
+  // nothing to show.
+  if (!checked || installed) return null;
+
   return (
     <div className={st.setting}>
       <div className={st.settingText}>
         <span className={st.settingTitle}>Install the app</span>
         <span className={st.settingSub}>Opens full screen from your home screen.</span>
       </div>
-      {installed ? (
-        <span className={st.on}>
-          <Check size={16} aria-hidden="true" /> Installed
-        </span>
-      ) : deferred ? (
+      {deferred ? (
         <button type="button" className={`${s.btnSecondary} ${st.settingBtn}`} onClick={install}>
           Install
         </button>
       ) : null}
-      {!installed && promptFailed && (
+      {promptFailed && (
         <p className={`${p.hint} ${p.hintError} ${st.settingWide}`}>
           The one-tap install didn&apos;t start. Use the steps below.
         </p>
       )}
-      {!installed && manualSteps}
+      {manualSteps}
     </div>
   );
 }

@@ -476,22 +476,28 @@ function TodayPanel({
       <PanelHead id="today-h" title="Today" />
       {items.map((item) => {
         if (item.kind === 'date') {
-          const verb = item.row.missed ? 'Reschedule' : 'Add date';
+          const { row } = item;
+          const verb = row.missed ? 'Reschedule' : 'Add date';
+          const stampSub = row.missed
+            ? row.missedDayLabel
+            : row.soldDate
+              ? `Sold ${shortDate(row.soldDate)}`
+              : null;
           return (
             <button
-              key={`date-${item.row.id}`}
+              key={`date-${row.id}`}
               type="button"
               className={`${d.tRow} ${d.tRowBtn}`}
-              onClick={() => onSetDate(item.row)}
+              onClick={() => onSetDate(row)}
             >
-              <span className={`${d.stamp} ${d.stampNow}`}>Now</span>
+              <span className={`${d.stamp} ${row.missed ? d.stampMissed : d.stampNeeds}`}>
+                <span className={d.stampLabel}>{row.missed ? 'Missed' : 'Needs date'}</span>
+                {stampSub ? <span className={d.stampSub}>{stampSub}</span> : null}
+              </span>
               <span className={d.tText}>
-                <span className={d.tTitle}>{item.row.missed ? 'Missed install' : 'Add an install date'}</span>
-                <span className={d.tSub}>
-                  {item.row.customer}
-                  {item.row.plan ? `, ${item.row.plan}` : ''}
-                </span>
-                {item.row.missedNote ? <span className={d.tNote}>{item.row.missedNote}</span> : null}
+                <span className={d.tTitle}>{row.customer}</span>
+                <span className={d.tSub}>{row.plan}</span>
+                {row.missedReason ? <span className={d.tNote}>{row.missedReason}</span> : null}
               </span>
               <span className={d.tAct}>{verb}</span>
             </button>
@@ -503,7 +509,7 @@ function TodayPanel({
           <Link
             key={item.kind === 'call' ? `call-${item.call.id}` : item.key}
             href={href}
-            className={d.tRow}
+            className={item.kind === 'call' ? d.tRow : `${d.tRow} ${d.tRowPlain}`}
             {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
           >
             {item.kind === 'call' ? (
@@ -526,7 +532,6 @@ function TodayPanel({
               </>
             ) : (
               <>
-                <span className={`${d.stamp} ${d.stampQueue}`}>Queue</span>
                 <span className={d.tText}>
                   <span className={d.tTitle}>{item.title}</span>
                   <span className={d.tSub}>{item.sub}</span>

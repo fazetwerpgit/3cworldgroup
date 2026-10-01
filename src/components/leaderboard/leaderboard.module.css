@@ -27,102 +27,20 @@
   position: relative;
   isolation: isolate;
   max-width: 640px;
-  /* The shell's .main already carries the 16px gutter and a 16px top pad; the
-     column keeps its old 18px header offset and full phone width inside it. */
-  margin: calc(-1 * var(--s4, 16px)) auto 0;
-  padding: 18px 0 calc(20px + env(safe-area-inset-bottom));
-}
-
-/* ---------- page head ----------
-   C's page head, the same as Sales: a plain Geist title on the left and one
-   quiet meta line. The countdown moved into the stage's band. */
-
-.head {
-  margin-bottom: 14px;
-}
-
-.head h1 {
-  margin: 0;
-  color: var(--leaderboard-ink);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-}
-
-.head p {
-  margin: 2px 0 0;
-  color: var(--c-text-3);
-  font-size: 13px;
-  line-height: 1.35;
+  /* The shell's .main carries the gutter and the top pad, like every rep page. */
+  margin: 0 auto;
+  padding: 0 0 calc(20px + env(safe-area-inset-bottom));
 }
 
 /* ---------- filters ----------
-   Two segmented controls, each set in a well: the period takes the room it
-   needs to fit All time, the metric sits beside it. The pressed segment lifts
-   to the top step of the ladder; lime stays off the controls. */
+   Points | Sales switches the view, so it is the page tabs; Week to All time
+   only filters it, so those are the page chips (rep-page.module.css). The
+   page head is the shared title too. */
 
 .filters {
-  display: flex;
-  gap: 8px;
-}
-
-.filters div {
-  display: flex;
-  min-width: 0;
-  gap: 2px;
-  padding: 3px;
-  border-radius: 10px;
-  background: var(--c-well, #08101d);
-  box-shadow: var(--c-sink, inset 0 1px 3px rgba(0, 0, 0, 0.45));
-}
-
-.filters div:first-child {
-  flex: 1 1 auto;
-}
-
-.filters button {
-  position: relative;
-  flex: 1 1 auto;
-  min-height: 34px;
-  padding: 0 8px;
-  white-space: nowrap;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--c-text-3);
-  font: 600 13px var(--f-ui, var(--font-sans, system-ui));
-  letter-spacing: -0.005em;
-  cursor: pointer;
-  transition:
-    background-color 140ms ease,
-    color 140ms ease,
-    transform 140ms var(--ease, ease);
-}
-
-/* The segment reads at 34px but still takes a 44px press. */
-.filters button::after {
-  content: '';
-  position: absolute;
-  inset: -6px 0;
-}
-
-.filters button:active {
-  transform: scale(0.97);
-}
-
-.filters button[aria-pressed='true'] {
-  background: var(--c-panel-hi, #1d2c46);
-  color: var(--c-text);
-  box-shadow:
-    var(--c-edge, inset 0 1px 0 rgba(255, 255, 255, 0.06)),
-    0 1px 2px rgba(0, 0, 0, 0.35);
-}
-
-@media (hover: hover) {
-  .filters button[aria-pressed='false']:hover {
-    color: var(--c-text-2);
-  }
+  display: grid;
+  gap: var(--s3, 12px);
+  margin-bottom: 14px;
 }
 
 /* The stack under the head: stage, rows, standing bar. */
@@ -957,11 +875,6 @@
 /* ---------- responsive ---------- */
 
 @media (max-width: 359px) {
-  .filters button {
-    padding: 0 6px;
-    font-size: 12px;
-  }
-
   .row {
     gap: 10px;
     padding: 0 13px;
@@ -975,9 +888,5 @@
   .row,
   .feed {
     animation: none;
-  }
-
-  .filters button {
-    transition: none;
   }
 }

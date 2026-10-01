@@ -110,7 +110,7 @@ function WeeklyChallengeCard() {
   };
 
   return (
-    <section className={s.panel} aria-labelledby="set-weekly">
+    <section className={`${s.panel} ${st.narrow}`} aria-labelledby="set-weekly">
       <PanelHead id="set-weekly" title="Weekly challenge">
         {loading || loadFailed ? null : <span className={`${u.status} ${u.toneLime}`}>Live</span>}
       </PanelHead>
@@ -203,7 +203,7 @@ export function SystemSettings() {
   return (
     <AdminGate roles={['admin']}>
       <div className={u.page}>
-        <AdminPageHead title="System Settings" />
+        <AdminPageHead title="Weekly challenge" />
         <WeeklyChallengeCard />
       </div>
     </AdminGate>

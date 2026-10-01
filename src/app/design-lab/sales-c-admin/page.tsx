@@ -9,6 +9,7 @@ import type { Sale } from '@/types';
 import type { FiberOrder, FiberOrderStatus } from '@/types/fiberOrder';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
 
 // Temporary harness (untracked, never committed): rep Sales C on mock data.
 const d = (day: number, month = 8) => new Date(2026, month, day, 12);
@@ -94,8 +95,8 @@ function Harness() {
       <main className={s.scroller} id="rep-main">
         <div className={s.main}>
           <div className={x.page}>
-            <header className={x.head}>
-              <h1 className={x.title}>Sales</h1>
+            <header className={p.head}>
+              <h1 className={p.title}>Sales</h1>
               <div className={x.month}>
                 <button type="button" className={x.monthBtn} aria-label="Previous month">‹</button>
                 <span className={x.monthLabel}>September 2026</span>

@@ -1,0 +1,1082 @@
+/* ==========================================================================
+   Sale detail + edit sale, direction D. Tokens live on .root / .layer in
+   rep.module.css; panels, buttons, sheet and skeleton primitives come from
+   there too. This file is only the layout and the pieces those pages add.
+   Phone first (393px); desktop (>=1024px) is two columns.
+   ========================================================================== */
+
+.page {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  min-height: var(--tap);
+  margin-left: calc(var(--s2) * -1);
+  padding: 0 var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .back:hover {
+    color: var(--c-text);
+  }
+}
+
+/* ---------- head ---------- */
+.head {
+  display: grid;
+  gap: var(--s3);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  padding-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.headMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  min-width: 0;
+}
+
+.soldOn {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+/* The status chip: same colour language as the Sales list's status dots. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--r-control);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.chip::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.st_installed {
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
+}
+
+.st_scheduled {
+  background: rgba(124, 184, 255, 0.12);
+  color: var(--c-blue);
+}
+
+.st_needsdate {
+  background: var(--c-amber-wash);
+  color: var(--c-amber);
+}
+
+.st_missed {
+  background: rgba(255, 138, 128, 0.1);
+  color: var(--c-red);
+}
+
+.st_cancelled {
+  background: rgba(163, 184, 214, 0.08);
+  color: var(--c-text-2);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: rgba(163, 184, 214, 0.1);
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tagWarn {
+  background: var(--c-amber-wash);
+  color: var(--c-amber);
+}
+
+.chipSkel {
+  width: 148px;
+  height: 32px;
+}
+
+/* ---------- body: phone is one column in reading order ----------
+   The two column wrappers dissolve on phones and each section carries its own
+   order, so Install leads, then Customer, Plan, Order and proof, Notes, and the
+   admin actions last. On desktop the wrappers are the columns. */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.main,
+.side {
+  display: contents;
+}
+
+.oInstall {
+  order: 1;
+}
+.oCustomer {
+  order: 2;
+}
+.oPlan {
+  order: 3;
+}
+.oProof {
+  order: 4;
+}
+.oNotes {
+  order: 5;
+}
+.oActions {
+  order: 6;
+}
+
+@media (min-width: 1024px) {
+  .page {
+    gap: var(--s5);
+  }
+
+  .title {
+    font-size: var(--t-d1);
+  }
+
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+    align-items: start;
+    gap: var(--s5);
+  }
+
+  .main,
+  .side {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s4);
+    min-width: 0;
+  }
+}
+
+/* ---------- panels ---------- */
+.panelBody {
+  display: grid;
+  gap: var(--s1);
+  padding: var(--s2) var(--s4) var(--s4);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s3);
+  min-height: var(--tap);
+  padding: var(--s2) 0;
+}
+
+.kv + .kv {
+  border-top: 1px solid var(--c-line);
+}
+
+.kvLabel {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.kvValue {
+  min-width: 0;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.none {
+  color: var(--c-text-3);
+  font-weight: 400;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: var(--tap);
+  color: var(--c-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--c-line-strong);
+  text-underline-offset: 3px;
+}
+
+.link svg {
+  flex: none;
+  color: var(--c-text-3);
+}
+
+/* Install: the date leads, in the display face. */
+.installDate {
+  margin: var(--s3) 0 var(--s1);
+  font-family: var(--f-display);
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+.installDateNeeds {
+  color: var(--c-amber);
+}
+
+.installWhat {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.pay {
+  font: 600 var(--t-ui) / 1.4 var(--f-num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.payEst {
+  margin-right: 4px;
+  color: var(--c-text-3);
+  font-family: var(--f-ui);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.payQuiet {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.fine {
+  margin: var(--s2) 0 0;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  line-height: 1.45;
+}
+
+.retryLink {
+  min-height: var(--tap);
+  padding: 0 var(--s2);
+  border: 0;
+  background: transparent;
+  color: var(--c-lime-hi);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+/* ---------- plan rows ---------- */
+.plan {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--s3);
+  min-height: 56px;
+  padding: var(--s2) 0;
+}
+
+.plan + .plan {
+  border-top: 1px solid var(--c-line);
+}
+
+.carrier {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.planName {
+  min-width: 0;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.planPrice {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.planPts {
+  grid-column: 3;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: right;
+}
+
+.totals {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-top: var(--s2);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--c-line-strong);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.totals b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+/* ---------- proof ---------- */
+.proofList {
+  display: grid;
+  gap: var(--s2);
+  margin-top: var(--s2);
+}
+
+.proofBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.proofBtn > span {
+  flex: 1;
+}
+
+.proofBtn svg {
+  flex: none;
+  color: var(--c-text-2);
+}
+
+.proofBtn:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (hover: hover) {
+  .proofBtn:hover {
+    border-color: var(--c-text-2);
+  }
+}
+
+.notes {
+  margin: var(--s3) 0 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notesNone {
+  color: var(--c-text-3);
+}
+
+/* ---------- notices ---------- */
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-panel);
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.note svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.note strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.noteRed {
+  border-color: rgba(255, 138, 128, 0.35);
+  background: rgba(255, 138, 128, 0.08);
+}
+
+.noteRed svg {
+  color: var(--c-red);
+}
+
+.noteLime {
+  border-color: rgba(141, 198, 63, 0.3);
+  background: var(--c-lime-wash);
+}
+
+.noteLime svg {
+  color: var(--c-lime);
+}
+
+/* ---------- admin actions ---------- */
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+}
+
+.actions > * {
+  width: 100%;
+}
+
+.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 48px;
+  padding: 0 var(--s4);
+  border: 1px solid rgba(255, 138, 128, 0.5);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-red);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.danger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .danger:not(:disabled):hover {
+    background: rgba(255, 138, 128, 0.08);
+  }
+}
+
+/* ---------- delete confirm (inside the D sheet) ---------- */
+.confirm {
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s4);
+}
+
+.confirmText {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.5;
+}
+
+.confirmText strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.confirmError {
+  margin: 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.confirmActions {
+  display: grid;
+  gap: var(--s3);
+}
+
+.confirmDelete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-height: 52px;
+  padding: 0 var(--s4);
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--c-red);
+  color: #2a0b08;
+  font: 700 var(--t-body) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+.confirmDelete:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------- loading + not found ---------- */
+.skelTitle {
+  width: 64%;
+  height: 40px;
+}
+
+.skelBody {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.skelLine {
+  height: 14px;
+}
+
+.skelLineShort {
+  width: 45%;
+  height: 14px;
+}
+
+.skelBig {
+  width: 40%;
+  height: 40px;
+}
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: var(--s3);
+  padding: var(--s5) var(--s4);
+}
+
+.empty h1 {
+  margin: 0;
+  font-size: var(--t-d3);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.empty p {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+@media (min-width: 1024px) {
+  .empty {
+    max-width: 560px;
+    padding: var(--s6);
+  }
+}
+
+/* ==========================================================================
+   Edit sale
+   ========================================================================== */
+
+/* The pinned save bar replaces the tab bar on phones; leave room above it. */
+.editPage {
+  display: grid;
+  gap: var(--s4);
+  padding-bottom: calc(var(--s7) + var(--s4));
+  min-width: 0;
+}
+
+.editWho {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+}
+
+.editBody {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.editMain {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.editSide {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .editPage {
+    gap: var(--s5);
+    padding-bottom: 0;
+  }
+
+  .editBody {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+    align-items: start;
+    gap: var(--s5);
+  }
+
+  .editSide {
+    position: sticky;
+    top: calc(var(--topbar-h) + var(--s5));
+  }
+}
+
+.fields {
+  display: grid;
+  gap: var(--s4);
+  padding: var(--s4);
+}
+
+@media (min-width: 1024px) {
+  .fields {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s4) var(--s5);
+  }
+
+  .wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+  scroll-margin-top: 96px;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  min-height: 24px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.req {
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 10px;
+  background: var(--c-well);
+  box-shadow: var(--c-sink);
+  color: var(--c-text);
+  font: 400 var(--t-body) / 1 var(--f-ui);
+  font-variant-numeric: tabular-nums;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 160ms ease;
+}
+
+.input::placeholder {
+  color: var(--c-text-3);
+}
+
+.input:focus {
+  border-color: var(--c-lime);
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
+}
+
+/* iOS draws date inputs centred and short; keep them in line with the rest. */
+.input[type='date'] {
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+
+.input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+}
+
+.input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+.textarea {
+  height: auto;
+  min-height: 104px;
+  padding: 14px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.selectWrap {
+  position: relative;
+  display: block;
+}
+
+.selectWrap .input {
+  padding-right: 44px;
+}
+
+.selectWrap svg {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  color: var(--c-text-2);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.hint {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: 14px var(--s4);
+  border: 1px solid rgba(255, 138, 128, 0.5);
+  border-radius: var(--r-panel);
+  background: rgba(255, 138, 128, 0.1);
+  color: var(--c-red);
+  scroll-margin: 96px;
+}
+
+.alert svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.alert p {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+/* ---------- plan picker ---------- */
+.picker {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s4);
+}
+
+.pickerLabel {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.providers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s2);
+}
+
+.provider {
+  min-height: 48px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1.2 var(--f-ui);
+  cursor: pointer;
+}
+
+.provider[aria-pressed='true'] {
+  border-color: var(--c-lime);
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+}
+
+@media (min-width: 1024px) {
+  .providers {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.pickerEmpty {
+  margin: 0;
+  padding: var(--s4);
+  border: 1px dashed var(--c-line-strong);
+  border-radius: var(--r-control);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-align: center;
+}
+
+.pickerGroup {
+  margin: var(--s1) 0 0;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.planList {
+  display: grid;
+  gap: var(--s2);
+}
+
+.planPick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 24px;
+  align-items: center;
+  gap: 2px var(--s3);
+  width: 100%;
+  min-height: 60px;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planPick:disabled {
+  border-color: var(--c-lime);
+  background: var(--c-lime-wash);
+  cursor: default;
+}
+
+.planPickName {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.planPickSpeed {
+  display: block;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 400;
+}
+
+.planPickPrice {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.planPickPts {
+  display: block;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 400;
+}
+
+.planPick svg {
+  color: var(--c-lime);
+}
+
+@media (hover: hover) {
+  .planPick:not(:disabled):hover {
+    border-color: var(--c-text-2);
+  }
+}
+
+.chosen {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chosenRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--tap);
+  align-items: center;
+  gap: var(--s2);
+  min-height: 56px;
+  padding: var(--s1) var(--s1) var(--s1) var(--s3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-panel-hi);
+}
+
+.chosenName {
+  display: block;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.chosenMeta {
+  display: block;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .iconBtn:hover {
+    color: var(--c-red);
+  }
+}
+
+/* ---------- summary + save ---------- */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s3);
+  margin: 0;
+  padding: var(--s4);
+}
+
+.summary div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.summary dt {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.summary dd {
+  margin: 0;
+  font: 600 var(--t-d3) / 1.1 var(--f-num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Phone: fixed on <body> in the tab bar's place. While the soft keyboard is
+   up it is not rendered and .saveInline shows at the end of the form. */
+.saveBar {
+  position: fixed;
+  right: 0;
+  bottom: calc(0px - var(--pwa-bottom-gap, 0px));
+  left: 0;
+  z-index: 40;
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--c-line-strong);
+  background: var(--c-bar);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transform: translateZ(0);
+}
+
+.saveRow {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.saveRow > :last-child {
+  flex: 1;
+}
+
+.saveError {
+  margin: 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.saveInline {
+  display: none;
+  gap: var(--s2);
+  padding: var(--s4);
+  border-top: 1px solid var(--c-line);
+}
+
+.saveInline[data-keyboard='open'] {
+  display: grid;
+}
+
+.save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (min-width: 1024px) {
+  .saveBar {
+    display: none;
+  }
+
+  .saveInline,
+  .saveInline[data-keyboard='open'] {
+    display: grid;
+  }
+
+  .saveInline {
+    border-top: 1px solid var(--c-line);
+  }
+}

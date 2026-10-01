@@ -88,6 +88,35 @@ describe('RepTabBar', () => {
     expect(html).not.toContain('Board');
     expect(html).not.toContain('Chat');
   });
+
+  it('gives an owner Home / Sales / Board / Chat / Admin with the open-items count, and no Log sale', () => {
+    setUser({ status: 'active', role: 'owner', uid: 'o-1' });
+    const html = renderToStaticMarkup(
+      <RepTabBar navCounts={{ '/portal/admin/onboarding': 4, '/portal/admin/requests': 1 }} />
+    );
+    const labels = ['Home', 'Sales', 'Board', 'Chat', 'Admin'].map((label) => html.indexOf(`${label}<`));
+    expect(labels.every((index) => index > 0)).toBe(true);
+    expect([...labels].sort((a, b) => a - b)).toEqual(labels);
+    expect(html).not.toContain('Log sale');
+    expect(html).toContain('href="/portal/admin/onboarding"');
+    expect(html).toMatch(/<b[^>]*>5<\/b>/);
+    expect(html).toContain(', 5 waiting');
+  });
+
+  it('marks Admin current on any admin page and shows no count when nothing waits', () => {
+    setUser({ status: 'active', role: 'owner', uid: 'o-1' });
+    state.pathname = '/portal/admin/requests';
+    const html = renderToStaticMarkup(<RepTabBar />);
+    expect(html).toMatch(/aria-current="page" href="\/portal\/admin\/onboarding"/);
+    expect(html).not.toContain('waiting');
+  });
+
+  it('keeps the Log sale tab for reps and managers, and gives them no Admin tab', () => {
+    setUser({ status: 'active', fieldRole: 'l1_manager', uid: 'm-1' });
+    const html = renderToStaticMarkup(<RepTabBar navCounts={{ '/portal/admin/onboarding': 2 }} />);
+    expect(html).toContain('Log sale</a>');
+    expect(html).not.toContain('Admin');
+  });
 });
 
 describe('RepTopBar', () => {
@@ -108,6 +137,11 @@ describe('RepTopBar', () => {
     expect(html).toContain('aria-label="Notifications, 2 unread"');
     expect(html).toContain('aria-controls="rep-nav-sheet"');
     expect(html).toContain('href="/portal/sales/new"');
+  });
+
+  it('gives an owner no Log sale button', () => {
+    setUser({ status: 'active', role: 'owner', uid: 'o-1' });
+    expect(renderToStaticMarkup(<RepTopBar />)).not.toContain('href="/portal/sales/new"');
   });
 
   it('sends a task page back to its parent, or the dashboard by default', () => {
@@ -198,5 +232,7 @@ describe('activeRepHref', () => {
     expect(activeRepHref('/portal/sales/abc')).toBe('/portal/sales');
     expect(activeRepHref('/portal/chat/general')).toBe('/portal/chat');
     expect(activeRepHref('/portal/settings')).toBeNull();
+    expect(activeRepHref('/portal/admin/requests')).toBe('/portal/admin/onboarding');
+    expect(activeRepHref('/portal/admin')).toBe('/portal/admin/onboarding');
   });
 });

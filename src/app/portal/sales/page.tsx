@@ -10,7 +10,7 @@ import { RepShell } from '@/components/portal/rep/RepShell';
 import { LOG_SALE_HREF } from '@/components/portal/rep/repNav';
 import { AdminSalesBoard } from '@/components/sales/AdminSalesBoard';
 import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
-import { SalesTable } from '@/components/sales/SalesTable';
+import { SalesTable, SalesViewTabs } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
@@ -36,6 +36,7 @@ import {
 import { PayoutCard } from './PayoutCard';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
 
 function MonthPicker({
   month,
@@ -83,8 +84,8 @@ function PageHead({
   onMonth?: (next: MonthKey) => void;
 }) {
   return (
-    <header className={x.head}>
-      <h1 className={x.title}>Sales</h1>
+    <header className={p.head}>
+      <h1 className={p.title}>Sales</h1>
       {month && onMonth ? <MonthPicker month={month} max={max ?? currentMonth()} onChange={onMonth} /> : null}
     </header>
   );
@@ -350,6 +351,7 @@ function SalesContent() {
         </section>
       ) : (
         <>
+          <SalesViewTabs payView={payView} onChange={choosePayView} />
           {staleNote}
           {/* Without the carrier report, carrier cancellations and missed
               installs still count as money: say so, keep the numbers. */}
@@ -383,7 +385,6 @@ function SalesContent() {
                 onDelete={deleteSale}
                 loading={loading}
                 payView={payView}
-                onPayViewChange={choosePayView}
                 payPlan={payPlan}
                 fiber={fiber}
                 onSaleUpdated={refreshSales}

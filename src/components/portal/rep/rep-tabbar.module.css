@@ -1,0 +1,16 @@
+/* The owner's Admin tab: open items across the admin queues. Amber = needs you. */
+.count {
+  position: absolute;
+  top: -7px;
+  left: calc(100% - 4px);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--c-amber);
+  box-shadow: 0 0 0 2px var(--c-bar);
+  color: var(--c-on-lime);
+  font: 700 var(--t-min) / 18px var(--f-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}

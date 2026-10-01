@@ -1,4 +1,7 @@
-/* Member directory (direction D). Rows and cells come from admin-ui.module.css. */
+/* Member directory (direction D). Rows and cells come from admin-ui.module.css.
+   Phone: a compact two-line row. Line one is the name with a role chip, line two
+   the email; the status dot and approved-sales count sit right-aligned. Desktop
+   keeps the table. Overrides use `.cols .x` so they beat admin-ui's single classes. */
 
 .cols {
   --cols: minmax(0, 1.5fr) minmax(0, 1.25fr) 100px 116px 48px 56px 124px 20px;
@@ -27,6 +30,7 @@
 /* The name is the row's keyboard / screen-reader target; the whole row is the tap target. */
 .nameBtn {
   display: block;
+  flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
   margin: 0;
@@ -45,18 +49,92 @@
   outline-offset: 2px;
 }
 
+.nameLine {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 55%;
+  padding: 3px 7px;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipMuted {
+  border-style: dashed;
+  color: var(--c-text-3);
+}
+
+.statusWord {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .cols .action:empty {
   display: none;
 }
 
 .action > button {
   flex: 1 1 auto;
+  min-height: var(--tap);
 }
 
-.cols .chev,
-.cols .shirt,
-.deskOnly {
-  display: none;
+/* Phone grid: [person | status | sales]; Assign role gets its own line below. */
+@media (max-width: 1023px) {
+  .cols .row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0 var(--s3);
+    min-height: 56px;
+    padding: 9px var(--s4);
+  }
+
+  .cols .main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .cols .statusCell {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .cols .sales {
+    grid-column: 3;
+    grid-row: 1;
+    min-width: 3.5em;
+    justify-content: flex-end;
+    color: var(--c-text-2);
+    white-space: nowrap;
+  }
+
+  .cols .action {
+    grid-row: 2;
+    margin-top: var(--s2);
+  }
+
+  .cols .role,
+  .cols .date,
+  .cols .shirt,
+  .cols .chev,
+  .deskOnly {
+    display: none;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -76,11 +154,26 @@
 
   .action > button {
     flex: none;
+    min-height: 0;
   }
 
-  .cols .chev,
+  .cols .role,
+  .cols .date,
   .cols .shirt,
+  .cols .chev,
   .deskOnly {
     display: block;
+  }
+
+  .cols .phoneOnly {
+    display: none;
+  }
+
+  .cols .statusWord {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
   }
 }

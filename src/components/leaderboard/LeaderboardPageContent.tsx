@@ -13,6 +13,7 @@ import {
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { periodLabel } from './PeriodCountdown';
 import styles from './leaderboard.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
 
 interface LeaderboardPageContentProps {
   entries: LeaderboardEntry[];
@@ -55,9 +56,9 @@ export function LeaderboardPageContent({
 
   return (
     <div className={`${styles.scope} ${styles.shell}`}>
-      <header className={styles.head}>
-        <h1>Leaderboard</h1>
-        <p>{periodLabel(period, metric)}</p>
+      <header className={p.head}>
+        <h1 className={p.title}>Leaderboard</h1>
+        <p className={p.lede}>{periodLabel(period, metric)}</p>
       </header>
       <LeaderboardFilters
         period={period}

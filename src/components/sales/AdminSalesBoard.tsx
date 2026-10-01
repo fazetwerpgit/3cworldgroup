@@ -10,6 +10,7 @@ import { ChevronRight } from 'lucide-react';
 import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import p from '@/components/portal/rep/rep-page.module.css';
 import type { InstallBucket, InstallCounts } from '@/lib/sales/installBucket';
 import { bookForMonth, buildMergedBook, type MergedBook, type MergedRow } from '@/lib/sales/mergeBook';
 import { normalizeAddress } from '@/lib/fiberReport/matchSales';
@@ -638,9 +639,9 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   return (
     <div className={x.board}>
       {(hasPlan || ownerView) && (
-        <div className={x.seg} role="tablist" aria-label="Sales views">
+        <div className={p.tabs} role="tablist" aria-label="Sales views">
           <button
-            className={x.segBtn}
+            className={p.tab}
             data-part="board-tab"
             role="tab"
             type="button"
@@ -651,7 +652,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           </button>
           {hasPlan && (
             <button
-              className={x.segBtn}
+              className={p.tab}
               data-part="board-tab"
               role="tab"
               type="button"
@@ -677,7 +678,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
 
           <section className={s.panel} aria-labelledby="board-h">
             <div className={`${s.panelHead} ${x.panelHead}`}>
-              <h2 id="board-h" className={x.panelTitle}>Company sales</h2>
+              <h2 id="board-h" className={s.kicker}>Company sales</h2>
               <p className={x.panelMeta}>{month ? monthLabel(month) : 'All time'}</p>
             </div>
             <div className={x.figs}>
@@ -727,7 +728,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
 
           <section className={s.panel} aria-labelledby="board-reps-h">
             <div className={`${s.panelHead} ${x.panelHead}`}>
-              <h2 id="board-reps-h" className={x.panelTitle}>By rep</h2>
+              <h2 id="board-reps-h" className={s.kicker}>By rep</h2>
               <p className={x.panelMeta}>Value / mo</p>
             </div>
 
@@ -849,7 +850,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
       ) : (
         <section className={s.panel} aria-labelledby="board-pay-h">
           <div className={`${s.panelHead} ${x.panelHead}`}>
-            <h2 id="board-pay-h" className={x.panelTitle}>My est. pay</h2>
+            <h2 id="board-pay-h" className={s.kicker}>My est. pay</h2>
             {payScaleLabel && <p className={x.panelMeta}>Pay scale · {payScaleLabel}</p>}
           </div>
           <div className={x.figs}>

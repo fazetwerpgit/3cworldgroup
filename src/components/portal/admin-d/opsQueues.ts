@@ -27,6 +27,8 @@ export interface QueueCard {
   href: string;
   /** The hub page the queue lives in (its nav badge). */
   hub: string;
+  /** The tab inside that hub. */
+  tab: string;
   count: number;
   oldestWaitMs: number | null;
   /** null when the queue has no per-item timestamps (pipeline, signups). */
@@ -140,7 +142,13 @@ async function loadQueues(viewer: string) {
   publish({ ...(snapshot.viewer === viewer ? snapshot : { cards: null, refreshedAt: null }), viewer, loading: true });
   const cards = await Promise.all(
     sources.map(async (source): Promise<QueueCard> => {
-      const base = { key: source.key, label: source.label, href: hubTabHref(source.hub, source.tab), hub: source.hub.href };
+      const base = {
+        key: source.key,
+        label: source.label,
+        href: hubTabHref(source.hub, source.tab),
+        hub: source.hub.href,
+        tab: source.tab,
+      };
       try {
         return { ...base, ...(await source.load()), error: false };
       } catch {
@@ -209,6 +217,7 @@ export function useOpsQueues(): OpsQueues {
       label: 'New signups',
       href: hubTabHref(PEOPLE_HUB, 'everyone'),
       hub: PEOPLE_HUB.href,
+      tab: 'everyone',
       count: signups,
       oldestWaitMs: null,
       newToday: null,
@@ -228,4 +237,20 @@ export function useAdminNavCounts(): Record<string, number> {
     for (const card of cards ?? []) counts[card.hub] = (counts[card.hub] ?? 0) + card.count;
     return counts;
   }, [cards]);
+}
+
+/**
+ * Open items per tab of one hub (Onboarding's Review / Invites / Pipeline, the
+ * Requests types), from the same cache as the nav badges, so the tabs add up to
+ * the page's badge. undefined until the first load; a queue that failed to load
+ * has no entry rather than a zero.
+ */
+export function useHubTabCounts(hub: HubConfig): Record<string, number> | undefined {
+  const { cards } = useOpsQueues();
+  return useMemo(() => {
+    if (!cards) return undefined;
+    const counts: Record<string, number> = {};
+    for (const card of cards) if (card.hub === hub.href && !card.error) counts[card.tab] = card.count;
+    return counts;
+  }, [cards, hub.href]);
 }

@@ -80,10 +80,8 @@ function AdminSwitcher({ nav }: { nav: AdminNav }) {
   }
 
   const CurrentIcon = nav.current?.icon ?? Shield;
-  // Waiting on the other admin pages, so the switcher says there is more to do.
-  const elsewhere = badge(
-    nav.items.reduce((sum, item) => sum + (item.href === nav.current?.href ? 0 : nav.counts[item.href] ?? 0), 0)
-  );
+  // This page's own figure: the same one its rail and menu badges show.
+  const here = badge(nav.current ? nav.counts[nav.current.href] : undefined);
 
   return (
     <>
@@ -99,9 +97,9 @@ function AdminSwitcher({ nav }: { nav: AdminNav }) {
           <span className={f.switcherKicker}>Admin</span>
           <span className={f.switcherLabel}>{nav.current?.label ?? 'All admin pages'}</span>
         </span>
-        {elsewhere ? (
-          <b className={f.switcherCount} aria-label={`${elsewhere} waiting on other admin pages`}>
-            {elsewhere}
+        {here ? (
+          <b className={f.switcherCount} aria-label={`${here} waiting on this page`}>
+            {here}
           </b>
         ) : null}
         <ChevronsUpDown size={18} className={f.switcherChevron} aria-hidden="true" />

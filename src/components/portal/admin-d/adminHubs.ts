@@ -80,7 +80,7 @@ export const SETTINGS_HUB = {
   href: '/portal/admin/settings',
   param: 'tab',
   tabs: [
-    { key: 'system', label: 'System', roles: ['admin'], permissions: ['settings:read'] },
+    { key: 'system', label: 'Challenge', roles: ['admin'], permissions: ['settings:read'] },
     { key: 'form-options', label: 'Form options', roles: ['admin'] },
     { key: 'chat-channels', label: 'Chat channels', roles: ['admin'] },
     { key: 'email-templates', label: 'Email templates', roles: PLATFORM_ROLES },

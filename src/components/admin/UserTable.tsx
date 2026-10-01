@@ -36,8 +36,8 @@ function formatDate(date: Date | string | undefined) {
 }
 
 /**
- * The member directory. Desktop: a D table. Phone: each person is a stacked
- * card (name + status on top, then role, date and sales as label lines).
+ * The member directory. Desktop: a D table. Phone: a compact two-line row
+ * (name + role chip, email), status dot and sales count at the right.
  */
 export function UserTable({
   users,
@@ -85,31 +85,36 @@ export function UserTable({
               onPersonLink?.(user.uid);
             }}
           >
-            <span className={`${u.cellMain} ${u.person}`}>
+            <span className={`${u.cellMain} ${u.person} ${t.main}`}>
               <span className={u.personText}>
-                <button type="button" className={t.nameBtn} onClick={() => onPersonLink?.(user.uid)}>
-                  <span className={u.personName}>
-                    <span>{displayName}</span>
-                    {isOnline(user.lastActiveAt) ? (
-                      <span className={u.online} role="img" aria-label="Online now" />
-                    ) : null}
+                <span className={t.nameLine}>
+                  <button type="button" className={t.nameBtn} onClick={() => onPersonLink?.(user.uid)}>
+                    <span className={u.personName}>
+                      <span>{displayName}</span>
+                      {isOnline(user.lastActiveAt) ? (
+                        <span className={u.online} role="img" aria-label="Online now" />
+                      ) : null}
+                    </span>
+                  </button>
+                  <span className={`${t.chip} ${roleLabel ? '' : t.chipMuted} ${t.phoneOnly}`}>
+                    {roleLabel ?? 'No role yet'}
                   </span>
-                </button>
+                </span>
                 <span className={u.personSub}>{user.email}</span>
               </span>
             </span>
 
-            <span className={`${u.cell} ${t.role}`} data-label="Role">
+            <span className={`${u.cell} ${t.role}`}>
               {roleLabel ? <span>{roleLabel}</span> : <span className={u.toneMuted}>No role yet</span>}
             </span>
 
             <span className={`${u.cellEnd} ${t.statusCell}`}>
               <StatusDot tone={STATUS_TONE[status] ?? 'muted'}>
-                {status.charAt(0).toUpperCase() + status.slice(1)}
+                <span className={t.statusWord}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>
               </StatusDot>
             </span>
 
-            <span className={`${u.cell} ${u.num}`} data-label={isPending ? 'Requested' : 'Hire date'}>
+            <span className={`${u.cell} ${u.num} ${t.date}`}>
               <span>
                 {dateValue || (isPending ? '—' : 'N/A')}
                 {isPending ? <span className={`${u.cellSub} ${t.deskOnly}`}>requested</span> : null}
@@ -120,8 +125,9 @@ export function UserTable({
               {user.shirtSize ?? <span className={u.toneMuted}>—</span>}
             </span>
 
-            <span className={`${u.cell} ${u.num} ${u.alignEnd}`} data-label="Approved sales">
+            <span className={`${u.cell} ${u.num} ${u.alignEnd} ${t.sales}`}>
               {approvedSales}
+              <span className={t.phoneOnly}>{approvedSales === 1 ? ' sale' : ' sales'}</span>
             </span>
 
             <span className={`${u.cell} ${t.action}`}>

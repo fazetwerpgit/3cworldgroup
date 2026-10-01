@@ -119,6 +119,8 @@ export function RepPayStructure() {
   const tiers = (editing ? draft : data?.tiers ?? []).filter((tier) => !IBO_FIELD_ROLES.includes(tier.fieldRole));
   const ratesPending = data ? ratesArePending(data.tiers) : false;
   const ownTier = data?.scope === 'own' ? data.tiers[0] : undefined;
+  // A rep never sees a 0% placeholder: no confirmed base rate means one calm line instead.
+  const ownRatePending = !ownTier || !(ownTier.baseRate > 0);
   // IBO tiers are never named to reps (null drops the line).
   const ownRoleLabel = ownTier ? repFacingRoleLabel(ownTier.fieldRole) : 'Your tier';
 
@@ -168,19 +170,23 @@ export function RepPayStructure() {
 
           {data.scope === 'own' ? (
             <div className={l.rate}>
-              {ratesPending ? null : (
+              {ownRatePending ? (
+                <p className={l.rateNote}>Your rate will show here once leadership confirms it.</p>
+              ) : (
                 <>
                   <p className={s.kicker}>Your rate</p>
                   {ownRoleLabel !== null ? <p className={l.rateRole}>{ownRoleLabel}</p> : null}
                   <dl className={l.rateFigures}>
                     <div>
                       <dt>Base</dt>
-                      <dd>{ownTier?.baseRate ?? 0}%</dd>
+                      <dd>{ownTier?.baseRate}%</dd>
                     </div>
-                    <div>
-                      <dt>Override</dt>
-                      <dd>{ownTier?.overrideRate == null ? '—' : `${ownTier.overrideRate}%`}</dd>
-                    </div>
+                    {ownTier?.overrideRate ? (
+                      <div>
+                        <dt>Override</dt>
+                        <dd>{ownTier.overrideRate}%</dd>
+                      </div>
+                    ) : null}
                   </dl>
                   <p className={l.rateNote}>{ownTier?.notes || TIER_NOTES[ownTier?.fieldRole ?? 'entry_rep']}</p>
                 </>

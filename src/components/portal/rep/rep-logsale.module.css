@@ -1162,6 +1162,32 @@ span.thumbView {
     padding-bottom: 0;
   }
 
+  /* The entry step is a composed block, not a strip at the top-left: about
+     960px wide, centred in the viewport, scan card dominant with the manual
+     route beside it. The details step keeps the full-width form layout. */
+  .mainEntry {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    max-width: 960px;
+    min-height: calc(100dvh / var(--pz, 1) - var(--topbar-h) - 144px);
+    margin-inline: auto;
+    padding-bottom: 0;
+  }
+
+  .mainEntry .steps {
+    margin-bottom: var(--s4);
+  }
+
+  .mainEntry .entry {
+    min-height: 380px;
+  }
+
+  .mainEntry .entryBody {
+    padding: var(--s6) var(--s6) var(--s5);
+  }
+
   .steps {
     margin-bottom: var(--s5);
   }

@@ -114,3 +114,10 @@
     align-items: end;
   }
 }
+
+/* One small form: it does not need the whole 1100px content width. */
+@media (min-width: 1024px) {
+  .narrow {
+    max-width: 760px;
+  }
+}

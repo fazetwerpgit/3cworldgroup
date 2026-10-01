@@ -52,6 +52,7 @@ const queue = (key: string, label: string, count: number, extra: Partial<QueueCa
   label,
   href: `/portal/admin/onboarding?tab=${key}`,
   hub: '/portal/admin/onboarding',
+  tab: key,
   count,
   oldestWaitMs: null,
   newToday: null,
