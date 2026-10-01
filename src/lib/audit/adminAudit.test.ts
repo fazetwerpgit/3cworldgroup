@@ -78,4 +78,10 @@ describe('changedLeaves', () => {
     expect(changedLeaves({ a: { x: 1 } }, { a: { x: 1 } })).toEqual([]);
     expect(changedLeaves(undefined, { a: { x: 1 } })).toEqual([{ path: 'a.x', from: null, to: 1 }]);
   });
+
+  it('does not report an equal array or date that is merely a new object', () => {
+    const when = '2026-10-01T00:00:00.000Z';
+    expect(changedLeaves({ list: [1, 2], at: new Date(when) }, { list: [1, 2], at: new Date(when) })).toEqual([]);
+    expect(changedLeaves({ list: [1, 2] }, { list: [1, 3] })).toEqual([{ path: 'list', from: [1, 2], to: [1, 3] }]);
+  });
 });

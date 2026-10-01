@@ -152,6 +152,9 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+    // Read before the update: this is the state being undone, and the audit row needs it.
+    const previousReason = doc.data()?.decommission?.reason ?? null;
+    const targetName = doc.data()?.displayName;
 
     await docRef.update({
       status: 'active',
@@ -177,8 +180,8 @@ export async function DELETE(request: NextRequest) {
       actorUid: gate.uid,
       actorName: gate.name,
       targetUid: userId,
-      targetName: doc.data()?.displayName || undefined,
-      details: { previousReason: doc.data()?.decommission?.reason ?? null },
+      targetName: targetName || undefined,
+      details: { previousReason },
     });
 
     return NextResponse.json({ success: true, message: 'User reinstated' });

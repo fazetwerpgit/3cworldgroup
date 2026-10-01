@@ -365,4 +365,35 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
     expect((await summary()).status).toBe(403);
     expect(queryGetMock).not.toHaveBeenCalled();
   });
+
+  it('counts exactly what the Review tab lists for the same data, including a deleted user and an e-sign item', async () => {
+    const submitted = {
+      docs: [
+        waiting('u1', 'onboarding_submission', '2026-07-27T00:00:00.000Z'),
+        waiting('u2', 'dl_photos', '2026-07-26T00:00:00.000Z'),
+        waiting('u2', 'w9', '2026-07-25T00:00:00.000Z'),
+        waiting('ghost', 'dl_photos', '2026-07-24T00:00:00.000Z'), // account no longer exists
+        waiting('u3', 'not_a_real_item', '2026-07-23T00:00:00.000Z'),
+      ],
+    };
+    const users = [
+      { exists: true, id: 'u1', data: () => ({ displayName: 'One', fieldRole: 'entry_level_rep' }) },
+      { exists: true, id: 'u2', data: () => ({ displayName: 'Two', fieldRole: 'entry_level_rep' }) },
+      { exists: false, id: 'ghost', data: () => undefined },
+      { exists: true, id: 'u3', data: () => ({ displayName: 'Three', fieldRole: 'entry_level_rep' }) },
+    ];
+
+    // Full response: submitted, reviewed history, pending users.
+    queryGetMock.mockResolvedValueOnce(submitted).mockResolvedValueOnce({ docs: [] }).mockResolvedValueOnce({ docs: [] });
+    getAllMock.mockResolvedValueOnce(users);
+    const full = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
+
+    // Summary response: submitted only.
+    queryGetMock.mockResolvedValueOnce(submitted);
+    const counted = await (await summary()).json();
+
+    const times = (rows: Array<{ submittedAt: string | null }>) => rows.map((row) => row.submittedAt).sort();
+    expect(counted.submissions).toHaveLength(full.submissions.length);
+    expect(times(counted.submissions)).toEqual(times(full.submissions));
+  });
 });

@@ -81,6 +81,15 @@ describe('purgeSensitiveUserData', () => {
     expect(store.deletedFiles).not.toContain('onboarding/invite_zzz/dl_photos/front.jpg');
   });
 
+  it('still finds a legacy reference saved without the trailing slash', async () => {
+    store.col('userOnboarding').u1_dl_photos = { userId: 'u1', reference: 'onboarding/invite_abc/dl_photos' };
+
+    await purgeSensitiveUserData('u1');
+
+    expect(store.deletedFiles).toContain('onboarding/invite_abc/dl_photos/front.jpg');
+    expect(store.deletedFiles).not.toContain('onboarding/invite_zzz/dl_photos/front.jpg');
+  });
+
   it('ignores a reference that points at someone else\'s folder or at another item', async () => {
     store.col('userOnboarding').u1_dl_photos = { userId: 'u1', reference: 'onboarding/u10/dl_photos/' };
     await purgeSensitiveUserData('u1');

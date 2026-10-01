@@ -72,7 +72,9 @@ export function changedLeaves(
   for (const path of new Set([...was.keys(), ...now.keys()])) {
     const from = was.get(path) ?? null;
     const to = now.get(path) ?? null;
-    if (from !== to) changes.push({ path, from, to });
+    // Value comparison, not reference: an array or Date leaf must not read as
+    // changed on every save just because it is a new object.
+    if (JSON.stringify(from) !== JSON.stringify(to)) changes.push({ path, from, to });
   }
   return changes;
 }

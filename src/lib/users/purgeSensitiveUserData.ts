@@ -59,15 +59,18 @@ export async function purgeSensitiveUserData(uid: string): Promise<PurgeResult> 
   for (const itemId of SENSITIVE_UPLOAD_ITEMS) {
     try {
       const folders = new Set<string>([`onboarding/${uid}/${itemId}/`]);
-      const recorded = (await db.collection('userOnboarding').doc(`${uid}_${itemId}`).get()).data()?.reference;
+      const stored = (await db.collection('userOnboarding').doc(`${uid}_${itemId}`).get()).data()?.reference;
+      // Older references were saved without the trailing slash (signFolderFiles
+      // handles the same case); normalise so those hires' photos are not skipped.
+      const recorded = typeof stored === 'string' ? (stored.endsWith('/') ? stored : `${stored}/`) : null;
       // The reference is stored data, so only trust it if it is exactly this item's
       // folder under this person's own uid or an invite folder; anything else is
       // ignored, never deleted.
       const ownFolder =
-        typeof recorded === 'string' &&
+        recorded !== null &&
         recorded.endsWith(`/${itemId}/`) &&
         (recorded.startsWith(`onboarding/${uid}/`) || recorded.startsWith('onboarding/invite_'));
-      if (ownFolder) folders.add(recorded);
+      if (recorded !== null && ownFolder) folders.add(recorded);
 
       for (const prefix of folders) {
         // Trailing slash on the prefix: "onboarding/abc/x/" must never match "onboarding/abcd/x/".
