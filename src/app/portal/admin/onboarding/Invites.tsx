@@ -726,7 +726,7 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                 </label>
                 <button type="submit" className={`${s.btnPrimary} ${r.submit}`} disabled={saving}>
                   {saving ? <Loader2 size={20} className={u.spin} aria-hidden="true" /> : <Send size={20} aria-hidden="true" />}
-                  Create invite
+                  {saving ? 'Sending…' : 'Send invite'}
                 </button>
               </form>
 
