@@ -446,6 +446,9 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                 const submitted = invite.status === 'submitted';
                 const status = shownStatus(invite);
                 const open = OPEN_INVITE_STATUSES.includes(invite.status);
+                // An older invite (no saved link) the recruit already opened: its link still
+                // works, and a new one would break the page they have open (the API refuses).
+                const openedLegacy = !invite.linkSaved && invite.status === 'in_progress' && status !== 'expired';
                 const linkAction = linkBusy?.id === invite.id ? linkBusy.action : null;
                 return (
                   <li key={invite.id}>
@@ -507,6 +510,10 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                             <XCircle size={16} aria-hidden="true" />
                             Reject
                           </button>
+                        </span>
+                      ) : open && openedLegacy ? (
+                        <span className={`${u.cell} ${u.alignEnd} ${u.toneMuted}`}>
+                          Opened their link (sent before links were saved)
                         </span>
                       ) : open ? (
                         <span className={`${u.btnRow} ${r.actions}`}>

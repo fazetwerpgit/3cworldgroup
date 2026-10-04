@@ -10,7 +10,10 @@ import { inviteUrlFor, openInviteToken, sealInviteToken, sendInviteEmail } from 
 //   GET  -> { inviteUrl }: the saved link, to copy and send by hand.
 //   POST -> re-sends the invite email and gives the next 14 days. The saved
 //           link is kept, so the one already sent works again; an invite with
-//           no saved link (made before links were saved) gets a fresh one.
+//           no saved link (made before links were saved) gets a fresh one,
+//           unless the recruit already opened the old one: it still works and
+//           a new token would break the packet they have open (and the link
+//           their phone remembers for sign-up), so that case is refused.
 // Only invites the recruit can still fill in qualify: a submitted, activated or
 // rejected invite has no use for its link.
 
@@ -80,6 +83,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const renewed = !token;
     const update: Record<string, unknown> = {};
     if (!token) {
+      const opened = invite.data.status === 'in_progress' && !isInviteExpired(invite.data.expiresAt);
+      if (opened) {
+        return NextResponse.json(
+          {
+            error:
+              'They already opened the link from their first email, and it still works. A new link would break the page they have open, so ask them to use that email.',
+          },
+          { status: 409 }
+        );
+      }
       const fresh = createInviteToken();
       token = fresh.token;
       const tokenEncrypted = sealInviteToken(fresh.token);

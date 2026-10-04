@@ -117,6 +117,19 @@ it('gives an invite from before saved links a fresh link that opens it and can b
   expect(copied.inviteUrl).toBe(resent.inviteUrl);
 });
 
+it('keeps the original link working when the recruit already opened an older invite', async () => {
+  delete state.invite?.tokenEncrypted;
+  state.invite = { ...state.invite, status: 'in_progress' };
+  expect((await POST(request('POST'), params)).status).toBe(409);
+  expect(state.invite?.tokenHash).toBe(hashInviteToken('saved-token'));
+  expect(state.sendEmail).not.toHaveBeenCalled();
+
+  // Once that link has expired it is dead anyway, so a fresh one goes out.
+  state.invite = { ...state.invite, expiresAt: inDays(-1) };
+  const resent = await (await POST(request('POST'), params)).json();
+  expect(resent.newLink).toBe(true);
+});
+
 it('reports when the email did not go out, with the link to send by hand', async () => {
   state.sendEmail.mockResolvedValue({ ok: false, error: 'postmark_422' });
   const json = await (await POST(request('POST'), params)).json();
