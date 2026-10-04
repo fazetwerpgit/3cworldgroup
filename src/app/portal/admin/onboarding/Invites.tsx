@@ -138,6 +138,7 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
   const [saving, setSaving] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null);
+  const [replaceConfirmId, setReplaceConfirmId] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState<{ id: string; action: 'copy' | 'resend' } | null>(null);
   const [shownLink, setShownLink] = useState<{ id: string; url: string } | null>(null);
   const [error, setError] = useState('');
@@ -280,13 +281,15 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
     }
   };
 
-  const resendInvite = async (invite: InviteView) => {
+  const resendInvite = async (invite: InviteView, replaceOpenedLink = false) => {
     clearNotices();
+    setReplaceConfirmId(null);
     setLinkBusy({ id: invite.id, action: 'resend' });
     try {
       const response = await fetch(`/api/portal/recruiting/invites/${invite.id}`, {
         method: 'POST',
-        headers: await authHeaders(),
+        headers: await authHeaders(true),
+        body: JSON.stringify({ replaceOpenedLink }),
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to re-send the invite');
@@ -446,8 +449,8 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                 const submitted = invite.status === 'submitted';
                 const status = shownStatus(invite);
                 const open = OPEN_INVITE_STATUSES.includes(invite.status);
-                // An older invite (no saved link) the recruit already opened: its link still
-                // works, and a new one would break the page they have open (the API refuses).
+                // An older invite (no saved link) the recruit already opened: a new link
+                // replaces the one in the page they may have open, so it asks first.
                 const openedLegacy = !invite.linkSaved && invite.status === 'in_progress' && status !== 'expired';
                 const linkAction = linkBusy?.id === invite.id ? linkBusy.action : null;
                 return (
@@ -511,10 +514,6 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                             Reject
                           </button>
                         </span>
-                      ) : open && openedLegacy ? (
-                        <span className={`${u.cell} ${u.alignEnd} ${u.toneMuted}`}>
-                          Opened their link (sent before links were saved)
-                        </span>
                       ) : open ? (
                         <span className={`${u.btnRow} ${r.actions}`}>
                           {invite.linkSaved && status !== 'expired' ? (
@@ -543,7 +542,7 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                                 ? 'Emails the same link again and gives it 14 more days'
                                 : 'This invite predates saved links: emails a new link (the old one stops working)'
                             }
-                            onClick={() => resendInvite(invite)}
+                            onClick={() => (openedLegacy ? setReplaceConfirmId(invite.id) : resendInvite(invite))}
                           >
                             {linkAction === 'resend' ? (
                               <Loader2 size={16} className={u.spin} aria-hidden="true" />
@@ -564,6 +563,30 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                           <ExternalLink size={16} aria-hidden="true" />
                           Open
                         </a>
+                      </div>
+                    ) : null}
+                    {replaceConfirmId === invite.id ? (
+                      <div className={u.confirm} role="alert">
+                        <span>
+                          {invite.candidateName} already opened their first link. A new link replaces it: if their
+                          onboarding page is still open, they&apos;ll need the new email. Files they uploaded are kept.
+                        </span>
+                        <span className={u.btnRow}>
+                          <button
+                            type="button"
+                            className={`${s.btnSecondary} ${u.sm}`}
+                            onClick={() => setReplaceConfirmId(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className={`${s.btnSecondary} ${u.sm}`}
+                            onClick={() => resendInvite(invite, true)}
+                          >
+                            Yes, send a new link
+                          </button>
+                        </span>
                       </div>
                     ) : null}
                     {confirmingReject ? (

@@ -35,10 +35,11 @@ vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: state.sendEmail, onboarding
 import { GET, POST } from './route';
 
 const params = { params: Promise.resolve({ id: 'inv-1' }) };
-const request = (method: 'GET' | 'POST') =>
+const request = (method: 'GET' | 'POST', body?: unknown) =>
   new NextRequest('https://portal.test/api/portal/recruiting/invites/inv-1', {
     method,
     headers: { authorization: 'Bearer token' },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 const inDays = (days: number) => {
   const date = new Date(Date.now() + days * 86_400_000);
@@ -117,15 +118,24 @@ it('gives an invite from before saved links a fresh link that opens it and can b
   expect(copied.inviteUrl).toBe(resent.inviteUrl);
 });
 
-it('keeps the original link working when the recruit already opened an older invite', async () => {
+it('only replaces an older link the recruit already opened when the manager confirms', async () => {
   delete state.invite?.tokenEncrypted;
   state.invite = { ...state.invite, status: 'in_progress' };
-  expect((await POST(request('POST'), params)).status).toBe(409);
+  const refused = await POST(request('POST'), params);
+  expect(refused.status).toBe(409);
+  expect((await refused.json()).code).toBe('opened_link');
   expect(state.invite?.tokenHash).toBe(hashInviteToken('saved-token'));
   expect(state.sendEmail).not.toHaveBeenCalled();
 
-  // Once that link has expired it is dead anyway, so a fresh one goes out.
-  state.invite = { ...state.invite, expiresAt: inDays(-1) };
+  const resent = await (await POST(request('POST', { replaceOpenedLink: true }), params)).json();
+  expect(resent.newLink).toBe(true);
+  expect(state.invite?.tokenHash).toBe(hashInviteToken(tokenOf(resent.inviteUrl)));
+  expect(state.sendEmail).toHaveBeenCalledTimes(1);
+});
+
+it('sends a fresh link without asking once the opened older link has expired', async () => {
+  delete state.invite?.tokenEncrypted;
+  state.invite = { ...state.invite, status: 'in_progress', expiresAt: inDays(-1) };
   const resent = await (await POST(request('POST'), params)).json();
   expect(resent.newLink).toBe(true);
 });
