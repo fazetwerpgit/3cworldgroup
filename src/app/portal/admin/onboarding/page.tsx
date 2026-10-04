@@ -6,14 +6,16 @@ import { AdminHub } from '@/components/portal/admin-d/AdminHub';
 import { AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
 import { ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 import { useHubTabCounts, useOpsQueues } from '@/components/portal/admin-d/opsQueues';
+import { Applicants } from './Applicants';
 import { Invites } from './Invites';
 import { Pipeline } from './Pipeline';
 import { Review } from './Review';
 
-// Onboarding: Review, Invites (recruiting) and Pipeline, each under its old
-// gate, so a manager sees only Invites. Each tab shows its own open items (they
-// add up to the nav badge) and a bare visit opens the first tab that has any.
-// /portal/admin/recruiting and /pipeline redirect to their tab (next.config.ts).
+// Onboarding: Review, Invites (recruiting), Applicants and Pipeline, each under
+// its old gate, so a manager sees only Invites and Applicants. Each tab shows
+// its own open items (they add up to the nav badge) and a bare visit opens the
+// first tab that has any. /portal/admin/recruiting and /pipeline redirect to
+// their tab (next.config.ts).
 function Onboarding() {
   const tab = useSearchParams().get(ONBOARDING_HUB.param);
   const { refresh } = useOpsQueues();
@@ -38,6 +40,7 @@ function Onboarding() {
       panels={{
         review: () => <Review onChanged={refresh} />,
         invites: () => <Invites onChanged={refresh} />,
+        applicants: () => <Applicants />,
         pipeline: () => <Pipeline />,
       }}
     />

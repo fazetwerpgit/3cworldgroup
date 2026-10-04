@@ -52,6 +52,8 @@ export const ONBOARDING_HUB = {
   tabs: [
     { key: 'review', label: 'Review', roles: PLATFORM_ROLES },
     { key: 'invites', label: 'Invites', roles: RECRUITING_ROLES },
+    // Website applications are served by the invites API, so they share its gate.
+    { key: 'applicants', label: 'Applicants', roles: RECRUITING_ROLES },
     { key: 'pipeline', label: 'Pipeline', roles: PLATFORM_ROLES },
   ],
 } as const satisfies HubConfig;
@@ -85,6 +87,8 @@ export const SETTINGS_HUB = {
     { key: 'chat-channels', label: 'Chat channels', roles: ['admin'] },
     { key: 'email-templates', label: 'Email templates', roles: PLATFORM_ROLES },
     { key: 'university', label: 'University content', roles: PLATFORM_ROLES },
+    // Same gate as the comp plan at the foot of Learn > Pay & links.
+    { key: 'pay-rates', label: 'Pay rates', roles: ['owner'], permissions: ['finance:read'] },
   ],
 } as const satisfies HubConfig;
 

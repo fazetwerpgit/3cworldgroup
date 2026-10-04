@@ -9,14 +9,9 @@ import {
 } from './templates';
 
 describe('email templates', () => {
-  it('invite email contains the invite URL in html and text', () => {
-    const e = inviteEmail({
-      candidateName: 'Sam',
-      ownerName: 'Jacob',
-      inviteUrl: 'https://portal.test/onboard/tok123',
-    });
-    expect(e.subject.toLowerCase()).toContain('welcome');
-    expect(e.htmlBody).toContain('https://portal.test/onboard/tok123');
+  it('invite email links the invite URL from the button and the text body', () => {
+    const e = inviteEmail({ inviteUrl: 'https://portal.test/onboard/tok123' });
+    expect(e.htmlBody).toContain('href="https://portal.test/onboard/tok123"');
     expect(e.textBody).toContain('https://portal.test/onboard/tok123');
   });
 

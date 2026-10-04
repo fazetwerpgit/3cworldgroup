@@ -3,42 +3,18 @@ import { adminDb } from '@/lib/firebase/admin';
 import {
   ApplicationRecord,
   FieldRole,
-  IBO_FIELD_ROLES,
   INVITABLE_FIELD_ROLES,
-  isManagementRole,
   OnboardingInvite,
-  resolveRoles,
 } from '@/types';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
-import { sendEmail, onboardingFrom } from '@/lib/email/sendEmail';
-import { inviteEmail } from '@/lib/email/templates';
+import { getRecruitingRequester } from '@/lib/recruiting/requester';
+import { inviteUrlFor, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
 
 const APPLICATION_LIMIT = 1000;
 
 function clean(value: unknown, max = 200) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
-}
-
-async function getRequester(userId: string) {
-  if (!adminDb) return null;
-  const doc = await adminDb.collection('users').doc(userId).get();
-  if (!doc.exists) return null;
-  const data = doc.data();
-  const { role, fieldRole } = resolveRoles(data?.role, data?.fieldRole);
-  const canManage =
-    isManagementRole(role) ||
-    fieldRole === 'l1_manager' ||
-    fieldRole === 'l2_manager' ||
-    (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
-  return {
-    uid: userId,
-    role,
-    fieldRole,
-    canManage,
-    canViewAll: isManagementRole(role),
-    name: data?.displayName || data?.email || '3C Manager',
-  };
 }
 
 function serializeInvite(doc: FirebaseFirestore.QueryDocumentSnapshot) {
@@ -56,6 +32,7 @@ function serializeInvite(doc: FirebaseFirestore.QueryDocumentSnapshot) {
     ownerName: data.ownerName,
     applicationId: data.applicationId ?? null,
     convertedUserId: data.convertedUserId ?? null,
+    linkSaved: typeof data.tokenEncrypted === 'string',
     expiresAt: data.expiresAt?.toDate?.()?.toISOString?.() ?? null,
     submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() ?? null,
     createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
@@ -90,7 +67,7 @@ export async function GET(request: NextRequest) {
     }
     const userId = gate.uid;
 
-    const requester = await getRequester(userId);
+    const requester = await getRecruitingRequester(userId);
     if (!requester?.canManage) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -155,12 +132,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid field role' }, { status: 400 });
     }
 
-    const requester = await getRequester(requestedBy);
+    const requester = await getRecruitingRequester(requestedBy);
     if (!requester?.canManage) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const { token, tokenHash } = createInviteToken();
+    const tokenEncrypted = sealInviteToken(token);
     const now = new Date();
     const expiresAt = getInviteExpiration(14);
     const inviteRef = await adminDb.collection('onboardingInvites').add({
@@ -174,6 +152,7 @@ export async function POST(request: NextRequest) {
       ownerId: requestedBy,
       ownerName: requester.name,
       tokenHash,
+      ...(tokenEncrypted ? { tokenEncrypted } : {}),
       ...(applicationId ? { applicationId } : {}),
       expiresAt,
       createdAt: now,
@@ -191,15 +170,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const inviteUrl = `${request.nextUrl.origin}/onboard/${token}`;
-
-    // Must be awaited: on serverless the instance freezes once the response
-    // returns, killing any in-flight send. sendEmail never throws.
-    await sendEmail({
-      to: candidateEmail,
-      from: onboardingFrom(),
-      ...inviteEmail({ candidateName, ownerName: requester.name, inviteUrl }),
-    });
+    const inviteUrl = inviteUrlFor(request.nextUrl.origin, token);
+    const emailSent = await sendInviteEmail(candidateEmail, inviteUrl);
 
     return NextResponse.json({
       success: true,
@@ -215,11 +187,13 @@ export async function POST(request: NextRequest) {
         ownerId: requestedBy,
         ownerName: requester.name,
         applicationId: applicationId || null,
+        linkSaved: tokenEncrypted !== null,
         expiresAt: expiresAt.toISOString(),
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
       },
       inviteUrl,
+      emailSent,
     });
   } catch (error) {
     console.error('Error creating onboarding invite:', error);

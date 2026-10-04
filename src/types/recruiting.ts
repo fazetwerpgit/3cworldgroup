@@ -41,6 +41,8 @@ export interface OnboardingInvite {
   ownerId: string;
   ownerName: string;
   tokenHash: string;
+  /** The raw token, encrypted, so the link can be copied or re-sent later. Absent on older invites. */
+  tokenEncrypted?: string;
   applicationId?: string;
   convertedUserId?: string;
   expiresAt: Date;

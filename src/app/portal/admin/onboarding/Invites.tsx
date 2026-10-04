@@ -1,21 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   CheckCircle2,
   ChevronDown,
-  Download,
   ExternalLink,
   Link2,
   Loader2,
+  Mail,
   RotateCw,
-  Search,
   Send,
   UserPlus,
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { toCsv, downloadCsv } from '@/lib/export/csv';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { INVITABLE_FIELD_ROLES } from '@/types/auth';
 import {
@@ -28,13 +27,12 @@ import {
   StatusDot,
   type Tone,
 } from '@/components/portal/admin-d/AdminUi';
-import { RECRUITING_ROLES } from '@/components/portal/admin-d/adminHubs';
+import { hubTabHref, ONBOARDING_HUB, RECRUITING_ROLES } from '@/components/portal/admin-d/adminHubs';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './recruiting.module.css';
 import {
   ApplicationRecord,
-  ApplicationStatus,
   FieldRole,
   OnboardingInviteStatus,
   RecruitingStatusLabels,
@@ -61,6 +59,8 @@ interface InviteView {
   intendedFieldRole: FieldRole;
   isIBO: boolean;
   status: OnboardingInviteStatus;
+  /** The link is stored and can be copied again. False on invites made before links were saved. */
+  linkSaved: boolean;
   ownerName: string;
   applicationId?: string | null;
   convertedUserId?: string | null;
@@ -79,63 +79,28 @@ const emptyForm = {
   applicationId: '',
 };
 
-const APPLICATION_COLUMNS = [
-  { key: 'name', label: 'Name' },
-  { key: 'city', label: 'City' },
-  { key: 'phone', label: 'Phone' },
-  { key: 'email', label: 'Email' },
-  { key: 'referredBy', label: 'Referred by' },
-  { key: 'status', label: 'Status' },
-  { key: 'createdAt', label: 'Submitted' },
-];
+/** Invites the recruit can still fill in: their link can be copied or re-sent. */
+const OPEN_INVITE_STATUSES: OnboardingInviteStatus[] = ['invited', 'in_progress', 'expired'];
 
-type ApplicationView = 'new' | 'invited' | 'onboarded' | 'all';
-
-const APPLICATION_VIEWS: { value: ApplicationView; label: string; status?: ApplicationStatus }[] = [
-  { value: 'new', label: 'New', status: 'applied' },
-  { value: 'invited', label: 'Invited', status: 'invited' },
-  { value: 'onboarded', label: 'Onboarded', status: 'converted' },
-  { value: 'all', label: 'All' },
-];
-
-function inView(application: ApplicationRecord, view: ApplicationView): boolean {
-  const status = APPLICATION_VIEWS.find((option) => option.value === view)?.status;
-  return !status || application.status === status;
+/** The stored status turns 'expired' only when the recruit opens a stale link; the date tells first. */
+function shownStatus(invite: InviteView): OnboardingInviteStatus {
+  const pastExpiry = !!invite.expiresAt && new Date(invite.expiresAt).getTime() < Date.now();
+  return pastExpiry && (invite.status === 'invited' || invite.status === 'in_progress') ? 'expired' : invite.status;
 }
 
-/** Case-insensitive match on name, city, email or phone. Digits also match the
- * phone ignoring its punctuation, so "5125550100" finds "(512) 555-0100". */
-function matchesSearch(application: ApplicationRecord, query: string): boolean {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return true;
-  const haystack = [application.name, application.city, application.email, application.phone]
-    .map((value) => (value ?? '').toLowerCase());
-  if (haystack.some((value) => value.includes(needle))) return true;
-  const digits = needle.replace(/\D/g, '');
-  return digits.length >= 3 && (application.phone ?? '').replace(/\D/g, '').includes(digits);
+/**
+ * Copies a link that is still being fetched. Safari only lets a click write to
+ * the clipboard synchronously, so the pending text goes in as a ClipboardItem
+ * promise; browsers without ClipboardItem wait for the text, then write it.
+ */
+async function copyPendingText(text: Promise<string>): Promise<void> {
+  if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+    const blob = text.then((value) => new Blob([value], { type: 'text/plain' }));
+    await navigator.clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+    return;
+  }
+  await navigator.clipboard.writeText(await text);
 }
-
-function telHref(phone: string): string {
-  return `tel:${phone.replace(/[^0-9+]/g, '')}`;
-}
-
-/** Split from the previously-conflated single lookup (B-4) — ApplicationStatus and
- * OnboardingInviteStatus are distinct enums with only partial overlap. */
-const applicationStatusTone: Record<ApplicationStatus, Tone> = {
-  applied: 'blue',
-  contacted: 'amber',
-  invited: 'blue',
-  not_selected: 'muted',
-  converted: 'lime',
-};
-
-const applicationStatusLabel: Record<ApplicationStatus, string> = {
-  applied: 'Applied',
-  contacted: 'Contacted',
-  invited: 'Invited',
-  not_selected: 'Not selected',
-  converted: 'Onboarded',
-};
 
 const inviteStatusTone: Record<OnboardingInviteStatus, Tone> = {
   invited: 'blue',
@@ -146,6 +111,11 @@ const inviteStatusTone: Record<OnboardingInviteStatus, Tone> = {
   expired: 'muted',
   converted: 'lime',
 };
+
+function formatDate(value: string | null) {
+  if (!value) return 'N/A';
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 function formatMissingItems(missing: unknown): string {
   return Array.isArray(missing) && missing.length > 0
@@ -159,6 +129,8 @@ function formatMissingItems(missing: unknown): string {
 /** `onChanged` runs after each action that changes the recruits, so the hub's tab counts follow. */
 export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
   const { user, hasPermission, isRole } = useAuth();
+  const router = useRouter();
+  const prefillApplicationId = useSearchParams().get('application');
   const [invites, setInvites] = useState<InviteView[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,13 +138,14 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
   const [saving, setSaving] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null);
+  const [linkBusy, setLinkBusy] = useState<{ id: string; action: 'copy' | 'resend' } | null>(null);
+  const [shownLink, setShownLink] = useState<{ id: string; url: string } | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [warning, setWarning] = useState('');
   const [latestInviteUrl, setLatestInviteUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [applicationView, setApplicationView] = useState<ApplicationView>('new');
-  const [applicationQuery, setApplicationQuery] = useState('');
 
   const canAccess =
     hasPermission('recruiting:read') ||
@@ -192,7 +165,6 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
   const fetchRecruiting = useCallback(async () => {
     if (!user || !canAccess) return;
     setLoading(true);
-    setError('');
     try {
       const response = await fetch('/api/portal/recruiting/invites', { headers: await authHeaders() });
       const json = await response.json();
@@ -211,6 +183,12 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
   useEffect(() => {
     fetchRecruiting();
   }, [fetchRecruiting]);
+
+  const clearNotices = () => {
+    setError('');
+    setSuccess('');
+    setWarning('');
+  };
 
   const fillFromApplication = (applicationId: string) => {
     const application = applications.find((item) => item.id === applicationId);
@@ -234,12 +212,22 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
     document.getElementById('invite-name')?.focus({ preventScroll: true });
   };
 
+  // Applicants' Invite button lands here with ?application=<id>: fill the form
+  // once the applications load, then drop the param so a reload starts clean.
+  useEffect(() => {
+    if (!prefillApplicationId || loading) return;
+    if (applications.some((application) => application.id === prefillApplicationId)) {
+      inviteFromApplication(prefillApplicationId);
+    }
+    router.replace(hubTabHref(ONBOARDING_HUB, 'invites'), { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per handed-over applicant
+  }, [prefillApplicationId, loading]);
+
   const createInvite = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) return;
     setSaving(true);
-    setError('');
-    setSuccess('');
+    clearNotices();
     setLatestInviteUrl('');
     try {
       const response = await fetch('/api/portal/recruiting/invites', {
@@ -252,13 +240,69 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
       setInvites((prev) => [json.invite, ...prev]);
       setLatestInviteUrl(json.inviteUrl);
       setForm(emptyForm);
-      setSuccess('Invite link created. Copy it and send it by text, call follow-up, or manager chat.');
+      if (json.emailSent) {
+        setSuccess(`Invite emailed to ${json.invite.candidateEmail} from the onboarding department.`);
+      } else {
+        setWarning("Invite created, but the email didn't go out. Copy the link below and send it yourself.");
+      }
       await fetchRecruiting();
       onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create invite');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const copyInviteLink = async (invite: InviteView) => {
+    clearNotices();
+    setLinkBusy({ id: invite.id, action: 'copy' });
+    const url = (async () => {
+      const response = await fetch(`/api/portal/recruiting/invites/${invite.id}`, { headers: await authHeaders() });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Could not load the link');
+      return json.inviteUrl as string;
+    })();
+    try {
+      await copyPendingText(url);
+      setShownLink({ id: invite.id, url: await url });
+      setSuccess(`Link for ${invite.candidateName} copied.`);
+    } catch {
+      // Either the link failed to load or the browser refused the clipboard.
+      try {
+        setShownLink({ id: invite.id, url: await url });
+        setWarning('Your browser blocked copying. Select the link under the invite and copy it.');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not load the link');
+      }
+    } finally {
+      setLinkBusy(null);
+    }
+  };
+
+  const resendInvite = async (invite: InviteView) => {
+    clearNotices();
+    setLinkBusy({ id: invite.id, action: 'resend' });
+    try {
+      const response = await fetch(`/api/portal/recruiting/invites/${invite.id}`, {
+        method: 'POST',
+        headers: await authHeaders(),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to re-send the invite');
+      const until = formatDate(json.expiresAt);
+      const fresh = json.newLink ? ' This is a new link; the one sent before no longer works.' : '';
+      if (json.emailSent) {
+        setSuccess(`Invite re-sent to ${invite.candidateEmail}. The link works until ${until}.${fresh}`);
+      } else {
+        setShownLink({ id: invite.id, url: json.inviteUrl });
+        setWarning(`The email didn't go out. Copy the link under the invite and send it yourself (works until ${until}).${fresh}`);
+      }
+      await fetchRecruiting();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to re-send the invite');
+    } finally {
+      setLinkBusy(null);
     }
   };
 
@@ -272,8 +316,7 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
   const convertInvite = async (invite: InviteView, action: 'approved' | 'rejected') => {
     if (!user) return;
     setProcessingId(invite.id);
-    setError('');
-    setSuccess('');
+    clearNotices();
     try {
       const response = await fetch('/api/portal/recruiting/convert', {
         method: 'POST',
@@ -305,29 +348,12 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
     }
   };
 
-  const formatDate = (value: string | null) => {
-    if (!value) return 'N/A';
-    return new Date(value).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
   const submittedCount = invites.filter((invite) => invite.status === 'submitted').length;
   const activeCount = invites.filter((invite) => invite.status === 'converted').length;
   const inProgressCount = invites.filter((invite) =>
     ['invited', 'in_progress'].includes(invite.status)
   ).length;
-  const applicationCounts = Object.fromEntries(
-    APPLICATION_VIEWS.map((option) => [
-      option.value,
-      applications.filter((application) => inView(application, option.value)).length,
-    ])
-  ) as Record<ApplicationView, number>;
-  const visibleApplications = applications.filter(
-    (application) => inView(application, applicationView) && matchesSearch(application, applicationQuery)
-  );
+  const newApplications = applications.filter((application) => application.status === 'applied').length;
   // The form's picker offers applicants not yet invited, plus whichever one is filled in.
   const pickableApplications = applications.filter(
     (application) => application.status === 'applied' || application.id === form.applicationId
@@ -341,8 +367,8 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
           title="Recruiting"
           meta={
             showCounts ? (
-              <a href="#applications" className={r.jump}>
-                <b>{applicationCounts.new}</b> new {applicationCounts.new === 1 ? 'application' : 'applications'}
+              <a href={hubTabHref(ONBOARDING_HUB, 'applicants')} className={r.jump}>
+                <b>{newApplications}</b> new {newApplications === 1 ? 'applicant' : 'applicants'}
               </a>
             ) : null
           }
@@ -377,6 +403,9 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
         ) : null}
         {success ? (
           <AdminNotice tone="ok" onDismiss={() => setSuccess('')}>{success}</AdminNotice>
+        ) : null}
+        {warning ? (
+          <AdminNotice tone="warn" onDismiss={() => setWarning('')}>{warning}</AdminNotice>
         ) : null}
 
         <section className={s.panel} aria-labelledby="recruiting-invites-heading">
@@ -415,6 +444,9 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                 const confirmingReject = rejectConfirmId === invite.id;
                 const busy = processingId === invite.id;
                 const submitted = invite.status === 'submitted';
+                const status = shownStatus(invite);
+                const open = OPEN_INVITE_STATUSES.includes(invite.status);
+                const linkAction = linkBusy?.id === invite.id ? linkBusy.action : null;
                 return (
                   <li key={invite.id}>
                     <div className={`${u.row} ${r.invite} ${submitted ? u.rowHot : ''}`}>
@@ -427,8 +459,8 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                         </span>
                       </span>
                       <span className={`${u.cellEnd} ${r.phoneOnly}`}>
-                        <StatusDot tone={inviteStatusTone[invite.status] ?? 'blue'}>
-                          {RecruitingStatusLabels[invite.status] ?? invite.status}
+                        <StatusDot tone={inviteStatusTone[status] ?? 'blue'}>
+                          {RecruitingStatusLabels[status] ?? status}
                         </StatusDot>
                       </span>
                       <span className={u.cell} data-label="Role">
@@ -446,8 +478,8 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                         </span>
                       </span>
                       <span className={`${u.cell} ${r.deskOnly}`}>
-                        <StatusDot tone={inviteStatusTone[invite.status] ?? 'blue'}>
-                          {RecruitingStatusLabels[invite.status] ?? invite.status}
+                        <StatusDot tone={inviteStatusTone[status] ?? 'blue'}>
+                          {RecruitingStatusLabels[status] ?? status}
                         </StatusDot>
                       </span>
                       {submitted ? (
@@ -476,10 +508,57 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                             Reject
                           </button>
                         </span>
+                      ) : open ? (
+                        <span className={`${u.btnRow} ${r.actions}`}>
+                          {invite.linkSaved && status !== 'expired' ? (
+                            <button
+                              type="button"
+                              className={`${s.btnSecondary} ${u.sm}`}
+                              disabled={linkAction !== null}
+                              aria-label={`Copy invite link for ${invite.candidateName}`}
+                              onClick={() => copyInviteLink(invite)}
+                            >
+                              {linkAction === 'copy' ? (
+                                <Loader2 size={16} className={u.spin} aria-hidden="true" />
+                              ) : (
+                                <Link2 size={16} aria-hidden="true" />
+                              )}
+                              Copy link
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            className={`${s.btnSecondary} ${u.sm}`}
+                            disabled={linkAction !== null}
+                            aria-label={`Resend invite email to ${invite.candidateName}`}
+                            title={
+                              invite.linkSaved
+                                ? 'Emails the same link again and gives it 14 more days'
+                                : 'This invite predates saved links: emails a new link (the old one stops working)'
+                            }
+                            onClick={() => resendInvite(invite)}
+                          >
+                            {linkAction === 'resend' ? (
+                              <Loader2 size={16} className={u.spin} aria-hidden="true" />
+                            ) : (
+                              <Mail size={16} aria-hidden="true" />
+                            )}
+                            Resend email
+                          </button>
+                        </span>
                       ) : (
                         <span className={`${u.cell} ${u.alignEnd} ${r.deskOnly} ${u.toneMuted}`}>No action</span>
                       )}
                     </div>
+                    {shownLink?.id === invite.id ? (
+                      <div className={r.rowLink}>
+                        <p className={r.readyUrl}>{shownLink.url}</p>
+                        <a className={`${s.btnSecondary} ${u.sm}`} href={shownLink.url} target="_blank" rel="noreferrer">
+                          <ExternalLink size={16} aria-hidden="true" />
+                          Open
+                        </a>
+                      </div>
+                    ) : null}
                     {confirmingReject ? (
                       <div className={u.confirm} role="alert">
                         <span>Reject this recruit? This deactivates their account.</span>
@@ -511,7 +590,7 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
           )}
         </section>
 
-        <div className={r.grid}>
+        <div className={r.formWrap}>
           <section className={`${s.panel} ${r.formPanel}`} id="invite-form" aria-labelledby="recruiting-form-heading">
             <div className={`${s.panelHead} ${u.band}`}>
               <h2 id="recruiting-form-heading" className={s.kicker}>Start recruit onboarding</h2>
@@ -646,143 +725,6 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
                 </div>
               )}
             </div>
-          </section>
-
-          <section
-            className={`${s.panel} ${r.appsPanel}`}
-            id="applications"
-            aria-labelledby="recruiting-apps-heading"
-          >
-            <div className={`${s.panelHead} ${u.band}`}>
-              <h2 id="recruiting-apps-heading" className={s.kicker}>Website applications</h2>
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${u.sm} ${u.quiet} ${r.export}`}
-                disabled={visibleApplications.length === 0}
-                onClick={() =>
-                  downloadCsv(
-                    'applications.csv',
-                    toCsv(APPLICATION_COLUMNS, visibleApplications as unknown as Record<string, unknown>[])
-                  )
-                }
-              >
-                <Download size={16} aria-hidden="true" />
-                Export {visibleApplications.length} shown
-              </button>
-            </div>
-            {loading ? (
-              <AdminSkeletonRows rows={3} label="Loading applications" />
-            ) : loadFailed ? (
-              <AdminFailed what="applications" onRetry={fetchRecruiting} />
-            ) : applications.length === 0 ? (
-              <AdminEmpty title="No website applications yet" />
-            ) : (
-              <>
-                <div className={`${u.toolbar} ${r.filters}`}>
-                  <label className={`${u.search} ${r.searchBox}`}>
-                    <Search size={18} aria-hidden="true" />
-                    <input
-                      className={u.input}
-                      type="search"
-                      placeholder="Search name, city, email, phone"
-                      aria-label="Search applications"
-                      value={applicationQuery}
-                      onChange={(event) => setApplicationQuery(event.target.value)}
-                    />
-                  </label>
-                  <div className={`${u.segmented} ${r.status}`} role="group" aria-label="Filter applications">
-                    {APPLICATION_VIEWS.map((option) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        aria-pressed={applicationView === option.value}
-                        onClick={() => setApplicationView(option.value)}
-                      >
-                        {option.label}
-                        <span className={r.segCount}>{applicationCounts[option.value]}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {visibleApplications.length === 0 ? (
-                  <AdminEmpty
-                    title={applicationQuery.trim() ? 'No applications match' : 'Nothing here'}
-                  >
-                    {applicationQuery.trim() ? 'Try another name, city, email or phone.' : null}
-                  </AdminEmpty>
-                ) : (
-                  <ul className={`${u.rows} ${r.appCols}`}>
-                    <li className={u.tHead} aria-hidden="true">
-                      <span>Applicant</span>
-                      <span>Contact</span>
-                      <span>Status</span>
-                      <span />
-                    </li>
-                    {visibleApplications.map((application) => (
-                      <li key={application.id} className={`${u.row} ${r.app}`}>
-                        <span className={`${u.cellMain} ${u.person}`}>
-                          <span className={u.personText}>
-                            <span className={u.personName}>
-                              <span>{application.name}</span>
-                            </span>
-                            <span className={u.personSub}>
-                              {application.city ? `${application.city} · ` : ''}
-                              <span className={u.num}>
-                                {formatDate(application.createdAt ? application.createdAt.toString() : null)}
-                              </span>
-                            </span>
-                            {application.referredBy ? (
-                              <span className={u.personSub}>Referred by {application.referredBy}</span>
-                            ) : null}
-                          </span>
-                        </span>
-                        <span className={`${u.cellEnd} ${r.appStatus}`}>
-                          <StatusDot tone={applicationStatusTone[application.status] ?? 'blue'}>
-                            {applicationStatusLabel[application.status] ?? application.status}
-                          </StatusDot>
-                        </span>
-                        <span className={`${u.cell} ${r.phoneOnly}`} data-label="Phone">
-                          <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
-                            {application.phone}
-                          </a>
-                        </span>
-                        <span className={`${u.cell} ${r.phoneOnly}`} data-label="Email">
-                          <a className={`${r.ellipsis} ${r.contact}`} href={`mailto:${application.email}`}>
-                            {application.email}
-                          </a>
-                        </span>
-                        <span className={`${u.cell} ${r.deskOnly}`}>
-                          <span className={r.stackValue}>
-                            <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
-                              {application.phone}
-                            </a>
-                            <a
-                              className={`${u.cellSub} ${r.ellipsis} ${r.contact}`}
-                              href={`mailto:${application.email}`}
-                            >
-                              {application.email}
-                            </a>
-                          </span>
-                        </span>
-                        {application.status === 'applied' ? (
-                          <span className={`${u.btnRow} ${r.appAction}`}>
-                            <button
-                              type="button"
-                              className={`${s.btnSecondary} ${u.sm}`}
-                              aria-label={`Invite ${application.name}`}
-                              onClick={() => inviteFromApplication(application.id)}
-                            >
-                              <UserPlus size={16} aria-hidden="true" />
-                              Invite
-                            </button>
-                          </span>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
           </section>
         </div>
       </div>

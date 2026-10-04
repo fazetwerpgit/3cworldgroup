@@ -17,12 +17,54 @@ ${bodyHtml}
 </div></body></html>`;
 }
 
-export function inviteEmail(p: { candidateName: string; ownerName: string; inviteUrl: string }): EmailContent {
+/** Teal from the onboarding department's own hire email. */
+const INVITE_TEAL = '#00797c';
+const ONBOARDING_ADDRESS = 'onboarding@3cworldgroup.com';
+
+/**
+ * The hire email, laid out like the one the onboarding department sends by
+ * hand: logo, "Congratulations", the welcome lines signed by the department,
+ * and one button to the invite link. Table layout and inline styles only, so
+ * Gmail and Outlook render it the same.
+ */
+export function inviteEmail(p: { inviteUrl: string }): EmailContent {
   const subject = 'Welcome to 3C World Group - start your onboarding';
+  const lines = [
+    'Welcome to 3C!',
+    'Please click on the link below and fill out all details regarding onboarding.',
+    'When completed, you will receive a call from one of our onboarding specialists to schedule you in for online training!',
+    'We look forward to your upcoming success!',
+  ];
+  const p16 = 'margin:0 0 12px;font-size:16px;line-height:1.45;color:#1a1a1a';
+  const htmlBody = `<!doctype html><html><body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff">
+<tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px">
+<tr><td align="center" style="padding-bottom:20px"><img src="${appBaseUrl()}/logo.png" width="180" height="169" alt="3C World Group" style="display:block;border:0;width:180px;height:auto"></td></tr>
+<tr><td align="center" style="padding-bottom:20px"><h1 style="margin:0;font-size:40px;line-height:1.15;font-weight:700;color:${INVITE_TEAL}">Congratulations, you&#39;re hired!</h1></td></tr>
+<tr><td align="center">
+${lines.map((line) => `<p style="${p16}">${line}</p>`).join('\n')}
+<p style="${p16};margin-top:20px">Thank you,</p>
+<p style="${p16}">Onboarding Department</p>
+<p style="${p16}"><a href="mailto:${ONBOARDING_ADDRESS}" style="color:#1155cc">${ONBOARDING_ADDRESS}</a></p>
+</td></tr>
+<tr><td align="center" style="padding:16px 0 8px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+<td align="center" bgcolor="${INVITE_TEAL}" style="border-radius:4px;background:${INVITE_TEAL}"><a href="${p.inviteUrl}" style="display:inline-block;padding:14px 32px;font-size:17px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:4px">Start Onboarding</a></td>
+</tr></table>
+</td></tr>
+<tr><td align="center" style="padding-top:20px;font-size:12px;line-height:1.5;color:#6b7280">
+This link is just for you and expires in 14 days. If the button doesn&#39;t work, copy this into your browser:<br>
+<a href="${p.inviteUrl}" style="color:#6b7280;word-break:break-all">${p.inviteUrl}</a>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
   return {
     subject,
-    textBody: `Hi ${p.candidateName},\n\n${p.ownerName} invited you to join the team. Complete your onboarding here: ${p.inviteUrl} (link expires in 14 days).\n`,
-    htmlBody: layout(subject, `<p>Hi ${p.candidateName},</p><p>${p.ownerName} invited you to join the team.</p><p><a href="${p.inviteUrl}">Start your onboarding</a> (link expires in 14 days).</p><p>${p.inviteUrl}</p>`),
+    textBody: `Congratulations, you're hired!\n\n${lines.join('\n')}\n\nStart onboarding: ${p.inviteUrl}\n(This link is just for you and expires in 14 days.)\n\nThank you,\nOnboarding Department\n${ONBOARDING_ADDRESS}\n`,
+    htmlBody,
   };
 }
 

@@ -2,28 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
 import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
-import { IBO_FIELD_ROLES, isManagementRole, resolveRoles } from '@/types';
-
-async function getRequester(userId: string) {
-  if (!adminDb) return null;
-  const doc = await adminDb.collection('users').doc(userId).get();
-  if (!doc.exists) return null;
-  const data = doc.data();
-  const { role, fieldRole } = resolveRoles(data?.role, data?.fieldRole);
-  const canConvert =
-    isManagementRole(role) ||
-    fieldRole === 'l1_manager' ||
-    fieldRole === 'l2_manager' ||
-    (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
-  return {
-    uid: userId,
-    role,
-    fieldRole,
-    canConvert,
-    canViewAll: isManagementRole(role),
-    name: data?.displayName || data?.email || '3C Manager',
-  };
-}
+import { getRecruitingRequester } from '@/lib/recruiting/requester';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,8 +24,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'inviteId is required' }, { status: 400 });
     }
 
-    const requester = await getRequester(requestedBy);
-    if (!requester?.canConvert) {
+    const requester = await getRecruitingRequester(requestedBy);
+    if (!requester?.canManage) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

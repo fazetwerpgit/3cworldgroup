@@ -83,17 +83,21 @@
   }
 }
 
-/* ---------- form + applications ---------- */
-.grid {
-  display: grid;
-  gap: var(--s5);
-  align-items: start;
+/* A copied or re-sent link, under its invite row. */
+.rowLink {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) var(--s4);
+  border-top: 1px solid var(--c-line);
+  background: var(--c-well);
 }
 
-@media (min-width: 1180px) {
-  .grid {
-    grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
-  }
+/* ---------- invite form ---------- */
+.formWrap {
+  max-width: 640px;
 }
 
 .formPanel {
@@ -139,7 +143,7 @@
   padding: 0 var(--s2);
 }
 
-/* The page-head count doubles as a jump to the applications panel. */
+/* The page-head count doubles as a link to the Applicants tab. */
 .jump {
   color: inherit;
   text-decoration: underline;

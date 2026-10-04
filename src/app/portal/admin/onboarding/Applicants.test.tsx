@@ -13,6 +13,12 @@ vi.mock('@/components/auth/ProtectedRoute', () => ({
 }));
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: async () => 'token' }));
 
+const nav = vi.hoisted(() => ({ params: new URLSearchParams(), push: vi.fn(), replace: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: nav.push, replace: nav.replace }),
+  useSearchParams: () => nav.params,
+}));
+
 const csv = vi.hoisted(() => ({ rows: [] as Array<Record<string, unknown>> }));
 vi.mock('@/lib/export/csv', () => ({
   toCsv: (_columns: unknown, rows: Array<Record<string, unknown>>) => {
@@ -22,6 +28,7 @@ vi.mock('@/lib/export/csv', () => ({
   downloadCsv: () => {},
 }));
 
+import { Applicants } from './Applicants';
 import { Invites } from './Invites';
 
 const APPLICATIONS = [
@@ -64,9 +71,21 @@ async function search(value: string) {
   });
 }
 
+async function mount(node: ReactNode, ready: () => unknown) {
+  await act(async () => {
+    root.render(node);
+  });
+  await act(async () => {
+    await vi.waitFor(() => expect(ready()).toBeTruthy());
+  });
+}
+
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   Element.prototype.scrollIntoView = vi.fn();
+  nav.params = new URLSearchParams();
+  nav.push.mockReset();
+  nav.replace.mockReset();
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => ({ ok: true, json: async () => ({ invites: [], applications: APPLICATIONS }) }))
@@ -74,12 +93,7 @@ beforeEach(async () => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => {
-    root.render(<Invites />);
-  });
-  await act(async () => {
-    await vi.waitFor(() => expect(panel().querySelector('ul')).not.toBeNull());
-  });
+  await mount(<Applicants />, () => panel().querySelector('ul'));
 });
 
 afterEach(() => {
@@ -134,7 +148,7 @@ it('exports only the rows currently shown', async () => {
   expect(csv.rows.map((row) => row.id)).toEqual(['a2']);
 });
 
-it('offers Invite only on new rows and fills the onboarding form from it', async () => {
+it('offers Invite only on new rows and hands the applicant to a filled Invites form', async () => {
   await click(filterButton('All'));
   const inviteButtons = [...panel().querySelectorAll('button')].filter((button) => button.textContent === 'Invite');
   expect(inviteButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
@@ -143,13 +157,21 @@ it('offers Invite only on new rows and fills the onboarding form from it', async
   ]);
 
   await click(inviteButtons[1]);
+  const target = new URL(nav.push.mock.calls[0][0], 'http://portal.test');
+  expect(target.pathname).toBe('/portal/admin/onboarding');
+  expect(target.searchParams.get('tab')).toBe('invites');
 
-  const value = (id: string) => (container.querySelector(`#${id}`) as HTMLInputElement).value;
+  // The Invites tab opens on that URL and fills its form from the applicant.
+  nav.params = target.searchParams;
+  await mount(<Invites />, () => container.querySelector<HTMLInputElement>('#invite-name')?.value);
+
+  const value = (id: string) => container.querySelector<HTMLInputElement>(`#${id}`)?.value;
   expect(value('invite-application')).toBe('a2');
   expect(value('invite-name')).toBe('Leo Park');
   expect(value('invite-email')).toBe('leo@example.com');
   expect(value('invite-phone')).toBe('214-555-0102');
   expect(value('invite-city')).toBe('Dallas');
   expect(document.activeElement?.id).toBe('invite-name');
-  expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  // The handed-over id leaves the URL, so a reload starts with an empty form.
+  expect(nav.replace).toHaveBeenCalledWith('/portal/admin/onboarding?tab=invites', { scroll: false });
 });

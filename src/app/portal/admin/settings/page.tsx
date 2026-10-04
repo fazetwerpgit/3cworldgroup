@@ -5,12 +5,13 @@ import { SETTINGS_HUB } from '@/components/portal/admin-d/adminHubs';
 import { ChatChannels } from './ChatChannels';
 import { EmailTemplates } from './EmailTemplates';
 import { FormOptions } from './FormOptions';
+import { PayRates } from './PayRates';
 import { SystemSettings } from './SystemSettings';
 import { UniversityContent } from './UniversityContent';
 
 // Admin settings: System, Form options, Chat channels, Email templates, University
-// content, each under its old gate. /portal/admin/form-options and the other
-// old URLs redirect to their tab (next.config.ts).
+// content and the owner's Pay rates, each under its old gate. /portal/admin/form-options
+// and the other old URLs redirect to their tab (next.config.ts).
 export default function SettingsPage() {
   return (
     <AdminHub
@@ -22,6 +23,7 @@ export default function SettingsPage() {
         'chat-channels': () => <ChatChannels />,
         'email-templates': () => <EmailTemplates />,
         university: () => <UniversityContent />,
+        'pay-rates': () => <PayRates />,
       }}
     />
   );
