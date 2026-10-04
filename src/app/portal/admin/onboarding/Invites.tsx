@@ -351,7 +351,7 @@ export function Invites({ onChanged }: { onChanged?: () => void } = {}) {
   const submittedCount = invites.filter((invite) => invite.status === 'submitted').length;
   const activeCount = invites.filter((invite) => invite.status === 'converted').length;
   const inProgressCount = invites.filter((invite) =>
-    ['invited', 'in_progress'].includes(invite.status)
+    ['invited', 'in_progress'].includes(shownStatus(invite))
   ).length;
   const newApplications = applications.filter((application) => application.status === 'applied').length;
   // The form's picker offers applicants not yet invited, plus whichever one is filled in.
