@@ -13,7 +13,7 @@ import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { downloadBlob } from '@/lib/export/csv';
 import type { OnboardingFileItem, OnboardingFileSummary } from '@/lib/onboarding/onboardingFile';
-import { onboardingFileItemStatus } from '@/lib/onboarding/onboardingFileStatus';
+import { onboardingFileItemStatus, opensInViewer } from '@/lib/onboarding/onboardingFileStatus';
 import { OnboardingCategoryLabels } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
@@ -138,7 +138,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
       `${base}/signed-pdf?itemId=${encodeURIComponent(item.itemId)}`,
       `${item.label}, signed by ${file?.profile.name || 'this person'}`,
       authHeaders,
-      opener,
+      opener
     );
 
   // Fetch first ("Preparing…"). Where the browser can share files (iPhone,
@@ -186,7 +186,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
         downloadBlob(zip.name, zip);
         setReady(null);
         setDownloaded(true);
-      },
+      }
     );
   };
 
@@ -307,13 +307,6 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
             </dl>
           </div>
 
-          {vault ? (
-            <div className={f.group}>
-              <h3 className={f.subhead}>Sensitive information</h3>
-              {vault}
-            </div>
-          ) : null}
-
           <div className={f.group}>
             <h3 className={f.subhead}>Onboarding items</h3>
             {file.items.length === 0 ? (
@@ -375,9 +368,9 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
                           <>
                             <div className={o.files}>
                               {opened.map((upload) =>
-                                // Photos open in the page. A PDF (or a HEIC, which only
-                                // Apple's browsers draw) stays a link: a real tap opens it.
-                                /^image\/(jpeg|png|webp)$/.test(upload.contentType) ? (
+                                // Photos and PDFs open in the page. A HEIC, which only
+                                // Apple's browsers draw, stays a link: a real tap opens it.
+                                opensInViewer(upload) ? (
                                   <button
                                     key={upload.name}
                                     type="button"
@@ -400,7 +393,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
                                     <FileText size={16} aria-hidden="true" />
                                     <span>{upload.name}</span>
                                   </a>
-                                ),
+                                )
                               )}
                             </div>
                             <p className={u.hint}>Links expire in 15 minutes.</p>
@@ -417,6 +410,14 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
           </div>
         </div>
       )}
+      {/* Outside the load states: the masked SSN / DL# and Reveal come from
+          their own route and stay usable even if the summary fails. */}
+      {vault ? (
+        <div className={`${u.panelBody} ${f.group}`}>
+          <h3 className={f.subhead}>Sensitive information</h3>
+          {vault}
+        </div>
+      ) : null}
       {viewer.viewer}
     </section>
   );

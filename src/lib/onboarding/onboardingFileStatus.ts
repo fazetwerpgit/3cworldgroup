@@ -1,3 +1,4 @@
+import { isPdfUrl } from '@/lib/forms/openAttachment';
 import type { OnboardingStatus } from '@/types';
 
 export type OnboardingFileTone = 'lime' | 'blue' | 'amber' | 'red' | 'muted';
@@ -30,4 +31,10 @@ export function onboardingFileItemStatus(item: {
         ? { tone: 'muted', label: 'Not sent yet' }
         : { tone: 'muted', label: 'Not started' };
   }
+}
+
+/** Photos and PDFs draw in the in-app viewer; anything else (HEIC) stays a link. */
+export function opensInViewer(upload: { url: string; contentType: string }): boolean {
+  if (/^image\/(jpeg|png|webp)$/.test(upload.contentType)) return true;
+  return upload.contentType === 'application/pdf' && isPdfUrl(upload.url);
 }
