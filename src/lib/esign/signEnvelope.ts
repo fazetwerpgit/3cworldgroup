@@ -6,6 +6,8 @@ import {
   validateFields,
   type EsignFieldValues,
 } from '@/lib/esign/documents';
+import { FieldValue } from 'firebase-admin/firestore';
+import { adminDb } from '@/lib/firebase/admin';
 import { envelopeRef, type InhouseEnvelopeRecord } from '@/lib/esign/inhouse';
 import { sha256Hex, stampDocument } from '@/lib/esign/stamp';
 import { completeEsignItem } from '@/lib/esign/complete';
@@ -95,6 +97,56 @@ export function parseSignRequest(
  * PDF, audit block and checklist approval. Nothing the rep typed is logged or
  * written to the envelope; the field values live only inside the stamped PDF.
  */
+/**
+ * A signing claim older than this is treated as abandoned (the process died
+ * between stamping and completing), so the rep is not locked out for good.
+ * Stamping plus upload takes seconds; two minutes is a wide margin.
+ */
+export const SIGNING_CLAIM_STALE_MS = 2 * 60 * 1000;
+
+function claimTime(value: unknown): number | undefined {
+  if (value instanceof Date) return value.getTime();
+  if (value && typeof (value as { toDate?: unknown }).toDate === 'function') {
+    return (value as { toDate: () => Date }).toDate().getTime();
+  }
+  return undefined;
+}
+
+/**
+ * Takes the envelope for this signature in a transaction. The earlier status
+ * read is a plain read, so two concurrent requests (a double tap, Sign all
+ * racing a single sign, two devices) would both stamp and both complete the
+ * item. Only the winner continues; the loser sees the same outcome as signing
+ * an already signed document.
+ */
+async function claimEnvelopeForSigning(envelopeId: string, now: Date): Promise<boolean> {
+  const ref = envelopeRef(envelopeId);
+  return adminDb!.runTransaction(async (transaction) => {
+    const fresh = await transaction.get(ref);
+    const status = fresh.get('status');
+    if (status === 'completed') return false;
+    if (status === 'signing') {
+      const claimedAt = claimTime(fresh.get('signingClaimedAt'));
+      if (claimedAt !== undefined && now.getTime() - claimedAt < SIGNING_CLAIM_STALE_MS) return false;
+    }
+    transaction.set(ref, { status: 'signing', signingClaimedAt: now }, { merge: true });
+    return true;
+  });
+}
+
+/** Hands the envelope back after a failed attempt so the rep can sign again. */
+async function releaseSigningClaim(envelopeId: string): Promise<void> {
+  try {
+    await envelopeRef(envelopeId).set(
+      { status: 'sent', signingClaimedAt: FieldValue.delete() },
+      { merge: true }
+    );
+  } catch (error) {
+    // The claim goes stale on its own after SIGNING_CLAIM_STALE_MS.
+    console.error('[esign] failed to release the signing claim', { envelopeId, error });
+  }
+}
+
 export async function signInhouseEnvelope(input: {
   envelope: InhouseEnvelopeRecord;
   userId: string;
@@ -130,6 +182,10 @@ export async function signInhouseEnvelope(input: {
   }
 
   const now = new Date();
+  if (!(await claimEnvelopeForSigning(envelopeId, now))) {
+    return { ok: false, status: 409, error: 'already completed' };
+  }
+
   let pdf: Buffer;
   let completedPdfPath: string | null;
   try {
@@ -166,17 +222,20 @@ export async function signInhouseEnvelope(input: {
       docKey: envelope.docKey,
       error,
     });
+    await releaseSigningClaim(envelopeId);
     return { ok: false, status: 500, error: 'sign failed' };
   }
 
-  // The envelope stays 'sent' when the upload failed, so the rep can sign again.
+  // The envelope goes back to 'sent' when the upload failed, so the rep can sign again.
   if (!completedPdfPath) {
+    await releaseSigningClaim(envelopeId);
     return { ok: false, status: 502, error: 'upload failed' };
   }
 
   await envelopeRef(envelopeId).set(
     {
       status: 'completed',
+      signingClaimedAt: FieldValue.delete(),
       completedAt: now,
       consentAt: now,
       ip,

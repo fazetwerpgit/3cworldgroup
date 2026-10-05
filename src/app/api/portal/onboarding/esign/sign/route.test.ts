@@ -14,13 +14,50 @@ type CompleteEsignItem = (input: {
   pdf: Buffer | null;
 }) => Promise<{ completedPdfPath: string | null }>;
 
-const { docGetMock, docSetMock, collectionMock, gateMock, stampDocumentMock, completeEsignItemMock } =
-  vi.hoisted(() => {
+const {
+  docGetMock,
+  docSetMock,
+  txSetMock,
+  collectionMock,
+  runTransactionMock,
+  gateMock,
+  stampDocumentMock,
+  completeEsignItemMock,
+} = vi.hoisted(() => {
     const docGet = vi.fn<() => Promise<DocSnapshot>>();
     const docSet = vi.fn<(record: Record<string, unknown>, options: { merge: boolean }) => Promise<void>>();
+    // Transaction writes land in the envelope the next read returns, and
+    // transactions run one at a time, as Firestore guarantees for one document.
+    const txSet = vi.fn((record: Record<string, unknown>) => {
+      void record;
+    });
+    let queue: Promise<unknown> = Promise.resolve();
+    const runTransaction = vi.fn(<T,>(body: (tx: unknown) => Promise<T>): Promise<T> => {
+      let read: Record<string, unknown> = {};
+      const run = queue.then(() =>
+        body({
+          get: async () => {
+            read = (await docGet()).data() ?? {};
+            return { get: (field: string) => read[field] };
+          },
+          set: (_ref: unknown, record: Record<string, unknown>) => {
+            txSet(record);
+            const next = { ...read, ...record };
+            docGet.mockResolvedValue({ exists: true, data: () => next });
+          },
+        })
+      );
+      queue = run.then(
+        () => undefined,
+        () => undefined
+      );
+      return run;
+    });
     return {
       docGetMock: docGet,
       docSetMock: docSet,
+      txSetMock: txSet,
+      runTransactionMock: runTransaction,
       collectionMock: vi.fn(() => ({ doc: vi.fn(() => ({ get: docGet, set: docSet })) })),
       gateMock: vi.fn(),
       stampDocumentMock: vi.fn<(input: StampInput) => Promise<StampResult>>(),
@@ -29,7 +66,7 @@ const { docGetMock, docSetMock, collectionMock, gateMock, stampDocumentMock, com
   });
 
 vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: { collection: collectionMock },
+  adminDb: { collection: collectionMock, runTransaction: runTransactionMock },
   getOnboardingBucket: vi.fn(),
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: gateMock }));
@@ -286,13 +323,23 @@ describe('signing', () => {
   });
 });
 
+// A failed attempt hands the envelope back: status 'sent', claim removed,
+// never 'completed'.
+function expectClaimReleased() {
+  expect(docSetMock).toHaveBeenCalledTimes(1);
+  const [written, options] = docSetMock.mock.calls[0];
+  expect(options).toEqual({ merge: true });
+  expect(written.status).toBe('sent');
+  expect(Object.keys(written).sort()).toEqual(['signingClaimedAt', 'status']);
+}
+
 describe('failure after the rep pressed sign', () => {
   it('returns 502 and leaves the envelope open when the upload did not land', async () => {
     completeEsignItemMock.mockResolvedValue({ completedPdfPath: null });
     const res = await POST(signRequest(signBody()));
     expect(res.status).toBe(502);
     await expect(res.json()).resolves.toEqual({ error: 'upload failed' });
-    expect(docSetMock).not.toHaveBeenCalled();
+    expectClaimReleased();
   });
 
   it('returns 500 without logging any field value when stamping throws', async () => {
@@ -302,7 +349,7 @@ describe('failure after the rep pressed sign', () => {
     const res = await POST(signRequest(signBody()));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: 'sign failed' });
-    expect(docSetMock).not.toHaveBeenCalled();
+    expectClaimReleased();
 
     const logged = consoleError.mock.calls.map((call) => JSON.stringify(call)).join(' ');
     expect(logged).toContain(ENVELOPE_ID);
@@ -316,7 +363,55 @@ describe('failure after the rep pressed sign', () => {
 
     const res = await POST(signRequest(signBody()));
     expect(res.status).toBe(500);
-    expect(docSetMock).not.toHaveBeenCalled();
+    expectClaimReleased();
     consoleError.mockRestore();
+  });
+});
+
+describe('concurrent signing', () => {
+  it('claims the envelope in a transaction before stamping', async () => {
+    const res = await POST(signRequest(signBody()));
+    expect(res.status).toBe(200);
+    expect(runTransactionMock).toHaveBeenCalledOnce();
+    expect(txSetMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'signing' }));
+    expect(txSetMock.mock.invocationCallOrder[0]).toBeLessThan(stampDocumentMock.mock.invocationCallOrder[0]);
+  });
+
+  it('lets only one of two simultaneous signs through; the other sees already completed', async () => {
+    const [a, b] = await Promise.all([POST(signRequest(signBody())), POST(signRequest(signBody()))]);
+
+    expect([a.status, b.status].sort()).toEqual([200, 409]);
+    const loser = a.status === 409 ? a : b;
+    await expect(loser.json()).resolves.toEqual({ error: 'already completed' });
+    expect(stampDocumentMock).toHaveBeenCalledTimes(1);
+    expect(completeEsignItemMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses while another request holds a fresh claim', async () => {
+    docGetMock.mockResolvedValue(envelope({ status: 'signing', signingClaimedAt: new Date(Date.now() - 30_000) }));
+    const res = await POST(signRequest(signBody()));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: 'already completed' });
+    expect(stampDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it('takes over a stale claim so an abandoned attempt never locks the rep out', async () => {
+    docGetMock.mockResolvedValue(
+      envelope({ status: 'signing', signingClaimedAt: new Date(Date.now() - 3 * 60_000) })
+    );
+    const res = await POST(signRequest(signBody()));
+    expect(res.status).toBe(200);
+    expect(completeEsignItemMock).toHaveBeenCalledOnce();
+  });
+
+  it('can sign again after a failed attempt released the claim', async () => {
+    completeEsignItemMock.mockResolvedValueOnce({ completedPdfPath: null });
+    const first = await POST(signRequest(signBody()));
+    expect(first.status).toBe(502);
+    // The release write is a plain set; mirror it into the stored envelope.
+    docGetMock.mockResolvedValue(envelope({ status: 'sent' }));
+
+    const second = await POST(signRequest(signBody()));
+    expect(second.status).toBe(200);
   });
 });
