@@ -8,12 +8,12 @@ import {
   AdminNotice,
   AdminSkeletonRows,
   StatusDot,
-  type Tone,
 } from '@/components/portal/admin-d/AdminUi';
 import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { downloadBlob } from '@/lib/export/csv';
 import type { OnboardingFileItem, OnboardingFileSummary } from '@/lib/onboarding/onboardingFile';
+import { onboardingFileItemStatus } from '@/lib/onboarding/onboardingFileStatus';
 import { OnboardingCategoryLabels } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
@@ -36,22 +36,6 @@ const PREFILL_LABELS: Record<string, string> = {
   taxClassification: 'Tax classification',
   accountType: 'Account type',
 };
-
-function itemStatus(item: OnboardingFileItem): { tone: Tone; label: string } {
-  if (item.onHold) return { tone: 'muted', label: 'On hold' };
-  switch (item.status) {
-    case 'approved':
-      return { tone: 'lime', label: 'Approved' };
-    case 'rejected':
-      return { tone: 'red', label: 'Rejected' };
-    case 'submitted':
-      return item.referenceKind === 'esign'
-        ? { tone: 'blue', label: 'Out for signature' }
-        : { tone: 'amber', label: 'Needs review' };
-    default:
-      return { tone: 'muted', label: 'Not started' };
-  }
-}
 
 function itemMeta(item: OnboardingFileItem): string[] {
   const lines: string[] = [];
@@ -282,7 +266,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
             ) : (
               <ul className={f.items}>
                 {file.items.map((item) => {
-                  const status = itemStatus(item);
+                  const status = onboardingFileItemStatus(item);
                   const opened = openedFiles[item.itemId];
                   return (
                     <li key={item.itemId} className={f.item}>

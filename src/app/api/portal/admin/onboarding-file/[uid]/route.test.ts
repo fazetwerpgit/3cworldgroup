@@ -272,8 +272,8 @@ describe('summary', () => {
       hasSignedPdf: true,
       prefill: { taxClassification: 'individual' },
     });
-    expect(byId.contract).toMatchObject({ hasSignedPdf: true });
-    expect(byId.direct_deposit).toMatchObject({ status: 'submitted', hasSignedPdf: false });
+    expect(byId.contract).toMatchObject({ hasSignedPdf: true, envelopeSent: true });
+    expect(byId.direct_deposit).toMatchObject({ status: 'submitted', hasSignedPdf: false, envelopeSent: false });
     expect(byId.dl_photos).toMatchObject({ hasFiles: true });
     // Never a decrypted number.
     expect(JSON.stringify(body)).not.toMatch(/123456789|123-45|D1234567/);

@@ -34,6 +34,8 @@ export interface OnboardingFileItem {
   reviewerName: string | null;
   /** E-sign item with a completed PDF to open. */
   hasSignedPdf: boolean;
+  /** E-sign item with an envelope created (sent to the person for signature). */
+  envelopeSent: boolean;
   /** Storage item with an upload folder on file. */
   hasFiles: boolean;
   /** Vendor or manual reference text (never a raw number; see looksLikeRawSensitiveData). */
@@ -159,6 +161,7 @@ export function buildOnboardingFileItems(source: OnboardingFileSource): Onboardi
         reviewedAt: day(doc?.reviewedAt),
         reviewerName: text(doc?.reviewerName) || null,
         hasSignedPdf: item.referenceKind === 'esign' && hasSignedPdf(doc),
+        envelopeSent: item.referenceKind === 'esign' && text(doc?.esignEnvelopeId) !== '',
         hasFiles: item.referenceKind === 'storage' && reference !== '',
         reference: item.referenceKind === 'vendor' || item.referenceKind === 'manual' ? reference || null : null,
         prefill,
