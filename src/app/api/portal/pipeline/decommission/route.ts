@@ -82,6 +82,8 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     await docRef.update({
       status: 'inactive',
+      // Read by the people route's activation gate on a later reactivation.
+      ...(data?.status && data.status !== 'inactive' ? { deactivatedFromStatus: data.status } : {}),
       decommission: {
         // Reinstate returns them here (a pending hire must not come back active).
         // An already-inactive user stores none; reinstate then derives it.
@@ -211,6 +213,7 @@ export async function DELETE(request: NextRequest) {
 
     await docRef.update({
       status,
+      deactivatedFromStatus: FieldValue.delete(),
       decommission: FieldValue.delete(),
       updatedAt: new Date(),
     });

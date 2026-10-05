@@ -83,6 +83,20 @@ export async function closeOutInvitesForUser(userId: string, now = new Date()): 
   await Promise.all(writes);
 }
 
+/**
+ * Readiness against the checklist of `fieldRole` (the role the user will hold
+ * after an edit), rather than the role stored now.
+ */
+export async function getActivationReadinessForRole(
+  userId: string,
+  fieldRole: FieldRole,
+  isIBO: boolean
+): Promise<ActivationReadiness> {
+  if (!adminDb) return { ready: false, missing: ['database'] };
+  if (!roleRequiresOnboarding(fieldRole)) return { ready: true, missing: [] };
+  return computeReadiness(getOnboardingItemsForUser(fieldRole, isIBO), await loadStatuses(userId));
+}
+
 /** Activate a ready user and send the single active-account notification. */
 export async function activateUser(
   userId: string

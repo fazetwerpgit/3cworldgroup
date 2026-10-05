@@ -96,9 +96,11 @@ import { writeAdminAudit } from '@/lib/audit/adminAudit';
 
 vi.mock('@/lib/audit/adminAudit', () => ({ writeAdminAudit: vi.fn(async () => undefined) }));
 const readinessMock = vi.hoisted(() =>
-  vi.fn<(userId: string) => Promise<{ ready: boolean; missing: string[] }>>(async () => ({ ready: true, missing: [] }))
+  vi.fn<(userId: string, fieldRole: string, isIBO: boolean) => Promise<{ ready: boolean; missing: string[] }>>(
+    async () => ({ ready: true, missing: [] })
+  )
 );
-vi.mock('@/lib/onboarding/activation', () => ({ getActivationReadiness: readinessMock }));
+vi.mock('@/lib/onboarding/activation', () => ({ getActivationReadinessForRole: readinessMock }));
 
 const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
 const mockResolveAlertTasks = resolveAlertTasks as unknown as ReturnType<typeof vi.fn>;
@@ -140,7 +142,8 @@ describe('PUT /api/portal/auth/users/[id] activation readiness gate', () => {
     const body = (await response.json()) as { error: string; missing: string[] };
     expect(body.missing).toEqual(['w9', 'contract']);
     expect(body.error).toContain('W-9, Contract');
-    expect(readinessMock).toHaveBeenCalledWith('pending-user');
+    // Checked against the checklist of the role they would hold.
+    expect(readinessMock).toHaveBeenCalledWith('pending-user', 'ae_tier_1', false);
     expect(firestore.updates).toHaveLength(0);
     expect(firestore.adminAuth.updateUser).not.toHaveBeenCalled();
   });
@@ -155,15 +158,56 @@ describe('PUT /api/portal/auth/users/[id] activation readiness gate', () => {
     expect(firestore.updates).toHaveLength(0);
   });
 
-  it('refuses a role change that would activate a hire mid-checklist immediately', async () => {
+  it('does not gate promoting a pending hire to a role with no checklist', async () => {
     pendingHire();
     readinessMock.mockResolvedValue({ ready: false, missing: ['w9'] });
 
-    const response = await PUT(request({ fieldRole: 'general_manager' }), params());
+    for (const body of [{ fieldRole: 'general_manager' }, { role: 'operations' }]) {
+      firestore.updates.length = 0;
+      pendingHire();
+      const response = await PUT(request(body), params());
+      expect(response.status).toBe(200);
+      expect(firestore.updates[0]?.data).toMatchObject({ status: 'active' });
+    }
+    expect(readinessMock).not.toHaveBeenCalled();
+  });
+
+  it('gates pending -> inactive -> active, and stamps where the account came from', async () => {
+    pendingHire();
+    readinessMock.mockResolvedValue({ ready: false, missing: ['w9'] });
+
+    const off = await PUT(request({ status: 'inactive' }), params());
+    expect(off.status).toBe(200);
+    expect(firestore.users.get('pending-user')).toMatchObject({ status: 'inactive', deactivatedFromStatus: 'pending' });
+
+    firestore.updates.length = 0;
+    const on = await PUT(request({ status: 'active' }), params());
+    expect(on.status).toBe(409);
+    expect(firestore.updates).toHaveLength(0);
+    expect(firestore.adminAuth.updateUser).not.toHaveBeenCalledWith('pending-user', { disabled: false });
+  });
+
+  it('gates an older inactive invite hire who was never activated (no activatedAt, no stamp)', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', fieldRole: 'entry_level_rep', onboardingInviteId: 'inv-1' });
+    readinessMock.mockResolvedValue({ ready: false, missing: ['contract'] });
+
+    const response = await PUT(request({ status: 'active' }), params());
 
     expect(response.status).toBe(409);
-    expect(firestore.updates).toHaveLength(0);
-    expect(mockResolveAlertTasks).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['deactivated while active', { deactivatedFromStatus: 'active', onboardingInviteId: 'inv-1' }],
+    ['activated before (activatedAt)', { activatedAt: new Date('2026-09-25'), onboardingInviteId: 'inv-1' }],
+    ['an older rep with no invite and no stamps', {}],
+  ])('never gates reactivating a rep %s', async (_label, extra) => {
+    firestore.users.set('pending-user', { status: 'inactive', fieldRole: 'ae_tier_1', ...extra });
+    readinessMock.mockResolvedValue({ ready: false, missing: ['w9'] });
+
+    const response = await PUT(request({ status: 'active' }), params());
+
+    expect(response.status).toBe(200);
+    expect(readinessMock).not.toHaveBeenCalled();
   });
 
   it('allows Accept once every item is approved', async () => {

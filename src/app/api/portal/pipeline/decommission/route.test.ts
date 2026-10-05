@@ -159,3 +159,25 @@ describe('reinstate restores the prior status', () => {
     expect(store.users.get('rep')).toMatchObject({ status: 'active', decommission: '__DELETE__' });
   });
 });
+
+describe('pipeline decommission and the activation gate', () => {
+  it('stamps the status the account had, and a hire decommissioned while pending is reinstated to pending', async () => {
+    store.users.set('rep-1', { displayName: 'Hire', fieldRole: 'entry_level_rep', status: 'pending' });
+
+    await POST(call('POST', { userId: 'rep-1', reason: 'non_activity' }));
+    expect(store.users.get('rep-1')).toMatchObject({ status: 'inactive', deactivatedFromStatus: 'pending' });
+
+    const res = await DELETE(call('DELETE', { userId: 'rep-1' }));
+    expect(res.status).toBe(200);
+    expect(store.users.get('rep-1')?.status).toBe('pending');
+  });
+
+  it('reinstates an active rep to active', async () => {
+    store.users.set('rep-1', { displayName: 'Rep', fieldRole: 'ae_tier_1', status: 'active' });
+
+    await POST(call('POST', { userId: 'rep-1', reason: 'non_activity' }));
+    await DELETE(call('DELETE', { userId: 'rep-1' }));
+
+    expect(store.users.get('rep-1')?.status).toBe('active');
+  });
+});

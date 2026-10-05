@@ -22,10 +22,28 @@ import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
 import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
-import { getActivationReadiness } from '@/lib/onboarding/activation';
+import { getActivationReadinessForRole } from '@/lib/onboarding/activation';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
+
+/**
+ * An inactive account that never went active: deactivated straight from
+ * pending (deactivatedFromStatus, stamped since this gate), or, for accounts
+ * deactivated before that stamp existed, an invite hire with no activatedAt.
+ * activatedAt is stamped by every activation path (activateUser and the
+ * pending -> active save here); hireDate is not a marker, the invite submit
+ * sets it on a pending hire. A rep activated before activatedAt existed
+ * (pre 2026-09-22) and deactivated before deactivatedFromStatus existed reads
+ * as never activated only if they came through an invite; they still pass if
+ * their checklist is complete, as the activation gate required since July.
+ */
+function neverActivated(doc: FirebaseFirestore.DocumentSnapshot): boolean {
+  const from = doc.get('deactivatedFromStatus');
+  if (from !== undefined) return from === 'pending';
+  if (doc.get('activatedAt')) return false;
+  return typeof doc.get('onboardingInviteId') === 'string';
+}
 
 // GET /api/portal/auth/users/[id] - Get a single user (management only)
 export async function GET(
@@ -326,16 +344,21 @@ export async function PUT(
     }
 
     // A hire on an onboarding checklist goes active only when it is complete,
-    // the same gate as /api/portal/onboarding/activate: an explicit Accept, or
-    // a role change that would activate them immediately. An owner who needs
-    // to skip an item marks it complete with a note (onboarding/mark-complete).
-    // Reactivating an inactive or decommissioned account is not gated.
-    if (
+    // the same gate as /api/portal/onboarding/activate. It covers an explicit
+    // Accept, a role change that activates immediately, and pending ->
+    // inactive -> active: an inactive account that was never activated (see
+    // neverActivated) is still a hire, not a rep being reactivated. The gate
+    // follows the role the user ends up with: promoting a pending hire to a
+    // role with no checklist (GM, office, platform) is not gated. An owner who
+    // needs to skip an item marks it complete (onboarding/mark-complete).
+    const resultingFieldRole: FieldRole | undefined =
+      role !== undefined ? undefined : fieldRole !== undefined ? fieldRole : existingFieldRole;
+    const previousStatus = doc.get('status');
+    const becomingActive =
       updateData.status === 'active' &&
-      doc.get('status') === 'pending' &&
-      roleRequiresOnboarding(existingFieldRole)
-    ) {
-      const readiness = await getActivationReadiness(id);
+      (previousStatus === 'pending' || (previousStatus === 'inactive' && neverActivated(doc)));
+    if (becomingActive && resultingFieldRole && roleRequiresOnboarding(resultingFieldRole)) {
+      const readiness = await getActivationReadinessForRole(id, resultingFieldRole, !!doc.get('isIBO'));
       if (!readiness.ready) {
         const labels = readiness.missing.map(
           (itemId) => ONBOARDING_ITEMS.find((item) => item.id === itemId)?.label ?? itemId
@@ -351,6 +374,11 @@ export async function PUT(
         );
       }
     }
+    // Remember what an account was before it went inactive, so a later
+    // reactivation can tell a rep (ungated) from a hire who never finished.
+    if (updateData.status === 'inactive' && previousStatus !== 'inactive') {
+      updateData.deactivatedFromStatus = previousStatus ?? null;
+    }
 
     // Update displayName in Firebase Auth if changed
     if (trimmedDisplayName) {
@@ -364,7 +392,14 @@ export async function PUT(
     // whose stored value actually changes are listed, and a save that changes
     // nothing writes no row.
     const changedFields = Object.keys(updateData).filter((key) => {
-      if (key === 'updatedAt' || key === 'activatedAt' || key === 'decommission') return false;
+      if (
+        key === 'updatedAt' ||
+        key === 'activatedAt' ||
+        key === 'decommission' ||
+        key === 'deactivatedFromStatus'
+      ) {
+        return false;
+      }
       const before = doc.get(key);
       const after = updateData[key];
       return after === FieldValue.delete()
