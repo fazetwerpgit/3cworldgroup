@@ -103,6 +103,8 @@ export async function GET(
       },
       items,
       locked: false,
+      // The page tells the candidate they sign on the next screen, not later.
+      signOnTheSpot: inviteSigningAvailable(),
     });
   } catch (error) {
     console.error('Error loading public onboarding invite:', error);

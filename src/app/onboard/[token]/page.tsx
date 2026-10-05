@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { AlertTriangle, Check, ChevronDown, LoaderCircle } from 'lucide-react';
@@ -16,6 +16,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import f from '@/components/portal/rep/rep-forms.module.css';
 import a from '@/components/auth/auth.module.css';
 import o from '@/components/onboarding/onboarding.module.css';
+import { InviteSignAll } from '@/components/onboarding/InviteSignAll';
 
 interface InviteView {
   id: string;
@@ -39,6 +40,29 @@ interface OnboardingResponse {
   closed?: boolean;
   /** The email is midway through another invite's onboarding. */
   onboardingElsewhere?: boolean;
+  /** In-house signing: the documents are signed on the next screen. */
+  signOnTheSpot?: boolean;
+}
+
+// The signing key from the packet submit, kept for this tab only so a reload
+// lands back on the signing step. Never in localStorage: it is a credential.
+const signingKeyStorage = (token: string) => `onboard-signing-key:${token}`;
+
+function readSigningKey(token: string): string | null {
+  try {
+    return window.sessionStorage.getItem(signingKeyStorage(token));
+  } catch {
+    return null;
+  }
+}
+
+function writeSigningKey(token: string, key: string | null) {
+  try {
+    if (key) window.sessionStorage.setItem(signingKeyStorage(token), key);
+    else window.sessionStorage.removeItem(signingKeyStorage(token));
+  } catch {
+    // Private mode or blocked storage: the step still works until a reload.
+  }
 }
 
 // Fields the POST can reject by name (its `field` key), and the control to mark.
@@ -79,6 +103,8 @@ export default function PublicOnboardingPage() {
   // restored from the back/forward cache can drop an answer that never came.
   const sendRef = useRef<AbortController | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // Set once the packet is in and the documents can be signed right here.
+  const [signingKey, setSigningKey] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [profile, setProfile] = useState({
     displayName: '',
@@ -109,6 +135,15 @@ export default function PublicOnboardingPage() {
     front: '',
     back: '',
   });
+
+  useEffect(() => {
+    if (token) setSigningKey(readSigningKey(token));
+  }, [token]);
+
+  const dropSigningKey = useCallback(() => {
+    writeSigningKey(token, null);
+    setSigningKey(null);
+  }, [token]);
 
   useEffect(() => {
     async function loadInvite() {
@@ -265,6 +300,10 @@ export default function PublicOnboardingPage() {
         }
         throw new Error(json.error || 'Failed to submit onboarding');
       }
+      if (typeof json.signingKey === 'string' && json.signingKey) {
+        writeSigningKey(token, json.signingKey);
+        setSigningKey(json.signingKey);
+      }
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
@@ -288,7 +327,7 @@ export default function PublicOnboardingPage() {
     !!references[item.id]?.trim() && (item.id !== 'dl_photos' || !!profile.dlNumber.trim());
   const completed = actionableItems.filter(isItemComplete).length;
   const total = actionableItems.length;
-  // E-sign items are signed in the portal after this form, so the count leaves them out.
+  // E-sign items are signed after this form (next screen or the portal), so the count leaves them out.
   const signLater = data ? data.items.length - total : 0;
   const roleLabel = data?.invite.intendedFieldRole
     ? RoleDisplayNames[data.invite.intendedFieldRole]
@@ -361,6 +400,10 @@ export default function PublicOnboardingPage() {
     );
   }
 
+  if (signingKey && (submitted || data?.locked) && !data?.existingAccount) {
+    return <InviteSignAll token={token} signingKey={signingKey} onSessionLost={dropSigningKey} />;
+  }
+
   if (submitted || data?.locked) {
     return (
       <AuthShell tag="Onboarding">
@@ -427,7 +470,8 @@ export default function PublicOnboardingPage() {
               </span>
               {signLater > 0 ? (
                 <p className={f.hint}>
-                  Plus {signLater} {signLater === 1 ? 'document' : 'documents'} you sign after you log in.
+                  Plus {signLater} {signLater === 1 ? 'document' : 'documents'} you sign{' '}
+                  {data?.signOnTheSpot ? 'on the next screen.' : 'after you log in.'}
                 </p>
               ) : null}
             </div>
@@ -659,7 +703,9 @@ export default function PublicOnboardingPage() {
                       </h3>
                       <p className={o.rowDesc}>
                         {esign
-                          ? ESIGN_HELPER_TEXT
+                          ? data?.signOnTheSpot
+                            ? 'You sign this on the next screen, right after you submit.'
+                            : ESIGN_HELPER_TEXT
                           : item.id === 'dl_photos'
                             ? 'Your license number and a photo of each side.'
                             : item.sensitive
@@ -826,6 +872,8 @@ export default function PublicOnboardingPage() {
                   <LoaderCircle size={18} className={f.spin} aria-hidden="true" />
                   Submitting
                 </>
+              ) : data?.signOnTheSpot ? (
+                'Submit and continue'
               ) : (
                 'Submit onboarding packet'
               )}

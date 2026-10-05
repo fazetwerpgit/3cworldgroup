@@ -1,0 +1,74 @@
+/* The invite link's sign-all step (/onboard/[token], after the packet).
+   Panels, pills and the page grid come from onboarding.module.css; fields and
+   buttons from the rep kits. This file holds only what signing adds. */
+
+.docHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+  min-width: 0;
+}
+
+.docHead > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.docBody {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+/* The pages scroll inside their own box so the fields stay in reach. */
+.pages {
+  max-height: 60vh;
+  /* svh: on an iPhone vh is the height with Safari's bars hidden. */
+  max-height: 60svh;
+  padding: 0 var(--s3) var(--s1);
+  overflow-y: auto;
+  /* PdfPages' zoom scroller owns the horizontal overflow. */
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+  background: var(--c-panel);
+}
+
+.docError {
+  margin: 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.signSection {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.status {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.status[data-state='error'] {
+  color: var(--c-red);
+}
+
+/* Clears the iPhone home indicator when the button is the last thing on the page. */
+.actions {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (min-width: 1024px) {
+  .pages {
+    max-height: 70vh;
+    max-height: 70svh;
+  }
+}
