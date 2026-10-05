@@ -245,8 +245,8 @@ export default function ContactPage() {
               <div className={styles.detail}>
                 <p className={styles.detailTerm}>Business hours</p>
                 <div className={styles.detailValue}>
-                  <span>Monday – Friday: 9am – 6pm EST</span>
-                  <span>Saturday: 10am – 4pm EST</span>
+                  <span>Monday – Friday: 9am – 6pm Central</span>
+                  <span>Saturday: 10am – 4pm Central</span>
                 </div>
               </div>
             </div>

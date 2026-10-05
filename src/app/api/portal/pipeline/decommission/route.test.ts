@@ -142,12 +142,16 @@ describe('reinstate restores the prior status', () => {
       onboardingInviteId: 'inv-2',
       activatedAt: new Date('2026-09-01'),
     });
+    // Activated before activatedAt existed and before invites were closed out.
+    store.users.set('vet-old-invite', { fieldRole: 'entry_rep', status: 'inactive', onboardingInviteId: 'inv-2' });
 
     await DELETE(call('DELETE', { userId: 'vet' }));
     await DELETE(call('DELETE', { userId: 'vet-invited' }));
+    await DELETE(call('DELETE', { userId: 'vet-old-invite' }));
 
     expect(store.users.get('vet')?.status).toBe('active');
     expect(store.users.get('vet-invited')?.status).toBe('active');
+    expect(store.users.get('vet-old-invite')?.status).toBe('active');
   });
 
   it('clears a stale decommission marker left on an active rep and keeps them active', async () => {

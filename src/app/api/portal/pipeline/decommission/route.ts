@@ -11,14 +11,15 @@ const VALID_REASONS: DecommissionReason[] = ['non_activity', 'wrongdoing', 'mana
 
 /**
  * True for an account that came in through an invite and never went active:
- * no activation stamp and the invite never converted. Veteran reps (no
- * invite, or activated) are false.
+ * no activation stamp and the invite still open or closed without a hire. A
+ * 'submitted'/'approved' invite counts as finished: before activation closed
+ * invites out, hires who went active left them at 'submitted'.
  */
 async function neverFinishedOnboarding(data: FirebaseFirestore.DocumentData | undefined): Promise<boolean> {
   const inviteId = data?.onboardingInviteId;
   if (!adminDb || typeof inviteId !== 'string' || data?.activatedAt) return false;
   const invite = await adminDb.collection('onboardingInvites').doc(inviteId).get();
-  return invite.exists && invite.data()?.status !== 'converted';
+  return ['invited', 'in_progress', 'rejected', 'expired'].includes(invite.data()?.status);
 }
 
 // POST /api/portal/pipeline/decommission - Deactivate a rep with an audit
