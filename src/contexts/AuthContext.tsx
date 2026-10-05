@@ -301,11 +301,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn('Failed to set auth displayName:', profileError);
       }
       try {
+        // Exactly the keys firestore.rules lets a client create users/{uid}
+        // with (hasOnly email/displayName/status/createdAt): any extra field
+        // is denied and the new account is rolled back.
         await setDoc(doc(db, 'users', cred.user.uid), {
           email,
           displayName,
           status: 'pending',
-          signupMethod: 'team_code',
           createdAt: serverTimestamp(),
         });
         void fetch('/api/portal/auth/signup-notify', {
