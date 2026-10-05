@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminQueue, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
+import { displayPhone } from '@/lib/phone';
 import { useMarkHandled } from '@/components/portal/admin-ops/useMarkHandled';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
@@ -75,7 +76,7 @@ export function ExpediteOrders() {
         detailFields: [
           { label: 'Order #', value: queueValue(row.orderNumber) },
           { label: 'Reason', value: queueValue(row.reason) },
-          { label: 'Phone', value: queueValue(row.customerPhone) },
+          { label: 'Phone', value: typeof row.customerPhone === 'string' && row.customerPhone ? displayPhone(row.customerPhone) : '—' },
           { label: 'Email', value: queueValue(row.customerEmail) },
           {
             label: 'Address',

@@ -1,5 +1,5 @@
 import { cleanDlNumber, cleanSsn } from '@/lib/onboarding/sensitiveFields';
-import { formatPhone } from '@/lib/sales/scan/normalize';
+import { formatPhone } from '@/lib/phone';
 import { last4 } from '@/lib/security/fieldEncryption';
 import { validateAddress, type AddressFields } from '@/lib/validation/address';
 import { isShirtSize, type ShirtSize } from '@/types/auth';

@@ -20,6 +20,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './recruiting.module.css';
 import { ApplicationRecord, ApplicationStatus } from '@/types';
+import { displayPhone, telHref } from '@/lib/phone';
 
 // Everyone who applied on the website (/apply), with the same gate as Invites:
 // the recruiting API serves both. Invite hands the applicant to the Invites tab,
@@ -59,10 +60,6 @@ function matchesSearch(application: ApplicationRecord, query: string): boolean {
   if (haystack.some((value) => value.includes(needle))) return true;
   const digits = needle.replace(/\D/g, '');
   return digits.length >= 3 && (application.phone ?? '').replace(/\D/g, '').includes(digits);
-}
-
-function telHref(phone: string): string {
-  return `tel:${phone.replace(/[^0-9+]/g, '')}`;
 }
 
 const applicationStatusTone: Record<ApplicationStatus, Tone> = {
@@ -243,7 +240,7 @@ export function Applicants() {
                       </span>
                       <span className={`${u.cell} ${r.phoneOnly}`} data-label="Phone">
                         <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
-                          {application.phone}
+                          {displayPhone(application.phone)}
                         </a>
                       </span>
                       <span className={`${u.cell} ${r.phoneOnly}`} data-label="Email">
@@ -254,7 +251,7 @@ export function Applicants() {
                       <span className={`${u.cell} ${r.deskOnly}`}>
                         <span className={r.stackValue}>
                           <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
-                            {application.phone}
+                            {displayPhone(application.phone)}
                           </a>
                           <a
                             className={`${u.cellSub} ${r.ellipsis} ${r.contact}`}

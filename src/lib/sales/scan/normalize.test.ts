@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanIsoDate, cleanOrderNumber, formatPhone, joinAddress, matchCarrier, matchPlanId, planTextMbps } from './normalize';
+import { cleanIsoDate, cleanOrderNumber, joinAddress, matchCarrier, matchPlanId, planTextMbps } from './normalize';
 
 describe('matchCarrier', () => {
   it.each([
@@ -42,11 +42,6 @@ describe('planTextMbps / matchPlanId', () => {
 });
 
 describe('field cleanup', () => {
-  it('formats a 10-digit US phone and drops anything else', () => {
-    expect(formatPhone('+1 512.555.0142')).toBe('(512) 555-0142');
-    expect(formatPhone('555-0142')).toBeNull();
-  });
-
   it('joins the address into the one line the form takes', () => {
     expect(joinAddress({ street: '9 Oak St', unit: '', city: 'Waco', state: 'tx', zip: '76701', confidence: 'high' })).toBe(
       '9 Oak St, Waco, TX 76701'

@@ -478,6 +478,61 @@
   color: var(--c-text-3);
 }
 
+/* A carrier row tied to the rep's own logged sale opens that sale. */
+.fiberRowOpen {
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .fiberRowOpen:hover {
+    background: var(--c-raised);
+  }
+}
+
+.fiberWho .fiberPhone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  min-height: var(--tap);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--c-line-strong);
+  text-underline-offset: 3px;
+}
+
+.fiberPhone svg {
+  color: var(--c-text-3);
+}
+
+.fiberDetails,
+.fiberNote {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--t-sm);
+}
+
+.fiberDetails {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 4px;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-lime-hi);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fiberNote {
+  color: var(--c-text-3);
+  line-height: 1.4;
+}
+
 /* ---------- loading / failed / zero ---------- */
 .skelBody {
   display: flex;

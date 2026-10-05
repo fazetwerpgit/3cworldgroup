@@ -1,4 +1,5 @@
 import { getPlansByCompany } from '@/types';
+import { formatPhone } from '@/lib/phone';
 import { weakerConfidence, type SaleScanFields, type ScanConfidence, type ScanValue } from './types';
 
 // Turns what the model read off a confirmation into values the Log Sale form
@@ -78,14 +79,6 @@ export function matchPlanId(company: string, planText: string | undefined): stri
     (plan) => plan.category !== 'extra' && catalogMbps(plan.speed) === mbps
   );
   return plans.length === 1 ? plans[0].id : null;
-}
-
-/** US phone as "(512) 555-0142"; anything that is not 10 digits is dropped. */
-export function formatPhone(raw: string): string | null {
-  let digits = raw.replace(/\D/g, '');
-  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
-  if (digits.length !== 10) return null;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
 /** The form's one-line address: "123 Main St Apt 4, Austin, TX 78701". */

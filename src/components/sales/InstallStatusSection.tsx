@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Phone } from 'lucide-react';
+import { displayPhone, telHref } from '@/lib/phone';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import type { FiberOrder, FiberOrderStatus, FiberStatusResponse, Sale } from '@/types';
@@ -203,18 +204,46 @@ export function fiberTone(bucket: FiberBucket): string {
   return TONE[bucket];
 }
 
-function FiberOrderRow({ order, showRepName = false }: { order: FiberOrder; showRepName?: boolean }) {
+interface FiberRowLinks {
+  /** The rep's own logged sale this carrier order belongs to, when there is one. */
+  saleFor?: (order: FiberOrder) => Sale | undefined;
+  /** Opens that sale's detail sheet. Given only where the viewer owns the sales. */
+  onOpenSale?: (saleId: string) => void;
+}
+
+function FiberOrderRow({ order, showRepName = false, saleFor, onOpenSale }: { order: FiberOrder; showRepName?: boolean } & FiberRowLinks) {
   const location = [order.city, order.state].filter(Boolean).join(', ');
   const date = relevantDate(order);
   const dateLabel = formatDate(date.value);
-  const loggedCustomerName = order.loggedCustomerName?.trim();
+  const sale = saleFor?.(order);
+  const saleId = sale?.id;
+  // The carrier report names the customer only on missed installs; a logged
+  // sale carries the name the rep typed.
+  const customerName = sale?.customerName?.trim() || order.loggedCustomerName?.trim() || order.customerName?.trim() || '';
+  const open = saleId && onOpenSale ? () => onOpenSale(saleId) : undefined;
 
   return (
-    <article className={x.fiberRow} data-part="fiber-row">
+    // The whole row opens the sale for a quick tap; the details button is the
+    // keyboard and screen-reader path, and the phone link calls without opening.
+    <article
+      className={`${x.fiberRow} ${open ? x.fiberRowOpen : ''}`}
+      data-part="fiber-row"
+      onClick={open}
+    >
       <div className={x.fiberWho}>
-        <strong>{loggedCustomerName || order.address || 'Address unavailable'}</strong>
-        {loggedCustomerName && <span>{order.address || 'Address unavailable'}</span>}
+        <strong>{customerName || order.address || 'Address unavailable'}</strong>
+        {customerName && <span>{order.address || 'Address unavailable'}</span>}
         {location && <span>{location}</span>}
+        {sale?.customerPhone ? (
+          <a
+            className={x.fiberPhone}
+            href={telHref(sale.customerPhone)}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <Phone size={14} aria-hidden="true" />
+            {displayPhone(sale.customerPhone)}
+          </a>
+        ) : null}
       </div>
       <div className={x.fiberMeta}>
         {showRepName && order.repName && <span>{order.repName}</span>}
@@ -224,19 +253,36 @@ function FiberOrderRow({ order, showRepName = false }: { order: FiberOrder; show
         {order.status === 'breakage' && order.breakageNotes && (
           <span title={order.breakageNotes}>{truncateNotes(order.breakageNotes)}</span>
         )}
-        {order.status === 'breakage' && order.customerName && <span>{order.customerName}</span>}
       </div>
       <div className={x.fiberPill}>
         <FiberStatusPill status={order.status} />
       </div>
+      {open ? (
+        <button
+          type="button"
+          className={x.fiberDetails}
+          onClick={(event) => {
+            event.stopPropagation();
+            open();
+          }}
+        >
+          Customer details <ChevronRight size={14} aria-hidden="true" />
+        </button>
+      ) : onOpenSale ? (
+        <p className={x.fiberNote}>
+          Not logged in the portal, so there is no phone number for it. The carrier report only lists the address.
+        </p>
+      ) : null}
     </article>
   );
 }
 
-export function FiberRows({ orders, showRepName = false }: { orders: FiberOrder[]; showRepName?: boolean }) {
+export function FiberRows({ orders, showRepName = false, saleFor, onOpenSale }: { orders: FiberOrder[]; showRepName?: boolean } & FiberRowLinks) {
   return (
     <div data-part="fiber-list">
-      {orders.map((order) => <FiberOrderRow key={order.id} order={order} showRepName={showRepName} />)}
+      {orders.map((order) => (
+        <FiberOrderRow key={order.id} order={order} showRepName={showRepName} saleFor={saleFor} onOpenSale={onOpenSale} />
+      ))}
     </div>
   );
 }

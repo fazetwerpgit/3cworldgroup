@@ -35,6 +35,7 @@ import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import { InstallStatusLine } from './InstallStatusLine';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import { displayPhone, telHref } from '@/lib/phone';
 
 interface SaleDetailSheetProps {
   sale: Sale | null;
@@ -439,9 +440,9 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
             <div className={x.dKv}>
               <span>Phone</span>
               {sale.customerPhone ? (
-                <a className={x.dPhone} href={`tel:${sale.customerPhone.replace(/[^0-9+]/g, '')}`}>
+                <a className={x.dPhone} href={telHref(sale.customerPhone)}>
                   <Phone size={16} aria-hidden="true" />
-                  {sale.customerPhone}
+                  {displayPhone(sale.customerPhone)}
                 </a>
               ) : (
                 <span className={x.dNone}>No phone provided</span>

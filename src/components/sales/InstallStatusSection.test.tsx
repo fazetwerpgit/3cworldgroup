@@ -12,7 +12,7 @@ import type { FiberOrder, FiberStatusResponse, Sale } from '@/types';
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: async () => 'test-token' }));
 vi.mock('@/hooks/useFiberStatus', () => ({ useFiberStatus: () => ({ data: null, loading: false, error: null, refetch: async () => {} }) }));
 
-import { InstallStatusSection } from './InstallStatusSection';
+import { FiberRows, InstallStatusSection } from './InstallStatusSection';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -153,5 +153,52 @@ describe('before the first answer arrives', () => {
   it('a rep still sees nothing', async () => {
     await render({ fiber: { data: null, loading: false, error: 'Network down', refetch: async () => {} } });
     expect(container.innerHTML).toBe('');
+  });
+});
+
+describe("a rep's carrier rows (Pending install, Cancelled, Needs attention)", () => {
+  const churned = order({ id: 'TMO-CH', status: 'churned', address: '12 ELM ST' });
+  const pending = order({ id: 'TMO-PI', status: 'pending_install', address: '9 OAK ST' });
+  const logged = sale({ id: 's-ch', customerName: 'Dana Ruiz', customerPhone: '5155550123' });
+
+  async function renderRows(onOpenSale = vi.fn()) {
+    await act(async () => {
+      root.render(
+        <FiberRows
+          orders={[churned, pending]}
+          saleFor={(o) => (o.id === churned.id ? logged : undefined)}
+          onOpenSale={onOpenSale}
+        />
+      );
+    });
+    return [...container.querySelectorAll<HTMLElement>('[data-part="fiber-row"]')];
+  }
+
+  it('shows the logged customer and a readable, callable phone, and opens the sale', async () => {
+    const onOpenSale = vi.fn();
+    const [row] = await renderRows(onOpenSale);
+
+    expect(row.textContent).toContain('Dana Ruiz');
+    const phone = row.querySelector<HTMLAnchorElement>('a[href^="tel:"]');
+    expect(phone?.textContent).toBe('(515) 555-0123');
+    expect(phone?.getAttribute('href')).toBe('tel:5155550123');
+
+    await act(async () => { phone?.click(); });
+    expect(onOpenSale).not.toHaveBeenCalled();
+
+    const details = [...row.querySelectorAll('button')].find((b) => b.textContent?.includes('Customer details'));
+    await act(async () => { details?.click(); });
+    expect(onOpenSale).toHaveBeenCalledWith('s-ch');
+  });
+
+  it('says why a row with no logged sale has no phone, and does not pretend to open', async () => {
+    const onOpenSale = vi.fn();
+    const [, row] = await renderRows(onOpenSale);
+
+    expect(row.textContent).toContain('9 OAK ST');
+    expect(row.textContent).toContain('Not logged in the portal');
+    expect(row.querySelector('button')).toBeNull();
+    await act(async () => { row.click(); });
+    expect(onOpenSale).not.toHaveBeenCalled();
   });
 });

@@ -183,6 +183,16 @@ export function SalesTable({
     () => matchFiberOrdersToSales(sales, fiberOrders),
     [fiberOrders, sales]
   );
+  // The reverse: which of the rep's own sales a carrier order belongs to, so a
+  // carrier row can open that sale (name, phone, order number).
+  const saleByOrderId = useMemo(() => {
+    const byId = new Map<string, Sale>();
+    for (const sale of sales) {
+      const order = fiberBySale.get(sale.id || '');
+      if (order) byId.set(order.id, sale);
+    }
+    return byId;
+  }, [fiberBySale, sales]);
   const monthSales = useMemo(
     () => (month ? salesSoldIn(sales, month) : sales),
     [month, sales]
@@ -236,8 +246,6 @@ export function SalesTable({
 
   // The rows actually on screen — the ledger, or the pay list.
   const listSales = showPay ? paySales : monthSales;
-  const selectedIndex = selectedId ? listSales.findIndex((sale) => sale.id === selectedId) : -1;
-  const selectedSale = selectedIndex >= 0 ? listSales[selectedIndex] : null;
 
   // The just-logged row plays its arrival on the first render that has it, and
   // only then: the mark clears once it has played, or after 10s if it never
@@ -278,13 +286,22 @@ export function SalesTable({
   }, [fiberOrders, fiberView]);
   // The fiber filter only shows on the Sales tab; Pay keeps it parked for the way back.
   const showFiberView = fiberView !== null && !showPay;
+  // The sheet steps through what is on screen: the carrier rows that belong to
+  // a logged sale when a carrier view is open, otherwise the ledger or pay list.
+  const fiberViewSales = useMemo(
+    () => fiberBucketOrders.flatMap((order) => saleByOrderId.get(order.id) ?? []),
+    [fiberBucketOrders, saleByOrderId]
+  );
+  const sheetSales = showFiberView ? fiberViewSales : listSales;
+  const selectedIndex = selectedId ? sheetSales.findIndex((sale) => sale.id === selectedId) : -1;
+  const selectedSale = selectedIndex >= 0 ? sheetSales[selectedIndex] : null;
 
   const moveSelection = useCallback((direction: number) => {
-    if (!listSales.length) return;
-    const current = listSales.findIndex((sale) => sale.id === selectedId);
-    const next = (current + direction + listSales.length) % listSales.length;
-    setSelectedId(listSales[next]?.id || null);
-  }, [listSales, selectedId]);
+    if (!sheetSales.length) return;
+    const current = sheetSales.findIndex((sale) => sale.id === selectedId);
+    const next = (current + direction + sheetSales.length) % sheetSales.length;
+    setSelectedId(sheetSales[next]?.id || null);
+  }, [sheetSales, selectedId]);
 
   useEffect(() => {
     if (!selectedSale) return;
@@ -409,7 +426,11 @@ export function SalesTable({
             <p className={x.srcNote}>
               From the provider report · updated {formatDate(fiber?.data?.lastReportAt)}
             </p>
-            <FiberRows orders={fiberBucketOrders} />
+            <FiberRows
+              orders={fiberBucketOrders}
+              saleFor={(order) => saleByOrderId.get(order.id)}
+              onOpenSale={setSelectedId}
+            />
           </div>
         ) : showPay ? (
           <div className={x.ledgerBody}>
@@ -586,7 +607,7 @@ export function SalesTable({
 
       <SaleDetailSheet
         sale={selectedSale}
-        total={listSales.length}
+        total={sheetSales.length}
         index={selectedIndex}
         open={!!selectedSale}
         onOpenChange={(open) => { if (!open) setSelectedId(null); }}

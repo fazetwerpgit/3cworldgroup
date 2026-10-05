@@ -36,6 +36,7 @@ import { FIBER_COMPANIES, SALE_TYPES, SaleStatusConfig, type Sale } from '@/type
 import { BodyLayer } from './BodyLayer';
 import { useAttachmentViewer } from './ImageViewer';
 import { formatDay, formatMoney, formatPrice, num } from './saleFormat';
+import { displayPhone, telHref } from '@/lib/phone';
 import s from './rep.module.css';
 import x from './rep-sale.module.css';
 
@@ -433,9 +434,9 @@ export function RepSaleDetail() {
               </Row>
               <Row label="Phone">
                 {sale.customerPhone ? (
-                  <a className={x.link} href={`tel:${sale.customerPhone.replace(/[^0-9+]/g, '')}`}>
+                  <a className={x.link} href={telHref(sale.customerPhone)}>
                     <Phone size={16} aria-hidden="true" />
-                    {sale.customerPhone}
+                    {displayPhone(sale.customerPhone)}
                   </a>
                 ) : (
                   <span className={x.none}>Not provided</span>
