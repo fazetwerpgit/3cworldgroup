@@ -99,7 +99,7 @@ export function UserForm({ user }: UserFormProps) {
   // land off screen where it reads as nothing happening.
   const errorRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (error) errorRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    if (error) errorRef.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
   }, [error]);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);

@@ -207,7 +207,7 @@ export function InviteSignAll({ token, signingKey, onSessionLost }: Props) {
   const reveal = (itemId: string) => {
     setOpen((current) => ({ ...current, [itemId]: true }));
     requestAnimationFrame(() =>
-      document.getElementById(`sign-doc-${itemId}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      document.getElementById(`sign-doc-${itemId}`)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' })
     );
   };
 

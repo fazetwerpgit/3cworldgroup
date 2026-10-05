@@ -66,6 +66,8 @@ beforeEach(() => {
   root = createRoot(container);
   window.sessionStorage.clear();
   window.scrollTo = vi.fn();
+  // jsdom has no layout: scrolling a document into view is a no-op here.
+  Element.prototype.scrollIntoView = vi.fn();
   saveSignature({ png: PNG, method: 'draw' });
   signAnswers = {};
   signedEnvelopes.length = 0;
@@ -107,6 +109,25 @@ async function click(el: HTMLElement) {
 }
 
 describe('InviteSignAll', () => {
+  it('does not throw where scrollIntoView is missing', async () => {
+    const original = Element.prototype.scrollIntoView;
+    // @ts-expect-error simulating an environment without scrollIntoView
+    delete Element.prototype.scrollIntoView;
+    VIEW.documents[0] = { ...doc('w9', 'W-9'), envelope: { ...doc('w9', 'W-9').envelope!, docKey: 'w9' } };
+    try {
+      await render();
+      await click(container.querySelector('input[type="checkbox"]') as HTMLInputElement);
+      await click(button(/Sign all 3 documents/));
+      await act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      });
+      expect(container.textContent).toContain('W-9: Enter your SSN or EIN.');
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      VIEW.documents[0] = doc('w9', 'W-9');
+    }
+  });
+
   it('will not sign while a document still needs information, and opens it', async () => {
     VIEW.documents[0] = { ...doc('w9', 'W-9'), envelope: { ...doc('w9', 'W-9').envelope!, docKey: 'w9' } };
     try {
@@ -116,6 +137,11 @@ describe('InviteSignAll', () => {
       expect(signedEnvelopes).toEqual([]);
       expect(container.textContent).toContain('W-9: Enter your SSN or EIN.');
       expect(container.querySelector('[data-testid="pdf"]')).toBeTruthy();
+      // The blocked document is brought into view on the next frame.
+      await act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      });
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
     } finally {
       VIEW.documents[0] = doc('w9', 'W-9');
     }
