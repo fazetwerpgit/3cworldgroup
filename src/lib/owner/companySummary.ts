@@ -1,8 +1,9 @@
-import type { CompPlanCompanyRates, CompPlanMargin, CompPlanRates, FiberOrder, Sale } from '@/types';
+import type { CompPlanMargin, CompPlanRates, FiberOrder, Sale } from '@/types';
 import { rateFor, resolveCompRole } from '@/types/compPlan';
 import { periodBounds } from '@/lib/leaderboard/periods';
 import { carrierInstallDate } from '@/lib/sales/carrierInstall';
 import { buildMergedBook } from '@/lib/sales/mergeBook';
+import { saleRevenue } from '@/lib/owner/revenue';
 
 // The owner's company view: money, what needs attention, recruiting. Pure and
 // framework-free — every read comes through an injected OwnerSummarySource, so
@@ -190,11 +191,6 @@ function sumProducts(sale: Sale, rateOf: (company: string, planId: string) => nu
   }, 0);
 }
 
-function companyRate(table: CompPlanCompanyRates, company: string, planId: string): number {
-  const value = table[company]?.[planId];
-  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
-}
-
 export interface PricedInstall extends InstallRecord {
   revenue: number;
   commission: number;
@@ -211,7 +207,7 @@ export function priceInstalls(
     const compRole = rep ? resolveCompRole(rep.fieldRole, rep.role) : null;
     return {
       ...install,
-      revenue: sumProducts(install.sale, (company, planId) => companyRate(plan.margin, company, planId)),
+      revenue: saleRevenue(install.sale, plan.margin),
       commission: compRole
         ? sumProducts(install.sale, (company, planId) => rateFor(plan.rates, compRole, company, planId))
         : 0,

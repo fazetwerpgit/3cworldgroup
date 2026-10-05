@@ -344,13 +344,6 @@
   overflow-wrap: anywhere;
 }
 
-.planPrice {
-  font-size: var(--t-ui);
-  font-weight: 600;
-  text-align: right;
-  white-space: nowrap;
-}
-
 .planPts {
   grid-column: 3;
   color: var(--c-text-2);

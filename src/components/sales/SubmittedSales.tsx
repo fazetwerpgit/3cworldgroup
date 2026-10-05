@@ -23,10 +23,6 @@ import x from '@/components/portal/rep/rep-sales.module.css';
 // The address leads every row for the same reason as before: reading down the
 // column looking for one street is the entire job these rows do.
 
-function formatMoney(value: number) {
-  return `$${Math.round(value).toLocaleString('en-US')}`;
-}
-
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return null;
   const date = new Date(value as Date | string);
@@ -66,7 +62,7 @@ export function SubmittedRows({ sales }: { sales: Sale[] }) {
           <Link className={x.subRow} data-part="sub-row" key={sale.id} href={`/portal/sales/${sale.id}`}>
             <span className={x.subAddr} data-part="sub-addr">{sale.customerAddress || 'No address given'}</span>
             <span className={x.bVal}>
-              <b>{formatMoney(sale.totalValue || 0)}</b>/mo
+              <b>{sale.totalPoints || 0}</b> pts
             </span>
             <span className={x.subWho}>
               {[sale.customerName || 'No customer name', planSummary(sale)]

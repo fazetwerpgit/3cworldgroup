@@ -103,7 +103,7 @@ async function render(
   sales: Sale[],
   orders: FiberOrder[],
   month: MonthKey | undefined,
-  extra?: { truncated?: boolean }
+  extra?: { truncated?: boolean; margin?: Record<string, Record<string, number>> }
 ) {
   await act(async () => {
     root.render(
@@ -111,6 +111,7 @@ async function render(
         sales={sales}
         month={month}
         truncated={extra?.truncated}
+        margin={extra?.margin ?? null}
         fiber={{
           data: { scope: 'all', lastReportAt: null, orders, unmatched: [] },
           loading: false,
@@ -507,5 +508,40 @@ describe('the board re-reads the clock when the feeds come back', () => {
     vi.setSystemTime(at(9, 12));
     await render([{ ...sale }], [], SEPTEMBER);
     expect(container.querySelector(chip)?.textContent).toMatch(/^Installed /);
+  });
+});
+
+describe('what the board totals instead of the monthly plan price', () => {
+  const twoGig = {
+    ...backDatedSale,
+    saleDate: monthsAgo(0, 2),
+    totalValue: 70,
+    totalPoints: 10,
+    products: [{ company: 'tfiber', productId: 'tfiber-2gig', quantity: 1 }],
+  } as unknown as Sale;
+  const margin = { tfiber: { 'tfiber-2gig': 560 } };
+  const figure = (label: string) =>
+    [...container.querySelectorAll('[data-part="fig"]')].find((fig) => fig.querySelector('span')?.textContent === label)
+      ?.querySelector('strong')?.textContent;
+
+  it('shows the owner what 3C is paid, never the $/mo plan price', async () => {
+    viewer.role = 'owner';
+    await render([twoGig], [], thisMonth(), { margin });
+    await openRep();
+
+    expect(figure('3C revenue')).toBe('$560');
+    expect(container.querySelector('[data-part="rep"]')?.textContent).toContain('$560');
+    expect(container.querySelector('[data-part="board-row"]')?.textContent).toContain('$560');
+    expect(container.textContent).not.toMatch(/\/\s?mo|Value/);
+  });
+
+  it('shows an admin (no revenue table) points instead', async () => {
+    await render([twoGig], [], thisMonth(), { margin });
+    await openRep();
+
+    expect(figure('Points')).toBe('10 pts');
+    expect(figure('3C revenue')).toBeUndefined();
+    expect(container.textContent).not.toContain('$560');
+    expect(container.textContent).not.toMatch(/\/\s?mo/);
   });
 });

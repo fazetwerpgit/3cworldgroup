@@ -70,6 +70,8 @@ interface SaleDetailSheetProps {
    * out, the sale's stored commission shows, unless the sale is cancelled.
    */
   estPay?: number | null;
+  /** What 3C is paid for this sale. Passed only on the owner's board. */
+  revenue?: number | null;
 }
 
 /** A legacy free-text carrier has no mark; show its name rather than nothing. */
@@ -129,6 +131,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
     payout = null,
     fiberOrder = null,
     estPay,
+    revenue = null,
   } = closing ? kept : props;
   /** Index of the screenshot being fetched, or null when none is. */
   const [proofLoading, setProofLoading] = useState<number | null>(null);
@@ -348,7 +351,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
             </p>
           )}
 
-          {/* The money sits in a well at the top: est. pay, then the value and points behind it. */}
+          {/* The money sits in a well at the top: est. pay, then points (and, for the owner, 3C revenue). */}
           <div className={x.dMoney}>
             <div>
               <span className={s.kicker}>Est. pay</span>
@@ -357,7 +360,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
               </span>
             </div>
             <dl className={x.dSummary}>
-              <div><dt>Monthly value</dt><dd>{formatMoney(sale.totalValue || 0)}</dd></div>
+              {revenue !== null && <div><dt>3C revenue</dt><dd>{formatMoney(revenue)}</dd></div>}
               <div><dt>Points</dt><dd>{sale.totalPoints || 0}</dd></div>
             </dl>
           </div>
@@ -422,7 +425,6 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
                 <div className={x.dPlan} key={`${product.productId}-${productIndex}`}>
                   {carrierName(product.company) ? <span className={x.carrierMark}>{carrierName(product.company)}</span> : null}
                   <strong>{planWithoutCarrier(product.productName, product.company)}</strong>
-                  <b>{formatMoney(product.totalPrice || product.unitPrice)}/mo</b>
                   <em>{product.points} pts</em>
                 </div>
               ))}

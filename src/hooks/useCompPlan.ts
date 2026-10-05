@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAY_DELAY_DAYS } from '@/types';
-import type { CompPlanCompanyRates, CompPlanResponse, CompPlanRole } from '@/types';
+import type { CompPlanCompanyRates, CompPlanMargin, CompPlanResponse, CompPlanRole } from '@/types';
 
 export interface CompPlanResult {
   /** The caller's own rates, company → planId → dollars. Null when their role has no slice. */
@@ -12,6 +12,8 @@ export interface CompPlanResult {
   compRole: CompPlanRole | null;
   payDelayDays: number;
   hasPlan: boolean;
+  /** "3C Receives" per product. Only an owner ever gets this from the server; null for everyone else. */
+  margin: CompPlanMargin | null;
   loading: boolean;
   /**
    * The rates could not be fetched. Distinct from "no plan assigned": the rep
@@ -31,6 +33,7 @@ const EMPTY: PlanState = {
   payDelayDays: PAY_DELAY_DAYS,
   hasPlan: false,
   error: false,
+  margin: null,
 };
 
 /**
@@ -91,6 +94,7 @@ export function useCompPlan(): CompPlanResult {
           payDelayDays: data.payDelayDays ?? PAY_DELAY_DAYS,
           hasPlan: !!rates,
           error: false,
+          margin: data.margin ?? null,
         });
       } catch (error) {
         // Expected pay is supporting information: a failed fetch never breaks
@@ -117,6 +121,7 @@ export function useCompPlan(): CompPlanResult {
     hasPlan: settled && plan.hasPlan,
     loading,
     error: settled && plan.error,
+    margin: settled ? plan.margin : null,
     retry,
   };
 }

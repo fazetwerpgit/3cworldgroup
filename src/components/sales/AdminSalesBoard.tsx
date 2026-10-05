@@ -2,7 +2,8 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { FIBER_COMPANIES, RoleDisplayNames, isOwner } from '@/types';
-import type { CompPlanCompanyRates, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
+import type { CompPlanCompanyRates, CompPlanMargin, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
+import { saleRevenue } from '@/lib/owner/revenue';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
@@ -64,6 +65,8 @@ interface AdminSalesBoardProps {
     hasPlan: boolean;
     compRole: CompPlanRole | null;
   };
+  /** "3C Receives" per product. Only an owner has it; the board shows 3C revenue from it. */
+  margin?: CompPlanMargin | null;
   /** Refetches the book after the detail sheet edits a sale's install date. */
   onSaleUpdated?: () => void;
 }
@@ -171,9 +174,6 @@ function orderLine(order: FiberOrder): string {
   const estimated = formatCarrierDate(order.estInstallDate);
   if (activated) bits.push(`Activated ${activated}`);
   else if (estimated) bits.push(`Install est. ${estimated}`);
-  if (typeof order.mrc === 'number' && Number.isFinite(order.mrc)) {
-    bits.push(`carrier ${formatMoney(order.mrc)}/mo`);
-  }
   return bits.join(' · ') || 'In the carrier report';
 }
 
@@ -244,7 +244,7 @@ function carrierTime(value: string | null | undefined): number | null {
   return Number.isNaN(date.getTime()) ? null : date.getTime();
 }
 
-export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, onSetCancelled, fiber, payPlan, onSaleUpdated }: AdminSalesBoardProps) {
+export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, onSetCancelled, fiber, payPlan, margin = null, onSaleUpdated }: AdminSalesBoardProps) {
   const { user, isRole } = useAuth();
   const isAdmin = isRole('admin');
   // Owner is a tier ABOVE admin, so this cannot be a permission check — every
@@ -295,7 +295,17 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
 
   const counts = book.counts;
   const countedCount = counts.installed + counts.scheduled + counts.attention;
-  const monthValue = book.totalValue;
+  // The owner reads what 3C is paid per sale ("3C Receives" in Pay rates);
+  // anyone without that table (an admin) reads points. The customer's monthly
+  // plan price is not a number the office runs on (owner, 2026-10-05).
+  const revenueTable = ownerView ? margin : null;
+  const figureOf = (sale: Sale | null) =>
+    !sale ? 0 : revenueTable ? saleRevenue(sale, revenueTable) : (sale.totalPoints ?? 0);
+  const showFigure = (value: number) => (revenueTable ? formatMoney(value) : `${Math.round(value)} pts`);
+  const figureLabel = revenueTable ? '3C revenue' : 'Points';
+  const repFigure = (rows: MergedRow[]) => rows.reduce((sum, row) => sum + (row.counted ? figureOf(row.sale) : 0), 0);
+  const monthFigure = repFigure(book.rows);
+  const repsByFigure = [...book.reps].sort((a, b) => repFigure(b.rows) - repFigure(a.rows) || b.count - a.count);
 
   // Drawer 1 carries the open rows and the settled ones together: a dismissal
   // is the answer to a not-logged row, so it belongs where the question was
@@ -556,7 +566,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           {row.customerName || row.address || 'Customer pending'}
         </span>
         <span className={x.bVal}>
-          <b>{formatMoney(row.value)}</b>/mo
+          <b>{showFigure(figureOf(sale))}</b>
         </span>
         <span className={x.bProd}>
           {cancelled
@@ -571,7 +581,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         )}
         {row.state === 'agreed' && gap && (
           <span className={`${x.bNote} ${x.bNoteWarn}`} data-part="gap-note">
-            Check · carrier has {formatMoney(gap.carrierMrc)}/mo
+            Check plan · the carrier report shows a different plan
           </span>
         )}
       </div>
@@ -670,8 +680,8 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                 <span>Sales</span>
               </div>
               <div className={x.fig} data-part="fig">
-                <strong>{formatMoney(monthValue)}<small>/ mo</small></strong>
-                <span>Value</span>
+                <strong>{showFigure(monthFigure)}</strong>
+                <span>{figureLabel}</span>
               </div>
               {/* Carrier installs with no sale in the portal. It is NOT a count
                   of people owed money: the company is only just starting to log
@@ -712,14 +722,14 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           <section className={s.panel} aria-labelledby="board-reps-h">
             <div className={`${s.panelHead} ${x.panelHead}`}>
               <h2 id="board-reps-h" className={s.kicker}>By rep</h2>
-              <p className={x.panelMeta}>Value / mo</p>
+              <p className={x.panelMeta}>{figureLabel}</p>
             </div>
 
             {book.reps.length === 0 && !loading && (
               <p className={x.empty}>No sales logged this month.</p>
             )}
 
-            {book.reps.map((rep) => {
+            {repsByFigure.map((rep) => {
               const open = openRepId === rep.repId;
               const summary = countsSummary(rep.counts);
               return (
@@ -734,7 +744,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                     <ChevronRight className={x.chev} size={18} aria-hidden="true" />
                     <span className={x.exName}>{rep.repName}</span>
                     <span className={x.exSide}>
-                      <span className={x.money}>{formatMoney(rep.value)}</span>
+                      <span className={x.money}>{showFigure(repFigure(rep.rows))}</span>
                     </span>
                     {/* "5 installed · 2 scheduled · 1 not in the portal" — only the last
                         part is red, because only the last part is a problem. */}
@@ -925,6 +935,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         onSaleUpdated={onSaleUpdated}
         payout={selectedPayout}
         fiberOrder={selectedOrder}
+        revenue={revenueTable && selectedSale ? saleRevenue(selectedSale, revenueTable) : null}
       />
 
       <LinkOrderDialog

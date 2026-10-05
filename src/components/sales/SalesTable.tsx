@@ -258,9 +258,9 @@ export function SalesTable({
     return () => clearTimeout(timer);
   }, [arriving, arrivingShown]);
   const arriveClass = (sale: Sale) => (arriving && sale.id === arriving ? x.arrive : '');
-  // The total under the list is MONEY, so a cancellation leaves it — whoever
-  // cancelled it, us or the carrier. The row itself stays on screen, marked.
-  const totalValue = countedSales(listSales, fiberBySale).reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
+  // Points under the list, like the Board: a cancellation drops out of it,
+  // whoever cancelled it, us or the carrier. The row itself stays on screen, marked.
+  const totalPoints = countedSales(listSales, fiberBySale).reduce((sum, sale) => sum + (sale.totalPoints || 0), 0);
   // Whole dollars per row first, as each row prints, so the total adds up.
   const expectedTotal = hasPlan
     ? listSales.reduce((sum, sale) => sum + Math.round(expectedBySale[sale.id || ''] ?? 0), 0)
@@ -546,7 +546,7 @@ export function SalesTable({
               <span className={x.lhStamp}>Sold</span>
               <span>Customer</span>
               <span>Status</span>
-              <span className={x.num}>Value</span>
+              <span className={x.num}>Points</span>
               <span className={x.num}>Est. pay</span>
               {isAdmin && <span />}
             </div>
@@ -576,7 +576,7 @@ export function SalesTable({
                           {[salePlan(sale, mark), sale.customerAddress].filter(Boolean).join(' · ')}
                         </span>
                       </span>
-                      <span className={x.sValue}>{formatMoney(sale.totalValue || 0)}/mo</span>
+                      <span className={x.sValue}>{sale.totalPoints || 0} pts</span>
                       <span className={x.cActions}>{rowActions(sale)}</span>
                     </div>
                   );
@@ -593,7 +593,7 @@ export function SalesTable({
             )}
             <div className={x.ledgerTotals}>
               <span>
-                <b>{listSales.length}</b> {listSales.length === 1 ? 'sale' : 'sales'} · <b>{formatMoney(totalValue)}</b>/mo value
+                <b>{listSales.length}</b> {listSales.length === 1 ? 'sale' : 'sales'} · <b>{totalPoints}</b> pts
               </span>
               {hasPlan && (
                 <span className={x.totalsPay}>

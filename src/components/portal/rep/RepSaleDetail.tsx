@@ -35,7 +35,7 @@ import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { FIBER_COMPANIES, SALE_TYPES, SaleStatusConfig, type Sale } from '@/types';
 import { BodyLayer } from './BodyLayer';
 import { useAttachmentViewer } from './ImageViewer';
-import { formatDay, formatMoney, formatPrice, num } from './saleFormat';
+import { formatDay, formatMoney, num } from './saleFormat';
 import { displayPhone, telHref } from '@/lib/phone';
 import s from './rep.module.css';
 import x from './rep-sale.module.css';
@@ -471,9 +471,6 @@ export function RepSaleDetail() {
                       <span className={x.planName}>
                         {planWithoutCarrier(product.productName || product.productId || 'Plan', product.company)}
                       </span>
-                      <span className={x.planPrice}>
-                        {formatPrice(num(product.totalPrice) || num(product.unitPrice))}/mo
-                      </span>
                       <span className={x.planPts}>{num(product.points)} pts</span>
                     </div>
                   );
@@ -482,9 +479,6 @@ export function RepSaleDetail() {
                 <p className={`${x.hint} ${x.none}`}>{sale.productSold || 'Plan not set'}</p>
               )}
               <div className={x.totals}>
-                <span>
-                  Monthly value <b>{formatMoney(sale.totalValue)}</b>
-                </span>
                 <span>
                   Points <b>{num(sale.totalPoints)}</b>
                 </span>
