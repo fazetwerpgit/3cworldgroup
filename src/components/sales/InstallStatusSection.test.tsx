@@ -191,13 +191,14 @@ describe("a rep's carrier rows (Pending install, Cancelled, Needs attention)", (
     expect(onOpenSale).toHaveBeenCalledWith('s-ch');
   });
 
-  it('says why a row with no logged sale has no phone, and does not pretend to open', async () => {
+  it('marks a row with no logged sale, explains why once for the list, and does not pretend to open', async () => {
     const onOpenSale = vi.fn();
     const [, row] = await renderRows(onOpenSale);
 
     expect(row.textContent).toContain('9 OAK ST');
     expect(row.textContent).toContain('Not logged in the portal');
     expect(row.querySelector('button')).toBeNull();
+    expect(container.textContent?.match(/only lists the\s+address/g)).toHaveLength(1);
     await act(async () => { row.click(); });
     expect(onOpenSale).not.toHaveBeenCalled();
   });

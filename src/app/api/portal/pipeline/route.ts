@@ -31,17 +31,22 @@ export async function GET(request: NextRequest) {
 
     // Whole-collection reads, aggregated in memory (team-sized data set -
     // same pattern as the users list API).
-    const [usersSnap, onboardingSnap, channelsSnap, salesSnap] = await Promise.all([
+    const [usersSnap, onboardingSnap, channelsSnap, salesSnap, ordersSnap] = await Promise.all([
       adminDb.collection('users').get(),
       adminDb.collection('userOnboarding').get(),
       adminDb.collection('userChannelOnboarding').get(),
       adminDb.collection('sales').where('status', '==', 'approved').get(),
+      // Only who each carrier order belongs to: an order under a rep's dealer
+      // code proves they have carrier logins, logged in the portal or not.
+      adminDb.collection('fiberOrders').select('matchedUserId').get(),
     ]);
 
     // Index progress by userId
     const approvedItemsByUser = new Map<string, Set<string>>();
+    const hasChecklistRecords = new Set<string>();
     for (const doc of onboardingSnap.docs) {
       const d = doc.data();
+      hasChecklistRecords.add(d.userId);
       if (d.status === 'approved') {
         if (!approvedItemsByUser.has(d.userId)) approvedItemsByUser.set(d.userId, new Set());
         approvedItemsByUser.get(d.userId)!.add(d.itemId);
@@ -63,6 +68,12 @@ export async function GET(request: NextRequest) {
       if (repId) salesByUser.set(repId, (salesByUser.get(repId) ?? 0) + 1);
     }
 
+    const carrierOrdersByUser = new Map<string, number>();
+    for (const doc of ordersSnap.docs) {
+      const repId = doc.data().matchedUserId;
+      if (repId) carrierOrdersByUser.set(repId, (carrierOrdersByUser.get(repId) ?? 0) + 1);
+    }
+
     // Display-name join for managers
     const nameById = new Map<string, string>();
     for (const doc of usersSnap.docs) {
@@ -82,7 +93,12 @@ export async function GET(request: NextRequest) {
       const approved = checklist.filter((item) => approvedSet.has(item.id)).length;
       const channels = channelsByUser.get(doc.id) ?? { cleared: 0, submitted: 0 };
       const approvedSales = salesByUser.get(doc.id) ?? 0;
+      const carrierOrders = carrierOrdersByUser.get(doc.id) ?? 0;
       const decommission = data.decommission;
+      // Channel clearances were barely ever recorded, so a rep who is already
+      // selling (approved sales, or orders under their dealer code on the
+      // carrier report) plainly has logins.
+      const hasLogins = channels.cleared > 0 || approvedSales > 0 || carrierOrders > 0;
 
       let stage: PipelineStage;
       if (decommission || data.status === 'inactive') {
@@ -91,9 +107,9 @@ export async function GET(request: NextRequest) {
         // An active rep is past onboarding even with no checklist records (made
         // active in People, or from before the checklist existed).
         stage = 'processing';
-      } else if (channels.cleared === 0) {
+      } else if (!hasLogins) {
         stage = 'need_logins';
-      } else if (approvedSales === 0) {
+      } else if (approvedSales === 0 && carrierOrders === 0) {
         stage = 'cleared_to_sell';
       } else {
         stage = 'active';
@@ -110,10 +126,14 @@ export async function GET(request: NextRequest) {
         reportsToId,
         managerName: reportsToId ? nameById.get(reportsToId) : undefined,
         stage,
-        onboarding: { approved, total: checklist.length },
+        // Null for an active rep from before the checklist: there is nothing
+        // to count, and "0/6" would read as unfinished paperwork.
+        onboarding:
+          data.status === 'active' && !hasChecklistRecords.has(doc.id) ? null : { approved, total: checklist.length },
         channelsCleared: channels.cleared,
         channelsSubmitted: channels.submitted,
         approvedSales,
+        carrierOrders,
         hireDate: data.hireDate?.toDate(),
         decommission: decommission
           ? {

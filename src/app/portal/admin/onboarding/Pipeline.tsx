@@ -372,7 +372,7 @@ export function Pipeline() {
                 <span />
               </li>
               {visibleReps.map((rep) => {
-                const pct = rep.onboarding.total > 0 ? (rep.onboarding.approved / rep.onboarding.total) * 100 : 0;
+                const pct = rep.onboarding && rep.onboarding.total > 0 ? (rep.onboarding.approved / rep.onboarding.total) * 100 : 0;
                 return (
                   <li key={rep.uid}>
                     <button
@@ -400,20 +400,28 @@ export function Pipeline() {
                         <span className={p.ellipsis}>{rep.managerName ?? '—'}</span>
                       </span>
                       <span className={`${u.cell} ${p.progressCell}`} data-label="Onboarding">
-                        <span className={p.progress}>
-                          <span className={`${s.track} ${p.track}`} aria-hidden="true">
-                            <span className={s.fill} style={{ width: `${pct}%` }} />
+                        {rep.onboarding ? (
+                          <span className={p.progress}>
+                            <span className={`${s.track} ${p.track}`} aria-hidden="true">
+                              <span className={s.fill} style={{ width: `${pct}%` }} />
+                            </span>
+                            <b className={u.num}>
+                              {rep.onboarding.approved}/{rep.onboarding.total}
+                            </b>
                           </span>
-                          <b className={u.num}>
-                            {rep.onboarding.approved}/{rep.onboarding.total}
-                          </b>
-                        </span>
+                        ) : (
+                          <span className={u.toneMuted}>Before checklist</span>
+                        )}
                       </span>
                       <span className={u.cell} data-label="Channels">
                         <span className={p.channels}>
-                          <span className={rep.channelsCleared > 0 ? u.toneLime : u.toneMuted}>
-                            {rep.channelsCleared} cleared
-                          </span>
+                          {rep.channelsCleared > 0 ? (
+                            <span className={u.toneLime}>{rep.channelsCleared} cleared</span>
+                          ) : rep.carrierOrders > 0 ? (
+                            <span className={u.toneLime}>On carrier report</span>
+                          ) : (
+                            <span className={u.toneMuted}>0 cleared</span>
+                          )}
                           {rep.channelsSubmitted > 0 ? (
                             <span className={u.toneAmber}>{rep.channelsSubmitted} pending</span>
                           ) : null}
@@ -479,7 +487,9 @@ export function Pipeline() {
               <div>
                 <dt>Onboarding</dt>
                 <dd className={u.num}>
-                  {selectedRep.onboarding.approved}/{selectedRep.onboarding.total} approved
+                  {selectedRep.onboarding
+                    ? `${selectedRep.onboarding.approved}/${selectedRep.onboarding.total} approved`
+                    : 'Joined before the checklist'}
                 </dd>
               </div>
               <div>
@@ -487,6 +497,7 @@ export function Pipeline() {
                 <dd>
                   {selectedRep.channelsCleared} cleared
                   {selectedRep.channelsSubmitted ? `, ${selectedRep.channelsSubmitted} pending` : ''}
+                  {selectedRep.carrierOrders > 0 ? ` · ${selectedRep.carrierOrders} orders on the carrier report` : ''}
                 </dd>
               </div>
               <div>

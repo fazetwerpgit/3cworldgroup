@@ -2,9 +2,9 @@ import { FieldRole } from './auth';
 
 // Recruiting pipeline stages, derived (never stored) from underlying data:
 //   processing      - onboarding checklist not fully approved
-//   need_logins     - onboarding complete, no sales channel cleared yet
-//   cleared_to_sell - at least one channel cleared, no approved sales yet
-//   active          - has at least one approved sale
+//   need_logins     - onboarding complete, no sign of carrier logins yet
+//   cleared_to_sell - a channel cleared, but nothing sold yet
+//   active          - selling: approved sales, or orders on the carrier report
 //   decommissioned  - account deactivated via the decommission flow
 export type PipelineStage =
   | 'processing'
@@ -24,7 +24,7 @@ export const PipelineStageConfig: Record<
   },
   need_logins: {
     name: 'Need Logins',
-    description: 'Onboarding done - awaiting channel credentials',
+    description: 'Onboarding done - no carrier logins yet',
     color: 'blue',
   },
   cleared_to_sell: {
@@ -34,7 +34,7 @@ export const PipelineStageConfig: Record<
   },
   active: {
     name: 'Active',
-    description: 'Selling - has approved sales',
+    description: 'Selling - sales in the portal or on the carrier report',
     color: 'green',
   },
   decommissioned: {
@@ -83,10 +83,13 @@ export interface PipelineRep {
   reportsToId?: string;
   managerName?: string;
   stage: PipelineStage;
-  onboarding: { approved: number; total: number };
+  /** Null for an active rep from before the onboarding checklist existed. */
+  onboarding: { approved: number; total: number } | null;
   channelsCleared: number;
   channelsSubmitted: number;
   approvedSales: number;
+  /** Orders under this rep's dealer code on the carrier report. */
+  carrierOrders: number;
   hireDate?: Date;
   decommission?: DecommissionRecord;
 }

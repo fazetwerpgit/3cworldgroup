@@ -269,17 +269,22 @@ function FiberOrderRow({ order, showRepName = false, saleFor, onOpenSale }: { or
           Customer details <ChevronRight size={14} aria-hidden="true" />
         </button>
       ) : onOpenSale ? (
-        <p className={x.fiberNote}>
-          Not logged in the portal, so there is no phone number for it. The carrier report only lists the address.
-        </p>
+        <p className={x.fiberNote}>Not logged in the portal</p>
       ) : null}
     </article>
   );
 }
 
 export function FiberRows({ orders, showRepName = false, saleFor, onOpenSale }: { orders: FiberOrder[]; showRepName?: boolean } & FiberRowLinks) {
+  const anyUnlogged = !!onOpenSale && orders.some((order) => !saleFor?.(order));
   return (
     <div data-part="fiber-list">
+      {anyUnlogged ? (
+        <p className={x.fiberExplain}>
+          Rows marked &ldquo;Not logged in the portal&rdquo; have no phone number: the carrier report only lists the
+          address. Log the sale in the portal to keep the customer&rsquo;s name and phone with it.
+        </p>
+      ) : null}
       {orders.map((order) => (
         <FiberOrderRow key={order.id} order={order} showRepName={showRepName} saleFor={saleFor} onOpenSale={onOpenSale} />
       ))}
