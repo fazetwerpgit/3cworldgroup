@@ -22,6 +22,8 @@ import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
 import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
+import { getActivationReadiness } from '@/lib/onboarding/activation';
+import { ONBOARDING_ITEMS } from '@/types/onboarding';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
 
@@ -321,6 +323,33 @@ export async function PUT(
     // as "already decommissioned".
     if (updateData.status === 'active' && doc.get('decommission')) {
       updateData.decommission = FieldValue.delete();
+    }
+
+    // A hire on an onboarding checklist goes active only when it is complete,
+    // the same gate as /api/portal/onboarding/activate: an explicit Accept, or
+    // a role change that would activate them immediately. An owner who needs
+    // to skip an item marks it complete with a note (onboarding/mark-complete).
+    // Reactivating an inactive or decommissioned account is not gated.
+    if (
+      updateData.status === 'active' &&
+      doc.get('status') === 'pending' &&
+      roleRequiresOnboarding(existingFieldRole)
+    ) {
+      const readiness = await getActivationReadiness(id);
+      if (!readiness.ready) {
+        const labels = readiness.missing.map(
+          (itemId) => ONBOARDING_ITEMS.find((item) => item.id === itemId)?.label ?? itemId
+        );
+        return NextResponse.json(
+          {
+            error: labels.length
+              ? `Onboarding is not complete, so this account cannot be activated yet. Still open: ${labels.join(', ')}. Approve those items, or mark them complete from Onboarding review.`
+              : 'Onboarding is not complete, so this account cannot be activated yet.',
+            missing: readiness.missing,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Update displayName in Firebase Auth if changed

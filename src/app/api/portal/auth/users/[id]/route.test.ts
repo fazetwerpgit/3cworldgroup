@@ -95,6 +95,10 @@ vi.mock('@/lib/users/purgeSensitiveUserData', () => ({
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
 
 vi.mock('@/lib/audit/adminAudit', () => ({ writeAdminAudit: vi.fn(async () => undefined) }));
+const readinessMock = vi.hoisted(() =>
+  vi.fn<(userId: string) => Promise<{ ready: boolean; missing: string[] }>>(async () => ({ ready: true, missing: [] }))
+);
+vi.mock('@/lib/onboarding/activation', () => ({ getActivationReadiness: readinessMock }));
 
 const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
 const mockResolveAlertTasks = resolveAlertTasks as unknown as ReturnType<typeof vi.fn>;
@@ -115,6 +119,91 @@ beforeEach(() => {
   firestore.updates.length = 0;
   vi.clearAllMocks();
   mockGate.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
+  readinessMock.mockResolvedValue({ ready: true, missing: [] });
+});
+
+describe('PUT /api/portal/auth/users/[id] activation readiness gate', () => {
+  const pendingHire = () =>
+    firestore.users.set('pending-user', {
+      status: 'pending',
+      fieldRole: 'entry_level_rep',
+      displayName: 'Pending Rep',
+    });
+
+  it('refuses Accept for a hire whose checklist is not complete, naming what is open', async () => {
+    pendingHire();
+    readinessMock.mockResolvedValue({ ready: false, missing: ['w9', 'contract'] });
+
+    const response = await PUT(request({ status: 'active', fieldRole: 'ae_tier_1' }), params());
+
+    expect(response.status).toBe(409);
+    const body = (await response.json()) as { error: string; missing: string[] };
+    expect(body.missing).toEqual(['w9', 'contract']);
+    expect(body.error).toContain('W-9, Contract');
+    expect(readinessMock).toHaveBeenCalledWith('pending-user');
+    expect(firestore.updates).toHaveLength(0);
+    expect(firestore.adminAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses a plain status flip to active the same way', async () => {
+    pendingHire();
+    readinessMock.mockResolvedValue({ ready: false, missing: ['onboarding_submission'] });
+
+    const response = await PUT(request({ status: 'active' }), params());
+
+    expect(response.status).toBe(409);
+    expect(firestore.updates).toHaveLength(0);
+  });
+
+  it('refuses a role change that would activate a hire mid-checklist immediately', async () => {
+    pendingHire();
+    readinessMock.mockResolvedValue({ ready: false, missing: ['w9'] });
+
+    const response = await PUT(request({ fieldRole: 'general_manager' }), params());
+
+    expect(response.status).toBe(409);
+    expect(firestore.updates).toHaveLength(0);
+    expect(mockResolveAlertTasks).not.toHaveBeenCalled();
+  });
+
+  it('allows Accept once every item is approved', async () => {
+    pendingHire();
+
+    const response = await PUT(request({ status: 'active', fieldRole: 'ae_tier_1' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.updates[0]?.data).toMatchObject({ status: 'active', fieldRole: 'ae_tier_1' });
+  });
+
+  it('never gates reactivating an inactive account', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', fieldRole: 'entry_level_rep', displayName: 'Old Rep' });
+    readinessMock.mockResolvedValue({ ready: false, missing: ['w9'] });
+
+    const response = await PUT(request({ status: 'active' }), params());
+
+    expect(response.status).toBe(200);
+    expect(readinessMock).not.toHaveBeenCalled();
+  });
+
+  it('never gates other status edits on a pending hire', async () => {
+    pendingHire();
+    readinessMock.mockResolvedValue({ ready: false, missing: ['w9'] });
+
+    const response = await PUT(request({ status: 'inactive' }), params());
+
+    expect(response.status).toBe(200);
+    expect(readinessMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty role instead of reading it as an assignment', async () => {
+    pendingHire();
+
+    for (const body of [{ fieldRole: '' }, { role: '' }]) {
+      const response = await PUT(request(body), params());
+      expect(response.status).toBe(400);
+    }
+    expect(firestore.updates).toHaveLength(0);
+  });
 });
 
 describe('PUT /api/portal/auth/users/[id] role assignment', () => {

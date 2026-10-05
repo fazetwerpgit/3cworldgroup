@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, ChevronDown, Lock, Search, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -94,6 +94,13 @@ export function UserForm({ user }: UserFormProps) {
   const { user: currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // The notice sits above the form, and Accept / Save are far below it: a
+  // refused save (e.g. 409, onboarding not complete) must come into view, not
+  // land off screen where it reads as nothing happening.
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [error]);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
@@ -296,9 +303,11 @@ export function UserForm({ user }: UserFormProps) {
   return (
     <div className={f.form}>
       {error ? (
-        <AdminNotice tone="error" onDismiss={() => setError('')}>
-          {error}
-        </AdminNotice>
+        <div ref={errorRef}>
+          <AdminNotice tone="error" onDismiss={() => setError('')}>
+            {error}
+          </AdminNotice>
+        </div>
       ) : null}
 
       <section className={s.panel} aria-labelledby="person-details-heading">
