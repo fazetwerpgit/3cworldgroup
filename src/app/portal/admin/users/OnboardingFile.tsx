@@ -13,7 +13,7 @@ import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { downloadBlob } from '@/lib/export/csv';
 import type { OnboardingFileItem, OnboardingFileSummary } from '@/lib/onboarding/onboardingFile';
-import { onboardingFileItemStatus, opensInViewer } from '@/lib/onboarding/onboardingFileStatus';
+import { isAppleMobile, onboardingFileItemStatus, opensInViewer } from '@/lib/onboarding/onboardingFileStatus';
 import { OnboardingCategoryLabels } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
@@ -34,6 +34,8 @@ function canShareFile(file: File): boolean {
   try {
     return (
       typeof navigator !== 'undefined' &&
+      // Share sheet on iOS / iPadOS only; Android and desktop download directly.
+      isAppleMobile(navigator.userAgent, navigator.maxTouchPoints ?? 0) &&
       typeof navigator.share === 'function' &&
       !!navigator.canShare?.({ files: [file] })
     );

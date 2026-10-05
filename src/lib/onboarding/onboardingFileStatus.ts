@@ -38,3 +38,13 @@ export function opensInViewer(upload: { url: string; contentType: string }): boo
   if (/^image\/(jpeg|png|webp)$/.test(upload.contentType)) return true;
   return upload.contentType === 'application/pdf' && isPdfUrl(upload.url);
 }
+
+/**
+ * iPhone, iPod or iPad (iPadOS reports a Mac UA, so a "Macintosh" with a touch
+ * screen counts). Only there does the zip go through the share sheet (Save to
+ * Files); Android, desktop and everything else download the blob directly.
+ */
+export function isAppleMobile(userAgent: string, maxTouchPoints: number): boolean {
+  if (/iPhone|iPad|iPod/.test(userAgent)) return true;
+  return /Macintosh/.test(userAgent) && maxTouchPoints > 1;
+}
