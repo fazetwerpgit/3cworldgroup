@@ -70,7 +70,7 @@ interface SaleDetailSheetProps {
    * out, the sale's stored commission shows, unless the sale is cancelled.
    */
   estPay?: number | null;
-  /** What 3C is paid for this sale. Passed only on the owner's board. */
+  /** What 3C keeps from this sale after the rep's pay. Passed only on the owner's board. */
   revenue?: number | null;
 }
 
@@ -360,7 +360,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
               </span>
             </div>
             <dl className={x.dSummary}>
-              {revenue !== null && <div><dt>3C revenue</dt><dd>{formatMoney(revenue)}</dd></div>}
+              {revenue !== null && <div><dt>3C revenue after rep pay</dt><dd>{formatMoney(revenue)}</dd></div>}
               <div><dt>Points</dt><dd>{sale.totalPoints || 0}</dd></div>
             </dl>
           </div>

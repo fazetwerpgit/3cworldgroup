@@ -127,7 +127,7 @@ export function rateFor(
 }
 
 /**
- * GET /api/portal/comp-plan. `margin` is present only for an owner.
+ * GET /api/portal/comp-plan. `margin` and `repCompRoles` are present only for an owner.
  *
  * On `scope: 'all'` (a platform caller), `rates` is the whole role-keyed table —
  * they administer the plan. `ownRates` is that caller's personal slice, present
@@ -139,6 +139,8 @@ export interface CompPlanResponse {
   rates: CompPlanCompanyRates | Partial<CompPlanRates> | null;
   ownRates?: CompPlanCompanyRates | null;
   margin?: CompPlanMargin;
+  /** uid -> comp role each user is paid on. Owner only: prices rep pay out of 3C revenue. */
+  repCompRoles?: Record<string, CompPlanRole>;
   fieldRole?: FieldRole | null;
   compRole?: CompPlanRole | null;
   payDelayDays: number;

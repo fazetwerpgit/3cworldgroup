@@ -11,6 +11,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FiberOrder, Sale } from '@/types';
 import type { MonthKey } from '@/lib/sales/monthWindow';
+import type { OwnerPricing } from '@/lib/owner/revenue';
 import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
 
 // The viewer's platform role, swapped per test. `owner` sits ABOVE admin, so
@@ -103,7 +104,7 @@ async function render(
   sales: Sale[],
   orders: FiberOrder[],
   month: MonthKey | undefined,
-  extra?: { truncated?: boolean; margin?: Record<string, Record<string, number>> }
+  extra?: { truncated?: boolean; ownerPricing?: OwnerPricing }
 ) {
   await act(async () => {
     root.render(
@@ -111,7 +112,7 @@ async function render(
         sales={sales}
         month={month}
         truncated={extra?.truncated}
-        margin={extra?.margin ?? null}
+        ownerPricing={extra?.ownerPricing ?? null}
         fiber={{
           data: { scope: 'all', lastReportAt: null, orders, unmatched: [] },
           loading: false,
@@ -519,29 +520,34 @@ describe('what the board totals instead of the monthly plan price', () => {
     totalPoints: 10,
     products: [{ company: 'tfiber', productId: 'tfiber-2gig', quantity: 1 }],
   } as unknown as Sale;
-  const margin = { tfiber: { 'tfiber-2gig': 560 } };
+  // 3C is paid $560 for a 2 gig; Wil (AE Tier 1) is paid $200 of it.
+  const ownerPricing: OwnerPricing = {
+    margin: { tfiber: { 'tfiber-2gig': 560 } },
+    rates: { ae_tier_1: { tfiber: { 'tfiber-2gig': 200 } } },
+    repCompRoles: { r1: 'ae_tier_1' },
+  };
   const figure = (label: string) =>
     [...container.querySelectorAll('[data-part="fig"]')].find((fig) => fig.querySelector('span')?.textContent === label)
       ?.querySelector('strong')?.textContent;
 
-  it('shows the owner what 3C is paid, never the $/mo plan price', async () => {
+  it('shows the owner what 3C keeps after the rep is paid, never the $/mo plan price', async () => {
     viewer.role = 'owner';
-    await render([twoGig], [], thisMonth(), { margin });
+    await render([twoGig], [], thisMonth(), { ownerPricing });
     await openRep();
 
-    expect(figure('3C revenue')).toBe('$560');
-    expect(container.querySelector('[data-part="rep"]')?.textContent).toContain('$560');
-    expect(container.querySelector('[data-part="board-row"]')?.textContent).toContain('$560');
+    expect(figure('3C revenue')).toBe('$360');
+    expect(container.querySelector('[data-part="rep"]')?.textContent).toContain('$360');
+    expect(container.querySelector('[data-part="board-row"]')?.textContent).toContain('$360');
+    expect(container.textContent).not.toContain('$560');
     expect(container.textContent).not.toMatch(/\/\s?mo|Value/);
   });
 
-  it('shows an admin (no revenue table) points instead', async () => {
-    await render([twoGig], [], thisMonth(), { margin });
+  it('shows an admin points instead, even if revenue tables were passed', async () => {
+    await render([twoGig], [], thisMonth(), { ownerPricing });
     await openRep();
 
     expect(figure('Points')).toBe('10 pts');
     expect(figure('3C revenue')).toBeUndefined();
-    expect(container.textContent).not.toContain('$560');
-    expect(container.textContent).not.toMatch(/\/\s?mo/);
+    expect(container.textContent).not.toMatch(/\$360|\$560|\/\s?mo/);
   });
 });

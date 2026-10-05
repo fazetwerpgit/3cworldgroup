@@ -2,8 +2,8 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { FIBER_COMPANIES, RoleDisplayNames, isOwner } from '@/types';
-import type { CompPlanCompanyRates, CompPlanMargin, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
-import { saleRevenue } from '@/lib/owner/revenue';
+import type { CompPlanCompanyRates, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
+import { saleNetRevenue, type OwnerPricing } from '@/lib/owner/revenue';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
@@ -65,8 +65,8 @@ interface AdminSalesBoardProps {
     hasPlan: boolean;
     compRole: CompPlanRole | null;
   };
-  /** "3C Receives" per product. Only an owner has it; the board shows 3C revenue from it. */
-  margin?: CompPlanMargin | null;
+  /** Revenue tables and rep pay roles. Only an owner has them; the board shows 3C revenue after rep pay. */
+  ownerPricing?: OwnerPricing | null;
   /** Refetches the book after the detail sheet edits a sale's install date. */
   onSaleUpdated?: () => void;
 }
@@ -244,7 +244,7 @@ function carrierTime(value: string | null | undefined): number | null {
   return Number.isNaN(date.getTime()) ? null : date.getTime();
 }
 
-export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, onSetCancelled, fiber, payPlan, margin = null, onSaleUpdated }: AdminSalesBoardProps) {
+export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, onSetCancelled, fiber, payPlan, ownerPricing = null, onSaleUpdated }: AdminSalesBoardProps) {
   const { user, isRole } = useAuth();
   const isAdmin = isRole('admin');
   // Owner is a tier ABOVE admin, so this cannot be a permission check — every
@@ -295,14 +295,15 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
 
   const counts = book.counts;
   const countedCount = counts.installed + counts.scheduled + counts.attention;
-  // The owner reads what 3C is paid per sale ("3C Receives" in Pay rates);
-  // anyone without that table (an admin) reads points. The customer's monthly
-  // plan price is not a number the office runs on (owner, 2026-10-05).
-  const revenueTable = ownerView ? margin : null;
+  // The owner reads what 3C keeps per sale: "3C Receives" in Pay rates minus
+  // the selling rep's pay. Anyone without those tables (an admin) reads points.
+  // The customer's monthly plan price is not a number the office runs on
+  // (owner, 2026-10-05).
+  const pricing = ownerView ? ownerPricing : null;
   const figureOf = (sale: Sale | null) =>
-    !sale ? 0 : revenueTable ? saleRevenue(sale, revenueTable) : (sale.totalPoints ?? 0);
-  const showFigure = (value: number) => (revenueTable ? formatMoney(value) : `${Math.round(value)} pts`);
-  const figureLabel = revenueTable ? '3C revenue' : 'Points';
+    !sale ? 0 : pricing ? saleNetRevenue(sale, pricing) : (sale.totalPoints ?? 0);
+  const showFigure = (value: number) => (pricing ? formatMoney(value) : `${Math.round(value)} pts`);
+  const figureLabel = pricing ? '3C revenue' : 'Points';
   const repFigure = (rows: MergedRow[]) => rows.reduce((sum, row) => sum + (row.counted ? figureOf(row.sale) : 0), 0);
   const monthFigure = repFigure(book.rows);
   const repsByFigure = [...book.reps].sort((a, b) => repFigure(b.rows) - repFigure(a.rows) || b.count - a.count);
@@ -722,7 +723,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           <section className={s.panel} aria-labelledby="board-reps-h">
             <div className={`${s.panelHead} ${x.panelHead}`}>
               <h2 id="board-reps-h" className={s.kicker}>By rep</h2>
-              <p className={x.panelMeta}>{figureLabel}</p>
+              <p className={x.panelMeta}>{pricing ? '3C revenue after rep pay' : 'Points'}</p>
             </div>
 
             {book.reps.length === 0 && !loading && (
@@ -935,7 +936,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         onSaleUpdated={onSaleUpdated}
         payout={selectedPayout}
         fiberOrder={selectedOrder}
-        revenue={revenueTable && selectedSale ? saleRevenue(selectedSale, revenueTable) : null}
+        revenue={pricing && selectedSale ? saleNetRevenue(selectedSale, pricing) : null}
       />
 
       <LinkOrderDialog

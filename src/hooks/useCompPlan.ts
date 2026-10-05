@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useAuth } from '@/contexts/AuthContext';
 import { PAY_DELAY_DAYS } from '@/types';
-import type { CompPlanCompanyRates, CompPlanMargin, CompPlanResponse, CompPlanRole } from '@/types';
+import type { CompPlanCompanyRates, CompPlanRates, CompPlanResponse, CompPlanRole } from '@/types';
+import type { OwnerPricing } from '@/lib/owner/revenue';
 
 export interface CompPlanResult {
   /** The caller's own rates, company → planId → dollars. Null when their role has no slice. */
@@ -12,8 +13,8 @@ export interface CompPlanResult {
   compRole: CompPlanRole | null;
   payDelayDays: number;
   hasPlan: boolean;
-  /** "3C Receives" per product. Only an owner ever gets this from the server; null for everyone else. */
-  margin: CompPlanMargin | null;
+  /** Revenue tables for pricing 3C's take per sale. Only an owner ever gets these; null for everyone else. */
+  ownerPricing: OwnerPricing | null;
   loading: boolean;
   /**
    * The rates could not be fetched. Distinct from "no plan assigned": the rep
@@ -33,7 +34,7 @@ const EMPTY: PlanState = {
   payDelayDays: PAY_DELAY_DAYS,
   hasPlan: false,
   error: false,
-  margin: null,
+  ownerPricing: null,
 };
 
 /**
@@ -94,7 +95,14 @@ export function useCompPlan(): CompPlanResult {
           payDelayDays: data.payDelayDays ?? PAY_DELAY_DAYS,
           hasPlan: !!rates,
           error: false,
-          margin: data.margin ?? null,
+          ownerPricing:
+            data.scope === 'all' && data.margin
+              ? {
+                  margin: data.margin,
+                  rates: (data.rates as Partial<CompPlanRates> | null) ?? {},
+                  repCompRoles: data.repCompRoles ?? {},
+                }
+              : null,
         });
       } catch (error) {
         // Expected pay is supporting information: a failed fetch never breaks
@@ -121,7 +129,7 @@ export function useCompPlan(): CompPlanResult {
     hasPlan: settled && plan.hasPlan,
     loading,
     error: settled && plan.error,
-    margin: settled ? plan.margin : null,
+    ownerPricing: settled ? plan.ownerPricing : null,
     retry,
   };
 }

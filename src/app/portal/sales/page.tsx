@@ -193,7 +193,7 @@ function SalesContent() {
     loading: planLoading,
     error: planError,
     retry: retryPlan,
-    margin,
+    ownerPricing,
   } = useCompPlan();
   const payPlan = useMemo(
     () => ({ rates, payDelayDays, hasPlan, compRole, error: planError, onRetry: retryPlan }),
@@ -304,7 +304,7 @@ function SalesContent() {
                 onSetCancelled={setSaleCancelled}
                 fiber={fiber}
                 payPlan={payPlan}
-                margin={margin}
+                ownerPricing={ownerPricing}
                 onSaleUpdated={refreshSales}
               />
 

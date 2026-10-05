@@ -11,6 +11,7 @@ import {
   CompPlanCompanyRates,
   CompPlanMargin,
   CompPlanRates,
+  CompPlanRole,
   PAY_DELAY_DAYS,
   resolveCompRole,
 } from '@/types';
@@ -65,10 +66,22 @@ function invalidCompanyRates(value: unknown, label: string): string | null {
   return null;
 }
 
+/** uid -> the comp role each user is paid on, for every user who resolves to one. */
+async function loadRepCompRoles(): Promise<Record<string, CompPlanRole>> {
+  const snap = await adminDb!.collection('users').select('fieldRole', 'role').get();
+  const roles: Record<string, CompPlanRole> = {};
+  for (const doc of snap.docs) {
+    const compRole = resolveCompRole(doc.get('fieldRole'), doc.get('role'));
+    if (compRole) roles[doc.id] = compRole;
+  }
+  return roles;
+}
+
 // GET /api/portal/comp-plan - per-install pay rates, visibility-scoped.
 // Field users get ONLY the slice their role is paid from (legacy roles fall back
 // to AE Tier 1). Admin/operations get every role's rates. The owner additionally
-// gets the margin — no other caller ever receives that key.
+// gets the margin and each user's comp role (so the Sales board can show 3C's
+// revenue after rep pay) — no other caller ever receives those keys.
 export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
@@ -101,7 +114,7 @@ export async function GET(request: NextRequest) {
         rates,
         compRole: ownCompRole,
         ownRates: ownCompRole ? rates[ownCompRole] ?? null : null,
-        ...(gate.role === 'owner' ? { margin: await loadMargin() } : {}),
+        ...(gate.role === 'owner' ? { margin: await loadMargin(), repCompRoles: await loadRepCompRoles() } : {}),
       });
     }
 

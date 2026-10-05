@@ -10,6 +10,11 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
 // config/compPlan and config/compPlanMargin are absent by default, so the route
 // falls back to the committed module — the pre-seed state.
 const docs = new Map<string, Record<string, unknown>>();
+const users: Array<{ id: string; fieldRole?: string; role?: string }> = [
+  { id: 'rep1', fieldRole: 'ae_tier_1' },
+  { id: 'boss', role: 'admin' },
+  { id: 'nobody' },
+];
 const setSpy = vi.fn();
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
@@ -17,6 +22,11 @@ vi.mock('@/lib/firebase/admin', () => ({
       doc: vi.fn((id: string) => ({
         get: vi.fn(async () => ({ exists: docs.has(id), data: () => docs.get(id) })),
         set: vi.fn(async (value: unknown) => setSpy(id, value)),
+      })),
+      select: vi.fn(() => ({
+        get: vi.fn(async () => ({
+          docs: users.map((user) => ({ id: user.id, get: (field: 'fieldRole' | 'role') => user[field] })),
+        })),
       })),
     })),
   },
@@ -110,6 +120,7 @@ describe('GET /api/portal/comp-plan', () => {
     expect(json.scope).toBe('all');
     expect(Object.keys(json.rates)).toContain('director');
     expect('margin' in json).toBe(false);
+    expect('repCompRoles' in json).toBe(false);
   });
 
   it('gives an admin their own Internal Rep slice alongside the full table', async () => {
@@ -146,7 +157,7 @@ describe('GET /api/portal/comp-plan', () => {
     expect(json.rates).toBeNull();
   });
 
-  it('gives the owner the margin', async () => {
+  it('gives the owner the margin and each user\'s pay role', async () => {
     mockRequester.mockResolvedValue({
       ok: true, uid: 'o1', name: 'Owner', email: 'o@x.com',
       role: 'owner', isManagement: true, isAdmin: true, isManagerOrAbove: true,
@@ -154,6 +165,7 @@ describe('GET /api/portal/comp-plan', () => {
     const json = await (await GET(get())).json();
     expect(json.scope).toBe('all');
     expect(json.margin.att['att-1gig']).toBe(500);
+    expect(json.repCompRoles).toEqual({ rep1: 'ae_tier_1', boss: 'internal_rep' });
   });
 });
 
