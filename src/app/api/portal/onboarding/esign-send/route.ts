@@ -5,6 +5,7 @@ import { getOnboardingItemsForUser, resolveRoles } from '@/types';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
+import { envelopeExists } from '@/lib/esign/inhouse';
 
 // POST /api/portal/onboarding/esign-send - Send or resend one e-sign item.
 export async function POST(request: NextRequest) {
@@ -41,7 +42,13 @@ export async function POST(request: NextRequest) {
     const itemRef = adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`);
     const itemDoc = await itemRef.get();
     const envelopeId = itemDoc.get('esignEnvelopeId') as string | undefined;
-    if (envelopeId) {
+    // An id with no envelope record was sent before signing moved in-house and
+    // can no longer be signed: unless the item is signed, it counts as no
+    // envelope, and the send below replaces it. A failed read throws (500).
+    if (
+      envelopeId &&
+      (itemDoc.get('status') === 'approved' || (await envelopeExists(envelopeId)))
+    ) {
       return NextResponse.json({ sent: false, reason: 'envelope_exists', envelopeId });
     }
 

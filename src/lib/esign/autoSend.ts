@@ -9,7 +9,7 @@ import { getOnboardingItemsForUser } from '@/types/onboarding';
 import { isHeldOnboardingItem } from '@/types/onboardingHold';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
-import { createEnvelope, ENVELOPES_COLLECTION } from './inhouse';
+import { createEnvelope, envelopeExists } from './inhouse';
 import type { EsignDocKey } from './types';
 
 const MIN_RETRY_INTERVAL_MS = 5 * 60 * 1000;
@@ -36,19 +36,13 @@ interface PendingItem {
   item: ReturnType<typeof getOnboardingItemsForUser>[number];
   ref: ReturnType<NonNullable<typeof adminDb>['doc']>;
   snap: Awaited<ReturnType<ReturnType<NonNullable<typeof adminDb>['doc']>['get']>>;
-  /** An unsigned item's old envelope id that names no envelope record (see staleEnvelopeId). */
+  /**
+   * An unsigned item's envelope id that names no envelope record. Items sent
+   * before signing moved in-house carry such ids; they get a fresh envelope,
+   * which replaces the id. Approved items are never looked at, so a signed
+   * document is never resent.
+   */
   staleEnvelopeId?: string;
-}
-
-/**
- * The item's envelope id when it can no longer be signed: the item is unsigned
- * and no envelope record exists under that id. Items sent before signing moved
- * in-house carry such ids. They get a fresh envelope, which replaces the id.
- * Approved items are never looked at, so a signed document is never resent.
- */
-async function staleEnvelopeId(envelopeId: string): Promise<string | undefined> {
-  const envelope = await adminDb!.doc(`${ENVELOPES_COLLECTION}/${envelopeId}`).get();
-  return envelope.exists ? undefined : envelopeId;
 }
 
 function asDate(value: unknown): Date | undefined {
@@ -292,6 +286,12 @@ export interface SendPendingOptions {
    * if something is still unsigned (sendDeferredEsignReadyEmails).
    */
   deferReadyEmail?: boolean;
+  /**
+   * Only replace stale envelopes (ids with no envelope record); never send a
+   * document that was not sent before. For active reps who still owe
+   * signatures from before signing moved in-house.
+   */
+  onlyStale?: boolean;
 }
 
 /**
@@ -339,11 +339,14 @@ export async function sendPendingEsignDocs(
         const existingEnvelopeId = snap.get('esignEnvelopeId');
         let stale: string | undefined;
         if (typeof existingEnvelopeId === 'string' && existingEnvelopeId) {
-          stale = await staleEnvelopeId(existingEnvelopeId);
-          if (!stale) continue;
+          // A failed read throws into the catch below: the item is skipped,
+          // never resent on a guess.
+          if (await envelopeExists(existingEnvelopeId)) continue;
+          stale = existingEnvelopeId;
         } else if (existingEnvelopeId) {
           continue;
         }
+        if (options.onlyStale && !stale) continue;
         if (isThrottled(state, now)) continue;
         pending.push({ item, ref, snap, ...(stale ? { staleEnvelopeId: stale } : {}) });
       } catch (error) {

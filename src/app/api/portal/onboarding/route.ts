@@ -7,7 +7,7 @@ import {
 } from '@/types';
 import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
-import { ENVELOPES_COLLECTION, inhouseSignPath } from '@/lib/esign/inhouse';
+import { envelopeExists, inhouseSignPath } from '@/lib/esign/inhouse';
 import { isEsignItem } from '@/lib/onboarding/esign';
 
 // GET /api/portal/onboarding?userId=xxx - Merged onboarding checklist for a user.
@@ -100,15 +100,30 @@ export async function GET(request: NextRequest) {
             typeof data?.esignEnvelopeId === 'string' &&
             data.esignEnvelopeId
         );
-      if (unsigned.length > 0) {
-        const envelopes = await adminDb.getAll(
-          ...unsigned.map(({ data }) => adminDb!.collection(ENVELOPES_COLLECTION).doc(data!.esignEnvelopeId as string))
-        );
-        envelopes.forEach((envelope, i) => {
-          if (envelope.exists) {
-            signPathByItemId.set(unsigned[i].item.id, inhouseSignPath(unsigned[i].data!.esignEnvelopeId as string));
+      let hasStale = false;
+      await Promise.all(
+        unsigned.map(async ({ item, data }) => {
+          const envelopeId = data!.esignEnvelopeId as string;
+          try {
+            if (await envelopeExists(envelopeId)) {
+              signPathByItemId.set(item.id, inhouseSignPath(envelopeId));
+            } else {
+              hasStale = true;
+            }
+          } catch (error) {
+            // A failed read shows no link and never triggers a resend.
+            console.error('[onboarding] envelope read failed', error);
           }
-        });
+        })
+      );
+      // An active rep approved before signing still owes these documents.
+      // Replace only the stale envelopes; never send anything new.
+      if (signOff && hasStale) {
+        after(() =>
+          sendPendingEsignDocs(userId, { onlyStale: true }).catch((error) => {
+            console.error('[onboarding] stale envelope resend failed', error);
+          })
+        );
       }
     }
 

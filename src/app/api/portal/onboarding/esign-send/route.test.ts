@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { gateMock, userGetMock, itemGetMock, itemSetMock, sendMock } = vi.hoisted(() => ({
+const { gateMock, userGetMock, itemGetMock, itemSetMock, sendMock, envelopeExistsMock } = vi.hoisted(() => ({
+  envelopeExistsMock: vi.fn(),
   gateMock: vi.fn(),
   userGetMock: vi.fn(),
   itemGetMock: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));
 vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendMock }));
+vi.mock('@/lib/esign/inhouse', () => ({ envelopeExists: envelopeExistsMock }));
 vi.mock('firebase-admin/firestore', () => ({ FieldValue: { delete: vi.fn(() => '__DELETE__') } }));
 
 import { POST } from './route';
@@ -41,6 +43,7 @@ beforeEach(() => {
   itemGetMock.mockResolvedValue({ exists: true, get: vi.fn(() => undefined) });
   itemSetMock.mockResolvedValue(undefined);
   sendMock.mockResolvedValue(['w9']);
+  envelopeExistsMock.mockResolvedValue(true);
 });
 
 describe('POST /api/portal/onboarding/esign-send', () => {
@@ -63,6 +66,47 @@ describe('POST /api/portal/onboarding/esign-send', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ sent: false, reason: 'envelope_exists', envelopeId: 'env-1' });
     expect(itemSetMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('replaces an unsigned item whose envelope id has no record', async () => {
+    itemGetMock.mockResolvedValue({
+      exists: true,
+      get: vi.fn((field: string) => ({ esignEnvelopeId: 'legacy-1', status: 'submitted' })[field]),
+    });
+    envelopeExistsMock.mockResolvedValue(false);
+
+    const response = await POST(request({ userId: 'user-1', itemId: 'w9' }));
+
+    await expect(response.json()).resolves.toEqual({ sent: true, sent_items: ['w9'] });
+    expect(envelopeExistsMock).toHaveBeenCalledWith('legacy-1');
+    expect(sendMock).toHaveBeenCalledWith('user-1');
+  });
+
+  it('never resends a signed item, even without an envelope record', async () => {
+    itemGetMock.mockResolvedValue({
+      exists: true,
+      get: vi.fn((field: string) => ({ esignEnvelopeId: 'legacy-1', status: 'approved' })[field]),
+    });
+    envelopeExistsMock.mockResolvedValue(false);
+
+    const response = await POST(request({ userId: 'user-1', itemId: 'w9' }));
+
+    await expect(response.json()).resolves.toMatchObject({ sent: false, reason: 'envelope_exists' });
+    expect(itemSetMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('does not send when the envelope read fails', async () => {
+    itemGetMock.mockResolvedValue({
+      exists: true,
+      get: vi.fn((field: string) => ({ esignEnvelopeId: 'env-1', status: 'submitted' })[field]),
+    });
+    envelopeExistsMock.mockRejectedValue(new Error('unavailable'));
+
+    const response = await POST(request({ userId: 'user-1', itemId: 'w9' }));
+
+    expect(response.status).toBe(500);
     expect(sendMock).not.toHaveBeenCalled();
   });
 

@@ -180,8 +180,11 @@ vi.mock('firebase-admin/firestore', () => ({
 
 vi.mock('./inhouse', () => ({
   createEnvelope: createEnvelopeMock,
-  ENVELOPES_COLLECTION: 'esignEnvelopes',
+  envelopeExists: envelopeExistsMock,
 }));
+// Reads the same store the rest of the test writes, so seeding
+// `esignEnvelopes/<id>` makes an envelope exist.
+const envelopeExistsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
 const sendEmailMock = vi.hoisted(() =>
@@ -234,6 +237,8 @@ beforeEach(() => {
   runTransactionMock.mockImplementation(applyTransaction);
   createEnvelopeMock.mockReset();
   createEnvelopeMock.mockResolvedValue({ envelopeId: 'env_1' });
+  envelopeExistsMock.mockReset();
+  envelopeExistsMock.mockImplementation(async (id: string) => store.has(`esignEnvelopes/${id}`));
   createAlertTaskMock.mockReset();
   createAlertTaskMock.mockResolvedValue('alert_1');
   resolveAlertTasksMock.mockReset();
@@ -743,6 +748,27 @@ describe('envelopes from before signing moved in-house', () => {
     expect(sent).toEqual([]);
     expect(createEnvelopeMock).not.toHaveBeenCalled();
     expect(store.get('userOnboarding/u1_contract')?.esignEnvelopeId).toBe('legacy-contract');
+  });
+
+  it('skips, never resends, an item whose envelope read fails', async () => {
+    approveAllBut('contract');
+    store.set('userOnboarding/u1_contract', { status: 'submitted', esignEnvelopeId: 'legacy-123' });
+    envelopeExistsMock.mockRejectedValueOnce(new Error('firestore unavailable'));
+
+    expect(await sendPendingEsignDocs('u1')).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+  });
+
+  it('with onlyStale, replaces stale envelopes but sends nothing that was never sent', async () => {
+    store.set('users/u1', { ...store.get('users/u1'), status: 'active' });
+    store.set('userOnboarding/u1_contract', { status: 'submitted', esignEnvelopeId: 'legacy-123' });
+    // w9, direct_deposit, fcra_auth, pay_structure: never sent.
+
+    const sent = await sendPendingEsignDocs('u1', { onlyStale: true });
+
+    expect(sent).toEqual(['contract']);
+    expect(createEnvelopeMock).toHaveBeenCalledOnce();
+    expect(store.get('userOnboarding/u1_w9')).toBeUndefined();
   });
 
   it('keeps an unsigned item whose envelope record exists', async () => {

@@ -176,6 +176,36 @@ describe('GET /api/portal/onboarding status gate', () => {
     expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
   });
 
+  // Approved before signing, with envelopes sent before signing moved in-house:
+  // the rep still owes them, so those (and only those) get fresh envelopes.
+  it('resends only stale envelopes for an active rep reading their own checklist', async () => {
+    activeUser();
+    gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
+    store.set('userOnboarding/u1_w9', { status: 'submitted', esignEnvelopeId: 'legacy-123' });
+
+    await GET(makeRequest('u1'));
+
+    expect(sendPendingEsignDocsMock).toHaveBeenCalledExactlyOnceWith('u1', { onlyStale: true });
+  });
+
+  it('does not resend for an active rep when an envelope read fails', async () => {
+    activeUser();
+    gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
+    store.set('userOnboarding/u1_w9', { status: 'submitted', esignEnvelopeId: 'env_9' });
+    const realDoc = docMock.getMockImplementation()!;
+    docMock.mockImplementation((name: string, id: string) =>
+      name === 'esignEnvelopes'
+        ? { path: `${name}/${id}`, get: () => Promise.reject(new Error('unavailable')) }
+        : realDoc(name, id)
+    );
+
+    const res = await GET(makeRequest('u1'));
+
+    docMock.mockImplementation(realDoc);
+    expect(res.status).toBe(200);
+    expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
+  });
+
   it('is empty for an active rep activated before e-sign existed (nothing sent)', async () => {
     activeUser();
     gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
