@@ -529,3 +529,61 @@ describe('POST /api/public/onboarding/[token]', () => {
     });
   });
 });
+
+describe('POST: the sign-on-the-spot handoff', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('with in-house signing, creates the envelopes before answering, holds the email, and returns a one-time signing key', async () => {
+    vi.stubEnv('ESIGN_PROVIDER', 'inhouse');
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { signingKey?: string };
+    expect(body.signingKey).toEqual(expect.any(String));
+    expect(sendPendingEsignDocsMock).toHaveBeenCalledWith('user-1', { deferReadyEmail: true });
+
+    // Only the key's hash is stored on the invite, bound to the new account.
+    const inviteWrite = batchSetMock.mock.calls.find(([ref]) => ref === inviteRef)?.[1] as {
+      esignSession?: { keyHash: string; userId: string; expiresAt: Date };
+    };
+    expect(inviteWrite.esignSession).toMatchObject({ userId: 'user-1', keyHash: expect.any(String) });
+    expect(inviteWrite.esignSession?.keyHash).not.toBe(body.signingKey);
+    expect(JSON.stringify(inviteWrite)).not.toContain(body.signingKey!);
+  });
+
+  it('with a vendor provider, keeps the old path: no key, envelopes and email sent after the response', async () => {
+    vi.stubEnv('ESIGN_PROVIDER', 'signwell');
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).not.toHaveProperty('signingKey');
+    expect(sendPendingEsignDocsMock).toHaveBeenCalledWith('user-1');
+    const inviteWrite = batchSetMock.mock.calls.find(([ref]) => ref === inviteRef)?.[1];
+    expect(inviteWrite).not.toHaveProperty('esignSession');
+  });
+
+  it('never mints a key for an account it refused to claim', async () => {
+    vi.stubEnv('ESIGN_PROVIDER', 'inhouse');
+    getUserByEmailMock.mockResolvedValue({ uid: 'victim' });
+    userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'active', fieldRole: 'ae_tier_1' }) });
+
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).not.toHaveProperty('signingKey');
+    expect(batchSetMock).not.toHaveBeenCalled();
+    expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
+  });
+
+  it('never mints a second key for an invite already submitted', async () => {
+    vi.stubEnv('ESIGN_PROVIDER', 'inhouse');
+    inviteData.status = 'submitted';
+
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).not.toHaveProperty('signingKey');
+  });
+});

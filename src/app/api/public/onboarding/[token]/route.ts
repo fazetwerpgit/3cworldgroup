@@ -16,6 +16,7 @@ import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { findActivePortalAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
+import { inviteSigningAvailable, issueSigningSession } from '@/lib/onboarding/inviteSigning';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -380,9 +381,15 @@ export async function POST(
       );
     }
 
+    // In-house signing: the hire signs every document on the next screen, so
+    // this response carries a one-time signing key for it (see inviteSigning).
+    const signOnTheSpot = inviteSigningAvailable() && items.some((item) => isEsignItem(item.id));
+    const signingSession = signOnTheSpot ? issueSigningSession(userRecord.uid, now) : null;
+
     batch.set(
       invite.ref,
       {
+        ...(signingSession ? { esignSession: signingSession.record } : {}),
         status: 'submitted',
         convertedUserId: userRecord.uid,
         candidateName: displayName,
@@ -422,11 +429,20 @@ export async function POST(
       throw commitError;
     }
 
-    after(() =>
-      sendPendingEsignDocs(userRecord.uid).catch((err) =>
-        console.error('[onboarding] esign auto-send failed', err)
-      )
-    );
+    if (signingSession) {
+      // The envelopes must exist when the signing step loads, so they are
+      // created now, not after the response. The "ready to sign" email is held
+      // back: the hire is about to sign, and the daily cron sends it only if
+      // something is still unsigned later. Failure-contained: the step's load
+      // call retries whatever did not go out.
+      await sendPendingEsignDocs(userRecord.uid, { deferReadyEmail: true });
+    } else {
+      after(() =>
+        sendPendingEsignDocs(userRecord.uid).catch((err) =>
+          console.error('[onboarding] esign auto-send failed', err)
+        )
+      );
+    }
 
     try {
       await adminDb.collection('notifications').add({
@@ -442,7 +458,11 @@ export async function POST(
       console.error('Failed to create onboarding notification:', notificationError);
     }
 
-    return NextResponse.json({ success: true, status: 'submitted' });
+    return NextResponse.json({
+      success: true,
+      status: 'submitted',
+      ...(signingSession ? { signingKey: signingSession.key } : {}),
+    });
   } catch (error: unknown) {
     console.error('Error submitting public onboarding:', error);
     if (error && typeof error === 'object' && 'code' in error) {
