@@ -1,0 +1,88 @@
+/* A document's fill-in fields and the signing consent row, shared by the
+   portal sign page and the invite link's sign-all step. Layout and inputs come
+   from rep-forms.module.css; tokens live on .root / .layer in rep.module.css. */
+
+.input[readonly] {
+  color: var(--c-text-2);
+  background: var(--c-panel);
+}
+
+.editButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  margin: calc((var(--tap) - 24px) / -2) calc(var(--s3) * -1) calc((var(--tap) - 24px) / -2) 0;
+  padding: 0 var(--s3);
+  border: 0;
+  background: none;
+  color: var(--c-lime);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+/* Checkbox rows: Log Sale's extras (a 22px box, 52px row). */
+.checks {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+}
+
+.checks .check + .check {
+  border-top: 1px solid var(--c-line);
+}
+
+.check {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: var(--s3);
+  min-height: 52px;
+  padding: 15px var(--s4);
+  background: var(--c-ground);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.box {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--c-line-strong);
+  border-radius: 4px;
+  color: var(--c-on-lime);
+}
+
+.check:has(input:checked) .box {
+  border-color: var(--c-lime);
+  background: var(--c-lime);
+}
+
+.check:has(input:focus-visible) {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.consent {
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.consent:has(input:checked) {
+  border-color: rgba(141, 198, 63, 0.45);
+  background: var(--c-lime-wash);
+  color: var(--c-text);
+}
+

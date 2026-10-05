@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Check, CircleCheck, RotateCw } from 'lucide-react';
+import { ArrowLeft, CircleCheck, RotateCw } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RepBoot, RepShell, useHideRepTabBar } from '@/components/portal/rep/RepShell';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
@@ -11,7 +11,13 @@ import { useSoftKeyboardOpen } from '@/components/portal/rep/RepForm';
 import s from '@/components/portal/rep/rep.module.css';
 import f from '@/components/portal/rep/rep-forms.module.css';
 import PdfPages from '@/components/esign/PdfPages';
-import { fieldLabelWithOptional } from '@/components/esign/fieldLabel';
+import {
+  ConsentCheck,
+  DocumentFields,
+  fieldsBlocker,
+  initialFieldValues,
+  type FieldValues,
+} from '@/components/esign/DocumentFields';
 import SignaturePad from '@/components/esign/SignaturePad';
 import {
   clearSignature,
@@ -21,7 +27,7 @@ import {
   type StoredSignature,
 } from '@/components/esign/signatureStore';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { ESIGN_CONSENT_TEXT, fieldFormatError } from '@/lib/esign/documents';
+import type { EnvelopeView } from '@/lib/esign/envelopeView';
 import { friendlyError } from '@/lib/forms/friendlyError';
 import { FieldRoles } from '@/types';
 import { envelopeLoadFailure, type EnvelopeLoadFailure } from './loadFailure';
@@ -29,109 +35,12 @@ import styles from './sign-page.module.css';
 
 const CHECKLIST_HREF = '/portal/onboarding';
 
-/** Mirrors the envelope route's response (`EnvelopeView`). */
-interface EnvelopeFieldView {
-  key: string;
-  type: 'text' | 'checkbox';
-  label: string;
-  required: boolean;
-  sensitive: boolean;
-  value: string | boolean;
-  prefilled: boolean;
-  page: number;
-}
-
-interface EnvelopeView {
-  envelopeId: string;
-  docKey: string;
-  name: string;
-  status: 'sent' | 'completed';
-  pageCount: number;
-  signerName: string;
-  signerEmail: string;
-  fields: EnvelopeFieldView[];
-}
-
-type FieldValues = Record<string, string | boolean>;
-
-/**
- * The server's one-of rules, mirrored here only so the Sign button can say what
- * is missing before the round trip. `validateFields` on the server stays the
- * authority; this never lets anything through that it would reject.
- * `none` shows while nothing is filled, `many` while more than one is.
- */
-const ONE_OF_RULES: Record<string, { keys: string[]; none: string; many: string; label?: string }[]> = {
-  w9: [
-    {
-      keys: ['ssn', 'ein'],
-      none: 'Enter your SSN or EIN.',
-      many: 'Enter either an SSN or an EIN, not both.',
-      // Each box alone is optional, but one of them is not: say so on both.
-      label: 'SSN or EIN required',
-    },
-    {
-      keys: ['individual_sole_prop', 'llc'],
-      none: 'Choose a tax classification.',
-      many: 'Choose one tax classification.',
-    },
-  ],
-  direct_deposit: [{ keys: ['checking', 'savings'], none: 'Choose checking or savings.', many: 'Choose checking or savings, not both.' }],
-};
-
-type FieldInputProps = Pick<
-  React.InputHTMLAttributes<HTMLInputElement>,
-  'type' | 'inputMode' | 'autoComplete' | 'autoCapitalize' | 'autoCorrect' | 'spellCheck'
->;
-
-/** Numbers never go into autofill, autocorrect or the suggestion bar. */
-const PRIVATE_NUMBER: FieldInputProps = {
-  inputMode: 'numeric',
-  autoComplete: 'off',
-  autoCapitalize: 'off',
-  autoCorrect: 'off',
-  spellCheck: false,
-};
-const PERSON_NAME: FieldInputProps = { autoComplete: 'name', autoCapitalize: 'words', autoCorrect: 'off', spellCheck: false };
-const STREET: FieldInputProps = { autoComplete: 'address-line1', autoCapitalize: 'words', autoCorrect: 'off' };
-
-/**
- * The phone keyboard and autofill for each document field. Fields not listed
- * take a plain sentence-case text box with autofill off.
- */
-const FIELD_INPUT: Record<string, FieldInputProps> = {
-  ssn: PRIVATE_NUMBER,
-  ein: PRIVATE_NUMBER,
-  routing_number: PRIVATE_NUMBER,
-  account_number: PRIVATE_NUMBER,
-  cell_phone: { type: 'tel', autoComplete: 'mobile tel' },
-  office_phone: { type: 'tel', autoComplete: 'work tel' },
-  email: { type: 'email', autoComplete: 'email', autoCapitalize: 'off', autoCorrect: 'off', spellCheck: false },
-  website: { type: 'url', autoComplete: 'url', autoCapitalize: 'off', autoCorrect: 'off', spellCheck: false },
-  name: PERSON_NAME,
-  legal_name: PERSON_NAME,
-  agent_name: PERSON_NAME,
-  business_name: { autoComplete: 'organization', autoCapitalize: 'words', autoCorrect: 'off' },
-  bank_name: { autoComplete: 'off', autoCapitalize: 'words', autoCorrect: 'off' },
-  street_address: STREET,
-  address: STREET,
-  city_state_zip: { autoComplete: 'off', autoCapitalize: 'words', autoCorrect: 'off' },
-  llc_classification: { autoComplete: 'off', autoCapitalize: 'characters', autoCorrect: 'off', spellCheck: false },
-  deposit_amount: { inputMode: 'decimal', autoComplete: 'off' },
-};
-
-function isFilled(value: string | boolean | undefined): boolean {
-  return typeof value === 'boolean' ? value : String(value ?? '').trim().length > 0;
-}
-
-
 function EsignSign() {
   const { envelopeId } = useParams<{ envelopeId: string }>();
 
   const [envelope, setEnvelope] = useState<EnvelopeView | null>(null);
   const [values, setValues] = useState<FieldValues>({});
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
-  // Fields the rep has left once: a format error shows under them from then on.
-  const [blurred, setBlurred] = useState<Record<string, boolean>>({});
   const [signature, setSignature] = useState<StoredSignature | null>(null);
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -176,7 +85,7 @@ function EsignSign() {
 
       const view = payload as EnvelopeView;
       setEnvelope(view);
-      setValues(Object.fromEntries(view.fields.map((field) => [field.key, field.value])));
+      setValues(initialFieldValues(view));
       if (view.status === 'completed') setCompleted(true);
     };
 
@@ -242,20 +151,8 @@ function EsignSign() {
   /** The one thing still standing between the rep and a signed document. */
   const blocker = useMemo(() => {
     if (!envelope) return 'Loading this document.';
-    for (const field of envelope.fields) {
-      if (field.type === 'text' && field.required && !isFilled(values[field.key])) {
-        return `Fill in ${field.label.toLowerCase()}.`;
-      }
-    }
-    for (const field of envelope.fields) {
-      const formatError = fieldFormatError(envelope.docKey, field.key, String(values[field.key] ?? ''));
-      if (field.type === 'text' && formatError) return `${formatError}.`;
-    }
-    for (const rule of ONE_OF_RULES[envelope.docKey] ?? []) {
-      const filled = rule.keys.filter((key) => isFilled(values[key])).length;
-      if (filled === 0) return rule.none;
-      if (filled > 1) return rule.many;
-    }
+    const missing = fieldsBlocker(envelope, values);
+    if (missing) return missing;
     if (!signature) return 'Add your signature.';
     if (!consent) return 'Read and accept the statement above.';
     return null;
@@ -304,70 +201,6 @@ function EsignSign() {
   // The sign bar takes the tab bar's place on phones while there is something to sign.
   useHideRepTabBar(Boolean(envelope) && !completed);
 
-  const renderCheckbox = (field: EnvelopeFieldView) => (
-    <label key={field.key} className={styles.check}>
-      <input
-        type="checkbox"
-        checked={values[field.key] === true}
-        onChange={(event) => setFieldValue(field.key, event.target.checked)}
-      />
-      <span className={styles.box} aria-hidden="true">
-        {values[field.key] === true ? <Check size={14} strokeWidth={3} /> : null}
-      </span>
-      <span>{field.label}</span>
-    </label>
-  );
-
-  const renderField = (field: EnvelopeFieldView) => {
-    // Prefilled values come from the rep's own profile; they stay read-only
-    // until the rep asks to change them, so a stray tap cannot blank a name.
-    const readOnly = field.prefilled && !unlocked[field.key];
-    const formatError = fieldFormatError(envelope?.docKey ?? '', field.key, String(values[field.key] ?? ''));
-    const showFormatError = Boolean(formatError) && Boolean(blurred[field.key]);
-    const oneOf = ONE_OF_RULES[envelope?.docKey ?? '']?.find((rule) => rule.label && rule.keys.includes(field.key));
-    return (
-      <div key={field.key} className={f.field}>
-        <div className={f.label}>
-          <label htmlFor={`esign-${field.key}`}>
-            {oneOf ? `${field.label.trim()} (${oneOf.label})` : fieldLabelWithOptional(field.label, field.required)}
-          </label>
-          {readOnly && (
-            <button
-              type="button"
-              className={styles.editButton}
-              onClick={() => setUnlocked((current) => ({ ...current, [field.key]: true }))}
-            >
-              Edit
-            </button>
-          )}
-        </div>
-        <input
-          id={`esign-${field.key}`}
-          className={`${f.input} ${styles.input}`}
-          value={String(values[field.key] ?? '')}
-          readOnly={readOnly}
-          onChange={(event) => setFieldValue(field.key, event.target.value)}
-          onBlur={() => setBlurred((current) => ({ ...current, [field.key]: true }))}
-          aria-invalid={showFormatError || undefined}
-          aria-describedby={showFormatError ? `esign-${field.key}-error` : undefined}
-          autoComplete="off"
-          autoCapitalize={field.sensitive ? 'off' : 'sentences'}
-          spellCheck={field.sensitive ? false : undefined}
-          {...FIELD_INPUT[field.key]}
-          maxLength={200}
-        />
-        {showFormatError && (
-          <p id={`esign-${field.key}-error`} className={f.fieldError}>
-            {formatError}
-          </p>
-        )}
-        {field.sensitive && (
-          <p className={f.hint}>Written into this signed document only. Never saved to your profile.</p>
-        )}
-      </div>
-    );
-  };
-
   // A failed Sign shows here, in the bar the rep is looking at, not at the top of the page.
   const status = submitting
     ? 'Applying your signature…'
@@ -385,8 +218,6 @@ function EsignSign() {
       {submitting ? 'Signing…' : 'Sign'}
     </button>
   );
-  const textFields = envelope?.fields.filter((field) => field.type !== 'checkbox') ?? [];
-  const checkFields = envelope?.fields.filter((field) => field.type === 'checkbox') ?? [];
   const signStep = envelope && envelope.fields.length > 0 ? 3 : 2;
 
   if (loading) {
@@ -484,8 +315,13 @@ function EsignSign() {
                 <b aria-hidden="true">2</b>
                 Fill
               </h2>
-              {textFields.length > 0 && <div className={f.grid}>{textFields.map(renderField)}</div>}
-              {checkFields.length > 0 && <div className={styles.checks}>{checkFields.map(renderCheckbox)}</div>}
+              <DocumentFields
+                envelope={envelope}
+                values={values}
+                unlocked={unlocked}
+                onChange={setFieldValue}
+                onUnlock={(key) => setUnlocked((current) => ({ ...current, [key]: true }))}
+              />
             </section>
           )}
 
@@ -495,13 +331,7 @@ function EsignSign() {
               Sign
             </h2>
             <SignaturePad value={signature} signerName={envelope.signerName} onChange={handleSignatureChange} />
-            <label className={`${styles.check} ${styles.consent}`}>
-              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-              <span className={styles.box} aria-hidden="true">
-                {consent ? <Check size={14} strokeWidth={3} /> : null}
-              </span>
-              <span>{ESIGN_CONSENT_TEXT}</span>
-            </label>
+            <ConsentCheck checked={consent} onChange={setConsent} />
           </section>
 
           {/* Desktop, and phones with the keyboard up: in the page flow. */}
