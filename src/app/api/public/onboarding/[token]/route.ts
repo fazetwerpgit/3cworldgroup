@@ -257,9 +257,24 @@ export async function POST(
       userRecord = await adminAuth.getUserByEmail(data.candidateEmail);
       const existingDoc = await adminDb.collection('users').doc(userRecord.uid).get();
       existingUserData = existingDoc.exists ? existingDoc.data() : undefined;
-      const reusable = !existingDoc.exists || existingUserData?.status === 'pending' || !!existingUserData?.onboardingInviteId;
-      if (!reusable) {
-        return NextResponse.json({ error: 'This email already has an active portal account. Sign in at the portal instead, or contact your manager.' }, { status: 409 });
+      // An invite may claim an existing login only when nobody else is using
+      // it: a bare self-signup still waiting for a role, a past hire who is no
+      // longer active (re-hire), or this same invite retried. Never an active
+      // account, a back-office account, or a hire midway through someone
+      // else's onboarding: claiming resets their password and profile.
+      const status = existingUserData?.status;
+      const platformRole = typeof existingUserData?.role === 'string' && ['owner', 'admin', 'operations'].includes(existingUserData.role);
+      const onboardingElsewhere =
+        status === 'pending' && !!existingUserData?.fieldRole && existingUserData?.onboardingInviteId !== invite.id;
+      if (existingDoc.exists && (status === 'active' || platformRole || onboardingElsewhere)) {
+        return NextResponse.json(
+          {
+            error: onboardingElsewhere
+              ? 'This email is already onboarding with 3C. Sign in at the portal to continue, or contact your manager.'
+              : 'This email already has an active portal account. Sign in at the portal instead, or contact your manager.',
+          },
+          { status: 409 }
+        );
       }
       await adminAuth.updateUser(userRecord.uid, { password, displayName });
     } catch (error: unknown) {

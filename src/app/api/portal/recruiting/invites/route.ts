@@ -10,6 +10,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
 import { inviteUrlFor, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
+import { findActivePortalAccount } from '@/lib/auth/existingAccount';
 
 const APPLICATION_LIMIT = 1000;
 
@@ -135,6 +136,12 @@ export async function POST(request: NextRequest) {
     const requester = await getRecruitingRequester(requestedBy);
     if (!requester?.canManage) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (await findActivePortalAccount(candidateEmail)) {
+      return NextResponse.json(
+        { error: 'This email already has an active portal account. They can sign in with it instead.' },
+        { status: 409 }
+      );
     }
 
     const { token, tokenHash } = createInviteToken();

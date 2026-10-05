@@ -47,8 +47,8 @@ const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 //
 // This is a regex over file text, not a TypeScript parse — fine for a dev-time
 // audit, not fine to trust blindly. Block comments are stripped first so a
-// commented-out `export async function POST_DISABLED(...)` (see
-// portal/auth/signup/route.ts) can't be mistaken for a live POST, and the
+// commented-out `export async function POST_DISABLED(...)` can't be mistaken
+// for a live POST, and the
 // method regex requires the exact method name immediately followed by `(` so
 // POST_DISABLED itself never matches POST. If a route.ts uses some other
 // export shape (default export, re-exported handler, etc.) it will be
@@ -125,7 +125,6 @@ const ALLOWED_OPEN = [
   ['POST', '/api/public/onboarding/probe-token/upload', 'same invite-token auth'],
   ['POST', '/api/webhooks/esign', 'verifies a request signature, not a bearer token'],
   ['GET', '/api/cron/onboarding-nudges', 'checks CRON_SECRET'],
-  ['POST', '/api/portal/auth/signup', 'intentionally unauthenticated (currently hard-disabled server-side, returns 403 to everyone regardless)'],
   ['POST', '/api/portal/auth/signup-notify', 'intentionally unauthenticated'],
   ['POST', '/api/public/applications', 'intentionally unauthenticated'],
 ];

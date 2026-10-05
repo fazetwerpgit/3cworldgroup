@@ -290,6 +290,27 @@ describe('POST /api/public/onboarding/[token]', () => {
     expect(createUserMock).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['an active rep who joined through an earlier invite', { status: 'active', fieldRole: 'entry_level_rep', onboardingInviteId: 'old-invite' }],
+    ['a back-office account', { status: 'inactive', role: 'admin' }],
+    ["a hire midway through another manager's onboarding", { status: 'pending', fieldRole: 'ae_tier_1', onboardingInviteId: 'other-invite' }],
+  ])('never takes over %s (no password reset, no profile write)', async (_label, existing) => {
+    getUserByEmailMock.mockResolvedValue({ uid: 'victim' });
+    userDocGetMock.mockResolvedValue({ exists: true, data: () => existing });
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+    expect(response.status).toBe(409);
+    expect(updateUserMock).not.toHaveBeenCalled();
+    expect(createUserMock).not.toHaveBeenCalled();
+  });
+
+  it('lets an invite claim a bare self-signup still waiting for a role', async () => {
+    getUserByEmailMock.mockResolvedValue({ uid: 'self-signup' });
+    userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'pending' }) });
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+    expect(response.status).toBe(200);
+    expect(updateUserMock).toHaveBeenCalledWith('self-signup', expect.any(Object));
+  });
+
   it('returns success when notification creation fails', async () => {
     const db = (await import('@/lib/firebase/admin')).adminDb!;
     (db.collection('notifications').add as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('nope'));
