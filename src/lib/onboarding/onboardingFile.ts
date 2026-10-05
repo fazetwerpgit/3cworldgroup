@@ -127,14 +127,16 @@ export async function loadOnboardingFileSource(db: Db, uid: string): Promise<Onb
 export function buildOnboardingFileItems(source: OnboardingFileSource): OnboardingFileItem[] {
   const { fieldRole } = resolveRoles(source.user.role as never, source.user.fieldRole as never);
   const onChecklist = new Set(
-    fieldRole ? getOnboardingItemsForUser(fieldRole as FieldRole, source.user.isIBO === true).map((item) => item.id) : []
+    fieldRole
+      ? getOnboardingItemsForUser(fieldRole as FieldRole, source.user.isIBO === true).map((item) => item.id)
+      : [],
   );
   return ONBOARDING_ITEMS.filter((item) => onChecklist.has(item.id) || source.itemDocs.has(item.id))
     .sort((a, b) => a.order - b.order)
     .map((item) => {
       const doc = source.itemDocs.get(item.id);
       const status = (['not_started', 'submitted', 'approved', 'rejected'] as const).includes(
-        doc?.status as OnboardingStatus
+        doc?.status as OnboardingStatus,
       )
         ? (doc?.status as OnboardingStatus)
         : 'not_started';
@@ -245,7 +247,10 @@ export function uploadFileName(prefix: string, itemId: string, storedName: strin
   const base = dot > 0 ? storedName.slice(0, dot) : storedName;
   const ext = dot > 0 ? slug(storedName.slice(dot + 1)).toLowerCase() : '';
   const baseSlug = slug(base);
-  const name = baseSlug && baseSlug !== 'file' ? `${prefix}-${itemFileName(itemId)}-${baseSlug}` : `${prefix}-${itemFileName(itemId)}`;
+  const name =
+    baseSlug && baseSlug !== 'file'
+      ? `${prefix}-${itemFileName(itemId)}-${baseSlug}`
+      : `${prefix}-${itemFileName(itemId)}`;
   return ext ? `${name}.${ext}` : name;
 }
 

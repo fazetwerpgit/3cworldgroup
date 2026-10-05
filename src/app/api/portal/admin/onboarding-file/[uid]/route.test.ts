@@ -168,7 +168,11 @@ beforeEach(() => {
     status: 'approved',
     esignEnvelopeId: 'env-1',
   });
-  fake.store.set('userOnboarding/alex_direct_deposit', { userId: 'alex', itemId: 'direct_deposit', status: 'submitted' });
+  fake.store.set('userOnboarding/alex_direct_deposit', {
+    userId: 'alex',
+    itemId: 'direct_deposit',
+    status: 'submitted',
+  });
   fake.store.set('userOnboarding/alex_dl_photos', {
     userId: 'alex',
     itemId: 'dl_photos',
@@ -180,7 +184,12 @@ beforeEach(() => {
   fake.files.set('onboarding/alex/dl_photos/back.jpg', Buffer.from('back-bytes'));
 
   // An older rep: no onboarding records, no packet, no sensitive doc.
-  fake.store.set('users/old', { displayName: 'Pat Older', email: 'pat@example.com', fieldRole: 'ae_tier_1', status: 'active' });
+  fake.store.set('users/old', {
+    displayName: 'Pat Older',
+    email: 'pat@example.com',
+    fieldRole: 'ae_tier_1',
+    status: 'active',
+  });
   // Another owner.
   fake.store.set('users/owner1', { displayName: 'Owner One', role: 'owner', status: 'active' });
   fake.store.set('userSensitive/owner1', { ssnEncrypted: encryptField('111223333') });
@@ -226,7 +235,11 @@ describe('owner gate on every onboarding-file route', () => {
     expect(summary.status).toBe(200);
     const download = await call.download('owner1');
     expect(download.status).toBe(200);
-    expect(rows('sensitiveAccessLog')[0]).toMatchObject({ targetUid: 'owner1', revealedBy: 'owner2', sensitiveFields: true });
+    expect(rows('sensitiveAccessLog')[0]).toMatchObject({
+      targetUid: 'owner1',
+      revealedBy: 'owner2',
+      sensitiveFields: true,
+    });
   });
 
   it('404s an unknown person or a malformed uid', async () => {
@@ -254,7 +267,11 @@ describe('summary', () => {
       backgroundConsent: 'Yes',
     });
     const byId = Object.fromEntries(body.items.map((item: { itemId: string }) => [item.itemId, item]));
-    expect(byId.w9).toMatchObject({ status: 'approved', hasSignedPdf: true, prefill: { taxClassification: 'individual' } });
+    expect(byId.w9).toMatchObject({
+      status: 'approved',
+      hasSignedPdf: true,
+      prefill: { taxClassification: 'individual' },
+    });
     expect(byId.contract).toMatchObject({ hasSignedPdf: true });
     expect(byId.direct_deposit).toMatchObject({ status: 'submitted', hasSignedPdf: false });
     expect(byId.dl_photos).toMatchObject({ hasFiles: true });
@@ -262,7 +279,12 @@ describe('summary', () => {
     expect(JSON.stringify(body)).not.toMatch(/123456789|123-45|D1234567/);
 
     expect(rows('adminAuditLog')).toEqual([
-      expect.objectContaining({ action: 'onboardingFile.view', actorUid: 'owner1', targetUid: 'alex', targetName: 'Alex Rivera' }),
+      expect.objectContaining({
+        action: 'onboardingFile.view',
+        actorUid: 'owner1',
+        targetUid: 'alex',
+        targetName: 'Alex Rivera',
+      }),
     ]);
   });
 
@@ -270,7 +292,13 @@ describe('summary', () => {
     const response = await call.summary('old');
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.profile).toMatchObject({ name: 'Pat Older', address: '', manager: '', packetSubmittedAt: '', backgroundConsent: '' });
+    expect(body.profile).toMatchObject({
+      name: 'Pat Older',
+      address: '',
+      manager: '',
+      packetSubmittedAt: '',
+      backgroundConsent: '',
+    });
     for (const item of body.items) {
       expect(item).toMatchObject({ status: 'not_started', hasSignedPdf: false, hasFiles: false });
     }
@@ -284,7 +312,12 @@ describe('signed PDF', () => {
     expect(response.headers.get('content-type')).toBe('application/pdf');
     expect(Buffer.from(await response.arrayBuffer()).toString()).toBe('%PDF-w9');
     expect(rows('sensitiveAccessLog')).toEqual([
-      expect.objectContaining({ targetUid: 'alex', itemId: 'w9', revealedBy: 'owner1', source: 'onboarding-file-signed-pdf' }),
+      expect.objectContaining({
+        targetUid: 'alex',
+        itemId: 'w9',
+        revealedBy: 'owner1',
+        source: 'onboarding-file-signed-pdf',
+      }),
     ]);
   });
 
@@ -392,7 +425,13 @@ describe('download all files', () => {
     ]);
     expect(rows('sensitiveAccessLog')[0].itemIds).toEqual(['w9', 'dl_photos', 'contract']);
     expect(rows('adminExports')).toEqual([
-      expect.objectContaining({ kind: 'onboarding-file', by: 'owner1', targetUid: 'alex', fileCount: 5, missingCount: 0 }),
+      expect.objectContaining({
+        kind: 'onboarding-file',
+        by: 'owner1',
+        targetUid: 'alex',
+        fileCount: 5,
+        missingCount: 0,
+      }),
     ]);
     expect(JSON.stringify(rows('adminExports'))).not.toMatch(/6789|D1234567|555-0100|Rivera/);
   });

@@ -8,7 +8,7 @@ import { getEsignProvider } from '@/lib/esign/provider';
 export class SignedPdfError extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
   ) {
     super(message);
     this.name = 'SignedPdfError';
@@ -30,11 +30,7 @@ export function hasSignedPdf(data: Record<string, unknown> | undefined): boolean
  * the next open is local. Throws SignedPdfError with the HTTP status a route
  * should send: 404 nothing to load, 500 storage missing, 502 provider failed.
  */
-export async function loadSignedPdf(
-  userId: string,
-  itemId: string,
-  data: Record<string, unknown>
-): Promise<Buffer> {
+export async function loadSignedPdf(userId: string, itemId: string, data: Record<string, unknown>): Promise<Buffer> {
   const storedPdfPath = typeof data.completedPdfPath === 'string' ? data.completedPdfPath : '';
   const envelopeId = typeof data.esignEnvelopeId === 'string' ? data.esignEnvelopeId : '';
   if (!storedPdfPath && !envelopeId) throw new SignedPdfError('Signed PDF not available', 404);
@@ -61,10 +57,7 @@ export async function loadSignedPdf(
         .bucket(bucketName)
         .file(completedPdfPath)
         .save(pdf, { contentType: 'application/pdf', resumable: false });
-      await adminDb
-        .collection('userOnboarding')
-        .doc(`${userId}_${itemId}`)
-        .set({ completedPdfPath }, { merge: true });
+      await adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`).set({ completedPdfPath }, { merge: true });
     }
   } catch (error) {
     // The provider PDF is still valid for this response if persistence is unavailable.

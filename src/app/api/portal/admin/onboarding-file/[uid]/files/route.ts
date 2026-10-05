@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const snap = await adminDb.collection('userOnboarding').doc(`${uid}_${itemId}`).get();
-    const reference = snap.exists ? (snap.data()?.reference as string | undefined) ?? null : null;
+    const reference = snap.exists ? ((snap.data()?.reference as string | undefined) ?? null) : null;
     const files = await signFolderFiles(reference);
     if (files.length > 0) {
       await logSensitiveFileAccess({

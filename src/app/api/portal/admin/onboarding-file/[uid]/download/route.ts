@@ -76,20 +76,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           zip.file(uniqueName(uploadFileName(prefix, item.itemId, file.name), taken), file.data);
         }
         if (files.length > 0) included.push(item.itemId);
-        if (failed.length > 0) missing.push(`${item.label}: ${failed.length === 1 ? 'a file' : `${failed.length} files`} could not be loaded`);
-        else if (item.hasFiles && files.length === 0) missing.push(`${item.label}: no files found in its upload folder`);
+        if (failed.length > 0)
+          missing.push(
+            `${item.label}: ${failed.length === 1 ? 'a file' : `${failed.length} files`} could not be loaded`,
+          );
+        else if (item.hasFiles && files.length === 0)
+          missing.push(`${item.label}: no files found in its upload folder`);
       }
     }
 
     const { rows, revealedUids } = buildExportRows(
       [{ uid, data: source.user }],
-      new Map<string, ExportSensitive>([[uid, source.sensitive as ExportSensitive]])
+      new Map<string, ExportSensitive>([[uid, source.sensitive as ExportSensitive]]),
     );
     zip.file(uniqueName(`${prefix}-info.xlsx`, taken), await buildExportWorkbook(rows));
     if (missing.length > 0) {
       zip.file(
         uniqueName(`${prefix}-missing-files.txt`, taken),
-        `These files could not be included in this download:\r\n\r\n${missing.map((line) => `- ${line}`).join('\r\n')}\r\n`
+        `These files could not be included in this download:\r\n\r\n${missing.map((line) => `- ${line}`).join('\r\n')}\r\n`,
       );
     }
 

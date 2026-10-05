@@ -4,7 +4,7 @@ import { personFilePrefix, signedPdfFileName, uniqueName, uploadFileName } from 
 describe('onboarding file names', () => {
   it('puts the last name first and keeps only safe characters', () => {
     expect(personFilePrefix('Alex Rivera')).toBe('Rivera-Alex');
-    expect(personFilePrefix('Mary Ann  O\'Neil')).toBe('O-Neil-Mary-Ann');
+    expect(personFilePrefix("Mary Ann  O'Neil")).toBe('O-Neil-Mary-Ann');
     expect(personFilePrefix('José Núñez')).toBe('Nunez-Jose');
     expect(personFilePrefix('Cher')).toBe('Cher');
     expect(personFilePrefix('  ')).toBe('Employee');
