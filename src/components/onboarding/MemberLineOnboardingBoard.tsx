@@ -59,7 +59,6 @@ interface Props {
   renderItemAction: (item: WizardItem) => ReactNode;
   openItemId: string | null;
   onOpenItem: (id: string | null) => void;
-  onRefresh: () => void;
 }
 
 // Full always-visible checklist, direction D. Row next-actions that need real
@@ -73,7 +72,6 @@ export default function MemberLineOnboardingBoard({
   renderItemAction,
   openItemId,
   onOpenItem,
-  onRefresh,
 }: Props) {
   const ordered = [...items].sort((a, b) => a.order - b.order);
   const openItem = ordered.find((item) => item.id === openItemId) ?? null;
@@ -207,7 +205,6 @@ export default function MemberLineOnboardingBoard({
                   <MemberLineOnboardingSheetBody
                     item={openItem}
                     renderItemAction={renderItemAction}
-                    onRefresh={onRefresh}
                   />
                 </div>
               </div>
@@ -232,11 +229,9 @@ function rowDescription(item: WizardItem) {
 function MemberLineOnboardingSheetBody({
   item,
   renderItemAction,
-  onRefresh,
 }: {
   item: WizardItem;
   renderItemAction: (item: WizardItem) => ReactNode;
-  onRefresh: () => void;
 }) {
   if (item.status === 'approved') {
     return (
@@ -257,8 +252,8 @@ function MemberLineOnboardingSheetBody({
       )}
 
       {isEsignItem(item.id) ? (
-        item.esignSigningUrl ? (
-          <EsignSignAction itemId={item.id} signingUrl={item.esignSigningUrl} onRefresh={onRefresh} />
+        item.signPath ? (
+          <EsignSignAction signPath={item.signPath} />
         ) : (
           <p className={item.esignDispatch?.state === 'failed' ? `${o.note} ${o.noteWarn}` : o.note}>
             {item.esignDispatch?.state === 'failed' ? ESIGN_FAILURE_HELPER_TEXT : ESIGN_HELPER_TEXT}

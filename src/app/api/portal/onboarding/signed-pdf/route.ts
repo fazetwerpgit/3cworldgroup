@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
-import { getEsignProvider } from '@/lib/esign/provider';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { isSensitiveOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
 
@@ -59,10 +58,12 @@ export async function GET(request: NextRequest) {
     }
 
     const data = onboardingDoc.data() ?? {};
+    // Every signed document is stored when it is signed. Some documents signed
+    // before signing moved in-house never got a stored copy; those are only in
+    // the old vendor's dashboard, and this route says so rather than failing.
     const storedPdfPath = typeof data.completedPdfPath === 'string' ? data.completedPdfPath : '';
-    const envelopeId = typeof data.esignEnvelopeId === 'string' ? data.esignEnvelopeId : '';
-    if (!storedPdfPath && !envelopeId) {
-      return NextResponse.json({ error: 'Signed PDF not available' }, { status: 404 });
+    if (!storedPdfPath) {
+      return NextResponse.json({ error: 'No stored copy of this signed document' }, { status: 404 });
     }
 
     // Audit before any sensitive bytes leave the server, in the same shape the
@@ -77,39 +78,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (storedPdfPath) {
-      if (!adminStorage || !process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
-        return NextResponse.json({ error: 'Storage not configured' }, { status: 500 });
-      }
-      const [pdf] = await adminStorage
-        .bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)
-        .file(storedPdfPath)
-        .download();
-      return pdfResponse(pdf, itemId);
+    if (!adminStorage || !process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
+      return NextResponse.json({ error: 'Storage not configured' }, { status: 500 });
     }
-
-    let pdf: Buffer;
-    try {
-      pdf = await getEsignProvider().getCompletedPdf(envelopeId);
-    } catch (error) {
-      console.error(`[esign] completed PDF fetch failed for ${userId}/${itemId}`, error);
-      return NextResponse.json({ error: 'Failed to fetch signed PDF' }, { status: 502 });
-    }
-
-    const completedPdfPath = `esign-completed/${userId}/${itemId}.pdf`;
-    try {
-      if (adminStorage && process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
-        await adminStorage
-          .bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)
-          .file(completedPdfPath)
-          .save(pdf, { contentType: 'application/pdf', resumable: false });
-        await onboardingRef.set({ completedPdfPath }, { merge: true });
-      }
-    } catch (error) {
-      // The provider PDF is still valid for this response if persistence is unavailable.
-      console.error(`[esign] completed PDF persistence failed for ${userId}/${itemId}`, error);
-    }
-
+    const [pdf] = await adminStorage
+      .bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)
+      .file(storedPdfPath)
+      .download();
     return pdfResponse(pdf, itemId);
   } catch (error) {
     console.error('Error fetching signed onboarding PDF:', error);

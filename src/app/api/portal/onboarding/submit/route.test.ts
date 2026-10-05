@@ -80,7 +80,7 @@ describe('POST /api/portal/onboarding/submit', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: 'E-signature items are completed by the e-sign provider and do not accept typed references',
+      error: 'E-signature items are completed by signing them and do not accept typed references',
     });
     expect(batchSetMock).not.toHaveBeenCalled();
   });

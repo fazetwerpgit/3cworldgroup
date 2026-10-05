@@ -1,7 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { adminDb } from '@/lib/firebase/admin';
 import { getInviteByToken, SUBMITTED_INVITE_STATUSES } from '@/lib/recruiting/inviteLookup';
-import { getEsignProvider } from '@/lib/esign/provider';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { getOnboardingItemsForUser, type OnboardingItem } from '@/types/onboarding';
 import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
@@ -49,15 +48,6 @@ function asDate(value: unknown): Date | undefined {
   if (value instanceof Date) return value;
   const maybe = value as { toDate?: () => Date } | null | undefined;
   return typeof maybe?.toDate === 'function' ? maybe.toDate() : undefined;
-}
-
-/** True when this deployment signs in-house, which the sign-all step needs. */
-export function inviteSigningAvailable(): boolean {
-  try {
-    return getEsignProvider().id === 'inhouse';
-  } catch {
-    return false;
-  }
 }
 
 /** A fresh key for the hire's browser, and the record that goes on the invite. */

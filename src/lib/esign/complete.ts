@@ -12,7 +12,7 @@ export interface CompleteEsignItemInput {
   userId: string;
   itemId: string;
   envelopeId: string;
-  /** Signed PDF bytes, or null when the provider fetch failed (approval is still recorded, upload skipped). */
+  /** Signed PDF bytes, or null when there are none (approval is still recorded, upload skipped). */
   pdf: Buffer | null;
 }
 
@@ -27,9 +27,8 @@ export function completedPdfPathFor(userId: string, itemId: string): string {
 
 // The signed PDF is evidence, not the approval itself: a rep who signed stays
 // approved even when Storage is unavailable, so every failure here is logged
-// and swallowed. A null path tells the caller the bytes are not retrievable —
-// the in-house sign route uses that to refuse the signature and let the rep
-// retry, the webhook accepts it because the provider still holds the original.
+// and swallowed. A null path tells the caller the bytes are not retrievable;
+// the sign route uses that to refuse the signature and let the rep retry.
 async function storeCompletedPdf(
   ref: OnboardingRef,
   { userId, itemId, envelopeId }: Omit<CompleteEsignItemInput, 'pdf'>,
@@ -74,8 +73,8 @@ async function resolveRepName(userId: string): Promise<string> {
  * off that: storing the signed PDF, notifying the rep and the owners, and
  * re-checking activation readiness.
  *
- * Shared by the provider webhook (SignWell) and the in-house sign route, so it
- * takes bytes rather than fetching them. Ordering matters: the approval write
+ * Called by the sign act (signEnvelope), which hands over the stamped bytes.
+ * Ordering matters: the approval write
  * comes first and is the only step allowed to fail loudly, because a caller
  * that retries must not lose the approval. Every later step is contained so a
  * flaky bucket, mailbox, or activation read cannot undo a completed signature.

@@ -3,10 +3,10 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { LineCapStyle, PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
 import { DOCUMENTS, boxToPdfRect, type EsignExtraField, type EsignFieldValues, type PdfRect } from './documents';
-import type { EsignDocKey } from './provider';
+import type { EsignDocKey } from './types';
 
 /**
- * Server-side PDF stamping for the in-house e-sign provider: draws the rep's
+ * Server-side PDF stamping for e-signing: draws the rep's
  * answers, signature image, and sign date onto the blank source document, then
  * appends one audit page recording how and when it was signed.
  *

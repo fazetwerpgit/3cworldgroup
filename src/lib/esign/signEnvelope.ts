@@ -91,8 +91,8 @@ export function parseSignRequest(
 
 /**
  * The whole in-house signing act for one envelope the caller has already
- * proven belongs to `userId`: stamp the source PDF, run the same completion the
- * SignWell webhook runs, then mark the envelope. Shared by the portal sign
+ * proven belongs to `userId`: stamp the source PDF, run the shared completion
+ * (completeEsignItem), then mark the envelope. Shared by the portal sign
  * route and the invite link's sign-all step, so both leave the same signed
  * PDF, audit block and checklist approval. Nothing the rep typed is logged or
  * written to the envelope; the field values live only inside the stamped PDF.

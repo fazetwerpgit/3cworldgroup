@@ -123,7 +123,6 @@ const ALLOWED_OPEN = [
   ['GET', '/api/public/onboarding/probe-token', 'single-use invite token in the path, SHA-256-hashed and matched server-side — not a bearer token'],
   ['POST', '/api/public/onboarding/probe-token', 'same invite-token auth as the GET above'],
   ['POST', '/api/public/onboarding/probe-token/upload', 'same invite-token auth'],
-  ['POST', '/api/webhooks/esign', 'verifies a request signature, not a bearer token'],
   ['GET', '/api/cron/onboarding-nudges', 'checks CRON_SECRET'],
   ['POST', '/api/public/applications', 'intentionally unauthenticated'],
 ];

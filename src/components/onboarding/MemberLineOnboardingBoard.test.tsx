@@ -1,22 +1,16 @@
 // @vitest-environment jsdom
 //
 // Coverage for the exact branch implicated in the correctness review's
-// finding 5: MemberLineOnboardingBoard's `item.esignSigningUrl ? <EsignSignAction/>
+// finding 5: MemberLineOnboardingBoard's `item.signPath ? <EsignSignAction/>
 // : <fallback note>` decision (the checklist sheet body) had no test at all,
 // so a ternary inversion or a copy regression would pass the full suite
 // unnoticed. This also covers the "no-URL dead end" honesty requirement:
-// a no-URL item with esignDispatch.state === 'failed' must show the failure
-// copy, and a no-URL item with no failure recorded must show the normal
+// an item with no signing page and esignDispatch.state === 'failed' must show
+// the failure copy, and one with no failure recorded must show the normal
 // "preparing" copy - never the other way around.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-// EsignSignAction now routes in-app for in-house signing paths, so it calls
-// useRouter - which needs an app-router context this bare render does not have.
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
 
 import MemberLineOnboardingBoard from './MemberLineOnboardingBoard';
 import type { WizardItem } from './types';
@@ -42,7 +36,7 @@ function makeItem(overrides: Partial<WizardItem> = {}): WizardItem {
     rejectionReason: null,
     reviewerName: null,
     esignDispatch: null,
-    esignSigningUrl: null,
+    signPath: null,
     ...overrides,
   };
 }
@@ -57,7 +51,6 @@ async function renderBoard(item: WizardItem) {
         renderItemAction={() => null}
         openItemId={item.id}
         onOpenItem={() => {}}
-        onRefresh={() => {}}
       />,
     );
   });
@@ -78,15 +71,15 @@ afterEach(() => {
 });
 
 // The row description (outside the sheet) always shows ESIGN_HELPER_TEXT or
-// ESIGN_FAILURE_HELPER_TEXT for any non-approved esign item regardless of URL
-// presence - that's a separate, unrelated branch (rowDescription). These
+// ESIGN_FAILURE_HELPER_TEXT for any non-approved esign item regardless of
+// signing page presence - that's a separate, unrelated branch (rowDescription). These
 // assertions scope to the open sheet body itself, the exact branch finding 5
 // flagged as untested.
 // The sheet overlay portals to document.body (iOS app-shell scroller fix),
 // so queries go through body rather than the render container.
-function signNowButton(): HTMLButtonElement | null {
-  const buttons = document.body.querySelectorAll<HTMLButtonElement>('[data-onboarding-sheet] button');
-  return Array.from(buttons).find((button) => button.textContent?.includes('Sign now')) ?? null;
+function signNowButton(): HTMLAnchorElement | null {
+  const links = document.body.querySelectorAll<HTMLAnchorElement>('[data-onboarding-sheet] a');
+  return Array.from(links).find((link) => link.textContent?.includes('Sign now')) ?? null;
 }
 
 function sheetText(): string {
@@ -94,28 +87,28 @@ function sheetText(): string {
 }
 
 describe('MemberLineOnboardingBoard esign sheet body', () => {
-  it('renders the Sign now action when a signing url is present', async () => {
-    await renderBoard(makeItem({ status: 'submitted', esignSigningUrl: 'https://www.signwell.com/e/abc' }));
+  it('renders the Sign now action when the document has a signing page', async () => {
+    await renderBoard(makeItem({ status: 'submitted', signPath: '/portal/onboarding/sign/env-1' }));
 
-    expect(signNowButton()).not.toBeNull();
+    expect(signNowButton()?.getAttribute('href')).toBe('/portal/onboarding/sign/env-1');
     expect(sheetText()).not.toContain(ESIGN_HELPER_TEXT);
     expect(sheetText()).not.toContain(ESIGN_FAILURE_HELPER_TEXT);
   });
 
-  it('shows the normal preparing copy when there is no url and no recorded failure', async () => {
-    await renderBoard(makeItem({ status: 'submitted', esignSigningUrl: null, esignDispatch: null }));
+  it('shows the normal preparing copy when there is no signing page and no recorded failure', async () => {
+    await renderBoard(makeItem({ status: 'submitted', signPath: null, esignDispatch: null }));
 
     expect(sheetText()).toContain(ESIGN_HELPER_TEXT);
     expect(sheetText()).not.toContain(ESIGN_FAILURE_HELPER_TEXT);
-    // No signing url means no EsignSignAction - never a "Sign now" button.
+    // No signing page means no EsignSignAction - never a "Sign now" link.
     expect(signNowButton()).toBeNull();
   });
 
-  it('shows the honest failure copy when there is no url and the dispatch is marked failed', async () => {
+  it('shows the honest failure copy when there is no signing page and the dispatch is marked failed', async () => {
     await renderBoard(
       makeItem({
         status: 'submitted',
-        esignSigningUrl: null,
+        signPath: null,
         esignDispatch: { state: 'failed', attempts: 1 },
       }),
     );
@@ -134,7 +127,7 @@ describe('MemberLineOnboardingBoard row status', () => {
   }
 
   it('asks the rep to sign a sent document and leads with its button', async () => {
-    await renderBoard(makeItem({ status: 'submitted', esignSigningUrl: '/portal/onboarding/sign/env-1' }));
+    await renderBoard(makeItem({ status: 'submitted', signPath: '/portal/onboarding/sign/env-1' }));
 
     expect(row().text).toContain('Needs your signature');
     expect(row().text).not.toContain('In review');
@@ -167,8 +160,7 @@ describe('MemberLineOnboardingBoard sheet focus', () => {
           renderItemAction={() => <input id="reference-orientation" />}
           openItemId={item.id}
           onOpenItem={onOpenItem}
-          onRefresh={() => {}}
-        />,
+          />,
       );
     });
   }

@@ -1,4 +1,4 @@
-import { after, NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
   CLOSED_INVITE_STATUSES,
@@ -16,7 +16,7 @@ import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { findActivePortalAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
-import { inviteSigningAvailable, issueSigningSession } from '@/lib/onboarding/inviteSigning';
+import { issueSigningSession } from '@/lib/onboarding/inviteSigning';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -103,8 +103,6 @@ export async function GET(
       },
       items,
       locked: false,
-      // The page tells the candidate they sign on the next screen, not later.
-      signOnTheSpot: inviteSigningAvailable(),
     });
   } catch (error) {
     console.error('Error loading public onboarding invite:', error);
@@ -383,9 +381,9 @@ export async function POST(
       );
     }
 
-    // In-house signing: the hire signs every document on the next screen, so
-    // this response carries a one-time signing key for it (see inviteSigning).
-    const signOnTheSpot = inviteSigningAvailable() && items.some((item) => isEsignItem(item.id));
+    // The hire signs every document on the next screen, so this response
+    // carries a one-time signing key for it (see inviteSigning).
+    const signOnTheSpot = items.some((item) => isEsignItem(item.id));
     const signingSession = signOnTheSpot ? issueSigningSession(userRecord.uid, now) : null;
 
     batch.set(
@@ -438,12 +436,6 @@ export async function POST(
       // something is still unsigned later. Failure-contained: the step's load
       // call retries whatever did not go out.
       await sendPendingEsignDocs(userRecord.uid, { deferReadyEmail: true });
-    } else {
-      after(() =>
-        sendPendingEsignDocs(userRecord.uid).catch((err) =>
-          console.error('[onboarding] esign auto-send failed', err)
-        )
-      );
     }
 
     try {

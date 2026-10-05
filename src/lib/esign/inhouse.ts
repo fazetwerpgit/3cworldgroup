@@ -1,19 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
 import { DOCUMENTS } from './documents';
 import { sha256Hex } from './stamp';
-import type {
-  EnvelopeRequest,
-  EnvelopeResult,
-  EsignDocKey,
-  EsignProvider,
-  EsignWebhookEvent,
-} from './provider';
+import type { EnvelopeRequest, EsignDocKey } from './types';
 
-// The in-house provider replaces the vendor round-trip with a record in this
-// collection plus an in-app signing page. There is no firestore.rules match for
+// An envelope is a record in this collection plus an in-app signing page. There is no firestore.rules match for
 // it: every read and write goes through the Admin SDK on a route that has
 // already checked the caller owns the envelope.
 export const ENVELOPES_COLLECTION = 'esignEnvelopes';
@@ -113,46 +106,33 @@ async function sourcePdfSha256(docKey: EsignDocKey): Promise<string> {
   return sha256Hex(bytes);
 }
 
-export const inhouseProvider: EsignProvider = {
-  id: 'inhouse',
+/**
+ * Creates an envelope. Nothing is rendered up front: the record plus the
+ * in-app path is the whole envelope. The rep's browser fetches the blank PDF
+ * and the sign route stamps it.
+ */
+export async function createEnvelope(req: EnvelopeRequest): Promise<{ envelopeId: string }> {
+  const envelopeId = randomUUID();
+  const ref = envelopeRef(envelopeId);
+  const envelope: InhouseEnvelope = {
+    docKey: req.docKey,
+    userId: req.userId,
+    itemId: req.itemId,
+    signerName: req.signerName,
+    signerEmail: req.signerEmail,
+    status: 'sent',
+    createdAt: new Date(),
+    sourcePdfSha256: await sourcePdfSha256(req.docKey),
+    prefill: persistablePrefill(req.prefill),
+  };
+  await ref.set(envelope);
+  return { envelopeId };
+}
 
-  // Nothing is rendered up front: the record plus the in-app path is the whole
-  // envelope. The rep's browser fetches the blank PDF and the sign route stamps it.
-  async createEnvelope(req: EnvelopeRequest): Promise<EnvelopeResult> {
-    const envelopeId = randomUUID();
-    const ref = envelopeRef(envelopeId);
-    const envelope: InhouseEnvelope = {
-      docKey: req.docKey,
-      userId: req.userId,
-      itemId: req.itemId,
-      signerName: req.signerName,
-      signerEmail: req.signerEmail,
-      status: 'sent',
-      createdAt: new Date(),
-      sourcePdfSha256: await sourcePdfSha256(req.docKey),
-      prefill: persistablePrefill(req.prefill),
-    };
-    await ref.set(envelope);
-    return { envelopeId, embeddedSigningUrl: inhouseSignPath(envelopeId) };
-  },
-
-  async getEmbeddedSigningUrl(envelopeId: string): Promise<{ url?: string; completed: boolean }> {
-    const envelope = await loadEnvelope(envelopeId);
-    if (!envelope) throw new Error('Envelope not found');
-    return { url: inhouseSignPath(envelopeId), completed: envelope.status === 'completed' };
-  },
-
-  async getCompletedPdf(envelopeId: string): Promise<Buffer> {
-    const envelope = await loadEnvelope(envelopeId);
-    if (!envelope) throw new Error('Envelope not found');
-    if (!envelope.signedPdfPath) throw new Error('Envelope has no signed PDF');
-    const [bytes] = await getOnboardingBucket().file(envelope.signedPdfPath).download();
-    return bytes;
-  },
-
-  // In-house signing has no vendor callback: the sign route completes the item
-  // inline, so the webhook endpoint has nothing to parse for this provider.
-  async parseWebhook(): Promise<EsignWebhookEvent | null> {
-    return null;
-  },
-};
+/**
+ * Whether an envelope id names a record in this collection. Ids stored before
+ * signing moved in-house name no record here and cannot be signed any more.
+ */
+export async function envelopeExists(envelopeId: string): Promise<boolean> {
+  return (await envelopeRef(envelopeId).get()).exists;
+}

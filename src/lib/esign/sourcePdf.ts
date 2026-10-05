@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { DOCUMENTS } from '@/lib/esign/documents';
-import type { EsignDocKey } from '@/lib/esign/provider';
+import type { EsignDocKey } from '@/lib/esign/types';
 
 /**
  * The blank source document for its signer to read before signing. Never the

@@ -7,7 +7,6 @@ const {
   collectionMock,
   createEnvelopeMock,
   dispatchMock,
-  getEsignProviderMock,
   createAlertTaskMock,
   resolveAlertTasksMock,
   runTransactionMock,
@@ -114,17 +113,12 @@ const {
   };
   const runTransactionMock = vi.fn(applyTransaction);
   const createEnvelopeMock = vi.fn(
-    async (request: { itemId: string }): Promise<{ envelopeId: string; embeddedSigningUrl?: string }> => {
+    async (request: { itemId: string }): Promise<{ envelopeId: string }> => {
       if (!request.itemId) throw new Error('item id required');
       return { envelopeId: 'env_1' };
     },
   );
   const dispatchMock = vi.fn(async () => undefined);
-  const getEsignProviderMock = vi.fn(() => ({
-    id: 'signwell' as const,
-    createEnvelope: createEnvelopeMock,
-    parseWebhook: vi.fn(),
-  }));
   const collectionMock = vi.fn((name: string) => {
     if (name === 'users') {
       // Only the deferred ready-email sweep queries users: `field <= cutoff`.
@@ -162,7 +156,6 @@ const {
     collectionMock,
     createEnvelopeMock,
     dispatchMock,
-    getEsignProviderMock,
     runTransactionMock,
     applyTransaction,
     claimItem,
@@ -185,8 +178,9 @@ vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { delete: vi.fn(() => DELETE_SENTINEL) },
 }));
 
-vi.mock('./provider', () => ({
-  getEsignProvider: getEsignProviderMock,
+vi.mock('./inhouse', () => ({
+  createEnvelope: createEnvelopeMock,
+  ENVELOPES_COLLECTION: 'esignEnvelopes',
 }));
 
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
@@ -239,18 +233,7 @@ beforeEach(() => {
   runTransactionMock.mockReset();
   runTransactionMock.mockImplementation(applyTransaction);
   createEnvelopeMock.mockReset();
-  // Default: envelope creation succeeds AND returns an embedded signing url.
-  // Tests about the missing-url path override this explicitly per-call.
-  createEnvelopeMock.mockResolvedValue({
-    envelopeId: 'env_1',
-    embeddedSigningUrl: 'https://www.signwell.com/e/default',
-  });
-  getEsignProviderMock.mockReset();
-  getEsignProviderMock.mockImplementation(() => ({
-    id: 'signwell' as const,
-    createEnvelope: createEnvelopeMock,
-    parseWebhook: vi.fn(),
-  }));
+  createEnvelopeMock.mockResolvedValue({ envelopeId: 'env_1' });
   createAlertTaskMock.mockReset();
   createAlertTaskMock.mockResolvedValue('alert_1');
   resolveAlertTasksMock.mockReset();
@@ -269,6 +252,11 @@ beforeEach(() => {
     email: 'sam@x.com',
     status: 'pending',
   });
+  // Envelope records the tests' ids point at. An id with no record here is an
+  // envelope from before signing moved in-house (see the stale envelope tests).
+  for (const id of ['env_0', 'env_1', 'env_old']) {
+    store.set(`esignEnvelopes/${id}`, { status: 'sent' });
+  }
 });
 
 afterEach(() => {
@@ -300,29 +288,15 @@ describe('placeholder document hold', () => {
 
 describe('sendPendingEsignDocs', () => {
   it('creates envelopes for all applicable unsent esign items and marks them submitted', async () => {
-    createEnvelopeMock.mockResolvedValue({
-      envelopeId: 'env_1',
-      embeddedSigningUrl: 'https://www.signwell.com/e/abc',
-    });
     const sent = await sendPendingEsignDocs('u1');
     expect(sent.sort()).toEqual(['contract', 'direct_deposit', 'fcra_auth', 'pay_structure', 'w9']);
     expect(createEnvelopeMock).toHaveBeenCalledTimes(5);
-    // The signing URL is a bearer capability: it must never land in
-    // userOnboarding (client-readable via firestore.rules for owner/management).
     expect(store.get('userOnboarding/u1_contract')).toMatchObject({
       status: 'submitted',
       esignEnvelopeId: 'env_1',
     });
-    expect(store.get('userOnboarding/u1_contract')).not.toHaveProperty('esignSigningUrl');
-    // It lives only in the server-only esignSigningUrls collection.
-    expect(store.get('esignSigningUrls/u1_contract')).toMatchObject({
-      userId: 'u1',
-      itemId: 'contract',
-      envelopeId: 'env_1',
-      url: 'https://www.signwell.com/e/abc',
-    });
-    // Two writes per item now: the signing url doc, then the userOnboarding doc.
-    expect(setOptions).toHaveLength(10);
+    // One write per item: the userOnboarding doc.
+    expect(setOptions).toHaveLength(5);
     expect(setOptions.every((options) => options?.merge === true)).toBe(true);
     expect(createEnvelopeMock).toHaveBeenCalledWith({
       docKey: 'contract',
@@ -339,51 +313,7 @@ describe('sendPendingEsignDocs', () => {
       }),
       { merge: true }
     );
-    expect(setMock).toHaveBeenCalledWith(
-      'esignSigningUrls/u1_contract',
-      expect.objectContaining({
-        url: 'https://www.signwell.com/e/abc',
-        envelopeId: 'env_1',
-      }),
-      { merge: true }
-    );
     expect(dispatchMock).toHaveBeenCalledOnce();
-  });
-
-  it('does not treat a missing embedded signing url as a clean send', async () => {
-    for (const itemId of ['direct_deposit', 'fcra_auth', 'pay_structure']) {
-      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved' });
-    }
-    createEnvelopeMock.mockImplementation(async (request: { itemId: string }) => {
-      if (request.itemId === 'contract') return { envelopeId: 'env_1' };
-      return { envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/default' };
-    });
-
-    const sent = await sendPendingEsignDocs('u1');
-
-    // Never a silent no-URL dead end: not counted as sent...
-    expect(sent).not.toContain('contract');
-    // ...no esignSigningUrls doc is written for it...
-    expect(store.get('esignSigningUrls/u1_contract')).toBeUndefined();
-    // ...but the envelope fields are still persisted (webhook integrity)...
-    expect(store.get('userOnboarding/u1_contract')).toMatchObject({
-      status: 'submitted',
-      esignEnvelopeId: 'env_1',
-    });
-    expect(store.get('userOnboarding/u1_contract')).not.toHaveProperty('esignSigningUrl');
-    // ...and the dispatch state is marked failed immediately, not silently.
-    expect(store.get('userOnboarding/u1_contract')?.esignDispatch).toMatchObject({
-      state: 'failed',
-      attempts: 1,
-      lastError: 'missing_signing_url',
-    });
-    // Ops is alerted right away - not after three attempts.
-    expect(createAlertTaskMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        kind: 'review_needed',
-        title: 'E-signature signing link missing',
-      })
-    );
   });
 
   it('skips items that already have an envelope', async () => {
@@ -451,7 +381,7 @@ describe('sendPendingEsignDocs', () => {
   });
 
   it('continues when one envelope creation fails', async () => {
-    createEnvelopeMock.mockRejectedValueOnce(new Error('signwell 500'));
+    createEnvelopeMock.mockRejectedValueOnce(new Error('envelope 500'));
     const sent = await sendPendingEsignDocs('u1');
     expect(sent.length).toBe(4);
   });
@@ -483,10 +413,8 @@ describe('sendPendingEsignDocs', () => {
     const sent = await sendPendingEsignDocs('u1');
 
     expect(sent).toEqual(['w9', 'contract']);
-    expect(setMock).toHaveBeenCalledTimes(5);
+    expect(setMock).toHaveBeenCalledTimes(3);
     expect(setMock.mock.calls.map(([, , options]) => options)).toEqual([
-      { merge: true },
-      { merge: true },
       { merge: true },
       { merge: true },
       { merge: true },
@@ -494,10 +422,6 @@ describe('sendPendingEsignDocs', () => {
     expect(store.get('userOnboarding/u1_contract')).toMatchObject({
       status: 'submitted',
       esignEnvelopeId: 'env_1',
-    });
-    expect(store.get('esignSigningUrls/u1_contract')).toMatchObject({
-      url: 'https://www.signwell.com/e/default',
-      envelopeId: 'env_1',
     });
   });
 
@@ -531,7 +455,7 @@ describe('sendPendingEsignDocs', () => {
 
     expect(sent).toEqual(['w9']);
     expect(createEnvelopeMock).toHaveBeenCalledTimes(2);
-    expect(setMock).toHaveBeenCalledTimes(6);
+    expect(setMock).toHaveBeenCalledTimes(4);
     expect(store.get('userOnboarding/u1_contract')?.esignDispatch).toMatchObject({
       state: 'failed',
       attempts: 1,
@@ -545,8 +469,8 @@ describe('sendPendingEsignDocs', () => {
 
   it('records a failed dispatch while allowing the other items to send', async () => {
     createEnvelopeMock.mockImplementation(async (request: { itemId: string }) => {
-      if (request.itemId === 'fcra_auth') throw new Error('signwell 500');
-      return { envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/default' };
+      if (request.itemId === 'fcra_auth') throw new Error('envelope 500');
+      return { envelopeId: 'env_1' };
     });
 
     const sent = await sendPendingEsignDocs('u1');
@@ -555,7 +479,7 @@ describe('sendPendingEsignDocs', () => {
     expect(store.get('userOnboarding/u1_fcra_auth')?.esignDispatch).toMatchObject({
       state: 'failed',
       attempts: 1,
-      lastError: 'Error: signwell 500',
+      lastError: 'Error: envelope 500',
       lastAttemptAt: expect.any(Date),
     });
   });
@@ -572,7 +496,7 @@ describe('sendPendingEsignDocs', () => {
     });
     createEnvelopeMock.mockImplementation(async (request: { itemId: string }) => {
       if (request.itemId === 'contract') throw new Error('provider still down');
-      return { envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/default' };
+      return { envelopeId: 'env_1' };
     });
 
     await sendPendingEsignDocs('u1');
@@ -582,24 +506,6 @@ describe('sendPendingEsignDocs', () => {
       attempts: 2,
       lastError: 'Error: provider still down',
     });
-  });
-
-  it('marks every applicable item failed when provider construction throws without throwing', async () => {
-    getEsignProviderMock.mockImplementationOnce(() => {
-      throw new Error('provider misconfigured');
-    });
-
-    await expect(sendPendingEsignDocs('u1')).resolves.toEqual([]);
-
-    expect(createEnvelopeMock).not.toHaveBeenCalled();
-    for (const itemId of ['w9', 'contract', 'direct_deposit', 'fcra_auth', 'pay_structure']) {
-      expect(store.get(`userOnboarding/u1_${itemId}`)?.esignDispatch).toMatchObject({
-        state: 'failed',
-        attempts: 1,
-        lastError: 'Error: provider misconfigured',
-        lastAttemptAt: expect.any(Date),
-      });
-    }
   });
 
   it('skips an item whose last attempt was less than five minutes ago', async () => {
@@ -660,7 +566,7 @@ describe('sendPendingEsignDocs', () => {
       if (request.itemId === 'contract' || request.itemId === 'direct_deposit') {
         throw new Error('third-attempt failure');
       }
-      return { envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/default' };
+      return { envelopeId: 'env_1' };
     });
 
     await sendPendingEsignDocs('u1');
@@ -789,6 +695,79 @@ describe('sendPendingEsignDocs', () => {
 // Two checklist reads land together on login. Both build the same pending list
 // before either writes, so only the transactional claim can stop the second
 // from creating a duplicate envelope and sending a second "ready to sign" email.
+describe('envelopes from before signing moved in-house', () => {
+  const approveAllBut = (itemId: string) => {
+    for (const other of ['w9', 'contract', 'direct_deposit', 'fcra_auth', 'pay_structure']) {
+      if (other !== itemId) store.set(`userOnboarding/u1_${other}`, { status: 'approved' });
+    }
+  };
+
+  it('sends a fresh envelope for an unsigned item whose envelope id names no record', async () => {
+    approveAllBut('contract');
+    store.set('userOnboarding/u1_contract', {
+      userId: 'u1',
+      itemId: 'contract',
+      status: 'submitted',
+      reference: 'esign:legacy-123',
+      esignEnvelopeId: 'legacy-123',
+    });
+    createEnvelopeMock.mockResolvedValueOnce({ envelopeId: 'env_new' });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual(['contract']);
+    expect(createEnvelopeMock).toHaveBeenCalledOnce();
+    expect(store.get('userOnboarding/u1_contract')).toMatchObject({
+      status: 'submitted',
+      esignEnvelopeId: 'env_new',
+      reference: 'esign:env_new',
+    });
+    expect(dispatchMock).toHaveBeenCalledOnce();
+  });
+
+  it('also replaces a stale id on a rejected item', async () => {
+    approveAllBut('w9');
+    store.set('userOnboarding/u1_w9', { status: 'rejected', esignEnvelopeId: 'legacy-9' });
+
+    expect(await sendPendingEsignDocs('u1')).toEqual(['w9']);
+    expect(store.get('userOnboarding/u1_w9')?.esignEnvelopeId).toBe('env_1');
+  });
+
+  it('never resends an approved item, whatever its old envelope id', async () => {
+    for (const itemId of ['w9', 'contract', 'direct_deposit', 'fcra_auth', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { status: 'approved', esignEnvelopeId: `legacy-${itemId}` });
+    }
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+    expect(store.get('userOnboarding/u1_contract')?.esignEnvelopeId).toBe('legacy-contract');
+  });
+
+  it('keeps an unsigned item whose envelope record exists', async () => {
+    approveAllBut('contract');
+    store.set('userOnboarding/u1_contract', { status: 'submitted', esignEnvelopeId: 'env_old' });
+
+    expect(await sendPendingEsignDocs('u1')).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+  });
+
+  it('sends one fresh envelope when two callers replace the same stale id at once', async () => {
+    approveAllBut('contract');
+    store.set('userOnboarding/u1_contract', { status: 'submitted', esignEnvelopeId: 'legacy-123' });
+    createEnvelopeMock.mockImplementation(async () => {
+      store.set('esignEnvelopes/env_new', { status: 'sent' });
+      return { envelopeId: 'env_new' };
+    });
+
+    const [a, b] = await Promise.all([sendPendingEsignDocs('u1'), sendPendingEsignDocs('u1')]);
+
+    expect([...a, ...b]).toEqual(['contract']);
+    expect(createEnvelopeMock).toHaveBeenCalledOnce();
+  });
+});
+
 describe('sendPendingEsignDocs concurrent dispatch', () => {
   // Lets a rival caller claim `items` in the window between our pending read
   // and our own claim transaction, which is exactly where the race lives.
@@ -872,7 +851,7 @@ describe('sendPendingEsignDocs concurrent dispatch', () => {
       if (request.itemId === 'contract') {
         claimAtCreateTime = store.get('userOnboarding/u1_contract')?.esignDispatch;
       }
-      return { envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/abc' };
+      return { envelopeId: 'env_1' };
     });
 
     await sendPendingEsignDocs('u1');
@@ -917,7 +896,7 @@ describe('sendPendingEsignDocs ready-to-sign email', () => {
         firstCallerReachedProvider();
         await held;
       }
-      return { envelopeId: 'env_1', embeddedSigningUrl: 'https://www.signwell.com/e/abc' };
+      return { envelopeId: 'env_1' };
     });
 
     const firstCaller = sendPendingEsignDocs('u1');

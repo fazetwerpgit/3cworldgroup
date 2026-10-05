@@ -9,9 +9,7 @@ vi.mock('next/server', async () => {
 // A path-keyed store stands in for Firestore: production code builds refs via
 // adminDb.collection(name).doc(id), and adminDb.getAll(...refs) resolves each
 // ref by its `${name}/${id}` path. This lets tests set up userOnboarding and
-// esignSigningUrls documents independently, matching the real two-collection
-// architecture (the signing URL is a bearer capability kept out of
-// userOnboarding entirely - see finding 1 of the security review).
+// esignEnvelopes documents independently.
 const { userDocGetMock, docMock, getAllMock, gateMock, sendPendingEsignDocsMock, store } = vi.hoisted(() => {
   const store = new Map<string, Record<string, unknown>>();
   const userDocGetMock = vi.fn();
@@ -68,64 +66,54 @@ beforeEach(() => {
 });
 
 describe('GET /api/portal/onboarding', () => {
-  it('includes esignSigningUrl for the owner, sourced from esignSigningUrls', async () => {
+  it('links the owner to the signing page of an envelope that exists', async () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
     store.set('userOnboarding/u1_contract', { status: 'submitted', esignEnvelopeId: 'env_1' });
-    store.set('esignSigningUrls/u1_contract', {
-      url: 'https://www.signwell.com/e/abc',
-      envelopeId: 'env_1',
-    });
+    store.set('esignEnvelopes/env_1', { status: 'sent' });
 
     const res = await GET(makeRequest('u1'));
     const json = await res.json();
     const item = json.items.find((i: { id: string }) => i.id === 'contract');
 
-    expect(item.esignSigningUrl).toBe('https://www.signwell.com/e/abc');
+    expect(item.signPath).toBe('/portal/onboarding/sign/env_1');
   });
 
-  it('never reads the signing url field back off the userOnboarding document itself', async () => {
+  it('gives no signing page for an envelope id with no record (sent before signing moved in-house)', async () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
-    // Simulate a stray/legacy field on the userOnboarding doc - the API must
-    // ignore it and source the URL only from esignSigningUrls.
-    store.set('userOnboarding/u1_contract', {
-      status: 'submitted',
-      esignEnvelopeId: 'env_1',
-      esignSigningUrl: 'https://www.signwell.com/e/should-not-be-served',
-    });
+    store.set('userOnboarding/u1_contract', { status: 'submitted', esignEnvelopeId: 'legacy-123' });
 
     const res = await GET(makeRequest('u1'));
     const json = await res.json();
     const item = json.items.find((i: { id: string }) => i.id === 'contract');
 
-    expect(item.esignSigningUrl).toBeNull();
+    expect(item.signPath).toBeNull();
+    // The pending hire's read triggers the send that replaces the stale id.
+    expect(sendPendingEsignDocsMock).toHaveBeenCalledWith('u1');
   });
 
-  it('nulls esignSigningUrl for management viewing another user', async () => {
+  it('nulls signPath for management viewing another user, without reading envelopes', async () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'admin1', name: 'Admin', isManagement: true });
     store.set('userOnboarding/u1_contract', { status: 'submitted', esignEnvelopeId: 'env_1' });
-    store.set('esignSigningUrls/u1_contract', {
-      url: 'https://www.signwell.com/e/abc',
-      envelopeId: 'env_1',
-    });
+    store.set('esignEnvelopes/env_1', { status: 'sent' });
 
     const res = await GET(makeRequest('u1'));
     const json = await res.json();
     const item = json.items.find((i: { id: string }) => i.id === 'contract');
 
-    expect(item.esignSigningUrl).toBeNull();
-    // Management never needs the URL - the route should not even fetch it.
+    expect(item.signPath).toBeNull();
     expect(getAllMock).toHaveBeenCalledTimes(1);
   });
 
-  it('nulls esignSigningUrl for the owner when no signing url was persisted', async () => {
+  it('gives no signing page for a signed item', async () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
-    store.set('userOnboarding/u1_contract', { status: 'submitted', esignEnvelopeId: 'env_1' });
+    store.set('userOnboarding/u1_contract', { status: 'approved', esignEnvelopeId: 'env_1' });
+    store.set('esignEnvelopes/env_1', { status: 'completed' });
 
     const res = await GET(makeRequest('u1'));
     const json = await res.json();
     const item = json.items.find((i: { id: string }) => i.id === 'contract');
 
-    expect(item.esignSigningUrl).toBeNull();
+    expect(item.signPath).toBeNull();
   });
 
   it('tells the rep a license number is on file by its last 4 only', async () => {
@@ -171,7 +159,7 @@ describe('GET /api/portal/onboarding status gate', () => {
     gateMock.mockResolvedValue({ ok: true, uid: 'u1', name: 'Sam', isManagement: false });
     store.set('userOnboarding/u1_contract', { status: 'approved', esignEnvelopeId: 'env_1' });
     store.set('userOnboarding/u1_w9', { status: 'submitted', esignEnvelopeId: 'env_2' });
-    store.set('esignSigningUrls/u1_w9', { url: '/portal/onboarding/sign/env_2' });
+    store.set('esignEnvelopes/env_2', { status: 'sent' });
     // Never sent (no signing link): nothing the rep can act on, so not listed.
     store.set('userOnboarding/u1_pay_structure', { status: 'not_started' });
 

@@ -9,7 +9,7 @@ export type OnboardingStatus = 'not_started' | 'submitted' | 'approved' | 'rejec
 // raw document/number - only this kind of pointer:
 //   vendor  - a token/ref from an external vendor (e.g. background-check provider)
 //   storage - a Firebase Storage path to an uploaded file (e.g. DL photos)
-//   esign   - a reference to a signed agreement (e.g. Adobe Sign agreement id)
+//   esign   - a reference to a signed in-house envelope
 //   manual  - free-text confirmation reference entered by staff
 export type ReferenceKind = 'vendor' | 'storage' | 'esign' | 'manual';
 
@@ -21,7 +21,6 @@ export interface OnboardingItem {
   iboOnly: boolean;
   sensitive: boolean;
   referenceKind: ReferenceKind;
-  signatureProvider?: 'adobe_sign' | 'signwell'; // Set when the item is completed via e-signature
   order: number;
 }
 

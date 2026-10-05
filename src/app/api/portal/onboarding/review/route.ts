@@ -160,8 +160,8 @@ export async function GET(request: NextRequest) {
         reviewerName: (data?.reviewerName as string | undefined) ?? null,
         rejectionReason: (data?.rejectionReason as string | undefined) ?? null,
         esignEnvelopeId: typeof data?.esignEnvelopeId === 'string' ? data.esignEnvelopeId : null,
-        // Only a stored PDF opens. Envelopes from the old provider (Mason's 8/24
-        // documents) and unsigned ones can't be fetched, so they read "No PDF".
+        // Only a stored PDF opens. Some documents signed before signing moved
+        // in-house have no stored copy; the Review tab notes that instead.
         hasSignedPdf: item.referenceKind === 'esign' && Boolean(data?.completedPdfPath),
         manualCompletion: data?.manualCompletion
           ? {
@@ -299,7 +299,7 @@ export async function POST(request: NextRequest) {
 
     if (status === 'approved' && isEsignItem(itemId)) {
       return NextResponse.json(
-        { error: 'E-signature items are completed only by the e-sign provider' },
+        { error: 'E-signature items are completed only when the rep signs them' },
         { status: 400 }
       );
     }
@@ -359,14 +359,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (isRejectedEsign) {
-      // The signing URL is a bearer capability for the superseded envelope -
-      // once rejected, offering it back to the candidate would let them keep
-      // signing a document management has already thrown out.
-      try {
-        await adminDb.collection('esignSigningUrls').doc(`${userId}_${itemId}`).delete();
-      } catch (error) {
-        console.error('Failed to delete stale esign signing url:', error);
-      }
+      // The rejection cleared the envelope id above, so the checklist stops
+      // linking the thrown-out envelope; a fresh one goes out.
       after(() =>
         sendPendingEsignDocs(userId).catch((error) => {
           console.error('Failed to resend e-sign documents after rejection:', error);

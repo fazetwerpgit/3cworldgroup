@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            'E-signature items are completed by the e-sign provider and do not accept typed references',
+            'E-signature items are completed by signing them and do not accept typed references',
         },
         { status: 400 }
       );

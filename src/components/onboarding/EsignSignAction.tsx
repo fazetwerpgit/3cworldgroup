@@ -1,180 +1,21 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { loadSignWellEmbed } from '@/lib/esign/embedClient';
-import { getIdToken } from '@/lib/firebase/getIdToken';
-import { ESIGN_FAILURE_HELPER_TEXT } from '@/lib/onboarding/esign';
+import Link from 'next/link';
 import s from '@/components/portal/rep/rep.module.css';
 import o from './onboarding.module.css';
 
-const CONFIRM_POLL_MS = 3000;
-const CONFIRM_POLL_MAX = 10;
-
-type EsignActionState = 'idle' | 'opening' | 'signing' | 'confirming' | 'slow-confirming' | 'declined' | 'failed';
-
 interface Props {
-  itemId: string;
-  signingUrl: string;
-  onRefresh: () => void;
+  /** The in-app signing page for this document. */
+  signPath: string;
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
-  const token = await getIdToken();
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${token ?? ''}`,
-  };
-}
-
-// In-portal SignWell embed. The UI never writes approval state itself — the
-// 'completed' event only means the rep finished the signing flow client-side;
-// the webhook (server-side, source of truth) is what flips the item to
-// approved. This component just shows a confirming note and polls the
-// checklist so the approved state appears without a manual refresh.
-export function EsignSignAction({ itemId, signingUrl, onRefresh }: Props) {
-  const router = useRouter();
-  const [state, setState] = useState<EsignActionState>('idle');
-  const polls = useRef(0);
-  const pollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mounted = useRef(true);
-  const failureReported = useRef(false);
-
-  // Never setState (or schedule a poll tick that would setState) once the
-  // sheet has closed and this component has unmounted - the parent's
-  // fetchChecklist stays valid, but there's nothing left here to update.
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      if (pollTimeout.current) clearTimeout(pollTimeout.current);
-    };
-  }, []);
-
-  const safeSetState = useCallback((next: EsignActionState | ((current: EsignActionState) => EsignActionState)) => {
-    if (mounted.current) setState(next);
-  }, []);
-
-  const reportFailure = useCallback(async () => {
-    if (failureReported.current) return;
-    failureReported.current = true;
-    safeSetState('failed');
-    try {
-      await fetch('/api/portal/onboarding/esign-embed-error', {
-        method: 'POST',
-        headers: await authHeaders(),
-        body: JSON.stringify({ itemId }),
-      });
-    } catch {
-      // Best-effort alert only; the UI failure state above is already shown.
-    }
-  }, [itemId, safeSetState]);
-
-  const beginConfirmPolling = useCallback(() => {
-    safeSetState('confirming');
-    polls.current = 0;
-    const tick = () => {
-      polls.current += 1;
-      onRefresh(); // Parent refetches the checklist; approval arrives via webhook.
-      if (polls.current < CONFIRM_POLL_MAX) {
-        pollTimeout.current = setTimeout(tick, CONFIRM_POLL_MS);
-      } else {
-        // Polling has a ceiling, but the wait doesn't: be honest that we've
-        // stopped actively checking rather than leaving "confirming..."
-        // displayed forever. Never claims approval - just that it's still
-        // coming and nothing further is needed from the candidate.
-        safeSetState('slow-confirming');
-      }
-    };
-    pollTimeout.current = setTimeout(tick, CONFIRM_POLL_MS);
-  }, [onRefresh, safeSetState]);
-
-  const open = useCallback(async () => {
-    safeSetState('opening');
-    // The in-house provider returns an in-app path instead of a vendor URL.
-    // Route to it client-side; there is no embed to load and no signing-url
-    // refresh to make, because the path never expires.
-    if (signingUrl.startsWith('/')) {
-      router.push(signingUrl);
-      return;
-    }
-    try {
-      let url = signingUrl;
-      try {
-        const res = await fetch('/api/portal/onboarding/esign-signing-url', {
-          method: 'POST',
-          headers: await authHeaders(),
-          body: JSON.stringify({ itemId }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { url?: string; completed?: boolean };
-          if (data.completed === true) {
-            beginConfirmPolling();
-            return;
-          }
-          if (data.url) url = data.url;
-        }
-      } catch {
-        // Fall back to the stored URL when the refresh request fails.
-      }
-
-      const SignWellEmbed = await loadSignWellEmbed();
-      const embed = new SignWellEmbed({
-        url,
-        events: {
-          completed: () => beginConfirmPolling(),
-          declined: () => safeSetState('declined'),
-          closed: () => safeSetState((current) => (current === 'signing' ? 'idle' : current)),
-          error: () => {
-            void reportFailure();
-          },
-        },
-      });
-      safeSetState('signing');
-      embed.open();
-    } catch {
-      void reportFailure();
-    }
-  }, [signingUrl, router, beginConfirmPolling, reportFailure, safeSetState]);
-
-  if (state === 'confirming') {
-    return (
-      <p className={o.note} role="status">
-        Signature received. Confirming with the signing service; this completes automatically.
-      </p>
-    );
-  }
-
-  if (state === 'slow-confirming') {
-    return (
-      <p className={o.note} role="status">
-        Signature received. Confirmation is taking longer than usual. It finishes automatically, and nothing else is
-        needed from you.
-      </p>
-    );
-  }
-
-  if (state === 'declined') {
-    return (
-      <p className={`${o.note} ${o.noteWarn}`}>
-        You declined this document. Reach out to your manager if that was a mistake.
-      </p>
-    );
-  }
-
-  if (state === 'failed') {
-    return <p className={`${o.note} ${o.noteWarn}`}>{ESIGN_FAILURE_HELPER_TEXT}</p>;
-  }
-
+// Opens the document's signing page. Signing there completes the item on the
+// server, so the checklist shows it approved when the rep comes back.
+export function EsignSignAction({ signPath }: Props) {
   return (
-    <button
-      type="button"
-      onClick={() => void open()}
-      disabled={state === 'opening' || state === 'signing'}
-      className={`${s.btnPrimary} ${o.submit}`}
-    >
-      {state === 'opening' ? 'Opening…' : 'Sign now'}
-    </button>
+    <Link href={signPath} className={`${s.btnPrimary} ${o.submit}`}>
+      Sign now
+    </Link>
   );
 }
 

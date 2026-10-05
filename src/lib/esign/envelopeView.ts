@@ -5,7 +5,7 @@ import {
   selectedCheckboxKey,
 } from '@/lib/esign/documents';
 import type { InhouseEnvelopeRecord } from '@/lib/esign/inhouse';
-import type { EsignDocKey } from '@/lib/esign/provider';
+import type { EsignDocKey } from '@/lib/esign/types';
 
 export interface EnvelopeFieldView {
   key: string;

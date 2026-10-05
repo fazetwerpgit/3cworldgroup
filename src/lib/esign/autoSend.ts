@@ -9,8 +9,8 @@ import { getOnboardingItemsForUser } from '@/types/onboarding';
 import { isHeldOnboardingItem } from '@/types/onboardingHold';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
-import { getEsignProvider } from './provider';
-import type { EsignDocKey, EsignProvider } from './provider';
+import { createEnvelope, ENVELOPES_COLLECTION } from './inhouse';
+import type { EsignDocKey } from './types';
 
 const MIN_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 const CLAIM_STALE_MS = 2 * 60 * 1000;
@@ -36,6 +36,19 @@ interface PendingItem {
   item: ReturnType<typeof getOnboardingItemsForUser>[number];
   ref: ReturnType<NonNullable<typeof adminDb>['doc']>;
   snap: Awaited<ReturnType<ReturnType<NonNullable<typeof adminDb>['doc']>['get']>>;
+  /** An unsigned item's old envelope id that names no envelope record (see staleEnvelopeId). */
+  staleEnvelopeId?: string;
+}
+
+/**
+ * The item's envelope id when it can no longer be signed: the item is unsigned
+ * and no envelope record exists under that id. Items sent before signing moved
+ * in-house carry such ids. They get a fresh envelope, which replaces the id.
+ * Approved items are never looked at, so a signed document is never resent.
+ */
+async function staleEnvelopeId(envelopeId: string): Promise<string | undefined> {
+  const envelope = await adminDb!.doc(`${ENVELOPES_COLLECTION}/${envelopeId}`).get();
+  return envelope.exists ? undefined : envelopeId;
 }
 
 function asDate(value: unknown): Date | undefined {
@@ -106,7 +119,9 @@ async function claimForDispatch(pending: PendingItem, userId: string): Promise<b
   try {
     return await adminDb!.runTransaction(async (transaction) => {
       const fresh = await transaction.get(pending.ref);
-      if (fresh.get('esignEnvelopeId')) return false;
+      // Another caller already replaced the id (or the item got one) since it was read.
+      const currentEnvelopeId = fresh.get('esignEnvelopeId');
+      if (currentEnvelopeId && currentEnvelopeId !== pending.staleEnvelopeId) return false;
 
       const state = dispatchState(fresh);
       if (state.state === 'sending') {
@@ -189,96 +204,6 @@ async function raiseDispatchAlert(userId: string, signerName: string): Promise<v
   }
 }
 
-// The embedded signing URL is a bearer capability and never lives in
-// userOnboarding (client-readable via firestore.rules). It is stored
-// server-only in esignSigningUrls/{userId}_{itemId}, a collection with no
-// firestore.rules match — the Admin SDK can read/write it, the client SDK
-// cannot read it under any role.
-async function persistSigningUrl(
-  userId: string,
-  itemId: string,
-  envelopeId: string,
-  url: string
-): Promise<boolean> {
-  const ref = adminDb!.doc(`esignSigningUrls/${userId}_${itemId}`);
-  const data = { userId, itemId, envelopeId, url, updatedAt: new Date() };
-  try {
-    await ref.set(data, { merge: true });
-    return true;
-  } catch (firstError) {
-    try {
-      await ref.set(data, { merge: true });
-      return true;
-    } catch (error) {
-      console.error(`[esign] embedded signing url failed to persist for ${userId}/${itemId}`, {
-        envelopeId,
-        error,
-        firstError,
-      });
-      return false;
-    }
-  }
-}
-
-// The envelope was created (webhook will still fire and must find a record to
-// update), but there is no usable in-portal signing link for the candidate —
-// either the provider never returned one, or persisting it failed after
-// retry. This is never a silent dead end: the item's dispatch state is marked
-// failed (surfaces the honest "we hit a snag" copy on the board) and ops is
-// alerted immediately, not after three attempts.
-async function recordMissingSigningUrl(
-  pending: PendingItem,
-  userId: string,
-  signerName: string,
-  envelopeId: string,
-  lastError: string
-): Promise<void> {
-  const now = new Date();
-  const state = dispatchState(pending.snap);
-  const attempts = previousAttempts(state) + 1;
-  const persistence = {
-    userId,
-    itemId: pending.item.id,
-    status: 'submitted',
-    reference: `esign:${envelopeId}`,
-    esignEnvelopeId: envelopeId,
-    esignDispatch: {
-      state: 'failed',
-      attempts,
-      lastError,
-      lastAttemptAt: now,
-    },
-    submittedAt: now,
-    updatedAt: now,
-  };
-
-  try {
-    await pending.ref.set(persistence, { merge: true });
-  } catch (firstError) {
-    try {
-      await pending.ref.set(persistence, { merge: true });
-    } catch (error) {
-      console.error(
-        `[esign] envelope was created but its record failed to persist for ${userId}/${pending.item.id}`,
-        { envelopeId, userId, itemId: pending.item.id, error, firstError }
-      );
-    }
-  }
-
-  try {
-    await createAlertTask({
-      kind: ALERT_KIND,
-      subjectUserId: userId,
-      subjectName: signerName,
-      title: 'E-signature signing link missing',
-      message: `${signerName} has a document (${pending.item.label}) ready to sign, but no in-portal signing link was available.`,
-      link: '/portal/admin/onboarding',
-    });
-  } catch (error) {
-    console.error(`[esign] failed to raise missing-signing-url alert for ${userId}/${pending.item.id}`, error);
-  }
-}
-
 async function resolveDispatchAlert(userId: string): Promise<void> {
   try {
     await resolveAlertTasks(userId, [ALERT_KIND]);
@@ -301,21 +226,19 @@ async function hasFailedDispatch(userId: string): Promise<boolean> {
 }
 
 async function sendOne(
-  provider: EsignProvider,
   pending: PendingItem,
   userId: string,
   signerName: string,
   signerEmail: string
 ): Promise<{ sent: boolean; recovered?: boolean; failed?: { previousAttempts: number; attempts: number } }> {
   let envelopeId: string;
-  let embeddedSigningUrl: string | undefined;
   try {
     const rawPrefill = pending.snap.get('prefill');
     const prefill =
       rawPrefill && typeof rawPrefill === 'object' && !Array.isArray(rawPrefill)
         ? (rawPrefill as Record<string, string>)
         : undefined;
-    ({ envelopeId, embeddedSigningUrl } = await provider.createEnvelope({
+    ({ envelopeId } = await createEnvelope({
       docKey: pending.item.id as EsignDocKey,
       userId,
       itemId: pending.item.id,
@@ -326,17 +249,6 @@ async function sendOne(
   } catch (error) {
     console.error(`[esign] envelope creation failed for ${userId}/${pending.item.id}`, error);
     return { sent: false, failed: (await recordFailure(pending, userId, error)) ?? undefined };
-  }
-
-  if (!embeddedSigningUrl) {
-    await recordMissingSigningUrl(pending, userId, signerName, envelopeId, 'missing_signing_url');
-    return { sent: false };
-  }
-
-  const urlPersisted = await persistSigningUrl(userId, pending.item.id, envelopeId, embeddedSigningUrl);
-  if (!urlPersisted) {
-    await recordMissingSigningUrl(pending, userId, signerName, envelopeId, 'signing_url_persist_failed');
-    return { sent: false };
   }
 
   const now = new Date();
@@ -385,7 +297,7 @@ export interface SendPendingOptions {
 /**
  * Creates or retries e-sign envelopes for applicable items. This function is
  * deliberately failure-contained: callers receive whatever was sent, while
- * provider and persistence failures are recorded/logged and never re-thrown.
+ * envelope and persistence failures are recorded/logged and never re-thrown.
  */
 export async function sendPendingEsignDocs(
   userId: string,
@@ -403,7 +315,7 @@ export async function sendPendingEsignDocs(
 
     // Last line of defence for every call site: only a pending or active hire
     // may have documents sent. Decommissioned, suspended, and other statuses
-    // must never trigger provider dispatch.
+    // must never trigger envelope dispatch.
     if (!['pending', 'active'].includes(userSnap.get('status') as string)) return sent;
     if (!roleRequiresOnboarding(fieldRole)) return sent;
 
@@ -423,32 +335,23 @@ export async function sendPendingEsignDocs(
         const snap = await ref.get();
         const state = dispatchState(snap);
         const status = (snap.get('status') as string | undefined) ?? 'not_started';
-        if (snap.get('esignEnvelopeId')) continue;
         if (!['not_started', 'submitted', 'rejected'].includes(status)) continue;
+        const existingEnvelopeId = snap.get('esignEnvelopeId');
+        let stale: string | undefined;
+        if (typeof existingEnvelopeId === 'string' && existingEnvelopeId) {
+          stale = await staleEnvelopeId(existingEnvelopeId);
+          if (!stale) continue;
+        } else if (existingEnvelopeId) {
+          continue;
+        }
         if (isThrottled(state, now)) continue;
-        pending.push({ item, ref, snap });
+        pending.push({ item, ref, snap, ...(stale ? { staleEnvelopeId: stale } : {}) });
       } catch (error) {
         console.error(`[esign] failed to inspect ${userId}/${item.id}`, error);
       }
     }
 
     if (pending.length === 0) return sent;
-
-    let provider: EsignProvider;
-    try {
-      provider = getEsignProvider();
-    } catch (error) {
-      console.error(`[esign] provider construction failed for ${userId}`, error);
-      let alertRaised = false;
-      for (const item of pending) {
-        const failure = await recordFailure(item, userId, error);
-        if (!alertRaised && failure && failure.attempts >= 3) {
-          alertRaised = true;
-          await raiseDispatchAlert(userId, signerName);
-        }
-      }
-      return sent;
-    }
 
     let alertRaised = false;
     let recovered = false;
@@ -457,7 +360,7 @@ export async function sendPendingEsignDocs(
       // Another caller is already dispatching this item; it sends the email.
       if (!(await claimForDispatch(item, userId))) continue;
 
-      const result = await sendOne(provider, item, userId, signerName, signerEmail);
+      const result = await sendOne(item, userId, signerName, signerEmail);
       if (result.sent) {
         sent.push(item.item.id);
         sentLabels.push(item.item.label);

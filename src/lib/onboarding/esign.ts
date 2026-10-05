@@ -1,6 +1,6 @@
 import { ONBOARDING_ITEMS } from '@/types';
 
-// Items signed via the configured e-sign provider.
+// Items signed electronically in the portal.
 export const ESIGN_ITEM_IDS: string[] = ONBOARDING_ITEMS.filter(
   (i) => i.referenceKind === 'esign'
 ).map((i) => i.id);
@@ -14,8 +14,8 @@ export function isEsignItem(itemId: string): boolean {
  * documents go out, but the next move is the rep's, not the manager's: signing
  * approves it.
  */
-export function awaitsSignature(item: { id: string; status: string; esignSigningUrl?: string | null }): boolean {
-  return item.status === 'submitted' && isEsignItem(item.id) && !!item.esignSigningUrl;
+export function awaitsSignature(item: { id: string; status: string; signPath?: string | null }): boolean {
+  return item.status === 'submitted' && isEsignItem(item.id) && !!item.signPath;
 }
 
 // Single source for the rep-facing instruction on esign items.

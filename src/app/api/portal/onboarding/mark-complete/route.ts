@@ -3,7 +3,6 @@ import { adminDb } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
-import { isEsignItem } from '@/lib/onboarding/esign';
 import {
   MANUAL_NOTE_MAX,
   MANUAL_NOTE_MIN,
@@ -14,7 +13,7 @@ import {
 // POST /api/portal/onboarding/mark-complete - An owner marks one of a rep's
 // onboarding items complete, whatever its current status, with a required note
 // (e.g. the contract was signed on paper). Admin and operations cannot: this
-// skips the review and the e-sign provider entirely.
+// skips the review and e-signature entirely.
 export async function POST(request: NextRequest) {
   try {
     if (!adminDb) {
@@ -65,8 +64,8 @@ export async function POST(request: NextRequest) {
 
     const now = new Date();
     const manualCompletion: ManualCompletion = { note, by: gate.uid, byName: gate.name, at: now };
-    // Envelope fields stay: a provider webhook for an envelope already out
-    // still has to find this item, and it only re-approves it.
+    // Envelope fields stay as the record of what was sent; an approved item
+    // never links to its envelope again.
     await docRef.set(
       {
         userId,
@@ -81,17 +80,6 @@ export async function POST(request: NextRequest) {
       },
       { merge: true }
     );
-
-    if (isEsignItem(itemId)) {
-      // The signing URL is what asks the rep to sign. The item is done, so stop
-      // offering it. Failure is contained: an approved item already reads as
-      // complete on the rep's checklist.
-      try {
-        await adminDb.collection('esignSigningUrls').doc(`${userId}_${itemId}`).delete();
-      } catch (error) {
-        console.error('Failed to delete esign signing url after manual completion:', error);
-      }
-    }
 
     after(() =>
       maybeFlagActivationReady(userId).catch((error) => {

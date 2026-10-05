@@ -278,7 +278,7 @@ describe('signing', () => {
     expect(stampDocumentMock.mock.calls[0][0].fields).toMatchObject({ checking: false, savings: true });
   });
 
-  it('runs the same completion the SignWell webhook runs', async () => {
+  it('runs the shared completion for the signed item', async () => {
     await POST(signRequest(signBody()));
     expect(completeEsignItemMock).toHaveBeenCalledWith({
       userId: 'user-1',

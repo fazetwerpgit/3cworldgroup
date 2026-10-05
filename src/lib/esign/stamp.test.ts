@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PDFDocument, PDFPage, StandardFonts } from 'pdf-lib';
 import { formatSignDate, formatSignTimestamp, sha256Hex, stampDocument } from './stamp';
 import { DOCUMENTS, boxToPdfRect } from './documents';
-import type { EsignDocKey } from './provider';
+import type { EsignDocKey } from './types';
 
 // 2x2 opaque PNG.
 const PNG = Buffer.from(

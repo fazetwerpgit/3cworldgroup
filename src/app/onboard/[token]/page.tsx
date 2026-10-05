@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { AlertTriangle, Check, ChevronDown, LoaderCircle } from 'lucide-react';
 import { OnboardingItem, RoleDisplayNames, FieldRole, requiresHeavyVetting, SHIRT_SIZES } from '@/types';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
-import { isEsignItem, ESIGN_HELPER_TEXT } from '@/lib/onboarding/esign';
+import { isEsignItem } from '@/lib/onboarding/esign';
 import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
 import { US_STATES, isValidZip } from '@/lib/validation/address';
 import { forgetInvite, rememberInvite } from '@/lib/onboarding/rememberedInvite';
@@ -40,8 +40,6 @@ interface OnboardingResponse {
   closed?: boolean;
   /** The email is midway through another invite's onboarding. */
   onboardingElsewhere?: boolean;
-  /** In-house signing: the documents are signed on the next screen. */
-  signOnTheSpot?: boolean;
 }
 
 // The signing key from the packet submit, kept for this tab only so a reload
@@ -470,8 +468,7 @@ export default function PublicOnboardingPage() {
               </span>
               {signLater > 0 ? (
                 <p className={f.hint}>
-                  Plus {signLater} {signLater === 1 ? 'document' : 'documents'} you sign{' '}
-                  {data?.signOnTheSpot ? 'on the next screen.' : 'after you log in.'}
+                  Plus {signLater} {signLater === 1 ? 'document' : 'documents'} you sign on the next screen.
                 </p>
               ) : null}
             </div>
@@ -703,9 +700,7 @@ export default function PublicOnboardingPage() {
                       </h3>
                       <p className={o.rowDesc}>
                         {esign
-                          ? data?.signOnTheSpot
-                            ? 'You sign this on the next screen, right after you submit.'
-                            : ESIGN_HELPER_TEXT
+                          ? 'You sign this on the next screen, right after you submit.'
                           : item.id === 'dl_photos'
                             ? 'Your license number and a photo of each side.'
                             : item.sensitive
@@ -872,7 +867,7 @@ export default function PublicOnboardingPage() {
                   <LoaderCircle size={18} className={f.spin} aria-hidden="true" />
                   Submitting
                 </>
-              ) : data?.signOnTheSpot ? (
+              ) : signLater > 0 ? (
                 'Submit and continue'
               ) : (
                 'Submit onboarding packet'

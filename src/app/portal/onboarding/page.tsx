@@ -26,7 +26,7 @@ interface ChecklistItem extends OnboardingItem {
   submittedAt: string | null;
   reviewedAt: string | null;
   esignDispatch: { state?: string; attempts?: number } | null;
-  esignSigningUrl: string | null;
+  signPath: string | null;
 }
 
 interface ChecklistResponse {
@@ -388,7 +388,6 @@ function OnboardingChecklist() {
               renderItemAction={renderItemAction}
               openItemId={openItemId}
               onOpenItem={openItem}
-              onRefresh={fetchChecklist}
             />
           ) : activeAndDone ? null : (
             <p className={`${s.panel} ${o.empty}`}>No onboarding items for your account yet. Your manager adds them.</p>

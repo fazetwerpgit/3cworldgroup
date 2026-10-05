@@ -71,7 +71,6 @@ beforeEach(() => {
 describe('POST /api/portal/onboarding/mark-complete', () => {
   it('completes a not-started e-sign item and stops asking the rep to sign', async () => {
     store.set('userOnboarding/rep-1_contract', { status: 'not_started', esignEnvelopeId: 'env_1' });
-    store.set('esignSigningUrls/rep-1_contract', { url: '/portal/onboarding/sign/env_1', envelopeId: 'env_1' });
     store.set('esignEnvelopes/env_1', { status: 'sent' });
 
     const response = await POST(request(valid));
@@ -82,16 +81,15 @@ describe('POST /api/portal/onboarding/mark-complete', () => {
       reviewedBy: 'owner-1',
       reviewerName: 'Jeremy',
       rejectionReason: null,
-      // The envelope stays recorded so a late provider webhook still matches.
+      // The envelope id stays recorded; an approved item never links to it.
       esignEnvelopeId: 'env_1',
       manualCompletion: { note: 'Signed on paper 9/20', by: 'owner-1', byName: 'Jeremy', at: expect.any(Date) },
     });
-    expect(store.has('esignSigningUrls/rep-1_contract')).toBe(false);
     expect(store.get('esignEnvelopes/env_1')).toEqual({ status: 'sent' });
     expect(activationMock).toHaveBeenCalledWith('rep-1');
   });
 
-  it('completes an item that has no progress doc yet without touching signing urls', async () => {
+  it('completes an item that has no progress doc yet ', async () => {
     const response = await POST(request({ ...valid, itemId: 'dl_photos' }));
 
     expect(response.status).toBe(200);
@@ -146,7 +144,6 @@ describe('POST /api/portal/onboarding/mark-complete', () => {
   it('leaves an already approved item as it was', async () => {
     const approved = { status: 'approved', reviewedBy: 'system', reviewerName: 'E-sign (auto)' };
     store.set('userOnboarding/rep-1_contract', approved);
-    store.set('esignSigningUrls/rep-1_contract', { url: 'x' });
 
     const response = await POST(request(valid));
 

@@ -7,6 +7,7 @@ import {
 } from '@/types';
 import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
+import { ENVELOPES_COLLECTION, inhouseSignPath } from '@/lib/esign/inhouse';
 import { isEsignItem } from '@/lib/onboarding/esign';
 
 // GET /api/portal/onboarding?userId=xxx - Merged onboarding checklist for a user.
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
     // must never create envelopes or email "your documents are ready to sign".
     if (userData?.status === 'pending') {
       // Retry delivery after the response. sendPendingEsignDocs is failure-contained
-      // and throttled, so a provider outage cannot delay or fail this checklist read.
+      // and throttled, so a failed envelope send cannot delay or fail this checklist read.
       after(() =>
         sendPendingEsignDocs(userId).catch((error) => {
           console.error('[onboarding] esign auto-send failed', error);
@@ -75,8 +76,8 @@ export async function GET(request: NextRequest) {
     // Onboarding Review still has to show what a now-active hire completed.
     const checklist = getOnboardingItemsForUser(fieldRole, isIBO).filter((item) => !signOff || isEsignItem(item.id));
 
-    // Bearer capability: an embedded signing URL is only ever handed to the
-    // checklist owner. Management viewing someone else's checklist gets null.
+    // The signing page link only goes to the checklist owner; management
+    // viewing someone else's checklist gets null.
     const isOwner = gate.uid === userId;
 
     // Fetch all progress docs for this user in one batch read
@@ -85,19 +86,30 @@ export async function GET(request: NextRequest) {
     );
     const progressDocs = refs.length > 0 ? await adminDb.getAll(...refs) : [];
 
-    // Signing URLs live in a server-only collection (no firestore.rules match,
-    // so the client SDK can never read it). Only fetched for the owner, and
-    // only for esign items, since management never needs it.
-    const esignItems = checklist.filter((item) => isEsignItem(item.id));
-    const signingUrlByItemId = new Map<string, string | null>();
-    if (isOwner && esignItems.length > 0) {
-      const signingRefs = esignItems.map((item) =>
-        adminDb!.collection('esignSigningUrls').doc(`${userId}_${item.id}`)
-      );
-      const signingDocs = await adminDb.getAll(...signingRefs);
-      signingDocs.forEach((doc, i) => {
-        signingUrlByItemId.set(esignItems[i].id, doc.exists ? ((doc.data()?.url as string | undefined) ?? null) : null);
-      });
+    // An unsigned item links to its signing page only when its envelope record
+    // exists. Ids from before signing moved in-house name no record; those
+    // items show as being prepared until the auto-send above replaces them.
+    const signPathByItemId = new Map<string, string>();
+    if (isOwner) {
+      const unsigned = checklist
+        .map((item, i) => ({ item, data: progressDocs[i]?.exists ? progressDocs[i].data() : undefined }))
+        .filter(
+          ({ item, data }) =>
+            isEsignItem(item.id) &&
+            data?.status !== 'approved' &&
+            typeof data?.esignEnvelopeId === 'string' &&
+            data.esignEnvelopeId
+        );
+      if (unsigned.length > 0) {
+        const envelopes = await adminDb.getAll(
+          ...unsigned.map(({ data }) => adminDb!.collection(ENVELOPES_COLLECTION).doc(data!.esignEnvelopeId as string))
+        );
+        envelopes.forEach((envelope, i) => {
+          if (envelope.exists) {
+            signPathByItemId.set(unsigned[i].item.id, inhouseSignPath(unsigned[i].data!.esignEnvelopeId as string));
+          }
+        });
+      }
     }
 
     const merged = checklist.map((item, i) => {
@@ -116,13 +128,13 @@ export async function GET(request: NextRequest) {
               attempts: progress.esignDispatch.attempts,
             }
           : null,
-        esignSigningUrl: isOwner ? (signingUrlByItemId.get(item.id) ?? null) : null,
+        signPath: signPathByItemId.get(item.id) ?? null,
       };
     });
-    // Only what the rep can act on: sent (it has a signing link) and unsigned.
+    // Only what the rep can act on: sent (it has a signing page) and unsigned.
     // Reps activated before e-sign existed have nothing sent, so nothing shows.
     const items = signOff
-      ? merged.filter((item) => item.status !== 'approved' && item.esignSigningUrl)
+      ? merged.filter((item) => item.status !== 'approved' && item.signPath)
       : merged;
 
     const approvedCount = items.filter((i) => i.status === 'approved').length;

@@ -85,7 +85,7 @@ function postRequest(itemId: string, status: 'approved' | 'rejected') {
       userId: 'user-1',
       itemId,
       status,
-      ...(status === 'rejected' ? { rejectionReason: 'Please use the provider envelope.' } : {}),
+      ...(status === 'rejected' ? { rejectionReason: 'Please sign the new envelope.' } : {}),
     }),
   });
 }
@@ -106,7 +106,7 @@ describe('POST /api/portal/onboarding/review', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
-      error: expect.stringContaining('e-sign provider'),
+      error: expect.stringContaining('only when the rep signs them'),
     });
     expect(docUpdateMock).not.toHaveBeenCalled();
   });
@@ -134,10 +134,6 @@ describe('POST /api/portal/onboarding/review', () => {
       esignEnvelopeId: '__FIELD_VALUE_DELETE__',
       esignDispatch: '__FIELD_VALUE_DELETE__',
     }));
-    // The stale, superseded envelope's bearer signing URL must not keep being
-    // served to the candidate after the item is rejected.
-    expect(docIdMock).toHaveBeenCalledWith('esignSigningUrls', 'user-1_contract');
-    expect(docDeleteMock).toHaveBeenCalledOnce();
     expect(sendPendingEsignDocsMock).toHaveBeenCalledWith('user-1');
   });
 
@@ -154,7 +150,6 @@ describe('POST /api/portal/onboarding/review', () => {
       esignEnvelopeId: '__FIELD_VALUE_DELETE__',
       esignDispatch: '__FIELD_VALUE_DELETE__',
     });
-    expect(docDeleteMock).toHaveBeenCalledOnce();
   });
 
   it('rejecting a non-e-sign item does not clear e-sign fields', async () => {

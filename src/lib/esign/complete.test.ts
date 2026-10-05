@@ -24,8 +24,8 @@ const {
   consoleErrorMock: vi.fn(),
 }));
 
-// Same module specifiers the webhook route test mocks, so the extracted helper
-// keeps working inside that route without either test knowing about the other.
+// Same module specifiers the sign route tests mock, so the helper keeps
+// working inside those routes without either test knowing about the other.
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: { doc: docMock },
   adminStorage: { bucket: bucketMock },

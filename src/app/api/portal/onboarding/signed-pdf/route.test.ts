@@ -10,8 +10,6 @@ const {
   storageDownloadMock,
   storageSaveMock,
   bucketMock,
-  getCompletedPdfMock,
-  getEsignProviderMock,
   logAddMock,
 } = vi.hoisted(() => {
   const docGetMock = vi.fn();
@@ -21,8 +19,6 @@ const {
   const storageSaveMock = vi.fn();
   const storageFileMock = vi.fn(() => ({ download: storageDownloadMock, save: storageSaveMock }));
   const bucketMock = { file: storageFileMock };
-  const getCompletedPdfMock = vi.fn();
-  const getEsignProviderMock = vi.fn(() => ({ getCompletedPdf: getCompletedPdfMock }));
   return {
     gateMock: vi.fn(),
     docGetMock,
@@ -32,8 +28,6 @@ const {
     storageDownloadMock,
     storageSaveMock,
     bucketMock,
-    getCompletedPdfMock,
-    getEsignProviderMock,
     logAddMock: vi.fn(),
   };
 });
@@ -43,7 +37,6 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminDb: { collection: vi.fn(() => ({ doc: docMock, add: logAddMock })) },
   adminStorage: { bucket: vi.fn(() => bucketMock) },
 }));
-vi.mock('@/lib/esign/provider', () => ({ getEsignProvider: getEsignProviderMock }));
 
 import { GET } from './route';
 
@@ -63,7 +56,6 @@ beforeEach(() => {
   docSetMock.mockResolvedValue(undefined);
   storageDownloadMock.mockResolvedValue([Buffer.from('%PDF-stored')]);
   storageSaveMock.mockResolvedValue(undefined);
-  getCompletedPdfMock.mockResolvedValue(Buffer.from('%PDF-live'));
   logAddMock.mockResolvedValue(undefined);
 });
 
@@ -108,28 +100,21 @@ describe('GET /api/portal/onboarding/signed-pdf', () => {
     expect(response.headers.get('content-disposition')).toBe('inline; filename="contract.pdf"');
     expect(storageFileMock).toHaveBeenCalledWith('esign-completed/user-1/contract.pdf');
     expect(await response.text()).toBe('%PDF-stored');
-    expect(getCompletedPdfMock).not.toHaveBeenCalled();
   });
 
-  it('fetches a live PDF and best-effort persists its storage path', async () => {
+  it('answers 404 with a plain message for a signed item with no stored copy', async () => {
     docGetMock.mockResolvedValue({
       exists: true,
-      data: () => ({ itemId: 'contract', esignEnvelopeId: 'env-1' }),
+      data: () => ({ itemId: 'contract', status: 'approved', esignEnvelopeId: 'legacy-1' }),
     });
 
     const response = await GET(request());
 
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe('%PDF-live');
-    expect(getCompletedPdfMock).toHaveBeenCalledWith('env-1');
-    expect(storageFileMock).toHaveBeenCalledWith('esign-completed/user-1/contract.pdf');
-    expect(storageSaveMock).toHaveBeenCalledWith(Buffer.from('%PDF-live'), expect.objectContaining({
-      contentType: 'application/pdf',
-    }));
-    expect(docSetMock).toHaveBeenCalledWith(
-      { completedPdfPath: 'esign-completed/user-1/contract.pdf' },
-      { merge: true }
-    );
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'No stored copy of this signed document' });
+    expect(storageDownloadMock).not.toHaveBeenCalled();
+    expect(storageSaveMock).not.toHaveBeenCalled();
+    expect(docSetMock).not.toHaveBeenCalled();
   });
 
   it.each(['w9', 'direct_deposit'])('refuses the sensitive %s PDF to non-admin management', async (itemId) => {

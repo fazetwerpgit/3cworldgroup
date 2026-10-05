@@ -46,7 +46,6 @@ vi.mock('@/lib/recruiting/inviteLookup', () => ({
     return { id: 'invite-1', ref: docApi('onboardingInvites/invite-1'), data: store.get('onboardingInvites/invite-1') };
   },
 }));
-vi.mock('@/lib/esign/provider', () => ({ getEsignProvider: () => ({ id: 'inhouse' }) }));
 vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingMock }));
 vi.mock('@/lib/esign/inhouse', () => ({
   loadEnvelope: async (id: string) => {

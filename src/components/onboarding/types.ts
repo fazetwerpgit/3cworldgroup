@@ -9,5 +9,6 @@ export interface WizardItem extends OnboardingItem {
   submittedAt?: string | null;
   reviewedAt?: string | null;
   esignDispatch?: { state?: string; attempts?: number } | null;
-  esignSigningUrl?: string | null;
+  /** The in-app signing page for an unsigned document that has been sent. */
+  signPath?: string | null;
 }

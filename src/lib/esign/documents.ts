@@ -1,19 +1,15 @@
-import type { EsignDocKey } from './provider';
+import type { EsignDocKey } from './types';
 
 /**
  * Shared description of the five onboarding documents: which PDF, where every
- * field sits on it, and the rules for what a rep must fill in.
- *
- * This lives outside `signwell.ts` because both the SignWell provider (which
- * posts these boxes to the vendor) and the in-house provider (which stamps them
- * with pdf-lib) need the same coordinates.
+ * field sits on it, and the rules for what a rep must fill in. The sign page
+ * lays out its form from it and `stamp.ts` draws into these boxes with pdf-lib.
  */
 
 export type EsignFieldType = 'text' | 'checkbox';
 
 /**
- * A field box in 96-DPI pixels measured from the page's TOP-LEFT corner, the
- * coordinate system SignWell uses. PDF points are 72 DPI from the BOTTOM-LEFT,
+ * A field box in 96-DPI pixels measured from the page's TOP-LEFT corner. PDF points are 72 DPI from the BOTTOM-LEFT,
  * so `boxToPdfRect` converts before anything is drawn with pdf-lib.
  *
  * `page` is 1-based.
@@ -25,8 +21,6 @@ export interface EsignBox {
   height: number;
   page: number;
   required: boolean;
-  date_format?: 'MM/DD/YYYY';
-  lock_sign_date?: boolean;
 }
 
 export interface EsignExtraField extends EsignBox {
@@ -58,7 +52,7 @@ export const DOCUMENTS: Record<EsignDocKey, EsignDocumentConfig> = {
     name: 'Independent Agent Agreement',
     pages: 3,
     signature: { x: 184, y: 584, page: 3, required: true, width: 312, height: 34 },
-    date: { x: 534, y: 584, page: 3, required: true, width: 148, height: 34, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    date: { x: 534, y: 584, page: 3, required: true, width: 148, height: 34 },
     extra: [
       { key: 'agent_name', type: 'text', x: 168, y: 636, page: 3, required: true, width: 532, height: 30 },
       { key: 'business_name', type: 'text', x: 184, y: 684, page: 3, required: false, width: 516, height: 30 },
@@ -78,7 +72,7 @@ export const DOCUMENTS: Record<EsignDocKey, EsignDocumentConfig> = {
     // Jacob 9/25: the signature ran up into the "(Last Name, First Name…)" label
     // and the typed lines floated above their rules. Boxes now sit on the lines.
     signature: { x: 112, y: 586, page: 1, required: true, width: 500, height: 30 },
-    date: { x: 676, y: 590, page: 1, required: true, width: 100, height: 22, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    date: { x: 676, y: 590, page: 1, required: true, width: 100, height: 22 },
     extra: [
       { key: 'legal_name', type: 'text', x: 132, y: 540, page: 1, required: true, width: 644, height: 34 },
       { key: 'bank_name', type: 'text', x: 128, y: 169, page: 2, required: true, width: 644, height: 26 },
@@ -95,14 +89,14 @@ export const DOCUMENTS: Record<EsignDocKey, EsignDocumentConfig> = {
     name: 'Pay Structure Acknowledgment',
     pages: 1,
     signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
-    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28 },
   },
   w9: {
     file: 'w9.pdf',
     name: 'Form W-9 (Request for Taxpayer Identification Number)',
     pages: 6,
     signature: { x: 200, y: 770, page: 1, required: true, width: 304, height: 32 },
-    date: { x: 552, y: 770, page: 1, required: true, width: 208, height: 32, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    date: { x: 552, y: 770, page: 1, required: true, width: 208, height: 32 },
     extra: [
       // Text and TIN boxes are the IRS form's own field rectangles (Rev. 3-2024
       // AcroForm), converted to px: x = pt / 0.75, y = (792 - top pt) / 0.75.
@@ -113,7 +107,7 @@ export const DOCUMENTS: Record<EsignDocKey, EsignDocumentConfig> = {
       { key: 'llc_classification', type: 'text', x: 557, y: 256, page: 1, required: false, width: 38, height: 15 },
       { key: 'address', type: 'text', x: 78, y: 381, page: 1, required: true, width: 439, height: 19 },
       { key: 'city_state_zip', type: 'text', x: 78, y: 413, page: 1, required: true, width: 439, height: 19 },
-      // TIN is one-of SSN/EIN — SignWell cannot express either/or, so both stay
+      // TIN is one-of SSN/EIN: a box cannot express either/or, so both stay
       // optional here and `validateFields` enforces the choice instead.
       {
         key: 'ssn', type: 'text', x: 556.8, y: 496, page: 1, required: false, width: 211.2, height: 32,
@@ -137,7 +131,7 @@ export const DOCUMENTS: Record<EsignDocKey, EsignDocumentConfig> = {
     name: 'FCRA Background Check Authorization',
     pages: 1,
     signature: { x: 187, y: 827, page: 1, required: true, width: 253, height: 42 },
-    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28, date_format: 'MM/DD/YYYY', lock_sign_date: true },
+    date: { x: 573, y: 841, page: 1, required: true, width: 147, height: 28 },
   },
 };
 
