@@ -8,7 +8,14 @@ export function isSensitiveOnboardingItem(itemId: unknown): boolean {
   return ONBOARDING_ITEMS.some((item) => item.id === itemId && item.sensitive);
 }
 
-export type SensitiveFileAccessSource = 'onboarding-review' | 'onboarding-files' | 'onboarding-signed-pdf';
+export type SensitiveFileAccessSource =
+  | 'onboarding-review'
+  | 'onboarding-files'
+  | 'onboarding-signed-pdf'
+  // The owner's onboarding file on a person's record: every opening is logged,
+  // sensitive item or not.
+  | 'onboarding-file-files'
+  | 'onboarding-file-signed-pdf';
 
 // Writes the same audit row the SSN/DL# reveal route writes (who, whose, when),
 // plus which onboarding item was opened and from where. Throws on failure so a

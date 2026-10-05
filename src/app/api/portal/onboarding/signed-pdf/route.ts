@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb, adminStorage } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { isSensitiveOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
+import { hasSignedPdf, loadSignedPdf, NO_STORED_COPY, SignedPdfError } from '@/lib/onboarding/signedPdf';
 
 function pdfResponse(pdf: Buffer, itemId: string): NextResponse {
   return new NextResponse(pdf as unknown as BodyInit, {
@@ -51,19 +52,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const onboardingRef = adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`);
-    const onboardingDoc = await onboardingRef.get();
+    const onboardingDoc = await adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`).get();
     if (!onboardingDoc.exists) {
       return NextResponse.json({ error: 'Onboarding item not found' }, { status: 404 });
     }
 
     const data = onboardingDoc.data() ?? {};
-    // Every signed document is stored when it is signed. Some documents signed
-    // before signing moved in-house never got a stored copy; those are only in
-    // the old vendor's dashboard, and this route says so rather than failing.
-    const storedPdfPath = typeof data.completedPdfPath === 'string' ? data.completedPdfPath : '';
-    if (!storedPdfPath) {
-      return NextResponse.json({ error: 'No stored copy of this signed document' }, { status: 404 });
+    // Stored copies only; see loadSignedPdf. Checked before the audit write so
+    // a document with no stored copy logs no access.
+    if (!hasSignedPdf(data)) {
+      return NextResponse.json({ error: NO_STORED_COPY }, { status: 404 });
     }
 
     // Audit before any sensitive bytes leave the server, in the same shape the
@@ -78,14 +76,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (!adminStorage || !process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
-      return NextResponse.json({ error: 'Storage not configured' }, { status: 500 });
+    try {
+      return pdfResponse(await loadSignedPdf(data), itemId);
+    } catch (error) {
+      if (error instanceof SignedPdfError) {
+        return NextResponse.json({ error: error.message }, { status: error.status });
+      }
+      throw error;
     }
-    const [pdf] = await adminStorage
-      .bucket(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET)
-      .file(storedPdfPath)
-      .download();
-    return pdfResponse(pdf, itemId);
   } catch (error) {
     console.error('Error fetching signed onboarding PDF:', error);
     return NextResponse.json({ error: 'Failed to fetch signed PDF' }, { status: 500 });

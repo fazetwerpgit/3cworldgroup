@@ -16,10 +16,11 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { User, UserRole, RoleDisplayNames, getEffectiveRole, isAdminLevel } from '@/types';
+import { User, UserRole, RoleDisplayNames, getEffectiveRole, isAdminLevel, isOwner } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import d from '../user-detail.module.css';
+import { OnboardingFile } from '../OnboardingFile';
 
 const STATUS_TONE: Record<string, Tone> = { active: 'lime', pending: 'amber', inactive: 'muted' };
 
@@ -139,6 +140,63 @@ export default function EditUserPage() {
 
   const back = { href: '/portal/admin/people?tab=everyone', label: 'People' };
   const showVault = isAdminLevel(currentUser?.role) && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4);
+  const viewerIsOwner = isOwner(currentUser?.role);
+
+  // The masked SSN / DL# with its recorded Reveal. Admins see it in the side
+  // column; an owner sees it inside the onboarding file instead.
+  const vaultContent = sensitive ? (
+    <>
+      <p className={u.hint}>Admin-only values stay masked until you choose to view them.</p>
+      <dl className={`${u.facts} ${d.vaultFacts}`}>
+        <div>
+          <dt>Social security number</dt>
+          <dd className={u.num}>{revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}</dd>
+        </div>
+        <div>
+          <dt>Driver license reference</dt>
+          <dd className={u.num}>{revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}</dd>
+        </div>
+      </dl>
+
+      {!revealed && !revealOpen ? (
+        <div className={d.revealRow}>
+          <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setRevealOpen(true)}>
+            <Eye size={16} aria-hidden="true" />
+            Reveal for this session
+          </button>
+          <span className={u.hint}>This view is recorded.</span>
+        </div>
+      ) : null}
+
+      {revealOpen && !revealed ? (
+        <div className={d.revealConfirm} role="alert">
+          <p>Confirm reveal? This is a one-session view of sensitive records, and it is recorded.</p>
+          <div className={u.btnRow}>
+            <button
+              type="button"
+              className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
+              onClick={() => setRevealOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+              onClick={() => void doReveal()}
+              disabled={revealing}
+            >
+              {revealing ? 'Revealing…' : revealError ? 'Retry' : 'Continue'}
+            </button>
+          </div>
+          {revealError ? (
+            <AdminNotice tone="error">Couldn&apos;t reveal: {revealError}. Nothing was shown or logged.</AdminNotice>
+          ) : null}
+        </div>
+      ) : null}
+
+      {revealLogged ? <AdminNotice tone="ok">Reveal logged for this session.</AdminNotice> : null}
+    </>
+  ) : null;
 
   return (
     <AdminGate roles={['admin', 'operations']}>
@@ -160,6 +218,12 @@ export default function EditUserPage() {
             <div className={d.layout}>
               <div className={d.main}>
                 <UserForm user={user} />
+                {viewerIsOwner ? (
+                  <OnboardingFile
+                    userId={userId}
+                    vault={showVault ? <div className={d.vaultBody}>{vaultContent}</div> : null}
+                  />
+                ) : null}
               </div>
 
               <aside className={d.aside} aria-label="Record summary">
@@ -173,7 +237,7 @@ export default function EditUserPage() {
                   </div>
                 </section>
 
-                {showVault ? (
+                {showVault && !viewerIsOwner ? (
                   <section className={`${s.panel} ${d.vault}`} aria-labelledby="person-vault-heading">
                     <div className={`${s.panelHead} ${u.band}`}>
                       <h2 id="person-vault-heading" className={s.kicker}>
@@ -184,67 +248,7 @@ export default function EditUserPage() {
                         Admin only
                       </span>
                     </div>
-                    <div className={`${u.panelBody} ${d.vaultBody}`}>
-                      <p className={u.hint}>Admin-only values stay masked until you choose to view them.</p>
-                      <dl className={`${u.facts} ${d.vaultFacts}`}>
-                        <div>
-                          <dt>Social security number</dt>
-                          <dd className={u.num}>
-                            {revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Driver license reference</dt>
-                          <dd className={u.num}>
-                            {revealed?.dlNumber ?? (sensitive.dlLast4 ? `•••••${sensitive.dlLast4}` : '—')}
-                          </dd>
-                        </div>
-                      </dl>
-
-                      {!revealed && !revealOpen ? (
-                        <div className={d.revealRow}>
-                          <button
-                            type="button"
-                            className={`${s.btnSecondary} ${u.sm}`}
-                            onClick={() => setRevealOpen(true)}
-                          >
-                            <Eye size={16} aria-hidden="true" />
-                            Reveal for this session
-                          </button>
-                          <span className={u.hint}>This view is recorded.</span>
-                        </div>
-                      ) : null}
-
-                      {revealOpen && !revealed ? (
-                        <div className={d.revealConfirm} role="alert">
-                          <p>Confirm reveal? This is a one-session view of sensitive records, and it is recorded.</p>
-                          <div className={u.btnRow}>
-                            <button
-                              type="button"
-                              className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
-                              onClick={() => setRevealOpen(false)}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-                              onClick={() => void doReveal()}
-                              disabled={revealing}
-                            >
-                              {revealing ? 'Revealing…' : revealError ? 'Retry' : 'Continue'}
-                            </button>
-                          </div>
-                          {revealError ? (
-                            <AdminNotice tone="error">
-                              Couldn&apos;t reveal: {revealError}. Nothing was shown or logged.
-                            </AdminNotice>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      {revealLogged ? <AdminNotice tone="ok">Reveal logged for this session.</AdminNotice> : null}
-                    </div>
+                    <div className={`${u.panelBody} ${d.vaultBody}`}>{vaultContent}</div>
                   </section>
                 ) : null}
               </aside>
