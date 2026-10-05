@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import {
   resolveRoles,
@@ -81,6 +81,20 @@ export async function GET(request: NextRequest) {
       nameById.set(doc.id, d.displayName ?? d.email ?? doc.id);
     }
 
+    // Last portal sign-in per user, from Firebase Auth (100 uids per call).
+    const lastSignInById = new Map<string, string>();
+    if (adminAuth) {
+      const uids = usersSnap.docs.map((doc) => ({ uid: doc.id }));
+      for (let i = 0; i < uids.length; i += 100) {
+        const { users } = await adminAuth.getUsers(uids.slice(i, i + 100));
+        for (const record of users) {
+          if (record.metadata.lastSignInTime) {
+            lastSignInById.set(record.uid, new Date(record.metadata.lastSignInTime).toISOString());
+          }
+        }
+      }
+    }
+
     const reps: PipelineRep[] = [];
     for (const doc of usersSnap.docs) {
       const data = doc.data();
@@ -95,10 +109,7 @@ export async function GET(request: NextRequest) {
       const approvedSales = salesByUser.get(doc.id) ?? 0;
       const carrierOrders = carrierOrdersByUser.get(doc.id) ?? 0;
       const decommission = data.decommission;
-      // Channel clearances were barely ever recorded, so a rep who is already
-      // selling (approved sales, or orders under their dealer code on the
-      // carrier report) plainly has logins.
-      const hasLogins = channels.cleared > 0 || approvedSales > 0 || carrierOrders > 0;
+      const lastSignInAt = lastSignInById.get(doc.id) ?? null;
 
       let stage: PipelineStage;
       if (decommission || data.status === 'inactive') {
@@ -107,7 +118,8 @@ export async function GET(request: NextRequest) {
         // An active rep is past onboarding even with no checklist records (made
         // active in People, or from before the checklist existed).
         stage = 'processing';
-      } else if (!hasLogins) {
+      } else if (!lastSignInAt) {
+        // Owner decision 2026-10-05: "logins" means the portal itself.
         stage = 'need_logins';
       } else if (approvedSales === 0 && carrierOrders === 0) {
         stage = 'cleared_to_sell';
@@ -134,6 +146,7 @@ export async function GET(request: NextRequest) {
         channelsSubmitted: channels.submitted,
         approvedSales,
         carrierOrders,
+        lastSignInAt,
         hireDate: data.hireDate?.toDate(),
         decommission: decommission
           ? {

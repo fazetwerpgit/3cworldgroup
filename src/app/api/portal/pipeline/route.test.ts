@@ -6,6 +6,8 @@ const state = vi.hoisted(() => ({
   sales: [] as Array<Record<string, unknown>>,
   orders: [] as Array<Record<string, unknown>>,
   onboarding: [] as Array<Record<string, unknown>>,
+  /** uid -> last portal sign-in; absent = never signed in. */
+  signIns: {} as Record<string, string>,
 }));
 
 vi.mock('@/lib/firebase/admin', () => {
@@ -22,6 +24,11 @@ vi.mock('@/lib/firebase/admin', () => {
         where: () => ({ get: async () => snap(name === 'sales' ? state.sales : []) }),
       }),
     },
+    adminAuth: {
+      getUsers: async (ids: Array<{ uid: string }>) => ({
+        users: ids.map(({ uid }) => ({ uid, metadata: { lastSignInTime: state.signIns[uid] } })),
+      }),
+    },
   };
 });
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
@@ -35,6 +42,7 @@ beforeEach(() => {
   state.sales = [];
   state.orders = [];
   state.onboarding = [];
+  state.signIns = {};
 });
 
 async function pipeline() {
@@ -54,20 +62,27 @@ it('does not keep an active rep with no checklist records in Processing', async 
   expect(rep('pending-hire').stage).toBe('processing');
 });
 
-it('counts a rep who is already selling as having logins, with no recorded channel clearance', async () => {
+it('puts an active rep who never signed into the portal in Need Logins, and moves them on once they do', async () => {
   state.users = [
-    { id: 'logs-sales', fieldRole: 'internal_rep', status: 'active' },
+    { id: 'never', fieldRole: 'ae_tier_1', status: 'active' },
+    { id: 'signed-in', fieldRole: 'ae_tier_1', status: 'active' },
+    { id: 'selling', fieldRole: 'internal_rep', status: 'active' },
     { id: 'carrier-only', fieldRole: 'entry_rep', status: 'active' },
-    { id: 'brand-new', fieldRole: 'ae_tier_1', status: 'active' },
   ];
-  state.sales = [{ salesRepId: 'logs-sales', status: 'approved' }];
+  state.signIns = {
+    'signed-in': 'Mon, 05 Oct 2026 14:00:00 GMT',
+    selling: 'Tue, 18 Aug 2026 12:00:00 GMT',
+    'carrier-only': 'Wed, 08 Jul 2026 12:00:00 GMT',
+  };
+  state.sales = [{ salesRepId: 'selling', status: 'approved' }];
   state.orders = [{ matchedUserId: 'carrier-only' }, { matchedUserId: null }];
 
   const rep = await pipeline();
 
-  expect(rep('logs-sales').stage).toBe('active');
+  expect(rep('never')).toMatchObject({ stage: 'need_logins', lastSignInAt: null });
+  expect(rep('signed-in')).toMatchObject({ stage: 'cleared_to_sell', lastSignInAt: '2026-10-05T14:00:00.000Z' });
+  expect(rep('selling').stage).toBe('active');
   expect(rep('carrier-only')).toMatchObject({ stage: 'active', carrierOrders: 1 });
-  expect(rep('brand-new').stage).toBe('need_logins');
 });
 
 it('shows no checklist count for an active rep from before the checklist, but keeps it for hires', async () => {

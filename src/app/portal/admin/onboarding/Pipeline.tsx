@@ -503,6 +503,14 @@ export function Pipeline() {
                 </dd>
               </div>
               <div>
+                <dt>Last portal sign-in</dt>
+                <dd>
+                  {selectedRep.lastSignInAt
+                    ? new Date(selectedRep.lastSignInAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'Never'}
+                </dd>
+              </div>
+              <div>
                 <dt>Approved sales</dt>
                 <dd className={u.num}>{selectedRep.approvedSales}</dd>
               </div>
