@@ -6,7 +6,9 @@ export type AdminAuditAction =
   | 'user.decommission'
   | 'user.reinstate'
   | 'compPlan.update'
-  | 'commission.update';
+  | 'commission.update'
+  // An owner opened a person's onboarding file (profile + checklist).
+  | 'onboardingFile.view';
 
 export interface AdminAuditEntry {
   action: AdminAuditAction;
