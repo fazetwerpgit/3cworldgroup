@@ -36,7 +36,7 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
   };
 }
 
-interface ChecklistItem {
+export interface ChecklistItem {
   id: string;
   userId: string;
   itemId: string;
@@ -121,6 +121,20 @@ function itemStatus(item: ChecklistItem): { tone: Tone; label: string } {
   }
 }
 
+/**
+ * Signed, but no copy was stored: some documents signed before signing moved
+ * in-house only exist in the old vendor's dashboard. A note, not an error.
+ */
+export function signedWithoutCopy(item: ChecklistItem): boolean {
+  return (
+    isEsignItem(item.itemId) &&
+    item.status === 'approved' &&
+    !item.hasSignedPdf &&
+    !item.manualCompletion &&
+    Boolean(item.esignEnvelopeId)
+  );
+}
+
 function itemDetail(item: ChecklistItem): string | null {
   if (item.onHold) return "Placeholder on hold until 3C sends the real document. The rep isn't asked to sign it.";
   switch (item.status) {
@@ -128,7 +142,9 @@ function itemDetail(item: ChecklistItem): string | null {
       if (item.manualCompletion) {
         return `Marked complete by ${item.manualCompletion.byName}: ${item.manualCompletion.note}`;
       }
-      return `Approved ${formatDate(item.reviewedAt)}${item.reviewerName ? ` by ${item.reviewerName}` : ''}`;
+      return `Approved ${formatDate(item.reviewedAt)}${item.reviewerName ? ` by ${item.reviewerName}` : ''}${
+        signedWithoutCopy(item) ? ' · Signed (no stored copy)' : ''
+      }`;
     case 'rejected':
       return `Rejected ${formatDate(item.reviewedAt)}${item.reviewerName ? ` by ${item.reviewerName}` : ''}${
         item.rejectionReason ? `: ${item.rejectionReason}` : ''
