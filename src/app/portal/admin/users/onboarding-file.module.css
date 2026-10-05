@@ -81,3 +81,10 @@
   flex-wrap: wrap;
   gap: var(--s2);
 }
+
+/* Phones: the file comes before the long edit form, not after it. */
+@media (max-width: 1023px) {
+  .section {
+    order: -1;
+  }
+}

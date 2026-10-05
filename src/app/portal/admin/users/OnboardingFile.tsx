@@ -30,6 +30,18 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 const FILENAME = /filename="([^"]+)"/;
 
+function canShareFile(file: File): boolean {
+  try {
+    return (
+      typeof navigator !== 'undefined' &&
+      typeof navigator.share === 'function' &&
+      !!navigator.canShare?.({ files: [file] })
+    );
+  } catch {
+    return false;
+  }
+}
+
 type UploadedFile = { name: string; url: string; contentType: string };
 
 const PREFILL_LABELS: Record<string, string> = {
@@ -76,6 +88,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [ready, setReady] = useState<File | null>(null);
   // In-app viewer, not a new tab: a tab opened after an await is blocked or
   // opens blank in Safari and strands an iPhone home-screen app.
   const viewer = useAttachmentViewer();
@@ -128,6 +141,10 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
       opener,
     );
 
+  // Fetch first ("Preparing…"). Where the browser can share files (iPhone,
+  // including the home-screen app), the iOS share sheet offers Save to Files,
+  // but share() must run straight from a tap, so the zip waits behind one
+  // clear "Save file" tap. Everywhere else it downloads right away.
   const downloadAll = async () => {
     setDownloading(true);
     setError('');
@@ -139,14 +156,38 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
         throw new Error(typeof json.error === 'string' ? json.error : 'The download failed');
       }
       const filename = FILENAME.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? 'onboarding-file.zip';
-      downloadBlob(filename, await response.blob());
-      setDownloaded(true);
+      const zip = new File([await response.blob()], filename, { type: 'application/zip' });
+      if (canShareFile(zip)) {
+        setReady(zip);
+      } else {
+        downloadBlob(filename, zip);
+        setDownloaded(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The download failed');
     } finally {
       setDownloading(false);
       setConfirming(false);
     }
+  };
+
+  const saveReady = () => {
+    if (!ready) return;
+    const zip = ready;
+    // Called synchronously from the tap, as share() requires.
+    navigator.share({ files: [zip] }).then(
+      () => {
+        setReady(null);
+        setDownloaded(true);
+      },
+      (err: unknown) => {
+        // Closing the share sheet is not a failure; the file stays ready.
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        downloadBlob(zip.name, zip);
+        setReady(null);
+        setDownloaded(true);
+      },
+    );
   };
 
   const profile = file?.profile;
@@ -157,7 +198,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
   const name = profile?.name || 'this person';
 
   return (
-    <section className={s.panel} aria-labelledby="onboarding-file-heading">
+    <section id="onboarding-file" className={`${s.panel} ${f.section}`} aria-labelledby="onboarding-file-heading">
       <div className={`${s.panelHead} ${u.band} ${f.head}`}>
         <h2 id="onboarding-file-heading" className={s.kicker}>
           Onboarding file
@@ -190,7 +231,24 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
               Every signed document, upload and an info sheet with full SSN and license number, in one .zip. Each
               download is logged under your name.
             </p>
-            {confirming ? (
+            {ready ? (
+              <div className={d.revealConfirm} role="status">
+                <p>{ready.name} is ready. Save it to Files or send it where you need it.</p>
+                <div className={u.btnRow}>
+                  <button
+                    type="button"
+                    className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
+                    onClick={() => setReady(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={saveReady}>
+                    <Download size={18} aria-hidden="true" />
+                    Save file
+                  </button>
+                </div>
+              </div>
+            ) : confirming ? (
               <div className={d.revealConfirm} role="alertdialog" aria-labelledby="onboarding-file-confirm">
                 <p id="onboarding-file-confirm">
                   Download everything on file for {name}, including full SSN and license number? This is logged under
