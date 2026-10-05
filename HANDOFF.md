@@ -9,6 +9,14 @@ Current checkpoint: see "Session Handoff 2026-07-11 — Leaderboard Spotlight
 Arena re-skin DEPLOYED" below; the rest of this doc is standing project
 background (intent, stack, design system, constraints) and still applies.
 
+> **E-sign (2026-10-05):** signing is in-house only (`src/lib/esign/inhouse.ts`,
+> `signEnvelope.ts`, `/portal/onboarding/sign/[envelopeId]`, and the invite
+> link's sign-all step). The old e-sign vendor, its webhook, embed and scripts
+> are removed; mentions of it in the dated handoffs below are history. Unsigned
+> items whose envelope id has no `esignEnvelopes` record get a fresh envelope
+> from `sendPendingEsignDocs`. Signed documents with no stored copy show
+> "Signed (no stored copy)" in Review.
+
 ## Session Handoff 2026-07-11 — Leaderboard Spotlight Arena re-skin DEPLOYED
 
 ### Completed (this session)
