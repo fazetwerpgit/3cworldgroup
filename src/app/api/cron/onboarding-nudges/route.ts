@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const now = new Date();
   // Invite-link hires sign on the spot; the "ready to sign" email they skipped
   // goes out here only if a document is still unsigned.
-  let deferredReady: { sent: number; cleared: number } = { sent: 0, cleared: 0 };
+  let deferredReady = { sent: 0, cleared: 0, retrying: 0 };
   try {
     deferredReady = await sendDeferredEsignReadyEmails(now);
   } catch (error) {

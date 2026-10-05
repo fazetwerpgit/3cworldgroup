@@ -190,6 +190,16 @@ vi.mock('./provider', () => ({
 }));
 
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
+const sendEmailMock = vi.hoisted(() =>
+  vi.fn(async (input: { to: string; subject: string }): Promise<{ ok: boolean; error?: string }> => {
+    void input;
+    return { ok: true };
+  })
+);
+vi.mock('@/lib/email/sendEmail', () => ({
+  sendEmail: sendEmailMock,
+  onboardingFrom: () => undefined,
+}));
 vi.mock('@/lib/alerts/alertTasks', () => ({
   createAlertTask: createAlertTaskMock,
   resolveAlertTasks: resolveAlertTasksMock,
@@ -246,6 +256,8 @@ beforeEach(() => {
   resolveAlertTasksMock.mockReset();
   resolveAlertTasksMock.mockResolvedValue(undefined);
   dispatchMock.mockClear();
+  sendEmailMock.mockReset();
+  sendEmailMock.mockResolvedValue({ ok: true });
   consoleErrorMock.mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(consoleErrorMock);
   vi.useFakeTimers();
@@ -1009,12 +1021,14 @@ describe('deferred ready-to-sign email (invite link)', () => {
     store.set('userOnboarding/u1_w9', { ...store.get('userOnboarding/u1_w9'), status: 'approved' });
 
     const early = await sendDeferredEsignReadyEmails(new Date(Date.now() + HOUR / 2));
-    expect(early).toEqual({ sent: 0, cleared: 0 });
+    expect(early).toEqual({ sent: 0, cleared: 0, retrying: 0 });
     expect(dispatchMock).not.toHaveBeenCalled();
 
     const later = new Date(Date.now() + 2 * HOUR);
     const first = await sendDeferredEsignReadyEmails(later);
-    expect(first).toEqual({ sent: 1, cleared: 0 });
+    expect(first).toEqual({ sent: 1, cleared: 0, retrying: 0 });
+    expect(sendEmailMock).toHaveBeenCalledOnce();
+    expect(sendEmailMock.mock.calls[0][0].to).toBe('sam@x.com');
     expect(dispatchMock).toHaveBeenCalledOnce();
     const [notice] = dispatchMock.mock.calls[0] as unknown as [{ userId: string; message: string }];
     expect(notice.userId).toBe('u1');
@@ -1023,8 +1037,51 @@ describe('deferred ready-to-sign email (invite link)', () => {
     expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailDeferredAt');
 
     const second = await sendDeferredEsignReadyEmails(new Date(later.getTime() + HOUR));
-    expect(second).toEqual({ sent: 0, cleared: 0 });
+    expect(second).toEqual({ sent: 0, cleared: 0, retrying: 0 });
+    expect(sendEmailMock).toHaveBeenCalledOnce();
     expect(dispatchMock).toHaveBeenCalledOnce();
+  });
+
+  it('a failed email keeps the marker so the next run retries, and sends once', async () => {
+    await sendPendingEsignDocs('u1', { deferReadyEmail: true });
+    const deferredAt = store.get('users/u1')?.esignReadyEmailDeferredAt;
+    sendEmailMock.mockResolvedValueOnce({ ok: false, error: 'provider down' });
+
+    const later = new Date(Date.now() + 2 * HOUR);
+    const failed = await sendDeferredEsignReadyEmails(later);
+    expect(failed).toEqual({ sent: 0, cleared: 0, retrying: 1 });
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(store.get('users/u1')?.esignReadyEmailDeferredAt).toEqual(deferredAt);
+    expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailAt');
+
+    sendEmailMock.mockRejectedValueOnce(new Error('network'));
+    const thrown = await sendDeferredEsignReadyEmails(new Date(later.getTime() + HOUR));
+    expect(thrown).toEqual({ sent: 0, cleared: 0, retrying: 1 });
+    expect(store.get('users/u1')?.esignReadyEmailDeferredAt).toEqual(deferredAt);
+
+    const retried = await sendDeferredEsignReadyEmails(new Date(later.getTime() + 2 * HOUR));
+    expect(retried).toEqual({ sent: 1, cleared: 0, retrying: 0 });
+    expect(sendEmailMock).toHaveBeenCalledTimes(3);
+    expect(dispatchMock).toHaveBeenCalledOnce();
+    expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailDeferredAt');
+
+    const after = await sendDeferredEsignReadyEmails(new Date(later.getTime() + 3 * HOUR));
+    expect(after).toEqual({ sent: 0, cleared: 0, retrying: 0 });
+    expect(sendEmailMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('a failed email does not restore the marker when a portal notice went out meanwhile', async () => {
+    await sendPendingEsignDocs('u1', { deferReadyEmail: true });
+    const later = new Date(Date.now() + 2 * HOUR);
+    sendEmailMock.mockImplementationOnce(async () => {
+      store.set('users/u1', { ...store.get('users/u1'), esignReadyEmailAt: new Date(later.getTime() + 1) });
+      return { ok: false, error: 'provider down' };
+    });
+
+    const result = await sendDeferredEsignReadyEmails(later);
+
+    expect(result).toEqual({ sent: 0, cleared: 0, retrying: 1 });
+    expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailDeferredAt');
   });
 
   it('sends nothing when the hire signed everything on the spot', async () => {
@@ -1035,7 +1092,7 @@ describe('deferred ready-to-sign email (invite link)', () => {
 
     const result = await sendDeferredEsignReadyEmails(new Date(Date.now() + 2 * HOUR));
 
-    expect(result).toEqual({ sent: 0, cleared: 1 });
+    expect(result).toEqual({ sent: 0, cleared: 1, retrying: 0 });
     expect(dispatchMock).not.toHaveBeenCalled();
     expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailDeferredAt');
   });
@@ -1046,7 +1103,7 @@ describe('deferred ready-to-sign email (invite link)', () => {
 
     const result = await sendDeferredEsignReadyEmails(new Date(Date.now() + 2 * HOUR));
 
-    expect(result).toEqual({ sent: 0, cleared: 1 });
+    expect(result).toEqual({ sent: 0, cleared: 1, retrying: 0 });
     expect(dispatchMock).not.toHaveBeenCalled();
   });
 });

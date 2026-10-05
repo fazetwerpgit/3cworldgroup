@@ -3,7 +3,8 @@ import { adminDb } from '@/lib/firebase/admin';
 import { createAlertTask, resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { appBaseUrl, esignSentEmail } from '@/lib/email/templates';
-import { onboardingFrom } from '@/lib/email/sendEmail';
+import { onboardingFrom, sendEmail } from '@/lib/email/sendEmail';
+import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { getOnboardingItemsForUser } from '@/types/onboarding';
 import { isHeldOnboardingItem } from '@/types/onboardingHold';
 import { isEsignItem } from '@/lib/onboarding/esign';
@@ -521,14 +522,43 @@ async function unsignedEsignLabels(
 }
 
 /**
+ * Puts the held-back marker back after a failed send, so the next cron run
+ * tries again. Only this run's claim is undone: if a portal notice went out in
+ * the meantime (esignReadyEmailAt moved on) the rep already has an email and
+ * the marker stays cleared.
+ */
+async function releaseDeferredClaim(
+  ref: FirebaseFirestore.DocumentReference,
+  deferredAt: unknown,
+  claimedAt: Date
+): Promise<void> {
+  try {
+    await adminDb!.runTransaction(async (transaction) => {
+      const fresh = await transaction.get(ref);
+      const lastSentAt = asDate(fresh.get('esignReadyEmailAt'));
+      if (!lastSentAt || lastSentAt.getTime() !== claimedAt.getTime()) return;
+      transaction.set(
+        ref,
+        { [DEFERRED_READY_EMAIL_FIELD]: deferredAt, esignReadyEmailAt: FieldValue.delete() },
+        { merge: true }
+      );
+    });
+  } catch (error) {
+    console.error('[esign] failed to restore the held-back ready-to-sign notice', error);
+  }
+}
+
+/**
  * Sends the "ready to sign" email the invite link held back, once the hire has
  * had DEFERRED_READY_EMAIL_DELAY_MS to sign on the spot and still has
  * something unsigned. Run by the onboarding-nudges cron. Each user is claimed
  * in a transaction that clears the marker, so two overlapping runs (or a
  * portal-triggered notice in between) never send it twice.
  */
-export async function sendDeferredEsignReadyEmails(now: Date): Promise<{ sent: number; cleared: number }> {
-  const result = { sent: 0, cleared: 0 };
+export async function sendDeferredEsignReadyEmails(
+  now: Date
+): Promise<{ sent: number; cleared: number; retrying: number }> {
+  const result = { sent: 0, cleared: 0, retrying: 0 };
   if (!adminDb) return result;
   const db = adminDb;
 
@@ -547,7 +577,8 @@ export async function sendDeferredEsignReadyEmails(now: Date): Promise<{ sent: n
 
       const claimed = await db.runTransaction(async (transaction) => {
         const fresh = await transaction.get(userDoc.ref);
-        if (!fresh.get(DEFERRED_READY_EMAIL_FIELD)) return false;
+        const deferredAt = fresh.get(DEFERRED_READY_EMAIL_FIELD);
+        if (!deferredAt) return null;
         transaction.set(
           userDoc.ref,
           {
@@ -556,7 +587,7 @@ export async function sendDeferredEsignReadyEmails(now: Date): Promise<{ sent: n
           },
           { merge: true }
         );
-        return true;
+        return { deferredAt: deferredAt as unknown, to: emailFromUserDoc(fresh) };
       });
       if (!claimed) continue;
       if (labels.length === 0) {
@@ -564,19 +595,43 @@ export async function sendDeferredEsignReadyEmails(now: Date): Promise<{ sent: n
         continue;
       }
 
+      // The email goes out first and on its own, because dispatchToUser logs
+      // and swallows email failures. A failed send hands the claim back so the
+      // next cron run retries it; the bell and push only follow a real send,
+      // so a retry never repeats them.
       const name = (userDoc.get('displayName') as string | undefined) ?? 'Rep';
+      if (claimed.to) {
+        let delivered = false;
+        try {
+          const outcome = await sendEmail({
+            to: claimed.to,
+            ...esignSentEmail({
+              name,
+              docLabels: labels,
+              portalUrl: `${appBaseUrl()}/portal/onboarding`,
+            }),
+            from: onboardingFrom(),
+          });
+          delivered = outcome.ok;
+          if (!outcome.ok) {
+            console.error(`[esign] deferred ready-to-sign email to ${userId} failed: ${outcome.error ?? 'unknown'}`);
+          }
+        } catch (error) {
+          console.error(`[esign] deferred ready-to-sign email to ${userId} failed`, error);
+        }
+        if (!delivered) {
+          await releaseDeferredClaim(userDoc.ref, claimed.deferredAt, now);
+          result.retrying += 1;
+          continue;
+        }
+      }
+
       await dispatchToUser({
         userId,
         type: 'system',
         title: 'Documents ready to sign',
         message: `Ready to sign: ${labels.join(', ')}`,
         link: '/portal/onboarding',
-        email: esignSentEmail({
-          name,
-          docLabels: labels,
-          portalUrl: `${appBaseUrl()}/portal/onboarding`,
-        }),
-        emailFrom: onboardingFrom(),
       });
       result.sent += 1;
     } catch (error) {
