@@ -400,7 +400,7 @@ export function Pipeline() {
                         <span className={p.ellipsis}>{rep.managerName ?? '—'}</span>
                       </span>
                       <span className={`${u.cell} ${p.progressCell}`} data-label="Onboarding">
-                        {rep.onboarding ? (
+                        {rep.onboarding && rep.onboarding.total > 0 ? (
                           <span className={p.progress}>
                             <span className={`${s.track} ${p.track}`} aria-hidden="true">
                               <span className={s.fill} style={{ width: `${pct}%` }} />
@@ -410,7 +410,7 @@ export function Pipeline() {
                             </b>
                           </span>
                         ) : (
-                          <span className={u.toneMuted}>Before checklist</span>
+                          <span className={u.toneMuted}>{rep.onboarding ? 'None for this role' : 'Before checklist'}</span>
                         )}
                       </span>
                       <span className={u.cell} data-label="Channels">
@@ -487,9 +487,11 @@ export function Pipeline() {
               <div>
                 <dt>Onboarding</dt>
                 <dd className={u.num}>
-                  {selectedRep.onboarding
-                    ? `${selectedRep.onboarding.approved}/${selectedRep.onboarding.total} approved`
-                    : 'Joined before the checklist'}
+                  {!selectedRep.onboarding
+                    ? 'Joined before the checklist'
+                    : selectedRep.onboarding.total === 0
+                      ? 'No checklist for this role'
+                      : `${selectedRep.onboarding.approved}/${selectedRep.onboarding.total} approved`}
                 </dd>
               </div>
               <div>
