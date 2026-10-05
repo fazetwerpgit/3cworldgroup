@@ -1016,6 +1016,43 @@ describe('deferred ready-to-sign email (invite link)', () => {
     expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailDeferredAt');
   });
 
+  it('a later normal send that takes over the held-back notice lists every unsigned document', async () => {
+    store.set('users/u1', { ...store.get('users/u1'), esignReadyEmailDeferredAt: new Date() });
+    // Sent from the invite link earlier and still unsigned.
+    store.set('userOnboarding/u1_contract', {
+      userId: 'u1',
+      itemId: 'contract',
+      status: 'in_progress',
+      esignEnvelopeId: 'env_old',
+    });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent).not.toContain('contract');
+    expect(dispatchMock).toHaveBeenCalledOnce();
+    const [notice] = dispatchMock.mock.calls[0] as unknown as [
+      { message: string; email: { html?: string; text?: string } },
+    ];
+    expect(notice.message).toContain('Contract');
+    expect(notice.message).toContain('W-9');
+    expect(JSON.stringify(notice.email)).toContain('Contract');
+  });
+
+  it('a normal send without a held-back notice names only what it sent', async () => {
+    store.set('userOnboarding/u1_contract', {
+      userId: 'u1',
+      itemId: 'contract',
+      status: 'in_progress',
+      esignEnvelopeId: 'env_old',
+    });
+
+    await sendPendingEsignDocs('u1');
+
+    const [notice] = dispatchMock.mock.calls[0] as unknown as [{ message: string }];
+    expect(notice.message).not.toContain('Contract');
+    expect(notice.message).toContain('W-9');
+  });
+
   it('the cron sends it once, after the delay, naming only the unsigned documents', async () => {
     await sendPendingEsignDocs('u1', { deferReadyEmail: true });
     store.set('userOnboarding/u1_w9', { ...store.get('userOnboarding/u1_w9'), status: 'approved' });

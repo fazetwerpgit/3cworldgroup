@@ -142,29 +142,35 @@ async function claimForDispatch(pending: PendingItem, userId: string): Promise<b
  * Ten minutes rather than forever: a rejected document is re-sent later, and
  * that resend has to be able to reach the rep.
  */
-async function claimReadyEmail(userId: string, now: Date): Promise<boolean> {
+async function claimReadyEmail(
+  userId: string,
+  now: Date
+): Promise<{ claimed: boolean; hadDeferred: boolean }> {
+  const refused = { claimed: false, hadDeferred: false };
   try {
     const ref = adminDb!.doc(`users/${userId}`);
     return await adminDb!.runTransaction(async (transaction) => {
       const fresh = await transaction.get(ref);
       const lastSentAt = asDate(fresh.get('esignReadyEmailAt'));
       if (lastSentAt && now.getTime() - lastSentAt.getTime() < READY_EMAIL_INTERVAL_MS) {
-        return false;
+        return refused;
       }
-      // This notice supersedes any held-back one from the invite link.
+      // This notice supersedes any held-back one from the invite link, so the
+      // caller must then list everything unsigned, not just what it sent now.
+      const hadDeferred = !!fresh.get(DEFERRED_READY_EMAIL_FIELD);
       transaction.set(
         ref,
         { esignReadyEmailAt: now, [DEFERRED_READY_EMAIL_FIELD]: FieldValue.delete() },
         { merge: true }
       );
-      return true;
+      return { claimed: true, hadDeferred };
     });
   } catch (error) {
     // The envelopes are already created and the checklist already shows them.
     // A failed claim costs the rep a notification, never a document, so it is
     // logged and swallowed rather than risking a second email.
     console.error(`[esign] failed to claim the ready-to-sign notice for ${userId}`, error);
-    return false;
+    return refused;
   }
 }
 
@@ -478,23 +484,33 @@ export async function sendPendingEsignDocs(
       } catch (error) {
         console.error(`[esign] failed to defer the ready-to-sign notice for ${userId}`, error);
       }
-    } else if (sentLabels.length > 0 && (await claimReadyEmail(userId, new Date()))) {
-      try {
-        await dispatchToUser({
-          userId,
-          type: 'system',
-          title: 'Documents sent for signature',
-          message: `Ready to sign: ${sentLabels.join(', ')}`,
-          link: '/portal/onboarding',
-          email: esignSentEmail({
-            name: signerName,
-            docLabels: sentLabels,
-            portalUrl: `${appBaseUrl()}/portal/onboarding`,
-          }),
-          emailFrom: onboardingFrom(),
-        });
-      } catch (error) {
-        console.error(`[esign] failed to notify ${userId} about sent documents`, error);
+    } else if (sentLabels.length > 0) {
+      const claim = await claimReadyEmail(userId, new Date());
+      if (claim.claimed) {
+        try {
+          // The held-back invite notice was never sent, so this one has to
+          // carry every document still waiting, not only the new ones.
+          let docLabels = sentLabels;
+          if (claim.hadDeferred) {
+            const unsigned = await unsignedEsignLabels(userId, fieldRole, !!userSnap.get('isIBO'));
+            docLabels = [...new Set([...unsigned, ...sentLabels])];
+          }
+          await dispatchToUser({
+            userId,
+            type: 'system',
+            title: 'Documents sent for signature',
+            message: `Ready to sign: ${docLabels.join(', ')}`,
+            link: '/portal/onboarding',
+            email: esignSentEmail({
+              name: signerName,
+              docLabels,
+              portalUrl: `${appBaseUrl()}/portal/onboarding`,
+            }),
+            emailFrom: onboardingFrom(),
+          });
+        } catch (error) {
+          console.error(`[esign] failed to notify ${userId} about sent documents`, error);
+        }
       }
     }
   } catch (error) {
