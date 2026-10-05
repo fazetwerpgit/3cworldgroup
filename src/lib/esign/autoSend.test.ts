@@ -126,6 +126,25 @@ const {
     parseWebhook: vi.fn(),
   }));
   const collectionMock = vi.fn((name: string) => {
+    if (name === 'users') {
+      // Only the deferred ready-email sweep queries users: `field <= cutoff`.
+      return {
+        where: vi.fn((field: string, _operator: string, cutoff: Date) => ({
+          get: async () => ({
+            docs: [...store.entries()]
+              .filter(([path, data]) => {
+                const value = data[field];
+                return path.startsWith('users/') && value instanceof Date && value <= cutoff;
+              })
+              .map(([path, data]) => ({
+                id: path.slice('users/'.length),
+                ref: docMock(path),
+                get: (f: string) => data[f],
+              })),
+          }),
+        })),
+      };
+    }
     if (name !== 'userOnboarding') throw new Error(`Unexpected collection: ${name}`);
     return {
       where: vi.fn((_field: string, _operator: string, value: unknown) => ({
@@ -184,7 +203,7 @@ vi.mock('@/types/onboardingHold', async (importOriginal) => {
   return { isHeldOnboardingItem: (itemId: string) => hold.on && actual.isHeldOnboardingItem(itemId) };
 });
 
-import { sendPendingEsignDocs } from './autoSend';
+import { sendDeferredEsignReadyEmails, sendPendingEsignDocs } from './autoSend';
 import { getOnboardingItemsForUser } from '@/types/onboarding';
 import { ONBOARDING_FIELD_ROLES } from '@/types/auth';
 
@@ -961,5 +980,73 @@ describe('sendPendingEsignDocs ready-to-sign email', () => {
       '[esign] failed to claim the ready-to-sign notice for u1',
       expect.any(Error)
     );
+  });
+});
+
+describe('deferred ready-to-sign email (invite link)', () => {
+  const HOUR = 60 * 60 * 1000;
+
+  it('creates every envelope but holds the email back, marking the user instead', async () => {
+    const sent = await sendPendingEsignDocs('u1', { deferReadyEmail: true });
+
+    expect(sent.sort()).toEqual(['contract', 'direct_deposit', 'fcra_auth', 'pay_structure', 'w9']);
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(store.get('users/u1')?.esignReadyEmailDeferredAt).toEqual(new Date('2026-07-26T12:00:00.000Z'));
+    expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailAt');
+  });
+
+  it('a later normal send emails right away and clears the held-back marker', async () => {
+    store.set('users/u1', { ...store.get('users/u1'), esignReadyEmailDeferredAt: new Date() });
+
+    await sendPendingEsignDocs('u1');
+
+    expect(dispatchMock).toHaveBeenCalledOnce();
+    expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailDeferredAt');
+  });
+
+  it('the cron sends it once, after the delay, naming only the unsigned documents', async () => {
+    await sendPendingEsignDocs('u1', { deferReadyEmail: true });
+    store.set('userOnboarding/u1_w9', { ...store.get('userOnboarding/u1_w9'), status: 'approved' });
+
+    const early = await sendDeferredEsignReadyEmails(new Date(Date.now() + HOUR / 2));
+    expect(early).toEqual({ sent: 0, cleared: 0 });
+    expect(dispatchMock).not.toHaveBeenCalled();
+
+    const later = new Date(Date.now() + 2 * HOUR);
+    const first = await sendDeferredEsignReadyEmails(later);
+    expect(first).toEqual({ sent: 1, cleared: 0 });
+    expect(dispatchMock).toHaveBeenCalledOnce();
+    const [notice] = dispatchMock.mock.calls[0] as unknown as [{ userId: string; message: string }];
+    expect(notice.userId).toBe('u1');
+    expect(notice.message).not.toContain('W-9');
+    expect(notice.message).toContain('Contract');
+    expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailDeferredAt');
+
+    const second = await sendDeferredEsignReadyEmails(new Date(later.getTime() + HOUR));
+    expect(second).toEqual({ sent: 0, cleared: 0 });
+    expect(dispatchMock).toHaveBeenCalledOnce();
+  });
+
+  it('sends nothing when the hire signed everything on the spot', async () => {
+    await sendPendingEsignDocs('u1', { deferReadyEmail: true });
+    for (const itemId of ['w9', 'fcra_auth', 'contract', 'direct_deposit', 'pay_structure']) {
+      store.set(`userOnboarding/u1_${itemId}`, { ...store.get(`userOnboarding/u1_${itemId}`), status: 'approved' });
+    }
+
+    const result = await sendDeferredEsignReadyEmails(new Date(Date.now() + 2 * HOUR));
+
+    expect(result).toEqual({ sent: 0, cleared: 1 });
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(store.get('users/u1')).not.toHaveProperty('esignReadyEmailDeferredAt');
+  });
+
+  it('sends nothing to a hire who is no longer pending', async () => {
+    await sendPendingEsignDocs('u1', { deferReadyEmail: true });
+    store.set('users/u1', { ...store.get('users/u1'), status: 'active' });
+
+    const result = await sendDeferredEsignReadyEmails(new Date(Date.now() + 2 * HOUR));
+
+    expect(result).toEqual({ sent: 0, cleared: 1 });
+    expect(dispatchMock).not.toHaveBeenCalled();
   });
 });

@@ -14,6 +14,14 @@ import type { EsignDocKey, EsignProvider } from './provider';
 const MIN_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 const CLAIM_STALE_MS = 2 * 60 * 1000;
 const READY_EMAIL_INTERVAL_MS = 10 * 60 * 1000;
+/**
+ * How long an invite-link hire has to sign on the spot before the deferred
+ * "ready to sign" email may go out. The onboarding-nudges cron runs daily, so
+ * the real delay is this plus up to a day.
+ */
+export const DEFERRED_READY_EMAIL_DELAY_MS = 60 * 60 * 1000;
+/** users/{uid} field: the ready-to-sign email was held back at this time. */
+export const DEFERRED_READY_EMAIL_FIELD = 'esignReadyEmailDeferredAt';
 const MAX_ERROR_LENGTH = 500;
 const ALERT_KIND = 'review_needed' as const;
 
@@ -142,7 +150,12 @@ async function claimReadyEmail(userId: string, now: Date): Promise<boolean> {
       if (lastSentAt && now.getTime() - lastSentAt.getTime() < READY_EMAIL_INTERVAL_MS) {
         return false;
       }
-      transaction.set(ref, { esignReadyEmailAt: now }, { merge: true });
+      // This notice supersedes any held-back one from the invite link.
+      transaction.set(
+        ref,
+        { esignReadyEmailAt: now, [DEFERRED_READY_EMAIL_FIELD]: FieldValue.delete() },
+        { merge: true }
+      );
       return true;
     });
   } catch (error) {
@@ -352,12 +365,25 @@ async function sendOne(
   return { sent: true, recovered: hadFailedDispatch };
 }
 
+export interface SendPendingOptions {
+  /**
+   * The invite link signs the documents on the spot, so it must not email
+   * "your documents are ready" at the hire who is looking at them. Instead the
+   * user is marked, and the onboarding-nudges cron sends that email later only
+   * if something is still unsigned (sendDeferredEsignReadyEmails).
+   */
+  deferReadyEmail?: boolean;
+}
+
 /**
  * Creates or retries e-sign envelopes for applicable items. This function is
  * deliberately failure-contained: callers receive whatever was sent, while
  * provider and persistence failures are recorded/logged and never re-thrown.
  */
-export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
+export async function sendPendingEsignDocs(
+  userId: string,
+  options: SendPendingOptions = {}
+): Promise<string[]> {
   if (!adminDb) return [];
 
   const sent: string[] = [];
@@ -443,7 +469,15 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
       await resolveDispatchAlert(userId);
     }
 
-    if (sentLabels.length > 0 && (await claimReadyEmail(userId, new Date()))) {
+    if (sentLabels.length > 0 && options.deferReadyEmail) {
+      try {
+        await adminDb
+          .doc(`users/${userId}`)
+          .set({ [DEFERRED_READY_EMAIL_FIELD]: new Date() }, { merge: true });
+      } catch (error) {
+        console.error(`[esign] failed to defer the ready-to-sign notice for ${userId}`, error);
+      }
+    } else if (sentLabels.length > 0 && (await claimReadyEmail(userId, new Date()))) {
       try {
         await dispatchToUser({
           userId,
@@ -467,4 +501,88 @@ export async function sendPendingEsignDocs(userId: string): Promise<string[]> {
   }
 
   return sent;
+}
+
+/** The e-sign documents this user was sent and has not signed yet, by label. */
+async function unsignedEsignLabels(
+  userId: string,
+  fieldRole: FieldRole,
+  isIBO: boolean
+): Promise<string[]> {
+  const items = getOnboardingItemsForUser(fieldRole, isIBO).filter((item) => isEsignItem(item.id));
+  const snapshot = await adminDb!.collection('userOnboarding').where('userId', '==', userId).get();
+  const byItem = new Map(snapshot.docs.map((doc) => [String(doc.get('itemId')), doc]));
+  return items
+    .filter((item) => {
+      const doc = byItem.get(item.id);
+      return !!doc?.get('esignEnvelopeId') && doc.get('status') !== 'approved';
+    })
+    .map((item) => item.label);
+}
+
+/**
+ * Sends the "ready to sign" email the invite link held back, once the hire has
+ * had DEFERRED_READY_EMAIL_DELAY_MS to sign on the spot and still has
+ * something unsigned. Run by the onboarding-nudges cron. Each user is claimed
+ * in a transaction that clears the marker, so two overlapping runs (or a
+ * portal-triggered notice in between) never send it twice.
+ */
+export async function sendDeferredEsignReadyEmails(now: Date): Promise<{ sent: number; cleared: number }> {
+  const result = { sent: 0, cleared: 0 };
+  if (!adminDb) return result;
+  const db = adminDb;
+
+  const cutoff = new Date(now.getTime() - DEFERRED_READY_EMAIL_DELAY_MS);
+  const snapshot = await db.collection('users').where(DEFERRED_READY_EMAIL_FIELD, '<=', cutoff).get();
+
+  for (const userDoc of snapshot.docs) {
+    const userId = userDoc.id;
+    try {
+      const fieldRole = userDoc.get('fieldRole') as FieldRole | undefined;
+      const stillOnboarding =
+        userDoc.get('status') === 'pending' && !!fieldRole && roleRequiresOnboarding(fieldRole);
+      const labels = stillOnboarding
+        ? await unsignedEsignLabels(userId, fieldRole, !!userDoc.get('isIBO'))
+        : [];
+
+      const claimed = await db.runTransaction(async (transaction) => {
+        const fresh = await transaction.get(userDoc.ref);
+        if (!fresh.get(DEFERRED_READY_EMAIL_FIELD)) return false;
+        transaction.set(
+          userDoc.ref,
+          {
+            [DEFERRED_READY_EMAIL_FIELD]: FieldValue.delete(),
+            ...(labels.length > 0 ? { esignReadyEmailAt: now } : {}),
+          },
+          { merge: true }
+        );
+        return true;
+      });
+      if (!claimed) continue;
+      if (labels.length === 0) {
+        result.cleared += 1;
+        continue;
+      }
+
+      const name = (userDoc.get('displayName') as string | undefined) ?? 'Rep';
+      await dispatchToUser({
+        userId,
+        type: 'system',
+        title: 'Documents ready to sign',
+        message: `Ready to sign: ${labels.join(', ')}`,
+        link: '/portal/onboarding',
+        email: esignSentEmail({
+          name,
+          docLabels: labels,
+          portalUrl: `${appBaseUrl()}/portal/onboarding`,
+        }),
+        emailFrom: onboardingFrom(),
+      });
+      result.sent += 1;
+    } catch (error) {
+      console.error(`[esign] deferred ready-to-sign notice failed for ${userId}`, error);
+    }
+  }
+
+  return result;
 }
