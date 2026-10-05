@@ -8,7 +8,7 @@ import { getEsignProvider } from '@/lib/esign/provider';
 export class SignedPdfError extends Error {
   constructor(
     message: string,
-    readonly status: number,
+    readonly status: number
   ) {
     super(message);
     this.name = 'SignedPdfError';

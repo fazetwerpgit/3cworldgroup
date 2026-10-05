@@ -52,17 +52,26 @@ export async function downloadFolderFiles(
   }
   const files: { name: string; data: Buffer }[] = [];
   const failed: string[] = [];
-  for (const file of listed) {
-    const name = file.name.split('/').pop() ?? file.name;
-    // Only files directly in the folder, as the upload route writes them.
-    if (!name || file.name.slice(prefix.length).includes('/')) continue;
-    try {
-      const [data] = await file.download();
-      files.push({ name, data });
-    } catch (error) {
-      console.error('Failed to download an onboarding file:', error instanceof Error ? error.message : 'unknown');
-      failed.push(name);
-    }
+  // Only files directly in the folder, as the upload route writes them.
+  const direct = listed.filter((file) => {
+    const name = file.name.split('/').pop() ?? '';
+    return name !== '' && !file.name.slice(prefix.length).includes('/');
+  });
+  const results = await Promise.all(
+    direct.map(async (file) => {
+      const name = file.name.split('/').pop() ?? file.name;
+      try {
+        const [data] = await file.download();
+        return { name, data };
+      } catch (error) {
+        console.error('Failed to download an onboarding file:', error instanceof Error ? error.message : 'unknown');
+        return { name, data: null };
+      }
+    })
+  );
+  for (const result of results) {
+    if (result.data) files.push({ name: result.name, data: result.data });
+    else failed.push(result.name);
   }
   return { files, failed };
 }

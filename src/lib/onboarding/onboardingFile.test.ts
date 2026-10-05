@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { personFilePrefix, signedPdfFileName, uniqueName, uploadFileName } from './onboardingFile';
+import { mapLimit, personFilePrefix, signedPdfFileName, uniqueName, uploadFileName } from './onboardingFile';
 
 describe('onboarding file names', () => {
   it('puts the last name first and keeps only safe characters', () => {
@@ -24,5 +24,25 @@ describe('onboarding file names', () => {
     expect(uniqueName('a.pdf', taken)).toBe('a.pdf');
     expect(uniqueName('a.pdf', taken)).toBe('a-2.pdf');
     expect(uniqueName('a.pdf', taken)).toBe('a-3.pdf');
+  });
+});
+
+describe('mapLimit', () => {
+  it('keeps at most `limit` calls in flight and returns results in input order', async () => {
+    let active = 0;
+    let peak = 0;
+    const out = await mapLimit([5, 1, 4, 2, 3, 0, 6], 4, async (ms) => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      active -= 1;
+      return ms * 10;
+    });
+    expect(out).toEqual([50, 10, 40, 20, 30, 0, 60]);
+    expect(peak).toBe(4);
+  });
+
+  it('handles an empty list', async () => {
+    expect(await mapLimit([], 4, async () => 1)).toEqual([]);
   });
 });

@@ -131,14 +131,14 @@ export function buildOnboardingFileItems(source: OnboardingFileSource): Onboardi
   const onChecklist = new Set(
     fieldRole
       ? getOnboardingItemsForUser(fieldRole as FieldRole, source.user.isIBO === true).map((item) => item.id)
-      : [],
+      : []
   );
   return ONBOARDING_ITEMS.filter((item) => onChecklist.has(item.id) || source.itemDocs.has(item.id))
     .sort((a, b) => a.order - b.order)
     .map((item) => {
       const doc = source.itemDocs.get(item.id);
       const status = (['not_started', 'submitted', 'approved', 'rejected'] as const).includes(
-        doc?.status as OnboardingStatus,
+        doc?.status as OnboardingStatus
       )
         ? (doc?.status as OnboardingStatus)
         : 'not_started';
@@ -273,4 +273,18 @@ export function uniqueName(name: string, taken: Set<string>): string {
       return candidate;
     }
   }
+}
+
+/** Maps with at most `limit` calls in flight; results keep the input order. */
+export async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
