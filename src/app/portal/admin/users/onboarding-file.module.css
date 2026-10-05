@@ -1,0 +1,83 @@
+/* The owner's onboarding file on a person's record. */
+
+.body {
+  display: grid;
+  gap: var(--s4);
+}
+
+.head {
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.subhead {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.group {
+  display: grid;
+  gap: var(--s2);
+}
+
+.wide {
+  grid-column: 1 / -1;
+}
+
+.empty {
+  color: var(--c-text-3);
+  font-weight: 500;
+}
+
+.items {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: 10px;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3);
+}
+
+.item + .item {
+  border-top: 1px solid var(--c-line);
+}
+
+.itemTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.itemName {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.itemMeta {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
