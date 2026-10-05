@@ -35,7 +35,8 @@ async function alertsEnabled(key: string): Promise<boolean> {
   }
 }
 
-// The UIDs of every management user — the people who work the review queues.
+// The UIDs of every active management user — the people who work the review
+// queues. Deactivated accounts lost access, so they get no alerts either.
 async function managementUids(): Promise<string[]> {
   if (!adminDb) return [];
   const snap = await adminDb.collection('users').get();
@@ -43,7 +44,7 @@ async function managementUids(): Promise<string[]> {
     .filter((d) => {
       const data = d.data();
       const { role } = resolveRoles(data.role, data.fieldRole);
-      return isManagementRole(role);
+      return data.status === 'active' && isManagementRole(role);
     })
     .map((d) => d.id);
 }

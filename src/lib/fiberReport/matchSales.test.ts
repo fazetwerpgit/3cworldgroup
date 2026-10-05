@@ -237,6 +237,41 @@ describe('same-day re-order at one address', () => {
   });
 });
 
+describe("an admin's saleLink", () => {
+  const link = { by: 'admin-1', byName: 'Jacob', at: '2026-09-03T00:00:00.000Z' };
+
+  it('excludes an order marked "not a sale" from the address match', () => {
+    const dismissed = order({ id: 'dismissed', saleLink: { saleId: null, ...link } });
+
+    expect(matchFiberOrdersToSales([{ id: 'sale-1', customerAddress: '5780 Hall St SE' }], [dismissed]).size).toBe(0);
+  });
+
+  it('joins a linked order to its sale over any address match', () => {
+    const guessable = order({ id: 'guess', status: 'active' });
+    const linked = order({ id: 'linked', address: '77 Nobody Rd', saleLink: { saleId: 'sale-1', ...link } });
+
+    for (const orders of [[guessable, linked], [linked, guessable]]) {
+      expect(matchFiberOrdersToSales([{ id: 'sale-1', customerAddress: '5780 Hall St SE' }], orders).get('sale-1')).toBe(linked);
+    }
+  });
+
+  it('never lets an order linked to one sale match another by address', () => {
+    const linkedElsewhere = order({ id: 'linked', saleLink: { saleId: 'sale-x', ...link } });
+    const result = matchFiberOrdersToSales(
+      [
+        { id: 'sale-x', customerAddress: '900 Other Rd' },
+        { id: 'sale-y', customerAddress: '5780 Hall St SE' },
+      ],
+      [linkedElsewhere]
+    );
+
+    expect(result.get('sale-x')).toBe(linkedElsewhere);
+    expect(result.has('sale-y')).toBe(false);
+    // The sale it names may not be in the caller's list at all (another rep's).
+    expect(matchFiberOrdersToSales([{ id: 'sale-y', customerAddress: '5780 Hall St SE' }], [linkedElsewhere]).size).toBe(0);
+  });
+});
+
 describe('apartment buildings: a neighbour is not this sale', () => {
   const pick = (address: string, orders: FiberOrder[]) =>
     matchFiberOrdersToSales([{ id: 'sale-1', customerAddress: address }], orders).get('sale-1');

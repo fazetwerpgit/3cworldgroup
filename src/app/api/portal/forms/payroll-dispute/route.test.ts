@@ -70,4 +70,11 @@ describe('POST /api/portal/forms/payroll-dispute', () => {
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
   });
+
+  it('rejects a contractor email that is not an email', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ ...VALID, contractorEmail: 'x' }));
+    expect(res.status).toBe(400);
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
 });

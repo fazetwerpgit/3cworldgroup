@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "Career Path | 3C World Group",
   description:
     "Build a career with 3C World Group through training, support, and a clear path forward.",
+  alternates: { canonical: "/opportunities" },
 };
 
 /**

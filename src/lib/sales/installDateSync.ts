@@ -4,6 +4,7 @@ import {
   doorOrders,
   isAddressPrefixPair,
   latestDay,
+  linkedSaleId,
   normalizeAddress,
   ordersPlacedForSale,
   pickCurrentOrder,
@@ -157,13 +158,16 @@ type Current =
  * order), is ambiguous: a writer needs a real answer.
  */
 function currentOrderForSale(sale: SyncSale, orders: FiberOrder[]): Current {
-  const links = orders.filter((order) => text(order.saleLink?.saleId) === sale.id);
+  const links = orders.filter((order) => {
+    const link = linkedSaleId(order);
+    return link.linked && link.saleId === sale.id;
+  });
   if (links.length > 1) return { kind: 'ambiguous' };
   if (links.length === 1) return { kind: 'order', order: links[0] };
 
   if (sale.normalizedAddress.length < 6) return { kind: 'none' };
   const candidates = ordersPlacedForSale(sale.saleDate, orders).filter((order) => {
-    if (order.saleLink) return false;
+    if (linkedSaleId(order).linked) return false;
     const orderAddress = normalizeAddress(order.address);
     return orderAddress.length >= 6 && isAddressPrefixPair(sale.normalizedAddress, orderAddress);
   });
@@ -185,6 +189,17 @@ type Resolved =
 type SaleCurrent = { sale: SyncSale; current: Current };
 
 /**
+ * The sales an order is the current row of, less any cancelled (or rejected)
+ * duplicate logged at the same door: a dead sale never makes a live one's order
+ * ambiguous. All of them when none is live, so a dead sale alone still reaches
+ * decide() and is counted skippedCancelled.
+ */
+function liveClaimants(claimed: SyncSale[]): SyncSale[] {
+  const live = claimed.filter((sale) => sale.status !== 'cancelled' && sale.status !== 'rejected');
+  return live.length ? live : claimed;
+}
+
+/**
  * The join, resolved for one batch of orders: each sale the batch touches,
  * paired with its current row when that row can move a day.
  *
@@ -192,7 +207,7 @@ type SaleCurrent = { sale: SyncSale; current: Current };
  * the page already reads the activation date for an installed order, and an
  * old install at the door must never be pushed onto a newer sale there. A row
  * with no est day cannot move one. And an order that is the current row of two
- * sales (two logs of one customer, say) writes neither.
+ * live sales (two logs of one customer, say) writes neither.
  */
 function resolveMatches(currents: SaleCurrent[]): Resolved[] {
   const claimants = new Map<FiberOrder, SyncSale[]>();
@@ -209,7 +224,8 @@ function resolveMatches(currents: SaleCurrent[]): Resolved[] {
     claimants.set(order, [...(claimants.get(order) ?? []), sale]);
   }
 
-  for (const [order, claimed] of claimants) {
+  for (const [order, all] of claimants) {
+    const claimed = liveClaimants(all);
     if (claimed.length > 1) out.push({ kind: 'ambiguous' });
     else out.push({ kind: 'match', order, sale: claimed[0] });
   }
@@ -225,7 +241,8 @@ function orderSalesFor(currents: SaleCurrent[]): Map<string, OrderSale> {
     claimed.set(id, [...(claimed.get(id) ?? []), sale]);
   }
   const out = new Map<string, OrderSale>();
-  for (const [orderId, sales] of claimed) {
+  for (const [orderId, all] of claimed) {
+    const sales = liveClaimants(all);
     if (sales.length !== 1) continue;
     const [sale] = sales;
     out.set(orderId, {

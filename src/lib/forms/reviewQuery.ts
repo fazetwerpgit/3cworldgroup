@@ -26,7 +26,8 @@ export async function markHandled(
   } catch (e) {
     const msg = e instanceof Error ? e.message : '';
     if (msg === 'NOT_FOUND') return { ok: false, error: 'Not found', status: 404 };
-    if (msg === 'ALREADY_HANDLED') return { ok: false, error: 'Already handled', status: 400 };
+    // 409 lets the queue treat it as done: someone else handled it first.
+    if (msg === 'ALREADY_HANDLED') return { ok: false, error: 'Already handled', status: 409 };
     return { ok: false, error: 'Failed to update', status: 500 };
   }
   return { ok: true };

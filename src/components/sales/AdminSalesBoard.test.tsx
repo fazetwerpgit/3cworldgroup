@@ -11,6 +11,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FiberOrder, Sale } from '@/types';
 import type { MonthKey } from '@/lib/sales/monthWindow';
+import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
 
 // The viewer's platform role, swapped per test. `owner` sits ABOVE admin, so
 // the Submitted tab cannot be gated on a permission — admins hold every one an
@@ -413,5 +414,98 @@ describe('the raw submitted feed is no longer a tab', () => {
       expect(tabLabels()).not.toContain('Submitted');
       expect(container.querySelector('[data-part="sub-row"]')).toBeNull();
     }
+  });
+});
+
+// Fixed clock: these are about which month and window a date falls in.
+const at = (month: number, day: number) => new Date(2026, month - 1, day, 12, 0, 0);
+const SEPTEMBER: MonthKey = { year: 2026, month: 8 };
+
+function mine(id: string, address: string, saleDate: Date, installDate: Date | undefined): Sale {
+  return {
+    id,
+    salesRepId: 'admin1',
+    salesRepName: 'Jacob',
+    customerName: id,
+    customerAddress: address,
+    totalValue: 60,
+    status: 'approved',
+    saleDate,
+    installDate,
+    products: [{ productId: 'tfiber-1gig', productName: 'TFiber 1 Gig', company: 'tfiber', quantity: 1, unitPrice: 60, totalPrice: 60, points: 8 }],
+  } as unknown as Sale;
+}
+
+async function renderPay(sales: Sale[], orders: FiberOrder[]) {
+  await act(async () => {
+    root.render(
+      <AdminSalesBoard
+        sales={sales}
+        month={SEPTEMBER}
+        fiber={{ data: { scope: 'all', lastReportAt: null, orders, unmatched: [] }, loading: false, error: null, refetch }}
+        payPlan={{ rates: { tfiber: { 'tfiber-1gig': 140 } }, payDelayDays: 0, hasPlan: true, compRole: null }}
+      />
+    );
+  });
+  const payTab = [...container.querySelectorAll<HTMLButtonElement>('[data-part="board-tab"]')].find((tab) => tab.textContent === 'My pay')!;
+  await act(async () => payTab.click());
+}
+
+describe('My pay groups by install, like the rep Pay view', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(at(9, 20));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('files by install month and payout window, scheduled and missed installs included', async () => {
+    const soldInAugust = mine('Sold in August', '11 Oak Street', at(8, 25), at(9, 4));
+    const scheduled = mine('Scheduled', '22 Elm Street', at(9, 15), at(9, 25));
+    const installsInOctober = mine('Installs in October', '33 Pine Street', at(9, 10), at(10, 2));
+    const broke = mine('Broke at the door', '44 Birch Street', at(9, 1), at(9, 8));
+    const breakage = {
+      ...carrierOrder,
+      id: 'TMO-broke',
+      status: 'breakage',
+      matchedUserId: 'admin1',
+      repName: 'Jacob',
+      address: '44 BIRCH STREET',
+      orderDate: '2026-09-01',
+      estInstallDate: '2026-09-08',
+      activationDate: null,
+    } as unknown as FiberOrder;
+
+    await renderPay([soldInAugust, scheduled, installsInOctober, broke], [breakage]);
+
+    const groups = [...container.querySelectorAll('[data-part="pay-group"]')].map((group) => ({
+      head: group.querySelector('strong')?.textContent ?? '',
+      rows: [...group.querySelectorAll('[data-part="pay-row"]')].map((row) => row.querySelector('span')?.textContent),
+    }));
+    expect(groups).toEqual([
+      { head: `${formatPayoutWindow(payoutWindowForSale(scheduled, true)!)} · est. $140`, rows: ['Scheduled'] },
+      { head: `${formatPayoutWindow(payoutWindowForSale(soldInAugust, true)!)} · est. $140`, rows: ['Sold in August'] },
+      { head: 'Missed install · est. $140', rows: ['Broke at the door'] },
+    ]);
+    // The headline counts only installs with a date that stands.
+    expect(container.querySelector('[data-part="fig"] strong')?.textContent).toBe('est.$280');
+  });
+});
+
+describe('the board re-reads the clock when the feeds come back', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('turns a scheduled install into an installed one after a resume refetch', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(at(9, 10));
+    const sale = { ...backDatedSale, saleDate: at(9, 5), installDate: at(9, 11) } as unknown as Sale;
+    await render([sale], [], SEPTEMBER);
+    await openRep();
+    const chip = '[data-part="board-row"] [data-part="chip"]';
+    expect(container.querySelector(chip)?.textContent).toMatch(/^Installs /);
+
+    // Two days later the page refetches on resume and hands over a new array.
+    vi.setSystemTime(at(9, 12));
+    await render([{ ...sale }], [], SEPTEMBER);
+    expect(container.querySelector(chip)?.textContent).toMatch(/^Installed /);
   });
 });

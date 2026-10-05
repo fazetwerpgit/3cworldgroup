@@ -236,9 +236,25 @@ describe('GET /api/portal/chat/channels/[channelId]/members', () => {
 
     expect(res.status).toBe(200);
     expect(json.members).toEqual([
-      { uid: 'pending-hire', name: 'Pending Hire', role: 'Entry Level Rep', isExtra: false },
+      // A rep sees no role labels; those stay admin-only.
+      { uid: 'pending-hire', name: 'Pending Hire', role: '', isExtra: false },
     ]);
     expect(json.memberCount).toBe(1);
+  });
+
+  it('drops a member whose current role no longer reaches the channel', async () => {
+    mockGetUser.mockResolvedValue(ADMIN);
+    firestore.users.set('mgr', { status: 'active', fieldRole: 'l1_manager', displayName: 'Still Mgr' });
+    firestore.users.set('demoted', { status: 'active', fieldRole: 'entry_rep', displayName: 'Demoted' });
+    firestore.channels.set('managers', {
+      id: 'managers', name: 'Managers', description: 'M', audience: 'managers', order: 4,
+      active: true, memberIds: ['mgr', 'demoted'],
+    });
+
+    const res = await GET(req('managers'), ctx('managers'));
+    const json = await res.json();
+
+    expect(json.members.map((m: { uid: string }) => m.uid)).toEqual(['mgr']);
   });
 
   it('flags manually-added members with isExtra and lists addable non-members for admins', async () => {

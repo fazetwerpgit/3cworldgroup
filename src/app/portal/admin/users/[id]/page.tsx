@@ -34,6 +34,8 @@ export default function EditUserPage() {
   const [revealed, setRevealed] = useState<{ ssn: string | null; dlNumber: string | null } | null>(null);
   const [revealOpen, setRevealOpen] = useState(false);
   const [revealLogged, setRevealLogged] = useState(false);
+  const [revealError, setRevealError] = useState('');
+  const [revealing, setRevealing] = useState(false);
 
   const userId = params.id as string;
 
@@ -108,16 +110,27 @@ export default function EditUserPage() {
     };
   }, [currentUser, userId]);
 
+  // Only a successful reveal was decrypted and logged; any failure keeps the
+  // confirm open with the server's reason and a Retry.
   const doReveal = async () => {
-    const token = await auth?.currentUser?.getIdToken();
-    if (!token) return;
-    const r = await fetch(`/api/portal/admin/sensitive/${userId}?reveal=true`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const d = await r.json();
-    // Stored as 9 bare digits; shown the way people read an SSN.
-    setRevealed({ ssn: d.ssn?.replace(/^(\d{3})(\d{2})(\d{4})$/, '$1-$2-$3') ?? null, dlNumber: d.dlNumber });
-    setRevealLogged(true);
+    setRevealError('');
+    setRevealing(true);
+    try {
+      const token = await auth?.currentUser?.getIdToken();
+      if (!token) throw new Error('you are signed out, sign in again');
+      const r = await fetch(`/api/portal/admin/sensitive/${userId}?reveal=true`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(typeof d.error === 'string' ? d.error : 'Failed to reveal sensitive fields');
+      // Stored as 9 bare digits; shown the way people read an SSN.
+      setRevealed({ ssn: d.ssn?.replace(/^(\d{3})(\d{2})(\d{4})$/, '$1-$2-$3') ?? null, dlNumber: d.dlNumber });
+      setRevealLogged(true);
+    } catch (err) {
+      setRevealError(err instanceof Error ? err.message : 'Failed to reveal sensitive fields');
+    } finally {
+      setRevealing(false);
+    }
   };
 
   const userRole = user ? getEffectiveRole(user) : undefined;
@@ -213,10 +226,20 @@ export default function EditUserPage() {
                             >
                               Cancel
                             </button>
-                            <button type="button" className={`${s.btnSecondary} ${u.sm} ${u.danger}`} onClick={doReveal}>
-                              Continue
+                            <button
+                              type="button"
+                              className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                              onClick={() => void doReveal()}
+                              disabled={revealing}
+                            >
+                              {revealing ? 'Revealing…' : revealError ? 'Retry' : 'Continue'}
                             </button>
                           </div>
+                          {revealError ? (
+                            <AdminNotice tone="error">
+                              Couldn&apos;t reveal: {revealError}. Nothing was shown or logged.
+                            </AdminNotice>
+                          ) : null}
                         </div>
                       ) : null}
 

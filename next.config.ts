@@ -62,9 +62,40 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       ...MOVED_PAGES.map(([source, destination]) => ({ source, destination, permanent: false })),
+      // Retired public URLs: /careers became /opportunities; the legacy /culture
+      // page was folded into /about.
+      { source: '/careers', destination: '/opportunities', permanent: true },
+      { source: '/culture', destination: '/about', permanent: true },
+    ];
+  },
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          // Clickjacking: no other site may frame any page (the portal sign-in
+          // included). frame-ancestors is the only CSP directive set here.
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Content-Security-Policy', value: "frame-ancestors 'self'" },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          // The microphone stays on for Ask 3C's Talk mode (handsFreeMic.ts);
+          // sale photos use a file input, which needs no camera permission.
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=(), usb=()' },
+        ],
+      },
+      // Public images are not content-hashed, so a day fresh plus a week of
+      // background revalidation instead of a 304 round trip on every view.
+      ...['/redesign/:path*', '/icons/:path*'].map((source) => ({
+        source,
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }],
+      })),
     ];
   },
   images: {
+    // 30 days for optimized images (the default is the source's own max-age,
+    // which for /public files is 0).
+    minimumCacheTTL: 2592000,
     remotePatterns: [
       {
         protocol: 'https',

@@ -6,6 +6,7 @@ import {
   boxToPdfRect,
   isSensitiveFieldKey,
   selectedCheckboxKey,
+  fieldFormatError,
   validateFields,
 } from './documents';
 
@@ -106,14 +107,14 @@ describe('validateFields', () => {
     const r = validateFields('direct_deposit', {
       legal_name: ' A ',
       bank_name: 'B',
-      routing_number: '1',
-      account_number: '2',
+      routing_number: '021000021',
+      account_number: '12345678',
       checking: true,
       bogus: 'x',
     });
     expect(r).toEqual({
       ok: true,
-      fields: { legal_name: 'A', bank_name: 'B', routing_number: '1', account_number: '2', checking: true },
+      fields: { legal_name: 'A', bank_name: 'B', routing_number: '021000021', account_number: '12345678', checking: true },
     });
   });
 
@@ -133,8 +134,8 @@ describe('validateFields', () => {
     const r = validateFields('direct_deposit', {
       legal_name: 'A',
       bank_name: 'B',
-      routing_number: '1',
-      account_number: '2',
+      routing_number: '021000021',
+      account_number: '12345678',
       checking: 'yes',
       savings: true,
     });
@@ -142,7 +143,7 @@ describe('validateFields', () => {
   });
 
   it('requires exactly one of checking or savings', () => {
-    const base = { legal_name: 'A', bank_name: 'B', routing_number: '1', account_number: '2' };
+    const base = { legal_name: 'A', bank_name: 'B', routing_number: '021000021', account_number: '12345678' };
     expect(validateFields('direct_deposit', base)).toMatchObject({
       ok: false,
       error: 'Choose checking or savings',
@@ -157,17 +158,49 @@ describe('validateFields', () => {
     const base = { name: 'N', address: 'A', city_state_zip: 'C', individual_sole_prop: true };
     expect(validateFields('w9', base)).toMatchObject({ ok: false, error: 'Provide either an SSN or an EIN' });
     expect(validateFields('w9', { ...base, ssn: '1', ein: '2' })).toMatchObject({ ok: false });
-    expect(validateFields('w9', { ...base, ssn: '1' })).toMatchObject({ ok: true });
-    expect(validateFields('w9', { ...base, ein: '2' })).toMatchObject({ ok: true });
+    expect(validateFields('w9', { ...base, ssn: '123-45-6789' })).toMatchObject({ ok: true });
+    expect(validateFields('w9', { ...base, ein: '12-3456789' })).toMatchObject({ ok: true });
   });
 
   it('requires exactly one w9 tax classification', () => {
-    const base = { name: 'N', address: 'A', city_state_zip: 'C', ssn: '1' };
+    const base = { name: 'N', address: 'A', city_state_zip: 'C', ssn: '123456789' };
     expect(validateFields('w9', base)).toMatchObject({ ok: false, error: 'Choose a tax classification' });
     expect(validateFields('w9', { ...base, individual_sole_prop: true, llc: true })).toMatchObject({
       ok: false,
       error: 'Choose a tax classification',
     });
+  });
+
+  it('rejects malformed bank numbers on direct deposit', () => {
+    const base = { legal_name: 'A', bank_name: 'B', routing_number: '021000021', account_number: '12345678', checking: true };
+    expect(validateFields('direct_deposit', { ...base, routing_number: '12' })).toMatchObject({
+      ok: false,
+      error: 'Routing number must be 9 digits',
+    });
+    expect(validateFields('direct_deposit', { ...base, routing_number: '021000022' })).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('routing number is not valid'),
+    });
+    expect(validateFields('direct_deposit', { ...base, account_number: 'abc' })).toMatchObject({
+      ok: false,
+      error: 'Account number must be 4 to 17 digits',
+    });
+    expect(validateFields('direct_deposit', { ...base, account_number: '123' })).toMatchObject({ ok: false });
+    expect(validateFields('direct_deposit', { ...base, account_number: '1'.repeat(18) })).toMatchObject({ ok: false });
+  });
+
+  it('rejects a malformed SSN or EIN on w9', () => {
+    const base = { name: 'N', address: 'A', city_state_zip: 'C', individual_sole_prop: true };
+    expect(validateFields('w9', { ...base, ssn: '12345678' })).toMatchObject({
+      ok: false,
+      error: 'Social Security number must be 9 digits',
+    });
+    expect(validateFields('w9', { ...base, ein: '12-34567ab' })).toMatchObject({ ok: false, error: 'EIN must be 9 digits' });
+  });
+
+  it('leaves the contract EIN and other documents unchecked', () => {
+    expect(fieldFormatError('contract', 'ein', 'abc')).toBeNull();
+    expect(fieldFormatError('direct_deposit', 'bank_name', 'abc')).toBeNull();
   });
 
   it('returns empty fields for docs without extras', () => {

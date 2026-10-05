@@ -8,10 +8,18 @@ export function appBaseUrl(): string {
   return process.env.APP_BASE_URL ?? 'http://localhost:3000';
 }
 
+// Every interpolated value (names, labels, reasons, form input) goes through
+// esc() before it reaches HTML; text bodies stay plain.
+function esc(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[character] ?? character));
+}
+
 function layout(title: string, bodyHtml: string): string {
   return `<!doctype html><html><body style="font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;margin:0;padding:24px;background:#f6f7f9">
 <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:8px;padding:32px">
-<h2 style="margin:0 0 16px">${title}</h2>
+<h2 style="margin:0 0 16px">${esc(title)}</h2>
 ${bodyHtml}
 <p style="margin-top:32px;font-size:12px;color:#8a8f98">3C World Group Portal - automated message.</p>
 </div></body></html>`;
@@ -50,12 +58,12 @@ ${lines.map((line) => `<p style="${p16}">${line}</p>`).join('\n')}
 </td></tr>
 <tr><td align="center" style="padding:16px 0 8px">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-<td align="center" bgcolor="${INVITE_TEAL}" style="border-radius:4px;background:${INVITE_TEAL}"><a href="${p.inviteUrl}" style="display:inline-block;padding:14px 32px;font-size:17px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:4px">Start Onboarding</a></td>
+<td align="center" bgcolor="${INVITE_TEAL}" style="border-radius:4px;background:${INVITE_TEAL}"><a href="${esc(p.inviteUrl)}" style="display:inline-block;padding:14px 32px;font-size:17px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:4px">Start Onboarding</a></td>
 </tr></table>
 </td></tr>
 <tr><td align="center" style="padding-top:20px;font-size:12px;line-height:1.5;color:#6b7280">
 This link is just for you and expires in 14 days. If the button doesn&#39;t work, copy this into your browser:<br>
-<a href="${p.inviteUrl}" style="color:#6b7280;word-break:break-all">${p.inviteUrl}</a>
+<a href="${esc(p.inviteUrl)}" style="color:#6b7280;word-break:break-all">${esc(p.inviteUrl)}</a>
 </td></tr>
 </table>
 </td></tr>
@@ -81,7 +89,7 @@ export function nudgeEmail(p: { name: string; tier: NudgeTier; portalUrl: string
   return {
     subject: c.subject,
     textBody: `Hi ${p.name},\n\n${c.line}\n\nContinue: ${p.portalUrl}\n`,
-    htmlBody: layout(c.subject, `<p>Hi ${p.name},</p><p>${c.line}</p><p><a href="${p.portalUrl}">Continue onboarding</a></p><p>${p.portalUrl}</p>`),
+    htmlBody: layout(c.subject, `<p>Hi ${esc(p.name)},</p><p>${c.line}</p><p><a href="${esc(p.portalUrl)}">Continue onboarding</a></p><p>${esc(p.portalUrl)}</p>`),
   };
 }
 
@@ -91,7 +99,7 @@ export function checklistReadyEmail(p: { name: string; portalUrl: string }): Ema
   return {
     subject,
     textBody: `Hi ${p.name},\n\n${line}\n\nContinue: ${p.portalUrl}\n`,
-    htmlBody: layout(subject, `<p>Hi ${p.name},</p><p>${line}</p><p><a href="${p.portalUrl}">Continue onboarding</a></p><p>${p.portalUrl}</p>`),
+    htmlBody: layout(subject, `<p>Hi ${esc(p.name)},</p><p>${line}</p><p><a href="${esc(p.portalUrl)}">Continue onboarding</a></p><p>${esc(p.portalUrl)}</p>`),
   };
 }
 
@@ -100,7 +108,7 @@ export function itemRejectedEmail(p: { name: string; itemLabel: string; reason: 
   return {
     subject,
     textBody: `Hi ${p.name},\n\nYour "${p.itemLabel}" submission was returned: ${p.reason}\n\nFix it here: ${p.portalUrl}\n`,
-    htmlBody: layout(subject, `<p>Hi ${p.name},</p><p>Your <strong>${p.itemLabel}</strong> submission was returned:</p><blockquote>${p.reason}</blockquote><p><a href="${p.portalUrl}">Resubmit</a></p>`),
+    htmlBody: layout(subject, `<p>Hi ${esc(p.name)},</p><p>Your <strong>${esc(p.itemLabel)}</strong> submission was returned:</p><blockquote>${esc(p.reason)}</blockquote><p><a href="${esc(p.portalUrl)}">Resubmit</a></p>`),
   };
 }
 
@@ -112,7 +120,7 @@ export function esignSentEmail(p: { name: string; docLabels: string[]; portalUrl
     textBody: `Hi ${p.name},\n\nThe following documents are ready for your signature: ${list}.\n\nSign them in the portal: ${p.portalUrl}\n`,
     htmlBody: layout(
       subject,
-      `<p>Hi ${p.name},</p><p>The following documents are ready for your signature: <strong>${list}</strong>.</p><p><a href="${p.portalUrl}">Open your onboarding checklist</a> and sign them right there - it only takes a minute.</p>`,
+      `<p>Hi ${esc(p.name)},</p><p>The following documents are ready for your signature: <strong>${esc(list)}</strong>.</p><p><a href="${esc(p.portalUrl)}">Open your onboarding checklist</a> and sign them right there - it only takes a minute.</p>`,
     ),
   };
 }
@@ -122,7 +130,7 @@ export function activationEmail(p: { name: string }): EmailContent {
   return {
     subject,
     textBody: `Hi ${p.name},\n\nYour onboarding is complete and your account is now active. Welcome to the team!\n\n${appBaseUrl()}/portal\n`,
-    htmlBody: layout(subject, `<p>Hi ${p.name},</p><p>Your onboarding is complete and your account is now <strong>active</strong>. Welcome to the team!</p><p><a href="${appBaseUrl()}/portal">Open the portal</a></p>`),
+    htmlBody: layout(subject, `<p>Hi ${esc(p.name)},</p><p>Your onboarding is complete and your account is now <strong>active</strong>. Welcome to the team!</p><p><a href="${appBaseUrl()}/portal">Open the portal</a></p>`),
   };
 }
 
@@ -134,7 +142,7 @@ export function ownerDocSignedEmail(p: { repName: string; itemLabel: string; lin
 
 Review onboarding: ${p.link}
 `,
-    htmlBody: layout(subject, `<p><strong>${p.repName}</strong> signed <strong>${p.itemLabel}</strong>.</p><p><a href="${p.link}">Review onboarding</a></p>`),
+    htmlBody: layout(subject, `<p><strong>${esc(p.repName)}</strong> signed <strong>${esc(p.itemLabel)}</strong>.</p><p><a href="${esc(p.link)}">Review onboarding</a></p>`),
   };
 }
 
@@ -151,13 +159,6 @@ export interface OnboardingPacketData {
 
 const PACKET_MUTED = '#8a8f98';
 const PACKET_RULE = '#e6e8eb';
-
-// Packet values come from rep-entered profile data, so escape them for HTML.
-function esc(value: string): string {
-  return value.replace(/[&<>"']/g, (character) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  }[character] ?? character));
-}
 
 function packetHeading(text: string): string {
   return `<h3 style="margin:28px 0 8px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:${PACKET_MUTED}">${text}</h3>`;
@@ -228,8 +229,8 @@ ${p.checklist
     subject,
     textBody,
     htmlBody: layout(
-      `Onboarding packet: ${esc(p.repName)}`,
-      `<p style="margin:0 0 4px;font-size:14px">${intro}</p>${profileHtml}${checklistHtml}${documentsHtml}${maskedHtml}<p style="margin:28px 0 0"><a href="${p.link}">Review in the portal</a></p>`,
+      subject,
+      `<p style="margin:0 0 4px;font-size:14px">${esc(intro)}</p>${profileHtml}${checklistHtml}${documentsHtml}${maskedHtml}<p style="margin:28px 0 0"><a href="${esc(p.link)}">Review in the portal</a></p>`,
     ),
   };
 }
@@ -238,7 +239,7 @@ export function managerAlertEmail(p: { title: string; message: string; link: str
   return {
     subject: `[Portal] ${p.title}`,
     textBody: `${p.title}\n\n${p.message}\n\n${p.link}\n`,
-    htmlBody: layout(p.title, `<p>${p.message}</p><p><a href="${p.link}">Open in portal</a></p>`),
+    htmlBody: layout(p.title, `<p>${esc(p.message)}</p><p><a href="${esc(p.link)}">Open in portal</a></p>`),
   };
 }
 
@@ -248,6 +249,6 @@ export function formSubmissionEmail(p: { formName: string; submittedBy: string; 
   return {
     subject,
     textBody: `${submittedBy} submitted a ${p.formName}.\n\nReview it here: ${p.link}\n`,
-    htmlBody: layout(subject, `<p>${submittedBy} submitted a <strong>${p.formName}</strong>.</p><p><a href="${p.link}">Review submission</a></p>`),
+    htmlBody: layout(subject, `<p>${esc(submittedBy)} submitted a <strong>${esc(p.formName)}</strong>.</p><p><a href="${esc(p.link)}">Review submission</a></p>`),
   };
 }

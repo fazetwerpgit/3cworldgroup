@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { getEffectiveRole, isAdminLevel, resolveRoles, RoleDisplayNames } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import {
+  belongsInChannelDoc,
   isEligibleChatMember,
   readExtraMemberIds,
   toChatChannel,
@@ -87,19 +88,22 @@ export async function GET(
     const extraSet = new Set(readExtraMemberIds(data));
     const boundedIds = memberIds.slice(0, MAX_MEMBERS);
 
+    // Role labels (tiers, manager titles, IBO) are admin-only, like the UI.
+    const isAdmin = isAdminLevel(user.role);
     let members: ChannelMember[] = [];
     if (boundedIds.length > 0) {
       const refs = boundedIds.map((id) => adminDb!.collection('users').doc(id));
       const docs = await adminDb.getAll(...refs);
+      // memberIds can lag a role/status change; list only who belongs right now.
+      const channelData = { ...data, id: channel.id };
       members = docs
-        .filter((doc) => doc.exists)
-        .filter((doc) => isEligibleChatMember(doc.data() ?? {}))
+        .filter((doc) => doc.exists && belongsInChannelDoc(channelData, doc.id, doc.data() ?? {}))
         .map((doc) => {
           const userData = doc.data() ?? {};
           return {
             uid: doc.id,
             name: memberName(userData),
-            role: memberRole(userData),
+            role: isAdmin ? memberRole(userData) : '',
             isExtra: extraSet.has(doc.id),
             avatarUrl: memberAvatarUrl(userData),
           };
@@ -109,7 +113,6 @@ export async function GET(
 
     // Admins get a pick-list of people they can add (active users not already members).
     // Never returned to non-admins — the key is entirely absent for them.
-    const isAdmin = isAdminLevel(user.role);
     if (!isAdmin) {
       return NextResponse.json({ members, memberCount: members.length });
     }

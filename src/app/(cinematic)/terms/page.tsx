@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: "Terms of Service | 3C World Group",
   description:
     "The terms and conditions that govern your use of the 3C World Group website, contractor portal, and related services.",
+  alternates: { canonical: "/terms" },
 };
 
 /**

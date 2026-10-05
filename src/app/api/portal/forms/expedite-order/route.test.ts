@@ -87,4 +87,11 @@ describe('POST /api/portal/forms/expedite-order', () => {
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
   });
+
+  it('rejects a customer email that is not an email but allows leaving it blank', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    expect((await POST(req({ ...VALID, customerEmail: 'x' }))).status).toBe(400);
+    expect(mockSubmit).not.toHaveBeenCalled();
+    expect((await POST(req({ ...VALID, customerEmail: '' }))).status).toBe(200);
+  });
 });

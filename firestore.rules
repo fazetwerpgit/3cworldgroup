@@ -1,11 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Is the signed-in caller a back-office or field-management user?
-    function isManagement() {
-      let u = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return u.role in ['admin', 'operations', 'owner'] ||
-             u.fieldRole in ['l1_manager','l2_manager','ibo_level_1','ibo_level_2','ibo_level_3','ibo_level_4','general_manager','office_manager','regional_manager','director'];
+    // Is the signed-in caller back-office (owner/admin/operations)? Field
+    // managers are deliberately excluded: the onboarding APIs never show them
+    // other hires' checklists either.
+    function isPlatformManagement() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', null)
+        in ['admin', 'operations', 'owner'];
     }
 
     // Is the signed-in caller an APPROVED (active) user? Self-signups are
@@ -41,11 +42,16 @@ service cloud.firestore {
     // client still running the OLD signup code sends just 3 fields (no
     // displayName), and that write must keep passing so it isn't rolled back
     // (signUp() deletes the just-created auth user if the profile write fails).
+    // The email must be the account's own sign-in address, so a signup cannot
+    // point admins and portal mail at someone else's inbox.
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
         && request.resource.data.status == 'pending'
         && request.resource.data.keys().hasOnly(['email', 'displayName', 'status', 'createdAt'])
+        && request.resource.data.email is string
+        && request.auth.token.email is string
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
         && (!('displayName' in request.resource.data) ||
             (request.resource.data.displayName is string &&
              request.resource.data.displayName.size() > 0 &&
@@ -121,13 +127,13 @@ service cloud.firestore {
 
     match /userOnboarding/{docId} {
       allow read: if isApproved() &&
-        (resource.data.userId == request.auth.uid || isManagement());
+        (resource.data.userId == request.auth.uid || isPlatformManagement());
       allow write: if false;
     }
 
     match /userChannelOnboarding/{docId} {
       allow read: if isApproved() &&
-        (resource.data.userId == request.auth.uid || isManagement());
+        (resource.data.userId == request.auth.uid || isPlatformManagement());
       allow write: if false;
     }
 

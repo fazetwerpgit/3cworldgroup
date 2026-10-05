@@ -74,6 +74,16 @@ describe('installBucketForSale', () => {
     expect(installBucketForSale(scheduled, order('active'), NOW)).toBe('installed');
   });
 
+  it('does not call a past sale date installed while the carrier has not installed it', () => {
+    const past = sale({ installDate: new Date('2026-09-10T12:00:00') });
+    const now = new Date('2026-09-20T12:00:00');
+    expect(installBucketForSale(past, order('pre_sale'), now)).toBe('attention');
+    expect(installBucketForSale(past, order('pending_install'), now)).toBe('attention');
+    const pending = (estInstallDate: string) => ({ status: 'pending_install', estInstallDate }) as FiberOrder;
+    expect(installBucketForSale(past, pending('2026-09-18'), now)).toBe('attention');
+    expect(installBucketForSale(past, pending('2026-09-24'), now)).toBe('scheduled');
+  });
+
   it('treats an unparseable date as no date', () => {
     expect(installBucketForSale({ installDate: 'not-a-date' as unknown as Date }, null, NOW)).toBe('attention');
   });

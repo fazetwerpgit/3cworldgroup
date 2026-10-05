@@ -162,6 +162,14 @@ describe('POST /api/portal/sales proof screenshots', () => {
   });
 });
 
+describe('POST /api/portal/sales internet plan', () => {
+  it('refuses a sale of extras only', async () => {
+    const response = await POST(post({ ...baseBody, products: [{ productId: 'xfinity-tv' }] }));
+    expect(response.status).toBe(400);
+    expect(state.added).toHaveLength(0);
+  });
+});
+
 describe('POST /api/portal/sales after the write', () => {
   it('confirms the sale without promising a pay date', async () => {
     const response = await POST(post(baseBody));

@@ -3,6 +3,17 @@ import { adminDb } from '@/lib/firebase/admin';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { appendApplicationRow } from '@/lib/sheets/applicationsSheet';
 import { findActivePortalAccount } from '@/lib/auth/existingAccount';
+import { applicationLimiter } from '@/lib/forms/publicLimiters';
+import { clientIp } from '@/lib/rateLimit';
+import {
+  INVALID_EMAIL_MESSAGE,
+  INVALID_PHONE_MESSAGE,
+  PUBLIC_FIELD_LIMITS,
+  clipText,
+  isValidEmail,
+  isValidUsPhone,
+  readJsonObject,
+} from '@/lib/forms/publicFields';
 
 /*
   Trim, cap, and drop control characters.
@@ -22,15 +33,24 @@ import { findActivePortalAccount } from '@/lib/auth/existingAccount';
 */
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
 
-function clean(value: unknown, max = 200) {
+function clean(value: unknown, max: number = PUBLIC_FIELD_LIMITS.name) {
   return typeof value === 'string'
-    ? value.replace(CONTROL_CHARS, ' ').trim().slice(0, max)
+    ? clipText(value.replace(CONTROL_CHARS, ' ').trim(), max)
     : '';
 }
 
 export async function POST(request: NextRequest) {
+  if (!applicationLimiter.take(clientIp(request))) {
+    return NextResponse.json(
+      { error: 'Too many applications from this connection. Please try again in a few minutes.' },
+      { status: 429 }
+    );
+  }
   try {
-    const body = await request.json();
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: 'The application could not be read. Please try again.' }, { status: 400 });
+    }
     const honeypot = clean(body.website);
     if (honeypot) {
       return NextResponse.json({ success: true });
@@ -41,16 +61,23 @@ export async function POST(request: NextRequest) {
     }
 
     const name = clean(body.name);
-    const phone = clean(body.phone, 60);
-    const email = clean(body.email, 180).toLowerCase();
-    const city = clean(body.city, 120);
-    const referredBy = clean(body.referredBy, 180);
+    const phone = clean(body.phone, PUBLIC_FIELD_LIMITS.phone);
+    // Not clipped: a cut address is a different address. Over-long fails isValidEmail.
+    const email = clean(body.email, Infinity).toLowerCase();
+    const city = clean(body.city, PUBLIC_FIELD_LIMITS.city);
+    const referredBy = clean(body.referredBy, PUBLIC_FIELD_LIMITS.referredBy);
 
     if (!name || !phone || !email || !city) {
       return NextResponse.json(
         { error: 'Name, phone, email, and city are required' },
         { status: 400 }
       );
+    }
+    if (!isValidUsPhone(phone)) {
+      return NextResponse.json({ error: INVALID_PHONE_MESSAGE }, { status: 400 });
+    }
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: INVALID_EMAIL_MESSAGE }, { status: 400 });
     }
 
     if (await findActivePortalAccount(email)) {

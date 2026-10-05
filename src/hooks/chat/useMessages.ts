@@ -90,6 +90,37 @@ function toReplyTo(value: unknown): ChatReplySnippet | undefined {
   };
 }
 
+// One stored message doc as the thread renders it. `uid` decides myReactions.
+export function toChatMessageView(
+  id: string,
+  data: Record<string, unknown>,
+  channelId: string,
+  uid: string | undefined
+): ChatMessageView {
+  const reactions = toStringMap(data.reactions);
+  return {
+    id,
+    channelId: typeof data.channelId === 'string' ? data.channelId : channelId,
+    text: typeof data.text === 'string' ? data.text : '',
+    authorId: typeof data.authorId === 'string' ? data.authorId : '',
+    authorName: typeof data.authorName === 'string' ? data.authorName : '3C User',
+    authorRole: typeof data.authorRole === 'string' ? data.authorRole : undefined,
+    createdAt: toDate(data.createdAt),
+    reactionCounts: toCountMap(data.reactionCounts),
+    myReactions: uid
+      ? Object.entries(reactions)
+          .filter(([, uids]) => uids.includes(uid))
+          .map(([emoji]) => emoji)
+      : [],
+    attachment: toAttachment(data.attachment),
+    hasAttachment: data.hasAttachment === true,
+    replyTo: toReplyTo(data.replyTo),
+    editedAt: toDate(data.editedAt),
+    isPinned: data.isPinned === true,
+    pinnedAt: toDate(data.pinnedAt),
+  };
+}
+
 const INITIAL_WINDOW = 75;
 // Exported so consumers can compute "has my loadOlder growth actually landed
 // yet" (see the anchor-race guard in page.tsx / MobileThread.tsx) without
@@ -107,6 +138,9 @@ export function useMessages(channelId: string | null) {
   const [error, setError] = useState('');
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const [hasMore, setHasMore] = useState(false);
+  // True once the window sits at MAX_WINDOW and the channel still has older
+  // messages: the thread says history stops here instead of going quiet.
+  const [historyCapped, setHistoryCapped] = useState(false);
   // Bumped once per COMMITTED snapshot (never on the eviction-guard skip path).
   // Consumers key their scroll-anchor effects on this instead of message count,
   // since a growth that doesn't change the visible count (e.g. the eviction
@@ -163,6 +197,7 @@ export function useMessages(channelId: string | null) {
     if (!channelId) setRenderedChannel(null);
     setWindowSize(INITIAL_WINDOW);
     setHasMore(false);
+    setHistoryCapped(false);
     setLastSnapshotWindow(0);
   }
 
@@ -203,33 +238,7 @@ export function useMessages(channelId: string | null) {
         const uid = auth?.currentUser?.uid;
         const rawDocs = snapshot.docs;
         const docs = rawDocs.filter((doc) => !doc.data().deletedAt);
-        const next = docs
-          .map((doc) => {
-            const data = doc.data();
-            const reactions = toStringMap(data.reactions);
-            return {
-              id: doc.id,
-              channelId: data.channelId ?? channelId,
-              text: data.text ?? '',
-              authorId: data.authorId ?? '',
-              authorName: data.authorName ?? '3C User',
-              authorRole: data.authorRole ?? undefined,
-              createdAt: toDate(data.createdAt),
-              reactionCounts: toCountMap(data.reactionCounts),
-              myReactions: uid
-                ? Object.entries(reactions)
-                    .filter(([, uids]) => uids.includes(uid))
-                    .map(([emoji]) => emoji)
-                : [],
-              attachment: toAttachment(data.attachment),
-              hasAttachment: data.hasAttachment === true,
-              replyTo: toReplyTo(data.replyTo),
-              editedAt: toDate(data.editedAt),
-              isPinned: data.isPinned === true,
-              pinnedAt: toDate(data.pinnedAt),
-            } satisfies ChatMessageView;
-          })
-          .reverse();
+        const next = docs.map((doc) => toChatMessageView(doc.id, doc.data(), channelId, uid)).reverse();
 
         // Raw (unfiltered) oldest doc — desc order, so the last raw doc is the
         // oldest in the window regardless of soft-deletes. Comparing THIS
@@ -256,6 +265,7 @@ export function useMessages(channelId: string | null) {
         setRenderedChannel(channelId);
         setMessages(next);
         setHasMore(rawDocs.length >= windowSize && windowSize < MAX_WINDOW);
+        setHistoryCapped(rawDocs.length >= windowSize && windowSize >= MAX_WINDOW);
         setLastSnapshotWindow(windowSize);
         setSnapshotVersion((version) => version + 1);
         setLoading(false);
@@ -279,6 +289,7 @@ export function useMessages(channelId: string | null) {
     loading,
     error,
     hasMore,
+    historyCapped,
     loadOlder,
     windowSize,
     snapshotVersion,

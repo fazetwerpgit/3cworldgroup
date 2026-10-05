@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser, requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
-import { EDITABLE_OPTION_KEYS, OptionKey } from '@/lib/forms/formOptionsRegistry';
+import {
+  EDITABLE_OPTION_KEYS,
+  LOCKED_OPTION_VALUES,
+  missingLockedValue,
+  OptionKey,
+} from '@/lib/forms/formOptionsRegistry';
 
 // GET - any verified user gets the resolved (default + override) option lists.
 export async function GET(request: NextRequest) {
@@ -27,6 +32,11 @@ export async function PUT(request: NextRequest) {
     if (!Array.isArray(body.values)) {
       return NextResponse.json({ error: 'values must be an array' }, { status: 400 });
     }
+    // An empty override replaces the defaults, leaving reps a required select
+    // with nothing to pick and the submit route rejecting every value.
+    if (body.values.length === 0) {
+      return NextResponse.json({ error: 'Keep at least one option in this list' }, { status: 400 });
+    }
     if (body.values.length > 100) {
       return NextResponse.json({ error: 'Too many values (max 100)' }, { status: 400 });
     }
@@ -46,6 +56,13 @@ export async function PUT(request: NextRequest) {
       if (seen.has(v)) continue;
       seen.add(v);
       values.push(v);
+    }
+    const missing = missingLockedValue(key, values);
+    if (missing) {
+      return NextResponse.json(
+        { error: `Keep "${missing}". ${LOCKED_OPTION_VALUES[key]![missing]}` },
+        { status: 400 }
+      );
     }
 
     await adminDb.collection('formOptions').doc(key).set({

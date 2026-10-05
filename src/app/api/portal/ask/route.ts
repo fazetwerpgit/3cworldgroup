@@ -9,7 +9,7 @@ import { loadRepSnapshot } from '@/lib/ask/liveData';
 import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
 import { AskProviderError, askProviderConfig, callAskModel, type AskContentPart, type AskMessage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
-import { ASK_DAILY_LIMIT, ASK_LOG, loadNotes, ownDealerCodes, repHome, takeDailyAsk } from '@/lib/ask/store';
+import { ASK_DAILY_LIMIT, ASK_LOG, giveBackDailyAsk, loadNotes, ownDealerCodes, repHome, takeDailyAsk } from '@/lib/ask/store';
 
 // POST /api/portal/ask (multipart: question, history JSON, optional photo) —
 // Ask 3C: answers a rep's question from the owner's knowledge notes only.
@@ -122,6 +122,8 @@ export async function POST(request: NextRequest) {
       const kind = error instanceof AskProviderError ? error.kind : 'unknown';
       const status = error instanceof AskProviderError ? error.status ?? 0 : 0;
       log({ outcome: 'provider_error', kind, status, ms: Date.now() - started });
+      // Only an answered question counts against the day.
+      await giveBackDailyAsk(db, gate.uid, now).catch(() => {});
       return fail(
         kind === 'timeout' ? `Ask 3C took too long to answer. ${CALL_FOR_HELP}` : `Ask 3C couldn't answer right now. ${CALL_FOR_HELP}`,
         kind === 'timeout' ? 504 : 502

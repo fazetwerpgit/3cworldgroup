@@ -20,18 +20,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const opts = await getResolvedFormOptions();
     const companySold = s(body.companySold, 40);
-    if (companySold && !isValidOption(opts.providers, companySold)) {
+    const dateKnocked = s(body.dateKnocked, 40);
+    // Company and date are the minimum an admin can act on.
+    if (!companySold || !dateKnocked) {
+      return NextResponse.json({ error: 'Please complete all required fields' }, { status: 400 });
+    }
+    if (!isValidOption(opts.providers, companySold)) {
       return NextResponse.json({ error: 'Select a valid company' }, { status: 400 });
     }
 
-    const fields = {
-      companySold,
-      dateKnocked: s(body.dateKnocked, 40),
-      packNumber: s(body.packNumber, 40),
+    const counts = {
       numberOfReps: s(body.numberOfReps, 20),
       doorsKnocked: s(body.doorsKnocked, 20),
       customerContacts: s(body.customerContacts, 20),
       numberOfSales: s(body.numberOfSales, 20),
+    };
+    if (Object.values(counts).some((v) => v !== '' && !/^\d+$/.test(v))) {
+      return NextResponse.json({ error: 'Counts must be whole numbers' }, { status: 400 });
+    }
+
+    const fields = {
+      companySold,
+      dateKnocked,
+      packNumber: s(body.packNumber, 40),
+      ...counts,
       orderNumber: s(body.orderNumber, 120),
     };
 

@@ -293,6 +293,86 @@ describe('PUT /api/portal/sales/[id] install date provenance', () => {
     expect(response.status).toBe(400);
     expect(saleUpdateMock).not.toHaveBeenCalled();
   });
+
+  it('refuses an install date edited against a day that has since moved', async () => {
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true, isManagement: true });
+    // The form loaded 10/15; the rep has since moved the install to 10/20.
+    saleGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ salesRepId: 'rep-1', installDate: new Date(`${dayInput(10)}T17:00:00.000Z`) }),
+    });
+
+    const response = await put({
+      installDate: dayInput(3),
+      expectedInstallDate: new Date(`${dayInput(5)}T17:00:00.000Z`).toISOString(),
+    });
+
+    expect(response.status).toBe(409);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts an install date edited against the stored day', async () => {
+    const stored = new Date(`${dayInput(5)}T17:00:00.000Z`);
+    saleGetMock.mockResolvedValue({ exists: true, data: () => ({ salesRepId: 'rep-1', installDate: stored }) });
+
+    const response = await put({ installDate: dayInput(8), expectedInstallDate: stored.toISOString() });
+
+    expect(response.status).toBe(200);
+    expect(saleUpdateMock.mock.calls[0][0].installDate).toBeInstanceOf(Date);
+  });
+
+  it('rejects an install date before the sale date, like create does', async () => {
+    saleGetMock.mockResolvedValue({ exists: true, data: () => ({ salesRepId: 'rep-1' }) });
+
+    const response = await put({ saleDate: dayInput(-1), installDate: dayInput(-5) });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'Sale date cannot be after the install date' });
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects moving the sale date past the stored install date', async () => {
+    saleGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ salesRepId: 'rep-1', installDate: new Date(`${dayInput(-5)}T17:00:00.000Z`) }),
+    });
+
+    const response = await put({ saleDate: dayInput(-1) });
+
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /api/portal/sales/[id] products', () => {
+  it('re-derives value and points from the products, ignoring client totals', async () => {
+    saleGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        salesRepId: 'rep-1',
+        totalValue: 50,
+        totalPoints: 5,
+        products: [{ productId: 'tfiber-500', productName: 'TFiber 500', company: 'tfiber', quantity: 1, unitPrice: 50, totalPrice: 50, points: 5 }],
+      }),
+    });
+
+    const response = await put({ products: [{ productId: 'tfiber-2gig' }], totalValue: 1, totalPoints: 999 });
+
+    expect(response.status).toBe(200);
+    const written = saleUpdateMock.mock.calls[0][0];
+    expect(written.products.map((p: { productId: string }) => p.productId)).toEqual(['tfiber-2gig']);
+    expect(written.totalPoints).toBe(written.products[0].points);
+    expect(written.totalValue).toBe(written.products[0].totalPrice);
+    expect(written.totalPoints).not.toBe(5);
+  });
+
+  it('leaves stored points alone when the edit sends no products', async () => {
+    saleGetMock.mockResolvedValue({ exists: true, data: () => ({ salesRepId: 'rep-1', totalPoints: 5 }) });
+
+    await put({ notes: 'typo', totalPoints: 999 });
+
+    expect(saleUpdateMock.mock.calls[0][0].totalPoints).toBeUndefined();
+  });
 });
 
 describe('PUT /api/portal/sales/[id] proof screenshots', () => {

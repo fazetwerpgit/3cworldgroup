@@ -56,7 +56,9 @@ export async function POST(request: NextRequest) {
         user.uid
       );
 
-      transaction.set(messageRef, next, { merge: true });
+      // update() replaces each top-level map whole; set(merge) would keep the
+      // emoji keys toggleReaction just dropped, so removals never landed.
+      transaction.update(messageRef, next);
     });
 
     return NextResponse.json({ success: true });

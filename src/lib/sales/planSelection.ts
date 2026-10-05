@@ -69,3 +69,13 @@ export function validateOnePlanPerSale(products: SaleProduct[]): string | null {
   }
   return null;
 }
+
+/**
+ * A sale needs its internet plan: extras ride alongside one. The exception is
+ * an Add-On sale, where the customer already has internet and buys only extras
+ * (a TV package, a phone line). Error message when the payload has none, else null.
+ */
+export function validateHasInternetPlan(products: SaleProduct[], saleType?: string): string | null {
+  if (saleType === 'add_on' && products.length > 0) return null;
+  return selectedInternetProduct(products) ? null : 'Pick an internet plan — extras are sold with one';
+}

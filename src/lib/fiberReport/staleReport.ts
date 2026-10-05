@@ -32,6 +32,16 @@ export function isOlderReport(incoming: ReportStamp, loaded: Partial<ReportStamp
   return false;
 }
 
+/**
+ * The stamp to store once `incoming` is loaded. Each measure only moves
+ * forward: a report with no mail date, say, never clears the date on record.
+ */
+export function newestStamp(incoming: ReportStamp, loaded: Partial<ReportStamp> | undefined): ReportStamp {
+  const later = (a: string | null | undefined, b: string | null | undefined) =>
+    a && b ? (a > b ? a : b) : a || b || null;
+  return { sentAt: later(incoming.sentAt, loaded?.sentAt), asOf: later(incoming.asOf, loaded?.asOf) };
+}
+
 /** An RFC 2822 mail Date header as ISO, or null. */
 export function mailSentAt(header: unknown): string | null {
   if (typeof header !== 'string' || !header.trim()) return null;

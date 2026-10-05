@@ -51,18 +51,22 @@ vi.mock('firebase/firestore', () => ({
   Timestamp: class {},
 }));
 
-import { useMessages } from './useMessages';
+import { MAX_WINDOW, useMessages } from './useMessages';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 function Probe({ channelId }: { channelId: string | null }) {
-  const { messages, loading, fromCache, snapshotVersion } = useMessages(channelId);
+  const { messages, loading, fromCache, snapshotVersion, historyCapped, loadOlder } = useMessages(channelId);
   return (
     <div>
       <span data-testid="loading">{String(loading)}</span>
       <span data-testid="count">{String(messages.length)}</span>
       <span data-testid="fromCache">{String(fromCache)}</span>
       <span data-testid="version">{String(snapshotVersion)}</span>
+      <span data-testid="capped">{String(historyCapped)}</span>
+      <button type="button" onClick={loadOlder}>
+        Older
+      </button>
     </div>
   );
 }
@@ -171,5 +175,25 @@ describe('useMessages connection metadata', () => {
     act(() => listeners[0].raw({ docs, metadata: { fromCache: false }, docChanges: () => [] }));
     expect(text('fromCache')).toBe('false');
     expect(text('version')).toBe('1');
+  });
+});
+
+describe('useMessages history cap', () => {
+  it('flags when the window reaches MAX_WINDOW with older history left', () => {
+    const text = (id: string) => container.querySelector(`[data-testid="${id}"]`)?.textContent;
+    act(() => root.render(<Probe channelId="c1" />));
+    // Each wider window reaches further back (older floor), so no eviction growth fires.
+    const feed = () => {
+      const latest = listeners[listeners.length - 1];
+      act(() => latest.next({ docs: makeDocs(latest.limit, 1_000_000 - latest.limit * 1000) }));
+    };
+    feed();
+    while (listeners[listeners.length - 1].limit < MAX_WINDOW) {
+      expect(text('capped')).toBe('false');
+      act(() => container.querySelector('button')?.click());
+      feed();
+    }
+    expect(text('count')).toBe(String(MAX_WINDOW));
+    expect(text('capped')).toBe('true');
   });
 });

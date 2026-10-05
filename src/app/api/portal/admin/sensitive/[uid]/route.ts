@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 import { revealSensitive } from '@/lib/onboarding/sensitiveFields';
+import { isOwner, resolveRoles } from '@/types';
 
 // GET /api/portal/admin/sensitive/[uid] - Sensitive onboarding fields for one user.
 // VERIFIED admin only (real Firebase ID token via Authorization: Bearer header,
@@ -43,6 +44,19 @@ export async function GET(
         ssn: null,
         dlNumber: null,
       });
+    }
+
+    // The owner tier is closed to admins everywhere else (edit, delete, role),
+    // so only an owner may decrypt an owner's SSN/DL.
+    const target = await adminDb.collection('users').doc(uid).get();
+    if (isOwner(resolveRoles(target.get('role'), target.get('fieldRole')).role)) {
+      const caller = await adminDb.collection('users').doc(gate.uid).get();
+      if (!isOwner(resolveRoles(caller.get('role'), caller.get('fieldRole')).role)) {
+        return NextResponse.json(
+          { error: "Forbidden: only an owner can reveal an owner's sensitive fields" },
+          { status: 403 }
+        );
+      }
     }
 
     const revealed = revealSensitive({

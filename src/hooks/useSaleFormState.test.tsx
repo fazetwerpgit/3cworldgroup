@@ -103,6 +103,14 @@ describe('validateSaleForm', () => {
     expect(Object.keys(errors)).toEqual(['customerAddress', 'plan', 'installDate', 'orderNumberOrBtn']);
   });
 
+  it('wants an internet plan: extras alone are not a plan', () => {
+    const tv = getPlanById('xfinity-tv')!;
+    const extra = { ...product, productId: tv.id, productName: tv.name, company: tv.company };
+    const base = { formData: fields({ orderNumberOrBtn: 'TMF-1' }), proofPaths: [] };
+    expect(validateSaleForm({ ...base, products: [extra] }).plan).toBe('Pick a plan');
+    expect(validateSaleForm({ ...base, products: [product, extra] })).toEqual({});
+  });
+
   it('takes a screenshot or an order number as proof', () => {
     const base = { formData: fields(), products: [product] };
     expect(validateSaleForm({ ...base, proofPaths: [] }).orderNumberOrBtn).toBeTruthy();

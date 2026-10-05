@@ -27,4 +27,10 @@ describe('toCsv', () => {
   it('quotes fields containing newlines', () => {
     expect(toCsv([{ key: 'n', label: 'N' }], [{ n: 'line1\nline2' }])).toBe('N\r\n"line1\nline2"');
   });
+  it('neutralizes text that a spreadsheet would run as a formula', () => {
+    const c = [{ key: 'n', label: 'N' }];
+    expect(toCsv(c, [{ n: '=HYPERLINK("http://x","y")' }])).toBe('N\r\n"\'=HYPERLINK(""http://x"",""y"")"');
+    expect(toCsv(c, [{ n: '+1' }, { n: '-2' }, { n: '@SUM(A1)' }, { n: '\tx' }])).toBe("N\r\n'+1\r\n'-2\r\n'@SUM(A1)\r\n'\tx");
+    expect(toCsv(c, [{ n: -5 }])).toBe('N\r\n-5');
+  });
 });

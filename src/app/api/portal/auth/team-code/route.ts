@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { isValidTeamCode } from '@/lib/auth/teamCode';
+import { isValidTeamCode, teamCodeLimiter } from '@/lib/auth/teamCode';
+import { clientIp } from '@/lib/rateLimit';
 import { getInviteByToken, inviteSignupState } from '@/lib/recruiting/inviteLookup';
 
 let warnedUnconfigured = false;
@@ -17,9 +18,9 @@ const INVITE_TOKEN_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
  * the packet at /onboard/<token> can still be filled in; 'submitted' means the
  * hire already has an account from it. Unknown, expired and closed invites
  * all answer the same { ok: false }. The team code itself is never returned.
- * Always responds 200 so the client can branch on `ok` alone, mirroring
- * /api/portal/auth/captcha. The code check fails closed when the env var is
- * missing.
+ * Responds 200 so the client can branch on `ok` alone, mirroring
+ * /api/portal/auth/captcha, except that code guesses past the per-IP limit get
+ * 429 { ok: false }. The code check fails closed when the env var is missing.
  */
 export async function POST(request: Request) {
   let body: { code?: unknown; inviteToken?: unknown };
@@ -42,6 +43,10 @@ export async function POST(request: Request) {
       console.error('Error checking signup invite token:', error);
       return NextResponse.json({ ok: false });
     }
+  }
+
+  if (!teamCodeLimiter.take(clientIp(request))) {
+    return NextResponse.json({ ok: false, error: 'Too many attempts. Try again in a few minutes.' }, { status: 429 });
   }
 
   const expected = process.env.PORTAL_TEAM_CODE;

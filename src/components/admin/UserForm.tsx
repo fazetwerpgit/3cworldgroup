@@ -15,8 +15,10 @@ import {
   RoleDisplayNames,
   getEffectiveRole,
   isAdminLevel,
+  isManagementRole,
   isOwner,
   isPlatformRole,
+  MANAGEMENT_FIELD_ROLES,
   graduatedFieldRole,
 } from '@/types';
 import type { FieldRole, PlatformRole } from '@/types';
@@ -75,22 +77,13 @@ const statusSegments: { value: 'pending' | 'active' | 'inactive'; label: string 
   { value: 'inactive', label: 'Inactive' },
 ];
 
-const MANAGER_ELIGIBLE: UserRole[] = [
-  'l1_manager',
-  'l2_manager',
-  'regional_manager',
-  'director',
-  'operations',
-  'admin',
-  'owner',
-];
-
 interface ManagerCandidate {
   uid: string;
   displayName?: string;
   email?: string;
   role?: PlatformRole;
   fieldRole?: FieldRole;
+  status?: string;
 }
 
 const roleLabel = (role?: string) =>
@@ -109,6 +102,8 @@ export function UserForm({ user }: UserFormProps) {
   // onboarding (checklist email + e-sign envelopes), so a name-only save must
   // never re-send or default one.
   const [loadedRole, setLoadedRole] = useState<UserRole | ''>(getEffectiveRole(user) ?? '');
+  // managerId is only sent when changed, so a save never re-sends a stale one.
+  const loadedManagerId = user.reportsToId || '';
 
   const [formData, setFormData] = useState({
     email: user.email || '',
@@ -134,7 +129,7 @@ export function UserForm({ user }: UserFormProps) {
   const [pickingManager, setPickingManager] = useState(false);
 
   // Real name-search picker, backed by the EXISTING GET /api/portal/auth/users
-  // endpoint — no new route. Filtered client-side to manager-eligible roles.
+  // endpoint — no new route. Filtered client-side to manager-eligible people.
   useEffect(() => {
     if (!currentUser) return;
     let active = true;
@@ -143,13 +138,18 @@ export function UserForm({ user }: UserFormProps) {
         const res = await fetch('/api/portal/auth/users', { headers: await authHeaders() });
         const data = await res.json();
         if (!active || !res.ok) return;
-        // L1/L2 managers are stored under fieldRole, not role — check the
-        // effective role (role ?? fieldRole) so they aren't silently excluded.
-        const eligible = ((data.users || []) as ManagerCandidate[]).filter((u) =>
-          MANAGER_ELIGIBLE.includes(getEffectiveRole(u) as UserRole)
+        const everyone = (data.users || []) as ManagerCandidate[];
+        // Same rule the PUT route enforces: an active person in a back-office
+        // role or a management field role (GMs, office managers, IBO tiers).
+        setManagerCandidates(
+          everyone.filter(
+            (c) =>
+              c.status === 'active' &&
+              (isManagementRole(c.role) || (c.fieldRole ? MANAGEMENT_FIELD_ROLES.includes(c.fieldRole) : false))
+          )
         );
-        setManagerCandidates(eligible);
-        const current = eligible.find((u) => u.uid === formData.managerId);
+        // The current manager is named even if no longer eligible to be picked.
+        const current = everyone.find((u) => u.uid === formData.managerId);
         if (current) {
           setSelectedManagerLabel(current.displayName || current.email || current.uid);
         }
@@ -203,7 +203,7 @@ export function UserForm({ user }: UserFormProps) {
           city: formData.city,
           state: formData.state,
           zip: formData.zip,
-          managerId: formData.managerId || null,
+          ...(formData.managerId !== loadedManagerId ? { managerId: formData.managerId || null } : {}),
           ...(formData.status !== user.status ? { status: formData.status } : {}),
         }),
       });
@@ -289,6 +289,7 @@ export function UserForm({ user }: UserFormProps) {
       ? isOwner(currentUser?.role)
       : isAdminLevel(currentUser?.role) || !isPlatformRole(seg.value)
   );
+  const isOwnRecord = currentUser?.uid === user.uid;
   const personName = formData.displayName || 'this person';
   const showSaveBar = dirty || saved;
 
@@ -404,10 +405,11 @@ export function UserForm({ user }: UserFormProps) {
               </label>
               {/* Platform roles are admin-grantable only, and Owner is
                   owner-grantable only — the server enforces both; hiding them here
-                  keeps the UI from offering choices that would 403. A retired role
-                  the user still holds (IBO level, L1/L2 manager) is shown as a
-                  disabled option so the dropdown reflects reality until they are
-                  moved to a current role. */}
+                  keeps the UI from offering choices that would 403. A role the
+                  user holds that this viewer can't assign (a platform role, or a
+                  retired IBO level / L1/L2 manager) is shown as a disabled option
+                  so the dropdown reflects reality instead of falling back to the
+                  first option. */}
               <span className={u.selectWrap}>
                 <select
                   id="person-role"
@@ -420,9 +422,9 @@ export function UserForm({ user }: UserFormProps) {
                       Select a role
                     </option>
                   )}
-                  {formData.role && !ALL_ROLE_VALUES.includes(formData.role) && (
+                  {formData.role && !selectableRoles.some((seg) => seg.value === formData.role) && (
                     <option value={formData.role} disabled>
-                      {roleLabel(formData.role)} (retired)
+                      {`${roleLabel(formData.role)}${ALL_ROLE_VALUES.includes(formData.role) ? '' : ' (retired)'}`}
                     </option>
                   )}
                   {selectableRoles.map((seg) => (
@@ -544,22 +546,29 @@ export function UserForm({ user }: UserFormProps) {
                 {actionBusy ? 'Working…' : 'Accept'}
               </button>
             ) : null}
-            <button
-              type="button"
-              className={`${s.btnSecondary} ${u.sm}`}
-              onClick={() => void updateStatus(formData.status === 'inactive' ? 'active' : 'inactive')}
-              disabled={actionBusy}
-            >
-              {actionBusy ? 'Working…' : formData.status === 'inactive' ? 'Activate' : 'Deactivate'}
-            </button>
-            <button
-              type="button"
-              className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-              onClick={() => void deleteUser()}
-              disabled={actionBusy}
-            >
-              Delete
-            </button>
+            {/* Your own record has no Deactivate: there is no way back from
+                locking yourself out (the server refuses it too). */}
+            {isOwnRecord ? null : (
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm}`}
+                onClick={() => void updateStatus(formData.status === 'inactive' ? 'active' : 'inactive')}
+                disabled={actionBusy}
+              >
+                {actionBusy ? 'Working…' : formData.status === 'inactive' ? 'Activate' : 'Deactivate'}
+              </button>
+            )}
+            {/* Hard delete is admin/owner only (users:delete). */}
+            {isAdminLevel(currentUser?.role) ? (
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                onClick={() => void deleteUser()}
+                disabled={actionBusy}
+              >
+                Delete
+              </button>
+            ) : null}
           </div>
         </div>
       </section>

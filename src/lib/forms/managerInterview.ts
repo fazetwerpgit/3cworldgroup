@@ -3,11 +3,11 @@ import type { UserRole } from '@/types';
 // The only non-promotion job position; everything else (manager tiers and any
 // future GM/Director/etc.) is treated as a promotion, which reveals the three
 // "For Promotion Only" questions. Kept as a single rule because job positions are
-// admin-editable (see the editable-form-options design).
-const ENTRY_ROLE = 'Account Executive';
+// admin-editable (see the editable-form-options design); Form options keeps it.
+export const ENTRY_JOB_POSITION = 'Account Executive';
 
 export function isPromotionRole(jobPosition: string): boolean {
-  return jobPosition.trim() !== '' && jobPosition.trim() !== ENTRY_ROLE;
+  return jobPosition.trim() !== '' && jobPosition.trim() !== ENTRY_JOB_POSITION;
 }
 
 const SIGNATURE_PREFIX = 'data:image/png;base64,';

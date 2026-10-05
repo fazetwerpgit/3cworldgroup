@@ -41,11 +41,26 @@ export async function POST(request: NextRequest) {
       failedCount: 0,
     });
   } catch (error) {
-    if ((error as { code?: unknown })?.code === ALREADY_EXISTS) {
-      return NextResponse.json({ error: 'This announcement was already sent' }, { status: 409 });
+    if ((error as { code?: unknown })?.code !== ALREADY_EXISTS) {
+      console.error('Error creating send-now announcement:', error);
+      return NextResponse.json({ error: 'Failed to send the announcement' }, { status: 500 });
     }
-    console.error('Error creating send-now announcement:', error);
-    return NextResponse.json({ error: 'Failed to send the announcement' }, { status: 500 });
+    // Same requestId again: only a send that FAILED BEFORE any push went out
+    // may be retried. Flip it back to scheduled atomically so two taps can't
+    // both re-send.
+    const ref = adminDb.collection(ANNOUNCEMENTS).doc(requestId);
+    const retry = await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.get('status') !== 'failed' || snap.get('fanOutStarted') === true) return false;
+      tx.update(ref, { status: 'scheduled', sendAt: now, error: FieldValue.delete() });
+      return true;
+    });
+    if (!retry) {
+      return NextResponse.json(
+        { error: 'This announcement already went out (or partly did), so it was not sent again. Check the list.' },
+        { status: 409 }
+      );
+    }
   }
 
   const outcome = await sendAnnouncement(adminDb, requestId, now);

@@ -74,4 +74,28 @@ describe('POST /api/portal/forms/bug-report', () => {
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
   });
+
+  it('notifies only active owner/admin/operations users', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const add = vi.fn(async (_doc: Record<string, unknown>) => ({ id: 'n' }));
+    const user = (id: string, role: string | undefined, status: string, fieldRole?: string) => ({
+      id,
+      data: () => ({ role, fieldRole, status }),
+    });
+    mockAdminCollection.mockImplementation(() => ({
+      get: vi.fn(async () => ({
+        docs: [
+          user('owner1', 'owner', 'active'),
+          user('ops1', 'operations', 'active'),
+          user('ops2', 'operations', 'inactive'),
+          user('admin2', 'admin', 'inactive'),
+          user('rep1', undefined, 'active', 'entry_rep'),
+        ],
+      })),
+      add,
+    }));
+    const res = await POST(req(VALID));
+    expect(res.status).toBe(200);
+    expect(add.mock.calls.map((c) => c[0].userId).sort()).toEqual(['ops1', 'owner1']);
+  });
 });

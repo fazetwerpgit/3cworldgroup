@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
-import { isAdminLevel, resolveRoles } from '@/types';
+import { isManagementRole, resolveRoles } from '@/types';
 
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
@@ -10,8 +10,9 @@ function s(v: unknown, max = 200) {
 
 const AREAS = ['Forms', 'Sales', 'Onboarding', 'Chat', 'Leaderboard', 'Other'];
 
-// Notify every admin's in-portal bell that a new bug report landed. Best-effort:
-// a notification failure must never fail the report submission itself.
+// Notify every active owner/admin/operations bell (the people who work the
+// Requests queue) that a new bug report landed.
+// Best-effort: a notification failure must never fail the report submission itself.
 async function notifyAdmins(title: string, message: string) {
   if (!adminDb) return;
   try {
@@ -19,7 +20,7 @@ async function notifyAdmins(title: string, message: string) {
     const adminUids = snap.docs
       .filter((d) => {
         const data = d.data();
-        return isAdminLevel(resolveRoles(data.role, data.fieldRole).role);
+        return data.status === 'active' && isManagementRole(resolveRoles(data.role, data.fieldRole).role);
       })
       .map((d) => d.id);
     await Promise.all(

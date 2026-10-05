@@ -5,6 +5,8 @@ const state = vi.hoisted(() => ({
   gate: vi.fn(),
   requester: { role: 'owner' } as Record<string, unknown> | null,
   applications: [] as Array<Record<string, unknown>>,
+  invites: [] as Array<Record<string, unknown>>,
+  onboardingAccount: null as { uid: string } | null,
 }));
 
 // A Firestore stand-in for GET: users/{uid}, onboardingInvites and applications,
@@ -18,6 +20,9 @@ vi.mock('@/lib/firebase/admin', () => {
         get: async () => ({ docs: docsOf(rows().slice(0, count)) }),
       }),
     }),
+    where: (field: string, _op: string, value: unknown) => ({
+      get: async () => ({ docs: docsOf(rows().filter((row) => row[field] === value)) }),
+    }),
   });
   return {
     adminDb: {
@@ -30,12 +35,17 @@ vi.mock('@/lib/firebase/admin', () => {
           };
         }
         if (name === 'applications') return query(() => state.applications);
+        if (name === 'onboardingInvites') return query(() => state.invites);
         return query(() => []);
       },
     },
   };
 });
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: state.gate }));
+vi.mock('@/lib/auth/existingAccount', () => ({
+  findActivePortalAccount: vi.fn(async () => null),
+  findOnboardingPortalAccount: vi.fn(async () => state.onboardingAccount),
+}));
 
 import { GET, POST } from './route';
 
@@ -64,6 +74,8 @@ beforeEach(() => {
   state.gate.mockResolvedValue({ ok: true, uid: 'owner-1', name: 'Owner', email: 'o@example.com' });
   state.requester = { role: 'owner' };
   state.applications = [];
+  state.invites = [];
+  state.onboardingAccount = null;
 });
 
 it('returns every application, not just the newest 50', async () => {
@@ -109,4 +121,48 @@ it('rejects a direct invite POST for a non-invitable field role', async () => {
   const response = await POST(request);
   expect(response.status).toBe(400);
   await expect(response.json()).resolves.toEqual({ error: 'Invalid field role' });
+});
+
+function invite(index: number, extra: Record<string, unknown> = {}) {
+  return { id: `inv-${index}`, status: 'invited', ownerId: 'other', createdAt: at(index), ...extra };
+}
+
+it("lists a manager's own invites even when 100+ newer invites belong to others", async () => {
+  state.requester = { role: 'rep', fieldRole: 'l1_manager' };
+  state.gate.mockResolvedValue({ ok: true, uid: 'mgr-1', name: 'Mgr', email: 'm@example.com' });
+  state.invites = [
+    ...Array.from({ length: 120 }, (_, index) => invite(index)),
+    invite(500, { ownerId: 'mgr-1', status: 'submitted' }),
+  ];
+
+  const json = await (await GET(getRequest())).json();
+  expect(json.invites.map((row: { id: string }) => row.id)).toEqual(['inv-500']);
+});
+
+it('gives management an old submitted invite beyond the newest 100', async () => {
+  state.invites = [
+    ...Array.from({ length: 120 }, (_, index) => invite(index)),
+    invite(500, { status: 'submitted' }),
+  ];
+
+  const json = await (await GET(getRequest())).json();
+  expect(json.invites).toHaveLength(101);
+  expect(json.invites.at(-1).id).toBe('inv-500');
+});
+
+it('refuses a new invite for an email already partway through onboarding', async () => {
+  state.onboardingAccount = { uid: 'pending-1' };
+  const request = new NextRequest('http://localhost/api/portal/recruiting/invites', {
+    method: 'POST',
+    body: JSON.stringify({
+      candidateName: 'Rex',
+      candidateEmail: 'rex@example.com',
+      candidatePhone: '555-0100',
+      intendedFieldRole: 'entry_level_rep',
+    }),
+    headers: { 'content-type': 'application/json' },
+  });
+
+  const response = await POST(request);
+  expect(response.status).toBe(409);
 });

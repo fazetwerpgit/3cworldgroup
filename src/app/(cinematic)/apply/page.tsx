@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   title: "Apply | 3C World Group",
   description:
     "Apply to sell fiber internet, TV and home security door to door with 3C World Group. A 1099, commission-only role with full training and no experience needed.",
+  // Static: ?market= prefills the form but is the same page.
+  alternates: { canonical: "/apply" },
 };
 
 /**

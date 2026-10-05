@@ -5,6 +5,7 @@ import { isValidOption } from '@/lib/forms/formOptions';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { buildSubmissionAttachmentFolder, isValidFormUploadId } from '@/lib/forms/formUploads';
+import { isEmailShaped } from '@/lib/forms/managerInterview';
 
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
@@ -26,6 +27,9 @@ export async function POST(request: NextRequest) {
 
     if (!contractorName || !contractorEmail || !typeOfOrder || !dateOfInstall) {
       return NextResponse.json({ error: 'Please complete all required fields' }, { status: 400 });
+    }
+    if (!isEmailShaped(contractorEmail)) {
+      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
     }
     if (!isValidOption(opts.payrollCampaigns, campaign)) {
       return NextResponse.json({ error: 'Select a valid campaign' }, { status: 400 });

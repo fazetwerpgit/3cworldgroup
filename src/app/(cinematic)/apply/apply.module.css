@@ -160,7 +160,7 @@
   padding: clamp(1.4rem, 5vw, 2.6rem);
   position: relative;
   /* The closing button and the header both land here; clear the fixed header. */
-  scroll-margin-top: 5.75rem;
+  scroll-margin-top: calc(5.75rem - var(--header-clear));
 }
 
 .formTitle {
@@ -287,7 +287,7 @@
   line-height: 1.4;
   min-height: 3.25rem;
   padding: 0.85rem 1rem;
-  scroll-margin: 6.25rem 0 9rem;
+  scroll-margin: calc(6.25rem - var(--header-clear)) 0 9rem;
   /*
     Interaction feedback, not an entrance: 180ms is long enough that the edge
     and the ring arrive rather than snap, and short enough that the field is
@@ -479,6 +479,9 @@
 .applyAside {
   order: 2;
   position: relative;
+  /* #the-work lands here: clear the fixed header, plus the 12px the reveal
+     rise is still settling when the anchor scroll measures it. */
+  scroll-margin-top: calc(6.5rem - var(--header-clear));
 }
 
 .asideEyebrow {

@@ -52,6 +52,7 @@ export const metadata: Metadata = {
   title: "Door-to-Door Sales Careers | 3C World Group",
   description:
     "Sell fiber internet, TV, and home security face to face. A 1099, commission-only role with real training and support. Apply to 3C World Group.",
+  alternates: { canonical: "/" },
 };
 
 /**

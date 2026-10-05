@@ -18,6 +18,13 @@ const firestore = vi.hoisted(() => {
     collection: vi.fn((collectionName: string) => {
       if (collectionName !== 'users') throw new Error(`Unexpected collection: ${collectionName}`);
       return {
+        where: (field: string, _op: string, value: unknown) => ({
+          get: vi.fn(async () => ({
+            docs: [...users.entries()]
+              .filter(([, data]) => data[field] === value)
+              .map(([id, data]) => ({ id, get: (key: string) => data[key] })),
+          })),
+        }),
         doc: (userId: string) => ({
           get: vi.fn(async () => {
             const data = users.get(userId);
@@ -71,6 +78,7 @@ vi.mock('@/lib/email/templates', () => ({
 }));
 vi.mock('@/lib/chat/restampAuthor', () => ({ restampAuthor: vi.fn(async () => undefined) }));
 vi.mock('@/lib/users/restampDisplayName', () => ({ restampDisplayName: vi.fn(async () => undefined) }));
+vi.mock('@/lib/chat/channels', () => ({ reconcileChatMembershipForUser: vi.fn(async () => []) }));
 
 import { DELETE, PUT } from './route';
 import { after } from 'next/server';
@@ -78,6 +86,7 @@ import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
+import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 
 vi.mock('@/lib/users/purgeSensitiveUserData', () => ({
   purgeSensitiveUserData: vi.fn(async () => ({ userSensitive: 0, files: 0, failures: [] })),
@@ -187,8 +196,24 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
       activatedAt: '__SERVER_TS__',
     });
     expect(firestore.updates[0]?.data).not.toHaveProperty('hireDate');
-    expect(mockResolveAlertTasks).not.toHaveBeenCalled();
+    expect(mockResolveAlertTasks).toHaveBeenCalledOnce();
+    expect(mockResolveAlertTasks).toHaveBeenCalledWith('pending-user', [
+      'pending_assignment',
+      'stalled_rep',
+      'review_needed',
+      'activation_ready',
+    ]);
     expect(sendPendingEsignDocs).not.toHaveBeenCalled();
+  });
+
+  it('resolves every open alert task when the user is set inactive', async () => {
+    firestore.users.set('pending-user', { status: 'pending', displayName: 'Spam Signup' });
+
+    const response = await PUT(request({ status: 'inactive' }), params());
+
+    expect(response.status).toBe(200);
+    expect(mockResolveAlertTasks).toHaveBeenCalledOnce();
+    expect(mockResolveAlertTasks).toHaveBeenCalledWith('pending-user', undefined);
   });
 
   it('does not stamp activatedAt when an inactive account is reactivated', async () => {
@@ -218,6 +243,21 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(firestore.updates[0]?.data).toMatchObject({ fieldRole: 'l1_manager' });
     expect(mockResolveAlertTasks).not.toHaveBeenCalled();
     expect(sendPendingEsignDocs).not.toHaveBeenCalled();
+  });
+
+  it('recomputes chat channel membership when the role or status changes', async () => {
+    firestore.users.set('pending-user', { status: 'active', fieldRole: 'l1_manager', displayName: 'Demoted' });
+
+    await PUT(request({ fieldRole: 'entry_rep' }), params());
+    expect(reconcileChatMembershipForUser).toHaveBeenCalledWith('pending-user');
+
+    vi.mocked(reconcileChatMembershipForUser).mockClear();
+    await PUT(request({ status: 'inactive' }), params());
+    expect(reconcileChatMembershipForUser).toHaveBeenCalledWith('pending-user');
+
+    vi.mocked(reconcileChatMembershipForUser).mockClear();
+    await PUT(request({ displayName: 'Name Only' }), params());
+    expect(reconcileChatMembershipForUser).not.toHaveBeenCalled();
   });
 
   it('rejects an operations caller assigning a platform role', async () => {
@@ -293,6 +333,157 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
   });
 });
 
+describe('PUT /api/portal/auth/users/[id] manager', () => {
+  beforeEach(() => {
+    firestore.users.set('mgr-old', { status: 'active', fieldRole: 'regional_manager' });
+    firestore.users.set('gm', { status: 'active', fieldRole: 'general_manager' });
+    firestore.users.set('rep-2', { status: 'active', fieldRole: 'entry_rep' });
+    firestore.users.set('gone-admin', { status: 'inactive', role: 'admin' });
+    // An invited hire: the invite claim wrote both fields.
+    firestore.users.set('pending-user', {
+      status: 'active',
+      fieldRole: 'entry_rep',
+      reportsToId: 'mgr-old',
+      managerId: 'mgr-old',
+    });
+  });
+
+  it('moves reportsToId with managerId, so readers see the new manager', async () => {
+    const response = await PUT(request({ managerId: 'gm' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.users.get('pending-user')).toMatchObject({ reportsToId: 'gm', managerId: 'gm' });
+  });
+
+  it('clears both fields when the manager is cleared', async () => {
+    const response = await PUT(request({ managerId: null }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.updates[0]?.data).toMatchObject({ reportsToId: '__DELETE__', managerId: '__DELETE__' });
+  });
+
+  it.each([
+    ['a non-manager', 'rep-2'],
+    ['an inactive admin', 'gone-admin'],
+    ['a missing user', 'nobody'],
+    ['the person themselves', 'pending-user'],
+  ])('rejects %s as manager', async (_label, managerId) => {
+    const response = await PUT(request({ managerId }), params());
+
+    expect(response.status).toBe(400);
+    expect(firestore.updates).toHaveLength(0);
+  });
+
+  it('accepts re-sending the stored manager even if they are no longer eligible', async () => {
+    firestore.users.set('mgr-old', { status: 'inactive', fieldRole: 'regional_manager' });
+
+    const response = await PUT(request({ managerId: 'mgr-old' }), params());
+
+    expect(response.status).toBe(200);
+  });
+});
+
+describe('PUT /api/portal/auth/users/[id] input validation', () => {
+  beforeEach(() => {
+    firestore.users.set('pending-user', { status: 'active', fieldRole: 'entry_rep' });
+  });
+
+  it.each([
+    ['fieldRole null', { fieldRole: null }],
+    ["fieldRole ''", { fieldRole: '' }],
+    ['role null', { role: null }],
+    ["role ''", { role: '' }],
+    ['role and fieldRole together', { role: 'admin', fieldRole: 'entry_rep' }],
+    ['an object managerId', { managerId: { evil: true } }],
+    ["an empty managerId", { managerId: '' }],
+    ['a numeric phone', { phone: 12345 }],
+    ['an overlong phone', { phone: '5'.repeat(41) }],
+    ['an array territoryId', { territoryId: ['x'] }],
+  ])('rejects %s with 400 and writes nothing', async (_label, body) => {
+    const response = await PUT(request(body), params());
+
+    expect(response.status).toBe(400);
+    expect(firestore.updates).toHaveLength(0);
+  });
+});
+
+describe('PUT /api/portal/auth/users/[id] self and last-owner protection', () => {
+  it('refuses an admin deactivating themselves', async () => {
+    firestore.users.set('pending-user', { status: 'active', role: 'admin' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'pending-user', name: 'Admin', isAdmin: true });
+
+    const response = await PUT(request({ status: 'inactive' }), params());
+
+    expect(response.status).toBe(400);
+    expect(firestore.updates).toHaveLength(0);
+    expect(firestore.adminAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('refuses an admin dropping their own platform role', async () => {
+    firestore.users.set('pending-user', { status: 'active', role: 'admin' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'pending-user', name: 'Admin', isAdmin: true });
+
+    const response = await PUT(request({ fieldRole: 'entry_rep' }), params());
+
+    expect(response.status).toBe(400);
+    expect(firestore.updates).toHaveLength(0);
+  });
+
+  it.each([
+    ['deactivating', { status: 'inactive' }],
+    ['demoting', { role: 'admin' }],
+    ['moving to a field role', { fieldRole: 'director' }],
+  ])('refuses %s the last active owner with 409', async (_label, body) => {
+    firestore.users.set('pending-user', { status: 'active', role: 'owner' });
+    firestore.users.set('owner-2', { status: 'inactive', role: 'owner' });
+    // A caller other than the target, so this exercises the owner count rather
+    // than the self-protection rule.
+    mockGate.mockResolvedValue({ ok: true, uid: 'owner-session', name: 'Owner', isAdmin: true, isOwner: true });
+
+    const response = await PUT(request(body), params());
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toMatch(/last active owner/);
+    expect(firestore.updates).toHaveLength(0);
+  });
+
+  it('lets an owner demote another owner while a second active owner remains', async () => {
+    firestore.users.set('pending-user', { status: 'active', role: 'owner' });
+    firestore.users.set('owner-2', { status: 'active', role: 'owner' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'owner-2', name: 'Owner', isAdmin: true, isOwner: true });
+
+    const response = await PUT(request({ role: 'admin' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.users.get('pending-user')).toMatchObject({ role: 'admin' });
+  });
+});
+
+describe('PUT /api/portal/auth/users/[id] audit', () => {
+  it('lists only the fields whose value changed', async () => {
+    firestore.users.set('pending-user', {
+      status: 'active',
+      fieldRole: 'entry_rep',
+      displayName: 'Rep One',
+      phone: '555-0100',
+    });
+
+    await PUT(request({ displayName: 'Rep Uno', phone: '555-0100', managerId: null }), params());
+
+    const entry = (writeAdminAudit as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(entry.details.fields).toEqual(['displayName']);
+  });
+
+  it('writes no audit row when nothing changed', async () => {
+    firestore.users.set('pending-user', { status: 'active', fieldRole: 'entry_rep', displayName: 'Rep One', phone: '555-0100' });
+
+    const response = await PUT(request({ displayName: 'Rep One', phone: '555-0100', managerId: null }), params());
+
+    expect(response.status).toBe(200);
+    expect(writeAdminAudit).not.toHaveBeenCalled();
+  });
+});
+
 describe('DELETE /api/portal/auth/users/[id]', () => {
   it('closes the account\'s open alerts, so a deleted signup stops nagging', async () => {
     firestore.users.set('pending-user', { status: 'pending' });
@@ -313,6 +504,18 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
 
     expect(response.status).toBe(403);
     expect(firestore.users.get('pending-user')).toBeDefined();
+  });
+
+  it('rejects an operations caller hard-deleting a field user', async () => {
+    firestore.users.set('pending-user', { status: 'active', fieldRole: 'director' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    const response = await DELETE(request({}), params());
+
+    expect(response.status).toBe(403);
+    expect(firestore.users.get('pending-user')).toBeDefined();
+    expect(purgeSensitiveUserData).not.toHaveBeenCalled();
+    expect(firestore.adminAuth.deleteUser).not.toHaveBeenCalled();
   });
 
   it('purges the person\'s SSN/licence data while the profile still exists, then removes the profile', async () => {

@@ -17,6 +17,9 @@ export default function ReportBugCard() {
   const [area, setArea] = useState('Forms');
   const [summary, setSummary] = useState('');
   const [details, setDetails] = useState('');
+  // The card lives in Settings, so the current URL never says where the bug
+  // was; the reporter names the page instead.
+  const [page, setPage] = useState('');
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
@@ -53,7 +56,7 @@ export default function ReportBugCard() {
     try {
       const token = await auth?.currentUser?.getIdToken();
       if (!token) throw new Error('Not signed in');
-      const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+      const pageUrl = page.trim();
       const res = await fetch('/api/portal/forms/bug-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -64,6 +67,7 @@ export default function ReportBugCard() {
       setDone(true);
       setSummary('');
       setDetails('');
+      setPage('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit');
     } finally {
@@ -83,9 +87,16 @@ export default function ReportBugCard() {
 
       <Collapse open={open} className={st.drawer}>
           {done ? (
-            <div className={`${p.notice} ${p.noticeLime}`} role="status">
-              <CheckCircle2 size={16} aria-hidden="true" />
-              <span>Thanks. Your report went to the team.</span>
+            <div className={st.stack}>
+              <div className={`${p.notice} ${p.noticeLime}`} role="status">
+                <CheckCircle2 size={16} aria-hidden="true" />
+                <span>Thanks. Your report went to the team.</span>
+              </div>
+              <div className={st.actions}>
+                <button type="button" className={s.btnSecondary} onClick={() => setDone(false)}>
+                  Report another bug
+                </button>
+              </div>
             </div>
           ) : (
             <form onSubmit={submit} className={st.stack}>
@@ -113,6 +124,16 @@ export default function ReportBugCard() {
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="What went wrong?"
                   required
+                />
+              </label>
+              <label className={p.field}>
+                <span className={p.label}>Which page? (optional)</span>
+                <input
+                  id="member-bug-page"
+                  className={p.input}
+                  value={page}
+                  onChange={(e) => setPage(e.target.value)}
+                  placeholder="e.g. Log a sale, Leaderboard"
                 />
               </label>
               <label className={p.field}>

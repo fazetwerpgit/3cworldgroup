@@ -114,7 +114,7 @@ describe('RepLogSale', () => {
   });
 
   /** A complete manual entry, restored from a draft so no typing is needed. */
-  async function mountFilled(saleDate: string) {
+  async function mountFilled(saleDate: string, product: { productId: string; productName: string } = { productId: 'tfiber-1gig', productName: 'TFiber 1 Gig' }) {
     window.sessionStorage.setItem(
       `${DRAFT_KEY_PREFIX}r1`,
       JSON.stringify({
@@ -130,7 +130,7 @@ describe('RepLogSale', () => {
           orderNumberOrBtn: 'TMF-1',
         },
         products: [
-          { productId: 'tfiber-1gig', productName: 'TFiber 1 Gig', company: 'tfiber', quantity: 1, unitPrice: 0, totalPrice: 0, points: 0 },
+          { ...product, company: 'tfiber', quantity: 1, unitPrice: 0, totalPrice: 0, points: 0 },
         ],
         saleDateTouched: true,
         proofUploadId: 'c'.repeat(32),
@@ -144,6 +144,13 @@ describe('RepLogSale', () => {
       container.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     });
   }
+
+  it('says Rate pending, not est. $0, for a plan the rep has no rate for', async () => {
+    // The mocked comp plan only rates tfiber-1gig.
+    await mountFilled('2026-08-30', { productId: 'tfiber-500', productName: 'TFiber 500' });
+    expect(document.body.textContent).toContain('Rate pending');
+    expect(document.body.textContent).not.toContain('$0');
+  });
 
   it('opens Sales on the month the sale was sold in', async () => {
     createSale.mockResolvedValue({ sale: { id: 'new-sale' }, duplicate: false });

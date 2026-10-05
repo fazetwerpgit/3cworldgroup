@@ -17,17 +17,51 @@ const firestore = vi.hoisted(() => {
     options?: { merge?: boolean };
   }> = [];
 
+  // Millis for ordering a stored timestamp ({toDate} or {seconds}); 0 when absent.
+  function millis(value: unknown): number {
+    const v = value as { toDate?: () => Date; seconds?: number } | null | undefined;
+    if (v && typeof v.toDate === 'function') return v.toDate().getTime();
+    if (v && typeof v.seconds === 'number') return v.seconds * 1000;
+    return 0;
+  }
+
+  // The chained query honors where('==') / orderBy / limit like Firestore would,
+  // so the GET's choice of query decides what it can see.
   function messagesCollection(channelId: string) {
+    const filters: Array<{ field: string; value: unknown }> = [];
+    let order: { field: string; dir: string } | null = null;
+    let max = Infinity;
     const query = {
-      where: vi.fn(() => query),
-      orderBy: vi.fn(() => query),
-      limit: vi.fn(() => query),
-      get: vi.fn(async () => ({
-        docs: (messageLists.get(channelId) ?? []).map((m) => ({
-          id: m.id,
-          data: (): DocData => m.data,
-        })),
-      })),
+      where: vi.fn((field: string, _op: string, value: unknown) => {
+        filters.push({ field, value });
+        return query;
+      }),
+      orderBy: vi.fn((field: string, dir = 'asc') => {
+        order = { field, dir };
+        return query;
+      }),
+      limit: vi.fn((n: number) => {
+        max = n;
+        return query;
+      }),
+      get: vi.fn(async () => {
+        let rows = (messageLists.get(channelId) ?? []).filter((m) =>
+          filters.every((f) => m.data[f.field] === f.value)
+        );
+        const sort = order as { field: string; dir: string } | null;
+        if (sort) {
+          rows = [...rows].sort((a, b) => {
+            const diff = millis(a.data[sort.field]) - millis(b.data[sort.field]);
+            return sort.dir === 'desc' ? -diff : diff;
+          });
+        }
+        return {
+          docs: rows.slice(0, max).map((m) => ({
+            id: m.id,
+            data: (): DocData => m.data,
+          })),
+        };
+      }),
       doc: vi.fn((messageId: string) => ({
         get: vi.fn(async () => {
           const data = messageDocs.get(channelId)?.get(messageId);
@@ -268,5 +302,34 @@ describe('GET /api/portal/chat/messages/pin', () => {
     // GIF attachment surfaces on the newest pin; deleted/unpinned rows are gone.
     expect(json.pins[0].attachment).toMatchObject({ type: 'gif' });
     expect(json.pins[0].pinnedAt).toBe('2026-07-02T10:00:00.000Z');
+  });
+
+  it('still returns a pin buried under hundreds of newer messages', async () => {
+    mockGate.mockResolvedValue(MANAGER);
+    const base = Date.parse('2026-07-01T00:00:00Z');
+    const rows: Array<{ id: string; data: Record<string, unknown> }> = [
+      {
+        id: 'old-pin',
+        data: {
+          isPinned: true,
+          text: 'pinned long ago',
+          authorName: 'A',
+          createdAt: { toDate: () => new Date(base) },
+          pinnedAt: { toDate: () => new Date(base + 1000) },
+        },
+      },
+    ];
+    for (let i = 1; i <= 400; i += 1) {
+      rows.push({
+        id: `m-${i}`,
+        data: { text: `msg ${i}`, authorName: 'B', createdAt: { toDate: () => new Date(base + i * 60_000) } },
+      });
+    }
+    firestore.messageLists.set('all-company', rows);
+
+    const res = await GET(getReq('all-company'));
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.pins.map((p: { messageId: string }) => p.messageId)).toEqual(['old-pin']);
   });
 });

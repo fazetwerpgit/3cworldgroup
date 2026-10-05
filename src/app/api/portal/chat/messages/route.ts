@@ -3,8 +3,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { sendPushToUser } from '@/lib/push/sendPush';
-import { buildChatPushBody, resolveChatPushRecipients } from '@/lib/push/chatPush';
+import { buildChatPushBody, sendChatPush } from '@/lib/push/chatPush';
 import { chatMessageDocId, isValidClientMessageId } from '@/lib/chat/outbox';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
@@ -12,6 +11,9 @@ import {
   readStoredAttachment,
   validateMessageAttachment,
 } from '@/lib/chat/media';
+
+// What a reply quote shows once its source message is deleted.
+const DELETED_REPLY_TEXT = 'Message deleted';
 
 // Build the server-stamped reply snippet from the SOURCE message's stored doc.
 // Client-supplied snippet fields are never used: text is the source's own text
@@ -237,26 +239,19 @@ export async function POST(request: NextRequest) {
       console.error('Error bumping channel lastMessageAt:', bumpError);
     }
 
-    // Notify the rest of the channel: the doc's memberIds roster, minus the author and
-    // capped at CHAT_PUSH_MAX_RECIPIENTS. after() runs the sends once the response is
-    // on the wire while keeping the function alive — a detached promise would be killed
-    // by the serverless freeze.
-    const recipients = resolveChatPushRecipients(found.data, user.uid);
-    if (recipients.length > 0) {
-      const pushBody = buildChatPushBody(user.displayName, text, attachment);
-      after(async () => {
-        await Promise.all(
-          recipients.map((uid) =>
-            sendPushToUser(uid, {
-              title: found.channel.name,
-              body: pushBody,
-              // Tapping the notification opens this channel, not just the chat tab.
-              url: `/portal/chat?channel=${encodeURIComponent(channelId)}`,
-            })
-          )
-        );
-      });
-    }
+    // Notify the rest of the channel: memberIds minus the author, re-checked against
+    // each recipient's current role/status (sendChatPush). after() runs the sends once
+    // the response is on the wire while keeping the function alive — a detached
+    // promise would be killed by the serverless freeze.
+    const pushBody = buildChatPushBody(user.displayName, text, attachment);
+    after(() =>
+      sendChatPush(found.data, user.uid, {
+        title: found.channel.name,
+        body: pushBody,
+        // Tapping the notification opens this channel, not just the chat tab.
+        url: `/portal/chat?channel=${encodeURIComponent(channelId)}`,
+      })
+    );
 
     return NextResponse.json({ success: true, messageId });
   } catch (error) {
@@ -361,10 +356,36 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    // Soft-delete scrubs the content too: channel members can still read the doc
+    // through the Firestore rules, and a pin would keep surfacing it.
     await messageRef.set(
-      { deletedAt: FieldValue.serverTimestamp(), deletedBy: user.uid },
+      {
+        deletedAt: FieldValue.serverTimestamp(),
+        deletedBy: user.uid,
+        text: '',
+        attachment: FieldValue.delete(),
+        hasAttachment: FieldValue.delete(),
+        isPinned: false,
+        pinnedAt: null,
+        pinnedBy: null,
+      },
       { merge: true }
     );
+
+    // Replies copied the deleted text into their quote at send time; replace it.
+    const quoting = await adminDb!
+      .collection('chatChannels')
+      .doc(channelId)
+      .collection('messages')
+      .where('replyTo.messageId', '==', messageId)
+      .get();
+    for (let i = 0; i < quoting.docs.length; i += 400) {
+      const batch = adminDb!.batch();
+      for (const doc of quoting.docs.slice(i, i + 400)) {
+        batch.update(doc.ref, { 'replyTo.text': DELETED_REPLY_TEXT });
+      }
+      await batch.commit();
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

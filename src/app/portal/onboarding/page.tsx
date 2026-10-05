@@ -16,6 +16,7 @@ import type { WizardItem } from '@/components/onboarding/types';
 import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
+import { draftReference as draftReferenceFor } from './draftReference';
 
 interface ChecklistItem extends OnboardingItem {
   status: OnboardingStatus;
@@ -130,6 +131,11 @@ function OnboardingChecklist() {
 
   const handleSubmit = async (item: WizardItem | null = submitModal, submittedReference = reference) => {
     if (!user || !item) return;
+    // Tie the send to this item so an error shows inside its open sheet.
+    if (submitModal?.id !== item.id) {
+      setSubmitModal(item);
+      setReference(submittedReference);
+    }
     setSubmitting(true);
     setError('');
 
@@ -161,8 +167,6 @@ function OnboardingChecklist() {
     }
   };
 
-  const getDraftReference = (item: WizardItem) => (submitModal?.id === item.id ? reference : (item.reference ?? ''));
-
   const startSubmission = (item: WizardItem, nextReference = item.reference ?? '') => {
     if (submitModal?.id !== item.id) {
       setSubmitModal(item);
@@ -178,7 +182,7 @@ function OnboardingChecklist() {
       return <p className={o.note}>Submitted. Your manager is reviewing it.</p>;
     }
 
-    const draftReference = getDraftReference(item);
+    const draftReference = draftReferenceFor(item, submitModal?.id, reference);
     const buttonLabel = item.status === 'rejected' ? 'Resubmit for review' : 'Submit for review';
     const busy = submitting && submitModal?.id === item.id;
     const sendError = error && submitModal?.id === item.id ? <FormAlert message={error} /> : null;

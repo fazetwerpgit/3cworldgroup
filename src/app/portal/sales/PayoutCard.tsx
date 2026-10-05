@@ -60,7 +60,12 @@ export function PayoutCard({
             </button>
           </div>
         ) : hasPlan && upcoming ? (
-          <PayNumeral amount={upcoming.amount ?? 0} />
+          // 0 = no contracted rate yet for these installs, as the rows say.
+          upcoming.amount ? (
+            <PayNumeral amount={upcoming.amount} />
+          ) : (
+            <p className={`${x.payNum} ${x.payPending}`}>Rate pending</p>
+          )
         ) : (
           <p className={`${x.payNum} ${x.payDash}`}>—</p>
         )}

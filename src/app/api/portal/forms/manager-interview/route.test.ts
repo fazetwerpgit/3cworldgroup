@@ -14,7 +14,7 @@ vi.mock('@/lib/forms/resolveFormOptions', () => ({
   getResolvedFormOptions: vi.fn(async () => ({
     providers: ['T-Fiber'],
     hireManagers: ['Jacob Myers'],
-    hireJobPositions: ['Account Executive'],
+    hireJobPositions: ['Account Executive', 'L1 Manager'],
     hireMarkets: ['Dallas TX'],
   })),
 }));
@@ -89,6 +89,35 @@ describe('POST /api/portal/forms/manager-interview', () => {
     const res = await POST(req(body));
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unanswered rating (the form sends an empty string)', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ ...VALID, rating: '' }));
+    expect(res.status).toBe(400);
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('stores a rating picked as a string as a number', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ ...VALID, rating: '4' }));
+    expect(res.status).toBe(200);
+    expect(mockSubmit.mock.calls[0][2]).toMatchObject({ rating: 4 });
+  });
+
+  it('requires every promotion answer for a promotion role', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const promo = { ...VALID, jobPosition: 'L1 Manager', completedProduction: true, completedReading: false };
+    const missing = await POST(req({ ...promo, completedTeamMetric: null }));
+    expect(missing.status).toBe(400);
+    expect(mockSubmit).not.toHaveBeenCalled();
+    const answered = await POST(req({ ...promo, completedTeamMetric: true }));
+    expect(answered.status).toBe(200);
+    expect(mockSubmit.mock.calls[0][2]).toMatchObject({
+      completedProduction: true,
+      completedReading: false,
+      completedTeamMetric: true,
+    });
   });
 
   it('rejects a submission with an invalid email', async () => {

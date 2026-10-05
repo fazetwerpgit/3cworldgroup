@@ -102,6 +102,7 @@ vi.mock('@/types', () => ({
   ONBOARDING_ITEMS: [
     { id: 'contract', label: 'Contract', sensitive: false, referenceKind: 'esign' },
     { id: 'direct_deposit', label: 'Direct Deposit', sensitive: true, referenceKind: 'esign' },
+    { id: 'w9', label: 'W-9', sensitive: true, referenceKind: 'esign' },
     { id: 'onboarding_submission', label: 'Onboarding Submission', sensitive: false, referenceKind: 'manual' },
   ],
   getOnboardingItemsForUser: vi.fn(() => [
@@ -202,6 +203,37 @@ describe('GET /api/public/onboarding/[token]', () => {
     });
     expect(inviteRef.set).not.toHaveBeenCalled();
   });
+
+  it.each(['rejected', 'expired'])('locks a %s invite as closed', async (status) => {
+    inviteData.status = status;
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+    if (status === 'expired') {
+      expect(response.status).toBe(410);
+      return;
+    }
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ items: [], locked: true, closed: true });
+  });
+
+  it('locks the invite before any data entry when the email is onboarding through another invite', async () => {
+    getUserByEmailMock.mockResolvedValue({ uid: 'pending-user' });
+    userDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ status: 'pending', fieldRole: 'entry_level_rep', onboardingInviteId: 'other-invite' }),
+    });
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+    await expect(response.json()).resolves.toMatchObject({ items: [], locked: true, onboardingElsewhere: true });
+  });
+
+  it('keeps the form open for the hire already linked to this same invite', async () => {
+    getUserByEmailMock.mockResolvedValue({ uid: 'pending-user' });
+    userDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ status: 'pending', fieldRole: 'entry_level_rep', onboardingInviteId: 'invite-1' }),
+    });
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+    await expect(response.json()).resolves.toMatchObject({ locked: false });
+  });
 });
 
 describe('POST /api/public/onboarding/[token]', () => {
@@ -237,7 +269,11 @@ describe('POST /api/public/onboarding/[token]', () => {
     const progressWrites = batchSetMock.mock.calls.filter(([ref]) =>
       String(ref?.id ?? '').startsWith('user-1_')
     );
-    expect(progressWrites.map(([, data]) => data.itemId)).toEqual(['onboarding_submission']);
+    expect(progressWrites.map(([, data]) => [data.itemId, data.reference])).toEqual([
+      ['contract', undefined],
+      ['direct_deposit', undefined],
+      ['onboarding_submission', 'completed'],
+    ]);
     const packetWrite = batchSetMock.mock.calls.find(([ref]) => ref?.id === 'invite-1');
     expect(packetWrite?.[1].items).toEqual([
       { itemId: 'contract', label: 'Contract', status: 'not_started' },
@@ -271,6 +307,45 @@ describe('POST /api/public/onboarding/[token]', () => {
     const response = await POST(request({ onboarding_submission: 'completed' }), params());
 
     expect(response.status).toBe(400);
+  });
+
+  it.each(['rejected', 'expired'])('refuses a %s invite without touching the account', async (status) => {
+    inviteData.status = status;
+    getUserByEmailMock.mockResolvedValue({ uid: 'rejected-user' });
+    userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'inactive', fieldRole: 'entry_level_rep' }) });
+
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining('closed') });
+    expect(updateUserMock).not.toHaveBeenCalled();
+    expect(batchSetMock).not.toHaveBeenCalled();
+  });
+
+  it('starts every item over when a packet claims a past hire (no old envelope or approval kept)', async () => {
+    getUserByEmailMock.mockResolvedValue({ uid: 'rehire' });
+    userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'inactive', fieldRole: 'entry_level_rep' }) });
+
+    const response = await POST(
+      request({ onboarding_submission: 'completed' }, 'password', { accountType: 'savings' }),
+      params()
+    );
+
+    expect(response.status).toBe(200);
+    const itemWrite = (id: string) => batchSetMock.mock.calls.find(([ref]) => ref?.id === `rehire_${id}`);
+    // Full replace (no merge option) drops esignEnvelopeId, approvals and stale prefill.
+    expect(itemWrite('contract')).toEqual([
+      expect.anything(),
+      { userId: 'rehire', itemId: 'contract', status: 'not_started', updatedAt: expect.any(Date) },
+    ]);
+    expect(itemWrite('direct_deposit')).toEqual([
+      expect.anything(),
+      expect.objectContaining({ status: 'not_started', prefill: { accountType: 'savings' } }),
+    ]);
+    expect(itemWrite('onboarding_submission')).toEqual([
+      expect.anything(),
+      expect.objectContaining({ status: 'submitted', reference: 'completed' }),
+    ]);
   });
 
   it('rejects a password shorter than six characters', async () => {
@@ -324,6 +399,11 @@ describe('POST /api/public/onboarding/[token]', () => {
   });
 
   it('writes optional onboarding prefills', async () => {
+    vi.mocked(getOnboardingItemsForUser).mockReturnValueOnce([
+      { id: 'direct_deposit', label: 'Direct Deposit', sensitive: true, referenceKind: 'esign' },
+      { id: 'w9', label: 'W-9', sensitive: true, referenceKind: 'esign' },
+      { id: 'onboarding_submission', label: 'Onboarding Submission', sensitive: false, referenceKind: 'manual' },
+    ] as never);
     const response = await POST(request({ onboarding_submission: 'completed' }, 'password', { accountType: 'checking', taxClassification: 'llc' }), params());
     expect(response.status).toBe(200);
     expect(batchSetMock.mock.calls.some(([ref, data]) => ref?.id === 'user-1_direct_deposit' && data.prefill.accountType === 'checking')).toBe(true);

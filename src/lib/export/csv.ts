@@ -6,8 +6,11 @@ export interface CsvColumn {
 }
 
 function cell(value: unknown): string {
-  const raw =
+  let raw =
     value == null ? '' : value instanceof Date ? value.toISOString() : String(value);
+  // Spreadsheets run text starting with = + - @ (or tab/CR) as a formula. Real
+  // numbers stay as-is so negative values still export as numbers.
+  if (typeof value === 'string' && /^[=+\-@\t\r]/.test(raw)) raw = `'${raw}`;
   return /[",\r\n]/.test(raw) ? `"${raw.replace(/"/g, '""')}"` : raw;
 }
 

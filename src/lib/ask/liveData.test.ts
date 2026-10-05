@@ -127,11 +127,35 @@ describe('loadRepSnapshot', () => {
     expect(text).toContain('Install tomorrow');
   });
 
+  it('shows managers-only calls to a director, like the Calls page', async () => {
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
+    data.users.dir1 = { displayName: 'Dee', status: 'active', fieldRole: 'director' };
+    const text = await loadRepSnapshot(createFakeAskDb(data).db as unknown as Firestore, 'dir1', NOW);
+    expect(text).toContain('Managers Only Sync');
+  });
+
   it('ranks the rep on the Board with the names just above them', async () => {
     const text = await load(createFakeAskDb(seed()).db);
     // Sunday starts a new Board week, so these Thursday/Friday sales are this month's only.
     expect(text).toContain('- This week (Sun, Sep 27 to Sat, Oct 3): nobody on the Board yet.');
     expect(text).toContain('- This month (Tue, Sep 1 to Wed, Sep 30): #2 of 3 with 1 sale, 10 points; just above: #1 Jordan Price (1 sale, 30 points); just below: #3 Sam Lee (1 sale, 5 points).');
+  });
+
+  it('breaks a points tie the way the Board does: by name, not by who sold last', async () => {
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
+    // Sam Lee sold after Dana Rep; tied on points, Dana still comes first.
+    data.sales.third.totalPoints = 10;
+    const text = await load(createFakeAskDb(data).db);
+    expect(text).toContain('#2 of 3 with 1 sale, 10 points; just above: #1 Jordan Price (1 sale, 30 points); just below: #3 Sam Lee (1 sale, 10 points).');
+  });
+
+  it('reads the newest notifications, however many older ones come first by id', async () => {
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
+    for (let i = 0; i < 45; i += 1) {
+      data.notifications[`a${String(i).padStart(2, '0')}`] = { userId: 'r1', type: 'install_reminder', title: `Old note ${i}`, message: '', read: true, createdAt: noon('2026-09-01') };
+    }
+    data.notifications.z9 = { userId: 'r1', type: 'install_reminder', title: 'Newest install news', message: '', read: false, createdAt: noon('2026-09-27') };
+    expect(await load(createFakeAskDb(data).db)).toContain('Newest install news');
   });
 
   it('gives someone who is not on the Board (an owner) everyone on it, not just the last row', async () => {

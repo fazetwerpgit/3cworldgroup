@@ -6,6 +6,8 @@ import {
   LEADS_MANAGERS,
   LEADS_LOCATIONS,
 } from './formOptions';
+import { SPECIAL_REQUEST_LOCATION } from './leadsPredicates';
+import { ENTRY_JOB_POSITION } from './managerInterview';
 
 // Stable keys for every editable form dropdown. Values are the code DEFAULTS;
 // admin overrides (in Firestore) supersede these at resolve time.
@@ -40,6 +42,22 @@ export const FORM_OPTION_LABELS: Record<OptionKey, string> = {
   hireJobPositions: 'Hire: Job Positions',
   hireMarkets: 'Hire: Markets',
 };
+
+// Values the form logic matches by exact text. Removing or renaming one would
+// silently change a form, so they can't be removed; each says why.
+export const LOCKED_OPTION_VALUES: Partial<Record<OptionKey, Record<string, string>>> = {
+  leadsLocations: {
+    [SPECIAL_REQUEST_LOCATION]: 'It opens the explanation box on the Leads Request form.',
+  },
+  hireJobPositions: {
+    [ENTRY_JOB_POSITION]: 'It is the one position that skips the promotion questions on the Manager Interview form.',
+  },
+};
+
+/** The first locked value missing from a list about to be saved, or null. */
+export function missingLockedValue(key: OptionKey, values: string[]): string | null {
+  return Object.keys(LOCKED_OPTION_VALUES[key] ?? {}).find((locked) => !values.includes(locked)) ?? null;
+}
 
 // Pure merge: for each known key, an override (including an empty array) wins;
 // otherwise the code default is used. Unknown keys in `overrides` are ignored.

@@ -21,7 +21,7 @@ import {
   type StoredSignature,
 } from '@/components/esign/signatureStore';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { ESIGN_CONSENT_TEXT } from '@/lib/esign/documents';
+import { ESIGN_CONSENT_TEXT, fieldFormatError } from '@/lib/esign/documents';
 import { friendlyError } from '@/lib/forms/friendlyError';
 import { FieldRoles } from '@/types';
 import { envelopeLoadFailure, type EnvelopeLoadFailure } from './loadFailure';
@@ -130,6 +130,8 @@ function EsignSign() {
   const [envelope, setEnvelope] = useState<EnvelopeView | null>(null);
   const [values, setValues] = useState<FieldValues>({});
   const [unlocked, setUnlocked] = useState<Record<string, boolean>>({});
+  // Fields the rep has left once: a format error shows under them from then on.
+  const [blurred, setBlurred] = useState<Record<string, boolean>>({});
   const [signature, setSignature] = useState<StoredSignature | null>(null);
   const [consent, setConsent] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -245,6 +247,10 @@ function EsignSign() {
         return `Fill in ${field.label.toLowerCase()}.`;
       }
     }
+    for (const field of envelope.fields) {
+      const formatError = fieldFormatError(envelope.docKey, field.key, String(values[field.key] ?? ''));
+      if (field.type === 'text' && formatError) return `${formatError}.`;
+    }
     for (const rule of ONE_OF_RULES[envelope.docKey] ?? []) {
       const filled = rule.keys.filter((key) => isFilled(values[key])).length;
       if (filled === 0) return rule.none;
@@ -316,6 +322,8 @@ function EsignSign() {
     // Prefilled values come from the rep's own profile; they stay read-only
     // until the rep asks to change them, so a stray tap cannot blank a name.
     const readOnly = field.prefilled && !unlocked[field.key];
+    const formatError = fieldFormatError(envelope?.docKey ?? '', field.key, String(values[field.key] ?? ''));
+    const showFormatError = Boolean(formatError) && Boolean(blurred[field.key]);
     const oneOf = ONE_OF_RULES[envelope?.docKey ?? '']?.find((rule) => rule.label && rule.keys.includes(field.key));
     return (
       <div key={field.key} className={f.field}>
@@ -339,12 +347,20 @@ function EsignSign() {
           value={String(values[field.key] ?? '')}
           readOnly={readOnly}
           onChange={(event) => setFieldValue(field.key, event.target.value)}
+          onBlur={() => setBlurred((current) => ({ ...current, [field.key]: true }))}
+          aria-invalid={showFormatError || undefined}
+          aria-describedby={showFormatError ? `esign-${field.key}-error` : undefined}
           autoComplete="off"
           autoCapitalize={field.sensitive ? 'off' : 'sentences'}
           spellCheck={field.sensitive ? false : undefined}
           {...FIELD_INPUT[field.key]}
           maxLength={200}
         />
+        {showFormatError && (
+          <p id={`esign-${field.key}-error`} className={f.fieldError}>
+            {formatError}
+          </p>
+        )}
         {field.sensitive && (
           <p className={f.hint}>Written into this signed document only. Never saved to your profile.</p>
         )}

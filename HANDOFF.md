@@ -220,8 +220,8 @@ via subagent-driven development (Codex implementer, Claude reviewers; audit trai
 - **Alert engine**: alertTasks collection — broadcast to management, one-tap claim
   (transaction), resolve, 24h re-nag; GET /api/portal/alerts + claim route.
 - **E-sign**: EsignProvider interface (frozen contract) + SignWell impl. Doc-verified:
-  webhook HMAC key is the WEBHOOK ID, not the API key (resolution chain ending in
-  SIGNWELL_WEBHOOK_ID env). Auto-send envelopes on wizard submit; webhook auto-approves.
+  webhook HMAC key is the WEBHOOK ID, not the API key (server-side SIGNWELL_WEBHOOK_ID
+  env only; unset fails closed). Auto-send envelopes on wizard submit; webhook auto-approves.
 - **Activation gate** (decision 6 behavior change): convert/approve no longer set
   status active. computeReadiness + POST /api/portal/onboarding/activate; an
   activation_ready alert fires when a pending user goes all-green; manager activates.

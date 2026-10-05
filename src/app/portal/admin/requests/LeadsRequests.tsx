@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { AdminQueue, QueueEvidence, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
+import { AdminQueue, QueueEvidence, QueueField, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
+import { useMarkHandled } from '@/components/portal/admin-ops/useMarkHandled';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
@@ -20,10 +21,17 @@ const COLUMNS = [
   { key: 'repName', label: 'Submitted by' },
   { key: 'campaign', label: 'Campaign' },
   { key: 'managerName', label: 'Manager' },
-  { key: 'repFirstName', label: 'Rep' },
+  { key: 'managerEmail', label: 'Manager email' },
+  { key: 'repFirstName', label: 'Rep first name' },
+  { key: 'repLastName', label: 'Rep last name' },
   { key: 'location', label: 'Location' },
+  { key: 'specialRequest', label: 'Special request' },
   { key: 'category', label: 'Category' },
+  { key: 'leadPackCode', label: 'Lead pack code' },
   { key: 'reason', label: 'Reason' },
+  { key: 'situationDescription', label: 'Situation' },
+  { key: 'newRepPhone', label: 'New rep phone' },
+  { key: 'newRepEmail', label: 'New rep email' },
   { key: 'createdAt', label: 'Submitted' },
 ];
 
@@ -60,15 +68,9 @@ export function LeadsRequests() {
     load();
   };
 
-  const markHandled = async (id: string) => {
-    const res = await authedFetch('/api/portal/forms/leads-request/review', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    if (!res.ok) throw new Error('Failed to mark handled');
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
-  };
+  const markHandled = useMarkHandled('/api/portal/forms/leads-request/review', (id) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)))
+  );
 
   // In-app viewer, not a new tab: a tab strands an iPhone home-screen app.
   const viewer = useAttachmentViewer();
@@ -108,11 +110,20 @@ export function LeadsRequests() {
         if (row.lassoUploadPath) {
           evidenceItems.push({ label: 'lasso', onClick: () => viewAttachment(row.lassoUploadPath as string, 'Lasso upload') });
         }
+        const repFull = [row.repFirstName, row.repLastName].filter(Boolean).join(' ');
+        // Only the follow-up fields the rep's answers opened.
+        const conditional: QueueField[] = [
+          { label: 'Special request', value: queueValue(row.specialRequest), wide: true },
+          { label: 'Lead pack code', value: queueValue(row.leadPackCode) },
+          { label: 'Situation', value: queueValue(row.situationDescription), wide: true },
+          { label: 'New rep phone', value: queueValue(row.newRepPhone) },
+          { label: 'New rep email', value: queueValue(row.newRepEmail) },
+        ].filter((field) => field.value !== '—');
         return {
           id: row.id,
           status: row.status === 'handled' ? 'handled' : 'new',
           person: queueValue(row.repName),
-          personSub: queueValue(row.repFirstName),
+          personSub: queueValue(repFull),
           subject: queueValue(row.category),
           subjectSub: queueValue(row.location),
           secondary: queueValue(row.createdAt),
@@ -121,12 +132,14 @@ export function LeadsRequests() {
           evidenceItems,
           detailFields: [
             { label: 'Manager', value: queueValue(row.managerName) },
-            { label: 'Rep', value: queueValue(row.repFirstName) },
+            { label: 'Manager email', value: queueValue(row.managerEmail) },
+            { label: 'Rep', value: queueValue(repFull) },
             { label: 'Location', value: queueValue(row.location) },
             { label: 'Category', value: queueValue(row.category) },
             { label: 'Reason', value: queueValue(row.reason) },
+            ...conditional,
           ],
-          searchText: [row.repName, row.repFirstName, row.campaign, row.location]
+          searchText: [row.repName, row.repFirstName, row.repLastName, row.campaign, row.location]
             .map(queueValue)
             .join(' ')
             .toLowerCase(),

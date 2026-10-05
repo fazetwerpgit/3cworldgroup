@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "About Us | 3C World Group",
   description:
     "3C World Group connects sales professionals, customers, and trusted service providers across the country.",
+  alternates: { canonical: "/about" },
 };
 
 /**

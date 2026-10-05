@@ -61,6 +61,18 @@ describe('dated / undated', () => {
     expect(sumExpectedPay([sale(), sale({ products: att() })], rates)).toBe(230);
     expect(sumExpectedPay([sale()], null)).toBeNull();
   });
+
+  it('totals the whole-dollar rows, so $68 + $68 reads $136, not $135', () => {
+    const half = { tfiber: { 'tfiber-1gig': 67.5 } };
+    expect(sumExpectedPay([sale(), sale()], half)).toBe(136);
+    const [group] = groupPaySales(
+      [sale({ installDate: d(2026, 9, 9) }), sale({ installDate: d(2026, 9, 10) })],
+      noFiber,
+      half
+    );
+    expect(group.sales).toHaveLength(2);
+    expect(group.amount).toBe(136);
+  });
 });
 
 describe('groupPaySales', () => {

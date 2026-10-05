@@ -598,6 +598,16 @@
   color: var(--c-text-3);
 }
 
+/* No contracted rate yet: words, not a giant $0. Two classes so the desktop
+   .payNum size cannot override it. */
+.payNum.payPending {
+  color: var(--c-text-2);
+  font-family: inherit;
+  font-size: var(--t-ui);
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
 .payMeta {
   margin: 14px 0 0;
   color: var(--c-text-2);

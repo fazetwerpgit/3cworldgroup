@@ -125,7 +125,6 @@ const ALLOWED_OPEN = [
   ['POST', '/api/public/onboarding/probe-token/upload', 'same invite-token auth'],
   ['POST', '/api/webhooks/esign', 'verifies a request signature, not a bearer token'],
   ['GET', '/api/cron/onboarding-nudges', 'checks CRON_SECRET'],
-  ['POST', '/api/portal/auth/signup-notify', 'intentionally unauthenticated'],
   ['POST', '/api/public/applications', 'intentionally unauthenticated'],
 ];
 const allowedOpenReason = new Map(ALLOWED_OPEN.map(([m, p, why]) => [`${m} ${p}`, why]));

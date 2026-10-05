@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isShirtSize } from '@/types/auth';
+import { restampAuthor } from '@/lib/chat/restampAuthor';
+import { restampDisplayName } from '@/lib/users/restampDisplayName';
 
 // PUT /api/portal/profile - Update user profile
 export async function PUT(request: NextRequest) {
@@ -30,13 +32,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Pick a shirt size from the list' }, { status: 400 });
     }
 
+    const trimmedDisplayName = typeof displayName === 'string' ? displayName.trim() : '';
+    if (displayName !== undefined && !trimmedDisplayName) {
+      return NextResponse.json({ error: 'Enter your name' }, { status: 400 });
+    }
+
     // Only allow updating specific fields
     const updates: Record<string, unknown> = {
       updatedAt: new Date(),
     };
 
-    if (displayName !== undefined) {
-      updates.displayName = displayName.trim();
+    if (trimmedDisplayName) {
+      updates.displayName = trimmedDisplayName;
     }
 
     if (phone !== undefined) {
@@ -47,7 +54,33 @@ export async function PUT(request: NextRequest) {
       updates.shirtSize = shirtSize;
     }
 
-    await adminDb.collection('users').doc(userId).update(updates);
+    const docRef = adminDb.collection('users').doc(userId);
+    const existingDisplayName = trimmedDisplayName
+      ? ((await docRef.get()).get('displayName') as string | undefined)
+      : undefined;
+
+    await docRef.update(updates);
+
+    // Same propagation as the admin edit (users/[id]): the Auth name, chat
+    // authorship and every denormalized copy (sales, leaderboard, forms).
+    // Fail-soft: the profile update is already committed.
+    if (trimmedDisplayName && trimmedDisplayName !== existingDisplayName) {
+      try {
+        await adminAuth?.updateUser(userId, { displayName: trimmedDisplayName });
+      } catch (error) {
+        console.error('[profile] Failed to update auth displayName:', error);
+      }
+      try {
+        await restampAuthor(userId, { authorName: trimmedDisplayName });
+      } catch (error) {
+        console.error('[profile] Failed to re-stamp chat author fields:', error);
+      }
+      try {
+        await restampDisplayName(userId, trimmedDisplayName);
+      } catch (error) {
+        console.error('[profile] Failed to re-stamp denormalized display names:', error);
+      }
+    }
 
     return NextResponse.json({
       success: true,

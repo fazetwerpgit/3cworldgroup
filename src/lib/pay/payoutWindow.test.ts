@@ -127,6 +127,11 @@ describe('nextPayout', () => {
     expect(result!.amount).toBeNull();
     expect(result!.count).toBe(1);
   });
+
+  it('sums whole-dollar rows, so two $68 installs read $136', () => {
+    const result = nextPayout([tfiber(d(2026, 9, 16)), tfiber(d(2026, 9, 17))], { tfiber: { 'tfiber-1gig': 67.5 } }, now);
+    expect(result!.amount).toBe(136);
+  });
 });
 
 describe('formatPayoutWindow', () => {

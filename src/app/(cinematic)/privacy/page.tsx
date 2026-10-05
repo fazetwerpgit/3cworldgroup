@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   title: "Privacy Policy | 3C World Group",
   description:
     "How 3C World Group collects, uses, and protects your personal information across our website, contractor applications, and sales portal.",
+  alternates: { canonical: "/privacy" },
 };
 
 /**
@@ -148,8 +149,11 @@ export default function PrivacyPolicyPage() {
                 <li>Opt out of marketing communications at any time.</li>
               </ul>
               <p>
-                To exercise any of these rights, contact us at the address below. We may need to verify
-                your identity before fulfilling a request.
+                To exercise any of these rights, email us or use the contact form listed under{" "}
+                <a href="#privacy-12" className={kit.inlineLink}>
+                  Contact Us
+                </a>{" "}
+                below. We may need to verify your identity before fulfilling a request.
               </p>
             </LegalSection>
 

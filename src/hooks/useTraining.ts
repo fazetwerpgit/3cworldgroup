@@ -28,12 +28,27 @@ interface UserProgress {
   };
 }
 
+/**
+ * Progress over the published modules: completions of unpublished or deleted
+ * modules (still in the rep's progress rows) don't count.
+ */
+export function trainingProgress(resources: TrainingResource[], progress: UserProgress) {
+  const done = resources.filter((r) => progress[r.id!]?.completed);
+  return {
+    completed: done.length,
+    total: resources.length,
+    requiredLeft: resources.filter((r) => r.isRequired && !progress[r.id!]?.completed),
+  };
+}
+
 export function useTraining() {
   const [resources, setResources] = useState<TrainingResource[]>([]);
   const [currentResource, setCurrentResource] = useState<TrainingResource | null>(null);
   const [progress, setProgress] = useState<UserProgress>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The module asked for is deleted or unpublished (a 404): retrying can't bring it back.
+  const [missing, setMissing] = useState(false);
 
   const fetchResources = useCallback(async (filters?: TrainingFilters) => {
     setLoading(true);
@@ -66,11 +81,16 @@ export function useTraining() {
   const fetchResource = useCallback(async (id: string): Promise<TrainingResource | null> => {
     setLoading(true);
     setError(null);
+    setMissing(false);
 
     try {
       const response = await fetch(`/api/portal/training/${id}`, {
         headers: await authHeaders(),
       });
+      if (response.status === 404) {
+        setMissing(true);
+        return null;
+      }
       const data = await response.json();
 
       if (!response.ok) {
@@ -152,17 +172,14 @@ export function useTraining() {
 
   // Calculate overall progress
   const getOverallProgress = useCallback((): { completed: number; total: number; percentage: number } => {
-    const total = resources.length;
-    const completed = Object.values(progress).filter((p) => p.completed).length;
+    const { completed, total } = trainingProgress(resources, progress);
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { completed, total, percentage };
   }, [resources, progress]);
 
   // Get required resources that are not completed
   const getIncompleteRequired = useCallback((): TrainingResource[] => {
-    return resources.filter(
-      (r) => r.isRequired && !progress[r.id!]?.completed
-    );
+    return trainingProgress(resources, progress).requiredLeft;
   }, [resources, progress]);
 
   return {
@@ -171,6 +188,7 @@ export function useTraining() {
     progress,
     loading,
     error,
+    missing,
     fetchResources,
     fetchResource,
     fetchProgress,

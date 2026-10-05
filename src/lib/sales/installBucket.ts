@@ -57,7 +57,17 @@ export function installBucketForSale(
   const installed = new Date(sale.installDate as Date | string);
   // An unparseable date is no date: it can't be scheduled against.
   if (Number.isNaN(installed.getTime())) return 'attention';
-  return installed.getTime() <= now.getTime() ? 'installed' : 'scheduled';
+  if (installed.getTime() > now.getTime()) return 'scheduled';
+  // The sale's day has passed, but the carrier says the install has not
+  // happened: a pending install is still scheduled while the carrier's own
+  // estimate is ahead (as the book reads an order alone), otherwise it needs chasing.
+  if (fiberOrder?.status === 'pre_sale') return 'attention';
+  if (fiberOrder?.status === 'pending_install') {
+    const estDay = installDayKey(fiberOrder.estInstallDate);
+    const today = installDayKey(now);
+    return estDay && today && estDay > today ? 'scheduled' : 'attention';
+  }
+  return 'installed';
 }
 
 /**

@@ -38,6 +38,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 
 import { POST } from './route';
+import { teamCodeLimiter } from '@/lib/auth/teamCode';
 
 const TEAM_CODE = 'Lime-Horizon-42';
 const OPEN_TOKEN = 'openTokenAbcdefghijklmnopqrstuvwxyz0123456';
@@ -54,10 +55,11 @@ function seed(token: string, data: Record<string, unknown>) {
   invites.set(hashInviteToken(token), { candidateEmail: 'hire@example.com', ...data });
 }
 
-async function post(body: unknown) {
+async function post(body: unknown, ip = '203.0.113.1') {
   const response = await POST(
     new Request('http://localhost/api/portal/auth/team-code', {
       method: 'POST',
+      headers: { 'x-forwarded-for': ip },
       body: typeof body === 'string' ? body : JSON.stringify(body),
     }),
   );
@@ -66,6 +68,7 @@ async function post(body: unknown) {
 }
 
 beforeEach(() => {
+  teamCodeLimiter.reset();
   vi.stubEnv('PORTAL_TEAM_CODE', TEAM_CODE);
   invites.clear();
   seed(OPEN_TOKEN, { status: 'in_progress', expiresAt: at(DAY) });
@@ -134,6 +137,18 @@ describe('POST /api/portal/auth/team-code with a code', () => {
   it('fails closed when PORTAL_TEAM_CODE is unset', async () => {
     vi.stubEnv('PORTAL_TEAM_CODE', '');
     expect((await post({ code: TEAM_CODE })).json).toEqual({ ok: false });
+  });
+
+  it('caps code guesses per IP, so even the right code is refused once over the limit', async () => {
+    for (let i = 0; i < 10; i++) {
+      expect((await post({ code: `guess-${i}` })).json).toEqual({ ok: false });
+    }
+    const limited = await post({ code: TEAM_CODE });
+    expect(limited.status).toBe(429);
+    expect(limited.json.ok).toBe(false);
+    // Another IP keeps its own count, and invite checks are not throttled.
+    expect((await post({ code: TEAM_CODE }, '203.0.113.2')).json).toEqual({ ok: true });
+    expect((await post({ inviteToken: OPEN_TOKEN })).json).toEqual({ ok: true, state: 'open' });
   });
 });
 

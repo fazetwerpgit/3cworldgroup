@@ -29,7 +29,7 @@ import l from '@/components/portal/rep/rep-learn.module.css';
 export default function TrainingDetailPage() {
   const params = useParams();
   const { user } = useAuth();
-  const { currentResource, progress, error, fetchResource, fetchProgress, markComplete } = useTraining();
+  const { currentResource, progress, error, missing, fetchResource, fetchProgress, markComplete } = useTraining();
   const [marking, setMarking] = useState(false);
   const [markFailed, setMarkFailed] = useState(false);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -115,13 +115,26 @@ export default function TrainingDetailPage() {
         Training
       </Link>
 
+      {!currentResource && missing ? (
+        <section className={s.panel}>
+          <div className={p.empty}>
+            <div>
+              <strong>This module is no longer available.</strong>
+              <p>
+                It was removed or taken down. <Link href="/portal/learn?tab=training">Back to Learn</Link>
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {!currentResource && error ? (
         <section className={s.panel}>
           <LoadFailed what="this module" onRetry={() => void fetchResource(resourceId)} />
         </section>
       ) : null}
 
-      {!currentResource && !error ? (
+      {!currentResource && !error && !missing ? (
         <div className={l.lessonHead} aria-busy="true" aria-label="Loading module">
           <span className={`${s.skel} ${p.skelLineShort}`} />
           <span className={`${s.skel} ${l.skelTitle}`} />

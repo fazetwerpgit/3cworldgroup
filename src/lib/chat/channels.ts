@@ -98,6 +98,25 @@ export function isEligibleChatMember(data: FirebaseFirestore.DocumentData): bool
     (data.status === 'pending' && roleRequiresOnboarding(fieldRole));
 }
 
+// Whether a user (raw users/{uid} doc) belongs in a channel's memberIds right now:
+// an eligible account whose current role reaches the audience, or a manual extra.
+// Archived channels are judged as if active (like syncChatChannels) so reactivating
+// one restores access immediately.
+export function belongsInChannelDoc(
+  channelData: FirebaseFirestore.DocumentData,
+  uid: string,
+  userData: FirebaseFirestore.DocumentData
+): boolean {
+  if (!isEligibleChatMember(userData)) return false;
+  const channel = toChatChannel(typeof channelData.id === 'string' ? channelData.id : '', channelData);
+  if (!channel) return false;
+  const { role, fieldRole } = resolveRoles(userData.role, userData.fieldRole);
+  return (
+    canAccessChatChannel({ ...channel, active: true }, role, fieldRole) ||
+    readExtraMemberIds(channelData).includes(uid)
+  );
+}
+
 interface ChatUserSnapshot {
   id: string;
   data(): FirebaseFirestore.DocumentData;
@@ -206,4 +225,50 @@ export async function ensureChatChannelMember(channelId: string, uid: string): P
     },
     { merge: true }
   );
+}
+
+// memberIds drives the Firestore read rules and the chat push fan-out, so it must
+// follow the user's CURRENT role and status. Recomputes one user's membership on
+// every channel doc: adds them where they now qualify, removes them where they no
+// longer do (extraMemberIds is never touched). Pass the user doc data when the
+// caller already has it; otherwise it is read here (a missing doc removes them
+// everywhere). Returns the active channels the user is now a member of.
+export async function reconcileChatMembershipForUser(
+  uid: string,
+  userData?: FirebaseFirestore.DocumentData | null
+): Promise<ChatChannel[]> {
+  if (!adminDb) throw new Error('Database not configured');
+
+  const data =
+    userData === undefined
+      ? (await adminDb.collection('users').doc(uid).get()).data() ?? {}
+      : userData ?? {};
+  const channelsSnap = await adminDb.collection('chatChannels').get();
+  const batch = adminDb.batch();
+  let writes = 0;
+  const memberOf: ChatChannel[] = [];
+
+  for (const doc of channelsSnap.docs) {
+    const channelData = doc.data();
+    const channel = toChatChannel(doc.id, channelData);
+    if (!channel) continue;
+
+    const belongs = belongsInChannelDoc({ ...channelData, id: channel.id }, uid, data);
+    const isMember = Array.isArray(channelData.memberIds) && channelData.memberIds.includes(uid);
+    if (belongs !== isMember) {
+      batch.set(
+        doc.ref,
+        {
+          memberIds: belongs ? FieldValue.arrayUnion(uid) : FieldValue.arrayRemove(uid),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      writes += 1;
+    }
+    if (belongs && channel.active) memberOf.push(channel);
+  }
+
+  if (writes > 0) await batch.commit();
+  return memberOf.sort((a, b) => a.order - b.order);
 }

@@ -1,5 +1,8 @@
 import { LEADS_CATEGORIES, LEADS_REASONS } from './formOptions';
 
+/** The leads location that opens the special-request explanation (Form options keeps it). */
+export const SPECIAL_REQUEST_LOCATION = 'Special Request';
+
 export interface LeadsConditions {
   needsHostile: boolean;
   needsBlindKnock: boolean;
@@ -26,6 +29,6 @@ export function leadsConditions(input: {
     category === LEADS_CATEGORIES[1] ||
     category === LEADS_CATEGORIES[2] ||
     category === LEADS_CATEGORIES[3];
-  const needsSpecialRequest = location === 'Special Request';
+  const needsSpecialRequest = location === SPECIAL_REQUEST_LOCATION;
   return { needsHostile, needsBlindKnock, needsLasso, needsNewRep, needsLeadPackCode, needsSpecialRequest };
 }

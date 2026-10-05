@@ -203,7 +203,8 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState('');
   /** The last question got no answer; it is back in the composer. */
-  const [failed, setFailed] = useState('');
+  // retry: false at the daily limit, where Try again would only hit it again.
+  const [failed, setFailed] = useState<{ message: string; retry: boolean } | null>(null);
   const [fileKey, setFileKey] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
@@ -283,13 +284,14 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
     setQuestion('');
     setPhoto(null);
     setNotice('');
-    setFailed('');
+    setFailed(null);
     setSending(true);
     showComposer('smooth');
 
     let reply: AskReply | null = null;
     const fallback = owner ? '' : ', or call Jeremy or Jacob';
     let error = `No answer came back. Check your signal and try again${fallback}.`;
+    let retry = true;
     try {
       const form = new FormData();
       form.set('question', text);
@@ -304,7 +306,10 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
       });
       const json = (await res.json().catch(() => ({}))) as Partial<AskReply> & { error?: string };
       if (res.ok && json.answer && json.id) reply = { id: json.id, answer: json.answer };
-      else error = json.error || `Ask 3C couldn't answer right now. Try again${fallback}.`;
+      else {
+        error = json.error || `Ask 3C couldn't answer right now. Try again${fallback}.`;
+        retry = res.status !== 429;
+      }
     } catch {
       // The default message above: nothing came back.
     }
@@ -317,7 +322,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
       update((current) => current.filter((turn) => turn.key !== key));
       setQuestion(text);
       setPhoto(sentPhoto);
-      setFailed(error);
+      setFailed({ message: error, retry });
     }
     setSending(false);
     showComposer('smooth');
@@ -345,7 +350,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
     for (const turn of turns) if (turn.photoUrl) URL.revokeObjectURL(turn.photoUrl);
     update(() => []);
     setNotice('');
-    setFailed('');
+    setFailed(null);
   };
 
   const answered = turns.some((turn) => turn.answer);
@@ -435,11 +440,13 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
         <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={send}>
           {failed ? (
             <div className={a.failed} role="alert">
-              <p>{failed}</p>
-              <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={() => void send()}>
-                <RotateCw size={18} aria-hidden="true" />
-                Try again
-              </button>
+              <p>{failed.message}</p>
+              {failed.retry ? (
+                <button type="button" className={`${s.btnSecondary} ${a.retry}`} onClick={() => void send()}>
+                  <RotateCw size={18} aria-hidden="true" />
+                  Try again
+                </button>
+              ) : null}
             </div>
           ) : null}
           <label htmlFor="ask-question" className={s.srOnly}>

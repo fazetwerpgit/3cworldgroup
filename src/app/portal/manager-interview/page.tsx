@@ -31,26 +31,38 @@ import { isPromotionRole, MANAGER_INTERVIEW_ROLES } from '@/lib/forms/managerInt
 
 const FORM_ID = 'manager-interview-form';
 
+// The decision answers start unanswered so a skipped question can't be saved
+// as "No" / rating 1; the API rejects them when missing.
 const EMPTY = {
   provider: '', jobPosition: '', hiringManager: '', hiringManagerEmail: '',
   candidateFirstName: '', candidateLastName: '', candidateEmail: '', market: '',
-  didShow: false, extendOffer: false, rating: 1,
-  completedProduction: false, completedReading: false, completedTeamMetric: false,
+  didShow: null as boolean | null, extendOffer: null as boolean | null, rating: '',
+  completedProduction: null as boolean | null,
+  completedReading: null as boolean | null,
+  completedTeamMetric: null as boolean | null,
   signatureDataUrl: '',
 };
 type Form = typeof EMPTY;
 
-const RULES: FieldRule<Form>[] = [
-  { key: 'provider', id: 'provider', message: 'Pick the provider' },
-  { key: 'jobPosition', id: 'jobPosition', message: 'Pick the job position' },
-  { key: 'hiringManager', id: 'hiringManager', message: 'Pick the hiring manager' },
-  { key: 'hiringManagerEmail', id: 'hiring-manager-email', message: "Enter the hiring manager's email", email: true },
-  { key: 'candidateFirstName', id: 'candidate-first-name', message: 'Enter the first name' },
-  { key: 'candidateLastName', id: 'candidate-last-name', message: 'Enter the last name' },
-  { key: 'candidateEmail', id: 'candidate-email', message: "Enter the candidate's email", email: true },
-  { key: 'market', id: 'market', message: 'Pick a market' },
-  { key: 'signatureDataUrl', id: 'manager-signature', message: 'Sign to approve' },
-];
+function rulesFor(promo: boolean): FieldRule<Form>[] {
+  return [
+    { key: 'provider', id: 'provider', message: 'Pick the provider' },
+    { key: 'jobPosition', id: 'jobPosition', message: 'Pick the job position' },
+    { key: 'hiringManager', id: 'hiringManager', message: 'Pick the hiring manager' },
+    { key: 'hiringManagerEmail', id: 'hiring-manager-email', message: "Enter the hiring manager's email", email: true },
+    { key: 'candidateFirstName', id: 'candidate-first-name', message: 'Enter the first name' },
+    { key: 'candidateLastName', id: 'candidate-last-name', message: 'Enter the last name' },
+    { key: 'candidateEmail', id: 'candidate-email', message: "Enter the candidate's email", email: true },
+    { key: 'market', id: 'market', message: 'Pick a market' },
+    { key: 'didShow', id: 'didShow', message: 'Answer whether the candidate showed' },
+    { key: 'extendOffer', id: 'extendOffer', message: 'Answer whether to extend an offer' },
+    { key: 'rating', id: 'rating', message: 'Rate the candidate' },
+    { key: 'completedProduction', id: 'completedProduction', message: 'Answer this promotion question', when: promo },
+    { key: 'completedReading', id: 'completedReading', message: 'Answer this promotion question', when: promo },
+    { key: 'completedTeamMetric', id: 'completedTeamMetric', message: 'Answer this promotion question', when: promo },
+    { key: 'signatureDataUrl', id: 'manager-signature', message: 'Sign to approve' },
+  ];
+}
 
 function ManagerInterviewForm() {
   const { user } = useAuth();
@@ -62,9 +74,8 @@ function ManagerInterviewForm() {
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
   const alertRef = useAlertScroll(error);
-  const check = useFormCheck(form, RULES);
-
   const promo = isPromotionRole(form.jobPosition);
+  const check = useFormCheck(form, rulesFor(promo));
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {
     setForm((p) => ({ ...p, [key]: value }));
@@ -201,16 +212,31 @@ function ManagerInterviewForm() {
       </FormSection>
 
       <FormSection title="The decision">
-        <YesNo name="didShow" label="Did the candidate show?" value={form.didShow} onChange={(v) => set('didShow', v)} />
-        <YesNo name="extendOffer" label="Extend an offer?" value={form.extendOffer} onChange={(v) => set('extendOffer', v)} />
+        <YesNo
+          name="didShow"
+          label="Did the candidate show?"
+          value={form.didShow}
+          onChange={(v) => set('didShow', v)}
+          required
+          error={check.errors.didShow}
+        />
+        <YesNo
+          name="extendOffer"
+          label="Extend an offer?"
+          value={form.extendOffer}
+          onChange={(v) => set('extendOffer', v)}
+          required
+          error={check.errors.extendOffer}
+        />
         <Choices
           name="rating"
           label="Rate the candidate (1 to 5)"
-          value={String(form.rating)}
+          value={form.rating}
           options={['1', '2', '3', '4', '5']}
-          onChange={(value) => set('rating', Number(value))}
+          onChange={(value) => set('rating', value)}
           columns={5}
           required
+          error={check.errors.rating}
         />
         {promo ? (
           <>
@@ -219,18 +245,24 @@ function ManagerInterviewForm() {
               label="Promotion: completed production?"
               value={form.completedProduction}
               onChange={(v) => set('completedProduction', v)}
+              required
+              error={check.errors.completedProduction}
             />
             <YesNo
               name="completedReading"
               label="Promotion: completed reading?"
               value={form.completedReading}
               onChange={(v) => set('completedReading', v)}
+              required
+              error={check.errors.completedReading}
             />
             <YesNo
               name="completedTeamMetric"
               label="Promotion: completed team metric?"
               value={form.completedTeamMetric}
               onChange={(v) => set('completedTeamMetric', v)}
+              required
+              error={check.errors.completedTeamMetric}
             />
           </>
         ) : null}

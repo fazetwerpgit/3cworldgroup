@@ -11,15 +11,18 @@ import {
   FORMS_BACK,
   FormSection,
   FormSent,
+  describe,
   useAlertScroll,
+  useFormCheck,
+  type FieldRule,
 } from '@/components/portal/rep/RepForm';
 import f from '@/components/portal/rep/rep-forms.module.css';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useFormOptions } from '@/hooks/useFormOptions';
 
-// Fiber report, direction D. Every field is optional (the API only checks
-// that a chosen company is one of the configured providers).
+// Fiber report, direction D. Company and date are required; the counts are
+// optional whole numbers (the API enforces the same).
 
 const FORM_ID = 'fiber-report-form';
 
@@ -29,6 +32,11 @@ const EMPTY = {
 };
 type Form = typeof EMPTY;
 
+const RULES: FieldRule<Form>[] = [
+  { key: 'companySold', id: 'companySold', message: 'Pick the company sold' },
+  { key: 'dateKnocked', id: 'date-knocked', message: 'Enter the date knocked' },
+];
+
 function FiberReportForm() {
   const { user } = useAuth();
   const { options } = useFormOptions();
@@ -37,19 +45,28 @@ function FiberReportForm() {
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
   const alertRef = useAlertScroll(error);
+  const check = useFormCheck(form, RULES);
 
+  const set = (key: keyof Form, value: string) => {
+    setForm((p) => ({ ...p, [key]: value }));
+    check.clear(key);
+  };
   const text = (key: keyof Form, id: string, numeric = false) => ({
     id,
     value: form[key],
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setForm((p) => ({ ...p, [key]: e.target.value })),
+    // Counts take digits only, so a typo can't land as text.
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      set(key, numeric ? e.target.value.replace(/\D/g, '') : e.target.value),
     className: f.input,
     autoComplete: 'off',
     ...(numeric ? { inputMode: 'numeric' as const } : {}),
+    ...describe(id, check.errors[key]),
   });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || saving) return;
+    if (!check.validate()) return;
     setSaving(true);
     setError('');
     try {
@@ -78,7 +95,10 @@ function FiberReportForm() {
         referenceId={referenceId}
         message="Your fiber activity is in the review queue."
         againLabel="Send another report"
-        onAgain={() => setReferenceId('')}
+        onAgain={() => {
+          setReferenceId('');
+          check.reset();
+        }}
       />
     );
   }
@@ -99,9 +119,11 @@ function FiberReportForm() {
           label="Company sold"
           value={form.companySold}
           options={options.providers}
-          onChange={(companySold) => setForm((p) => ({ ...p, companySold }))}
+          onChange={(companySold) => set('companySold', companySold)}
+          required
+          error={check.errors.companySold}
         />
-        <Field id="date-knocked" label="Date knocked">
+        <Field id="date-knocked" label="Date knocked" required error={check.errors.dateKnocked}>
           <input {...text('dateKnocked', 'date-knocked')} placeholder="MM/DD/YYYY" />
         </Field>
         <Field id="pack-number" label="Pack number">

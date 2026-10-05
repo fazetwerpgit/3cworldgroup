@@ -26,6 +26,7 @@ import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
 import { useConnectionNotice } from '@/hooks/chat/useConnectionNotice';
 import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
+import { usePinnedMessage } from '@/hooks/chat/usePinnedMessage';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import {
   SendRequestError,
@@ -43,7 +44,7 @@ import { countNewArrivals, newestDeliveredId } from '@/lib/chat/unseen';
 import { useLiveAppended } from '@/hooks/chat/useLiveAppended';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
-import { ChatAttachment, ChatReplySnippet, getEffectiveRole } from '@/types';
+import { ChatAttachment, ChatReplySnippet, getEffectiveRole, MANAGEMENT_FIELD_ROLES } from '@/types';
 
 function getLocalDayKey(createdAt: Date | null) {
   const date = createdAt ?? new Date();
@@ -208,6 +209,7 @@ export default function TeamChatPage() {
     loading: loadingMessages,
     error: messagesError,
     hasMore: hasMoreMessages,
+    historyCapped: messagesHistoryCapped,
     loadOlder: loadOlderMessages,
     windowSize: messagesWindowSize,
     snapshotVersion,
@@ -333,20 +335,9 @@ export default function TeamChatPage() {
   );
   const canModerate = hasPermission('chat:moderate');
   // Pinning is broader than moderation: admin/operations OR field managers,
-  // mirroring the pin route's server check. Reps can't pin. isRole matches either
-  // the platform role or the field role (see AuthContext.isRole).
-  const canPin = isRole(
-    'admin',
-    'operations',
-    'l1_manager',
-    'l2_manager',
-    'ibo_level_1',
-    'ibo_level_2',
-    'ibo_level_3',
-    'ibo_level_4',
-    'regional_manager',
-    'director'
-  );
+  // mirroring the pin route's server check (MANAGEMENT_FIELD_ROLES). Reps can't
+  // pin. isRole matches either the platform role or the field role.
+  const canPin = isRole('admin', 'operations', ...MANAGEMENT_FIELD_ROLES);
   // Channel-listener failures show in the channel list itself (rail / phone
   // list: "Chat's offline · Retry"), so they aren't repeated here.
   const shownError = error || messagesError;
@@ -1246,14 +1237,7 @@ export default function TeamChatPage() {
     });
   };
 
-  const pinnedMessage = useMemo(() => {
-    let latest: ThreadMessage | null = null;
-    for (const message of displayMessages) {
-      if (!message.isPinned) continue;
-      if (!latest || (message.createdAt?.getTime() ?? 0) >= (latest.createdAt?.getTime() ?? 0)) latest = message;
-    }
-    return latest;
-  }, [displayMessages]);
+  const pinnedMessage = usePinnedMessage(activeChannelId || null);
   const pinnedCopy = pinnedMessage
     ? pinnedMessage.text || (pinnedMessage.attachment?.type === 'gif' ? 'GIF' : 'Photo')
     : '';
@@ -1330,6 +1314,9 @@ export default function TeamChatPage() {
             <div ref={desktopScrollRef} onScroll={handleDesktopScroll} className={c.scroller}>
               {!loadingMessages && threadMessages.length > 0 && hasMoreMessages && (
                 <p className={c.pager}>Earlier messages load as you scroll</p>
+              )}
+              {!loadingMessages && threadMessages.length > 0 && messagesHistoryCapped && (
+                <p className={c.pager}>Showing the latest {MAX_WINDOW} messages. Older history isn&apos;t available here.</p>
               )}
               {loadingMessages ? (
                 <div className={c.msgSkels} aria-hidden="true">
@@ -1583,6 +1570,7 @@ export default function TeamChatPage() {
             windowSize={messagesWindowSize}
             lastSnapshotWindow={lastSnapshotWindow}
             hasMore={hasMoreMessages}
+            historyCapped={messagesHistoryCapped}
             onLoadOlder={loadOlderMessages}
             companyStats={activeChannelId === 'all-company' ? companyStats : null}
             authorAvatars={authorAvatars}

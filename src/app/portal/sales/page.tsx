@@ -143,7 +143,7 @@ function LoggedBanner({ name, onDismiss }: { name: string | null; onDismiss: () 
 }
 
 function SalesContent() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, isRole } = useAuth();
   const params = useSearchParams();
   const { sales: loggedSales, truncated, loading, error, fetchSales, deleteSale, setSaleCancelled } = useSales();
   const fiber = useFiberStatus();
@@ -153,6 +153,11 @@ function SalesContent() {
   // side effect of the approval permission.
   const canViewAll = hasPermission('sales:read:all');
   const canLog = hasPermission('sales:write');
+  // The status API answers scope 'all' to admins and owners. Until it answers —
+  // or when the first load fails — the role stands in, so Install status shows
+  // its loading state and Retry rather than vanishing.
+  const adminView = isRole('admin');
+  const showInstallStatus = fiber.data ? fiber.data.scope === 'all' : adminView;
 
   // `?view=pay` opens the rep's pay list directly.
   const [payView, setPayView] = useState(() => params.get('view') === 'pay');
@@ -288,7 +293,7 @@ function SalesContent() {
         ) : (
           <>
             {staleNote}
-            <div className={`${x.mgmt} ${fiber.data?.scope === 'all' ? '' : x.mgmtSolo}`}>
+            <div className={`${x.mgmt} ${showInstallStatus ? '' : x.mgmtSolo}`}>
               <AdminSalesBoard
                 sales={sales}
                 month={month}
@@ -307,12 +312,13 @@ function SalesContent() {
                   logged, this is what the carrier says actually happened, so
                   management needs both. It is not month-scoped; the picker
                   only moves the board. */}
-              {fiber.data?.scope === 'all' && (
+              {showInstallStatus && (
                 <InstallStatusSection
                   fiber={fiber}
                   sales={sales}
                   ownerView={isOwner(user?.role)}
                   viewerId={user?.uid ?? null}
+                  adminView={adminView}
                 />
               )}
             </div>

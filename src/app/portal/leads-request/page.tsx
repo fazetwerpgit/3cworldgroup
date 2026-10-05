@@ -44,7 +44,7 @@ type Form = typeof EMPTY;
 const RULES: FieldRule<Form>[] = [
   { key: 'campaign', id: 'campaign', message: 'Pick the campaign' },
   { key: 'managerName', id: 'managerName', message: 'Pick your manager' },
-  { key: 'managerEmail', id: 'manager-email', message: "Enter your manager's email" },
+  { key: 'managerEmail', id: 'manager-email', message: "Enter your manager's email", email: true },
   { key: 'repFirstName', id: 'rep-first-name', message: 'Enter the first name' },
   { key: 'repLastName', id: 'rep-last-name', message: 'Enter the last name' },
   { key: 'location', id: 'location', message: 'Pick a location' },
@@ -73,10 +73,20 @@ function LeadsRequestForm() {
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
   const alertRef = useAlertScroll(error);
-  const check = useFormCheck(form, RULES);
+  const cond = leadsConditions({ category: form.category, reason: form.reason, location: form.location });
+  const check = useFormCheck(form, [
+    ...RULES,
+    // Optional, so only checked once something is typed.
+    {
+      key: 'newRepEmail',
+      id: 'new-rep-email',
+      message: 'Enter a valid email',
+      email: true,
+      when: cond.needsNewRep && form.newRepEmail.trim() !== '',
+    },
+  ]);
   const { uploading, onBusyChange } = useUploadsInFlight();
 
-  const cond = leadsConditions({ category: form.category, reason: form.reason, location: form.location });
   const hasConditionalDetails =
     cond.needsSpecialRequest || cond.needsLeadPackCode || cond.needsHostile || cond.needsBlindKnock || cond.needsNewRep;
   const hasUploads = cond.needsHostile || cond.needsBlindKnock || cond.needsLasso;
@@ -100,6 +110,8 @@ function LeadsRequestForm() {
       id={id}
       label={label}
       accept="image/*,application/pdf"
+      // A slot hidden and shown again still holds its upload; say so.
+      initialDone={Boolean(form[SLOT_FIELD[slot]])}
       upload={(file, signal) =>
         uploadFormAttachment({
           file,
@@ -254,7 +266,7 @@ function LeadsRequestForm() {
               <Field id="new-rep-phone" label="New rep phone">
                 <input {...text('newRepPhone', 'new-rep-phone')} type="tel" inputMode="tel" />
               </Field>
-              <Field id="new-rep-email" label="New rep email">
+              <Field id="new-rep-email" label="New rep email" error={check.errors.newRepEmail}>
                 <input {...text('newRepEmail', 'new-rep-email')} type="email" inputMode="email" />
               </Field>
             </>

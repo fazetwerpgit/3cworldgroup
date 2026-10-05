@@ -76,6 +76,17 @@ export function takeDailyAsk(db: FirebaseFirestore.Firestore, uid: string, now: 
   return takeDaily(db, uid, now, '', ASK_DAILY_LIMIT);
 }
 
+/** Hands back a question takeDailyAsk counted when the model never answered it. */
+export async function giveBackDailyAsk(db: FirebaseFirestore.Firestore, uid: string, now: Date): Promise<void> {
+  const day = chicagoDayKey(now);
+  const ref = db.collection(ASK_USAGE).doc(`${uid}_${day}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const used = snap.exists ? Number(snap.get('count')) || 0 : 0;
+    if (used > 0) tx.set(ref, { uid, day, count: used - 1, updatedAt: now });
+  });
+}
+
 /**
  * Counts `calls` Practice model calls against the rep's day, on its own
  * counter (practicing never uses up Ask questions); false, and nothing

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { collection, doc, onSnapshot, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/config';
+import { canSubscribeToChat } from '@/hooks/chat/useChatChannels';
 
 // The minimal shape useChatUnread needs from a channel: its id and the last time
 // a message landed on it. useChatChannels' ChatChannelDoc already satisfies this.
@@ -73,9 +74,11 @@ export function useChatUnread(
     byChannel: {},
   });
 
+  const canSubscribe = canSubscribeToChat(user);
+
   useEffect(() => {
-    // Pending reps lack rules access to chat reads, so only active users subscribe.
-    if (!db || !uid || user?.status !== 'active') return;
+    // Only accounts the chat rules admit (active, or a hire mid-onboarding) subscribe.
+    if (!db || !uid || !canSubscribe) return;
 
     const readsCol = collection(db, 'users', uid, 'chatReads');
     return onSnapshot(
@@ -97,18 +100,18 @@ export function useChatUnread(
         console.error('Error listening to chat read receipts:', err);
       }
     );
-  }, [uid, user?.status]);
+  }, [uid, canSubscribe]);
 
   const unreadByChannel = useMemo(() => {
     const map: Record<string, boolean> = {};
     // Compute only once a settled snapshot for the CURRENT uid exists — never
     // during the load window (a missing receipt would otherwise read as unread).
-    if (!uid || user?.status !== 'active' || reads.uid !== uid) return map;
+    if (!uid || !canSubscribe || reads.uid !== uid) return map;
     for (const channel of channels) {
       map[channel.id] = computeUnread(channel.lastMessageAt, reads.byChannel[channel.id]);
     }
     return map;
-  }, [channels, reads, uid, user?.status]);
+  }, [channels, reads, uid, canSubscribe]);
 
   const anyUnread = useMemo(
     () => Object.values(unreadByChannel).some(Boolean),

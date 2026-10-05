@@ -1,11 +1,30 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // University training content: admins/operations upload, signed-in staff read.
+    function caller() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+    // Platform management: owner/admin/operations.
+    function isPlatformManagement() {
+      return request.auth != null && caller().get('role', null) in ['owner', 'admin', 'operations'];
+    }
+    // Mirrors the API status gate: an active account, or a hired rep still in
+    // onboarding (pending WITH a field role; /portal/training is on the
+    // onboarding allowlist). A role-less pending self-signup or an inactive
+    // account gets nothing.
+    function canReadTraining() {
+      return request.auth != null
+        && (caller().get('status', null) == 'active'
+          || (caller().get('status', null) == 'pending' && caller().get('fieldRole', null) != null));
+    }
+
+    // University training content: platform management uploads; staff fetch a
+    // file by its exact path (getDownloadURL). Only management may list, so
+    // nobody else can enumerate drafts.
     match /training/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'operations']
+      allow get: if canReadTraining();
+      allow list: if isPlatformManagement();
+      allow write: if isPlatformManagement()
         && request.resource.size < 1024 * 1024 * 1024
         && request.resource.contentType.matches('application/pdf|image/.*|video/.*');
     }

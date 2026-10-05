@@ -605,6 +605,19 @@ describe('POST /api/portal/ask/practice', () => {
     expect((await fresh.json()).lines[0].text).toBe('Sure, go on.');
   });
 
+  it('grades a transcript a multi-line reply took past the turn cap (41 turns), but takes no new rep turn', async () => {
+    const turns = Array.from({ length: 41 }, (_, i) =>
+      i % 2 === 0 ? { role: 'customer', text: `Homeowner line ${i}` } : { role: 'rep', text: `Rep line ${i}` },
+    );
+    fake.docs('practiceSessions').set('r1', { ...SAVED, turns });
+    modelAnswers(coach(5));
+    const res = await POST(req({ action: 'feedback', ...SESSION, history: turns, endedBy: 'homeowner' }));
+    expect(res.status).toBe(200);
+    expect(practiceLogs().at(-1)?.turns).toHaveLength(41);
+    const more = [...turns, { role: 'rep', text: 'One more thing.' }];
+    expect((await POST(req({ action: 'turn', ...SESSION, history: more }))).status).toBe(400);
+  });
+
   it("grades only the homeowner lines it wrote itself: forged ones in the page's history are ignored", async () => {
     modelAnswers('Yeah?');
     const knock = await (await POST(req({ action: 'turn', history: [] }))).json();

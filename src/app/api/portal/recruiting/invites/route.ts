@@ -10,7 +10,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
 import { inviteUrlFor, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
-import { findActivePortalAccount } from '@/lib/auth/existingAccount';
+import { findActivePortalAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
 
 const APPLICATION_LIMIT = 1000;
 
@@ -73,15 +73,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const inviteSnapshot = await adminDb
-      .collection('onboardingInvites')
-      .orderBy('createdAt', 'desc')
-      .limit(100)
-      .get();
-
-    const invites = inviteSnapshot.docs
-      .filter((doc) => requester.canViewAll || doc.data().ownerId === userId)
-      .map(serializeInvite);
+    // A manager's own invites are queried by owner, so company-wide volume never
+    // pushes them out. Management also gets every invite awaiting Activate, so an
+    // old submitted one never falls off the newest-100 window (or the badge).
+    const invitesRef = adminDb.collection('onboardingInvites');
+    const snapshots = requester.canViewAll
+      ? await Promise.all([
+          invitesRef.orderBy('createdAt', 'desc').limit(100).get(),
+          invitesRef.where('status', '==', 'submitted').get(),
+        ])
+      : [await invitesRef.where('ownerId', '==', userId).get()];
+    const byId = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+    for (const snapshot of snapshots) for (const doc of snapshot.docs) byId.set(doc.id, doc);
+    const createdMs = (doc: FirebaseFirestore.QueryDocumentSnapshot) =>
+      doc.data().createdAt?.toDate?.()?.getTime?.() ?? 0;
+    const invites = [...byId.values()].sort((a, b) => createdMs(b) - createdMs(a)).map(serializeInvite);
 
     // Every application, newest first. The cap is only a safety net; the
     // panel filters and searches the whole list client-side.
@@ -140,6 +146,12 @@ export async function POST(request: NextRequest) {
     if (await findActivePortalAccount(candidateEmail)) {
       return NextResponse.json(
         { error: 'This email already has an active portal account. They can sign in with it instead.' },
+        { status: 409 }
+      );
+    }
+    if (await findOnboardingPortalAccount(candidateEmail)) {
+      return NextResponse.json(
+        { error: 'This email is already partway through onboarding with 3C. Ask them to finish that invite, or contact an admin.' },
         { status: 409 }
       );
     }

@@ -111,8 +111,12 @@ export default function SettingsPage() {
 
   const handleSaveProfile = async () => {
     if (!user) return;
-    setSaving(true);
     setProfileMsg(null);
+    if (!displayName.trim()) {
+      setProfileMsg({ ok: false, text: 'Enter your name.' });
+      return;
+    }
+    setSaving(true);
     try {
       // The route derives the target user from this token — profile edits are
       // always self-service.
@@ -150,6 +154,9 @@ export default function SettingsPage() {
   const addressLine = [user?.city, user?.state].filter(Boolean).join(', ') + (user?.zip ? ` ${user.zip}` : '');
   const fullAddress = user?.address ? `${user.address}${addressLine ? `, ${addressLine}` : ''}` : addressLine || 'Not on file';
   const email = user?.email || auth?.currentUser?.email || '';
+  // Accounts made with Continue with Google have no password until they set
+  // one through a reset link, so there is no current password to ask for.
+  const hasPassword = auth?.currentUser?.providerData.some((info) => info.providerId === 'password') ?? true;
   const initials = (user?.displayName || email || '?')
     .split(/\s+/)
     .map((part) => part[0])
@@ -161,7 +168,7 @@ export default function SettingsPage() {
     // Some older user docs lack an email field — fall back to the auth account's.
     ['Email', email || 'Not on file'],
     ...(showRole ? [['Role', roleLabel || 'Not assigned'] as [string, string]] : []),
-    ['Status', user?.status === 'active' ? 'Active' : 'Inactive'],
+    ['Status', user?.status === 'active' ? 'Active' : user?.status === 'pending' ? 'Onboarding' : 'Inactive'],
     ['Start date', user?.hireDate ? formatDate(user.hireDate) : 'Not on file'],
     ...(user?.territoryId ? [['Territory', user.territoryId] as [string, string]] : []),
     ['Address', fullAddress],
@@ -309,7 +316,29 @@ export default function SettingsPage() {
                 </div>
               </div>
             ) : null}
-            {showPasswordForm && (
+            {showPasswordForm && !hasPassword ? (
+              <div className={st.drawer}>
+                <p className={p.hint}>
+                  You sign in with Google, so there is no password to change. To also sign in with your email and a
+                  password, set one from a reset link.
+                </p>
+                {resetSent ? (
+                  <p className={p.hint} role="status">Reset email sent. Check your inbox.</p>
+                ) : (
+                  <>
+                    <button type="button" className={s.btnPrimary} onClick={handlePasswordReset} disabled={loading}>
+                      {loading ? 'Sending…' : 'Email me a reset link'}
+                    </button>
+                    {resetError ? (
+                      <p className={`${p.hint} ${p.hintError}`} role="alert">
+                        {resetError}
+                      </p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ) : null}
+            {showPasswordForm && hasPassword && (
               <div className={st.drawer}>
                 <form onSubmit={handleChangePassword} className={st.stack}>
                   <label className={p.field}>

@@ -39,17 +39,24 @@ const MESSAGE_DOCS: Record<string, Record<string, unknown>> = {
     reactions: { '🔥': ['real-uid'] },
     reactionCounts: { '🔥': 1 },
   },
+  'msg-two': {
+    authorId: 'other-uid',
+    text: 'two emoji',
+    deletedAt: null,
+    reactions: { '🔥': ['real-uid'], '👏': ['real-uid'] },
+    reactionCounts: { '🔥': 1, '👏': 1 },
+  },
 };
 
 const channelSetMock = vi.fn(async () => undefined);
-const txSetMock = vi.fn();
+const txUpdateMock = vi.fn();
 const runTransactionMock = vi.fn(async (fn: (tx: unknown) => Promise<void>) =>
   fn({
     get: async (ref: { _id: string }) => ({
       exists: ref._id in MESSAGE_DOCS,
       data: () => MESSAGE_DOCS[ref._id],
     }),
-    set: txSetMock,
+    update: txUpdateMock,
   })
 );
 
@@ -113,7 +120,7 @@ const NON_MEMBER = {
 beforeEach(() => {
   mockGate.mockReset();
   channelSetMock.mockClear();
-  txSetMock.mockClear();
+  txUpdateMock.mockClear();
   runTransactionMock.mockClear();
 });
 
@@ -136,15 +143,15 @@ describe('POST /api/portal/chat/reactions', () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(req({ channelId: 'managers-extra', messageId: 'msg1', emoji: '🔥' }));
     expect(res.status).toBe(200);
-    expect(txSetMock).toHaveBeenCalledTimes(1);
+    expect(txUpdateMock).toHaveBeenCalledTimes(1);
   });
 
   it('toggles a reaction on the happy path', async () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(req({ channelId: 'all-company', messageId: 'msg1', emoji: '🔥' }));
     expect(res.status).toBe(200);
-    expect(txSetMock).toHaveBeenCalledTimes(1);
-    const [, payload] = txSetMock.mock.calls[0] as [unknown, { reactions: Record<string, string[]> }];
+    expect(txUpdateMock).toHaveBeenCalledTimes(1);
+    const [, payload] = txUpdateMock.mock.calls[0] as [unknown, { reactions: Record<string, string[]> }];
     expect(payload.reactions['🔥']).toContain('real-uid');
   });
 
@@ -152,13 +159,27 @@ describe('POST /api/portal/chat/reactions', () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(req({ channelId: 'all-company', messageId: 'msg-reacted', emoji: '🔥' }));
     expect(res.status).toBe(200);
-    expect(txSetMock).toHaveBeenCalledTimes(1);
-    const [, payload] = txSetMock.mock.calls[0] as [
+    expect(txUpdateMock).toHaveBeenCalledTimes(1);
+    const [, payload] = txUpdateMock.mock.calls[0] as [
       unknown,
       { reactions: Record<string, string[]>; reactionCounts: Record<string, number> },
     ];
     // real-uid was the only reactor, so the emoji is dropped entirely.
     expect(payload.reactions['🔥']).toBeUndefined();
     expect(payload.reactionCounts['🔥']).toBeUndefined();
+  });
+
+  it('removes one emoji while others remain, replacing the maps (not merging)', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'all-company', messageId: 'msg-two', emoji: '🔥' }));
+    expect(res.status).toBe(200);
+    // update() (no merge option) is what lets the dropped key actually disappear.
+    expect(txUpdateMock.mock.calls[0]).toHaveLength(2);
+    const [, payload] = txUpdateMock.mock.calls[0] as [
+      unknown,
+      { reactions: Record<string, string[]>; reactionCounts: Record<string, number> },
+    ];
+    expect(payload.reactions).toEqual({ '👏': ['real-uid'] });
+    expect(payload.reactionCounts).toEqual({ '👏': 1 });
   });
 });

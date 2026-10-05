@@ -1,7 +1,25 @@
+import { Bebas_Neue } from "next/font/google";
 import MotionRoot from "../_cinematic/MotionRoot";
 import SiteHeader from "../_cinematic/SiteHeader";
 import SiteFooter from "../_cinematic/SiteFooter";
 import styles from "../_cinematic/cinematic.module.css";
+
+// The display face, through next/font so this group's pages preload it: from
+// the @fontsource stylesheet it was first requested only after the globals CSS
+// arrived (~1.8s on a throttled phone). The kit's own size-adjusted
+// "Display Fallback" stays the stand-in, so next/font's is off.
+const bebas = Bebas_Neue({
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: false,
+});
+
+// Turbopack ignores `adjustFontFallback: false` and still lists its own
+// "Bebas Neue Fallback" (Arial at 76.72%, sized for lowercase text, ~34% too
+// wide for these all-caps lines) ahead of the kit's. So --font-bebas carries
+// the face alone and "Display Fallback" is the only stand-in.
+const BEBAS_FACE = { "--font-bebas": bebas.style.fontFamily.split(",")[0] } as React.CSSProperties;
 
 /*
   The motion gate, opened before the first paint.
@@ -58,10 +76,8 @@ const MOTION_BOOT = `try{var d=document.documentElement;if(!matchMedia("(prefers
 
 /**
  * The cinematic shell. Every route in this group renders its own header and
- * footer here rather than through PageWrapper, so it sits outside the
- * `.public-site` cascade in public.css — which is left untouched and still
- * drives every route outside the group. The route group means the URLs are
- * unchanged: this file wraps `/`, and whatever else moves in beside it.
+ * footer here. The route group means the URLs are unchanged: this file wraps
+ * `/`, and whatever else moves in beside it.
  *
  * Three things live here and nowhere else: the motion root that turns authored
  * motion on, the `.page` element that declares every design token, and the
@@ -73,7 +89,7 @@ export default function CinematicLayout({ children }: { children: React.ReactNod
       {/* Must stay above .page: it has to run before the hero is parsed. */}
       <script dangerouslySetInnerHTML={{ __html: MOTION_BOOT }} />
 
-      <div className={styles.page}>
+      <div className={styles.page} style={BEBAS_FACE}>
         {/*
           The header starts transparent over a full-bleed hero and only takes on
           its navy backdrop once SiteHeader sets `data-condensed`. With scripting
@@ -101,7 +117,7 @@ export default function CinematicLayout({ children }: { children: React.ReactNod
         <SiteHeader />
 
         {/*
-          This group renders its own document structure instead of PageWrapper's,
+          This group renders its own document structure,
           so the main landmark has to be declared here. It is a plain block
           wrapper — no layout property is set on it, so a page's sections lay out
           exactly as if they were top level. `tabIndex={-1}` is what lets the skip

@@ -5,7 +5,7 @@ import { Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { proofPathFields, validateProofPaths } from '@/lib/sales/proofPaths';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
-import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
+import { validateHasInternetPlan, validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { CLIENT_SALE_ID_RE, priceSaleProducts } from '@/lib/sales/pricing';
 
 // Helper function to create a notification
@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
     // One internet plan per address (Jacob, 2026-09-03). The form makes a
     // second one unreachable; this makes it unwritable, including from a rep's
     // phone still running the old client.
-    const planError = validateOnePlanPerSale(products);
+    const planError = validateOnePlanPerSale(products) ?? validateHasInternetPlan(products, saleType);
     if (planError) {
       return NextResponse.json({ error: planError }, { status: 400 });
     }

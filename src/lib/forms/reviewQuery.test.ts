@@ -1,9 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
 
-vi.mock('@/lib/firebase/admin', () => ({ adminDb: null }));
-vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: vi.fn() }));
+const db = vi.hoisted(() => ({ current: null as unknown }));
+vi.mock('@/lib/firebase/admin', () => ({
+  get adminDb() {
+    return db.current;
+  },
+}));
+vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
+  requireVerifiedManagement: vi.fn(async () => ({ ok: true, uid: 'ops1' })),
+}));
 
-import { mergeReviewDocs } from './reviewQuery';
+import { markHandled, mergeReviewDocs } from './reviewQuery';
 
 const doc = (id: string, status: string, day: number | null) => ({
   id,
@@ -30,5 +38,30 @@ describe('mergeReviewDocs', () => {
     );
     expect(rows.map((r) => r.id)).toEqual(['b', 'a', 'c']);
     expect(rows[0].createdAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('markHandled', () => {
+  const withDoc = (status: string) => {
+    const update = vi.fn();
+    db.current = {
+      collection: () => ({ doc: () => ({}) }),
+      runTransaction: async (fn: (tx: unknown) => Promise<void>) =>
+        fn({ get: async () => ({ exists: true, data: () => ({ status }) }), update }),
+    };
+    return update;
+  };
+  const req = () => new NextRequest('http://localhost/api/x', { method: 'POST' });
+
+  it('flips a new item to handled', async () => {
+    const update = withDoc('new');
+    expect(await markHandled('fiberReports', req(), 'a')).toEqual({ ok: true });
+    expect(update).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers 409 when someone else already handled it, so the queue can treat it as done', async () => {
+    const update = withDoc('handled');
+    expect(await markHandled('fiberReports', req(), 'a')).toEqual({ ok: false, error: 'Already handled', status: 409 });
+    expect(update).not.toHaveBeenCalled();
   });
 });

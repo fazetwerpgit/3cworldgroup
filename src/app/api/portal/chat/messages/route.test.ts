@@ -21,11 +21,19 @@ vi.mock('next/server', async (importOriginal) => {
 });
 
 const sendPushMock = vi.hoisted(() =>
-  vi.fn<(uid: string, payload: { title: string; body: string; url?: string }) => Promise<void>>(
-    async () => undefined
+  vi.fn<(uid: string, tokens: string[], payload: { title: string; body: string; url?: string }) => Promise<unknown>>(
+    async () => ({ delivered: 1, failed: 0 })
   )
 );
-vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: sendPushMock }));
+vi.mock('@/lib/push/sendPush', () => ({ sendPushToTokens: sendPushMock }));
+
+// Recipient user docs the push fan-out re-checks (role/status) before sending.
+const USER_DOCS = vi.hoisted((): Record<string, Record<string, unknown>> => ({
+  'mgr-1': { status: 'active', fieldRole: 'l1_manager', pushTokens: ['tok-mgr'] },
+}));
+
+// Writes made through adminDb.batch() (reply-quote scrubs on DELETE).
+const batchUpdates = vi.hoisted(() => [] as Array<{ id: string; data: Record<string, unknown> }>);
 
 const addMock = vi.fn<(doc: Record<string, unknown>) => Promise<{ id: string }>>(
   async () => ({ id: 'msg123' })
@@ -60,6 +68,13 @@ const MESSAGE_DOCS: Record<string, Record<string, unknown>> = {
   'own-msg': { authorId: 'real-uid', authorName: 'Real User', text: 'my message', deletedAt: null },
   'others-msg': { authorId: 'someone-else', authorName: 'Someone', text: 'not mine', deletedAt: null },
   'deleted-msg': { authorId: 'real-uid', authorName: 'Real User', text: 'was here', deletedAt: { seconds: 1 } },
+  'reply-to-others': {
+    authorId: 'real-uid',
+    authorName: 'Real User',
+    text: 'replying',
+    replyTo: { messageId: 'others-msg', authorName: 'Someone', text: 'not mine' },
+    deletedAt: null,
+  },
 };
 
 // create() on a messages.doc(id): the ids already "stored" reject like the
@@ -80,6 +95,17 @@ function messagesDoc(messageId: string) {
       data: () => MESSAGE_DOCS[messageId],
     })),
     set: msgSetMock,
+  };
+}
+
+// messages.where('replyTo.messageId', '==', id) — the replies quoting a message.
+function messagesWhere(_field: string, _op: string, messageId: string) {
+  return {
+    get: async () => ({
+      docs: Object.entries(MESSAGE_DOCS)
+        .filter(([, data]) => (data.replyTo as { messageId?: string } | undefined)?.messageId === messageId)
+        .map(([id]) => ({ id, ref: { id } })),
+    }),
   };
 }
 
@@ -109,21 +135,30 @@ const CHANNEL_DOCS: Record<string, Record<string, unknown>> = {
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
-    collection: () => ({
-      doc: (channelId: string) => ({
-        get: vi.fn(async () => ({
-          id: channelId,
-          exists: channelId in CHANNEL_DOCS,
-          data: () => CHANNEL_DOCS[channelId],
-        })),
-        set: setMock,
-        collection: () => ({ add: addMock, doc: messagesDoc }),
-      }),
+    collection: (name: string) =>
+      name === 'users'
+        ? { doc: (uid: string) => ({ __user: uid }) }
+        : {
+            doc: (channelId: string) => ({
+              get: vi.fn(async () => ({
+                id: channelId,
+                exists: channelId in CHANNEL_DOCS,
+                data: () => CHANNEL_DOCS[channelId],
+              })),
+              set: setMock,
+              collection: () => ({ add: addMock, doc: messagesDoc, where: messagesWhere }),
+            }),
+          },
+    getAll: async (...refs: Array<{ __user: string }>) =>
+      refs.map((r) => ({ id: r.__user, exists: r.__user in USER_DOCS, data: () => USER_DOCS[r.__user] })),
+    batch: () => ({
+      update: (ref: { id: string }, data: Record<string, unknown>) => batchUpdates.push({ id: ref.id, data }),
+      commit: async () => undefined,
     }),
   },
 }));
 
-import { POST, PATCH } from './route';
+import { POST, PATCH, DELETE } from './route';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 
 const mockGate = getVerifiedChatUser as unknown as ReturnType<typeof vi.fn>;
@@ -184,6 +219,7 @@ beforeEach(() => {
   msgSetMock.mockClear();
   createMock.mockClear();
   createdIds.clear();
+  batchUpdates.length = 0;
   sendPushMock.mockClear();
   afterTasks.length = 0;
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
@@ -411,7 +447,7 @@ describe('POST /api/portal/chat/messages (push fan-out)', () => {
     expect(res.status).toBe(200);
     await flushAfter();
     expect(sendPushMock).toHaveBeenCalledTimes(1);
-    expect(sendPushMock).toHaveBeenCalledWith('mgr-1', {
+    expect(sendPushMock).toHaveBeenCalledWith('mgr-1', ['tok-mgr'], {
       title: 'Managers',
       body: 'Real User: standup in five',
       url: '/portal/chat?channel=managers-extra',
@@ -436,7 +472,7 @@ describe('POST /api/portal/chat/messages (push fan-out)', () => {
     );
     expect(res.status).toBe(200);
     await flushAfter();
-    expect(sendPushMock.mock.calls[0][1]).toMatchObject({ body: 'Real User sent a photo' });
+    expect(sendPushMock.mock.calls[0][2]).toMatchObject({ body: 'Real User sent a photo' });
   });
 });
 
@@ -539,5 +575,32 @@ describe('PATCH /api/portal/chat/messages (edit own)', () => {
     expect(payload).not.toHaveProperty('attachment');
     expect(payload).not.toHaveProperty('replyTo');
     expect(payload).not.toHaveProperty('reactions');
+  });
+});
+
+describe('DELETE /api/portal/chat/messages', () => {
+  function deleteReq(body: unknown) {
+    return new NextRequest('http://localhost/api/portal/chat/messages', {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('clears the text, attachment and pin of the deleted message', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'own-msg' }));
+    expect(res.status).toBe(200);
+    const [payload, options] = msgSetMock.mock.calls[0];
+    expect(payload).toMatchObject({ deletedBy: 'real-uid', text: '', isPinned: false, pinnedAt: null });
+    expect(payload).toHaveProperty('attachment');
+    expect(payload).toHaveProperty('hasAttachment');
+    expect(options?.merge).toBe(true);
+  });
+
+  it('replaces the quoted text in replies to the deleted message', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'others-msg' }));
+    expect(res.status).toBe(200);
+    expect(batchUpdates).toEqual([{ id: 'reply-to-others', data: { 'replyTo.text': 'Message deleted' } }]);
   });
 });

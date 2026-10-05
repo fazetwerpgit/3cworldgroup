@@ -137,3 +137,21 @@ describe('what a rep logged, under the carrier rows', () => {
     expect(submittedAddresses()).toEqual(['58030 Jewwel Rd.']);
   });
 });
+
+describe('before the first answer arrives', () => {
+  it('an admin sees the loading state, then Retry when the first load fails', async () => {
+    const refetch = vi.fn(async () => {});
+    await render({ fiber: { data: null, loading: true, error: null, refetch }, adminView: true });
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+
+    await render({ fiber: { data: null, loading: false, error: 'Network down', refetch }, adminView: true });
+    const retry = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Retry')!;
+    await act(async () => retry.click());
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('a rep still sees nothing', async () => {
+    await render({ fiber: { data: null, loading: false, error: 'Network down', refetch: async () => {} } });
+    expect(container.innerHTML).toBe('');
+  });
+});

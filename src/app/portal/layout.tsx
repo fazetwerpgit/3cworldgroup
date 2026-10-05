@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { Archivo } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
@@ -22,9 +23,23 @@ export const viewport = {
   themeColor: "#070f1c",
 };
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Employee Portal | 3C World Group",
   description: "3C World Group employee portal - access your dashboard, training, and resources.",
+  robots: { index: false, follow: false },
+  // PWA: manifest (public/manifest.webmanifest) + iOS home-screen app behavior.
+  // Linked from the portal only, so the public site never offers to install it.
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    // Not "black-translucent": with viewport-fit=cover, iOS 26+ standalone
+    // sizes the web view one status bar (~59pt on Dynamic Island phones) short
+    // and leaves an unpaintable strip under the fixed tab bar (WebKit bug
+    // 301108). "default" gives an opaque status bar tinted by theme-color and
+    // a correctly sized view; safe-area-inset-top then reads 0.
+    statusBarStyle: "default",
+    title: "3C Console",
+  },
 };
 
 export default function PortalLayout({

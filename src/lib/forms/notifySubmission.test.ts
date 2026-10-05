@@ -25,7 +25,7 @@ vi.mock('@/lib/email/sendEmail', () => ({
 
 import { notifySubmission, FORM_ALERTS } from './notifySubmission';
 
-type MockUser = { id: string; role?: string; fieldRole?: string; email?: string; Email?: string };
+type MockUser = { id: string; role?: string; fieldRole?: string; status?: string; email?: string; Email?: string };
 
 function usersSnapshot(users: MockUser[]) {
   // collection('users').get() returns the list; collection('users').doc(id).get()
@@ -34,7 +34,12 @@ function usersSnapshot(users: MockUser[]) {
     const u = users.find((x) => x.id === id);
     return { get: (field: string) => (u as Record<string, unknown> | undefined)?.[field] };
   });
-  return { docs: users.map((u) => ({ id: u.id, data: () => ({ role: u.role, fieldRole: u.fieldRole }) })) };
+  return {
+    docs: users.map((u) => ({
+      id: u.id,
+      data: () => ({ role: u.role, fieldRole: u.fieldRole, status: u.status ?? 'active' }),
+    })),
+  };
 }
 
 beforeEach(() => {
@@ -62,6 +67,19 @@ describe('notifySubmission', () => {
       .map((c) => (c[0] as unknown as { userId: string }).userId)
       .sort();
     expect(targetedUids).toEqual(['admin1', 'ops1']);
+  });
+
+  it('skips deactivated management users for bells and emails', async () => {
+    alertDocGet.mockResolvedValue({ exists: false });
+    usersGet.mockResolvedValue(
+      usersSnapshot([
+        { id: 'ops1', role: 'operations', email: 'ops@x.com' },
+        { id: 'ops2', role: 'operations', status: 'inactive', email: 'gone@x.com' },
+      ])
+    );
+    await notifySubmission('fiber-report', 'Rep One');
+    expect(notifAdd.mock.calls.map((c) => c[0].userId)).toEqual(['ops1']);
+    expect(sendEmailMock.mock.calls.map((c) => c[0].to)).toEqual(['ops@x.com']);
   });
 
   it('deep-links the notification to the form review page', async () => {

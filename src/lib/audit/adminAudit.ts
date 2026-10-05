@@ -5,7 +5,8 @@ export type AdminAuditAction =
   | 'user.delete'
   | 'user.decommission'
   | 'user.reinstate'
-  | 'compPlan.update';
+  | 'compPlan.update'
+  | 'commission.update';
 
 export interface AdminAuditEntry {
   action: AdminAuditAction;

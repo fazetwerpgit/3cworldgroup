@@ -9,7 +9,7 @@ import {
   type InstallBucket,
   type InstallCounts,
 } from '@/lib/sales/installBucket';
-import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
+import { linkedSaleId, matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import type { MonthKey } from '@/lib/sales/monthWindow';
 
 // One book. The admin Sales page used to show two lists that disagreed: the
@@ -206,18 +206,6 @@ function byMonthThenBucket(a: MergedRow, b: MergedRow): number {
     return b.month.year - a.month.year || b.month.month - a.month.month;
   }
   return byBucketThenDate(a, b);
-}
-
-/**
- * The explicit join. `saleLink` is an admin saying "this order IS that sale" or
- * "this order is NOT any sale"; either way it outranks the address guess, which
- * is only ever a guess.
- */
-function linkedSaleId(order: FiberOrder): { linked: true; saleId: string | null } | { linked: false } {
-  const link = order.saleLink;
-  if (!link) return { linked: false };
-  const saleId = text(link.saleId);
-  return { linked: true, saleId };
 }
 
 function saleRow(

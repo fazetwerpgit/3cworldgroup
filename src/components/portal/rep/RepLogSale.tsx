@@ -343,7 +343,11 @@ export function RepLogSale() {
       ) : (
         <p className={l.estPay}>
           <span className={s.kicker}>Est. pay</span>
-          {est !== null ? (
+          {/* A 0 means the plan has no contracted rate for it yet — the Sales
+              rows say "Rate pending" for that, never a confident $0. */}
+          {est === 0 ? (
+            <span className={l.estNone}>Rate pending</span>
+          ) : est !== null ? (
             <span className={l.estNum}>
               <Amount value={est} />
             </span>

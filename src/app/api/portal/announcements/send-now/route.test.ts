@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { create, sendAnnouncement, docIds } = vi.hoisted(() => ({
+const { create, sendAnnouncement, docIds, stored, txUpdate } = vi.hoisted(() => ({
   create: vi.fn(),
   sendAnnouncement: vi.fn(),
   docIds: [] as string[],
+  // Status of the doc an ALREADY_EXISTS retry reads.
+  stored: { status: 'sent' } as Record<string, unknown>,
+  txUpdate: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: vi.fn() }));
@@ -19,6 +22,8 @@ vi.mock('@/lib/firebase/admin', () => ({
         },
       };
     },
+    runTransaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({ get: async () => ({ get: (field: string) => stored[field] }), update: txUpdate }),
   },
 }));
 vi.mock('@/lib/announcements/send', () => ({ ANNOUNCEMENTS: 'announcements', sendAnnouncement }));
@@ -88,10 +93,33 @@ describe('POST /api/portal/announcements/send-now', () => {
 
   it('never sends twice for a repeated requestId', async () => {
     gate.mockResolvedValue(OWNER);
+    stored.status = 'sent';
     create.mockRejectedValue(Object.assign(new Error('ALREADY_EXISTS'), { code: 6 }));
     const res = await post(valid);
     expect(res.status).toBe(409);
     expect(sendAnnouncement).not.toHaveBeenCalled();
+  });
+
+  it('retries a send that failed, under the same requestId', async () => {
+    gate.mockResolvedValue(OWNER);
+    stored.status = 'failed';
+    txUpdate.mockClear();
+    create.mockRejectedValue(Object.assign(new Error('ALREADY_EXISTS'), { code: 6 }));
+    const res = await post(valid);
+    expect(res.status).toBe(200);
+    expect(txUpdate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: 'scheduled' }));
+    expect(sendAnnouncement).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to retry a failed send whose pushes had already started', async () => {
+    gate.mockResolvedValue(OWNER);
+    stored.status = 'failed';
+    stored.fanOutStarted = true;
+    create.mockRejectedValue(Object.assign(new Error('ALREADY_EXISTS'), { code: 6 }));
+    const res = await post(valid);
+    expect(res.status).toBe(409);
+    expect(sendAnnouncement).not.toHaveBeenCalled();
+    delete stored.fanOutStarted;
   });
 
   it('409s when the claim was lost to another run', async () => {

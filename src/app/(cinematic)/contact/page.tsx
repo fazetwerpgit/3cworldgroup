@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { getImageProps } from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: "Contact | 3C World Group",
   description:
     "Get in touch with 3C World Group. Join as a sales rep, bring or build a team, or ask about the services we represent.",
+  alternates: { canonical: "/contact" },
 };
 
 /**
@@ -38,6 +39,25 @@ const PATHS = [
   { kind: "Leading a crew", title: "Bring or build a team", href: "/opportunities" },
   { kind: "Anything else", title: "Services & support", href: "/services" },
 ];
+
+/*
+  The head mark as plain <img> attributes, for the <picture> in the markup:
+  below 901px the mark is `display: none`, and a hidden next/image with
+  `priority` was still preloaded and fetched on every phone (106KB at w=1920).
+  No preload link above 900px either, for the reason measured on Home: the
+  server-rendered <img> with fetchpriority="high" is found by the preload
+  scanner just as early.
+*/
+const { props: headMark } = getImageProps({
+  src: "/redesign/contact-three-c-hd-x4f.webp",
+  alt: "",
+  width: 1395,
+  height: 1140,
+  sizes: "(max-width: 1023px) 34rem, 44vw",
+});
+
+/* A 1x1 transparent GIF: what <picture> picks where the mark is hidden, so nothing is requested. */
+const NO_IMAGE = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
 export default function ContactPage() {
   return (
@@ -89,15 +109,17 @@ export default function ContactPage() {
           a frame apart and start the line before the mark was solid.
         */}
         <div className={styles.headArt} aria-hidden="true" data-reveal>
-          <Image
-            src="/redesign/contact-three-c-hd-x4f.webp"
-            alt=""
-            width={1395}
-            height={1140}
-            priority
-            sizes="(max-width: 1023px) 34rem, 44vw"
-            className={styles.headArtImage}
-          />
+          {/* The breakpoint is the one contact.module.css hides .headArt at. */}
+          <picture>
+            <source media="(max-width: 900px)" srcSet={NO_IMAGE} />
+            <img
+              {...headMark}
+              alt=""
+              className={styles.headArtImage}
+              fetchPriority="high"
+              loading="eager"
+            />
+          </picture>
 
           <span className={styles.headTrail}>
             <svg

@@ -58,12 +58,15 @@ export async function GET(request: NextRequest) {
         if (!data.userId || !known || isEsignItem(data.itemId)) return [];
         return [{ userId: String(data.userId), submittedAt: data.submittedAt?.toDate?.() ?? null }];
       });
-      // Same rule as the full queue: a deleted account's items are not waiting on anyone.
+      // Same rule as the full queue: a deleted or inactive (rejected,
+      // decommissioned) account's items are not waiting on anyone.
       const ids = [...new Set(rows.map((row) => row.userId))];
       const accounts = ids.length
         ? await adminDb.getAll(...ids.map((id) => adminDb!.collection('users').doc(id)))
         : [];
-      const existing = new Set(accounts.filter((doc) => doc.exists).map((doc) => doc.id));
+      const existing = new Set(
+        accounts.filter((doc) => doc.exists && doc.data()?.status !== 'inactive').map((doc) => doc.id)
+      );
       const submissions = rows
         .filter((row) => existing.has(row.userId))
         .map((row) => ({ submittedAt: row.submittedAt }));
@@ -97,7 +100,8 @@ export async function GET(request: NextRequest) {
     if (missing.length > 0) {
       const userDocs = await adminDb.getAll(...missing.map((id) => adminDb!.collection('users').doc(id)));
       for (const doc of userDocs) {
-        if (doc.exists) users.set(doc.id, doc.data() ?? {});
+        // An inactive (rejected/decommissioned) hire's items wait on no one.
+        if (doc.exists && doc.data()?.status !== 'inactive') users.set(doc.id, doc.data() ?? {});
       }
     }
 
@@ -320,7 +324,7 @@ export async function POST(request: NextRequest) {
     const currentEnvelopeId = isRejectedEsign
       ? (doc.get('esignEnvelopeId') as string | undefined)
       : undefined;
-    await docRef.update({
+    const update = {
       status,
       reviewedBy: gate.uid,
       reviewerName: gate.name,
@@ -337,7 +341,22 @@ export async function POST(request: NextRequest) {
           }
         : {}),
       updatedAt: now,
-    });
+    };
+    // Precondition on the read: two reviewers acting at once must not both
+    // succeed (double emails, last write wins after activation fired).
+    try {
+      if (doc.updateTime) await docRef.update(update, { lastUpdateTime: doc.updateTime });
+      else await docRef.update(update);
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+      if (code === 9 || code === 'failed-precondition') {
+        return NextResponse.json(
+          { error: 'This item was just reviewed by someone else. Refresh and try again.' },
+          { status: 409 }
+        );
+      }
+      throw error;
+    }
 
     if (isRejectedEsign) {
       // The signing URL is a bearer capability for the superseded envelope -

@@ -126,7 +126,7 @@ const GROUP_NOTE: Record<PayGroup['kind'], string> = {
 };
 
 /** "Sep 21–25 · est. $280" — a pay period, always a range, always an estimate. */
-function PayGroupHead({ group, hasPlan }: { group: PayGroup; hasPlan: boolean }) {
+export function PayGroupHead({ group, hasPlan }: { group: PayGroup; hasPlan: boolean }) {
   const installs = group.window
     ? `installs ${formatDate(group.window.installFrom)}–${group.window.installTo.getDate()}`
     : null;
@@ -253,8 +253,9 @@ export function SalesTable({
   // The total under the list is MONEY, so a cancellation leaves it — whoever
   // cancelled it, us or the carrier. The row itself stays on screen, marked.
   const totalValue = countedSales(listSales, fiberBySale).reduce((sum, sale) => sum + (sale.totalValue || 0), 0);
+  // Whole dollars per row first, as each row prints, so the total adds up.
   const expectedTotal = hasPlan
-    ? listSales.reduce((sum, sale) => sum + (expectedBySale[sale.id || ''] ?? 0), 0)
+    ? listSales.reduce((sum, sale) => sum + Math.round(expectedBySale[sale.id || ''] ?? 0), 0)
     : null;
   const fiberBucketCounts = useMemo(() => {
     const counts: Record<FiberBucket, number> = { pending: 0, active: 0, cancelled: 0, attention: 0 };

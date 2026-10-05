@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOnboardingBucket } from '@/lib/firebase/admin';
+import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { validateFormUpload, resolveFormUploadFolder, resolveUploadMime } from '@/lib/forms/formUploads';
+import {
+  validateFormUpload,
+  resolveFormUploadFolder,
+  sniffUploadMime,
+  SUBMISSION_COLLECTION,
+} from '@/lib/forms/formUploads';
 
 // POST /api/portal/forms/upload - verified user uploads a form attachment.
 // Writes ONLY under the verified caller's own folder. Payroll Dispute / Leads
@@ -26,8 +31,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // iOS can send a HEIC with an empty type: judge it by its extension then.
-    const mime = resolveUploadMime(file.type, file.name);
+    // A submitted record's proof is final: its uploadId folder can't be rewritten.
+    const collection = SUBMISSION_COLLECTION[formType];
+    if (collection) {
+      if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+      const used = await adminDb.collection(collection).where('uploadId', '==', uploadId).limit(1).get();
+      if (!used.empty) {
+        return NextResponse.json({ error: 'This request was already sent. Start a new one to attach a file.' }, { status: 409 });
+      }
+    }
+
+    // The stored type comes from the file's own bytes, never the declared type
+    // or name, so a file can't pass as something it isn't.
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const mime = sniffUploadMime(buffer) ?? '';
     const check = validateFormUpload({ mime, size: file.size });
     if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 });
 
@@ -40,7 +57,6 @@ export async function POST(request: NextRequest) {
     // replaces the caller's own not-yet-submitted file, never another record's.
     await bucket.deleteFiles({ prefix: folder, force: true });
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     await bucket.file(objectPath).save(buffer, { contentType: mime, resumable: false });
 
     return NextResponse.json({ path: folder });

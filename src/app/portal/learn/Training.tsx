@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useTraining } from '@/hooks/useTraining';
+import { trainingProgress, useTraining } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { TrainingCategory, ResourceType, TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
+import { TrainingCategory, TrainingResource, ResourceType, TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 import { LoadFailed, ModuleList, ProgressCard, RowsSkeleton, ShortsEmpty } from '@/components/portal/rep/RepLearn';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -25,14 +25,13 @@ export function Training() {
     error,
     fetchResources,
     fetchProgress,
-    getIncompleteRequired,
   } = useTraining();
 
   const initialTab: TrainingTab = searchParams.get('view') === 'shorts' ? 'shorts' : 'path';
   const [activeTab, setActiveTab] = useState<TrainingTab>(initialTab);
   const [categoryFilter, setCategoryFilter] = useState<TrainingCategory | ''>('');
   const [typeFilter, setTypeFilter] = useState<ResourceType | ''>('');
-  const [unfilteredResourceCount, setUnfilteredResourceCount] = useState(0);
+  const [allResources, setAllResources] = useState<TrainingResource[] | null>(null);
   // The hook starts with an empty list; don't show "no modules" before the first answer.
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -65,8 +64,8 @@ export function Training() {
           headers: { Authorization: `Bearer ${token ?? ''}` },
         });
         if (!response.ok) return;
-        const data = await response.json() as { resources?: unknown[] };
-        if (active) setUnfilteredResourceCount(data.resources?.length ?? 0);
+        const data = await response.json() as { resources?: TrainingResource[] };
+        if (active) setAllResources(data.resources ?? []);
       } catch {
         // The filtered list still renders when the count request is unavailable.
       }
@@ -76,10 +75,9 @@ export function Training() {
   }, [user]);
 
   const loaded = loadedKey === requestKey;
-  const incompleteRequired = getIncompleteRequired();
-  const totalModules = Math.max(unfilteredResourceCount, resources.length);
-  const completedModules = Object.values(progress).filter((entry) => entry.completed).length;
-  const showFilters = activeTab === 'path' && unfilteredResourceCount >= 4;
+  // Progress and required-left read the whole published list, not the filtered one.
+  const { completed: completedModules, total: totalModules, requiredLeft } = trainingProgress(allResources ?? resources, progress);
+  const showFilters = activeTab === 'path' && (allResources?.length ?? 0) >= 4;
   const filtered = Boolean(categoryFilter || typeFilter);
 
   return (
@@ -87,9 +85,9 @@ export function Training() {
       <div className={`${l.col} ${l.side}`}>
         {totalModules > 0 ? (
           <ProgressCard
-            completed={Math.min(completedModules, totalModules)}
+            completed={completedModules}
             total={totalModules}
-            requiredLeft={incompleteRequired.length}
+            requiredLeft={requiredLeft.length}
           />
         ) : null}
       </div>

@@ -5,6 +5,7 @@ import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { activationEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
 import { sendOnboardingPacket } from '@/lib/onboarding/ownerNotify';
+import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import {
   getOnboardingItemsForUser,
   type OnboardingItem,
@@ -54,6 +55,34 @@ export async function getActivationReadiness(userId: string): Promise<Activation
   return computeReadiness(applicable, await loadStatuses(userId));
 }
 
+/**
+ * Marks the user's open invites and their linked applications 'converted'.
+ * Every activation path runs this so Invites/Applicants never keep an active
+ * rep as 'Submitted' (where Reject would deactivate them).
+ */
+export async function closeOutInvitesForUser(userId: string, now = new Date()): Promise<void> {
+  if (!adminDb) return;
+  const snap = await adminDb.collection('onboardingInvites').where('convertedUserId', '==', userId).get();
+  const writes: Promise<unknown>[] = [];
+  snap.forEach((doc) => {
+    const status = doc.get('status');
+    if (status === 'converted' || status === 'rejected') return;
+    writes.push(
+      doc.ref.set({ status: 'converted', convertedUserId: userId, updatedAt: now }, { merge: true })
+    );
+    const applicationId = doc.get('applicationId');
+    if (typeof applicationId === 'string' && applicationId) {
+      writes.push(
+        adminDb!
+          .collection('applications')
+          .doc(applicationId)
+          .set({ status: 'converted', convertedUserId: userId, updatedAt: now }, { merge: true })
+      );
+    }
+  });
+  await Promise.all(writes);
+}
+
 /** Activate a ready user and send the single active-account notification. */
 export async function activateUser(
   userId: string
@@ -79,7 +108,20 @@ export async function activateUser(
     updatedAt: now,
   });
 
+  // The graduated role can reach different chat channels than the onboarding one.
+  try {
+    await reconcileChatMembershipForUser(userId);
+  } catch (error) {
+    console.error('[onboarding] chat membership reconcile failed', { userId, error });
+  }
+
   await resolveAlertTasks(userId);
+
+  try {
+    await closeOutInvitesForUser(userId, now);
+  } catch (error) {
+    console.error('[onboarding] invite close-out failed', { userId, error });
+  }
 
   const name = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
   await dispatchToUser({

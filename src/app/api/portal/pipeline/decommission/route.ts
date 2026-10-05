@@ -3,9 +3,23 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
+import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
+import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { DecommissionReason, DecommissionReasonLabels, isManagementRole } from '@/types';
 
 const VALID_REASONS: DecommissionReason[] = ['non_activity', 'wrongdoing', 'manager_fire'];
+
+/**
+ * True for an account that came in through an invite and never went active:
+ * no activation stamp and the invite never converted. Veteran reps (no
+ * invite, or activated) are false.
+ */
+async function neverFinishedOnboarding(data: FirebaseFirestore.DocumentData | undefined): Promise<boolean> {
+  const inviteId = data?.onboardingInviteId;
+  if (!adminDb || typeof inviteId !== 'string' || data?.activatedAt) return false;
+  const invite = await adminDb.collection('onboardingInvites').doc(inviteId).get();
+  return invite.exists && invite.data()?.status !== 'converted';
+}
 
 // POST /api/portal/pipeline/decommission - Deactivate a rep with an audit
 // trail. Sets status 'inactive', disables the Firebase auth account and revokes
@@ -69,6 +83,9 @@ export async function POST(request: NextRequest) {
     await docRef.update({
       status: 'inactive',
       decommission: {
+        // Reinstate returns them here (a pending hire must not come back active).
+        // An already-inactive user stores none; reinstate then derives it.
+        ...(data?.status === 'pending' || data?.status === 'active' ? { previousStatus: data.status } : {}),
         reason,
         notes: typeof notes === 'string' ? notes.trim().slice(0, 1000) : '',
         decommissionedBy: gate.uid,
@@ -93,6 +110,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Drop them from every chat channel's memberIds (Firestore reads + pushes).
+    try {
+      await reconcileChatMembershipForUser(userId);
+    } catch (err) {
+      console.error('Decommission: failed to reconcile chat membership', userId, err);
+    }
+
+    // Their open tasks (unclaimed, stalled, review, activation) are moot now;
+    // left open they re-nag admins daily.
+    try {
+      await resolveAlertTasks(userId);
+    } catch (err) {
+      console.error('Decommission: failed to resolve alert tasks', userId, err);
+    }
+
     await writeAdminAudit({
       action: 'user.decommission',
       actorUid: gate.uid,
@@ -115,8 +147,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE /api/portal/pipeline/decommission - Reinstate a decommissioned rep
-// (undo path: clears the audit record and reactivates the account).
+// DELETE /api/portal/pipeline/decommission - Reinstate an inactive rep (undo
+// path: clears any decommission record and restores their prior status). Also
+// covers reps made inactive elsewhere (rejected invite, People), which Pipeline
+// lists as decommissioned.
 export async function DELETE(request: NextRequest) {
   try {
     if (!adminDb) {
@@ -146,18 +180,37 @@ export async function DELETE(request: NextRequest) {
     if (!doc.exists) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-    if (!doc.data()?.decommission) {
+    const data = doc.data();
+    // An active user can still carry a decommission marker: before Oct 1,
+    // reactivating in People left it behind, and Pipeline still lists them as
+    // decommissioned. Reinstate clears it and keeps them active.
+    const staleMarker = data?.status === 'active' && !!data?.decommission;
+    if ((data?.status !== 'inactive' && !staleMarker) || isManagementRole(data?.role)) {
       return NextResponse.json(
         { error: 'User is not decommissioned' },
         { status: 400 }
       );
     }
     // Read before the update: this is the state being undone, and the audit row needs it.
-    const previousReason = doc.data()?.decommission?.reason ?? null;
-    const targetName = doc.data()?.displayName;
+    const previousReason = data?.decommission?.reason ?? null;
+    const targetName = data?.displayName;
+    const storedStatus = data?.decommission?.previousStatus;
+    // Records written before previousStatus existed come back active, as they
+    // always did: most belong to veteran reps who never had a checklist. Only
+    // an account that never finished onboarding goes back to pending: one
+    // that came in through an invite, was never activated, and whose invite
+    // never converted (e.g. a recruit rejected from Invites).
+    let status: 'active' | 'pending';
+    if (staleMarker) {
+      status = 'active';
+    } else if (storedStatus === 'active' || storedStatus === 'pending') {
+      status = storedStatus;
+    } else {
+      status = (await neverFinishedOnboarding(data)) ? 'pending' : 'active';
+    }
 
     await docRef.update({
-      status: 'active',
+      status,
       decommission: FieldValue.delete(),
       updatedAt: new Date(),
     });
@@ -173,6 +226,13 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
+    // Back into the channels their role reaches.
+    try {
+      await reconcileChatMembershipForUser(userId);
+    } catch (err) {
+      console.error('Reinstate: failed to reconcile chat membership', userId, err);
+    }
+
     // Reinstating deletes the decommission record from the user doc, so this row
     // is the only lasting trace of who reinstated them and what it undid.
     await writeAdminAudit({
@@ -181,10 +241,10 @@ export async function DELETE(request: NextRequest) {
       actorName: gate.name,
       targetUid: userId,
       targetName: targetName || undefined,
-      details: { previousReason },
+      details: { previousReason, restoredStatus: status },
     });
 
-    return NextResponse.json({ success: true, message: 'User reinstated' });
+    return NextResponse.json({ success: true, message: 'User reinstated', status });
   } catch (error) {
     console.error('Error reinstating user:', error);
     return NextResponse.json(

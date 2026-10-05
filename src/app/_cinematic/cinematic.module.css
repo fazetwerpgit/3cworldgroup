@@ -7,9 +7,6 @@
    composition — a hero, a route drawing, a market explorer — stays in the
    page's own module and imports from this one.
 
-   Nothing here extends, patches or overrides public.css. The (cinematic) group
-   bypasses PageWrapper so that cascade never reaches it.
-
    Token names and values are documented in docs/cinematic/DESIGN.md; authoring
    notes are in docs/cinematic/PAGE-KIT.md.
    ========================================================================== */
@@ -43,7 +40,8 @@
     local("Liberation Sans"),
     local("DejaVu Sans"),
     local("Roboto");
-  size-adjust: 57%;
+  /* Bebas caps over Arial caps across the site's headings: 0.5725. */
+  size-adjust: 57.25%;
   ascent-override: 90%;
   descent-override: 30%;
   line-gap-override: 0%;
@@ -74,7 +72,8 @@
   */
   --accent: var(--lime);
 
-  --display: "Bebas Neue", "Display Fallback", var(--font-geist-sans), sans-serif;
+  /* --font-bebas is set on .page by the group layout (next/font, preloaded). */
+  --display: var(--font-bebas), "Display Fallback", var(--font-geist-sans), sans-serif;
   --body: var(--font-geist-sans), system-ui, sans-serif;
 
   /* Round 5 — the shell was 78rem (1248px), which on the 1740px display the
@@ -131,6 +130,19 @@
   overflow-x: clip;
   position: relative;
   scrollbar-color: rgba(141, 198, 63, 0.4) var(--ink-deep);
+}
+
+/*
+  Keyboard focus scrolls by the root's scroll-padding, not by an element's
+  scroll-margin, so without this a control tabbed to from below lands under
+  the fixed header (62-66px condensed). 4.75rem clears it plus the focus
+  ring. Anchor targets still set their own scroll-margin-top, written as
+  `calc(<old offset> - var(--header-clear))` so the two add up to where the
+  jump landed before. Custom properties inherit, so `.page` can read it.
+*/
+:global(html):has(.page) {
+  --header-clear: 4.75rem;
+  scroll-padding-top: var(--header-clear);
 }
 
 /* Browser surfaces the design still owns. */
@@ -852,7 +864,10 @@
   font-size: clamp(1.125rem, 1.3vw, 1.25rem);
   line-height: 1.55;
   margin-top: 1.5rem;
-  max-width: 36ch;
+  /* 36 Geist zeros (0.663em each). Not `ch`: ch follows the active font, and
+     the fallback's is narrower, so the lede rewrapped when Geist arrived and
+     moved the bottom-aligned head. Same for the em widths below. */
+  max-width: 23.9em;
   text-shadow: 0 1px 14px rgba(3, 13, 31, 0.6);
 }
 
@@ -882,7 +897,7 @@
   composes: pageHeadLede;
   color: var(--on-ink-dim);
   margin-top: 0;
-  max-width: 54ch;
+  max-width: 35.8em;
   text-shadow: none;
 }
 
@@ -982,25 +997,25 @@
 .surfaceInk {
   background: var(--ink);
   color: var(--on-ink);
-  scroll-margin-top: 5.5rem;
+  scroll-margin-top: calc(5.5rem - var(--header-clear));
 }
 
 .surfaceInkDeep {
   background: var(--ink-deep);
   color: var(--on-ink);
-  scroll-margin-top: 5.5rem;
+  scroll-margin-top: calc(5.5rem - var(--header-clear));
 }
 
 .surfacePaper {
   background: var(--paper);
   color: var(--on-paper);
-  scroll-margin-top: 5.5rem;
+  scroll-margin-top: calc(5.5rem - var(--header-clear));
 }
 
 .surfacePaperRaise {
   background: var(--paper-raise);
   color: var(--on-paper);
-  scroll-margin-top: 5.5rem;
+  scroll-margin-top: calc(5.5rem - var(--header-clear));
 }
 
 /* Declared after `.page ::selection` so the paper sections win on order. */
@@ -1525,7 +1540,7 @@
   }
 
   .pageHeadLede {
-    max-width: 40ch;
+    max-width: 26.5em;
   }
 }
 

@@ -9,10 +9,6 @@ import { isPromotionRole, validateSignatureDataUrl, isEmailShaped } from '@/lib/
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
 }
-// Coerce a truthy Yes/No answer to boolean (used for the optional promotion Qs).
-function yn(v: unknown): boolean {
-  return v === true || v === 'yes' || v === 'Yes';
-}
 // Strict Yes/No for REQUIRED decision fields: returns null when the value is
 // missing or not an explicit yes/no, so the route can reject it rather than
 // silently recording a "No".
@@ -76,11 +72,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Answer Did Candidate Show and Extend Offer' }, { status: 400 });
     }
 
-    // Promotion-only answers apply only for promotion roles; drop otherwise.
+    // Promotion-only answers apply only for promotion roles (dropped otherwise),
+    // and there they are required decisions too.
     const promo = isPromotionRole(jobPosition);
-    const completedProduction = promo ? yn(body.completedProduction) : '';
-    const completedReading = promo ? yn(body.completedReading) : '';
-    const completedTeamMetric = promo ? yn(body.completedTeamMetric) : '';
+    const completedProduction = promo ? requiredYesNo(body.completedProduction) : '';
+    const completedReading = promo ? requiredYesNo(body.completedReading) : '';
+    const completedTeamMetric = promo ? requiredYesNo(body.completedTeamMetric) : '';
+    if (completedProduction === null || completedReading === null || completedTeamMetric === null) {
+      return NextResponse.json({ error: 'Answer every promotion question' }, { status: 400 });
+    }
 
     const { id } = await submitFormRecord(
       'managerInterviews',

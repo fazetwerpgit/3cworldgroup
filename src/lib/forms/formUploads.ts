@@ -53,6 +53,29 @@ export function validateFormUpload(input: {
   return { ok: true, ext };
 }
 
+// ISO-BMFF major brands of an iPhone/Android HEIC or generic HEIF photo.
+const MIME_BY_HEIF_BRAND: Record<string, string> = {
+  heic: 'image/heic', heix: 'image/heic', hevc: 'image/heic', hevx: 'image/heic',
+  heim: 'image/heic', heis: 'image/heic', hevm: 'image/heic', hevs: 'image/heic',
+  mif1: 'image/heif', msf1: 'image/heif',
+};
+
+/**
+ * The type a file really is, read from its first bytes, or null when it is
+ * none of the accepted types. The server stores this, never the declared type,
+ * so a file can't be saved as a PDF when it is a PNG (or anything else).
+ */
+export function sniffUploadMime(bytes: Uint8Array): string | null {
+  const ascii = (start: number, end: number) => String.fromCharCode(...bytes.subarray(start, end));
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg';
+  if (ascii(0, 8) === '\x89PNG\r\n\x1a\n') return 'image/png';
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return 'image/webp';
+  // Readers accept a PDF header anywhere in the first 1 KB.
+  if (ascii(0, 1024).includes('%PDF-')) return 'application/pdf';
+  if (ascii(4, 8) === 'ftyp') return MIME_BY_HEIF_BRAND[ascii(8, 12)] ?? null;
+  return null;
+}
+
 // Legacy layout (no per-submission id): form-attachments/{uid}/{formType}/[{slot}/].
 // Still used by sale-proof (whose slot IS a per-sale id) and to read old records.
 export function buildFormAttachmentFolder(uid: string, formType: string, slot?: string): string {
@@ -84,6 +107,13 @@ export function isAllowedFormUpload(formType: string, slot: string): boolean {
 // Format: 32 lowercase hex (randomHex, the dash-stripped randomUUID shape).
 const FORM_UPLOAD_ID = /^[0-9a-f]{32}$/;
 const PER_SUBMISSION_FORMS = new Set(['payroll-dispute', 'leads-request']);
+
+// Where each per-submission form's records live: once a record carries an
+// uploadId, that folder is that record's proof and can no longer be replaced.
+export const SUBMISSION_COLLECTION: Record<string, string> = {
+  'payroll-dispute': 'payrollDisputes',
+  'leads-request': 'leadsRequests',
+};
 
 export function newFormUploadId(): string {
   return randomHex();

@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
       userDoc.data()?.role,
       userDoc.data()?.fieldRole
     );
-    // Same list the Managers chat channel and the alert broadcast use: L1/L2,
+    // Same list the Managers chat channel uses: L1/L2,
     // IBO levels, general / office / regional managers and directors.
     const seesManagerCalls = !!role || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false);
 
@@ -180,8 +180,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    const body = await request.json();
-    const { callId } = body;
+    const body = await request.json().catch(() => null);
+    const callId = body && typeof body.callId === 'string' ? body.callId : '';
     if (!callId) {
       return NextResponse.json(
         { error: 'Missing required field: callId' },

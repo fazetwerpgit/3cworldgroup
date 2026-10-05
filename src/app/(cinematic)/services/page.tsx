@@ -10,6 +10,7 @@ export const metadata: Metadata = {
   title: "Our Services | 3C World Group",
   description:
     "Explore fiber internet, TV, and security solutions from 3C World Group.",
+  alternates: { canonical: "/services" },
 };
 
 /**
@@ -170,7 +171,8 @@ export default function ServicesPage() {
                   src={service.image}
                   alt={service.alt}
                   fill
-                  sizes="(max-width: 900px) 100vw, 46vw"
+                  // Band 01 is drawn at bandArtTight's 1.7x zoom, so it needs 1.7x the pixels.
+                  sizes={i === 0 ? "(max-width: 900px) 170vw, 79vw" : "(max-width: 900px) 100vw, 46vw"}
                   className={styles.bandImage}
                   style={{ objectPosition: service.position }}
                 />

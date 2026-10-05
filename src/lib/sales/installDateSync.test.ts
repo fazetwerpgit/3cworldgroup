@@ -24,6 +24,7 @@ vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
 import { carrierOrderForSale, syncInstallDatesFromOrders } from './installDateSync';
 import { dateToSaleDateInput, installDayKey } from './saleDate';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
+import { planCarrierNotices } from '@/lib/fiberReport/carrierNotice';
 import type { FiberOrder } from '@/types/fiberOrder';
 
 const NOW = new Date('2026-09-14T17:00:00.000Z');
@@ -235,6 +236,40 @@ describe('syncInstallDatesFromOrders', () => {
     expect(result).toMatchObject({ checked: 1, updated: 0, skippedCancelled: 1 });
     expect(updateMock).not.toHaveBeenCalled();
     expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not let a cancelled duplicate at the door make the order ambiguous', async () => {
+    setSales([
+      { id: 'sale-dead', salesRepId: 'rep-1', customerAddress: '123 Main St', installDate: noon(2), status: 'cancelled' },
+      { id: 'sale-live', salesRepId: 'rep-1', customerName: 'Dana Reyes', customerAddress: '123 Main Street', installDate: noon(2) },
+    ]);
+
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: 'o-1', estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ checked: 1, updated: 1, skippedAmbiguous: 0 });
+    expect(updateMock).toHaveBeenCalledOnce();
+    expect(updateMock.mock.calls[0][0]).toBe('sale-live');
+    expect(result.orderSales.get('o-1')?.saleId).toBe('sale-live');
+  });
+
+  it('tells the live sale\'s rep about a carrier cancel despite a cancelled duplicate', async () => {
+    setSales([
+      { id: 'sale-dead', salesRepId: 'rep-1', customerAddress: '123 Main St', status: 'cancelled' },
+      { id: 'sale-live', salesRepId: 'rep-2', customerAddress: '123 Main Street' },
+    ]);
+    const cancelled = order({ id: 'o-1', status: 'cancelled', matchedUserId: null });
+
+    const { orderSales } = await syncInstallDatesFromOrders({ orders: [cancelled], now: NOW });
+    const notices = planCarrierNotices({
+      orders: [cancelled],
+      stored: new Map([['o-1', { status: 'pending_install', noticeStatus: null }]]),
+      orderSales,
+    });
+
+    expect(notices).toEqual([expect.objectContaining({ orderId: 'o-1', userId: 'rep-2', saleId: 'sale-live' })]);
   });
 
   it('follows saleLink instead of the address guess', async () => {

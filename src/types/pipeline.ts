@@ -69,6 +69,8 @@ export interface DecommissionRecord {
   decommissionedBy: string;
   decommissionedByName?: string;
   decommissionedAt: Date;
+  /** Status before decommission; Reinstate restores it. Absent on older records. */
+  previousStatus?: 'active' | 'pending';
 }
 
 // A field rep row in the pipeline dashboard (API response shape)

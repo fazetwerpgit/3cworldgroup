@@ -9,10 +9,9 @@ import { APPLY_HREF, NAV_LINKS } from "./nav";
 import styles from "./cinematic.module.css";
 
 /**
- * The (cinematic) group's header. It lives in the group layout rather than in
- * PageWrapper so it can start transparent over a full-bleed photograph and take
- * on its navy backdrop only once the reader has left the opening frame. Every
- * route outside the group keeps the shared Navbar untouched.
+ * The (cinematic) group's header. It lives in the group layout so it can start
+ * transparent over a full-bleed photograph and take on its navy backdrop only
+ * once the reader has left the opening frame.
  *
  * Only the homepage has that photograph. An interior page opens on `.pageHead`,
  * a flat navy band, where a transparent header would be transparent over
@@ -37,6 +36,7 @@ export default function SiteHeader() {
     const resolved = typeof next === "function" ? next(menuOpen) : next;
     setOpenedOn(resolved ? pathname : null);
   };
+  const headerRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const sheetId = useId();
 
@@ -54,6 +54,11 @@ export default function SiteHeader() {
     return () => window.removeEventListener("scroll", sync);
   }, [pathname]);
 
+  const closeMenu = () => {
+    setOpenedOn(null);
+    toggleRef.current?.focus();
+  };
+
   useEffect(() => {
     if (!menuOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -63,6 +68,24 @@ export default function SiteHeader() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
+
+  /*
+    While the sheet is open the page behind it is dimmed and scroll-locked, so
+    it must not take focus either: everything beside the header is made inert,
+    which keeps Tab inside the header row and the sheet. Only the attributes set
+    here are removed again.
+  */
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!menuOpen || !header?.parentElement) return;
+    const made = Array.from(header.parentElement.children).filter(
+      (el) => el !== header && !el.hasAttribute("inert"),
+    );
+    for (const el of made) el.setAttribute("inert", "");
+    return () => {
+      for (const el of made) el.removeAttribute("inert");
+    };
   }, [menuOpen]);
 
   /*
@@ -84,7 +107,17 @@ export default function SiteHeader() {
   const isCurrent = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <header className={styles.header} data-condensed={condensed || undefined} data-open={menuOpen || undefined}>
+    <header
+      ref={headerRef}
+      className={styles.header}
+      data-condensed={condensed || undefined}
+      data-open={menuOpen || undefined}
+      // The dimmed backdrop is the header's own ::after, so a tap on it targets
+      // the header element itself.
+      onClick={(event) => {
+        if (menuOpen && event.target === event.currentTarget) closeMenu();
+      }}
+    >
       <div className={styles.headerRow}>
         {/*
           A2 — the homepage has no "Home" text link, so without this the one

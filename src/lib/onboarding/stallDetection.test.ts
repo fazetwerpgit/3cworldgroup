@@ -53,6 +53,8 @@ vi.mock('@/lib/alerts/alertTasks', () => ({ createAlertTask: vi.fn(async () => '
 vi.mock('./activation', () => ({ getActivationReadiness: vi.fn(async () => ({ ready: false, missing: ['x'] })) }));
 
 import { dueNudges, runOnboardingNudges } from './stallDetection';
+import { getOnboardingItemsForUser } from '@/types/onboarding';
+import { isEsignItem } from './esign';
 
 const HOUR = 3600 * 1000;
 const now = new Date('2026-07-08T12:00:00Z');
@@ -97,7 +99,7 @@ describe('runOnboardingNudges', () => {
     expect(dispatchMock).not.toHaveBeenCalled();
   });
 
-  it('persists successful tiers and continues to later users after one user fails', async () => {
+  it('continues to later users after one user fails', async () => {
     store.set('users/u1', {
       status: 'pending',
       fieldRole: 'entry_level_rep',
@@ -111,26 +113,53 @@ describe('runOnboardingNudges', () => {
       createdAt: idleFor(25),
     });
 
-    dispatchMock.mockImplementation(async ({ userId, title }) => {
-      if (userId === 'u1' && title === 'Onboarding reminder') {
-        throw new Error('dispatch failed');
-      }
+    dispatchMock.mockImplementation(async ({ userId }) => {
+      if (userId === 'u1') throw new Error('dispatch failed');
     });
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    await expect(runOnboardingNudges(now)).resolves.toEqual({
-      nudged: 2,
-      flaggedAtRisk: 0,
+    await expect(runOnboardingNudges(now)).resolves.toEqual({ nudged: 1, flaggedAtRisk: 0 });
+
+    expect(store.get('onboardingNudges/u1')).toBeUndefined();
+    expect(store.get('onboardingNudges/u2')?.sent).toEqual(['h24']);
+    expect(errorSpy).toHaveBeenCalledWith('[nudges] failed to process user', 'u1', expect.any(Error));
+    errorSpy.mockRestore();
+  });
+
+  it('sends at most one tier per run to a hire first seen after a week idle', async () => {
+    store.set('users/u1', { status: 'pending', fieldRole: 'entry_level_rep', createdAt: idleFor(8 * 24) });
+
+    await expect(runOnboardingNudges(now)).resolves.toEqual({ nudged: 1, flaggedAtRisk: 0 });
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(store.get('onboardingNudges/u1')?.sent).toEqual(['h24']);
+  });
+
+  it('does not nudge a hire whose remaining items all wait on management review', async () => {
+    store.set('users/u1', { status: 'pending', fieldRole: 'entry_level_rep', createdAt: idleFor(8 * 24) });
+    for (const item of getOnboardingItemsForUser('entry_level_rep', false)) {
+      store.set(`userOnboarding/u1_${item.id}`, {
+        userId: 'u1',
+        itemId: item.id,
+        status: isEsignItem(item.id) ? 'approved' : 'submitted',
+        submittedAt: idleFor(5 * 24),
+      });
+    }
+
+    await expect(runOnboardingNudges(now)).resolves.toEqual({ nudged: 0, flaggedAtRisk: 0 });
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it("measures idle from the hire's own activity, not a reviewer's approval", async () => {
+    store.set('users/u1', { status: 'pending', fieldRole: 'entry_level_rep', createdAt: idleFor(8 * 24) });
+    store.set('userOnboarding/u1_w9', {
+      userId: 'u1',
+      itemId: 'w9',
+      status: 'approved',
+      submittedAt: idleFor(30),
+      updatedAt: idleFor(1), // approved an hour ago by a reviewer
     });
 
+    await runOnboardingNudges(now);
     expect(store.get('onboardingNudges/u1')?.sent).toEqual(['h24']);
-    expect(store.get('onboardingNudges/u2')?.sent).toEqual(['h24']);
-    expect(dispatchMock).toHaveBeenCalledTimes(3);
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[nudges] failed to process user',
-      'u1',
-      expect.any(Error)
-    );
-    errorSpy.mockRestore();
   });
 });

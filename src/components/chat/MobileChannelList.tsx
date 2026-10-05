@@ -70,7 +70,7 @@ export function ChannelRows({
     );
   }
   if (channels.length === 0) {
-    return <p className={c.empty}>No channels yet. An admin can sync them from Chat channels.</p>;
+    return <p className={c.empty}>No channels yet. Channels for your role appear here automatically.</p>;
   }
   return (
     <>

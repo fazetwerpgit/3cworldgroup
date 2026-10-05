@@ -26,6 +26,7 @@ import { POST } from './route';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
+import { LEADS_REASONS } from '@/lib/forms/formOptions';
 
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 const mockSubmit = submitFormRecord as unknown as ReturnType<typeof vi.fn>;
@@ -90,6 +91,20 @@ describe('POST /api/portal/forms/leads-request', () => {
   it('rejects an invalid campaign', async () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(req({ ...VALID, campaign: 'NotACampaign' }));
+    expect(res.status).toBe(400);
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a manager email that is not an email', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ ...VALID, managerEmail: 'not-an-email' }));
+    expect(res.status).toBe(400);
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malformed new rep email when the new-rep fields apply', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ ...VALID, reason: LEADS_REASONS[0], newRepEmail: 'nope' }));
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
   });

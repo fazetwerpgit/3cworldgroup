@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { mergeOptions, FORM_OPTION_DEFAULTS, EDITABLE_OPTION_KEYS } from './formOptionsRegistry';
+import { mergeOptions, missingLockedValue, FORM_OPTION_DEFAULTS, EDITABLE_OPTION_KEYS } from './formOptionsRegistry';
+import { leadsConditions } from './leadsPredicates';
+import { isPromotionRole } from './managerInterview';
 
 describe('mergeOptions', () => {
   it('returns all defaults when no overrides', () => {
@@ -24,5 +26,23 @@ describe('mergeOptions', () => {
   it('logic-bearing lists are NOT editable', () => {
     expect(EDITABLE_OPTION_KEYS).not.toContain('leadsCategories');
     expect(EDITABLE_OPTION_KEYS).not.toContain('leadsReasons');
+  });
+});
+
+describe('missingLockedValue', () => {
+  it('flags a renamed Special Request location or Account Executive position', () => {
+    expect(missingLockedValue('leadsLocations', ['Dallas TX', 'Special request'])).toBe('Special Request');
+    expect(missingLockedValue('hireJobPositions', ['AE', 'L1 Manager'])).toBe('Account Executive');
+  });
+
+  it('passes lists that keep them, and lists with nothing locked', () => {
+    expect(missingLockedValue('leadsLocations', FORM_OPTION_DEFAULTS.leadsLocations)).toBeNull();
+    expect(missingLockedValue('hireJobPositions', FORM_OPTION_DEFAULTS.hireJobPositions)).toBeNull();
+    expect(missingLockedValue('hireMarkets', [])).toBeNull();
+  });
+
+  it('locks exactly the values the form logic matches on', () => {
+    expect(leadsConditions({ category: '', reason: '', location: 'Special Request' }).needsSpecialRequest).toBe(true);
+    expect(isPromotionRole('Account Executive')).toBe(false);
   });
 });

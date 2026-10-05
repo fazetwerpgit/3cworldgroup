@@ -17,11 +17,6 @@ function canPinMessages(user: { role?: PlatformRole; fieldRole?: FieldRole }): b
   );
 }
 
-// Cap the scan for the pinned list. A where(isPinned)+orderBy(pinnedAt) query needs
-// a composite index; instead scan the newest messages (single-field orderBy is
-// automatic) and filter/sort pins in code — mirrors the media gallery strategy.
-const SCAN_WINDOW = 300;
-
 // Most pins we surface. Channels aren't expected to hold anywhere near this many;
 // the cap just bounds the response.
 const MAX_PINS = 20;
@@ -38,17 +33,10 @@ async function loadChannel(channelId: string) {
   return { channel, data };
 }
 
-// Convert a stored pin timestamp to millis for sorting (newest pinned first),
-// tolerating either an admin Timestamp (toMillis/toDate) or a raw {seconds} shape.
-function pinnedAtMillis(value: unknown): number {
-  if (value && typeof value === 'object') {
-    const v = value as { toMillis?: () => number; toDate?: () => Date; seconds?: number };
-    if (typeof v.toMillis === 'function') return v.toMillis();
-    if (typeof v.toDate === 'function') return v.toDate().getTime();
-    if (typeof v.seconds === 'number') return v.seconds * 1000;
-  }
-  return 0;
-}
+// Pinned messages straight from the isPinned+pinnedAt composite index
+// (firestore.indexes.json), so a pin survives however far the channel moves on.
+// Deleting a message unpins it; the slack only covers deleted pins from before that.
+const PIN_QUERY_LIMIT = MAX_PINS + 10;
 
 // POST /api/portal/chat/messages/pin — pin or unpin a message. Body:
 // { channelId, messageId, pinned: boolean }. Allowed for admin/operations or
@@ -139,15 +127,13 @@ export async function GET(request: NextRequest) {
       .collection('chatChannels')
       .doc(channelId)
       .collection('messages')
-      .orderBy('createdAt', 'desc')
-      .limit(SCAN_WINDOW)
+      .where('isPinned', '==', true)
+      .orderBy('pinnedAt', 'desc')
+      .limit(PIN_QUERY_LIMIT)
       .get();
 
-    // Sort the raw docs by pin time (newest first) and cap BEFORE mapping so the
-    // response shape carries no sort-only helper field.
     const pins = messagesSnap.docs
-      .filter((doc) => doc.data().isPinned === true && !doc.data().deletedAt)
-      .sort((a, b) => pinnedAtMillis(b.data().pinnedAt) - pinnedAtMillis(a.data().pinnedAt))
+      .filter((doc) => !doc.data().deletedAt)
       .slice(0, MAX_PINS)
       .map((doc) => {
         const data = doc.data();

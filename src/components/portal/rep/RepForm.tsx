@@ -351,25 +351,31 @@ export function Choices({
   );
 }
 
-/** A yes/no decision stored as a boolean. */
+/** A yes/no decision stored as a boolean; null is unanswered (nothing checked). */
 export function YesNo({
   name,
   label,
   value,
   onChange,
+  required,
+  error,
 }: {
   name: string;
   label: string;
-  value: boolean;
+  value: boolean | null;
   onChange: (value: boolean) => void;
+  required?: boolean;
+  error?: string;
 }) {
   return (
     <Choices
       name={name}
       label={label}
-      value={value ? 'Yes' : 'No'}
+      value={value === null ? '' : value ? 'Yes' : 'No'}
       options={['No', 'Yes']}
       onChange={(next) => onChange(next === 'Yes')}
+      required={required}
+      error={error}
     />
   );
 }

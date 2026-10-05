@@ -35,6 +35,10 @@ interface OnboardingResponse {
   items: OnboardingItem[];
   locked: boolean;
   existingAccount?: boolean;
+  /** Rejected or otherwise closed: the packet can't be sent. */
+  closed?: boolean;
+  /** The email is midway through another invite's onboarding. */
+  onboardingElsewhere?: boolean;
 }
 
 // Fields the POST can reject by name (its `field` key), and the control to mark.
@@ -120,7 +124,7 @@ export default function PublicOnboardingPage() {
         // Open or already sent, Sign in / Sign up on this device point back
         // here (or to signing in) instead of asking for a team code. An
         // existing account signs in as usual.
-        if (json.existingAccount) forgetInvite(token);
+        if (json.existingAccount || json.closed || json.onboardingElsewhere) forgetInvite(token);
         else rememberInvite(token, json.invite.expiresAt);
         setProfile({
           displayName: json.invite.candidateName || '',
@@ -323,6 +327,34 @@ export default function PublicOnboardingPage() {
         <div className={a.actions}>
           <Link href="/apply" className={`${s.btnPrimary} ${a.btn}`}>
             Back to 3C
+          </Link>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  if (data?.closed) {
+    return (
+      <AuthShell tag="Onboarding">
+        <h1 className={a.title}>This onboarding link is closed</h1>
+        <p className={a.sub}>Contact your manager if you think this is a mistake.</p>
+        <div className={a.actions}>
+          <Link href="/apply" className={`${s.btnPrimary} ${a.btn}`}>
+            Back to 3C
+          </Link>
+        </div>
+      </AuthShell>
+    );
+  }
+
+  if (data?.onboardingElsewhere) {
+    return (
+      <AuthShell tag="Onboarding">
+        <h1 className={a.title}>This email is already onboarding with 3C</h1>
+        <p className={a.sub}>Sign in at the portal to continue, or contact your manager.</p>
+        <div className={a.actions}>
+          <Link href="/portal" className={`${s.btnPrimary} ${a.btn}`}>
+            Sign in to the portal
           </Link>
         </div>
       </AuthShell>
@@ -711,10 +743,7 @@ export default function PublicOnboardingPage() {
                                   if (event.target.value) setAccountTypeError(false);
                                 }}
                                 onBlur={() => setAccountTypeError(!accountType)}
-                                onInvalid={(event) => {
-                                  event.preventDefault();
-                                  setAccountTypeError(true);
-                                }}
+                                onInvalid={() => setAccountTypeError(true)}
                                 required
                                 {...describe('onboard-account-type', accountTypeMessage)}
                               >
@@ -743,10 +772,7 @@ export default function PublicOnboardingPage() {
                                   if (event.target.value) setTaxClassificationError(false);
                                 }}
                                 onBlur={() => setTaxClassificationError(!taxClassification)}
-                                onInvalid={(event) => {
-                                  event.preventDefault();
-                                  setTaxClassificationError(true);
-                                }}
+                                onInvalid={() => setTaxClassificationError(true)}
                                 required
                                 {...describe('onboard-tax-classification', taxClassificationMessage)}
                               >

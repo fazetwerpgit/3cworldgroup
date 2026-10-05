@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales, type CreateSaleResult } from '@/hooks/useSales';
 import type { FiberPlan, Sale, SaleProduct, SaleType } from '@/types';
-import { addPlanToProducts, isExtraPlanId } from '@/lib/sales/planSelection';
+import { addPlanToProducts, isExtraPlanId, validateHasInternetPlan } from '@/lib/sales/planSelection';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { MAX_PROOF_SCREENSHOTS, proofPathFields, saleProofPaths } from '@/lib/sales/proofPaths';
 import { todaySaleDateInput } from '@/lib/sales/saleDate';
@@ -183,7 +183,9 @@ export function validateSaleForm(input: {
   const today = todaySaleDateInput();
 
   if (!formData.customerAddress.trim()) errors.customerAddress = 'Enter the service address';
-  if (products.length === 0) errors.plan = 'Pick a plan';
+  // Extras ride alongside an internet plan; ticking one is not a plan pick,
+  // except on an Add-On sale (the customer already has internet).
+  if (validateHasInternetPlan(products, formData.saleType)) errors.plan = 'Pick a plan';
   if (!formData.saleDate) errors.saleDate = 'Pick the sale date';
   else if (formData.saleDate > today) errors.saleDate = 'Sale date cannot be in the future';
   if (!formData.installDate) errors.installDate = 'Pick the install date';

@@ -51,4 +51,35 @@ describe('parseFiberReport', () => {
     expect(result.orders.find((order) => order.id === 'P-1')?.status).toBe('pre_sale');
     expect(result.orders.find((order) => order.status === 'breakage')?.id).toMatch(/^brk_[a-f0-9]{40}$/);
   });
+
+  it('reads rich-text, formula and hyperlink cells as their text and result', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const orders = workbook.addWorksheet('Orders To Date');
+    orders.addRow(['Alt Order ID', 'Account Status', 'Rep ID', 'dealername', 'Order Date', 'Street Address', 'MRC', 'Fiber Plan']);
+    orders.addRow([
+      { richText: [{ text: 'A-' }, { font: { bold: true }, text: '9' }] },
+      { formula: 'TRIM(" Active ")', result: 'Active' },
+      { formula: '40+2', result: 42 },
+      { text: 'Ada Rep', hyperlink: 'mailto:ada@example.com' },
+      { formula: '46260+2', result: 46262 },
+      { richText: [{ text: '1 Main ' }, { text: 'St' }] },
+      { formula: '50+9.99', result: 59.99 },
+      { text: { richText: [{ text: '1 Gig' }] }, hyperlink: 'https://example.com' },
+    ]);
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+
+    const [order] = (await parseFiberReport(buffer, '2026-08-25T12:00:00.000Z')).orders;
+
+    expect(order).toMatchObject({
+      id: 'A-9',
+      status: 'active',
+      rawStatus: 'Active',
+      repDealerId: '42',
+      repName: 'Ada Rep',
+      orderDate: '2026-08-28',
+      address: '1 Main St',
+      mrc: 59.99,
+      fiberPlan: '1 Gig',
+    });
+  });
 });

@@ -111,6 +111,18 @@ describe('POST /api/portal/onboarding/review', () => {
     expect(docUpdateMock).not.toHaveBeenCalled();
   });
 
+  it('returns 409 when another reviewer changed the item after it was read', async () => {
+    const updateTime = { seconds: 1 };
+    docGetMock.mockResolvedValue({ ...onboardingDoc(), updateTime });
+    docUpdateMock.mockRejectedValueOnce(Object.assign(new Error('precondition'), { code: 9 }));
+
+    const response = await POST(postRequest('onboarding_submission', 'approved'));
+
+    expect(response.status).toBe(409);
+    expect(docUpdateMock.mock.calls[0]?.[1]).toEqual({ lastUpdateTime: updateTime });
+    expect(maybeFlagActivationReady).not.toHaveBeenCalled();
+  });
+
   it('still allows rejection for an e-sign item', async () => {
     const response = await POST(postRequest('contract', 'rejected'));
 
@@ -360,6 +372,17 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
     accounts({ u1: { fieldRole: 'entry_level_rep' } });
     queryGetMock.mockResolvedValueOnce({
       docs: [waiting('u1', 'dl_photos', '2026-07-27T00:00:00.000Z'), waiting('ghost', 'dl_photos', '2026-07-24T00:00:00.000Z')],
+    });
+
+    const json = await (await summary()).json();
+
+    expect(json.submissions).toEqual([{ submittedAt: '2026-07-27T00:00:00.000Z' }]);
+  });
+
+  it('does not count items of an inactive (rejected or decommissioned) account', async () => {
+    accounts({ u1: { fieldRole: 'entry_level_rep' }, gone: { fieldRole: 'entry_level_rep', status: 'inactive' } });
+    queryGetMock.mockResolvedValueOnce({
+      docs: [waiting('u1', 'dl_photos', '2026-07-27T00:00:00.000Z'), waiting('gone', 'dl_photos', '2026-07-24T00:00:00.000Z')],
     });
 
     const json = await (await summary()).json();

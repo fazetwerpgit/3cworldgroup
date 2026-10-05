@@ -7,10 +7,25 @@ type Cell = ExcelJS.CellValue | undefined;
 
 const ORDER_SHEETS = ['Orders To Date', 'Pre-Sale to Schedule', 'Unconfirmed to Cancelled Orders'] as const;
 
+/**
+ * A cell as its plain value. exceljs hands back objects for styled and computed
+ * cells: rich text is { richText: [{ text }] }, a formula { formula, result },
+ * a hyperlink { text, hyperlink }, an error { error }.
+ */
+function plainValue(value: Cell): Cell {
+  if (value === null || value === undefined || typeof value !== 'object' || value instanceof Date) return value;
+  if ('richText' in value && Array.isArray(value.richText)) {
+    return value.richText.map((run) => (typeof run.text === 'string' ? run.text : '')).join('');
+  }
+  if ('formula' in value || 'sharedFormula' in value) return plainValue(value.result as Cell);
+  if ('text' in value) return plainValue(value.text as Cell);
+  return null;
+}
+
 function text(value: Cell): string {
-  if (value === null || value === undefined) return '';
-  if (typeof value === 'object' && 'text' in value && typeof value.text === 'string') return value.text.trim();
-  return String(value).trim();
+  const plain = plainValue(value);
+  if (plain === null || plain === undefined) return '';
+  return String(plain).trim();
 }
 
 function dateFromCell(value: Cell): string | null {
@@ -46,7 +61,7 @@ function headers(row: ExcelJS.Row): Map<string, number> {
 
 function cell(row: ExcelJS.Row, map: Map<string, number>, name: string): Cell {
   const column = map.get(name);
-  return column ? row.getCell(column).value : undefined;
+  return column ? plainValue(row.getCell(column).value) : undefined;
 }
 
 function mappedStatus(rawStatus: string, activationDate: string | null, cancellationDate: string | null): FiberOrderStatus {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminQueue, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
+import { useMarkHandled } from '@/components/portal/admin-ops/useMarkHandled';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 
@@ -51,15 +52,9 @@ export function BugReports() {
     load();
   };
 
-  const markHandled = async (id: string) => {
-    const res = await authedFetch('/api/portal/forms/bug-report/review', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    if (!res.ok) throw new Error('Failed to mark handled');
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
-  };
+  const markHandled = useMarkHandled('/api/portal/forms/bug-report/review', (id) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)))
+  );
 
   const queueRows: QueueRow[] = useMemo(
     () =>

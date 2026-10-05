@@ -5,20 +5,22 @@ import { FIBER_COMPANIES, RoleDisplayNames, isOwner } from '@/types';
 import type { CompPlanCompanyRates, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
-import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
+import { expectedPayForSale } from '@/lib/pay/expectedPay';
+import { groupPaySales } from '@/lib/pay/payGroups';
 import { ChevronRight } from 'lucide-react';
 import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
-import type { InstallBucket, InstallCounts } from '@/lib/sales/installBucket';
+import { isCarrierCancelled, isStandingBreakage, type InstallBucket, type InstallCounts } from '@/lib/sales/installBucket';
 import { bookForMonth, buildMergedBook, type MergedBook, type MergedRow } from '@/lib/sales/mergeBook';
 import { normalizeAddress } from '@/lib/fiberReport/matchSales';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { isInMonth, monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
+import { isCurrentMonth, monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { LinkOrderDialog, UnassignedOrders } from './UnloggedOrders';
 import { SalesDialog } from './SalesDialog';
+import { PayGroupHead } from './SalesTable';
 import { Collapse } from '@/components/portal/Collapse';
 
 // The company book, for admins and owners. One row per CUSTOMER — the sales the
@@ -156,13 +158,6 @@ const BUCKET_TONE: Record<InstallBucket, string> = {
   attention: x.st_needsdate,
 };
 
-/** Has this sale's install date arrived? Only then can it have a payout window. */
-function installedBy(sale: Sale, now: Date): boolean {
-  if (!sale.installDate) return false;
-  const time = new Date(sale.installDate as Date | string).getTime();
-  return !Number.isNaN(time) && time <= now.getTime();
-}
-
 function installChip(sale: Sale, bucket: InstallBucket) {
   if (bucket === 'attention') return 'No install date';
   return `${bucket === 'installed' ? 'Installed' : 'Installs'} ${formatDate(sale.installDate)}`;
@@ -240,20 +235,6 @@ function rankCandidates(rows: MergedRow[], order: FiberOrder | null): MergedRow[
   });
 }
 
-/** The month a submission belongs to, or null when it carries no usable date. */
-function monthOf(value: Date | string | null | undefined): MonthKey | null {
-  if (!value) return null;
-  const date = new Date(value as Date | string);
-  return Number.isNaN(date.getTime()) ? null : { year: date.getFullYear(), month: date.getMonth() };
-}
-
-/** Newest submission first. An undated one sorts last rather than to the top. */
-function saleTime(sale: Sale): number {
-  if (!sale.saleDate) return 0;
-  const time = new Date(sale.saleDate as Date | string).getTime();
-  return Number.isNaN(time) ? 0 : time;
-}
-
 function carrierTime(value: string | null | undefined): number | null {
   if (!value) return null;
   const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
@@ -285,10 +266,6 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   const [undoingKey, setUndoingKey] = useState<string | null>(null);
   const [undoError, setUndoError] = useState<string | null>(null);
 
-  // `now` is frozen per render pass so the bar, the sub-lines and the chips
-  // can never straddle midnight and disagree about what "installed" means.
-  const now = useMemo(() => new Date(), []);
-
   // Both halves of the carrier feed. `orders` are the ones whose dealer matched
   // a portal user; `unmatched` are the ones that did not, and they are exactly
   // the rows the unassigned drawer exists for — dropping them would delete the
@@ -297,6 +274,12 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
     () => [...(fiber?.data?.orders ?? []), ...(fiber?.data?.unmatched ?? [])],
     [fiber?.data?.orders, fiber?.data?.unmatched]
   );
+
+  // `now` is frozen per render pass so the bar, the sub-lines and the chips
+  // can never straddle midnight and disagree about what "installed" means. It
+  // is re-read whenever either feed arrives, so a resume refetch moves it too.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the feeds are the trigger, not inputs
+  const now = useMemo(() => new Date(), [sales, fiberOrders]);
 
   const fullBook = useMemo(
     () => buildMergedBook(sales, fiberOrders, { now }),
@@ -346,31 +329,29 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   const cancelledView = useMemo(() => drawerView(fullBook, fullBook.cancelled, month), [fullBook, month]);
   const historicView = useMemo(() => drawerView(fullBook, fullBook.historic, undefined), [fullBook]);
 
-  // My pay: the viewer's own installed work, soonest money first. The month is
-  // applied here now that the page hands over the whole book — this tab has
-  // always meant the month on the picker and still does.
-  // A row the book does not count is not pay — that covers a sale cancelled
-  // here and, since 2026-09-10, one the carrier cancelled.
-  const uncountedSaleIds = useMemo(
-    () => new Set(book.rows.filter((row) => row.sale && !row.counted).map((row) => row.sale!.id)),
-    [book.rows]
+  // My pay: the viewer's own work grouped the way the rep's Pay view groups it
+  // — by payout window off the INSTALL date, then other carriers by install
+  // month, then missed and undated installs (owner, 2026-09-22). The book's
+  // own carrier join decides cancellations and breakage.
+  const fiberBySale = useMemo(() => {
+    const map = new Map<string, FiberOrder>();
+    for (const row of fullBook.rows) if (row.sale?.id && row.order) map.set(row.sale.id, row.order);
+    return map;
+  }, [fullBook.rows]);
+  const myPayGroups = useMemo(
+    () => groupPaySales(
+      sales.filter((sale) => sale.salesRepId === user?.uid),
+      fiberBySale,
+      hasPlan ? payPlan?.rates ?? null : null,
+      { month, includeUndated: !month || isCurrentMonth(month, now) }
+    ),
+    [fiberBySale, hasPlan, month, now, payPlan?.rates, sales, user?.uid]
   );
-  const mySales = useMemo(
-    () =>
-      sales
-        .filter((sale) =>
-          sale.salesRepId === user?.uid &&
-          !!sale.installDate &&
-          isPayableSale(sale) &&
-          !uncountedSaleIds.has(sale.id) &&
-          (!month || isInMonth(sale.saleDate, month)))
-        .sort((a, b) => new Date(b.installDate!).getTime() - new Date(a.installDate!).getTime()),
-    [month, sales, uncountedSaleIds, user?.uid]
-  );
-  const myExpected = useMemo(
-    () => mySales.reduce((sum, sale) => sum + (expectedPayForSale(sale, payPlan?.rates ?? null) ?? 0), 0),
-    [mySales, payPlan?.rates]
-  );
+  const mySales = useMemo(() => myPayGroups.flatMap((group) => group.sales), [myPayGroups]);
+  // Money with a date that stands: missed and undated sales wait on a new date.
+  const myExpected = myPayGroups
+    .filter((group) => group.kind === 'window' || group.kind === 'other')
+    .reduce((sum, group) => sum + (group.amount ?? 0), 0);
 
   // Every post-write refetch is `fresh`. The order cache is invalidated only on
   // the instance that served the write, so a cached read after a link or an
@@ -460,12 +441,14 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   );
 
   // The T-Fiber estimated payout window for the sale open in the sheet — a
-  // range, never a single date, and only once the install has happened.
+  // range, never a single date. Scheduled installs have one too, as on the
+  // rep's Pay view; a carrier cancellation or a missed install does not.
   const selectedPayout = useMemo(() => {
     if (!selectedSale || selectedSale.status === 'cancelled') return null;
-    const window = payoutWindowForSale(selectedSale, installedBy(selectedSale, now));
+    const live = !isCarrierCancelled(selectedOrder) && !isStandingBreakage(selectedSale, selectedOrder);
+    const window = payoutWindowForSale(selectedSale, live);
     return window ? formatPayoutWindow(window) : null;
-  }, [now, selectedSale]);
+  }, [selectedOrder, selectedSale]);
 
   /** One status word, in the dashboard's colour language. */
   const chip = (tone: string, label: string) => (
@@ -865,65 +848,64 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
             final report decides what actually pays.
           </p>
 
-          {mySales.length === 0 ? (
+          {myPayGroups.length === 0 ? (
             <p className={x.empty}>
               Nothing installed yet. Pay shows up here once one of your sales has an install date.
             </p>
           ) : (
-            mySales.map((sale) => {
-              const expected = expectedPayForSale(sale, payPlan?.rates ?? null);
-              const window = payoutWindowForSale(sale, installedBy(sale, now));
-              return (
-                <div
-                  className={`${x.bRow} ${x.bPay}`}
-                  data-part="pay-row"
-                  key={sale.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setSelectedId(sale.id || null)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      setSelectedId(sale.id || null);
-                    }
-                  }}
-                >
-                  <span className={x.bCust}>
-                    {sale.customerName || sale.customerAddress || 'Customer pending'}
-                  </span>
-                  {/* A rate of 0 means the comp plan has no contracted rate for
-                      that product yet — say so rather than promising $0. */}
-                  <span className={x.bVal}>
-                    {expected ? <><small className={x.est}>est.</small><b>{formatMoney(expected)}</b></> : 'Rate pending'}
-                  </span>
-                  <span className={x.bProd}>
-                    {productSummary(sale) || '—'} · installed {formatDate(sale.installDate)} · sold {formatDate(sale.saleDate)}
-                  </span>
-                  {/* Stops the row's own click so ticking Paid doesn't also
-                      open the detail sheet over the top of it. */}
-                  <span
-                    className={x.bChip}
-                    onClick={(event) => event.stopPropagation()}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    <label className={x.paid}>
-                      <input
-                        type="checkbox"
-                        checked={!!paidBySale[sale.id || '']}
-                        onChange={() => void togglePaid(sale.id || '')}
-                        aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
-                      />
-                      <span>Paid</span>
-                    </label>
-                  </span>
-                  {window && (
-                    <span className={x.bNote}>
-                      <span className={x.payout}>Est. payout <b>{formatPayoutWindow(window)}</b></span>
-                    </span>
-                  )}
-                </div>
-              );
-            })
+            myPayGroups.map((group) => (
+              <div key={group.key} role="group" aria-labelledby={`pay-${group.key}`} data-part="pay-group">
+                <PayGroupHead group={group} hasPlan={hasPlan} />
+                {group.sales.map((sale) => {
+                  const expected = expectedPayForSale(sale, payPlan?.rates ?? null);
+                  return (
+                    <div
+                      className={`${x.bRow} ${x.bPay}`}
+                      data-part="pay-row"
+                      key={sale.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSelectedId(sale.id || null)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedId(sale.id || null);
+                        }
+                      }}
+                    >
+                      <span className={x.bCust}>
+                        {sale.customerName || sale.customerAddress || 'Customer pending'}
+                      </span>
+                      {/* A rate of 0 means the comp plan has no contracted rate for
+                          that product yet — say so rather than promising $0. */}
+                      <span className={x.bVal}>
+                        {expected ? <><small className={x.est}>est.</small><b>{formatMoney(expected)}</b></> : 'Rate pending'}
+                      </span>
+                      <span className={x.bProd}>
+                        {productSummary(sale) || '—'} · install {formatDate(sale.installDate)} · sold {formatDate(sale.saleDate)}
+                      </span>
+                      {/* Stops the row's own click so ticking Paid doesn't also
+                          open the detail sheet over the top of it. */}
+                      <span
+                        className={x.bChip}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <label className={x.paid}>
+                          <input
+                            type="checkbox"
+                            checked={!!paidBySale[sale.id || '']}
+                            onChange={() => void togglePaid(sale.id || '')}
+                            aria-label={`Mark pay received for ${sale.customerName || sale.customerAddress || 'this sale'}`}
+                          />
+                          <span>Paid</span>
+                        </label>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
           )}
         </section>
       )}

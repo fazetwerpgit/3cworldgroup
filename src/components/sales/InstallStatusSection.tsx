@@ -63,6 +63,12 @@ export type InstallStatusProps = {
   ownerView?: boolean;
   /** The signed-in user, so an admin can still see their own submissions. */
   viewerId?: string | null;
+  /**
+   * The viewer is an admin or owner, the roles the API answers with scope
+   * 'all'. Stands in until the first response arrives, so a failed first load
+   * shows its loading state and Retry instead of vanishing.
+   */
+  adminView?: boolean;
 };
 
 type RepGroup = {
@@ -239,7 +245,7 @@ function groupDomId(groupKey: string) {
   return `sales-line-fiber-group-${encodeURIComponent(groupKey).replace(/%/g, '-')}`;
 }
 
-function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, viewerId = null }: InstallStatusProps & { fiber: FiberStatusHookResult }) {
+function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, viewerId = null, adminView = false }: InstallStatusProps & { fiber: FiberStatusHookResult }) {
   const { data, loading, error, refetch } = fiber;
   const [filter, setFilter] = useState<FiberFilter>('all');
   const [find, setFind] = useState('');
@@ -349,7 +355,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
     return [...groups.values()].sort((a, b) => a.repName.localeCompare(b.repName) || a.dealerId.localeCompare(b.dealerId));
   }, [unmatchedOrders]);
   const updated = relativeReportDate(data?.lastReportAt ?? null);
-  const isAdmin = data?.scope === 'all';
+  const isAdmin = data ? data.scope === 'all' : adminView;
 
   const loadUsers = useCallback(async () => {
     if (usersLoaded || usersLoading) return;

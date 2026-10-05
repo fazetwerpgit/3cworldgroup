@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
-import { isOlderReport, mailSentAt, reportAsOf, type ReportStamp } from '@/lib/fiberReport/staleReport';
+import { isOlderReport, mailSentAt, newestStamp, reportAsOf, type ReportStamp } from '@/lib/fiberReport/staleReport';
 import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
 import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
@@ -56,6 +56,11 @@ function importLog(
 async function writeImportLog(entry: FiberReportImport): Promise<void> {
   if (!adminDb) throw new Error('Database not configured');
   await adminDb.collection('fiberReportImports').add(entry);
+}
+
+/** The newest report stamp loaded so far, as config/fiberReportStatus records it. */
+function loadedStamp(status: FirebaseFirestore.DocumentData | undefined): ReportStamp {
+  return { sentAt: status?.lastReportSentAt ?? null, asOf: status?.lastReportAsOf ?? null };
 }
 
 // Token-gated health check: confirms whether reports are landing without
@@ -159,13 +164,22 @@ export async function POST(request: NextRequest) {
 
     // An older daily report re-sent with the new one is skipped: loading it
     // would move install dates back (and push reps) until the newer file lands.
+    // The check and the stamp are one transaction, taken before anything is
+    // written: two overlapping deliveries can't both pass on the same old stamp,
+    // and the stamp only ever moves forward.
     const stamp: ReportStamp = {
       sentAt: mailSentAt(body.Date),
       asOf: reportAsOf(parsed.orders, receivedAt.slice(0, 10)),
     };
     const statusRef = adminDb.collection('config').doc('fiberReportStatus');
-    const loaded = (await statusRef.get()).data();
-    if (isOlderReport(stamp, { sentAt: loaded?.lastReportSentAt ?? null, asOf: loaded?.lastReportAsOf ?? null })) {
+    const claimed = await adminDb.runTransaction(async (transaction) => {
+      const loaded = loadedStamp((await transaction.get(statusRef)).data());
+      if (isOlderReport(stamp, loaded)) return false;
+      const newest = newestStamp(stamp, loaded);
+      transaction.set(statusRef, { lastReportSentAt: newest.sentAt, lastReportAsOf: newest.asOf }, { merge: true });
+      return true;
+    });
+    if (!claimed) {
       console.log(`[inbound-report] skipped an older report (sent ${stamp.sentAt}, as of ${stamp.asOf})`);
       await writeImportLog(
         importLog(receivedAt, filename, fromEmail, subject, {
@@ -218,13 +232,18 @@ export async function POST(request: NextRequest) {
     // only about changes. Never throws; null when it could not be read.
     const storedOrders = await readStoredOrders(orders);
 
+    // Each chunk commits only while this report still holds the claim: once a
+    // newer report has claimed, its rows must not be overwritten by this one's.
     const fiberOrders = adminDb.collection('fiberOrders');
-    for (let offset = 0; offset < orders.length; offset += 450) {
-      const batch = adminDb.batch();
-      for (const order of orders.slice(offset, offset + 450)) {
-        batch.set(fiberOrders.doc(order.id), order, { merge: true });
-      }
-      await batch.commit();
+    let superseded = false;
+    for (let offset = 0; offset < orders.length && !superseded; offset += 450) {
+      superseded = await adminDb.runTransaction(async (transaction) => {
+        if (isOlderReport(stamp, loadedStamp((await transaction.get(statusRef)).data()))) return true;
+        for (const order of orders.slice(offset, offset + 450)) {
+          transaction.set(fiberOrders.doc(order.id), order, { merge: true });
+        }
+        return false;
+      });
     }
 
     // The orders are stored, so the report is safe. Everything below is a
@@ -233,25 +252,33 @@ export async function POST(request: NextRequest) {
     // failure here must not fail a report that already landed, or the next
     // delivery would be the only way to recover data we already have.
     let installDateSync: InstallDateSyncCounts | null = null;
-    let orderSales = new Map<string, OrderSale>();
-    try {
-      const { changes, orderSales: linked, ...counts } = await syncInstallDatesFromOrders({ orders, now: new Date() });
-      installDateSync = counts;
-      orderSales = linked;
-      if (changes.length) {
-        console.log(`[inbound-report] moved ${changes.length} install date(s) from the report`);
-      }
-    } catch (error) {
-      console.error('[inbound-report] install date sync failed', error);
-    }
-
-    // Missed installs, carrier cancels and disconnects, told to the rep once.
     let carrierNotices: CarrierNoticeCounts | null = null;
-    if (storedOrders) {
+    // A newer report may have claimed the stamp while this one was upserting.
+    // Its sync and notices are the ones that count; running this older one's
+    // after them would move dates back and tell reps twice.
+    if (!superseded) superseded = isOlderReport(stamp, loadedStamp((await statusRef.get()).data()));
+    if (superseded) {
+      console.log(`[inbound-report] a newer report landed meanwhile; skipped the sync for (sent ${stamp.sentAt}, as of ${stamp.asOf})`);
+    } else {
+      let orderSales = new Map<string, OrderSale>();
       try {
-        carrierNotices = await sendCarrierNotices({ orders, stored: storedOrders, orderSales, now: new Date() });
+        const { changes, orderSales: linked, ...counts } = await syncInstallDatesFromOrders({ orders, now: new Date() });
+        installDateSync = counts;
+        orderSales = linked;
+        if (changes.length) {
+          console.log(`[inbound-report] moved ${changes.length} install date(s) from the report`);
+        }
       } catch (error) {
-        console.error('[inbound-report] carrier notices failed', error);
+        console.error('[inbound-report] install date sync failed', error);
+      }
+
+      // Missed installs, carrier cancels and disconnects, told to the rep once.
+      if (storedOrders) {
+        try {
+          carrierNotices = await sendCarrierNotices({ orders, stored: storedOrders, orderSales, now: new Date() });
+        } catch (error) {
+          console.error('[inbound-report] carrier notices failed', error);
+        }
       }
     }
 
@@ -260,8 +287,6 @@ export async function POST(request: NextRequest) {
         lastReportAt: receivedAt,
         lastFilename: filename,
         lastUpserted: orders.length,
-        lastReportSentAt: stamp.sentAt,
-        lastReportAsOf: stamp.asOf,
       },
       { merge: true }
     );

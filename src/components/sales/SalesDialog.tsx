@@ -51,7 +51,7 @@ export function SalesDialog({
   return (
     <BodyLayer>
       <div
-        className={s.backdrop}
+        className={`${s.backdrop} ${s.backdropAbove}`}
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) onClose();
         }}

@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import kit from "../../_cinematic/cinematic.module.css";
 import styles from "./contact.module.css";
+import {
+  INVALID_EMAIL_MESSAGE,
+  INVALID_PHONE_MESSAGE,
+  PUBLIC_FIELD_LIMITS,
+  isValidEmail,
+  isValidUsPhone,
+} from "@/lib/forms/publicFields";
 
 /**
  * The message form: the same five fields and five subjects as the page this
@@ -38,14 +45,18 @@ const MISSING: Record<string, string> = {
 };
 
 const MISMATCH: Record<string, string> = {
-  email: "Enter a valid email address.",
-  phone: "Enter a valid phone number.",
+  email: INVALID_EMAIL_MESSAGE,
+  phone: INVALID_PHONE_MESSAGE,
 };
+
+/* The counter under the message appears from here up to the server's cap. */
+const MESSAGE_COUNT_FROM = PUBLIC_FIELD_LIMITS.message - 400;
 
 function messageFor(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): string {
   const { validity, name, validationMessage } = field;
   if (validity.valueMissing) return MISSING[name] ?? "This field is required.";
-  if (validity.typeMismatch) return MISMATCH[name] ?? "Check this value.";
+  // customError is the shared email/phone check set below, the same one the server runs.
+  if (validity.typeMismatch || validity.customError) return MISMATCH[name] ?? "Check this value.";
   return validationMessage || "Check this value.";
 }
 
@@ -120,8 +131,12 @@ export default function ContactForm() {
     on is gone and focus falls to <body>: a screen reader is left at the top of
     the document with no idea the message went. Focus moves to the heading
     instead, which is both the announcement and the place to read on from.
-    `preventScroll` because the panel stands exactly where the form did and the
-    page should not jump.
+
+    The panel is far shorter than the form it replaces, so on a phone or tablet
+    it lands above the viewport or under the fixed header. It is scrolled to
+    the nearest edge that shows it (its scroll-margin clears the header) — a
+    no-op on a desktop where it is already in view — and the focus itself does
+    not scroll, so the two never fight.
 
     The panel used to carry `aria-live="polite"` and that never announced
     anything: a live region is only announced when its contents CHANGE, and
@@ -129,15 +144,33 @@ export default function ContactForm() {
     DOM empty for a paint first and filled after, which is the change an
     assistive technology is listening for.
   */
+  const sentPanelRef = useRef<HTMLDivElement>(null);
   const sentTitleRef = useRef<HTMLHeadingElement>(null);
   const [announced, setAnnounced] = useState(false);
 
   useEffect(() => {
     if (!submitted) return;
+    sentPanelRef.current?.scrollIntoView({ block: "nearest" });
     sentTitleRef.current?.focus({ preventScroll: true });
     const timer = window.setTimeout(() => setAnnounced(true), 120);
     return () => window.clearTimeout(timer);
   }, [submitted]);
+
+  /*
+    `type="email"` passes "foo@bar" and `type="tel"` passes anything, so the
+    shared checks are set as each control's custom validity: native validation
+    then blocks the submit and `handleInvalid` names the field, same as a
+    missing value.
+  */
+  const emailRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const email = formData.email.trim();
+    const phone = formData.phone.trim();
+    emailRef.current?.setCustomValidity(email && !isValidEmail(email) ? INVALID_EMAIL_MESSAGE : "");
+    phoneRef.current?.setCustomValidity(phone && !isValidUsPhone(phone) ? INVALID_PHONE_MESSAGE : "");
+  }, [formData.email, formData.phone]);
 
   /*
     Restore once, on mount. `restored` also gates the writer below, so the
@@ -270,7 +303,7 @@ export default function ContactForm() {
 
   if (submitted) {
     return (
-      <div className={styles.sent}>
+      <div className={styles.sent} ref={sentPanelRef}>
         <span className={styles.sentMark} aria-hidden="true">
           <Check size={22} strokeWidth={3} />
         </span>
@@ -292,6 +325,8 @@ export default function ContactForm() {
       </div>
     );
   }
+
+  const messageNearLimit = formData.message.length >= MESSAGE_COUNT_FROM;
 
   return (
     <form
@@ -331,6 +366,7 @@ export default function ContactForm() {
               type="text"
               id="contact-name"
               name="name"
+              maxLength={PUBLIC_FIELD_LIMITS.name}
               aria-invalid={invalid.name ? true : undefined}
               aria-describedby={invalid.name ? "contact-name-error" : undefined}
               onInvalid={handleInvalid}
@@ -357,6 +393,8 @@ export default function ContactForm() {
               type="email"
               id="contact-email"
               name="email"
+              ref={emailRef}
+              maxLength={PUBLIC_FIELD_LIMITS.email}
               aria-invalid={invalid.email ? true : undefined}
               aria-describedby={invalid.email ? "contact-email-error" : undefined}
               onInvalid={handleInvalid}
@@ -383,6 +421,8 @@ export default function ContactForm() {
               type="tel"
               id="contact-phone"
               name="phone"
+              ref={phoneRef}
+              maxLength={PUBLIC_FIELD_LIMITS.phone}
               aria-invalid={invalid.phone ? true : undefined}
               aria-describedby={invalid.phone ? "contact-phone-error" : undefined}
               onInvalid={handleInvalid}
@@ -439,8 +479,15 @@ export default function ContactForm() {
             className={`${styles.input} ${styles.textarea}`}
             id="contact-message"
             name="message"
+            maxLength={PUBLIC_FIELD_LIMITS.message}
             aria-invalid={invalid.message ? true : undefined}
-            aria-describedby={invalid.message ? "contact-message-error" : undefined}
+            aria-describedby={
+              invalid.message
+                ? "contact-message-error"
+                : messageNearLimit
+                  ? "contact-message-count"
+                  : undefined
+            }
             onInvalid={handleInvalid}
             required
             rows={5}
@@ -452,6 +499,10 @@ export default function ContactForm() {
         {invalid.message ? (
           <span className={styles.fieldError} id="contact-message-error">
             {invalid.message}
+          </span>
+        ) : messageNearLimit ? (
+          <span className={styles.charCount} id="contact-message-count">
+            {formData.message.length} / {PUBLIC_FIELD_LIMITS.message} characters
           </span>
         ) : null}
       </div>

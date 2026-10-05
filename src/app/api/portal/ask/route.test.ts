@@ -267,6 +267,19 @@ describe('POST /api/portal/ask', () => {
     expect(logs()).toHaveLength(0);
   });
 
+  it("doesn't use up a question the model never answered", async () => {
+    const usageId = `r1_${chicagoDayKey(new Date())}`;
+    fake.docs('askUsage').set(usageId, { uid: 'r1', count: 59 });
+    fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
+    expect((await POST(req({ question: 'Help' }))).status).toBe(502);
+    fetchMock.mockRejectedValueOnce(new DOMException('The operation timed out.', 'TimeoutError'));
+    expect((await POST(req({ question: 'Help' }))).status).toBe(504);
+    expect(fake.docs('askUsage').get(usageId)?.count).toBe(59);
+    modelAnswers();
+    expect((await POST(req({ question: 'Help' }))).status).toBe(200);
+    expect(fake.docs('askUsage').get(usageId)?.count).toBe(60);
+  });
+
   it('treats an empty model answer as a failure', async () => {
     modelAnswers('   ');
     expect((await POST(req({ question: 'Help' }))).status).toBe(502);

@@ -4,7 +4,7 @@ import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { appBaseUrl, managerAlertEmail } from '@/lib/email/templates';
 import { createNotificationForMany } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
-import { MANAGEMENT_FIELD_ROLES, MANAGEMENT_PLATFORM_ROLES } from '@/types/auth';
+import { MANAGEMENT_PLATFORM_ROLES } from '@/types/auth';
 import type { AlertTaskKind } from '@/types/alerts';
 
 const RENAG_MS = 24 * 3600 * 1000;
@@ -25,20 +25,18 @@ function requireDb() {
   return adminDb;
 }
 
-/** All back-office users plus active management field-role users. */
+/**
+ * Back-office users (owner/admin/operations), not inactive. Only they can open,
+ * claim or dismiss alert tasks (requireVerifiedManagement) and every task links
+ * into /portal/admin, so field managers are never notified.
+ */
 export async function getManagementUserIds(): Promise<string[]> {
   const db = requireDb();
-  const [platform, field] = await Promise.all([
-    db.collection('users').where('role', 'in', [...MANAGEMENT_PLATFORM_ROLES]).get(),
-    db.collection('users').where('fieldRole', 'in', [...MANAGEMENT_FIELD_ROLES]).get(),
-  ]);
+  const platform = await db.collection('users').where('role', 'in', [...MANAGEMENT_PLATFORM_ROLES]).get();
 
   const ids = new Set<string>();
   platform.forEach((doc) => {
     if (doc.get('status') !== 'inactive') ids.add(doc.id);
-  });
-  field.forEach((doc) => {
-    if (doc.get('status') === 'active') ids.add(doc.id);
   });
   return [...ids];
 }
@@ -83,23 +81,41 @@ async function broadcast(task: NewAlertTask & { id: string }): Promise<void> {
 /** Creates and broadcasts; returns existing id when an open/claimed duplicate exists. */
 export async function createAlertTask(input: NewAlertTask): Promise<string> {
   const db = requireDb();
-  const existing = await db
-    .collection('alertTasks')
-    .where('kind', '==', input.kind)
-    .where('subjectUserId', '==', input.subjectUserId)
-    .where('status', 'in', ['open', 'claimed'])
-    .limit(1)
-    .get();
+  // One key doc per kind+subject makes the duplicate check atomic: concurrent
+  // callers all read it, so only one transaction can create the task.
+  const keyRef = db.collection('alertTaskKeys').doc(`${input.kind}__${input.subjectUserId}`);
 
-  if (!existing.empty) return existing.docs[0].id;
+  const result = await db.runTransaction(async (tx) => {
+    const key = await tx.get(keyRef);
+    const keyedId = key.exists ? (key.get('taskId') as string | undefined) : undefined;
+    if (keyedId) {
+      const keyed = await tx.get(db.collection('alertTasks').doc(keyedId));
+      if (keyed.exists && ['open', 'claimed'].includes(keyed.get('status'))) {
+        return { id: keyedId, created: false };
+      }
+    }
+    // Tasks created before the key doc existed.
+    const existing = await tx.get(
+      db
+        .collection('alertTasks')
+        .where('kind', '==', input.kind)
+        .where('subjectUserId', '==', input.subjectUserId)
+        .where('status', 'in', ['open', 'claimed'])
+        .limit(1)
+    );
+    if (!existing.empty) {
+      tx.set(keyRef, { taskId: existing.docs[0].id });
+      return { id: existing.docs[0].id, created: false };
+    }
 
-  const ref = await db.collection('alertTasks').add({
-    ...input,
-    status: 'open',
-    createdAt: new Date(),
+    const ref = db.collection('alertTasks').doc();
+    tx.create(ref, { ...input, status: 'open', createdAt: new Date() });
+    tx.set(keyRef, { taskId: ref.id });
+    return { id: ref.id, created: true };
   });
-  await broadcast({ ...input, id: ref.id });
-  return ref.id;
+
+  if (result.created) await broadcast({ ...input, id: result.id });
+  return result.id;
 }
 
 export async function claimAlertTask(

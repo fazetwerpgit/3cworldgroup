@@ -98,7 +98,7 @@
 }
 
 .headLede {
-  max-width: 38ch;
+  max-width: 25.2em; /* 38ch of Geist; see .pageHeadLede */
 }
 
 /*
@@ -379,6 +379,19 @@
   top: 100%;
 }
 
+/* The message counter shares the error line's reserved gap, on the right.
+   It only appears near the limit, when the message has a value and so no
+   "Write your message." error can be showing beside it. */
+.charCount {
+  color: var(--on-paper-dim);
+  font-size: 0.78rem;
+  line-height: 1.2;
+  padding-top: 0.15rem;
+  position: absolute;
+  right: 0;
+  top: 100%;
+}
+
 .fieldLabel {
   color: var(--on-paper);
   display: block;
@@ -577,6 +590,8 @@
   /* It replaces the form inside `.formLayout`, which already carries the
      section head's margin — a second one would double it. */
   padding: clamp(1.75rem, 3.4vw, 2.75rem);
+  /* Scrolled into view on send; clear the fixed header. */
+  scroll-margin-top: calc(5.75rem - var(--header-clear));
 }
 
 .sentMark {

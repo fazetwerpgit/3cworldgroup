@@ -242,6 +242,42 @@ function exactlyOne(fields: EsignFieldValues, a: string, b: string): boolean {
   return Boolean(fields[a]) !== Boolean(fields[b]);
 }
 
+/** Digit-only fields on the payroll documents: allowed digit counts and the message for a bad value. */
+const DIGIT_FIELDS: Partial<Record<EsignDocKey, Record<string, { min: number; max: number; message: string }>>> = {
+  direct_deposit: {
+    routing_number: { min: 9, max: 9, message: 'Routing number must be 9 digits' },
+    account_number: { min: 4, max: 17, message: 'Account number must be 4 to 17 digits' },
+  },
+  w9: {
+    ssn: { min: 9, max: 9, message: 'Social Security number must be 9 digits' },
+    ein: { min: 9, max: 9, message: 'EIN must be 9 digits' },
+  },
+};
+
+/** ABA routing checksum: 3·(d1+d4+d7) + 7·(d2+d5+d8) + (d3+d6+d9) is a multiple of 10. */
+function validAbaChecksum(digits: string): boolean {
+  const d = [...digits].map(Number);
+  const sum = 3 * (d[0] + d[3] + d[6]) + 7 * (d[1] + d[4] + d[7]) + (d[2] + d[5] + d[8]);
+  return sum % 10 === 0;
+}
+
+/**
+ * Format problem with a typed bank or tax number, or null when it is fine (or
+ * not a checked field). Spaces and dashes are allowed; they are not digits.
+ * Shared by the sign page and `validateFields` so both say the same thing.
+ */
+export function fieldFormatError(docKey: string, key: string, value: string): string | null {
+  const rule = DIGIT_FIELDS[docKey as EsignDocKey]?.[key];
+  if (!rule || !value.trim()) return null;
+  if (!/^[\d\s-]+$/.test(value)) return rule.message;
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < rule.min || digits.length > rule.max) return rule.message;
+  if (key === 'routing_number' && !validAbaChecksum(digits)) {
+    return 'That routing number is not valid. Check the 9-digit number at the bottom left of a check.';
+  }
+  return null;
+}
+
 /**
  * Server-side validation of what a rep submitted for one document. Unknown keys
  * are dropped rather than rejected so a stale or hostile client cannot inject
@@ -268,6 +304,12 @@ export function validateFields(docKey: EsignDocKey, input: unknown): FieldValida
     if (field.required && field.type === 'text' && !fields[field.key]) {
       return { ok: false, error: `Missing required field: ${labelFor(field.key)}` };
     }
+  }
+
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value !== 'string') continue;
+    const formatError = fieldFormatError(docKey, key, value);
+    if (formatError) return { ok: false, error: formatError };
   }
 
   if (docKey === 'w9') {

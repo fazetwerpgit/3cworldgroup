@@ -165,7 +165,8 @@ describe('runDueAnnouncements', () => {
     const { db, store } = seed({ due: { title: 't', body: 'b', status: 'scheduled', sendAt: past } });
     const summary = await runDueAnnouncements({ db, now: NOW });
     expect(summary.failed).toEqual(['due']);
-    expect(store.get('announcements')!.get('due')?.status).toBe('failed');
+    // Pushes had started, so the owner's Send-now retry must refuse it.
+    expect(store.get('announcements')!.get('due')).toMatchObject({ status: 'failed', fanOutStarted: true });
   });
 
   it('reads Firestore Timestamps for sendAt', async () => {

@@ -27,4 +27,12 @@ describe('PORTAL_GUIDE', () => {
     expect(missing(REP_FORMS.map((form) => form.title))).toEqual([]);
     expect(missing([...EXPEDITE_REASONS, ...LEADS_REASONS])).toEqual([]);
   });
+
+  it('sends reps to the short videos where they are, and never promises Practice to everyone', () => {
+    const payAndLinks = PORTAL_GUIDE.match(/Pay & links \(([^)]*)\)/)?.[1] ?? '';
+    expect(payAndLinks).not.toContain('short videos');
+    expect(PORTAL_GUIDE).toContain('Training, Short videos');
+    expect(PORTAL_GUIDE).not.toContain('Its Practice tab lets a rep');
+    expect(PORTAL_GUIDE).toContain("Practice is only for people it's turned on for");
+  });
 });

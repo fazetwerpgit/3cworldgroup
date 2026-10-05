@@ -45,7 +45,9 @@ export function AuthAlert({ message }: { message: string }) {
 }
 
 export function LoginForm() {
-  const { signIn, error: authError, resetPassword } = useAuth();
+  // `authLoading` stays true after a good password while the profile loads;
+  // the portal page keeps this form mounted through it.
+  const { signIn, error: authError, resetPassword, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -265,8 +267,8 @@ export function LoginForm() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading || googleLoading} className={`${s.btnPrimary} ${a.btn}`}>
-              {loading ? (
+            <button type="submit" disabled={loading || authLoading || googleLoading} className={`${s.btnPrimary} ${a.btn}`}>
+              {loading || authLoading ? (
                 <>
                   {spinner}
                   Signing in

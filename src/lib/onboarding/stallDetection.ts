@@ -3,8 +3,11 @@ import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { nudgeEmail, appBaseUrl, type NudgeTier } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
 import { createAlertTask } from '@/lib/alerts/alertTasks';
-import { roleRequiresOnboarding } from '@/types/auth';
+import { roleRequiresOnboarding, type FieldRole } from '@/types/auth';
+import { getOnboardingItemsForUser, type OnboardingStatus } from '@/types/onboarding';
+import { isHeldOnboardingItem } from '@/types/onboardingHold';
 import { getActivationReadiness } from './activation';
+import { isEsignItem } from './esign';
 
 export type { NudgeTier };
 
@@ -51,66 +54,82 @@ export async function runOnboardingNudges(
       if (!roleRequiresOnboarding(userDoc.get('fieldRole'))) continue;
 
       const itemsSnap = await db.collection('userOnboarding').where('userId', '==', uid).get();
+      // Idle is measured from the hire's own actions (submitting, working a
+      // not-started item) or from a rejection handing work back - never from a
+      // reviewer's approval, which says nothing about whether the hire is engaged.
       let lastActivity = toDate(userDoc.get('createdAt')) ?? now;
+      const statuses: Record<string, OnboardingStatus> = {};
       itemsSnap.forEach((doc) => {
-        const updatedAt = toDate(doc.get('updatedAt'));
-        if (updatedAt && updatedAt > lastActivity) lastActivity = updatedAt;
+        const status = doc.get('status') as OnboardingStatus | undefined;
+        if (status) statuses[doc.get('itemId') as string] = status;
+        const own =
+          status === 'not_started'
+            ? toDate(doc.get('updatedAt'))
+            : status === 'rejected'
+              ? toDate(doc.get('reviewedAt')) ?? toDate(doc.get('updatedAt'))
+              : undefined;
+        for (const at of [toDate(doc.get('submittedAt')), own]) {
+          if (at && at > lastActivity) lastActivity = at;
+        }
       });
 
       const { ready } = await getActivationReadiness(uid);
       if (ready) continue;
 
+      // Nothing left for the hire: every owed item is approved or waiting on
+      // management review. (An e-sign item 'submitted' is out for their
+      // signature, so they still owe it.) The delay is the back office's.
+      const owed = getOnboardingItemsForUser(userDoc.get('fieldRole') as FieldRole, userDoc.get('isIBO') === true)
+        .filter((item) => !isHeldOnboardingItem(item.id));
+      const hireOwesSomething = owed.some((item) => {
+        const status = statuses[item.id];
+        return status !== 'approved' && !(status === 'submitted' && !isEsignItem(item.id));
+      });
+      if (!hireOwesSomething) continue;
+
       const nudgeRef = db.doc(`onboardingNudges/${uid}`);
       const nudgeSnap = await nudgeRef.get();
       const sent = (nudgeSnap.get('sent') as NudgeTier[] | undefined) ?? [];
-      const due = dueNudges(lastActivity, now, sent);
-      if (due.length === 0) continue;
+      // At most one tier per run: a hire first seen after days idle gets the
+      // 24h nudge now and the next tier on a later run, not all at once.
+      const tier = dueNudges(lastActivity, now, sent)[0];
+      if (!tier) continue;
 
       const name = (userDoc.get('displayName') as string | undefined) ?? 'there';
       const portalUrl = `${appBaseUrl()}/portal/onboarding`;
-      const sentNow: NudgeTier[] = [];
 
-      try {
-        for (const tier of due) {
-          await dispatchToUser({
-            userId: uid,
-            type: 'onboarding_nudge',
-            title:
-              tier === 'h24'
-                ? 'Your onboarding is waiting'
-                : tier === 'h72'
-                  ? 'Onboarding reminder'
-                  : 'Final onboarding reminder',
-            message: 'Pick up where you left off - a few steps remain.',
-            link: '/portal/onboarding',
-            email: nudgeEmail({ name, tier, portalUrl }),
-            emailFrom: onboardingFrom(),
-          });
+      await dispatchToUser({
+        userId: uid,
+        type: 'onboarding_nudge',
+        title:
+          tier === 'h24'
+            ? 'Your onboarding is waiting'
+            : tier === 'h72'
+              ? 'Onboarding reminder'
+              : 'Final onboarding reminder',
+        message: 'Pick up where you left off - a few steps remain.',
+        link: '/portal/onboarding',
+        email: nudgeEmail({ name, tier, portalUrl }),
+        emailFrom: onboardingFrom(),
+      });
+      nudged += 1;
+      // v1 intentionally does not re-arm previously sent tiers after new progress.
+      await nudgeRef.set({ sent: [...sent, tier], updatedAt: now }, { merge: true });
 
-          sentNow.push(tier);
-          nudged += 1;
+      if (tier === 'h72') {
+        await createAlertTask({
+          kind: 'stalled_rep',
+          subjectUserId: uid,
+          subjectName: name,
+          title: `${name} has stalled in onboarding`,
+          message: 'No progress for 72 hours. Reach out and unblock them.',
+          link: '/portal/admin/onboarding',
+        });
+      }
 
-          if (tier === 'h72') {
-            await createAlertTask({
-              kind: 'stalled_rep',
-              subjectUserId: uid,
-              subjectName: name,
-              title: `${name} has stalled in onboarding`,
-              message: 'No progress for 72 hours. Reach out and unblock them.',
-              link: '/portal/admin/onboarding',
-            });
-          }
-
-          if (tier === 'd7') {
-            await userDoc.ref.update({ atRisk: true, updatedAt: now });
-            flaggedAtRisk += 1;
-          }
-        }
-      } finally {
-        if (sentNow.length > 0) {
-          // v1 intentionally does not re-arm previously sent tiers after new progress.
-          await nudgeRef.set({ sent: [...sent, ...sentNow], updatedAt: now }, { merge: true });
-        }
+      if (tier === 'd7') {
+        await userDoc.ref.update({ atRisk: true, updatedAt: now });
+        flaggedAtRisk += 1;
       }
     } catch (error) {
       console.error('[nudges] failed to process user', userDoc.id, error);

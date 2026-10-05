@@ -137,7 +137,9 @@ export function nextPayout(
     const window = payoutWindowForSale(sale, true);
     if (!window || startOfDay(window.end) < today) continue;
     const key = window.start.getTime();
-    const pay = expectedPayForSale(sale, rates);
+    // Whole dollars per sale, as each Pay row shows it, so the card matches its window's rows.
+    const raw = expectedPayForSale(sale, rates);
+    const pay = raw === null ? null : Math.round(raw);
     const scheduled = (toDate(sale.installDate as Date | string | undefined)?.getTime() ?? 0) > now.getTime() ? 1 : 0;
     const entry = byWindow.get(key);
     if (entry) {

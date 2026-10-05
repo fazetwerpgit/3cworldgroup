@@ -9,6 +9,7 @@ import {
   buildSubmissionAttachmentFolder,
   resolveFormUploadFolder,
   resolveUploadMime,
+  sniffUploadMime,
 } from './formUploads';
 
 describe('validateFormUpload', () => {
@@ -59,6 +60,28 @@ describe('resolveUploadMime', () => {
       ok: true,
       ext: 'heic',
     });
+  });
+});
+
+describe('sniffUploadMime', () => {
+  const bytes = (...parts: (string | number[])[]) =>
+    new Uint8Array(parts.flatMap((p) => (typeof p === 'string' ? [...p].map((c) => c.charCodeAt(0)) : p)));
+
+  it.each([
+    ['jpeg', bytes([0xff, 0xd8, 0xff, 0xe0], 'JFIF'), 'image/jpeg'],
+    ['png', bytes([0x89], 'PNG\r\n\x1a\n', [0, 0]), 'image/png'],
+    ['webp', bytes('RIFF', [1, 2, 3, 4], 'WEBPVP8 '), 'image/webp'],
+    ['pdf', bytes('%PDF-1.7\n'), 'application/pdf'],
+    ['iPhone heic', bytes([0, 0, 0, 24], 'ftypheic', [0, 0, 0, 0]), 'image/heic'],
+    ['heif', bytes([0, 0, 0, 24], 'ftypmif1'), 'image/heif'],
+  ])('reads a %s from its first bytes', (_name, data, mime) => {
+    expect(sniffUploadMime(data)).toBe(mime);
+  });
+
+  it('rejects anything else, whatever it claims to be', () => {
+    expect(sniffUploadMime(bytes('<html><script>'))).toBeNull();
+    expect(sniffUploadMime(bytes([0, 0, 0, 24], 'ftypmp42'))).toBeNull();
+    expect(sniffUploadMime(new Uint8Array())).toBeNull();
   });
 });
 

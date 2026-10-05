@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getOnboardingItemsForUser, type OnboardingStatus } from '@/types/onboarding';
 import { graduatedFieldRole, type FieldRole } from '@/types/auth';
 
-const { store, updates, db, dispatchMock, resolveMock, sendPacketMock } = vi.hoisted(() => {
+const { store, updates, sets, db, dispatchMock, resolveMock, sendPacketMock } = vi.hoisted(() => {
   const store = new Map<string, Record<string, unknown>>();
   const updates: Array<{ path: string; data: Record<string, unknown> }> = [];
+  const sets: Array<{ path: string; data: Record<string, unknown> }> = [];
+  const setDoc = async (path: string, data: Record<string, unknown>) => {
+    sets.push({ path, data });
+    store.set(path, { ...(store.get(path) ?? {}), ...data });
+  };
   const get = (path: string) => ({
     exists: store.has(path),
     get: (field: string) => store.get(path)?.[field],
@@ -18,14 +23,18 @@ const { store, updates, db, dispatchMock, resolveMock, sendPacketMock } = vi.hoi
       },
     })),
     collection: vi.fn((name: string) => ({
-      where: vi.fn((_field: string, _op: string, value: unknown) => ({
+      doc: vi.fn((id: string) => ({
+        set: async (data: Record<string, unknown>) => setDoc(`${name}/${id}`, data),
+      })),
+      where: vi.fn((field: string, _op: string, value: unknown) => ({
         get: async () => {
           const docs = [...store.entries()]
-            .filter(([path, data]) => path.startsWith(`${name}/`) && data.userId === value)
-            .map(([, data]) => ({
-              get: (field: string) => data[field],
+            .filter(([path, data]) => path.startsWith(`${name}/`) && data[field] === value)
+            .map(([path, data]) => ({
+              get: (f: string) => data[f],
+              ref: { set: async (d: Record<string, unknown>) => setDoc(path, d) },
             }));
-          return { forEach: (callback: (doc: { get: (field: string) => unknown }) => void) => docs.forEach(callback) };
+          return { forEach: (callback: (doc: (typeof docs)[number]) => void) => docs.forEach(callback) };
         },
       })),
     })),
@@ -33,6 +42,7 @@ const { store, updates, db, dispatchMock, resolveMock, sendPacketMock } = vi.hoi
   return {
     store,
     updates,
+    sets,
     db,
     dispatchMock: vi.fn(async () => undefined),
     resolveMock: vi.fn(async () => undefined),
@@ -47,6 +57,8 @@ vi.mock('firebase-admin/firestore', () => ({
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: dispatchMock }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: resolveMock }));
 vi.mock('@/lib/onboarding/ownerNotify', () => ({ sendOnboardingPacket: sendPacketMock }));
+const reconcileMock = vi.hoisted(() => vi.fn(async () => []));
+vi.mock('@/lib/chat/channels', () => ({ reconcileChatMembershipForUser: reconcileMock }));
 
 import {
   activateUser,
@@ -58,9 +70,11 @@ import {
 beforeEach(() => {
   store.clear();
   updates.length = 0;
+  sets.length = 0;
   dispatchMock.mockReset();
   resolveMock.mockReset();
   sendPacketMock.mockReset();
+  reconcileMock.mockClear();
 });
 
 describe('activateUser', () => {
@@ -107,6 +121,8 @@ describe('activateUser', () => {
       status: 'active',
       fieldRole: 'ae_tier_1',
     });
+    // The graduated role may reach different chat channels.
+    expect(reconcileMock).toHaveBeenCalledWith('entry-level-rep');
   });
 
   it('does not add a field role when the target has none', async () => {
@@ -137,6 +153,18 @@ describe('activateUser', () => {
     await expect(activateUser('missing-user')).resolves.toBeNull();
 
     expect(updates).toHaveLength(0);
+  });
+
+  it('closes out the open invite and its application on activation', async () => {
+    store.set('users/hire', { status: 'pending', fieldRole: 'entry_level_rep' });
+    store.set('onboardingInvites/inv1', { status: 'submitted', convertedUserId: 'hire', applicationId: 'app1' });
+    store.set('onboardingInvites/old', { status: 'rejected', convertedUserId: 'hire' });
+
+    await activateUser('hire');
+
+    expect(store.get('onboardingInvites/inv1')).toMatchObject({ status: 'converted', convertedUserId: 'hire' });
+    expect(store.get('applications/app1')).toMatchObject({ status: 'converted', convertedUserId: 'hire' });
+    expect(store.get('onboardingInvites/old')?.status).toBe('rejected');
   });
 });
 

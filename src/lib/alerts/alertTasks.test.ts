@@ -124,22 +124,43 @@ describe('shouldRenag', () => {
 });
 
 describe('createAlertTask', () => {
+  const INPUT = {
+    kind: 'review_needed' as const,
+    subjectUserId: 'rep-1',
+    subjectName: 'Rep One',
+    title: 'Review needed',
+    message: 'Rep One needs review.',
+    link: '/portal/onboarding',
+  };
+
+  // tx.get: the key doc (a ref with an id) or the legacy duplicate query.
+  function useTx(opts: { keyedTask?: { status: string } } = {}) {
+    const create = vi.fn();
+    const set = vi.fn();
+    runTransactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({
+        get: vi.fn(async (target: { id?: string }) => {
+          if (target.id === undefined) return { empty: true, docs: [] };
+          if (opts.keyedTask && target.id === 'alert-1') {
+            return { exists: true, get: (f: string) => (f === 'taskId' ? 'alert-1' : opts.keyedTask?.status) };
+          }
+          return { exists: false, get: () => undefined };
+        }),
+        create,
+        set,
+      })
+    );
+    return { create, set };
+  }
+
   it('resolves with the new doc id when notification fan-out rejects', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     createNotificationForManyMock.mockRejectedValueOnce(new Error('notification write failed'));
+    const { create } = useTx();
 
-    await expect(
-      createAlertTask({
-        kind: 'review_needed',
-        subjectUserId: 'rep-1',
-        subjectName: 'Rep One',
-        title: 'Review needed',
-        message: 'Rep One needs review.',
-        link: '/portal/onboarding',
-      })
-    ).resolves.toBe('alert-1');
+    await expect(createAlertTask(INPUT)).resolves.toBe('alert-1');
 
-    expect(addAlertTaskMock).toHaveBeenCalledOnce();
+    expect(create).toHaveBeenCalledOnce();
     expect(sendPushMock).toHaveBeenCalledWith('manager-1', {
       title: 'Review needed',
       body: 'Rep One needs review.',
@@ -154,6 +175,23 @@ describe('createAlertTask', () => {
     );
 
     errorSpy.mockRestore();
+  });
+
+  it('returns the open task held by the key doc without creating or broadcasting', async () => {
+    const { create } = useTx({ keyedTask: { status: 'open' } });
+
+    await expect(createAlertTask(INPUT)).resolves.toBe('alert-1');
+
+    expect(create).not.toHaveBeenCalled();
+    expect(sendPushMock).not.toHaveBeenCalled();
+  });
+
+  it('notifies only back-office roles, never field managers who cannot act on it', async () => {
+    useTx();
+    await createAlertTask(INPUT);
+
+    // One users query (role in owner/admin/operations); no fieldRole query.
+    expect(getManagementUsersMock).toHaveBeenCalledTimes(1);
   });
 });
 

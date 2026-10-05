@@ -4,6 +4,7 @@ import { submitFormRecord } from '@/lib/forms/submitForm';
 import { isValidOption } from '@/lib/forms/formOptions';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
+import { isEmailShaped } from '@/lib/forms/managerInterview';
 import { validateAddress } from '@/lib/validation/address';
 
 function s(v: unknown, max = 200) {
@@ -27,11 +28,16 @@ export async function POST(request: NextRequest) {
     const orderNumber = s(body.orderNumber, 120);
     const expediteDates = s(body.expediteDates, 300);
     const reason = s(body.reason, 80);
+    const customerEmail = s(body.customerEmail, 180);
 
     // The page marks these required; enforce the same server-side so a crafted
     // request can't create a blank, un-actionable expedite order.
     if (!customerName || !customerPhone || !orderNumber || !expediteDates) {
       return NextResponse.json({ error: 'Please complete all required fields' }, { status: 400 });
+    }
+    // Customer email is optional, but when given it must look like one.
+    if (customerEmail && !isEmailShaped(customerEmail)) {
+      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
     }
     if (!isValidOption(opts.expediteReasons, reason)) {
       return NextResponse.json({ error: 'Select a valid reason' }, { status: 400 });
@@ -40,7 +46,7 @@ export async function POST(request: NextRequest) {
     const fields = {
       customerName,
       customerPhone,
-      customerEmail: s(body.customerEmail, 180),
+      customerEmail,
       ...addr.clean,
       orderNumber,
       expediteDates,

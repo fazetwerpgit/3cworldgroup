@@ -1,6 +1,11 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
-import { getInviteByToken, isInviteExpired, SUBMITTED_INVITE_STATUSES } from '@/lib/recruiting/inviteLookup';
+import {
+  CLOSED_INVITE_STATUSES,
+  getInviteByToken,
+  isInviteExpired,
+  SUBMITTED_INVITE_STATUSES,
+} from '@/lib/recruiting/inviteLookup';
 import { getOnboardingItemsForUser, looksLikeRawSensitiveData, requiresHeavyVetting } from '@/types';
 import { isShirtSize } from '@/types/auth';
 import type { SensitiveDoc } from '@/types/sensitive';
@@ -10,7 +15,7 @@ import { validateAddress } from '@/lib/validation/address';
 import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { isEsignItem } from '@/lib/onboarding/esign';
-import { findActivePortalAccount } from '@/lib/auth/existingAccount';
+import { findActivePortalAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -37,8 +42,8 @@ export async function GET(
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
     }
 
-    if (SUBMITTED_INVITE_STATUSES.includes(data.status)) {
-      return NextResponse.json({
+    const lockedView = (extra: Record<string, unknown> = {}) =>
+      NextResponse.json({
         invite: {
           id: invite.id,
           candidateName: data.candidateName,
@@ -53,28 +58,27 @@ export async function GET(
         },
         items: [],
         locked: true,
+        ...extra,
       });
+
+    if (CLOSED_INVITE_STATUSES.includes(data.status)) {
+      return lockedView({ closed: true });
+    }
+
+    if (SUBMITTED_INVITE_STATUSES.includes(data.status)) {
+      return lockedView();
     }
 
     const existingAccount = await findActivePortalAccount(data.candidateEmail);
     if (existingAccount) {
-      return NextResponse.json({
-        invite: {
-          id: invite.id,
-          candidateName: data.candidateName,
-          candidateEmail: data.candidateEmail,
-          candidatePhone: data.candidatePhone,
-          candidateCity: data.candidateCity ?? '',
-          intendedFieldRole: data.intendedFieldRole,
-          isIBO: data.isIBO ?? false,
-          status: data.status,
-          ownerName: data.ownerName,
-          expiresAt: data.expiresAt?.toDate?.()?.toISOString?.() ?? null,
-        },
-        items: [],
-        locked: true,
-        existingAccount: true,
-      });
+      return lockedView({ existingAccount: true });
+    }
+
+    // Same rule as the POST: someone midway through another invite's
+    // onboarding can't send this packet, so say so before any data entry.
+    const onboarding = await findOnboardingPortalAccount(data.candidateEmail);
+    if (onboarding && onboarding.onboardingInviteId !== invite.id) {
+      return lockedView({ onboardingElsewhere: true });
     }
 
     if (data.status === 'invited') {
@@ -124,6 +128,12 @@ export async function POST(
     if (isInviteExpired(data.expiresAt)) {
       await invite.ref.set({ status: 'expired', updatedAt: new Date() }, { merge: true });
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
+    }
+    if (CLOSED_INVITE_STATUSES.includes(data.status)) {
+      return NextResponse.json(
+        { error: 'This onboarding link is closed. Contact your manager if you think this is a mistake.' },
+        { status: 409 }
+      );
     }
     if (SUBMITTED_INVITE_STATUSES.includes(data.status)) {
       return NextResponse.json({ error: 'This onboarding packet was already submitted' }, { status: 400 });
@@ -343,28 +353,31 @@ export async function POST(
       updatedAt: now,
     });
 
+    // Every item starts over for this packet, replacing (not merging into) any
+    // doc left by an earlier hire on a claimed account: e-sign items lose the
+    // old envelope so fresh ones are sent, and nothing approved before counts
+    // toward this activation.
     for (const candidateItem of candidateItems) {
-      if (isEsignItem(candidateItem.itemId)) continue;
       batch.set(
         adminDb.collection('userOnboarding').doc(`${userRecord.uid}_${candidateItem.itemId}`),
-        {
-          userId: userRecord.uid,
-          itemId: candidateItem.itemId,
-          status: 'submitted',
-          reference: candidateItem.reference,
-          rejectionReason: null,
-          submittedAt: now,
-          updatedAt: now,
-        },
-        { merge: true }
+        candidateItem.status === 'not_started'
+          ? {
+              userId: userRecord.uid,
+              itemId: candidateItem.itemId,
+              status: 'not_started',
+              ...('prefill' in candidateItem ? { prefill: candidateItem.prefill } : {}),
+              updatedAt: now,
+            }
+          : {
+              userId: userRecord.uid,
+              itemId: candidateItem.itemId,
+              status: 'submitted',
+              reference: candidateItem.reference,
+              rejectionReason: null,
+              submittedAt: now,
+              updatedAt: now,
+            }
       );
-    }
-
-    if (accountType !== undefined) {
-      batch.set(adminDb.collection('userOnboarding').doc(`${userRecord.uid}_direct_deposit`), { userId: userRecord.uid, itemId: 'direct_deposit', status: 'not_started', prefill: { accountType }, updatedAt: now }, { merge: true });
-    }
-    if (taxClassification !== undefined) {
-      batch.set(adminDb.collection('userOnboarding').doc(`${userRecord.uid}_w9`), { userId: userRecord.uid, itemId: 'w9', status: 'not_started', prefill: { taxClassification }, updatedAt: now }, { merge: true });
     }
 
     batch.set(

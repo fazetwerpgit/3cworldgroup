@@ -9,6 +9,7 @@ import {
   EDITABLE_OPTION_KEYS,
   FORM_OPTION_DEFAULTS,
   FORM_OPTION_LABELS,
+  LOCKED_OPTION_VALUES,
   OptionKey,
 } from '@/lib/forms/formOptionsRegistry';
 import { Check, Plus, X } from 'lucide-react';
@@ -138,6 +139,7 @@ export function FormOptions() {
             {EDITABLE_OPTION_KEYS.map((key) => {
               const inputId = `option-add-${key}`;
               const count = options[key].length;
+              const locked = LOCKED_OPTION_VALUES[key] ?? {};
               const dirty = JSON.stringify(options[key]) !== JSON.stringify(savedOptions[key]);
               return (
                 <section key={key} className={cx(rep.panel, s.oCard)} aria-labelledby={`${inputId}-title`}>
@@ -151,26 +153,33 @@ export function FormOptions() {
                   </div>
                   <div className={s.oBody}>
                     {count === 0 ? (
-                      <p className={s.muted} style={{ margin: 0 }}>
-                        No options yet.
+                      <p className={s.muted} style={{ margin: 0 }} role="status">
+                        No options yet. Add at least one option to save this list.
                       </p>
                     ) : (
                       <ul className={s.chips}>
                         {options[key].map((value, index) => (
                           <li key={`${value}-${index}`} className={s.chip}>
                             {value}
-                            <button
-                              type="button"
-                              className={s.chipX}
-                              aria-label={`Remove ${value}`}
-                              onClick={() => removeValue(key, index)}
-                            >
-                              <X size={16} aria-hidden="true" />
-                            </button>
+                            {locked[value] ? null : (
+                              <button
+                                type="button"
+                                className={s.chipX}
+                                aria-label={`Remove ${value}`}
+                                onClick={() => removeValue(key, index)}
+                              >
+                                <X size={16} aria-hidden="true" />
+                              </button>
+                            )}
                           </li>
                         ))}
                       </ul>
                     )}
+                    {Object.entries(locked).map(([value, why]) => (
+                      <p key={value} className={s.muted} style={{ margin: 0 }}>
+                        &ldquo;{value}&rdquo; can&apos;t be removed or renamed. {why}
+                      </p>
+                    ))}
                     <div className={s.addRow}>
                       <label htmlFor={inputId} className={rep.srOnly}>
                         Add to {FORM_OPTION_LABELS[key]}
@@ -210,7 +219,7 @@ export function FormOptions() {
                       type="button"
                       className={dirty ? s.btnLime : s.btn}
                       onClick={() => saveValues(key)}
-                      disabled={savingKey === key}
+                      disabled={savingKey === key || count === 0}
                     >
                       {savingKey === key ? 'Saving…' : 'Save'}
                     </button>

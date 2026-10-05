@@ -4,7 +4,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/config';
-import { ChatChannel } from '@/types';
+import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
+import { ChatChannel, FieldRole } from '@/types';
+
+// Who the Firestore chat rules let read channels and receipts: active users and
+// hires mid-onboarding (isOnboardingMember). Everyone else would only get
+// permission errors, so they never subscribe.
+export function canSubscribeToChat(
+  user: { status?: string | null; fieldRole?: FieldRole | null } | null | undefined
+): boolean {
+  return user?.status === 'active' || isOnboardingUser(user);
+}
 
 // lastMessageAt is server-stamped on the channel doc when a message is sent (via
 // the messages POST route). Unread badges compare it against the caller's own
@@ -34,8 +44,7 @@ export function useChatChannels() {
   const [snap, setSnap] = useState<{ key: string; channels: ChatChannelDoc[] } | null>(null);
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
-  // Pending reps lack rules access to chat, so only active users subscribe.
-  const uid = user?.status === 'active' ? user.uid : undefined;
+  const uid = user && canSubscribeToChat(user) ? user.uid : undefined;
   const key = uid ? `${uid}:${attempt}` : '';
 
   useEffect(() => {

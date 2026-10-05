@@ -189,6 +189,11 @@ export function RepSaleEdit() {
       return;
     }
 
+    if (formData.installDate && formData.saleDate > formData.installDate) {
+      setFormError('Sale date cannot be after the install date');
+      return;
+    }
+
     if (uploads.uploadingCount > 0) {
       setFormError('A screenshot is still uploading. Save once it finishes.');
       return;
@@ -201,17 +206,24 @@ export function RepSaleEdit() {
 
     setSaving(true);
 
+    // The install date goes out only when the admin moved it, together with
+    // the date the form was loaded with: re-sending an untouched field would
+    // put back a day a rep or the carrier sync changed while the form was open.
+    const { installDate, ...fields } = formData;
+    const loadedInstallDate = sale?.installDate ? dateToSaleDateInput(new Date(sale.installDate)) : '';
     const updates: Partial<Omit<Sale, 'saleDate' | 'installDate'>> & {
       saleDate?: string;
       installDate?: string;
+      expectedInstallDate?: string | null;
     } = {
-      ...formData,
+      ...fields,
+      ...(installDate !== loadedInstallDate
+        ? { installDate, expectedInstallDate: sale?.installDate ? new Date(sale.installDate).toISOString() : null }
+        : {}),
       // The legacy single field mirrors the first screenshot for older readers.
       proofScreenshotPath: formData.proofScreenshotPaths[0] ?? '',
       productSold: products.map((p) => p.productName).join(', '),
       products,
-      totalValue,
-      totalPoints,
     };
 
     const success = await updateSale(saleId, updates);

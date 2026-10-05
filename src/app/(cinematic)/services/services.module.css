@@ -60,7 +60,7 @@
   grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
   min-height: clamp(28rem, 38vw, 37rem);
   overflow: hidden;
-  scroll-margin-top: 5.5rem;
+  scroll-margin-top: calc(5.5rem - var(--header-clear));
 }
 
 .band + .band {

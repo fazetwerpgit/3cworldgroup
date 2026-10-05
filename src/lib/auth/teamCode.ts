@@ -1,3 +1,11 @@
+import { createRateLimiter } from '@/lib/rateLimit';
+
+/** Team code guesses per IP: 10 per 10 minutes. The code is one shared word, so guessing must stay slow. */
+export const teamCodeLimiter = createRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 });
+
+/** Signup owner alerts per IP: 10 per 10 minutes, the same pace the team code check allows. */
+export const signupNotifyLimiter = createRateLimiter({ limit: 10, windowMs: 10 * 60 * 1000 });
+
 /**
  * Shared team code gate for portal self-signup.
  *

@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { getOwnerRecipients } from '@/lib/onboarding/ownerNotify';
+import { contactLimiter } from '@/lib/forms/publicLimiters';
+import { clientIp } from '@/lib/rateLimit';
+import {
+  INVALID_EMAIL_MESSAGE,
+  INVALID_PHONE_MESSAGE,
+  PUBLIC_FIELD_LIMITS,
+  clipText,
+  isValidEmail,
+  isValidUsPhone,
+  readJsonObject,
+} from '@/lib/forms/publicFields';
 
 /*
   The public Contact form. Same shape as /api/public/applications: honeypot
@@ -25,8 +36,8 @@ const SUBJECTS: Record<string, string> = {
   other: 'Other',
 };
 
-function clean(value: unknown, max = 200) {
-  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+function clean(value: unknown, max: number = PUBLIC_FIELD_LIMITS.name) {
+  return typeof value === 'string' ? clipText(value.trim(), max) : '';
 }
 
 function escapeHtml(value: string) {
@@ -38,8 +49,17 @@ function escapeHtml(value: string) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!contactLimiter.take(clientIp(request))) {
+    return NextResponse.json(
+      { error: 'Too many messages from this connection. Please try again in a few minutes.' },
+      { status: 429 }
+    );
+  }
   try {
-    const body = await request.json();
+    const body = await readJsonObject(request);
+    if (!body) {
+      return NextResponse.json({ error: 'The message could not be read. Please try again.' }, { status: 400 });
+    }
     if (clean(body.website)) {
       return NextResponse.json({ success: true });
     }
@@ -49,14 +69,21 @@ export async function POST(request: NextRequest) {
     }
 
     const name = clean(body.name);
-    const email = clean(body.email, 180).toLowerCase();
-    const phone = clean(body.phone, 60);
+    // Not clipped: a cut address is a different address. Over-long fails isValidEmail.
+    const email = clean(body.email, Infinity).toLowerCase();
+    const phone = clean(body.phone, PUBLIC_FIELD_LIMITS.phone);
     const subjectKey = clean(body.subject, 40);
-    const subject = subjectKey in SUBJECTS ? subjectKey : 'other';
-    const message = clean(body.message, 4000);
+    const subject = Object.hasOwn(SUBJECTS, subjectKey) ? subjectKey : 'other';
+    const message = clean(body.message, PUBLIC_FIELD_LIMITS.message);
 
-    if (!name || !email.includes('@') || !message) {
+    if (!name || !email || !message) {
       return NextResponse.json({ error: 'Name, email, and message are required' }, { status: 400 });
+    }
+    if (!isValidEmail(email)) {
+      return NextResponse.json({ error: INVALID_EMAIL_MESSAGE }, { status: 400 });
+    }
+    if (phone && !isValidUsPhone(phone)) {
+      return NextResponse.json({ error: INVALID_PHONE_MESSAGE }, { status: 400 });
     }
 
     const now = new Date();

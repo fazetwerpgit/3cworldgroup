@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminQueue, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
+import { useMarkHandled } from '@/components/portal/admin-ops/useMarkHandled';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 
@@ -55,17 +56,9 @@ export function ExpediteOrders() {
     load();
   };
 
-  const markHandled = async (id: string) => {
-    const token = await auth?.currentUser?.getIdToken();
-    if (!token) throw new Error('Not signed in');
-    const res = await fetch('/api/portal/forms/expedite-order/review', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ id }),
-    });
-    if (!res.ok) throw new Error('Failed to mark handled');
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)));
-  };
+  const markHandled = useMarkHandled('/api/portal/forms/expedite-order/review', (id) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)))
+  );
 
   const queueRows: QueueRow[] = useMemo(
     () =>
@@ -84,7 +77,15 @@ export function ExpediteOrders() {
           { label: 'Reason', value: queueValue(row.reason) },
           { label: 'Phone', value: queueValue(row.customerPhone) },
           { label: 'Email', value: queueValue(row.customerEmail) },
-          { label: 'Address', value: `${queueValue(row.address)}, ${queueValue(row.zip)}` },
+          {
+            label: 'Address',
+            // "123 Main St, Dallas, TX 75201"; any blank part is skipped.
+            value: queueValue(
+              [row.address, [[row.city, row.state].filter(Boolean).join(', '), row.zip].filter(Boolean).join(' ')]
+                .filter(Boolean)
+                .join(', ')
+            ),
+          },
           { label: 'Expedite dates', value: queueValue(row.expediteDates) },
         ],
         searchText: [row.repName, row.customerName, row.orderNumber].map(queueValue).join(' ').toLowerCase(),

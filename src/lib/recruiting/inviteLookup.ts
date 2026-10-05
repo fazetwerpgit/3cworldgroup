@@ -22,6 +22,9 @@ export function isInviteExpired(expiresAt: FirebaseFirestore.Timestamp | undefin
 /** Packet already sent: the public POST created the hire's portal account. */
 export const SUBMITTED_INVITE_STATUSES = ['submitted', 'approved', 'converted'];
 
+/** Closed for good: the packet can no longer be filled in or sent. */
+export const CLOSED_INVITE_STATUSES = ['rejected', 'expired'];
+
 /**
  * Where a hire holding this invite stands, coarse enough to hand the client:
  * 'open' means the packet can still be filled in at /onboard/<token>;
@@ -32,7 +35,7 @@ export function inviteSignupState(data: {
   status?: unknown;
   expiresAt?: FirebaseFirestore.Timestamp;
 }): 'open' | 'submitted' | null {
-  if (data.status === 'expired' || isInviteExpired(data.expiresAt)) return null;
+  if (CLOSED_INVITE_STATUSES.includes(data.status as string) || isInviteExpired(data.expiresAt)) return null;
   if (data.status === 'invited' || data.status === 'in_progress') return 'open';
   if (typeof data.status === 'string' && SUBMITTED_INVITE_STATUSES.includes(data.status)) return 'submitted';
   return null;

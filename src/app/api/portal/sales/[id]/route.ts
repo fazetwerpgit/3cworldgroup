@@ -186,9 +186,10 @@ export async function PUT(
 
     // Allowlist of fields a sale edit may set. `status` stays off it: sale
     // approval was removed in Sep 2026 and no route writes the field any more,
-    // so an edit must not become the back door that resurrects it. Ownership,
-    // points and server-managed timestamps are immutable here for the same
-    // reason — an edit is a correction, never a re-attribution.
+    // so an edit must not become the back door that resurrects it. Ownership
+    // and server-managed timestamps are immutable here for the same reason —
+    // an edit is a correction, never a re-attribution. Value and points are
+    // derived from the priced products below, never taken from the client.
     const EDITABLE_FIELDS = [
       'customerName',
       'customerPhone',
@@ -227,6 +228,18 @@ export async function PUT(
       if (!parsed.ok) {
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }
+      // The form sends the install day it was loaded with. If the stored day
+      // has moved since (a rep's reschedule, the carrier sync), this edit was
+      // made against an older date and must not put it back.
+      if (
+        body.expectedInstallDate !== undefined &&
+        installDayKey(body.expectedInstallDate) !== installDayKey(existing?.installDate)
+      ) {
+        return NextResponse.json(
+          { error: 'The install date just changed. Reload the sale and try again.' },
+          { status: 409 }
+        );
+      }
       updateData.installDate = parsed.date;
 
       // Who moved the date, stamped only when the day actually changed — a rep
@@ -254,11 +267,26 @@ export async function PUT(
       }
     }
 
-    // Products and value are priced server-side, never taken from the client.
-    // Lines already on the sale keep their stored snapshot (see pricing.ts); new
-    // ones come from the plan catalog, and an unknown productId is rejected. A
-    // client totalValue is ignored — it is derived from the lines. totalPoints
-    // stays immutable on edit, as before.
+    // Same rule as create: an install cannot happen before its sale. Checked
+    // only when this edit moves either date, so an older row can still be
+    // corrected field by field.
+    if (updateData.saleDate || updateData.installDate) {
+      const saleDay = installDayKey(updateData.saleDate ?? existing?.saleDate);
+      const installDay = installDayKey(updateData.installDate ?? existing?.installDate);
+      if (saleDay && installDay && saleDay > installDay) {
+        return NextResponse.json(
+          { error: 'Sale date cannot be after the install date' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Products, value and points are priced server-side, never taken from the
+    // client. Lines already on the sale keep their stored snapshot (see
+    // pricing.ts); new ones come from the plan catalog, and an unknown
+    // productId is rejected. Client totalValue/totalPoints are ignored — both
+    // are derived from the lines, so the board and leaderboard follow a plan
+    // change.
     delete updateData.totalValue;
     if (body.products !== undefined) {
       const priced = priceSaleProducts(body.products, (existing?.products ?? []) as SaleProduct[]);
@@ -274,6 +302,7 @@ export async function PUT(
       }
       updateData.products = priced.products;
       updateData.totalValue = priced.totalValue;
+      updateData.totalPoints = priced.totalPoints;
     }
 
     // Written only if the sale is as it was read: a report sync or a rep's date

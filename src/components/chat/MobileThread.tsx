@@ -84,6 +84,8 @@ interface MobileThreadProps {
   // drives both the "earlier messages" pager copy and whether scrolling near
   // the top requests more history.
   hasMore: boolean;
+  // The window hit useMessages' MAX_WINDOW with older history left: say so.
+  historyCapped?: boolean;
   onLoadOlder: () => void;
   // The All Company line, already gated to that channel by the page (null
   // elsewhere, or when the stats call failed) — rendered as-is, never fabricated.
@@ -263,6 +265,7 @@ export function MobileThread({
   windowSize,
   lastSnapshotWindow,
   hasMore,
+  historyCapped = false,
   onLoadOlder,
   companyStats,
   authorAvatars,
@@ -711,6 +714,9 @@ export function MobileThread({
         <div ref={scrollRef} onScroll={handleScroll} className={c.threadScroller}>
           {!loading && messages.length > 0 && hasMore && (
             <p className={c.pager}>Earlier messages load as you scroll</p>
+          )}
+          {!loading && messages.length > 0 && historyCapped && (
+            <p className={c.pager}>Showing the latest {MAX_WINDOW} messages. Older history isn&apos;t available here.</p>
           )}
           {loading ? (
             <div className={c.msgSkels} aria-hidden="true">

@@ -24,7 +24,8 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedUser: vi.fn(async () => ({ ok: true, uid: 'caller' })),
 }));
 
-import { GET } from './route';
+import { DELETE, GET } from './route';
+import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 
 async function titlesFor(profile: Record<string, unknown>): Promise<string[]> {
   db.users.set('caller', profile);
@@ -34,6 +35,14 @@ async function titlesFor(profile: Record<string, unknown>): Promise<string[]> {
 }
 
 beforeEach(() => db.users.clear());
+
+describe('DELETE /api/portal/calls', () => {
+  it('400s a request with no JSON body instead of crashing', async () => {
+    vi.mocked(requireVerifiedManagement).mockResolvedValue({ ok: true, uid: 'admin' } as never);
+    const res = await DELETE(new NextRequest('http://localhost/api/portal/calls?id=x', { method: 'DELETE' }));
+    expect(res.status).toBe(400);
+  });
+});
 
 describe('GET /api/portal/calls audience scoping', () => {
   it('shows an entry rep only the all-hands calls', async () => {

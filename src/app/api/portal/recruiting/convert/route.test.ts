@@ -40,6 +40,21 @@ const firestore = vi.hoisted(() => {
               : applications;
       return { doc: (id: string) => docFor(name, id, store) };
     }),
+    runTransaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const writes: Array<() => Promise<void>> = [];
+      type Ref = {
+        get: () => Promise<unknown>;
+        set: (data: Record<string, unknown>, options?: { merge?: boolean }) => Promise<void>;
+      };
+      const result = await fn({
+        get: (ref: Ref) => ref.get(),
+        set: (ref: Ref, data: Record<string, unknown>, options?: { merge?: boolean }) => {
+          writes.push(() => ref.set(data, options));
+        },
+      });
+      for (const write of writes) await write();
+      return result;
+    }),
   };
 
   return { adminDb, users, invites, candidateOnboarding, applications };
@@ -53,10 +68,14 @@ vi.mock('@/lib/onboarding/activation', () => ({
   activateUser: vi.fn(),
   getActivationReadiness: vi.fn(),
 }));
+vi.mock('@/lib/chat/channels', () => ({ reconcileChatMembershipForUser: vi.fn(async () => []) }));
+vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: vi.fn(async () => undefined) }));
 
 import { POST } from './route';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
+import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
+import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 const mockActivateUser = activateUser as unknown as ReturnType<typeof vi.fn>;
@@ -180,5 +199,18 @@ describe('POST /api/portal/recruiting/convert', () => {
     await expect(response.json()).resolves.toEqual({ success: true, status: 'rejected' });
     expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'rejected' });
     expect(firestore.users.get('recruit-1')).toMatchObject({ status: 'inactive' });
+    expect(reconcileChatMembershipForUser).toHaveBeenCalledWith('recruit-1');
+    expect(resolveAlertTasks).toHaveBeenCalledWith('recruit-1');
+  });
+
+  it('refuses to reject a recruit who is already active and leaves them active', async () => {
+    seedRecruit();
+    firestore.users.set('recruit-1', { ...firestore.users.get('recruit-1'), status: 'active' });
+
+    const response = await POST(request({ inviteId: 'invite-1', action: 'rejected' }));
+
+    expect(response.status).toBe(409);
+    expect(firestore.users.get('recruit-1')).toMatchObject({ status: 'active' });
+    expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'submitted' });
   });
 });

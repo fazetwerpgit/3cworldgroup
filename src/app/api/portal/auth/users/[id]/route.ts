@@ -7,6 +7,7 @@ import {
   FieldRole,
   FieldRoles,
   isManagementRole,
+  MANAGEMENT_FIELD_ROLES,
   MANAGEMENT_PLATFORM_ROLES,
   roleRequiresOnboarding,
   resolveRoles,
@@ -17,6 +18,7 @@ import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { kickoffOnboardingChecklist } from '@/lib/onboarding/kickoff';
 import { restampAuthor } from '@/lib/chat/restampAuthor';
+import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
 import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
@@ -149,22 +151,23 @@ export async function PUT(
       );
     }
 
-    // Validate roles if provided: `role` is platform-only, `fieldRole` is field-only
+    // Validate shapes before anything is written: `role` is platform-only,
+    // `fieldRole` is field-only, and a null/'' role would strip both roles.
     const validPlatformRoles: PlatformRole[] = [...MANAGEMENT_PLATFORM_ROLES];
     const validFieldRoles: FieldRole[] = Object.values(FieldRoles);
-    if (role && fieldRole) {
+    if (role !== undefined && fieldRole !== undefined) {
       return NextResponse.json(
         { error: 'Provide either role (platform) or fieldRole (field sales), not both' },
         { status: 400 }
       );
     }
-    if (role && !validPlatformRoles.includes(role)) {
+    if (role !== undefined && !validPlatformRoles.includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },
         { status: 400 }
       );
     }
-    if (fieldRole && !validFieldRoles.includes(fieldRole)) {
+    if (fieldRole !== undefined && !validFieldRoles.includes(fieldRole)) {
       return NextResponse.json(
         { error: 'Invalid fieldRole' },
         { status: 400 }
@@ -175,6 +178,75 @@ export async function PUT(
         { error: 'Invalid status' },
         { status: 400 }
       );
+    }
+    if (phone !== undefined && (typeof phone !== 'string' || phone.length > 40)) {
+      return NextResponse.json({ error: 'Invalid phone' }, { status: 400 });
+    }
+    if (territoryId !== undefined && (typeof territoryId !== 'string' || territoryId.length > 128)) {
+      return NextResponse.json({ error: 'Invalid territoryId' }, { status: 400 });
+    }
+    if (
+      managerId !== undefined &&
+      managerId !== null &&
+      (typeof managerId !== 'string' || !managerId || managerId.length > 128)
+    ) {
+      return NextResponse.json({ error: 'Invalid managerId' }, { status: 400 });
+    }
+    if (managerId === id) {
+      return NextResponse.json({ error: 'A person cannot be their own manager' }, { status: 400 });
+    }
+
+    // Nobody may lock themselves out: there is no self-service way back from a
+    // disabled account or a lost platform role.
+    if (gate.uid === id) {
+      if (status !== undefined && status !== 'active') {
+        return NextResponse.json(
+          { error: 'You cannot deactivate your own account' },
+          { status: 400 }
+        );
+      }
+      if (isManagementRole(existingRole) && fieldRole !== undefined) {
+        return NextResponse.json(
+          { error: 'You cannot remove your own platform role' },
+          { status: 400 }
+        );
+      }
+    }
+    // Only an owner can grant the owner role, so losing the last active owner
+    // locks payroll, comp plan and exports until Firestore is edited by hand.
+    const removesOwner =
+      (role !== undefined && role !== 'owner') || fieldRole !== undefined || (status !== undefined && status !== 'active');
+    if (existingRole === 'owner' && doc.get('status') === 'active' && removesOwner) {
+      const owners = await adminDb.collection('users').where('role', '==', 'owner').get();
+      if (!owners.docs.some((owner) => owner.id !== id && owner.get('status') === 'active')) {
+        return NextResponse.json(
+          {
+            error:
+              'This is the last active owner. Make someone else an owner before deactivating or changing the role of this account.',
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // A new manager must be an active person in a management role. Re-sending
+    // the stored manager is not a change, so it is accepted even if they have
+    // since stopped being eligible.
+    const storedManagerId = (doc.get('reportsToId') ?? doc.get('managerId')) as string | undefined;
+    if (typeof managerId === 'string' && managerId !== storedManagerId) {
+      const manager = await adminDb.collection('users').doc(managerId).get();
+      const managerRoles = resolveRoles(manager.get('role'), manager.get('fieldRole'));
+      const eligible =
+        manager.exists &&
+        manager.get('status') === 'active' &&
+        (isManagementRole(managerRoles.role) ||
+          (managerRoles.fieldRole ? MANAGEMENT_FIELD_ROLES.includes(managerRoles.fieldRole) : false));
+      if (!eligible) {
+        return NextResponse.json(
+          { error: 'The manager must be an active person in a management role' },
+          { status: 400 }
+        );
+      }
     }
 
     const addressCheck = validateAddress({ address, city, state, zip });
@@ -201,7 +273,12 @@ export async function PUT(
       updateData.fieldRole = fieldRole;
       updateData.role = FieldValue.delete();
     }
-    if (managerId !== undefined) updateData.managerId = managerId;
+    // Every reader prefers reportsToId (an invite claim sets both), so the two
+    // are always set or cleared together.
+    if (managerId !== undefined) {
+      updateData.reportsToId = managerId ?? FieldValue.delete();
+      updateData.managerId = managerId ?? FieldValue.delete();
+    }
     if (territoryId !== undefined) updateData.territoryId = territoryId;
     if (phone !== undefined) updateData.phone = phone;
     if (address !== undefined)
@@ -254,35 +331,45 @@ export async function PUT(
     await docRef.update(updateData);
 
     // Personal data (phone, address ...) is logged by field name only; status
-    // and role are not personal, so their before/after is recorded.
-    const changedFields = Object.keys(updateData).filter(
-      (key) => key !== 'updatedAt' && key !== 'activatedAt' && key !== 'decommission'
-    );
-    await writeAdminAudit({
-      action: 'user.update',
-      actorUid: gate.uid,
-      actorName: gate.name,
-      targetUid: id,
-      targetName: doc.get('displayName') || undefined,
-      details: {
-        fields: changedFields,
-        ...(updateData.status !== undefined
-          ? { status: { from: doc.get('status') ?? null, to: updateData.status } }
-          : {}),
-        ...(role !== undefined || fieldRole !== undefined
-          ? { role: { from: existingRole ?? existingFieldRole ?? null, to: role ?? fieldRole } }
-          : {}),
-        ...(updateData.decommission !== undefined
-          ? {
-              // The record is deleted by this save; keep what it said (never its notes).
-              decommissionCleared: {
-                previousReason: doc.get('decommission')?.reason ?? null,
-                decommissionedBy: doc.get('decommission')?.decommissionedBy ?? null,
-              },
-            }
-          : {}),
-      },
+    // and role are not personal, so their before/after is recorded. Only fields
+    // whose stored value actually changes are listed, and a save that changes
+    // nothing writes no row.
+    const changedFields = Object.keys(updateData).filter((key) => {
+      if (key === 'updatedAt' || key === 'activatedAt' || key === 'decommission') return false;
+      const before = doc.get(key);
+      const after = updateData[key];
+      return after === FieldValue.delete()
+        ? before !== undefined
+        : JSON.stringify(before) !== JSON.stringify(after);
     });
+    const roleAuditChanged = changedFields.includes('role') || changedFields.includes('fieldRole');
+    if (changedFields.length > 0) {
+      await writeAdminAudit({
+        action: 'user.update',
+        actorUid: gate.uid,
+        actorName: gate.name,
+        targetUid: id,
+        targetName: doc.get('displayName') || undefined,
+        details: {
+          fields: changedFields,
+          ...(changedFields.includes('status')
+            ? { status: { from: doc.get('status') ?? null, to: updateData.status } }
+            : {}),
+          ...(roleAuditChanged
+            ? { role: { from: existingRole ?? existingFieldRole ?? null, to: role ?? fieldRole } }
+            : {}),
+          ...(updateData.decommission !== undefined
+            ? {
+                // The record is deleted by this save; keep what it said (never its notes).
+                decommissionCleared: {
+                  previousReason: doc.get('decommission')?.reason ?? null,
+                  decommissionedBy: doc.get('decommission')?.decommissionedBy ?? null,
+                },
+              }
+            : {}),
+        },
+      });
+    }
 
     // Flipping the Firestore flag does not end the session: the account's refresh
     // token keeps minting valid ID tokens, so the API status gate would be the
@@ -307,6 +394,35 @@ export async function PUT(
         await adminAuth.updateUser(id, { disabled: false });
       } catch (err) {
         console.error('[users] Failed to re-enable auth account', id, err);
+      }
+    }
+
+    // Open alert tasks re-nag every admin daily until resolved. Deactivating
+    // someone ends all of theirs; a manual Accept (pending -> active with a
+    // field role) closes the onboarding ones activateUser would have closed.
+    const acceptedManually =
+      status === 'active' && fieldRole !== undefined && doc.get('status') === 'pending';
+    if (updateData.status === 'inactive' || acceptedManually) {
+      try {
+        await resolveAlertTasks(
+          id,
+          acceptedManually
+            ? ['pending_assignment', 'stalled_rep', 'review_needed', 'activation_ready']
+            : undefined
+        );
+      } catch (error) {
+        console.error('[users] Failed to resolve open alert tasks', id, error);
+      }
+    }
+
+    // Chat channel memberIds gate the Firestore reads and pushes, so a role or
+    // status change must add/remove this user per channel right away. Fail-soft
+    // like the restamps below: the profile update is already committed.
+    if (role !== undefined || fieldRole !== undefined || updateData.status !== undefined) {
+      try {
+        await reconcileChatMembershipForUser(id);
+      } catch (error) {
+        console.error('[users] Failed to reconcile chat membership:', error);
       }
     }
 
@@ -393,10 +509,17 @@ export async function DELETE(
       );
     }
 
-    // Only admin/operations may delete users.
+    // Deleting is irreversible (Auth account, profile, SSN/DL and licence
+    // photos), so it is admin/owner only, matching RolePermissions users:delete.
     const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
+    }
+    if (!gate.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden: only an admin can delete a user' },
+        { status: 403 }
+      );
     }
     // Don't let a caller delete their own account out from under themselves.
     if (gate.uid === id) {
@@ -413,15 +536,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Only an admin may delete a platform account — an operations caller must
-    // not be able to remove an admin. An owner may only be removed by an owner.
+    // An owner may only be removed by an owner.
     const targetRole = doc.get('role') as PlatformRole | undefined;
-    if (isManagementRole(targetRole) && !gate.isAdmin) {
-      return NextResponse.json(
-        { error: 'Forbidden: only an admin can delete a platform account' },
-        { status: 403 }
-      );
-    }
     if (targetRole === 'owner' && !gate.isOwner) {
       return NextResponse.json(
         { error: 'Forbidden: only an owner can delete an owner account' },

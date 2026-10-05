@@ -11,6 +11,7 @@ import {
   RETIRED_FIELD_ROLES,
   resolveRoles,
 } from '@/types';
+import { changedLeaves, writeAdminAudit } from '@/lib/audit/adminAudit';
 
 // Derived so the editable role list can never drift from the tier defaults.
 const FIELD_ROLES: FieldRole[] = DEFAULT_COMMISSION.map((tier) => tier.fieldRole);
@@ -189,6 +190,21 @@ export async function PUT(request: NextRequest) {
       updatedBy: gate.uid,
       updatedByName: gate.name,
       updatedAt: new Date(),
+    });
+
+    // The doc is overwritten whole, so this row is the only record of what a
+    // tier used to pay. Rates are pay terms, not personal data.
+    await writeAdminAudit({
+      action: 'commission.update',
+      actorUid: gate.uid,
+      actorName: gate.name,
+      // Keyed by role so the diff names the tier and field that changed.
+      details: {
+        tiers: changedLeaves(
+          Object.fromEntries(stored.map((tier) => [tier.fieldRole, tier])),
+          Object.fromEntries(merged.map((tier) => [tier.fieldRole, tier]))
+        ),
+      },
     });
 
     return NextResponse.json({ success: true, message: 'Pay structure updated' });

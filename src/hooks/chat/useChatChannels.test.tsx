@@ -11,7 +11,7 @@ type SnapshotDoc = { id: string; data: () => Record<string, unknown> };
 type Listener = { next: (snapshot: { docs: SnapshotDoc[] }) => void; fail: (error: Error) => void };
 
 const listeners: Listener[] = [];
-const auth: { user: { uid: string; status: string } | null; loading: boolean } = {
+const auth: { user: { uid: string; status: string; fieldRole?: string } | null; loading: boolean } = {
   user: { uid: 'me', status: 'active' },
   loading: false,
 };
@@ -118,5 +118,19 @@ describe('useChatChannels', () => {
     act(() => root.render(<Probe />));
     act(() => listeners[0].fail(new Error('permission-denied')));
     expect(read()).toEqual({ loading: 'false', count: '0', error: 'Failed to load live channels' });
+  });
+
+  it('subscribes for a hire mid-onboarding, whom the chat rules admit', () => {
+    auth.user = { uid: 'hire', status: 'pending', fieldRole: 'entry_level_rep' };
+    act(() => root.render(<Probe />));
+    expect(listeners).toHaveLength(1);
+    act(() => listeners[0].next({ docs: [doc('all-company')] }));
+    expect(read()).toEqual({ loading: 'false', count: '1', error: '' });
+  });
+
+  it('does not subscribe for a self-signup still awaiting a role', () => {
+    auth.user = { uid: 'signup', status: 'pending' };
+    act(() => root.render(<Probe />));
+    expect(listeners).toHaveLength(0);
   });
 });

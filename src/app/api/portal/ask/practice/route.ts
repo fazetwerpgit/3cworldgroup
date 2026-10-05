@@ -286,7 +286,9 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const sent = parsePracticeHistory(body?.history);
+  // Feedback grades the server's own transcript, which a multi-line reply can take past the turn cap, so
+  // the page's copy is only parsed (and length-checked) when there's no stored one.
+  const sent = action === 'feedback' && stored ? stored : parsePracticeHistory(body?.history);
   if (!sent) return fail('Bad practice conversation', 400);
   let history = sent;
   if (stored) {

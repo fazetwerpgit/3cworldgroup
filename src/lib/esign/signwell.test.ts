@@ -345,29 +345,40 @@ describe('signwellProvider.parseWebhook', () => {
     await expect(signwellProvider.parseWebhook(body, new Headers())).resolves.toBeNull();
   });
 
-  it('returns null without throwing when no verification key can be resolved', async () => {
-    const previousApiKey = process.env.SIGNWELL_API_KEY;
-    const previousWebhookId = process.env.SIGNWELL_WEBHOOK_ID;
-    delete process.env.SIGNWELL_API_KEY;
-    delete process.env.SIGNWELL_WEBHOOK_ID;
-    const body = JSON.stringify({
-      event: { type: 'document_completed', time: '1751970000', hash: 'deadbeef' },
-      data: { object: { id: 'doc_123', metadata: { userId: 'u1', itemId: 'contract' } } },
-    });
-
-    try {
-      await expect(signwellProvider.parseWebhook(body, new Headers())).resolves.toBeNull();
-    } finally {
-      process.env.SIGNWELL_API_KEY = previousApiKey;
-      process.env.SIGNWELL_WEBHOOK_ID = previousWebhookId;
-    }
-  });
-
-  it('returns a completed event for a correctly signed payload', async () => {
-    const key = 'wh_123';
+  it('returns null without throwing when no verification key is configured', async () => {
+    vi.stubEnv('SIGNWELL_API_KEY', 'api_key_is_not_the_webhook_key');
+    vi.stubEnv('SIGNWELL_WEBHOOK_ID', '');
+    const key = 'wh_attacker';
     const hash = createHmac('sha256', key).update('document_completed@1751970000').digest('hex');
     const body = JSON.stringify({
       event: { type: 'document_completed', time: '1751970000', hash, webhook_id: key },
+      data: { object: { id: 'doc_123', metadata: { userId: 'u1', itemId: 'contract' } } },
+    });
+
+    await expect(
+      signwellProvider.parseWebhook(body, new Headers({ 'x-signwell-webhook-id': key }))
+    ).resolves.toBeNull();
+  });
+
+  it('rejects a payload signed with a key the request supplies itself', async () => {
+    vi.stubEnv('SIGNWELL_WEBHOOK_ID', 'wh_server');
+    const key = 'wh_attacker';
+    const hash = createHmac('sha256', key).update('document_completed@1751970000').digest('hex');
+    const body = JSON.stringify({
+      event: { type: 'document_completed', time: '1751970000', hash, webhook_id: key, webhookId: key },
+      data: { object: { id: 'doc_123', metadata: { userId: 'u1', itemId: 'contract' } } },
+    });
+
+    await expect(
+      signwellProvider.parseWebhook(body, new Headers({ 'x-signwell-webhook-id': key }))
+    ).resolves.toBeNull();
+  });
+
+  it('returns a completed event for a payload signed with the configured key', async () => {
+    vi.stubEnv('SIGNWELL_WEBHOOK_ID', 'wh_123');
+    const hash = createHmac('sha256', 'wh_123').update('document_completed@1751970000').digest('hex');
+    const body = JSON.stringify({
+      event: { type: 'document_completed', time: '1751970000', hash },
       data: { object: { id: 'doc_123', metadata: { userId: 'u1', itemId: 'contract' } } },
     });
 

@@ -50,7 +50,11 @@ function ExpediteOrderForm() {
   const [referenceId, setReferenceId] = useState('');
   const [error, setError] = useState('');
   const alertRef = useAlertScroll(error);
-  const check = useFormCheck(form, RULES);
+  const check = useFormCheck(form, [
+    ...RULES,
+    // Optional, so only checked once something is typed (the API does the same).
+    { key: 'customerEmail', id: 'customer-email', message: 'Enter a valid email', email: true, when: form.customerEmail.trim() !== '' },
+  ]);
 
   const set = (key: keyof Form, value: string) => {
     setForm((p) => ({ ...p, [key]: value }));
@@ -122,7 +126,7 @@ function ExpediteOrderForm() {
         <Field id="customer-phone" label="Customer phone" required error={check.errors.customerPhone}>
           <input {...text('customerPhone', 'customer-phone')} type="tel" inputMode="tel" autoComplete="off" />
         </Field>
-        <Field id="customer-email" label="Customer email" wide>
+        <Field id="customer-email" label="Customer email" wide error={check.errors.customerEmail}>
           <input {...text('customerEmail', 'customer-email')} type="email" inputMode="email" autoComplete="off" />
         </Field>
       </FormSection>

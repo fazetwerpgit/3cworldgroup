@@ -8,3 +8,8 @@ export const NAV_LINKS = [
 ] as const;
 
 export const APPLY_HREF = "/apply";
+
+export const SITE_URL = "https://www.3cworldgroup.com";
+
+// Every indexable public page (the sitemap's list).
+export const PUBLIC_PATHS = ["/", ...NAV_LINKS.map((link) => link.href), APPLY_HREF, "/privacy", "/terms"];

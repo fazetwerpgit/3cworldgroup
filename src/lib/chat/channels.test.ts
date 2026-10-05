@@ -41,7 +41,7 @@ const firestore = vi.hoisted(() => {
             })),
             };
           }),
-          doc: vi.fn((id: string) => ({ __id: id })),
+          doc: vi.fn((id: string) => ({ __id: id, get: vi.fn(async () => userSnap(id)) })),
         };
       }
       throw new Error(`Unexpected collection ${name}`);
@@ -72,7 +72,13 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminDb: firestore.adminDb,
 }));
 
-import { createChannelId, getMemberIdsForAudience, syncChatChannels } from './channels';
+import { FieldValue } from 'firebase-admin/firestore';
+import {
+  createChannelId,
+  getMemberIdsForAudience,
+  reconcileChatMembershipForUser,
+  syncChatChannels,
+} from './channels';
 import { canAccessChatChannel, MANAGEMENT_FIELD_ROLES } from '@/types';
 import type { ChatChannel } from '@/types';
 
@@ -152,6 +158,63 @@ describe('syncChatChannels', () => {
       { field: 'status', op: '==', value: 'active' },
       { field: 'status', op: '==', value: 'pending' },
     ]);
+  });
+});
+
+describe('reconcileChatMembershipForUser', () => {
+  beforeEach(() => firestore.reset());
+
+  function channel(id: string, audience: string, memberIds: string[], extra: Record<string, unknown> = {}) {
+    firestore.channelDocs.push({
+      id,
+      data: { id, name: id, audience, order: 1, active: true, memberIds, ...extra },
+    });
+  }
+
+  it('removes a demoted manager from Managers and keeps their other channels', async () => {
+    channel('managers', 'managers', ['gm', 'other-mgr']);
+    channel('all-company', 'all', ['gm']);
+    firestore.users.set('gm', { status: 'active', fieldRole: 'ae_tier_1' });
+
+    const memberOf = await reconcileChatMembershipForUser('gm');
+
+    expect(firestore.batchSets).toEqual([
+      { ref: { __id: 'managers' }, data: expect.objectContaining({ memberIds: FieldValue.arrayRemove('gm') }) },
+    ]);
+    expect(memberOf.map((c) => c.id)).toEqual(['all-company']);
+  });
+
+  it('adds a new user to every custom channel their role reaches', async () => {
+    channel('qa-general', 'all', ['someone']);
+    channel('managers', 'managers', []);
+    firestore.users.set('new-rep', { status: 'active', fieldRole: 'entry_rep' });
+
+    await reconcileChatMembershipForUser('new-rep');
+
+    expect(firestore.batchSets).toEqual([
+      { ref: { __id: 'qa-general' }, data: expect.objectContaining({ memberIds: FieldValue.arrayUnion('new-rep') }) },
+    ]);
+  });
+
+  it('removes a deactivated user everywhere, even where they are a manual extra', async () => {
+    channel('managers', 'managers', ['gone'], { extraMemberIds: ['gone'] });
+    channel('all-company', 'all', ['gone']);
+    firestore.users.set('gone', { status: 'inactive', fieldRole: 'l1_manager' });
+
+    const memberOf = await reconcileChatMembershipForUser('gone');
+
+    expect(firestore.batchSets.map((s) => s.ref.__id).sort()).toEqual(['all-company', 'managers']);
+    expect(memberOf).toEqual([]);
+  });
+
+  it('keeps a manual extra whose role would not reach the channel', async () => {
+    channel('managers', 'managers', ['rep-x'], { extraMemberIds: ['rep-x'] });
+    firestore.users.set('rep-x', { status: 'active', fieldRole: 'entry_rep' });
+
+    const memberOf = await reconcileChatMembershipForUser('rep-x');
+
+    expect(firestore.batchSets).toEqual([]);
+    expect(memberOf.map((c) => c.id)).toEqual(['managers']);
   });
 });
 

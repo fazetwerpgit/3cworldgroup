@@ -8,6 +8,7 @@ import {
   type SaleRecord,
 } from '@/lib/leaderboard/history';
 import { periodBounds } from '@/lib/leaderboard/periods';
+import { boardOrder } from '@/lib/leaderboard/order';
 import { recentSales, unrankedReps, type RecentSale, type UnrankedRep } from '@/lib/leaderboard/team';
 
 // How many ranked rows a non-management caller may pull in one request. The
@@ -115,15 +116,11 @@ export async function GET(request: NextRequest) {
     // Convert to array and sort by metric
     const leaderboard = Object.values(salesByRep);
 
-    switch (metric) {
-      case 'totalSales':
-        leaderboard.sort((a, b) => b.totalSales - a.totalSales);
-        break;
-      case 'totalPoints':
-      default:
-        leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
-        break;
-    }
+    const score = metric === 'totalSales' ? 'totalSales' : 'totalPoints';
+    leaderboard.sort((a, b) => boardOrder(
+      { score: a[score], name: a.salesRepName, id: a.salesRepId },
+      { score: b[score], name: b.salesRepName, id: b.salesRepId },
+    ));
 
     // Rank the FULL sorted list first, so the caller's rank is correct even when
     // they fall below the returned top-N cutoff.

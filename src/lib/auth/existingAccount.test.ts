@@ -39,6 +39,13 @@ describe('findActivePortalAccount', () => {
     expect(userDocGetMock).not.toHaveBeenCalled();
   });
 
+  it('returns null instead of throwing for a malformed email', async () => {
+    getUserByEmailMock.mockRejectedValue({ code: 'auth/invalid-email' });
+
+    await expect(findActivePortalAccount('not-an-email')).resolves.toBeNull();
+    expect(userDocGetMock).not.toHaveBeenCalled();
+  });
+
   it('returns null when the users profile is missing', async () => {
     await expect(findActivePortalAccount('rep@example.com')).resolves.toBeNull();
   });

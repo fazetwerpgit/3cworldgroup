@@ -70,4 +70,19 @@ describe('POST /api/portal/forms/fiber-report', () => {
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
   });
+
+  it('rejects a blank report and one missing company or date', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    expect((await POST(req({}))).status).toBe(400);
+    expect((await POST(req({ ...VALID, companySold: '' }))).status).toBe(400);
+    expect((await POST(req({ ...VALID, dateKnocked: '  ' }))).status).toBe(400);
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('rejects counts that are not whole numbers but allows blank counts', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    expect((await POST(req({ ...VALID, doorsKnocked: 'lots' }))).status).toBe(400);
+    expect(mockSubmit).not.toHaveBeenCalled();
+    expect((await POST(req({ ...VALID, numberOfReps: '', numberOfSales: '' }))).status).toBe(200);
+  });
 });

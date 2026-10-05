@@ -53,10 +53,14 @@ export function undatedSales<T extends Sale>(sales: T[], fiberBySale: FiberMap):
   return countedSales(sales, fiberBySale).filter((sale) => !hasInstallDate(sale));
 }
 
-/** Σ expected pay, or null when the rep has no pay plan (never a confident $0). */
+/**
+ * Σ expected pay, or null when the rep has no pay plan (never a confident $0).
+ * Each sale is rounded to whole dollars first, the way its row shows it, so a
+ * total always equals the rows printed above it.
+ */
 export function sumExpectedPay(sales: Array<Pick<Sale, 'products'>>, rates: CompPlanCompanyRates | null): number | null {
   if (!rates) return null;
-  return sales.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
+  return sales.reduce((sum, sale) => sum + Math.round(expectedPayForSale(sale, rates) ?? 0), 0);
 }
 
 export type PayGroupKind = 'window' | 'other' | 'missed' | 'undated';

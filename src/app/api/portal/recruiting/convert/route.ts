@@ -3,6 +3,8 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
 import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
+import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
+import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 
 export async function POST(request: NextRequest) {
   try {
@@ -58,8 +60,16 @@ export async function POST(request: NextRequest) {
 
     const now = new Date();
     if (action === 'rejected') {
-      await Promise.all([
-        inviteRef.set(
+      const userRef = adminDb.collection('users').doc(invite.convertedUserId);
+      // Read invite + user inside the transaction so a concurrent Activate (or
+      // the hire's own last approval) can't be overwritten by this reject.
+      const outcome = await adminDb.runTransaction(async (tx) => {
+        const [freshInvite, user] = await Promise.all([tx.get(inviteRef), tx.get(userRef)]);
+        const freshStatus = freshInvite.get('status');
+        if (freshStatus === 'converted' || freshStatus === 'rejected') return `already_${freshStatus}`;
+        if (user.get('status') === 'active') return 'active';
+        tx.set(
+          inviteRef,
           {
             status: 'rejected',
             reviewedBy: requestedBy,
@@ -68,15 +78,35 @@ export async function POST(request: NextRequest) {
             updatedAt: now,
           },
           { merge: true }
-        ),
-        adminDb.collection('users').doc(invite.convertedUserId).set(
-          {
-            status: 'inactive',
-            updatedAt: now,
-          },
-          { merge: true }
-        ),
-      ]);
+        );
+        tx.set(userRef, { status: 'inactive', updatedAt: now }, { merge: true });
+        return 'rejected';
+      });
+      if (outcome === 'active') {
+        return NextResponse.json(
+          { error: 'This recruit has already finished onboarding and is an active rep. Deactivate them from People instead.' },
+          { status: 409 }
+        );
+      }
+      if (outcome !== 'rejected') {
+        return NextResponse.json(
+          { error: `This recruit was already ${outcome.replace('already_', '')}` },
+          { status: 400 }
+        );
+      }
+
+      // A rejected hire leaves every chat channel (Firestore reads + pushes).
+      try {
+        await reconcileChatMembershipForUser(invite.convertedUserId);
+      } catch (error) {
+        console.error('[recruiting] chat membership reconcile failed', error);
+      }
+      // Their stalled/activation tasks are no longer anyone's to act on.
+      try {
+        await resolveAlertTasks(invite.convertedUserId);
+      } catch (error) {
+        console.error('[recruiting] alert task resolve failed', error);
+      }
 
       return NextResponse.json({ success: true, status: 'rejected' });
     }

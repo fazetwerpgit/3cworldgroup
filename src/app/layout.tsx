@@ -1,37 +1,51 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SITE_URL } from "./_cinematic/nav";
 import "@fontsource/bebas-neue/latin-400.css";
 import "./globals.css";
-import "./public.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
 });
 
+// Nothing public renders in mono, so it is not preloaded on every page; the
+// portal's few <code>/<pre> elements fetch it when they render.
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "3C World Group | Fiber Internet, TV & Security Solutions",
   description: "Nationwide B2C sales solutions for fiber internet, TV services, and security systems. Join our team of successful independent contractors.",
-  // PWA: manifest + iOS home-screen app behavior + touch icon.
-  manifest: "/manifest.webmanifest",
-  appleWebApp: {
-    capable: true,
-    // Not "black-translucent": with viewport-fit=cover, iOS 26+ standalone
-    // sizes the web view one status bar (~59pt on Dynamic Island phones) short
-    // and leaves an unpaintable strip under the fixed tab bar (WebKit bug
-    // 301108). "default" gives an opaque status bar tinted by theme-color and
-    // a correctly sized view; safe-area-inset-top then reads 0.
-    statusBarStyle: "default",
-    title: "3C Console",
+  // Shared-link cards. No title or description here: Next fills them from each
+  // page's own, so every page's card names that page.
+  openGraph: {
+    type: "website",
+    siteName: "3C World Group",
+    locale: "en_US",
+    images: [
+      {
+        url: "/redesign/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "A neighborhood at dusk, its streets traced in light",
+      },
+    ],
   },
+  twitter: { card: "summary_large_image" },
+  // The PWA manifest and iOS home-screen settings belong to the portal and live
+  // in portal/layout.tsx, so adding the public site to a home screen does not
+  // install the employee app.
   icons: {
-    icon: "/icons/icon-192.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
     apple: "/icons/apple-touch-icon.png",
   },
 };

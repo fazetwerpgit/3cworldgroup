@@ -15,6 +15,7 @@ import {
   CallDay,
   CallDayLabels,
 } from '@/types';
+import { type CentralNow, getMinutesUntil, isPastOccurrence } from './callTiming';
 
 interface CallEntry {
   id: string;
@@ -31,11 +32,6 @@ interface CallEntry {
 interface CallsResponse {
   calls: CallEntry[];
   canManage: boolean;
-}
-
-interface CentralNow {
-  day: CallDay;
-  minutes: number;
 }
 
 const CENTRAL_TIME_ZONE = 'America/Chicago';
@@ -152,29 +148,11 @@ function formatTime(time: string): string {
   return `${hour}:${String(m).padStart(2, '0')} ${suffix}`;
 }
 
-function timeToMinutes(time: string): number {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
 function getCentralNow(date = new Date()): CentralNow {
   const parts = Object.fromEntries(CENTRAL_FORMATTER.formatToParts(date).map(({ type, value }) => [type, value]));
   const day = parts.weekday.toLowerCase() as CallDay;
   const hour = Number(parts.hour) % 24;
   return { day, minutes: hour * 60 + Number(parts.minute) };
-}
-
-function getMinutesUntil(call: CallEntry, now: CentralNow): number {
-  const todayIndex = CALL_DAY_ORDER.indexOf(now.day);
-  const callIndex = CALL_DAY_ORDER.indexOf(call.day);
-  let minutes = ((callIndex - todayIndex + CALL_DAY_ORDER.length) % CALL_DAY_ORDER.length) * 1440;
-  minutes += timeToMinutes(call.time) - now.minutes;
-  if (minutes <= 0) minutes += CALL_DAY_ORDER.length * 1440;
-  return minutes;
-}
-
-function isPastOccurrence(call: CallEntry, now: CentralNow): boolean {
-  return call.day === now.day && timeToMinutes(call.time) < now.minutes;
 }
 
 /** "3h 12m", "45m", or "1d 13h" once the call is a day or more away. */
@@ -209,9 +187,6 @@ export default function CallsSchedulePage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<CallDay>(() => getCentralNow().day);
   const [nowTick, setNowTick] = useState(() => Date.now());
-  const [reducedMotion, setReducedMotion] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ));
 
   const now = getCentralNow(new Date(nowTick));
   const calls = data?.calls ?? [];
@@ -246,18 +221,11 @@ export default function CallsSchedulePage() {
     fetchCalls();
   }, [fetchCalls]);
 
+  // The clock is not an animation, so it ticks under reduce-motion too.
   useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const updatePreference = () => setReducedMotion(media.matches);
-    media.addEventListener('change', updatePreference);
-    return () => media.removeEventListener('change', updatePreference);
-  }, []);
-
-  useEffect(() => {
-    if (reducedMotion) return;
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [reducedMotion]);
+  }, []);
 
   const handleCreate = async () => {
     if (!user) return;
@@ -379,8 +347,8 @@ export default function CallsSchedulePage() {
                     </p>
                   </div>
                   <p className={c.count}>
-                    <span className={c.countLabel}>Starts in</span>
-                    <strong className={c.countNum}>{formatCountdown(nextCallMinutes)}</strong>
+                    <span className={c.countLabel}>{nextCallMinutes <= 0 ? 'Started' : 'Starts in'}</span>
+                    <strong className={c.countNum}>{nextCallMinutes <= 0 ? 'Live now' : formatCountdown(nextCallMinutes)}</strong>
                   </p>
                 </div>
                 <a

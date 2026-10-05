@@ -8,6 +8,13 @@ import { ArrowRight, Check } from "lucide-react";
 import kit from "../../_cinematic/cinematic.module.css";
 import { findMarket } from "../../_cinematic/markets";
 import styles from "./apply.module.css";
+import {
+  INVALID_EMAIL_MESSAGE,
+  INVALID_PHONE_MESSAGE,
+  PUBLIC_FIELD_LIMITS,
+  isValidEmail,
+  isValidUsPhone,
+} from "@/lib/forms/publicFields";
 
 /**
  * The working half of /apply.
@@ -38,14 +45,15 @@ const MISSING: Record<string, string> = {
 };
 
 const MISMATCH: Record<string, string> = {
-  email: "Enter a valid email address.",
-  phone: "Enter a valid phone number.",
+  email: INVALID_EMAIL_MESSAGE,
+  phone: INVALID_PHONE_MESSAGE,
 };
 
 function messageFor(field: HTMLInputElement): string {
   const { validity, name, validationMessage } = field;
   if (validity.valueMissing) return MISSING[name] ?? "This field is required.";
-  if (validity.typeMismatch) return MISMATCH[name] ?? "Check this value.";
+  // customError is the shared email/phone check set below, the same one the server runs.
+  if (validity.typeMismatch || validity.customError) return MISMATCH[name] ?? "Check this value.";
   return validationMessage || "Check this value.";
 }
 
@@ -140,10 +148,11 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
     Restore once, on mount. `restored` also gates the writer below, so the
     empty state of the first render is never written over a real draft.
 
-    `referredBy` is the one field the draft does not get to win. It is prefilled
-    from `?ref=` in the URL of THIS visit by `ReferralFromQuery`, whose effect
-    runs before this one because it is a child — so a stored value is only used
-    where the link did not carry one.
+    A value already in the form wins over the draft. The only values there at
+    mount are the `?ref=` and `?market=` prefills from the URL of THIS visit,
+    set by `PrefillFromQuery`, whose effect runs before this one because it is
+    a child — the link is the newer, explicit choice, and an empty string left
+    in the draft must not blank it.
   */
   const [restored, setRestored] = useState(false);
 
@@ -154,10 +163,10 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
         const draft = JSON.parse(raw) as Draft;
         setFormData((current) => ({
           ...current,
-          name: draft.name ?? current.name,
-          phone: draft.phone ?? current.phone,
-          email: draft.email ?? current.email,
-          city: draft.city ?? current.city,
+          name: current.name || draft.name || "",
+          phone: current.phone || draft.phone || "",
+          email: current.email || draft.email || "",
+          city: current.city || draft.city || "",
           referredBy: current.referredBy || draft.referredBy || "",
         }));
       }
@@ -208,15 +217,32 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
     `?market=` comes off Home's market explorer. It only ever prefills City,
     and only from a slug that names one of the five markets the site lists —
     an unknown slug fills in nothing, so a link cannot put arbitrary query
-    text into the field. City stays a free-text input either way: the reader
-    can replace the market with the town they actually live in, and what a
-    submit sends is the same string it has always sent.
+    text into the field. A known slug always sets City, over a draft or an
+    earlier link: picking a market is an explicit choice, and the application
+    goes to the market City names. City stays a free-text input either way:
+    the reader can replace the market with the town they actually live in.
   */
   const applyMarket = useCallback((slug: string) => {
     const market = findMarket(slug);
     if (!market) return;
-    setFormData((prev) => (prev.city ? prev : { ...prev, city: market.applyCity }));
+    setFormData((prev) => ({ ...prev, city: market.applyCity }));
   }, []);
+
+  /*
+    `type="email"` passes "foo@bar" and `type="tel"` passes anything, so the
+    shared checks are set as each control's custom validity: native validation
+    then blocks the submit and `handleInvalid` names the field, same as a
+    missing value.
+  */
+  const emailRef = useRef<HTMLInputElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const email = formData.email.trim();
+    const phone = formData.phone.trim();
+    emailRef.current?.setCustomValidity(email && !isValidEmail(email) ? INVALID_EMAIL_MESSAGE : "");
+    phoneRef.current?.setCustomValidity(phone && !isValidUsPhone(phone) ? INVALID_PHONE_MESSAGE : "");
+  }, [formData.email, formData.phone]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -480,6 +506,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                         type="text"
                         id="apply-name"
                         name="name"
+                        maxLength={PUBLIC_FIELD_LIMITS.name}
                         aria-invalid={invalid.name ? true : undefined}
                         aria-describedby={invalid.name ? "apply-name-error" : undefined}
                         onInvalid={handleInvalid}
@@ -505,6 +532,8 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                         type="tel"
                         id="apply-phone"
                         name="phone"
+                        ref={phoneRef}
+                        maxLength={PUBLIC_FIELD_LIMITS.phone}
                         aria-invalid={invalid.phone ? true : undefined}
                         aria-describedby={invalid.phone ? "apply-phone-error" : undefined}
                         onInvalid={handleInvalid}
@@ -531,6 +560,8 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                       type="email"
                       id="apply-email"
                       name="email"
+                      ref={emailRef}
+                      maxLength={PUBLIC_FIELD_LIMITS.email}
                       aria-invalid={invalid.email ? true : undefined}
                       aria-describedby={invalid.email ? "apply-email-error" : undefined}
                       onInvalid={handleInvalid}
@@ -556,6 +587,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                       type="text"
                       id="apply-city"
                       name="city"
+                      maxLength={PUBLIC_FIELD_LIMITS.city}
                       aria-invalid={invalid.city ? true : undefined}
                       aria-describedby={invalid.city ? "apply-city-error" : undefined}
                       onInvalid={handleInvalid}
@@ -583,6 +615,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                     type="text"
                     id="apply-referred-by"
                     name="referredBy"
+                    maxLength={PUBLIC_FIELD_LIMITS.referredBy}
                     value={formData.referredBy}
                     onChange={handleChange}
                     placeholder="How did you hear about us?"

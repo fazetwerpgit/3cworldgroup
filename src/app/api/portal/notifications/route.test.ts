@@ -48,7 +48,8 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedSelfOrManagement: vi.fn(async () => ({ ok: true, uid: 'u1' })),
 }));
 
-import { GET } from './route';
+import { GET, PUT } from './route';
+import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 
 function get(limit: number) {
   return GET(new NextRequest(`http://localhost/api/portal/notifications?userId=u1&limit=${limit}`));
@@ -79,5 +80,23 @@ describe('GET /api/portal/notifications', () => {
     expect(response.status).toBe(200);
     expect(body.notifications).toHaveLength(5);
     expect(db.state.unorderedCalls).toBe(1);
+  });
+
+  it('400s a non-numeric limit instead of crashing', async () => {
+    const res = await GET(new NextRequest('http://localhost/api/portal/notifications?userId=u1&limit=abc'));
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('PUT /api/portal/notifications', () => {
+  it('treats an empty notificationIds list as nothing to mark, not a 500', async () => {
+    vi.mocked(requireVerifiedRequester).mockResolvedValue({ ok: true, uid: 'u1', isManagement: false } as never);
+    const res = await PUT(
+      new NextRequest('http://localhost/api/portal/notifications', {
+        method: 'PUT',
+        body: JSON.stringify({ notificationIds: [] }),
+      })
+    );
+    expect(res.status).toBe(200);
   });
 });

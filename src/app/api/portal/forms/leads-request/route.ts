@@ -5,6 +5,7 @@ import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { buildSubmissionAttachmentFolder, isValidFormUploadId } from '@/lib/forms/formUploads';
 import { leadsConditions } from '@/lib/forms/leadsPredicates';
+import { isEmailShaped } from '@/lib/forms/managerInterview';
 import {
   LEADS_CATEGORIES,
   LEADS_REASONS,
@@ -46,6 +47,9 @@ export async function POST(request: NextRequest) {
     if (!managerEmail || !repFirstName || !repLastName) {
       return NextResponse.json({ error: 'Please complete all required fields' }, { status: 400 });
     }
+    if (!isEmailShaped(managerEmail)) {
+      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
+    }
     if (!isValidOption(opts.leadsCampaigns, campaign)) {
       return NextResponse.json({ error: 'Select a valid campaign' }, { status: 400 });
     }
@@ -71,6 +75,9 @@ export async function POST(request: NextRequest) {
       cond.needsHostile || cond.needsBlindKnock ? s(body.situationDescription, 2000) : '';
     const newRepPhone = cond.needsNewRep ? s(body.newRepPhone, 40) : '';
     const newRepEmail = cond.needsNewRep ? s(body.newRepEmail, 180) : '';
+    if (newRepEmail && !isEmailShaped(newRepEmail)) {
+      return NextResponse.json({ error: 'Enter a valid email for the new rep' }, { status: 400 });
+    }
     const uploadId = isValidFormUploadId(body.uploadId) ? body.uploadId : '';
     const hostileUploadPath = cond.needsHostile ? scopedPath(body.hostileUploadPath, gate.uid, uploadId, 'hostile') : '';
     const blindKnockUploadPath = cond.needsBlindKnock ? scopedPath(body.blindKnockUploadPath, gate.uid, uploadId, 'blind-knock') : '';

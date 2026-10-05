@@ -3,6 +3,7 @@ import {
   addPlanToProducts,
   isExtraPlanId,
   selectedInternetProduct,
+  validateHasInternetPlan,
   validateOnePlanPerSale,
 } from './planSelection';
 import { FIBER_PLANS, type FiberPlan, type SaleProduct } from '@/types/sales';
@@ -106,5 +107,26 @@ describe('validateOnePlanPerSale', () => {
     const error = validateOnePlanPerSale(products);
     expect(error).toContain('TFiber 1 Gig');
     expect(error).toContain('TFiber 2 Gig');
+  });
+});
+
+describe('validateHasInternetPlan', () => {
+  it('rejects a new-service sale of extras only', () => {
+    expect(validateHasInternetPlan(addPlanToProducts([], plan('xfinity-tv')))).not.toBeNull();
+    expect(validateHasInternetPlan(addPlanToProducts([], plan('xfinity-tv')), 'new_service')).not.toBeNull();
+  });
+
+  it('passes an Add-On sale of extras only (the customer already has internet), but not an empty one', () => {
+    expect(validateHasInternetPlan(addPlanToProducts([], plan('xfinity-tv')), 'add_on')).toBeNull();
+    expect(validateHasInternetPlan([], 'add_on')).not.toBeNull();
+  });
+
+  it('rejects a sale with no products', () => {
+    expect(validateHasInternetPlan([])).not.toBeNull();
+  });
+
+  it('passes an internet plan with extras', () => {
+    const products = addPlanToProducts(addPlanToProducts([], plan('xfinity-1gig')), plan('xfinity-tv'));
+    expect(validateHasInternetPlan(products)).toBeNull();
   });
 });

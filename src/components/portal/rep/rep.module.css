@@ -784,6 +784,13 @@ h2.kicker::before {
   animation: fadeIn 280ms ease-out both;
 }
 
+/* A confirm (SalesDialog) nests its .sheet INSIDE this backdrop, so the whole
+   dialog paints at the backdrop's level. It is raised from an open sheet
+   (z 61), so it has to sit above that sheet, not under it. */
+.backdrop.backdropAbove {
+  z-index: 62;
+}
+
 .sheet {
   position: fixed;
   right: 0;

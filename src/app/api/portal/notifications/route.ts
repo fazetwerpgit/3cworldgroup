@@ -18,7 +18,11 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam === null ? 20 : Number(limitParam);
+    if (!Number.isInteger(limit) || limit < 1) {
+      return NextResponse.json({ error: 'limit must be a positive integer' }, { status: 400 });
+    }
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
 
     if (!userId) {
@@ -226,6 +230,13 @@ export async function PUT(request: NextRequest) {
       const requester = await requireVerifiedRequester(request);
       if (!requester.ok) {
         return NextResponse.json({ error: requester.error }, { status: requester.status });
+      }
+
+      if (!notificationIds.every((id: unknown) => typeof id === 'string' && id.length > 0)) {
+        return NextResponse.json({ error: 'notificationIds must be non-empty strings' }, { status: 400 });
+      }
+      if (notificationIds.length === 0) {
+        return NextResponse.json({ success: true, message: 'Marked 0 notifications as read' });
       }
 
       // Only mark notifications the caller actually owns (management may mark

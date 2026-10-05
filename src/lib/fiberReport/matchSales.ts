@@ -203,19 +203,51 @@ export function ordersPlacedForSale(saleDate: unknown, orders: readonly FiberOrd
   });
 }
 
-/** Match sales to the rep's own-scope API response in memory; callers own matchedUserId filtering. */
+/**
+ * The explicit join. `saleLink` is an admin saying "this order IS that sale" or
+ * "this order is NOT any sale" (saleId null); either way it outranks the
+ * address guess, which is only ever a guess.
+ */
+export function linkedSaleId(
+  order: Pick<FiberOrder, 'saleLink'>
+): { linked: true; saleId: string | null } | { linked: false } {
+  const link = order.saleLink;
+  if (!link) return { linked: false };
+  const saleId = typeof link.saleId === 'string' && link.saleId.trim() ? link.saleId.trim() : null;
+  return { linked: true, saleId };
+}
+
+/**
+ * Match sales to the rep's own-scope API response in memory; callers own matchedUserId filtering.
+ * A linked order leaves the address pool whichever way its link points, and a
+ * sale it names takes it over any address match — as buildMergedBook does.
+ */
 export function matchFiberOrdersToSales(
   sales: SaleForFiberMatch[],
   orders: FiberOrder[],
 ): Map<string, FiberOrder> {
   const matches = new Map<string, FiberOrder>();
+  const saleIds = new Set(sales.map((sale) => sale.id).filter((id): id is string => !!id?.trim()));
+  const openOrders: FiberOrder[] = [];
+
+  for (const order of orders) {
+    const link = linkedSaleId(order);
+    if (!link.linked) {
+      openOrders.push(order);
+      continue;
+    }
+    // At most one order per sale: the first link to name it keeps it.
+    if (link.saleId && saleIds.has(link.saleId) && !matches.has(link.saleId)) {
+      matches.set(link.saleId, order);
+    }
+  }
 
   for (const sale of sales) {
     const saleId = sale.id;
     const saleAddress = normalizeAddress(sale.customerAddress);
-    if (!saleId?.trim() || saleAddress.length < 6) continue;
+    if (!saleId?.trim() || matches.has(saleId) || saleAddress.length < 6) continue;
 
-    const atAddress = ordersPlacedForSale(sale.saleDate, orders).filter((order) =>
+    const atAddress = ordersPlacedForSale(sale.saleDate, openOrders).filter((order) =>
       isAddressPrefixPair(saleAddress, normalizeAddress(order.address))
     );
     const selectedOrder = pickCurrentOrder(doorOrders(sale.customerAddress, atAddress).orders);

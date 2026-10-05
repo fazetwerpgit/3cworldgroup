@@ -141,6 +141,9 @@ export async function sendAnnouncement(
   const ref = db.collection(ANNOUNCEMENTS).doc(id);
   try {
     const list = await (recipients ?? (() => announcementRecipients(db)))();
+    // From here pushes go out. A failure after this point may have reached
+    // people, so the owner's retry must not send it again.
+    await ref.update({ fanOutStarted: true });
     const result = await sendToRecipients(list, {
       title: String(data.title),
       body: String(data.body),

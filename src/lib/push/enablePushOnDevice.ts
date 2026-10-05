@@ -39,3 +39,25 @@ export async function enablePushOnDeviceDetailed(): Promise<{
     };
   }
 }
+
+// Sign-out: detach THIS device's FCM token from the signed-in user so a shared
+// phone stops getting their pushes. Runs only when permission is already granted
+// (so it never prompts), must run before Firebase sign-out (needs the ID token),
+// and is best-effort: a failure never blocks signing out.
+export async function unregisterPushOnDevice(): Promise<void> {
+  try {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    const idToken = await auth?.currentUser?.getIdToken();
+    if (!idToken) return;
+    const { token: fcmToken } = await requestPushTokenDetailed();
+    if (!fcmToken) return;
+    await fetch('/api/portal/push/register', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ token: fcmToken }),
+    });
+  } catch {
+    // Best-effort; the token stays until FCM reports it dead.
+  }
+}

@@ -87,7 +87,9 @@ export async function GET(request: NextRequest) {
       let stage: PipelineStage;
       if (decommission || data.status === 'inactive') {
         stage = 'decommissioned';
-      } else if (approved < checklist.length) {
+      } else if (data.status !== 'active' && approved < checklist.length) {
+        // An active rep is past onboarding even with no checklist records (made
+        // active in People, or from before the checklist existed).
         stage = 'processing';
       } else if (channels.cleared === 0) {
         stage = 'need_logins';

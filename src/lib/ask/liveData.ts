@@ -1,7 +1,7 @@
 import {
   CALL_DAY_ORDER,
   CallDayLabels,
-  IBO_FIELD_ROLES,
+  MANAGEMENT_FIELD_ROLES,
   getOnboardingItemsForUser,
   resolveRoles,
   type CallDay,
@@ -13,6 +13,7 @@ import { planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { periodBounds, type LeaderboardPeriod } from '@/lib/leaderboard/periods';
+import { boardOrder } from '@/lib/leaderboard/order';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { LIVE_DEFAULT_ZONE, zoneFor } from './prompt';
@@ -258,7 +259,7 @@ async function boardRankings(db: Db, now: Date): Promise<BoardRow[][]> {
       row.points += sale.points;
       byRep.set(sale.repId, row);
     }
-    return [...byRep.values()].sort((a, b) => b.points - a.points);
+    return [...byRep.values()].sort((a, b) => boardOrder({ score: a.points, name: a.name, id: a.id }, { score: b.points, name: b.name, id: b.id }));
   });
   boardCache.set(db, { key, expires: now.getTime() + BOARD_CACHE_MS, ranked });
   return ranked;
@@ -340,8 +341,8 @@ function nextOccurrence(day: CallDay, time: string, timeZone: string, now: Date)
 /** The call schedule as GET /api/portal/calls scopes it for this rep. */
 async function callsSection(db: Db, user: Data, now: Date, zone: Zone): Promise<string> {
   const { role, fieldRole } = resolveRoles(str(user.role) || undefined, str(user.fieldRole) || undefined);
-  const seesManagerCalls =
-    !!role || fieldRole === 'l1_manager' || fieldRole === 'l2_manager' || (fieldRole ? IBO_FIELD_ROLES.includes(fieldRole) : false);
+  // Same rule as GET /api/portal/calls.
+  const seesManagerCalls = !!role || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false);
   const snap = await db.collection('scheduledCalls').get();
   const upcoming = snap.docs
     .map((doc) => doc.data() as Data)
@@ -425,7 +426,7 @@ const NOTIFICATION_TYPES: Record<string, true> = {
 };
 
 async function notificationsSection(db: Db, uid: string, zone: Zone): Promise<string> {
-  const snap = await db.collection('notifications').where('userId', '==', uid).limit(40).get();
+  const snap = await db.collection('notifications').where('userId', '==', uid).orderBy('createdAt', 'desc').limit(40).get();
   const items = snap.docs
     .map((doc) => doc.data() as Data)
     .filter((data) => data.userId === uid && NOTIFICATION_TYPES[str(data.type)])

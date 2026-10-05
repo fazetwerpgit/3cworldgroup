@@ -14,7 +14,7 @@ import {
   EmailAuthProvider,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp, DocumentData } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { isAwaitingRoleAssignment } from '@/lib/auth/pendingApproval';
@@ -22,11 +22,12 @@ import { clearSignature } from '@/components/esign/signatureStore';
 import { ASK_CONVERSATION_KEY } from '@/lib/ask/chat';
 import { PRACTICE_SESSION_KEY } from '@/lib/ask/practice';
 import { ProfileLoadRetry } from '@/components/auth/ProfileLoadRetry';
+import { unregisterPushOnDevice } from '@/lib/push/enablePushOnDevice';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 
 interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName: string, teamCode: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -49,6 +50,8 @@ type FetchUserDataResult =
   | { status: 'error'; error: unknown };
 
 const missingProfileMessage = 'User profile not found. Please contact an administrator.';
+// Same words Firebase's auth/user-disabled maps to: deactivating also disables the auth account.
+const disabledAccountMessage = 'This account has been disabled. Contact your manager.';
 const profileLoadErrorMessage =
   'We could not load your profile. This is usually weak signal — you are still signed in, so just try again.';
 
@@ -76,6 +79,64 @@ function syncAvatarFromAuth(firebaseUser: FirebaseUser) {
     .catch(() => {});
 }
 
+// Fire-and-forget owner alert for a new pending self-signup. The route reads
+// the uid from the ID token, never from the body. A team-code signup sends its
+// code (checked server-side); the Google first sign-in sends none and is
+// accepted by its google.com sign-in provider. The token is fetched before the
+// caller signs out.
+async function notifyPendingSignup(firebaseUser: FirebaseUser, teamCode?: string) {
+  try {
+    const idToken = await firebaseUser.getIdToken();
+    void fetch('/api/portal/auth/signup-notify', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        ...(teamCode !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(teamCode !== undefined ? { body: JSON.stringify({ code: teamCode }) } : {}),
+    }).catch(() => {});
+  } catch {
+    // Best-effort: a missed alert must never fail the signup.
+  }
+}
+
+function toUser(uid: string, userData: DocumentData): User {
+  return {
+    uid,
+    email: userData.email,
+    displayName: userData.displayName,
+    ...resolveRoles(userData.role, userData.fieldRole),
+    isIBO: userData.isIBO ?? false,
+    // TODO: migrate Firestore managerId -> reportsToId
+    reportsToId: userData.reportsToId ?? userData.managerId,
+    territoryId: userData.territoryId,
+    phone: userData.phone,
+    address: userData.address,
+    city: userData.city,
+    state: userData.state,
+    zip: userData.zip,
+    shirtSize: userData.shirtSize,
+    avatarUrl: userData.avatarUrl,
+    status: userData.status,
+    hireDate: userData.hireDate?.toDate(),
+    createdAt: userData.createdAt?.toDate(),
+    updatedAt: userData.updatedAt?.toDate(),
+  } as User;
+}
+
+// Lets the profile listener skip a snapshot that changes nothing the app sees,
+// so `user` keeps its identity and no effect keyed on it re-runs.
+function sameUser(a: User, b: User): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof User>;
+  for (const key of keys) {
+    const x = a[key];
+    const y = b[key];
+    const equal = x instanceof Date && y instanceof Date ? x.getTime() === y.getTime() : x === y;
+    if (!equal) return false;
+  }
+  return true;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -94,6 +155,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const resolveGeneration = useRef(0);
   const resolveProfileRef = useRef<((firebaseUser: FirebaseUser) => Promise<void>) | null>(null);
   const profileLoadFailedRef = useRef(false);
+  // The one live listener on the signed-in user's own users doc.
+  const profileUnsubscribe = useRef<(() => void) | null>(null);
   useEffect(() => {
     profileLoadFailedRef.current = profileLoadFailed;
   }, [profileLoadFailed]);
@@ -103,31 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
       if (userDoc.exists()) {
-        const userData = userDoc.data();
-        return {
-          status: 'found',
-          user: {
-            uid: firebaseUser.uid,
-            email: userData.email,
-            displayName: userData.displayName,
-            ...resolveRoles(userData.role, userData.fieldRole),
-            isIBO: userData.isIBO ?? false,
-            // TODO: migrate Firestore managerId -> reportsToId
-            reportsToId: userData.reportsToId ?? userData.managerId,
-            territoryId: userData.territoryId,
-            phone: userData.phone,
-            address: userData.address,
-            city: userData.city,
-            state: userData.state,
-            zip: userData.zip,
-            shirtSize: userData.shirtSize,
-            avatarUrl: userData.avatarUrl,
-            status: userData.status,
-            hireDate: userData.hireDate?.toDate(),
-            createdAt: userData.createdAt?.toDate(),
-            updatedAt: userData.updatedAt?.toDate(),
-          } as User,
-        };
+        return { status: 'found', user: toUser(firebaseUser.uid, userDoc.data()) };
       }
       return { status: 'missing' };
     } catch (error) {
@@ -164,8 +203,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return generation === resolveGeneration.current ? result : null;
     };
 
+    const stopWatchingProfile = () => {
+      profileUnsubscribe.current?.();
+      profileUnsubscribe.current = null;
+    };
+
+    // After the profile resolves to a signed-in state, keep listening so an
+    // admin's change (deactivation, activation, a new role) reaches an open tab.
+    const watchProfile = (uid: string) => {
+      stopWatchingProfile();
+      profileUnsubscribe.current = onSnapshot(
+        doc(firestore, 'users', uid),
+        (snap) => {
+          // A cache-only or missing snapshot says nothing about the account
+          // (weak signal); the initial read already handled a missing profile.
+          if (snap.metadata.fromCache || !snap.exists()) return;
+          const next = toUser(uid, snap.data());
+          if (next.status === 'active' || (next.status === 'pending' && !isAwaitingRoleAssignment(next))) {
+            setState((prev) =>
+              prev.user?.uid === uid && !sameUser(prev.user, next) ? { ...prev, user: next } : prev
+            );
+            return;
+          }
+          stopWatchingProfile();
+          resolveGeneration.current += 1;
+          void (async () => {
+            if (auth) await firebaseSignOut(auth);
+            setState({ user: null, loading: false, error: disabledAccountMessage, pendingApproval: false });
+          })();
+        },
+        (error) => console.warn('User profile listener stopped:', error)
+      );
+    };
+
     const resolveProfile = async (firebaseUser: FirebaseUser) => {
       const generation = ++resolveGeneration.current;
+      stopWatchingProfile();
       const userDataResult = await fetchUserDataWithRetry(firebaseUser, generation);
       if (!userDataResult) return; // superseded by a newer auth event
       if (userDataResult.status !== 'error') setProfileLoadFailed(false);
@@ -173,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = userDataResult.user;
         if (userData.status === 'active') {
           setState({ user: userData, loading: false, error: null, pendingApproval: false });
+          watchProfile(firebaseUser.uid);
           // Only fires when the client already sees the Auth photo differs from
           // the stored one, so a normal login makes zero extra calls once synced.
           if (firebaseUser.photoURL && firebaseUser.photoURL !== userData.avatarUrl) {
@@ -183,24 +257,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setState({ user: null, loading: false, error: null, pendingApproval: true });
         } else if (userData.status === 'pending') {
           setState({ user: userData, loading: false, error: null, pendingApproval: false });
+          watchProfile(firebaseUser.uid);
         } else {
           if (auth) await firebaseSignOut(auth);
           setState({
             user: null,
             loading: false,
-            error: 'Your account has been deactivated. Please contact an administrator.',
+            error: disabledAccountMessage,
             pendingApproval: false,
           });
         }
       } else if (userDataResult.status === 'missing') {
         if (firebaseUser.email) {
           bootstrappingPendingProfile.current = true;
+          // A first sign-in with Google (no team code, no signup form): keep
+          // the Google name and raise the same owner alert a signup does.
+          const googleName = firebaseUser.displayName?.trim().slice(0, 100);
           try {
+            // firestore.rules: exactly these keys, and the email must be this
+            // account's own sign-in address.
             await setDoc(doc(firestore, 'users', firebaseUser.uid), {
-              email: firebaseUser.email,
+              email: firebaseUser.email.toLowerCase(),
+              ...(googleName ? { displayName: googleName } : {}),
               status: 'pending',
               createdAt: serverTimestamp(),
             });
+            await notifyPendingSignup(firebaseUser);
             if (auth) await firebaseSignOut(auth);
             setState({ user: null, loading: false, error: null, pendingApproval: true });
           } catch (profileError) {
@@ -245,6 +327,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await resolveProfile(firebaseUser);
       } else {
         resolveGeneration.current += 1;
+        stopWatchingProfile();
         setProfileLoadFailed(false);
         // Preserve pendingApproval so the pending screen survives the sign-out.
         setState((prev) => ({ ...prev, user: null, loading: false, error: null }));
@@ -262,6 +345,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       unsubscribe();
+      stopWatchingProfile();
       window.removeEventListener('online', handleOnline);
     };
   }, []);
@@ -289,7 +373,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, displayName: string) => {
+  const signUp = async (email: string, password: string, displayName: string, teamCode: string) => {
     if (!auth || !db) throw new Error('auth/not-configured');
     signingUp.current = true;
     setState((prev) => ({ ...prev, loading: true, error: null }));
@@ -303,18 +387,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // Exactly the keys firestore.rules lets a client create users/{uid}
         // with (hasOnly email/displayName/status/createdAt): any extra field
-        // is denied and the new account is rolled back.
+        // is denied and the new account is rolled back. The email must match
+        // the account's sign-in address.
         await setDoc(doc(db, 'users', cred.user.uid), {
-          email,
+          email: email.toLowerCase(),
           displayName,
           status: 'pending',
           createdAt: serverTimestamp(),
         });
-        void fetch('/api/portal/auth/signup-notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ uid: cred.user.uid }),
-        }).catch(() => {});
+        await notifyPendingSignup(cred.user, teamCode);
       } catch (docError) {
         // Roll back the just-created auth account so the profile write can be
         // retried cleanly instead of failing with email-already-in-use.
@@ -361,6 +442,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         // Storage blocked: the page's uid check still keeps it from the next rep.
       }
+      // Started before sign-out (it reads this user's ID token first), but a
+      // rep on weak signal shouldn't wait on it: after 2.5s sign out anyway and
+      // let the request finish in the background.
+      const cap = Promise.withResolvers<void>();
+      setTimeout(cap.resolve, 2500);
+      await Promise.race([unregisterPushOnDevice(), cap.promise]);
       await firebaseSignOut(auth);
       setProfileLoadFailed(false);
       setState({ user: null, loading: false, error: null, pendingApproval: false });

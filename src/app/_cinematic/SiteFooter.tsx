@@ -30,7 +30,10 @@ export default function SiteFooter() {
             </Link>
           ))}
           <Link href={APPLY_HREF}>Apply</Link>
-          <Link href="/portal">Employee login</Link>
+          {/* No prefetch: it would pull the portal's CSS and Archivo font onto every public page. */}
+          <Link href="/portal" prefetch={false}>
+            Employee login
+          </Link>
         </nav>
 
         <div className={styles.footerSocial}>
