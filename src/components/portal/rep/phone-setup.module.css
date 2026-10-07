@@ -47,6 +47,12 @@
   font-size: var(--t-ui);
   line-height: 1.45;
   text-align: left;
+  list-style: decimal outside;
+}
+
+.steps li::marker {
+  color: var(--c-lime);
+  font-weight: 700;
 }
 
 .inlineIcon {
