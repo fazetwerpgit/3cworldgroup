@@ -9,6 +9,11 @@ import kit from "../../_cinematic/cinematic.module.css";
 import { findMarket } from "../../_cinematic/markets";
 import styles from "./apply.module.css";
 import {
+  APPLICATION_INTERESTS,
+  cleanInterests,
+  type ApplicationInterest,
+} from "@/lib/forms/applicationInterests";
+import {
   INVALID_EMAIL_MESSAGE,
   INVALID_PHONE_MESSAGE,
   PUBLIC_FIELD_LIMITS,
@@ -87,6 +92,7 @@ type Draft = {
   email?: string;
   city?: string;
   referredBy?: string;
+  interests?: string[];
 };
 
 export default function ApplyFlow({ children }: { children: React.ReactNode }) {
@@ -98,6 +104,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
     referredBy: "",
     website: "",
   });
+  const [interests, setInterests] = useState<ApplicationInterest[]>([]);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<{ message: string; code: string } | null>(null);
@@ -169,6 +176,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
           city: current.city || draft.city || "",
           referredBy: current.referredBy || draft.referredBy || "",
         }));
+        setInterests((current) => (current.length ? current : cleanInterests(draft.interests)));
       }
     } catch {
       // A draft that will not parse, or storage that is blocked outright in a
@@ -190,6 +198,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
           email: formData.email,
           city: formData.city,
           referredBy: formData.referredBy,
+          interests,
         };
         window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       } catch {
@@ -197,7 +206,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
       }
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [formData, restored, submitted]);
+  }, [formData, interests, restored, submitted]);
 
   useEffect(() => {
     if (!submitted) return;
@@ -293,6 +302,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
           email: formData.email,
           city: formData.city,
           referredBy: formData.referredBy,
+          interests,
         }),
       });
 
@@ -604,6 +614,36 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
                     </span>
                   ) : null}
                 </div>
+
+                {/* Optional and any number: what they want to sell (owner request, 2026-10). */}
+                <fieldset className={`${styles.field} ${styles.interests}`}>
+                  <legend className={styles.fieldLabel}>
+                    What do you want to sell? <span className={styles.fieldOptional}>(pick any)</span>
+                  </legend>
+                  <div className={styles.interestGrid}>
+                    {APPLICATION_INTERESTS.map((interest) => (
+                      <label key={interest.value} className={styles.interest}>
+                        <input
+                          type="checkbox"
+                          name="interests"
+                          value={interest.value}
+                          checked={interests.includes(interest.value)}
+                          onChange={(event) => {
+                            const { checked } = event.currentTarget;
+                            setInterests((current) =>
+                              cleanInterests(
+                                checked
+                                  ? [...current, interest.value]
+                                  : current.filter((value) => value !== interest.value)
+                              )
+                            );
+                          }}
+                        />
+                        <span>{interest.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
 
                 <div className={styles.field}>
                   <label className={styles.fieldControl} htmlFor="apply-referred-by">

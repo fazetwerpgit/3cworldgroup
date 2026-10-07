@@ -1,4 +1,5 @@
 import { JWT } from 'google-auth-library';
+import { interestLabels } from '@/lib/forms/applicationInterests';
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const SHEETS_APPEND_URL = (spreadsheetId: string) =>
@@ -96,6 +97,7 @@ export async function appendApplicationRow(app: {
   email: string;
   city: string;
   referredBy?: string;
+  interests?: readonly string[];
   status: string;
   createdAt: Date;
 }): Promise<void> {
@@ -125,6 +127,8 @@ export async function appendApplicationRow(app: {
           app.city,
           app.referredBy ?? '',
           app.status,
+          // Last, so every column the owners' sheet already has stays where it is.
+          interestLabels(app.interests),
         ].map(sanitizeSheetCell)],
       }),
     });

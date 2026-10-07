@@ -373,6 +373,60 @@
   border-color: #b42318;
 }
 
+/* What they want to sell: a fieldset that looks like the other fields. */
+.interests {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.interests legend {
+  padding: 0;
+}
+
+.interestGrid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .interestGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.interest {
+  align-items: center;
+  background: var(--paper);
+  border: 1px solid var(--rule-ink);
+  color: var(--on-paper);
+  cursor: pointer;
+  display: flex;
+  font-family: var(--body);
+  font-size: 1rem;
+  gap: 0.6rem;
+  min-height: 3.25rem;
+  padding: 0.6rem 0.85rem;
+}
+
+.interest input {
+  accent-color: var(--lime-ink);
+  flex: none;
+  height: 1.2rem;
+  margin: 0;
+  width: 1.2rem;
+}
+
+.interest:has(input:checked) {
+  border-color: var(--lime-ink);
+  box-shadow: inset 0 0 0 1px var(--lime-ink);
+}
+
+.interest:has(input:focus-visible) {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
 .terms {
   background: var(--paper);
   border-left: 3px solid var(--lime-ink);

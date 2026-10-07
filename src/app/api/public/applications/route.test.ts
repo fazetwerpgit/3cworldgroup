@@ -86,6 +86,23 @@ describe('POST /api/public/applications', () => {
     expect(notifySubmissionMock).toHaveBeenCalledWith('application', 'Jane Rep (Dallas)');
   });
 
+  it('keeps only the known interests, once each and in the form order, for the record and the sheet', async () => {
+    const response = await POST(
+      request({ ...VALID_APPLICATION, interests: ['solar', 'fiber', 'solar', '=HYPERLINK("x")', 42] })
+    );
+
+    expect(response.status).toBe(200);
+    expect(addApplicationMock).toHaveBeenCalledWith(expect.objectContaining({ interests: ['fiber', 'solar'] }));
+    expect(appendApplicationRowMock).toHaveBeenCalledWith(expect.objectContaining({ interests: ['fiber', 'solar'] }));
+  });
+
+  it('accepts an application with no interests ticked', async () => {
+    const response = await POST(request(VALID_APPLICATION));
+
+    expect(response.status).toBe(200);
+    expect(addApplicationMock).toHaveBeenCalledWith(expect.objectContaining({ interests: [] }));
+  });
+
   it('validates required fields before checking for an existing account', async () => {
     const response = await POST(request({ ...VALID_APPLICATION, email: '' }));
 

@@ -14,6 +14,7 @@ import {
   isValidUsPhone,
   readJsonObject,
 } from '@/lib/forms/publicFields';
+import { cleanInterests } from '@/lib/forms/applicationInterests';
 
 /*
   Trim, cap, and drop control characters.
@@ -66,6 +67,7 @@ export async function POST(request: NextRequest) {
     const email = clean(body.email, Infinity).toLowerCase();
     const city = clean(body.city, PUBLIC_FIELD_LIMITS.city);
     const referredBy = clean(body.referredBy, PUBLIC_FIELD_LIMITS.referredBy);
+    const interests = cleanInterests(body.interests);
 
     if (!name || !phone || !email || !city) {
       return NextResponse.json(
@@ -94,6 +96,7 @@ export async function POST(request: NextRequest) {
       email,
       city,
       referredBy,
+      interests,
       status: 'applied',
       source: 'website',
       createdAt: now,
@@ -105,6 +108,7 @@ export async function POST(request: NextRequest) {
       email,
       city,
       referredBy,
+      interests,
       status: 'applied',
       createdAt: now,
     });

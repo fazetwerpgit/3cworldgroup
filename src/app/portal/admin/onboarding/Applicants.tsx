@@ -21,6 +21,7 @@ import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './recruiting.module.css';
 import { ApplicationRecord, ApplicationStatus } from '@/types';
 import { displayPhone, telHref } from '@/lib/phone';
+import { interestLabels } from '@/lib/forms/applicationInterests';
 
 // Everyone who applied on the website (/apply), with the same gate as Invites:
 // the recruiting API serves both. Invite hands the applicant to the Invites tab,
@@ -32,6 +33,7 @@ const APPLICATION_COLUMNS = [
   { key: 'phone', label: 'Phone' },
   { key: 'email', label: 'Email' },
   { key: 'referredBy', label: 'Referred by' },
+  { key: 'interestedIn', label: 'Interested in' },
   { key: 'status', label: 'Status' },
   { key: 'createdAt', label: 'Submitted' },
 ];
@@ -161,7 +163,10 @@ export function Applicants() {
               onClick={() =>
                 downloadCsv(
                   'applications.csv',
-                  toCsv(APPLICATION_COLUMNS, visible as unknown as Record<string, unknown>[])
+                  toCsv(
+                    APPLICATION_COLUMNS,
+                    visible.map((application) => ({ ...application, interestedIn: interestLabels(application.interests) }))
+                  )
                 )
               }
             >
@@ -230,6 +235,9 @@ export function Applicants() {
                           </span>
                           {application.referredBy ? (
                             <span className={u.personSub}>Referred by {application.referredBy}</span>
+                          ) : null}
+                          {application.interests?.length ? (
+                            <span className={u.personSub}>Interested in {interestLabels(application.interests)}</span>
                           ) : null}
                         </span>
                       </span>

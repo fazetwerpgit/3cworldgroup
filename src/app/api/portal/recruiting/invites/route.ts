@@ -50,6 +50,7 @@ function serializeApplication(doc: FirebaseFirestore.QueryDocumentSnapshot): App
     email: data.email ?? '',
     city: data.city ?? '',
     referredBy: data.referredBy ?? '',
+    interests: Array.isArray(data.interests) ? data.interests : [],
     status: data.status ?? 'applied',
     createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
     updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,

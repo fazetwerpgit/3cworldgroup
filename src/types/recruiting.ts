@@ -1,5 +1,6 @@
 import { FieldRole } from './auth';
 import { OnboardingStatus } from './onboarding';
+import type { ApplicationInterest } from '@/lib/forms/applicationInterests';
 
 export type ApplicationStatus =
   | 'applied'
@@ -24,6 +25,8 @@ export interface ApplicationRecord {
   email: string;
   city: string;
   referredBy?: string;
+  /** What they want to sell, ticked on /apply. Absent on applications from before the question. */
+  interests?: ApplicationInterest[];
   status: ApplicationStatus;
   createdAt: Date;
   updatedAt: Date;
