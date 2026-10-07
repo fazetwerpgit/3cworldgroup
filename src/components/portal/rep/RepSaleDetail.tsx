@@ -273,15 +273,12 @@ export function RepSaleDetail() {
   const missedReason = order?.status === 'breakage' ? carrierReasonLabel(order.breakageReason) : null;
 
   // EscaLink only handles T-Mobile Fiber, and only the seller or the office
-  // would file for this customer. The dealer code is the one the carrier
-  // filed this order under; failing that, any of the seller's own orders, and
-  // for the rep's own sale the codes the office mapped to them.
+  // would file for this customer. The dealer code is the one the carrier filed
+  // this order under; failing that, the rep's own code when the office mapped
+  // exactly one to them. A wrong code on a ticket is worse than a blank.
   const showEscalink = (ownSale || isAdmin) && isTMobileSale(sale);
-  const dealerCode =
-    order?.repDealerId ||
-    fiber.data?.orders.find((candidate) => candidate.matchedUserId === sale.salesRepId && candidate.repDealerId)?.repDealerId ||
-    (ownSale ? fiber.data?.dealerCodes?.[0] : null) ||
-    null;
+  const mappedCodes = ownSale ? fiber.data?.dealerCodes ?? [] : [];
+  const dealerCode = order?.repDealerId || (mappedCodes.length === 1 ? mappedCodes[0] : null);
   const ticket = showEscalink
     ? escalinkTicketText({
         dealerCode,

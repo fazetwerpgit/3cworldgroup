@@ -45,8 +45,8 @@ function EscalinkGuide() {
       <header className={p.head}>
         <h1 className={p.title}>EscaLink</h1>
         <p className={p.lede}>
-          T-Mobile&apos;s ticket app for install and order problems that T-Mobile Fiber Support has to fix. Sign in
-          with the T-Mobile login you were given; no login yet, ask Jeremy or Jacob.
+          T-Mobile&apos;s ticket app for install and order problems that T-Mobile Fiber Support has to fix. If
+          EscaLink won&apos;t let you in, ask Jeremy or Jacob.
         </p>
       </header>
 

@@ -78,7 +78,7 @@ export function escalinkTicketText(input: EscalinkTicketInput): string {
     clean(input.install),
   ].filter(Boolean).join(' · ');
   return [
-    `Submitter: D2D Agent · Dealer code ${clean(input.dealerCode) ?? '(add yours)'}`,
+    `Submitter: D2D Agent · Dealer code ${clean(input.dealerCode) ?? '(add dealer code)'}`,
     `Customer: ${customer || '(name and phone)'}`,
     `Service address: ${clean(input.address) ?? '(full service address)'}`,
     ...(order ? [order] : []),

@@ -34,7 +34,7 @@ describe('escalinkTicketText', () => {
       orderNumberOrBtn: 'TMO1',
     });
 
-    expect(text).toContain('Dealer code (add yours)');
+    expect(text).toContain('Dealer code (add dealer code)');
     expect(text).toContain('Customer: (name and phone)');
     expect(text).toContain('Service address: (full service address)');
     expect(text).toContain('Order: TMO1\n');
