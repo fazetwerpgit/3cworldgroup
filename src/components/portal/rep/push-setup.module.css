@@ -1,0 +1,56 @@
+/* The installed app's "Turn on notifications" sheet. Tokens from .layer (rep.module.css). */
+
+.body {
+  display: grid;
+  justify-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s5) var(--s5);
+  text-align: center;
+}
+
+.bell {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.text {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.5;
+}
+
+.text b,
+.steps b {
+  color: var(--c-text);
+}
+
+.steps {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding-left: 1.4em;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+  text-align: left;
+}
+
+.error {
+  margin: 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+}

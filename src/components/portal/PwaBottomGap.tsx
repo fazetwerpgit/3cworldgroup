@@ -2,15 +2,9 @@
 
 import { useEffect } from 'react';
 import { bottomGap } from '@/lib/pwa/bottomGap';
+import { isStandaloneApp } from '@/lib/pwa/standalone';
 
 const VAR = '--pwa-bottom-gap';
-
-function isStandalone(): boolean {
-  // iOS 26 can report display-mode: standalone as false in a home-screen app,
-  // so navigator.standalone comes first.
-  if ((navigator as Navigator & { standalone?: boolean }).standalone === true) return true;
-  return typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches;
-}
 
 // Publishes --pwa-bottom-gap on <html>: how far the fixed bottom bars (tab bar,
 // submit bars, sheets) drop to sit on the physical screen bottom when iOS 26
@@ -34,7 +28,7 @@ export default function PwaBottomGap() {
       frame = 0;
       const style = getComputedStyle(probe);
       const gap = bottomGap({
-        standalone: isStandalone(),
+        standalone: isStandaloneApp(),
         largeViewportHeight: parseFloat(style.height) || 0,
         safeAreaTop: parseFloat(style.paddingTop) || 0,
         innerHeight: window.innerHeight,

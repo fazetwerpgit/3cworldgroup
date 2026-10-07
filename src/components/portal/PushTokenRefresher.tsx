@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDeviceDetailed } from '@/lib/push/enablePushOnDevice';
+import { isStandaloneApp } from '@/lib/pwa/standalone';
 
 // Silently re-registers this device's FCM token on every portal open, but only
 // when the user already granted notifications (permission === 'granted' means
@@ -63,9 +64,7 @@ export default function PushTokenRefresher() {
             supported,
             permission,
             result,
-            standalone:
-              window.matchMedia?.('(display-mode: standalone)').matches === true ||
-              (window.navigator as unknown as { standalone?: boolean }).standalone === true,
+            standalone: isStandaloneApp(),
           }),
         });
       } catch {

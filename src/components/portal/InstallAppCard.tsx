@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Share } from 'lucide-react';
 import { isIosSafari } from '@/lib/pwa/addToHomeScreen';
+import { isStandaloneApp } from '@/lib/pwa/standalone';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import st from '@/components/portal/rep/rep-settings.module.css';
@@ -26,10 +27,7 @@ export default function InstallAppCard() {
 
   useEffect(() => {
     // Already running as an installed app?
-    const standalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      // iOS Safari
-      (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    const standalone = isStandaloneApp();
     // Post-mount detection keeps the server and first client render identical
     // (hydration-safe), same pattern as the theme/localStorage restores.
     // eslint-disable-next-line react-hooks/set-state-in-effect

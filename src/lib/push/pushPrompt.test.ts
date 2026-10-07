@@ -3,6 +3,7 @@ import {
   PUSH_PROMPT_SNOOZE_DAYS,
   PUSH_PROMPT_SNOOZE_KEY,
   isPushPromptSnoozed,
+  pushSetupStep,
   shouldShowPushPrompt,
   type PushPromptConditions,
 } from './pushPrompt';
@@ -15,6 +16,7 @@ const SHOWABLE: PushPromptConditions = {
   active: true,
   supported: true,
   permission: 'default',
+  standalone: false,
   snoozedAt: null,
   now: NOW,
 };
@@ -73,6 +75,10 @@ describe('shouldShowPushPrompt', () => {
     expect(shouldShowPushPrompt({ ...SHOWABLE, permission: 'denied' })).toBe(false);
   });
 
+  it('leaves the installed app to the setup sheet', () => {
+    expect(shouldShowPushPrompt({ ...SHOWABLE, standalone: true })).toBe(false);
+  });
+
   it('stays hidden inside the snooze window and returns after it', () => {
     const snoozedAt = String(NOW - 3 * DAY);
     expect(shouldShowPushPrompt({ ...SHOWABLE, snoozedAt })).toBe(false);
@@ -87,5 +93,31 @@ describe('shouldShowPushPrompt', () => {
         snoozedAt: String(NOW - 30 * DAY),
       })
     ).toBe(false);
+  });
+});
+
+describe('pushSetupStep (the installed app)', () => {
+  const APP = { ...SHOWABLE, standalone: true };
+  const HOUR = 60 * 60 * 1000;
+
+  it('asks on open while notifications are undecided, and never in a browser tab', () => {
+    expect(pushSetupStep(APP)).toBe('ask');
+    expect(pushSetupStep({ ...APP, standalone: false })).toBeNull();
+  });
+
+  it('shows the phone Settings steps once the phone said no, and nothing once allowed', () => {
+    expect(pushSetupStep({ ...APP, permission: 'denied' })).toBe('settings');
+    expect(pushSetupStep({ ...APP, permission: 'granted' })).toBeNull();
+  });
+
+  it('"Not now" holds until the next day, not for a month', () => {
+    const snoozedAt = String(NOW);
+    expect(pushSetupStep({ ...APP, snoozedAt, now: NOW + 8 * HOUR })).toBeNull();
+    expect(pushSetupStep({ ...APP, snoozedAt, now: NOW + 17 * HOUR })).toBe('ask');
+  });
+
+  it('stays away from inactive accounts and phones without push', () => {
+    expect(pushSetupStep({ ...APP, active: false })).toBeNull();
+    expect(pushSetupStep({ ...APP, supported: false })).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDevice } from '@/lib/push/enablePushOnDevice';
 import { PUSH_PROMPT_SNOOZE_KEY, shouldShowPushPrompt } from '@/lib/push/pushPrompt';
+import { isStandaloneApp } from '@/lib/pwa/standalone';
 import '@/styles/sweep-rep-b.css';
 
 type State = 'ready' | 'working' | 'failed';
@@ -31,6 +32,7 @@ export function usePushPromptVisible() {
         active,
         supported,
         permission: supported ? Notification.permission : 'denied',
+        standalone: isStandaloneApp(),
         snoozedAt,
         now: Date.now(),
       }));
