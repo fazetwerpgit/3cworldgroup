@@ -26,7 +26,7 @@ const {
   const collectionMock = vi.fn((name: string) => ({
     add: addMock,
     get: collectionGetMock,
-    doc: vi.fn((id?: string) => ({ id, set: setMock, get: docGetMock })),
+    doc: vi.fn((id?: string) => ({ id, set: setMock, get: () => docGetMock(id) })),
     name,
   }));
   // Transactions run one at a time, as Firestore serializes them, reading and
@@ -212,6 +212,67 @@ describe('POST /api/webhooks/inbound-report install-date sync', () => {
         installDateSync: expect.objectContaining({ updated: 1 }),
       })
     );
+  });
+
+  describe('dealer-code handoff (Miles selling on Jeremy’s 4808955 from Oct 5)', () => {
+    const order = (id: string, repDealerId: string, orderDate: string) => ({ id, repDealerId, repName: '', address: '', orderDate });
+    const withRepMap = () =>
+      docGetMock.mockImplementation(async (id?: string) => ({
+        exists: true,
+        data: () =>
+          id === 'fiberRepMap'
+            ? {
+                map: { '4808955': 'jeremy', '7777777': 'miles' },
+                handoffs: { '4808955': { userId: 'miles', from: '2026-10-05' } },
+              }
+            : {},
+      }));
+    const owners = () =>
+      Object.fromEntries(
+        (syncMock.mock.calls[0][0].orders as Array<{ id: string; matchedUserId: string }>).map((o) => [o.id, o.matchedUserId])
+      );
+
+    it("credits the code's orders from the start day to the borrower, and earlier ones to the owner", async () => {
+      withRepMap();
+      vi.mocked(parseFiberReport).mockResolvedValue({
+        orders: [order('before', '4808955', '2026-10-04'), order('during', '4808955', '2026-10-06')],
+        rowCounts: { Orders: 2 },
+      } as unknown as Awaited<ReturnType<typeof parseFiberReport>>);
+
+      await POST(
+        new NextRequest('http://localhost/api/webhooks/inbound-report?token=test-token', {
+          method: 'POST',
+          body: JSON.stringify({ Attachments: [{ Name: 'r.xlsx', Content: Buffer.from('x').toString('base64') }] }),
+        })
+      );
+
+      expect(owners()).toEqual({ before: 'jeremy', during: 'miles' });
+    });
+
+    it("hands the code back once the borrower sells on their own code, keeping what they sold before", async () => {
+      withRepMap();
+      vi.mocked(parseFiberReport).mockResolvedValue({
+        orders: [
+          order('during', '4808955', '2026-10-06'),
+          order('own-code', '7777777', '2026-10-20'),
+          order('after', '4808955', '2026-10-21'),
+        ],
+        rowCounts: { Orders: 3 },
+      } as unknown as Awaited<ReturnType<typeof parseFiberReport>>);
+
+      await POST(
+        new NextRequest('http://localhost/api/webhooks/inbound-report?token=test-token', {
+          method: 'POST',
+          body: JSON.stringify({ Attachments: [{ Name: 'r.xlsx', Content: Buffer.from('x').toString('base64') }] }),
+        })
+      );
+
+      expect(owners()).toEqual({ during: 'miles', 'own-code': 'miles', after: 'jeremy' });
+      expect(setMock).toHaveBeenCalledWith(
+        expect.objectContaining({ handoffs: { '4808955': { userId: 'miles', from: '2026-10-05', to: '2026-10-20' } } }),
+        { merge: true }
+      );
+    });
   });
 
   it('still stores the report when the sync throws', async () => {

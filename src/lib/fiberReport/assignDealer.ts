@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
+import { handoffOwner, readHandoffs } from '@/lib/fiberReport/dealerHandoff';
 
 const BATCH_SIZE = 450;
 
@@ -31,6 +32,8 @@ export async function assignDealerToUser(
       : {};
   dealerMap[trimmedDealerId] = trimmedUserId;
   await configRef.set({ map: dealerMap }, { merge: true });
+  // Orders a handoff gives to someone else stay theirs.
+  const handoffs = readHandoffs(mapSnapshot.data()?.handoffs);
 
   const snapshot = await adminDb
     .collection('fiberOrders')
@@ -40,7 +43,11 @@ export async function assignDealerToUser(
   for (let offset = 0; offset < snapshot.docs.length; offset += BATCH_SIZE) {
     const batch = adminDb.batch();
     for (const order of snapshot.docs.slice(offset, offset + BATCH_SIZE)) {
-      batch.update(order.ref, { matchedUserId: trimmedUserId, updatedAt });
+      const data = order.data();
+      const owner =
+        handoffOwner({ repDealerId: trimmedDealerId, orderDate: data.orderDate, estInstallDate: data.estInstallDate }, handoffs) ??
+        trimmedUserId;
+      batch.update(order.ref, { matchedUserId: owner, updatedAt });
     }
     await batch.commit();
   }

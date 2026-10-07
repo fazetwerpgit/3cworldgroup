@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
 import { isOlderReport, mailSentAt, newestStamp, reportAsOf, type ReportStamp } from '@/lib/fiberReport/staleReport';
 import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
+import { closeHandoffs, handoffOwner, readHandoffs } from '@/lib/fiberReport/dealerHandoff';
 import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
 import { syncInstallDatesFromOrders, type OrderSale } from '@/lib/sales/installDateSync';
@@ -202,30 +203,42 @@ export async function POST(request: NextRequest) {
     const usersByName = buildNameIndex(userEntries);
 
     const newlyMapped: Record<string, string> = {};
-    const unmatchedRepNames = new Set<string>();
-    let matchedReps = 0;
-    const now = new Date().toISOString();
-    const orders: FiberOrder[] = parsed.orders.map((order) => {
+    // By code (or name) first: that is also what tells a handoff its borrower
+    // is selling on their own code again.
+    const byCode = parsed.orders.map((order) => {
       const dealerId = order.repDealerId.trim();
-      const matchedUserId = matchOrder(
+      const userId = matchOrder(
         { repDealerId: dealerId, repName: order.repName },
         mappedDealerIds,
         usersByName,
         userEntries,
       );
-      if (matchedUserId && dealerId && !mappedDealerIds[dealerId]) {
-        mappedDealerIds[dealerId] = matchedUserId;
-        newlyMapped[dealerId] = matchedUserId;
+      if (userId && dealerId && !mappedDealerIds[dealerId]) {
+        mappedDealerIds[dealerId] = userId;
+        newlyMapped[dealerId] = userId;
       }
+      return userId;
+    });
+    const { handoffs, closed: closedHandoffs } = closeHandoffs(
+      readHandoffs(mapSnapshot.data()?.handoffs),
+      parsed.orders.map((order, index) => ({ ...order, matchedUserId: byCode[index] })),
+    );
+
+    const unmatchedRepNames = new Set<string>();
+    let matchedReps = 0;
+    const now = new Date().toISOString();
+    const orders: FiberOrder[] = parsed.orders.map((order, index) => {
+      const matchedUserId = handoffOwner(order, handoffs) ?? byCode[index];
       if (matchedUserId) matchedReps += 1;
       else if (order.repName.trim()) unmatchedRepNames.add(order.repName.trim());
       return { ...order, matchedUserId, updatedAt: now };
     });
 
-    if (Object.keys(newlyMapped).length) {
+    if (Object.keys(newlyMapped).length || closedHandoffs.length) {
+      if (closedHandoffs.length) console.log(`[inbound-report] dealer handoffs ended: ${closedHandoffs.join(', ')}`);
       // Firestore merge is shallow for nested maps; write the complete map so
       // a new name match cannot erase existing dealer-id mappings.
-      await adminDb.collection('config').doc('fiberRepMap').set({ map: mappedDealerIds }, { merge: true });
+      await adminDb.collection('config').doc('fiberRepMap').set({ map: mappedDealerIds, handoffs }, { merge: true });
     }
 
     // What each order was before this report: the carrier notices tell a rep
