@@ -63,7 +63,7 @@ const DAY = 1000 * 60 * 60 * 24;
 beforeEach(() => {
   state.role = 'owner';
   state.queues = [
-    queue('review', 'Onboarding review', 2, { newToday: 1, oldestWaitMs: 3 * DAY }),
+    queue('todo', 'Onboarding review', 2, { newToday: 1, oldestWaitMs: 3 * DAY }),
     queue('pipeline', 'Onboarding pipeline', 0),
     queue('payroll-disputes', 'Payroll disputes', 4, { hub: '/portal/admin/requests' }),
   ];
@@ -92,7 +92,7 @@ describe('OwnerDashboard', () => {
   it('lists the onboarding work with something waiting, each linking to its tab', () => {
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html).toContain('Needs attention');
-    expect(html).toContain('href="/portal/admin/onboarding?tab=review"');
+    expect(html).toContain('href="/portal/admin/onboarding?tab=todo"');
     expect(html).toContain('3d');
     expect(html).toContain('Stuck in onboarding 3+ days');
     expect(html).toContain('href="/portal/check/stalledOnboarding"');
@@ -110,7 +110,7 @@ describe('OwnerDashboard', () => {
   });
 
   it('says Nothing waiting once every onboarding row is zero', () => {
-    state.queues = [queue('review', 'Onboarding review', 0), queue('payroll-disputes', 'Payroll disputes', 4, { hub: '/portal/admin/requests' })];
+    state.queues = [queue('todo', 'Onboarding review', 0), queue('payroll-disputes', 'Payroll disputes', 4, { hub: '/portal/admin/requests' })];
     state.dash.problems = { status: 'ready', data: problems({}) };
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html.match(/Nothing waiting/g)).toHaveLength(1);

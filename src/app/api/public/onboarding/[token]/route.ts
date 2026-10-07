@@ -444,7 +444,7 @@ export async function POST(
         type: 'onboarding_submitted',
         title: 'Recruit onboarding submitted',
         message: `${displayName} completed the website onboarding flow.`,
-        link: '/portal/admin/onboarding?tab=invites',
+        link: '/portal/admin/onboarding?tab=recruits',
         read: false,
         createdAt: now,
       });

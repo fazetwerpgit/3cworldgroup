@@ -1,21 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, RotateCw, Search, UserPlus } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { Download, Search, UserPlus } from 'lucide-react';
 import { toCsv, downloadCsv } from '@/lib/export/csv';
-import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
   AdminEmpty,
   AdminFailed,
-  AdminGate,
-  AdminPageHead,
   AdminSkeletonRows,
   StatusDot,
   type Tone,
 } from '@/components/portal/admin-d/AdminUi';
-import { hubTabHref, ONBOARDING_HUB, RECRUITING_ROLES } from '@/components/portal/admin-d/adminHubs';
+import { hubTabHref, ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './recruiting.module.css';
@@ -23,9 +19,9 @@ import { ApplicationRecord, ApplicationStatus } from '@/types';
 import { displayPhone, telHref } from '@/lib/phone';
 import { interestLabels } from '@/lib/forms/applicationInterests';
 
-// Everyone who applied on the website (/apply), with the same gate as Invites:
-// the recruiting API serves both. Invite hands the applicant to the Invites tab,
-// which fills its form from ?application=<id>.
+// Everyone who applied on the website (/apply): the Recruits tab's last
+// section. Recruits loads the data and gates the tab. Invite sets
+// ?application=<id> on the same tab; the invite form above fills from it.
 
 const APPLICATION_COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -40,11 +36,11 @@ const APPLICATION_COLUMNS = [
 
 type ApplicationView = 'new' | 'invited' | 'onboarded' | 'all';
 
-const APPLICATION_VIEWS: { value: ApplicationView; label: string; status?: ApplicationStatus }[] = [
-  { value: 'new', label: 'New', status: 'applied' },
-  { value: 'invited', label: 'Invited', status: 'invited' },
-  { value: 'onboarded', label: 'Onboarded', status: 'converted' },
-  { value: 'all', label: 'All' },
+const APPLICATION_VIEWS: { value: ApplicationView; label: string; status?: ApplicationStatus; meaning: string }[] = [
+  { value: 'new', label: 'New', status: 'applied', meaning: 'Applied. No invite sent yet.' },
+  { value: 'invited', label: 'Invited', status: 'invited', meaning: 'Invite sent. Follow it in the invites above.' },
+  { value: 'onboarded', label: 'Onboarded', status: 'converted', meaning: 'Finished and on the team.' },
+  { value: 'all', label: 'All', meaning: 'Every application, including Contacted and Not selected.' },
 ];
 
 function inView(application: ApplicationRecord, view: ApplicationView): boolean {
@@ -85,37 +81,20 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export function Applicants() {
-  const { user } = useAuth();
+export function Applicants({
+  applications,
+  loading,
+  loadFailed,
+  reload,
+}: {
+  applications: ApplicationRecord[];
+  loading: boolean;
+  loadFailed: boolean;
+  reload: () => void;
+}) {
   const router = useRouter();
-  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
   const [view, setView] = useState<ApplicationView>('new');
   const [query, setQuery] = useState('');
-
-  const fetchApplications = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const token = await getIdToken();
-      const response = await fetch('/api/portal/recruiting/invites', {
-        headers: { Authorization: `Bearer ${token ?? ''}` },
-      });
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to load applications');
-      setApplications(json.applications);
-      setLoadFailed(false);
-    } catch {
-      setLoadFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    fetchApplications();
-  }, [fetchApplications]);
 
   const counts = Object.fromEntries(
     APPLICATION_VIEWS.map((option) => [
@@ -126,174 +105,157 @@ export function Applicants() {
   const visible = applications.filter(
     (application) => inView(application, view) && matchesSearch(application, query)
   );
-  const showCounts = !loading && !loadFailed;
 
   return (
-    <AdminGate roles={RECRUITING_ROLES}>
-      <div className={u.page}>
-        <AdminPageHead
-          title="Applicants"
-          meta={
-            showCounts ? (
-              <>
-                <b>{counts.all}</b> applied on the website · <b>{counts.new}</b> new
-              </>
-            ) : null
+    <section className={s.panel} id="applications" aria-labelledby="applicants-heading">
+      <div className={`${s.panelHead} ${u.band}`}>
+        <h2 id="applicants-heading" className={s.kicker}>Website applications</h2>
+        <button
+          type="button"
+          className={`${s.btnSecondary} ${u.sm} ${u.quiet} ${r.export}`}
+          disabled={visible.length === 0}
+          onClick={() =>
+            downloadCsv(
+              'applications.csv',
+              toCsv(
+                APPLICATION_COLUMNS,
+                visible.map((application) => ({ ...application, interestedIn: interestLabels(application.interests) }))
+              )
+            )
           }
-          actions={
-            <button
-              type="button"
-              className={`${s.btnSecondary} ${u.sm}`}
-              onClick={fetchApplications}
-              disabled={loading}
-            >
-              <RotateCw size={16} className={loading ? u.spin : undefined} aria-hidden="true" />
-              Refresh
-            </button>
-          }
-        />
-
-        <section className={s.panel} id="applications" aria-labelledby="applicants-heading">
-          <div className={`${s.panelHead} ${u.band}`}>
-            <h2 id="applicants-heading" className={s.kicker}>Website applications</h2>
-            <button
-              type="button"
-              className={`${s.btnSecondary} ${u.sm} ${u.quiet} ${r.export}`}
-              disabled={visible.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  'applications.csv',
-                  toCsv(
-                    APPLICATION_COLUMNS,
-                    visible.map((application) => ({ ...application, interestedIn: interestLabels(application.interests) }))
-                  )
-                )
-              }
-            >
-              <Download size={16} aria-hidden="true" />
-              Export {visible.length} shown
-            </button>
-          </div>
-          {loading ? (
-            <AdminSkeletonRows rows={4} label="Loading applications" />
-          ) : loadFailed ? (
-            <AdminFailed what="applications" onRetry={fetchApplications} />
-          ) : applications.length === 0 ? (
-            <AdminEmpty title="No website applications yet" />
-          ) : (
-            <>
-              <div className={`${u.toolbar} ${r.filters}`}>
-                <label className={`${u.search} ${r.searchBox}`}>
-                  <Search size={18} aria-hidden="true" />
-                  <input
-                    className={u.input}
-                    type="search"
-                    placeholder="Search name, city, email, phone"
-                    aria-label="Search applications"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </label>
-                <div className={`${u.segmented} ${r.status}`} role="group" aria-label="Filter applications">
-                  {APPLICATION_VIEWS.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      aria-pressed={view === option.value}
-                      onClick={() => setView(option.value)}
-                    >
-                      {option.label}
-                      <span className={r.segCount}>{counts[option.value]}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {visible.length === 0 ? (
-                <AdminEmpty title={query.trim() ? 'No applications match' : 'Nothing here'}>
-                  {query.trim() ? 'Try another name, city, email or phone.' : null}
-                </AdminEmpty>
-              ) : (
-                <ul className={`${u.rows} ${r.appCols}`}>
-                  <li className={u.tHead} aria-hidden="true">
-                    <span>Applicant</span>
-                    <span>Contact</span>
-                    <span>Status</span>
-                    <span />
-                  </li>
-                  {visible.map((application) => (
-                    <li key={application.id} className={`${u.row} ${r.app}`}>
-                      <span className={`${u.cellMain} ${u.person}`}>
-                        <span className={u.personText}>
-                          <span className={u.personName}>
-                            <span>{application.name}</span>
-                          </span>
-                          <span className={u.personSub}>
-                            {application.city ? `${application.city} · ` : ''}
-                            <span className={u.num}>
-                              {formatDate(application.createdAt ? application.createdAt.toString() : null)}
-                            </span>
-                          </span>
-                          {application.referredBy ? (
-                            <span className={u.personSub}>Referred by {application.referredBy}</span>
-                          ) : null}
-                          {application.interests?.length ? (
-                            <span className={u.personSub}>Interested in {interestLabels(application.interests)}</span>
-                          ) : null}
-                        </span>
-                      </span>
-                      <span className={`${u.cellEnd} ${r.appStatus}`}>
-                        <StatusDot tone={applicationStatusTone[application.status] ?? 'blue'}>
-                          {applicationStatusLabel[application.status] ?? application.status}
-                        </StatusDot>
-                      </span>
-                      <span className={`${u.cell} ${r.phoneOnly}`} data-label="Phone">
-                        <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
-                          {displayPhone(application.phone)}
-                        </a>
-                      </span>
-                      <span className={`${u.cell} ${r.phoneOnly}`} data-label="Email">
-                        <a className={`${r.ellipsis} ${r.contact}`} href={`mailto:${application.email}`}>
-                          {application.email}
-                        </a>
-                      </span>
-                      <span className={`${u.cell} ${r.deskOnly}`}>
-                        <span className={r.stackValue}>
-                          <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
-                            {displayPhone(application.phone)}
-                          </a>
-                          <a
-                            className={`${u.cellSub} ${r.ellipsis} ${r.contact}`}
-                            href={`mailto:${application.email}`}
-                          >
-                            {application.email}
-                          </a>
-                        </span>
-                      </span>
-                      {application.status === 'applied' ? (
-                        <span className={`${u.btnRow} ${r.appAction}`}>
-                          <button
-                            type="button"
-                            className={`${s.btnSecondary} ${u.sm}`}
-                            aria-label={`Invite ${application.name}`}
-                            onClick={() =>
-                              router.push(
-                                `${hubTabHref(ONBOARDING_HUB, 'invites')}&application=${encodeURIComponent(application.id)}`
-                              )
-                            }
-                          >
-                            <UserPlus size={16} aria-hidden="true" />
-                            Invite
-                          </button>
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
-        </section>
+        >
+          <Download size={16} aria-hidden="true" />
+          Export {visible.length} shown
+        </button>
       </div>
-    </AdminGate>
+      <p className={`${u.hint} ${r.lede}`}>Everyone who applied on 3cworldgroup.com/apply.</p>
+      <dl className={r.legend} aria-label="What the filters mean">
+        {APPLICATION_VIEWS.map((option) => (
+          <div key={option.value} className={r.legendItem}>
+            <dt>{option.label}</dt>
+            <dd>{option.meaning}</dd>
+          </div>
+        ))}
+      </dl>
+      {loading ? (
+        <AdminSkeletonRows rows={4} label="Loading applications" />
+      ) : loadFailed ? (
+        <AdminFailed what="applications" onRetry={reload} />
+      ) : applications.length === 0 ? (
+        <AdminEmpty title="No website applications yet" />
+      ) : (
+        <>
+          <div className={`${u.toolbar} ${r.filters}`}>
+            <label className={`${u.search} ${r.searchBox}`}>
+              <Search size={18} aria-hidden="true" />
+              <input
+                className={u.input}
+                type="search"
+                placeholder="Search name, city, email, phone"
+                aria-label="Search applications"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <div className={`${u.segmented} ${r.status}`} role="group" aria-label="Filter applications">
+              {APPLICATION_VIEWS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={view === option.value}
+                  onClick={() => setView(option.value)}
+                >
+                  {option.label}
+                  <span className={r.segCount}>{counts[option.value]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          {visible.length === 0 ? (
+            <AdminEmpty title={query.trim() ? 'No applications match' : 'Nothing here'}>
+              {query.trim() ? 'Try another name, city, email or phone.' : null}
+            </AdminEmpty>
+          ) : (
+            <ul className={`${u.rows} ${r.appCols}`}>
+              <li className={u.tHead} aria-hidden="true">
+                <span>Applicant</span>
+                <span>Contact</span>
+                <span>Status</span>
+                <span />
+              </li>
+              {visible.map((application) => (
+                <li key={application.id} className={`${u.row} ${r.app}`}>
+                  <span className={`${u.cellMain} ${u.person}`}>
+                    <span className={u.personText}>
+                      <span className={u.personName}>
+                        <span>{application.name}</span>
+                      </span>
+                      <span className={u.personSub}>
+                        {application.city ? `${application.city} · ` : ''}
+                        <span className={u.num}>
+                          {formatDate(application.createdAt ? application.createdAt.toString() : null)}
+                        </span>
+                      </span>
+                      {application.referredBy ? (
+                        <span className={u.personSub}>Referred by {application.referredBy}</span>
+                      ) : null}
+                      {application.interests?.length ? (
+                        <span className={u.personSub}>Interested in {interestLabels(application.interests)}</span>
+                      ) : null}
+                    </span>
+                  </span>
+                  <span className={`${u.cellEnd} ${r.appStatus}`}>
+                    <StatusDot tone={applicationStatusTone[application.status] ?? 'blue'}>
+                      {applicationStatusLabel[application.status] ?? application.status}
+                    </StatusDot>
+                  </span>
+                  <span className={`${u.cell} ${r.phoneOnly}`} data-label="Phone">
+                    <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
+                      {displayPhone(application.phone)}
+                    </a>
+                  </span>
+                  <span className={`${u.cell} ${r.phoneOnly}`} data-label="Email">
+                    <a className={`${r.ellipsis} ${r.contact}`} href={`mailto:${application.email}`}>
+                      {application.email}
+                    </a>
+                  </span>
+                  <span className={`${u.cell} ${r.deskOnly}`}>
+                    <span className={r.stackValue}>
+                      <a className={`${u.num} ${r.contact}`} href={telHref(application.phone)}>
+                        {displayPhone(application.phone)}
+                      </a>
+                      <a
+                        className={`${u.cellSub} ${r.ellipsis} ${r.contact}`}
+                        href={`mailto:${application.email}`}
+                      >
+                        {application.email}
+                      </a>
+                    </span>
+                  </span>
+                  {application.status === 'applied' ? (
+                    <span className={`${u.btnRow} ${r.appAction}`}>
+                      <button
+                        type="button"
+                        className={`${s.btnSecondary} ${u.sm}`}
+                        aria-label={`Invite ${application.name}`}
+                        onClick={() =>
+                          router.replace(
+                            `${hubTabHref(ONBOARDING_HUB, 'recruits')}&application=${encodeURIComponent(application.id)}`,
+                            { scroll: false }
+                          )
+                        }
+                      >
+                        <UserPlus size={16} aria-hidden="true" />
+                        Invite
+                      </button>
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
   );
 }

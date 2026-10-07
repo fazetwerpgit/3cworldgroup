@@ -10,6 +10,8 @@ import u from './admin-ui.module.css';
 interface AdminHubProps {
   hub: HubConfig;
   title: string;
+  /** One plain sentence under the title saying what the page is for. */
+  sub?: ReactNode;
   /** Renders each tab's page, keyed by tab key. */
   panels: Record<string, () => ReactNode>;
   /** Open items per tab, shown beside its label. undefined while they load. */
@@ -31,12 +33,22 @@ const COUNTS_WAIT_MS = 1200;
  * hosted page renders unchanged under its own gate; the hub shows only the tabs
  * the viewer can open and falls back to the first of them.
  */
-function Hub({ hub, title, panels, counts, landOnWork = false }: AdminHubProps) {
+function Hub({ hub, title, sub, panels, counts, landOnWork = false }: AdminHubProps) {
   const { isRole, hasPermission } = useAuth();
   const router = useRouter();
-  const asked = useSearchParams().get(hub.param);
+  const params = useSearchParams();
+  const asked = params.get(hub.param);
   const tabs = hub.tabs.filter((tab) => canOpenHubTab(tab, isRole, hasPermission));
   const askedTab = tabs.find((tab) => tab.key === asked);
+  // An old tab key (a bookmark or an old notification link) opens its new tab,
+  // keeping the rest of the query (?application= and the like).
+  const aliasOf = asked ? hub.aliases?.[asked] : undefined;
+  useEffect(() => {
+    if (!aliasOf) return;
+    const next = new URLSearchParams(params.toString());
+    next.set(hub.param, aliasOf);
+    router.replace(`${hub.href}?${next.toString()}`, { scroll: false });
+  }, [aliasOf, params, hub, router]);
 
   const [landed, setLanded] = useState<string | null>(null);
   // The counts load every queue; past the wait, land without them rather than
@@ -49,18 +61,21 @@ function Hub({ hub, title, panels, counts, landOnWork = false }: AdminHubProps) 
     return () => clearTimeout(timer);
   }, [waiting]);
 
-  if (askedTab) {
+  if (aliasOf) {
+    // Wait for the redirect rather than land on another tab first.
+  } else if (askedTab) {
     if (landed) setLanded(null);
   } else if (!landed && (!landOnWork || counts || waitedOut)) {
     const withWork = landOnWork ? tabs.find((tab) => (counts?.[tab.key] ?? 0) > 0) : undefined;
     const pick = withWork ?? tabs[0];
     if (pick) setLanded(pick.key);
   }
-  const current = askedTab ?? tabs.find((tab) => tab.key === landed);
+  const current = aliasOf ? undefined : (askedTab ?? tabs.find((tab) => tab.key === landed));
 
   return (
     <div className={u.page}>
-      <AdminPageHead title={title} />
+      <AdminPageHead title={title} sub={sub} />
+      {/* One tab needs no tab strip. */}
       {tabs.length > 1 && current ? (
         <AdminTabs
           label={`${title} sections`}
@@ -69,6 +84,7 @@ function Hub({ hub, title, panels, counts, landOnWork = false }: AdminHubProps) 
           onChange={(key) => router.replace(hubTabHref(hub, key), { scroll: false })}
         />
       ) : null}
+      {current?.hint ? <p className={u.sub}>{current.hint}</p> : null}
       {current ? (
         <AdminHubContext.Provider value>{panels[current.key]()}</AdminHubContext.Provider>
       ) : (

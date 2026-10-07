@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { Download, FileText, Lock } from 'lucide-react';
+import Link from 'next/link';
+import { ClipboardCheck, Download, FileText, Lock } from 'lucide-react';
 import {
   AdminEmpty,
   AdminFailed,
@@ -211,6 +212,10 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
           Owner only
         </span>
       </div>
+      <p className={`${u.panelBody} ${u.hint} ${d.intro}`}>
+        Everything this person gave us during onboarding: their details, each checklist step, and their private
+        numbers.
+      </p>
 
       {loading && !file ? (
         <AdminSkeletonRows rows={4} label="Loading onboarding file" />
@@ -295,6 +300,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
 
           <div className={f.group}>
             <h3 className={f.subhead}>Profile</h3>
+            <p className={u.hint}>Contact and job details from their onboarding paperwork.</p>
             <dl className={u.facts}>
               <Fact label="Phone" value={profile.phone} />
               <Fact label="Email" value={profile.email} />
@@ -312,6 +318,23 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
 
           <div className={f.group}>
             <h3 className={f.subhead}>Onboarding items</h3>
+            <p className={u.hint}>
+              Each step of their hiring checklist and where it stands. Approved means done; Needs review means it is
+              waiting on you; Rejected means it was sent back to fix; Not started or Not sent yet means nothing to check
+              yet.
+            </p>
+            {file.items.length > 0 ? (
+              <div className={u.btnRow}>
+                <Link
+                  href={`/portal/admin/onboarding?tab=todo&person=${encodeURIComponent(userId)}`}
+                  className={`${s.btnPrimary} ${u.primarySm}`}
+                >
+                  <ClipboardCheck size={18} aria-hidden="true" />
+                  Check documents
+                </Link>
+                <span className={u.hint}>Opens their checklist so you can Approve or Ask to fix each item.</span>
+              </div>
+            ) : null}
             {file.items.length === 0 ? (
               <AdminEmpty title="No onboarding on file">
                 {name} has no onboarding checklist, usually because they joined before portal onboarding. The download

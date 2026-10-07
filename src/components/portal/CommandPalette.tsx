@@ -97,7 +97,7 @@ export const portalNavGroups: PortalNavGroup[] = [
     collapsible: true,
     items: [
       { label: 'People', href: PEOPLE_HUB.href, icon: Users, roles: hubRoles(PEOPLE_HUB), hub: PEOPLE_HUB },
-      { label: 'Onboarding', href: ONBOARDING_HUB.href, icon: ClipboardCheck, roles: hubRoles(ONBOARDING_HUB), hub: ONBOARDING_HUB },
+      { label: 'Hiring', href: ONBOARDING_HUB.href, icon: ClipboardCheck, roles: hubRoles(ONBOARDING_HUB), hub: ONBOARDING_HUB },
       { label: 'Requests', href: REQUESTS_HUB.href, icon: Inbox, roles: hubRoles(REQUESTS_HUB), hub: REQUESTS_HUB },
       { label: 'Announcements', href: '/portal/admin/announcements', icon: Megaphone, roles: ['owner'] },
       { label: 'Admin settings', href: SETTINGS_HUB.href, icon: Settings, roles: hubRoles(SETTINGS_HUB), hub: SETTINGS_HUB },

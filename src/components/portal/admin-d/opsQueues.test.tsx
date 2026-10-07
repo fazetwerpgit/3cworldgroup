@@ -99,7 +99,7 @@ describe('useOpsQueues', () => {
       'New signups',
     ]);
     const byKey = Object.fromEntries(queues.cards!.map((card) => [card.key, card]));
-    expect(byKey.recruiting).toMatchObject({ href: '/portal/admin/onboarding?tab=invites', count: 1, newToday: 0 });
+    expect(byKey.recruiting).toMatchObject({ href: '/portal/admin/onboarding?tab=recruits', count: 1, newToday: 0 });
     expect(byKey.recruiting.oldestWaitMs).toBeGreaterThan(2 * 24 * HOUR);
     expect(byKey.pipeline).toMatchObject({ count: 3, newToday: null, oldestWaitMs: null });
     expect(byKey['bug-reports']).toMatchObject({ href: '/portal/admin/requests?type=bug-reports', count: 1, newToday: 1 });

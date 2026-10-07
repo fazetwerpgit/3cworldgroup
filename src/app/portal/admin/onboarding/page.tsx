@@ -6,17 +6,17 @@ import { AdminHub } from '@/components/portal/admin-d/AdminHub';
 import { AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
 import { ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 import { useHubTabCounts, useOpsQueues } from '@/components/portal/admin-d/opsQueues';
-import { Applicants } from './Applicants';
-import { Invites } from './Invites';
 import { Pipeline } from './Pipeline';
-import { Review } from './Review';
+import { Recruits } from './Recruits';
+import { Todo } from './Todo';
 
-// Onboarding: Review, Invites (recruiting), Applicants and Pipeline, each under
-// its old gate, so a manager sees only Invites and Applicants. Each tab shows
-// its own open items (they add up to the nav badge) and a bare visit opens the
-// first tab that has any. /portal/admin/recruiting and /pipeline redirect to
-// their tab (next.config.ts).
-function Onboarding() {
+// Hiring: To do (everything waiting on the owner), Recruits (invites and
+// website applicants) and Pipeline, each under its old gate, so a manager sees
+// only Recruits. Each tab shows its own open items (they add up to the nav
+// badge) and a bare visit opens the first tab that has any. Old tab keys
+// (review, invites, applicants) redirect via ONBOARDING_HUB.aliases;
+// /portal/admin/recruiting and /pipeline redirect to their tab (next.config.ts).
+function Hiring() {
   const tab = useSearchParams().get(ONBOARDING_HUB.param);
   const { refresh } = useOpsQueues();
   const counts = useHubTabCounts(ONBOARDING_HUB);
@@ -34,23 +34,22 @@ function Onboarding() {
   return (
     <AdminHub
       hub={ONBOARDING_HUB}
-      title="Onboarding"
+      title="Hiring"
       counts={counts}
       landOnWork
       panels={{
-        review: () => <Review onChanged={refresh} />,
-        invites: () => <Invites onChanged={refresh} />,
-        applicants: () => <Applicants />,
+        todo: () => <Todo onChanged={refresh} />,
+        recruits: () => <Recruits onChanged={refresh} />,
         pipeline: () => <Pipeline />,
       }}
     />
   );
 }
 
-export default function OnboardingPage() {
+export default function HiringPage() {
   return (
     <Suspense fallback={<AdminSkeletonRows rows={3} />}>
-      <Onboarding />
+      <Hiring />
     </Suspense>
   );
 }

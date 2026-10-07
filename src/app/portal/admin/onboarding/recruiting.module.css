@@ -143,19 +143,38 @@
   padding: 0 var(--s2);
 }
 
-/* The page-head count doubles as a link to the Applicants tab. */
-.jump {
-  color: inherit;
-  text-decoration: underline;
-  text-decoration-color: var(--c-line);
-  text-underline-offset: 4px;
+/* ---------- section explainers ---------- */
+/* One plain sentence under each section heading. */
+.lede {
+  padding: var(--s3) var(--s4) 0;
 }
 
-@media (hover: hover) {
-  .jump:hover {
-    color: var(--c-text);
-    text-decoration-color: currentColor;
-  }
+/* What each status word or filter means, as short "word: meaning" pairs. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s5);
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.legendItem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+}
+
+.legendItem > dt {
+  color: var(--c-text-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.legendItem > dd {
+  margin: 0;
 }
 
 .appsPanel {

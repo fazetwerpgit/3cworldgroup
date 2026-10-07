@@ -1,0 +1,110 @@
+/* Hiring > To do. Shared pieces are admin-ui.module.css and rep.module.css. */
+
+.group {
+  display: grid;
+  gap: var(--s3);
+  min-width: 0;
+}
+
+/* Groups stay mounted (their data keeps loading) but show only with work. */
+.group[hidden] {
+  display: none;
+}
+
+.groupHead {
+  align-items: center;
+}
+
+.groupAction {
+  display: inline-flex;
+  margin-right: calc(var(--s2) * -1);
+}
+
+.textLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  text-decoration: none;
+}
+
+/* ---------- rows: name over action on a phone, side by side above ---------- */
+.row.row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.rowAction {
+  display: flex;
+}
+
+.rowAction > a {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.phone {
+  color: inherit;
+}
+
+@media (min-width: 640px) {
+  .row.row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .rowAction > a {
+    flex: none;
+  }
+}
+
+/* ---------- status key ---------- */
+.legend {
+  border: 1px solid var(--c-line);
+  border-radius: 10px;
+  background: var(--c-well);
+}
+
+.legend > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.legendList {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0 var(--s4) var(--s4);
+}
+
+.legendRow {
+  display: grid;
+  gap: 2px;
+}
+
+.legendRow dd {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+@media (min-width: 640px) {
+  .legendRow {
+    grid-template-columns: 160px minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--s3);
+  }
+}
+
+.footer {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}

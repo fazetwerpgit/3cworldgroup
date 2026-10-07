@@ -58,7 +58,8 @@ function formatRelativeAge(createdAt: string | null): string {
   return ` · ${Math.floor(elapsedSeconds / 86400)}d ago`;
 }
 
-export default function ActionQueue() {
+/** `onCount` gets the open task count once loaded, or null when the queue failed to load. */
+export default function ActionQueue({ onCount }: { onCount?: (count: number | null) => void } = {}) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<AlertTaskRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +94,10 @@ export default function ActionQueue() {
     const timer = window.setInterval(() => void load(), 30000);
     return () => window.clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (!loading) onCount?.(loadFailed && tasks.length === 0 ? null : tasks.length);
+  }, [loading, loadFailed, tasks.length, onCount]);
 
   async function claim(taskId: string) {
     if (!user) return;

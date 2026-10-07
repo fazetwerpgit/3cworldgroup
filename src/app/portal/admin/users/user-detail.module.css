@@ -31,6 +31,25 @@
   gap: 4px;
 }
 
+/* One plain sentence under a section heading, before the section's body. */
+p.intro {
+  padding-bottom: 0;
+}
+
+.summaryBody {
+  display: grid;
+  gap: var(--s3);
+}
+
+dl.summaryFacts {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.stageWord {
+  display: grid;
+  gap: 4px;
+}
+
 .vaultBody {
   display: grid;
   gap: var(--s3);
@@ -68,6 +87,11 @@
     grid-template-columns: minmax(0, 1fr) 300px;
     align-items: start;
     gap: var(--s5);
+  }
+
+  /* No side column to show: the record uses the full width. */
+  .layout.solo {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .aside {

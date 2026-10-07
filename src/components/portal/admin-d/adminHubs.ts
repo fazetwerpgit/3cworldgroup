@@ -10,6 +10,8 @@ export interface HubTab {
   label: string;
   roles: UserRole[];
   permissions?: string[];
+  /** One plain sentence under the tabs saying what this tab is for. */
+  hint?: string;
 }
 
 export interface HubConfig {
@@ -17,6 +19,8 @@ export interface HubConfig {
   /** The query parameter that picks the tab. */
   param: 'tab' | 'type';
   tabs: readonly HubTab[];
+  /** Old tab keys that now open another tab (old links keep working). */
+  aliases?: Readonly<Record<string, string>>;
 }
 
 const PLATFORM_ROLES: UserRole[] = ['admin', 'operations'];
@@ -39,23 +43,34 @@ export const RECRUITING_ROLES: UserRole[] = [
 export const PEOPLE_HUB = {
   href: '/portal/admin/people',
   param: 'tab',
-  tabs: [
-    { key: 'everyone', label: 'Everyone', roles: PLATFORM_ROLES, permissions: ['users:read'] },
-    { key: 'employee-data', label: 'Employee data', roles: ['owner'] },
-    { key: 'knowledge', label: 'Knowledge', roles: ['owner'] },
-  ],
+  tabs: [{ key: 'everyone', label: 'Everyone', roles: PLATFORM_ROLES, permissions: ['users:read'] }],
 } as const satisfies HubConfig;
 
 export const ONBOARDING_HUB = {
   href: '/portal/admin/onboarding',
   param: 'tab',
   tabs: [
-    { key: 'review', label: 'Review', roles: PLATFORM_ROLES },
-    { key: 'invites', label: 'Invites', roles: RECRUITING_ROLES },
+    {
+      key: 'todo',
+      label: 'To do',
+      roles: PLATFORM_ROLES,
+      hint: 'Everything waiting on you: sign-ups to approve, documents to check, applicants to invite.',
+    },
     // Website applications are served by the invites API, so they share its gate.
-    { key: 'applicants', label: 'Applicants', roles: RECRUITING_ROLES },
-    { key: 'pipeline', label: 'Pipeline', roles: PLATFORM_ROLES },
+    {
+      key: 'recruits',
+      label: 'Recruits',
+      roles: RECRUITING_ROLES,
+      hint: 'Send invites and see everyone who applied on the website.',
+    },
+    {
+      key: 'pipeline',
+      label: 'Pipeline',
+      roles: PLATFORM_ROLES,
+      hint: 'Where every hire is, from paperwork to selling.',
+    },
   ],
+  aliases: { review: 'todo', invites: 'recruits', applicants: 'recruits' },
 } as const satisfies HubConfig;
 
 export interface RequestTab extends HubTab {
@@ -89,6 +104,18 @@ export const SETTINGS_HUB = {
     { key: 'university', label: 'University content', roles: PLATFORM_ROLES },
     // Same gate as the comp plan at the foot of Learn > Pay & links.
     { key: 'pay-rates', label: 'Pay rates', roles: ['owner'], permissions: ['finance:read'] },
+    {
+      key: 'employee-data',
+      label: 'Employee data',
+      roles: ['owner'],
+      hint: 'Download everyone’s details, or fill empty profiles from the employee spreadsheet.',
+    },
+    {
+      key: 'ask',
+      label: 'Ask 3C',
+      roles: ['owner'],
+      hint: 'The notes Ask 3C answers from, and the questions people asked it.',
+    },
   ],
 } as const satisfies HubConfig;
 

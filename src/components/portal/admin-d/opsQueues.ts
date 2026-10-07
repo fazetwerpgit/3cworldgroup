@@ -76,7 +76,7 @@ const SOURCES: QueueSource[] = [
     key: 'onboarding',
     label: 'Onboarding review',
     hub: ONBOARDING_HUB,
-    tab: 'review',
+    tab: 'todo',
     load: async () => {
       // Counts only: the summary read skips the review history and signed file URLs.
       const json = await authedJson('/api/portal/onboarding/review?summary=1');
@@ -88,7 +88,7 @@ const SOURCES: QueueSource[] = [
     key: 'recruiting',
     label: 'Onboarding invites',
     hub: ONBOARDING_HUB,
-    tab: 'invites',
+    tab: 'recruits',
     load: async () => {
       const json = await authedJson('/api/portal/recruiting/invites');
       const invites: { status?: string; submittedAt?: string | null }[] = Array.isArray(json.invites) ? json.invites : [];

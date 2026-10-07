@@ -73,7 +73,7 @@ describe('portal nav groups', () => {
     const admin = portalNavGroups.find((group) => group.label === 'Admin');
     expect(admin?.items.map((item) => item.label)).toEqual([
       'People',
-      'Onboarding',
+      'Hiring',
       'Requests',
       'Announcements',
       'Admin settings',

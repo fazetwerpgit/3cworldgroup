@@ -28,8 +28,7 @@ vi.mock('@/lib/export/csv', () => ({
   downloadCsv: () => {},
 }));
 
-import { Applicants } from './Applicants';
-import { Invites } from './Invites';
+import { Recruits } from './Recruits';
 
 const APPLICATIONS = [
   { id: 'a1', name: 'Maya Torres', city: 'Austin', email: 'maya@example.com', phone: '(512) 555-0101', referredBy: 'Jordan Reyes', status: 'applied', createdAt: '2026-09-20T12:00:00Z' },
@@ -93,7 +92,7 @@ beforeEach(async () => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  await mount(<Applicants />, () => panel().querySelector('ul'));
+  await mount(<Recruits />, () => panel().querySelector('ul'));
 });
 
 afterEach(() => {
@@ -148,7 +147,7 @@ it('exports only the rows currently shown', async () => {
   expect(csv.rows.map((row) => row.id)).toEqual(['a2']);
 });
 
-it('offers Invite only on new rows and hands the applicant to a filled Invites form', async () => {
+it('offers Invite only on new rows and fills the invite form on the same tab', async () => {
   await click(filterButton('All'));
   const inviteButtons = [...panel().querySelectorAll('button')].filter((button) => button.textContent === 'Invite');
   expect(inviteButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
@@ -157,13 +156,14 @@ it('offers Invite only on new rows and hands the applicant to a filled Invites f
   ]);
 
   await click(inviteButtons[1]);
-  const target = new URL(nav.push.mock.calls[0][0], 'http://portal.test');
+  const target = new URL(nav.replace.mock.calls[0][0], 'http://portal.test');
   expect(target.pathname).toBe('/portal/admin/onboarding');
-  expect(target.searchParams.get('tab')).toBe('invites');
+  expect(target.searchParams.get('tab')).toBe('recruits');
+  expect(nav.push).not.toHaveBeenCalled();
 
-  // The Invites tab opens on that URL and fills its form from the applicant.
+  // The form above picks up the new URL and fills from the applicant.
   nav.params = target.searchParams;
-  await mount(<Invites />, () => container.querySelector<HTMLInputElement>('#invite-name')?.value);
+  await mount(<Recruits />, () => container.querySelector<HTMLInputElement>('#invite-name')?.value);
 
   const value = (id: string) => container.querySelector<HTMLInputElement>(`#${id}`)?.value;
   expect(value('invite-application')).toBe('a2');
@@ -173,5 +173,5 @@ it('offers Invite only on new rows and hands the applicant to a filled Invites f
   expect(value('invite-city')).toBe('Dallas');
   expect(document.activeElement?.id).toBe('invite-name');
   // The handed-over id leaves the URL, so a reload starts with an empty form.
-  expect(nav.replace).toHaveBeenCalledWith('/portal/admin/onboarding?tab=invites', { scroll: false });
+  expect(nav.replace).toHaveBeenLastCalledWith('/portal/admin/onboarding?tab=recruits', { scroll: false });
 });

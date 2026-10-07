@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, ChevronDown, FileText, Lock, RotateCw } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
 import { MarkCompleteSheet, type MarkCompleteTarget } from './MarkCompleteSheet';
@@ -83,6 +84,19 @@ function isNew(person: Person) {
   return person.toReview + person.unsigned > 0;
 }
 
+/**
+ * Waiting on management, not the rep: an upload to check, or a signing
+ * document not sent yet (its next step is Send for signature).
+ */
+function waitsOnYou(person: Person) {
+  return (
+    person.toReview > 0 ||
+    person.items.some(
+      (item) => item.status === 'submitted' && !item.onHold && isEsignItem(item.itemId) && !item.esignEnvelopeId
+    )
+  );
+}
+
 function waitLabel(submittedAt: string | null): string {
   if (!submittedAt) return 'unknown wait';
   const ms = Date.now() - new Date(submittedAt).getTime();
@@ -122,6 +136,23 @@ function itemStatus(item: ChecklistItem): { tone: Tone; label: string } {
 }
 
 /**
+ * What each status word in the checklist means, in the order an item moves.
+ * Keep in step with personStatus and itemStatus above; To do shows it as a key.
+ */
+export const CHECKLIST_STATUS_LEGEND: readonly { tone: Tone; label: string; meaning: string }[] = [
+  { tone: 'muted', label: 'Not started', meaning: "They haven't done this item yet." },
+  { tone: 'amber', label: 'Needs review', meaning: 'They uploaded it. Waiting on you to approve or reject.' },
+  { tone: 'amber', label: 'Not sent', meaning: "A document to sign that hasn't gone to them yet. Tap Send for signature." },
+  { tone: 'blue', label: 'Out for signature', meaning: "Sent to them to sign. They haven't signed it yet." },
+  { tone: 'red', label: 'Rejected', meaning: 'Sent back to them to fix, with your reason.' },
+  { tone: 'lime', label: 'Approved', meaning: 'Done. Nothing more to do.' },
+  { tone: 'muted', label: 'On hold', meaning: 'A stand-in until 3C sends the real document. No one needs to act.' },
+  { tone: 'muted', label: 'In progress', meaning: 'Still working through their list. Nothing is waiting on you.' },
+  { tone: 'lime', label: 'Complete', meaning: 'Every item on their list is approved.' },
+  { tone: 'amber', label: 'At risk', meaning: 'No progress for a week, even after reminders. Reach out to them.' },
+];
+
+/**
  * Signed, but no copy was stored: some documents signed before signing moved
  * in-house only exist in the old vendor's dashboard. A note, not an error.
  */
@@ -156,8 +187,25 @@ function itemDetail(item: ChecklistItem): string | null {
   }
 }
 
-/** `onChanged` runs after each action that changes the queue, so the hub's tab counts follow. */
-export function Review({ onChanged }: { onChanged?: () => void } = {}) {
+interface ReviewProps {
+  /** Runs after each action that changes the queue, so the hub's tab counts follow. */
+  onChanged?: () => void;
+  /** Only people with something waiting on management; no filters. */
+  focus?: boolean;
+  /** Hosted inside To do, which shows its own title and activation tasks. */
+  embedded?: boolean;
+  /** People shown in focus mode once loaded; null when the list failed to load. */
+  onWaiting?: (count: number | null) => void;
+}
+
+/**
+ * Everyone's onboarding checklist. `?person=<uid>` opens that person's checklist
+ * (and keeps them listed in focus mode even when nothing of theirs is waiting).
+ */
+export function Review({ onChanged, focus = false, embedded = false, onWaiting }: ReviewProps = {}) {
+  const personParam = useSearchParams().get('person');
+  // The ?person= already opened, so closing that row stays closed.
+  const [linkedPerson, setLinkedPerson] = useState<string | null>(null);
   const { user } = useAuth();
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -313,14 +361,46 @@ export function Review({ onChanged }: { onChanged?: () => void } = {}) {
     }
   };
 
+  // Focus: anyone something is waiting on, plus a deep-linked person.
+  const waiting = useMemo(
+    () => people.filter((person) => waitsOnYou(person) || person.userId === personParam),
+    [people, personParam]
+  );
+
   const visible = useMemo(
     () =>
-      people.filter(
-        (person) =>
-          (view === 'all' || (view === 'new') === isNew(person)) && (!atRiskOnly || person.atRisk)
-      ),
-    [people, view, atRiskOnly]
+      focus
+        ? waiting
+        : people.filter(
+            (person) =>
+              (view === 'all' || (view === 'new') === isNew(person)) && (!atRiskOnly || person.atRisk)
+          ),
+    [focus, waiting, people, view, atRiskOnly]
   );
+
+  useEffect(() => {
+    if (!loading) onWaiting?.(loadFailed ? null : waiting.length);
+  }, [loading, loadFailed, waiting, onWaiting]);
+
+  // A deep link opens the person's checklist once their row is loaded. In the
+  // full view it also widens the filter when they are not under New.
+  if (!loading && personParam && linkedPerson !== personParam) {
+    const target = people.find((person) => person.userId === personParam);
+    if (target) {
+      setLinkedPerson(personParam);
+      if (!isNew(target)) setView('all');
+      setAtRiskOnly(false);
+      setOpenIds((prev) => new Set(prev).add(personParam));
+    }
+  }
+
+  useEffect(() => {
+    if (!linkedPerson) return;
+    const frame = requestAnimationFrame(() =>
+      document.getElementById(`onb-row-${linkedPerson}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [linkedPerson]);
 
   const newCount = people.filter(isNew).length;
   const toReviewTotal = people.reduce((sum, person) => sum + person.toReview, 0);
@@ -484,43 +564,49 @@ export function Review({ onChanged }: { onChanged?: () => void } = {}) {
   return (
     <AdminGate roles={['admin', 'operations']}>
       <div className={u.page}>
-        <AdminPageHead
-          title="Onboarding Review"
-          meta={
-            showStats ? (
-              <>
-                <b>{toReviewTotal}</b> to review
-                {unsignedTotal ? ` · ${unsignedTotal} out for signature` : null}
-                {atRiskPeople ? ` · ${atRiskPeople} at risk` : null}
-              </>
-            ) : null
-          }
-        />
+        {embedded ? null : (
+          <>
+            <AdminPageHead
+              title="Onboarding Review"
+              meta={
+                showStats ? (
+                  <>
+                    <b>{toReviewTotal}</b> to review
+                    {unsignedTotal ? ` · ${unsignedTotal} out for signature` : null}
+                    {atRiskPeople ? ` · ${atRiskPeople} at risk` : null}
+                  </>
+                ) : null
+              }
+            />
 
-        <ActionQueue />
+            <ActionQueue />
+          </>
+        )}
 
-        <div className={u.toolbar}>
-          <div className={u.segmented} role="group" aria-label="Filter people">
-            <button type="button" aria-pressed={view === 'new'} onClick={() => setView('new')}>
-              New{showStats ? ` ${newCount}` : ''}
-            </button>
-            <button type="button" aria-pressed={view === 'handled'} onClick={() => setView('handled')}>
-              Handled
-            </button>
-            <button type="button" aria-pressed={view === 'all'} onClick={() => setView('all')}>
-              All
+        {focus ? null : (
+          <div className={u.toolbar}>
+            <div className={u.segmented} role="group" aria-label="Filter people">
+              <button type="button" aria-pressed={view === 'new'} onClick={() => setView('new')}>
+                New{showStats ? ` ${newCount}` : ''}
+              </button>
+              <button type="button" aria-pressed={view === 'handled'} onClick={() => setView('handled')}>
+                Handled
+              </button>
+              <button type="button" aria-pressed={view === 'all'} onClick={() => setView('all')}>
+                All
+              </button>
+            </div>
+            <button
+              type="button"
+              className={`${u.chip} ${o.riskChip}`}
+              aria-pressed={atRiskOnly}
+              onClick={() => setAtRiskOnly((v) => !v)}
+            >
+              <AlertTriangle size={16} aria-hidden="true" />
+              At-risk Only
             </button>
           </div>
-          <button
-            type="button"
-            className={`${u.chip} ${o.riskChip}`}
-            aria-pressed={atRiskOnly}
-            onClick={() => setAtRiskOnly((v) => !v)}
-          >
-            <AlertTriangle size={16} aria-hidden="true" />
-            At-risk Only
-          </button>
-        </div>
+        )}
 
         {error ? (
           <AdminNotice tone="error" onDismiss={() => setError('')}>
@@ -539,7 +625,11 @@ export function Review({ onChanged }: { onChanged?: () => void } = {}) {
               People
             </h2>
             <span className={o.headRight}>
-              {showStats ? <span className={u.panelMeta}>{visible.length} of {people.length}</span> : null}
+              {showStats ? (
+                <span className={u.panelMeta}>
+                  {focus ? `${visible.length} waiting` : `${visible.length} of ${people.length}`}
+                </span>
+              ) : null}
               <button
                 type="button"
                 className={s.iconBtn}
@@ -557,7 +647,9 @@ export function Review({ onChanged }: { onChanged?: () => void } = {}) {
           ) : loadFailed ? (
             <AdminFailed what="onboarding" onRetry={retryLoad} />
           ) : visible.length === 0 ? (
-            view === 'new' && !atRiskOnly ? (
+            focus ? (
+              <AdminEmpty title="Nothing to check">No uploads or documents are waiting on you.</AdminEmpty>
+            ) : view === 'new' && !atRiskOnly ? (
               <AdminEmpty title="Nothing waiting">No one has onboarding waiting on review or a signature.</AdminEmpty>
             ) : (
               <AdminEmpty title="No one matches this view">Change the filter to see more people.</AdminEmpty>
@@ -584,6 +676,7 @@ export function Review({ onChanged }: { onChanged?: () => void } = {}) {
                   return (
                     <li
                       key={person.userId}
+                      id={`onb-row-${person.userId}`}
                       className={person.atRisk ? u.rowWarn : isNew(person) ? u.rowHot : undefined}
                     >
                       <button
