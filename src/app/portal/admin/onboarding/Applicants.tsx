@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, Search, UserPlus } from 'lucide-react';
+import { Download, RotateCw, Search, UserPlus } from 'lucide-react';
 import { toCsv, downloadCsv } from '@/lib/export/csv';
 import {
   AdminEmpty,
@@ -19,9 +19,10 @@ import { ApplicationRecord, ApplicationStatus } from '@/types';
 import { displayPhone, telHref } from '@/lib/phone';
 import { interestLabels } from '@/lib/forms/applicationInterests';
 
-// Everyone who applied on the website (/apply): the Recruits tab's last
-// section. Recruits loads the data and gates the tab. Invite sets
-// ?application=<id> on the same tab; the invite form above fills from it.
+// Everyone who applied on the website (/apply): the Recruits tab's first
+// section, under the "Send an invite" button. Recruits loads the data and gates
+// the tab; Refresh reloads all of it. Invite sets ?application=<id> on the same
+// tab, which opens the invite form above filled from that applicant.
 
 const APPLICATION_COLUMNS = [
   { key: 'name', label: 'Name' },
@@ -110,23 +111,34 @@ export function Applicants({
     <section className={s.panel} id="applications" aria-labelledby="applicants-heading">
       <div className={`${s.panelHead} ${u.band}`}>
         <h2 id="applicants-heading" className={s.kicker}>Website applications</h2>
-        <button
-          type="button"
-          className={`${s.btnSecondary} ${u.sm} ${u.quiet} ${r.export}`}
-          disabled={visible.length === 0}
-          onClick={() =>
-            downloadCsv(
-              'applications.csv',
-              toCsv(
-                APPLICATION_COLUMNS,
-                visible.map((application) => ({ ...application, interestedIn: interestLabels(application.interests) }))
+        <span className={u.btnRow}>
+          <button
+            type="button"
+            className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
+            onClick={reload}
+            disabled={loading}
+          >
+            <RotateCw size={16} className={loading ? u.spin : undefined} aria-hidden="true" />
+            Refresh
+          </button>
+          <button
+            type="button"
+            className={`${s.btnSecondary} ${u.sm} ${u.quiet} ${r.export}`}
+            disabled={visible.length === 0}
+            onClick={() =>
+              downloadCsv(
+                'applications.csv',
+                toCsv(
+                  APPLICATION_COLUMNS,
+                  visible.map((application) => ({ ...application, interestedIn: interestLabels(application.interests) }))
+                )
               )
-            )
-          }
-        >
-          <Download size={16} aria-hidden="true" />
-          Export {visible.length} shown
-        </button>
+            }
+          >
+            <Download size={16} aria-hidden="true" />
+            Export {visible.length} shown
+          </button>
+        </span>
       </div>
       <p className={`${u.hint} ${r.lede}`}>Everyone who applied on 3cworldgroup.com/apply.</p>
       <dl className={r.legend} aria-label="What the filters mean">

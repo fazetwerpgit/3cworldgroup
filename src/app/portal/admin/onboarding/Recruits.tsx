@@ -1,22 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RotateCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { AdminGate, AdminPageHead } from '@/components/portal/admin-d/AdminUi';
 import { RECRUITING_ROLES } from '@/components/portal/admin-d/adminHubs';
-import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import { ApplicationRecord } from '@/types';
 import { Applicants } from './Applicants';
 import { Invites, type InviteView } from './Invites';
 
-// Hiring → Recruits: the invite form, the invites already sent and the website
-// applications on one tab. One load of the recruiting API feeds both, so an
-// invite sent from an application moves that applicant out of New right away.
-// An applicant's Invite button sets ?application=<id>; Invites fills its form
-// from it (the same link works from anywhere in the portal).
+// Hiring → Recruits, top to bottom: the "Send an invite" button (opens the
+// form in place), the website applications, then the invites already sent.
+// One load of the recruiting API feeds both, so an invite sent from an
+// application moves that applicant out of New right away. An applicant's
+// Invite button sets ?application=<id>; Invites opens its form filled from it
+// (the same link works from anywhere in the portal).
 
 function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
   const { user, hasPermission, isRole } = useAuth();
@@ -69,15 +68,7 @@ function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
 
   return (
     <div className={u.page}>
-      <AdminPageHead
-        title="Recruits"
-        actions={
-          <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={load} disabled={loading}>
-            <RotateCw size={16} className={loading ? u.spin : undefined} aria-hidden="true" />
-            Refresh
-          </button>
-        }
-      />
+      <AdminPageHead title="Recruits" />
       <Invites
         invites={invites}
         applications={applications}
@@ -85,8 +76,9 @@ function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
         loadFailed={loadFailed}
         reload={load}
         onChanged={onChanged}
-      />
-      <Applicants applications={applications} loading={loading} loadFailed={loadFailed} reload={load} />
+      >
+        <Applicants applications={applications} loading={loading} loadFailed={loadFailed} reload={load} />
+      </Invites>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { ChevronRight, RotateCw } from 'lucide-react';
 import { AdminEmpty, AdminFailed } from './AdminUi';
-import { ONBOARDING_HUB, PEOPLE_HUB } from './adminHubs';
+import { ONBOARDING_HUB } from './adminHubs';
 import { useOpsQueues, type QueueCard } from './opsQueues';
 import s from '@/components/portal/rep/rep.module.css';
 import u from './admin-ui.module.css';
@@ -25,16 +25,17 @@ function isBacked(card: QueueCard): boolean {
   return !card.error && card.oldestWaitMs !== null && card.oldestWaitMs > BACKED_UP_THRESHOLD_MS;
 }
 
-/** Home's Needs attention is the onboarding work: its three tabs and new signups. */
-const HOME_HUBS: string[] = [ONBOARDING_HUB.href, PEOPLE_HUB.href];
+/** Home's Needs attention is the hiring work: To do's groups and the pipeline. */
+const HOME_HUBS: string[] = [ONBOARDING_HUB.href];
 
 /**
- * Home's Needs attention: the onboarding queues the viewer can open (review,
- * invites, pipeline, new signups for admins) with open count, new today and
- * oldest wait, each row linking to its tab. Only rows with something waiting
- * (or that failed to load) show. `extra` rows (the owner's stuck-onboarding
- * check) join them and `onRefresh` reloads them with the queues. The Requests
- * queues are counted on their own nav badge and tabs instead.
+ * Home's Needs attention: the hiring queues the viewer can open (documents to
+ * check, ready to activate, new applicants, sign-ups for admins, the pipeline)
+ * with open count, new today and oldest wait, each row linking to its tab. Only
+ * rows with something in them (or that failed to load) show. The waiting total
+ * leaves out the pipeline, which waits on no one. `extra` rows (the owner's
+ * stuck-onboarding check) join them and `onRefresh` reloads them with the
+ * queues. The Requests queues are counted on their own nav badge and tabs instead.
  */
 export function OpsQueuesPanel({
   title,
@@ -64,7 +65,7 @@ export function OpsQueuesPanel({
   const failedCount = cards?.filter((card) => card.error).length ?? 0;
   const allFailed = !!cards && cards.length > 0 && failedCount === cards.length;
   const showStats = !!cards && !allFailed;
-  const totalOpen = cards?.reduce((sum, card) => sum + card.count, 0) ?? 0;
+  const totalOpen = cards?.reduce((sum, card) => sum + (card.badge === false ? 0 : card.count), 0) ?? 0;
   const newToday = cards?.reduce((sum, card) => sum + (card.newToday ?? 0), 0) ?? 0;
   const backed = cards?.filter(isBacked).length ?? 0;
   const updated = queues.refreshedAt

@@ -359,7 +359,10 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
 
     expect(response.status).toBe(200);
     expect(json).toEqual({
-      submissions: [{ submittedAt: '2026-07-27T00:00:00.000Z' }, { submittedAt: '2026-07-26T00:00:00.000Z' }],
+      submissions: [
+        { userId: 'u1', submittedAt: '2026-07-27T00:00:00.000Z' },
+        { userId: 'u2', submittedAt: '2026-07-26T00:00:00.000Z' },
+      ],
     });
   });
 
@@ -371,7 +374,7 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
 
     const json = await (await summary()).json();
 
-    expect(json.submissions).toEqual([{ submittedAt: '2026-07-27T00:00:00.000Z' }]);
+    expect(json.submissions).toEqual([{ userId: 'u1', submittedAt: '2026-07-27T00:00:00.000Z' }]);
   });
 
   it('does not count items of an inactive (rejected or decommissioned) account', async () => {
@@ -382,7 +385,7 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
 
     const json = await (await summary()).json();
 
-    expect(json.submissions).toEqual([{ submittedAt: '2026-07-27T00:00:00.000Z' }]);
+    expect(json.submissions).toEqual([{ userId: 'u1', submittedAt: '2026-07-27T00:00:00.000Z' }]);
   });
 
   it('reads only the submitted items and their accounts: no review history, no pending scan, no signed files', async () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
   Loader2,
   Mail,
   Send,
+  UserPlus,
   XCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -136,10 +137,11 @@ function formatMissingItems(missing: unknown): string {
 }
 
 /**
- * The Recruits tab's invite sections: "Send an invite" (the form) and the
- * invites already sent. Recruits loads the data and gates the tab; `reload`
- * refetches it. `onChanged` runs after each action that changes the recruits,
- * so the hub's tab counts follow.
+ * The Recruits tab's invite parts: "Send an invite" (a button that opens the
+ * form in place), then `children` (the website applications), then the invites
+ * already sent. Recruits loads the data and gates the tab; `reload` refetches
+ * it. `onChanged` runs after each action that changes the recruits, so the
+ * hub's tab counts follow.
  */
 export function Invites({
   invites,
@@ -148,6 +150,7 @@ export function Invites({
   loadFailed,
   reload,
   onChanged,
+  children,
 }: {
   invites: InviteView[];
   applications: ApplicationRecord[];
@@ -155,10 +158,15 @@ export function Invites({
   loadFailed: boolean;
   reload: () => Promise<void>;
   onChanged?: () => void;
+  children?: ReactNode;
 }) {
   const { user } = useAuth();
   const router = useRouter();
   const prefillApplicationId = useSearchParams().get('application');
+  const [formOpen, setFormOpen] = useState(false);
+  // Bumped each time the form is asked for; the effect below scrolls to it
+  // once it has rendered.
+  const [formCalls, setFormCalls] = useState(0);
   const [saving, setSaving] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null);
@@ -178,6 +186,23 @@ export function Invites({
     setWarning('');
   };
 
+  const openForm = () => {
+    setFormOpen(true);
+    setFormCalls((count) => count + 1);
+  };
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setForm(emptyForm);
+    setLatestInviteUrl('');
+  };
+
+  useEffect(() => {
+    if (formCalls === 0) return;
+    document.getElementById('invite-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('invite-name')?.focus({ preventScroll: true });
+  }, [formCalls]);
+
   const fillFromApplication = (applicationId: string) => {
     const application = applications.find((item) => item.id === applicationId);
     if (!application) {
@@ -195,14 +220,13 @@ export function Invites({
   };
 
   // An applicant's Invite button (on this tab or a link from elsewhere) sets
-  // ?application=<id>: fill the form once the applications load, bring it into
-  // view, then drop the param so a reload starts clean.
+  // ?application=<id>: once the applications load, open the form filled from
+  // it, then drop the param so a reload starts clean.
   useEffect(() => {
     if (!prefillApplicationId || loading) return;
     if (applications.some((application) => application.id === prefillApplicationId)) {
       fillFromApplication(prefillApplicationId);
-      document.getElementById('invite-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.getElementById('invite-name')?.focus({ preventScroll: true });
+      openForm();
     }
     router.replace(hubTabHref(ONBOARDING_HUB, 'recruits'), { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per handed-over applicant
@@ -558,144 +582,159 @@ export function Invites({
         <AdminNotice tone="warn" onDismiss={() => setWarning('')}>{warning}</AdminNotice>
       ) : null}
 
-      <div className={r.formWrap}>
-        <section className={`${s.panel} ${r.formPanel}`} id="invite-form" aria-labelledby="recruiting-form-heading">
-          <div className={`${s.panelHead} ${u.band}`}>
-            <h2 id="recruiting-form-heading" className={s.kicker}>Send an invite</h2>
-          </div>
-          <p className={`${u.hint} ${r.lede}`}>Emails a link to start their paperwork. You can copy the link instead.</p>
-          <div className={u.panelBody}>
-            <form onSubmit={createInvite} className={u.formGrid}>
-              {pickableApplications.length > 0 && (
+      {formOpen ? (
+        <div className={r.formWrap}>
+          <section className={`${s.panel} ${r.formPanel}`} id="invite-form" aria-labelledby="recruiting-form-heading">
+            <div className={`${s.panelHead} ${u.band}`}>
+              <h2 id="recruiting-form-heading" className={s.kicker}>Send an invite</h2>
+              <button type="button" className={`${s.btnSecondary} ${u.sm} ${u.quiet}`} onClick={closeForm}>
+                {latestInviteUrl ? 'Close' : 'Cancel'}
+              </button>
+            </div>
+            <p className={`${u.hint} ${r.lede}`}>Emails a link to start their paperwork. You can copy the link instead.</p>
+            <div className={u.panelBody}>
+              <form onSubmit={createInvite} className={u.formGrid}>
+                {pickableApplications.length > 0 && (
+                  <div className={u.field}>
+                    <label htmlFor="invite-application" className={u.label}>Use website application</label>
+                    <span className={u.selectWrap}>
+                      <select
+                        id="invite-application"
+                        className={u.input}
+                        value={form.applicationId}
+                        onChange={(event) => fillFromApplication(event.target.value)}
+                      >
+                        <option value="">Manual entry</option>
+                        {pickableApplications.map((application) => (
+                          <option key={application.id} value={application.id}>
+                            {application.name} - {application.city}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={18} aria-hidden="true" />
+                    </span>
+                  </div>
+                )}
+
                 <div className={u.field}>
-                  <label htmlFor="invite-application" className={u.label}>Use website application</label>
+                  <label htmlFor="invite-name" className={u.label}>Name</label>
+                  <input
+                    id="invite-name"
+                    className={u.input}
+                    autoComplete="off"
+                    value={form.candidateName}
+                    onChange={(event) => setForm((prev) => ({ ...prev, candidateName: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className={u.field}>
+                  <label htmlFor="invite-email" className={u.label}>Email</label>
+                  <input
+                    id="invite-email"
+                    className={u.input}
+                    type="email"
+                    autoComplete="off"
+                    value={form.candidateEmail}
+                    onChange={(event) => setForm((prev) => ({ ...prev, candidateEmail: event.target.value }))}
+                    required
+                  />
+                </div>
+                <div className={`${u.formGrid} ${u.formGrid2}`}>
+                  <div className={u.field}>
+                    <label htmlFor="invite-phone" className={u.label}>Phone</label>
+                    <input
+                      id="invite-phone"
+                      className={u.input}
+                      inputMode="tel"
+                      autoComplete="off"
+                      value={form.candidatePhone}
+                      onChange={(event) => setForm((prev) => ({ ...prev, candidatePhone: event.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className={u.field}>
+                    <label htmlFor="invite-city" className={u.label}>City</label>
+                    <input
+                      id="invite-city"
+                      className={u.input}
+                      autoComplete="off"
+                      value={form.candidateCity}
+                      onChange={(event) => setForm((prev) => ({ ...prev, candidateCity: event.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className={u.field}>
+                  <label htmlFor="invite-role" className={u.label}>Role</label>
                   <span className={u.selectWrap}>
                     <select
-                      id="invite-application"
+                      id="invite-role"
                       className={u.input}
-                      value={form.applicationId}
-                      onChange={(event) => fillFromApplication(event.target.value)}
+                      value={form.intendedFieldRole}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))
+                      }
                     >
-                      <option value="">Manual entry</option>
-                      {pickableApplications.map((application) => (
-                        <option key={application.id} value={application.id}>
-                          {application.name} - {application.city}
+                      {INVITABLE_FIELD_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {RoleDisplayNames[role]}
                         </option>
                       ))}
                     </select>
                     <ChevronDown size={18} aria-hidden="true" />
                   </span>
                 </div>
+                <label className={u.check}>
+                  <input
+                    type="checkbox"
+                    checked={form.isIBO}
+                    onChange={(event) => setForm((prev) => ({ ...prev, isIBO: event.target.checked }))}
+                  />
+                  Include IBO business items
+                </label>
+                <button type="submit" className={`${s.btnPrimary} ${r.submit}`} disabled={saving}>
+                  {saving ? <Loader2 size={20} className={u.spin} aria-hidden="true" /> : <Send size={20} aria-hidden="true" />}
+                  {saving ? 'Sending…' : 'Send invite'}
+                </button>
+              </form>
+
+              {latestInviteUrl && (
+                <div className={r.ready} role="status">
+                  <p className={r.readyTitle}>
+                    <CheckCircle2 size={18} aria-hidden="true" />
+                    Invite link ready
+                  </p>
+                  <p className={r.readyUrl}>{latestInviteUrl}</p>
+                  <div className={u.btnRow}>
+                    <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={copyLatestInvite}>
+                      <Link2 size={18} aria-hidden="true" />
+                      {copied ? 'Copied' : 'Copy Link'}
+                    </button>
+                    <a
+                      className={`${s.btnSecondary} ${u.sm}`}
+                      href={latestInviteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <ExternalLink size={16} aria-hidden="true" />
+                      Open
+                    </a>
+                  </div>
+                </div>
               )}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <div className={r.inviteBar}>
+          <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={openForm}>
+            <UserPlus size={18} aria-hidden="true" />
+            Send an invite
+          </button>
+          <p className={u.hint}>Emails a link to start their paperwork. You can copy the link instead.</p>
+        </div>
+      )}
 
-              <div className={u.field}>
-                <label htmlFor="invite-name" className={u.label}>Name</label>
-                <input
-                  id="invite-name"
-                  className={u.input}
-                  autoComplete="off"
-                  value={form.candidateName}
-                  onChange={(event) => setForm((prev) => ({ ...prev, candidateName: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className={u.field}>
-                <label htmlFor="invite-email" className={u.label}>Email</label>
-                <input
-                  id="invite-email"
-                  className={u.input}
-                  type="email"
-                  autoComplete="off"
-                  value={form.candidateEmail}
-                  onChange={(event) => setForm((prev) => ({ ...prev, candidateEmail: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className={`${u.formGrid} ${u.formGrid2}`}>
-                <div className={u.field}>
-                  <label htmlFor="invite-phone" className={u.label}>Phone</label>
-                  <input
-                    id="invite-phone"
-                    className={u.input}
-                    inputMode="tel"
-                    autoComplete="off"
-                    value={form.candidatePhone}
-                    onChange={(event) => setForm((prev) => ({ ...prev, candidatePhone: event.target.value }))}
-                    required
-                  />
-                </div>
-                <div className={u.field}>
-                  <label htmlFor="invite-city" className={u.label}>City</label>
-                  <input
-                    id="invite-city"
-                    className={u.input}
-                    autoComplete="off"
-                    value={form.candidateCity}
-                    onChange={(event) => setForm((prev) => ({ ...prev, candidateCity: event.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className={u.field}>
-                <label htmlFor="invite-role" className={u.label}>Role</label>
-                <span className={u.selectWrap}>
-                  <select
-                    id="invite-role"
-                    className={u.input}
-                    value={form.intendedFieldRole}
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))
-                    }
-                  >
-                    {INVITABLE_FIELD_ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {RoleDisplayNames[role]}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={18} aria-hidden="true" />
-                </span>
-              </div>
-              <label className={u.check}>
-                <input
-                  type="checkbox"
-                  checked={form.isIBO}
-                  onChange={(event) => setForm((prev) => ({ ...prev, isIBO: event.target.checked }))}
-                />
-                Include IBO business items
-              </label>
-              <button type="submit" className={`${s.btnPrimary} ${r.submit}`} disabled={saving}>
-                {saving ? <Loader2 size={20} className={u.spin} aria-hidden="true" /> : <Send size={20} aria-hidden="true" />}
-                {saving ? 'Sending…' : 'Send invite'}
-              </button>
-            </form>
-
-            {latestInviteUrl && (
-              <div className={r.ready} role="status">
-                <p className={r.readyTitle}>
-                  <CheckCircle2 size={18} aria-hidden="true" />
-                  Invite link ready
-                </p>
-                <p className={r.readyUrl}>{latestInviteUrl}</p>
-                <div className={u.btnRow}>
-                  <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={copyLatestInvite}>
-                    <Link2 size={18} aria-hidden="true" />
-                    {copied ? 'Copied' : 'Copy Link'}
-                  </button>
-                  <a
-                    className={`${s.btnSecondary} ${u.sm}`}
-                    href={latestInviteUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <ExternalLink size={16} aria-hidden="true" />
-                    Open
-                  </a>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+      {children}
 
       <section className={s.panel} aria-labelledby="recruiting-open-heading">
         <div className={`${s.panelHead} ${u.band}`}>

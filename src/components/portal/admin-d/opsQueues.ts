@@ -6,7 +6,6 @@ import { auth } from '@/lib/firebase/config';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import {
   ONBOARDING_HUB,
-  PEOPLE_HUB,
   REQUEST_TABS,
   REQUESTS_HUB,
   canOpenHubTab,
@@ -15,11 +14,13 @@ import {
 } from './adminHubs';
 import { fetchOpenRequests } from './openRequests';
 
-// The admin work queues (what Ops Home used to list): the Onboarding tabs, the
-// Requests types and new signups. One loader and one cache feed Home's Needs
-// attention (the onboarding rows), the Requests switcher counts and the nav
+// The admin work queues (what Ops Home used to list): Hiring's To do groups,
+// the pipeline and the Requests types. One loader and one cache feed Home's
+// Needs attention (the hiring rows), the Requests switcher counts and the nav
 // badges, so a page and its badges never disagree and a page change does not
-// refetch everything.
+// refetch everything. Every To do card counts what that tab's header counts:
+// things waiting on you (people to review, invites to activate, applicants to
+// invite, sign-ups to give a role).
 
 export interface QueueCard {
   key: string;
@@ -34,6 +35,11 @@ export interface QueueCard {
   /** null when the queue has no per-item timestamps (pipeline, signups). */
   newToday: number | null;
   error: boolean;
+  /**
+   * false: listed on Home but not waiting on anyone (the pipeline), so it adds
+   * to no nav badge, tab count or waiting total.
+   */
+  badge?: boolean;
 }
 
 type QueueFigures = Pick<QueueCard, 'count' | 'oldestWaitMs' | 'newToday'>;
@@ -43,14 +49,16 @@ interface QueueSource {
   label: string;
   hub: HubConfig;
   tab: string;
-  load: () => Promise<QueueFigures>;
+  badge?: boolean;
+  /** `get` reads an API once per load, so two queues on one endpoint share the call. */
+  load: (get: (url: string) => Promise<Record<string, unknown>>) => Promise<QueueFigures>;
 }
 
 const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 /** Cached queues older than this reload when a page that shows them mounts. */
 const STALE_MS = 60_000;
 
-async function authedJson(url: string) {
+async function authedJson(url: string): Promise<Record<string, unknown>> {
   const token = await auth?.currentUser?.getIdToken();
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token ?? ''}` } });
   const json = await res.json();
@@ -74,25 +82,50 @@ function figuresFrom(times: (string | null | undefined)[]): QueueFigures {
 const SOURCES: QueueSource[] = [
   {
     key: 'onboarding',
-    label: 'Onboarding review',
+    label: 'Documents to check',
     hub: ONBOARDING_HUB,
     tab: 'todo',
-    load: async () => {
+    load: async (get) => {
       // Counts only: the summary read skips the review history and signed file URLs.
-      const json = await authedJson('/api/portal/onboarding/review?summary=1');
-      const rows: { submittedAt?: string | null }[] = Array.isArray(json.submissions) ? json.submissions : [];
-      return figuresFrom(rows.map((row) => row.submittedAt));
+      const json = await get('/api/portal/onboarding/review?summary=1');
+      const rows: { userId?: string; submittedAt?: string | null }[] = Array.isArray(json.submissions)
+        ? json.submissions
+        : [];
+      // One per person (To do lists people), aged by their oldest waiting upload.
+      const oldest = new Map<string, string | null>();
+      for (const row of rows) {
+        const key = row.userId ?? '';
+        const time = row.submittedAt ?? null;
+        const seen = oldest.get(key);
+        if (!oldest.has(key) || (time && (!seen || time < seen))) oldest.set(key, time);
+      }
+      return figuresFrom([...oldest.values()]);
     },
   },
   {
     key: 'recruiting',
-    label: 'Onboarding invites',
+    label: 'Ready to activate',
     hub: ONBOARDING_HUB,
-    tab: 'recruits',
-    load: async () => {
-      const json = await authedJson('/api/portal/recruiting/invites');
+    tab: 'todo',
+    load: async (get) => {
+      const json = await get('/api/portal/recruiting/invites');
       const invites: { status?: string; submittedAt?: string | null }[] = Array.isArray(json.invites) ? json.invites : [];
       return figuresFrom(invites.filter((invite) => invite.status === 'submitted').map((invite) => invite.submittedAt));
+    },
+  },
+  {
+    key: 'applicants',
+    label: 'New website applicants',
+    hub: ONBOARDING_HUB,
+    tab: 'todo',
+    load: async (get) => {
+      const json = await get('/api/portal/recruiting/invites');
+      const applications: { status?: string; createdAt?: string | null }[] = Array.isArray(json.applications)
+        ? json.applications
+        : [];
+      return figuresFrom(
+        applications.filter((application) => application.status === 'applied').map((application) => application.createdAt)
+      );
     },
   },
   {
@@ -100,9 +133,10 @@ const SOURCES: QueueSource[] = [
     label: 'Onboarding pipeline',
     hub: ONBOARDING_HUB,
     tab: 'pipeline',
-    load: async () => {
-      const json = await authedJson('/api/portal/pipeline');
-      const counts: Record<string, number> = json.counts || {};
+    badge: false,
+    load: async (get) => {
+      const json = await get('/api/portal/pipeline');
+      const counts = (json.counts ?? {}) as Record<string, number>;
       // No per-rep timestamp is fetched here, so age/newToday stay null rather than fabricated.
       const count = (counts.processing ?? 0) + (counts.need_logins ?? 0) + (counts.cleared_to_sell ?? 0);
       return { count, oldestWaitMs: null, newToday: null };
@@ -141,6 +175,15 @@ async function loadQueues(viewer: string) {
   const keys = viewer.slice(viewer.indexOf(':') + 1).split(',');
   const sources = SOURCES.filter((source) => keys.includes(source.key));
   publish({ ...(snapshot.viewer === viewer ? snapshot : { cards: null, refreshedAt: null }), viewer, loading: true });
+  const reads = new Map<string, Promise<Record<string, unknown>>>();
+  const get = (url: string) => {
+    let read = reads.get(url);
+    if (!read) {
+      read = authedJson(url);
+      reads.set(url, read);
+    }
+    return read;
+  };
   const cards = await Promise.all(
     sources.map(async (source): Promise<QueueCard> => {
       const base = {
@@ -149,9 +192,10 @@ async function loadQueues(viewer: string) {
         href: hubTabHref(source.hub, source.tab),
         hub: source.hub.href,
         tab: source.tab,
+        ...(source.badge === false ? { badge: false } : {}),
       };
       try {
-        return { ...base, ...(await source.load()), error: false };
+        return { ...base, ...(await source.load(get)), error: false };
       } catch {
         return { ...base, count: 0, oldestWaitMs: null, newToday: null, error: true };
       }
@@ -185,7 +229,7 @@ export interface OpsQueues {
 
 /**
  * The work queues the viewer can open (each under its hub tab's gate), plus
- * new signups for admins. Loads on mount when the cache is stale.
+ * sign-ups waiting for a role for admins. Loads on mount when the cache is stale.
  */
 export function useOpsQueues(): OpsQueues {
   const { user, isRole, hasPermission } = useAuth();
@@ -215,10 +259,10 @@ export function useOpsQueues(): OpsQueues {
     if (!showSignups) return loaded;
     const signupRow: QueueCard = {
       key: 'signups',
-      label: 'New signups',
-      href: hubTabHref(PEOPLE_HUB, 'everyone'),
-      hub: PEOPLE_HUB.href,
-      tab: 'everyone',
+      label: 'Sign-ups waiting for a role',
+      href: hubTabHref(ONBOARDING_HUB, 'todo'),
+      hub: ONBOARDING_HUB.href,
+      tab: 'todo',
       count: signups,
       oldestWaitMs: null,
       newToday: null,
@@ -230,28 +274,33 @@ export function useOpsQueues(): OpsQueues {
   return { cards, loading: mine?.loading ?? Boolean(viewer), refreshedAt: mine?.refreshedAt ?? null, refresh };
 }
 
-/** Open items per hub page, for the nav badges (People, Onboarding, Requests). */
+/** Things waiting on you per hub page, for the nav badges (Hiring, Requests). */
 export function useAdminNavCounts(): Record<string, number> {
   const { cards } = useOpsQueues();
   return useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const card of cards ?? []) counts[card.hub] = (counts[card.hub] ?? 0) + card.count;
+    for (const card of cards ?? []) {
+      if (card.badge !== false) counts[card.hub] = (counts[card.hub] ?? 0) + card.count;
+    }
     return counts;
   }, [cards]);
 }
 
 /**
- * Open items per tab of one hub (Onboarding's Review / Invites / Pipeline, the
- * Requests types), from the same cache as the nav badges, so the tabs add up to
- * the page's badge. undefined until the first load; a queue that failed to load
- * has no entry rather than a zero.
+ * Things waiting on you per tab of one hub (Hiring's To do, the Requests
+ * types), from the same cache as the nav badges, so the tabs add up to the
+ * page's badge. undefined until the first load; a tab whose queues all failed
+ * (or that waits on no one, like Pipeline) has no entry rather than a zero.
  */
 export function useHubTabCounts(hub: HubConfig): Record<string, number> | undefined {
   const { cards } = useOpsQueues();
   return useMemo(() => {
     if (!cards) return undefined;
     const counts: Record<string, number> = {};
-    for (const card of cards) if (card.hub === hub.href && !card.error) counts[card.tab] = card.count;
+    for (const card of cards) {
+      if (card.hub !== hub.href || card.error || card.badge === false) continue;
+      counts[card.tab] = (counts[card.tab] ?? 0) + card.count;
+    }
     return counts;
   }, [cards, hub.href]);
 }

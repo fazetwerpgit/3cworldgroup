@@ -12,10 +12,11 @@ import { Todo } from './Todo';
 
 // Hiring: To do (everything waiting on the owner), Recruits (invites and
 // website applicants) and Pipeline, each under its old gate, so a manager sees
-// only Recruits. Each tab shows its own open items (they add up to the nav
-// badge) and a bare visit opens the first tab that has any. Old tab keys
-// (review, invites, applicants) redirect via ONBOARDING_HUB.aliases;
-// /portal/admin/recruiting and /pipeline redirect to their tab (next.config.ts).
+// only Recruits. Only To do carries a count: the things waiting on you, the
+// same figure as the Hiring nav badge (opsQueues); Recruits and Pipeline wait
+// on no one. Old tab keys (review, invites, applicants) redirect via
+// ONBOARDING_HUB.aliases; /portal/admin/recruiting and /pipeline redirect to
+// their tab (next.config.ts).
 function Hiring() {
   const tab = useSearchParams().get(ONBOARDING_HUB.param);
   const { refresh } = useOpsQueues();

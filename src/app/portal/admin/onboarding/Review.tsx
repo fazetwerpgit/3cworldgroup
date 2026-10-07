@@ -84,19 +84,6 @@ function isNew(person: Person) {
   return person.toReview + person.unsigned > 0;
 }
 
-/**
- * Waiting on management, not the rep: an upload to check, or a signing
- * document not sent yet (its next step is Send for signature).
- */
-function waitsOnYou(person: Person) {
-  return (
-    person.toReview > 0 ||
-    person.items.some(
-      (item) => item.status === 'submitted' && !item.onHold && isEsignItem(item.itemId) && !item.esignEnvelopeId
-    )
-  );
-}
-
 function waitLabel(submittedAt: string | null): string {
   if (!submittedAt) return 'unknown wait';
   const ms = Date.now() - new Date(submittedAt).getTime();
@@ -194,7 +181,7 @@ interface ReviewProps {
   focus?: boolean;
   /** Hosted inside To do, which shows its own title and activation tasks. */
   embedded?: boolean;
-  /** People shown in focus mode once loaded; null when the list failed to load. */
+  /** People with an upload waiting on review, once loaded; null when the list failed to load. */
   onWaiting?: (count: number | null) => void;
 }
 
@@ -361,11 +348,13 @@ export function Review({ onChanged, focus = false, embedded = false, onWaiting }
     }
   };
 
-  // Focus: anyone something is waiting on, plus a deep-linked person.
+  // Focus: people with an upload waiting on review (what the Hiring badge
+  // counts), plus a deep-linked person.
   const waiting = useMemo(
-    () => people.filter((person) => waitsOnYou(person) || person.userId === personParam),
+    () => people.filter((person) => person.toReview > 0 || person.userId === personParam),
     [people, personParam]
   );
+  const toReviewPeople = people.filter((person) => person.toReview > 0).length;
 
   const visible = useMemo(
     () =>
@@ -379,8 +368,8 @@ export function Review({ onChanged, focus = false, embedded = false, onWaiting }
   );
 
   useEffect(() => {
-    if (!loading) onWaiting?.(loadFailed ? null : waiting.length);
-  }, [loading, loadFailed, waiting, onWaiting]);
+    if (!loading) onWaiting?.(loadFailed ? null : toReviewPeople);
+  }, [loading, loadFailed, toReviewPeople, onWaiting]);
 
   // A deep link opens the person's checklist once their row is loaded. In the
   // full view it also widens the filter when they are not under New.

@@ -182,9 +182,9 @@ export interface AdminTabOption {
 }
 
 /**
- * A hub's tab strip: the portal's canonical segmented tabs. Wider than the
- * screen (Requests has six) it scrolls sideways with a fade at each edge that
- * has more, and keeps the selected tab in view.
+ * A hub's tab strip: the portal's canonical segmented tabs. On a phone, wider
+ * than the screen it scrolls sideways with a fade at each edge that has more,
+ * and keeps the selected tab in view; on desktop it wraps onto more rows.
  */
 export function AdminTabs({
   label,

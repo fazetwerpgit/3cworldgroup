@@ -96,6 +96,14 @@
 }
 
 /* ---------- invite form ---------- */
+/* Closed: one button and its sentence on a line; the form opens in place. */
+.inviteBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s4);
+}
+
 .formWrap {
   max-width: 640px;
 }

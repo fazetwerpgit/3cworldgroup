@@ -28,7 +28,7 @@ type ProgressData = FirebaseFirestore.DocumentData;
 // their whole checklist (items never started included), reps with something
 // waiting first. `submissions`: the flat review queue (submitted, not e-sign),
 // oldest first; the admin dashboard counts it. `?summary=1` returns only the
-// waiting items' submittedAt, for counts.
+// waiting items' userId and submittedAt, for counts (the badge counts people).
 export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
       );
       const submissions = rows
         .filter((row) => existing.has(row.userId))
-        .map((row) => ({ submittedAt: row.submittedAt }));
+        .map((row) => ({ userId: row.userId, submittedAt: row.submittedAt }));
       return NextResponse.json({ submissions });
     }
 

@@ -1176,19 +1176,24 @@
   color: var(--c-amber);
 }
 
-/* Desktop: content-sized tabs, each at least 140px, as the canonical rep-page tabs. The
-   strip still scrolls (with its fades) if the tabs outgrow the page. */
+/* Desktop: content-sized tabs, each at least 140px, as the canonical rep-page tabs. When
+   they outgrow the page (Admin settings has eight) they wrap onto more rows rather than
+   scroll, so every tab and the selected one stay in sight; each row's tabs grow to fill
+   it so the 1px dividers stay a clean grid. */
 @media (min-width: 1024px) {
   .tabsWrap {
     align-self: flex-start;
     max-width: 100%;
+    --fade-l: 0px;
+    --fade-r: 0px;
   }
   .tabsWrap .tabsScroll {
+    flex-wrap: wrap;
     width: auto;
     max-width: 100%;
+    overflow: hidden;
   }
   .tabsWrap .tabItem {
-    flex: none;
-    min-width: 140px;
+    flex: 1 0 140px;
   }
 }

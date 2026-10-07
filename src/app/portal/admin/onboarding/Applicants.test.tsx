@@ -161,7 +161,7 @@ it('offers Invite only on new rows and fills the invite form on the same tab', a
   expect(target.searchParams.get('tab')).toBe('recruits');
   expect(nav.push).not.toHaveBeenCalled();
 
-  // The form above picks up the new URL and fills from the applicant.
+  // The form above opens on the new URL, filled from the applicant.
   nav.params = target.searchParams;
   await mount(<Recruits />, () => container.querySelector<HTMLInputElement>('#invite-name')?.value);
 
@@ -174,4 +174,27 @@ it('offers Invite only on new rows and fills the invite form on the same tab', a
   expect(document.activeElement?.id).toBe('invite-name');
   // The handed-over id leaves the URL, so a reload starts with an empty form.
   expect(nav.replace).toHaveBeenLastCalledWith('/portal/admin/onboarding?tab=recruits', { scroll: false });
+});
+
+it('keeps the invite form closed until asked, and Cancel closes and clears it', async () => {
+  const button = (label: string) =>
+    [...container.querySelectorAll('button')].find((node) => node.textContent === label) as HTMLButtonElement;
+  expect(container.querySelector('#invite-form')).toBeNull();
+  // Applications come before the invite lists.
+  const headings = [...container.querySelectorAll('h2')].map((node) => node.textContent);
+  expect(headings.indexOf('Website applications')).toBeLessThan(headings.indexOf('Open invites'));
+
+  await click(button('Send an invite'));
+  const name = container.querySelector<HTMLInputElement>('#invite-name')!;
+  expect(document.activeElement).toBe(name);
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  await act(async () => {
+    setValue.call(name, 'Typed Name');
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  await click(button('Cancel'));
+  expect(container.querySelector('#invite-form')).toBeNull();
+  await click(button('Send an invite'));
+  expect(container.querySelector<HTMLInputElement>('#invite-name')?.value).toBe('');
 });

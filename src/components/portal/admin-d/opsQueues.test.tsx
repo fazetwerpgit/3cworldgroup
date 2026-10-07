@@ -25,7 +25,8 @@ vi.mock('@/hooks/admin/usePendingSignupsCount', () => ({
   usePendingSignupsCount: (enabled: boolean) => (enabled ? 4 : 0),
 }));
 
-import { useAdminNavCounts, useOpsQueues, type OpsQueues } from './opsQueues';
+import { useAdminNavCounts, useHubTabCounts, useOpsQueues, type OpsQueues } from './opsQueues';
+import { ONBOARDING_HUB } from './adminHubs';
 
 const HOUR = 1000 * 60 * 60;
 const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
@@ -33,9 +34,30 @@ const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
 function respond(url: string) {
   const path = url.split('?')[0];
   if (state.failing.has(path)) return { ok: false, body: { error: 'nope' } };
-  if (path === '/api/portal/onboarding/review') return { ok: true, body: { submissions: [{ submittedAt: ago(HOUR) }] } };
+  // u1 has two uploads waiting, u2 one: two people.
+  if (path === '/api/portal/onboarding/review')
+    return {
+      ok: true,
+      body: {
+        submissions: [
+          { userId: 'u1', submittedAt: ago(30 * HOUR) },
+          { userId: 'u1', submittedAt: ago(HOUR) },
+          { userId: 'u2', submittedAt: ago(2 * HOUR) },
+        ],
+      },
+    };
   if (path === '/api/portal/recruiting/invites')
-    return { ok: true, body: { invites: [{ status: 'submitted', submittedAt: ago(3 * 24 * HOUR) }, { status: 'invited' }] } };
+    return {
+      ok: true,
+      body: {
+        invites: [{ status: 'submitted', submittedAt: ago(3 * 24 * HOUR) }, { status: 'invited' }],
+        applications: [
+          { status: 'applied', createdAt: ago(HOUR) },
+          { status: 'applied', createdAt: ago(2 * 24 * HOUR) },
+          { status: 'invited', createdAt: ago(HOUR) },
+        ],
+      },
+    };
   if (path === '/api/portal/pipeline') return { ok: true, body: { counts: { processing: 2, need_logins: 1 } } };
   // Every request type: one open item, one handled.
   return { ok: true, body: { submissions: [{ status: 'new', createdAt: ago(2 * HOUR) }, { status: 'handled' }] } };
@@ -46,10 +68,10 @@ const fetchMock = vi.fn(async (url: string) => {
   return { ok, json: async () => body } as Response;
 });
 
-type Seen = { queues: OpsQueues; counts: Record<string, number> };
+type Seen = { queues: OpsQueues; counts: Record<string, number>; tabs: Record<string, number> | undefined };
 let seen: Seen | null = null;
 function Probe({ onRender }: { onRender: (value: Seen) => void }) {
-  onRender({ queues: useOpsQueues(), counts: useAdminNavCounts() });
+  onRender({ queues: useOpsQueues(), counts: useAdminNavCounts(), tabs: useHubTabCounts(ONBOARDING_HUB) });
   return null;
 }
 
@@ -84,11 +106,12 @@ afterEach(() => {
 });
 
 describe('useOpsQueues', () => {
-  it('gives an admin every queue in menu order, then new signups, each linking to its tab', async () => {
-    const { queues, counts } = await renderAs({ role: 'admin' });
+  it('gives an admin every queue in menu order, then sign-ups, each linking to its tab', async () => {
+    const { queues, counts, tabs } = await renderAs({ role: 'admin' });
     expect(queues.cards?.map((card) => card.label)).toEqual([
-      'Onboarding review',
-      'Onboarding invites',
+      'Documents to check',
+      'Ready to activate',
+      'New website applicants',
       'Onboarding pipeline',
       'Payroll disputes',
       'Expedite orders',
@@ -96,27 +119,33 @@ describe('useOpsQueues', () => {
       'Fiber reports',
       'Manager interviews',
       'Bug reports',
-      'New signups',
+      'Sign-ups waiting for a role',
     ]);
     const byKey = Object.fromEntries(queues.cards!.map((card) => [card.key, card]));
-    expect(byKey.recruiting).toMatchObject({ href: '/portal/admin/onboarding?tab=recruits', count: 1, newToday: 0 });
+    // People, not uploads: u1's two uploads count once, aged by the older one.
+    expect(byKey.onboarding).toMatchObject({ href: '/portal/admin/onboarding?tab=todo', count: 2, newToday: 1 });
+    expect(byKey.onboarding.oldestWaitMs).toBeGreaterThan(29 * HOUR);
+    expect(byKey.recruiting).toMatchObject({ href: '/portal/admin/onboarding?tab=todo', count: 1, newToday: 0 });
     expect(byKey.recruiting.oldestWaitMs).toBeGreaterThan(2 * 24 * HOUR);
-    expect(byKey.pipeline).toMatchObject({ count: 3, newToday: null, oldestWaitMs: null });
+    expect(byKey.applicants).toMatchObject({ href: '/portal/admin/onboarding?tab=todo', count: 2, newToday: 1 });
+    expect(byKey.pipeline).toMatchObject({ count: 3, newToday: null, oldestWaitMs: null, badge: false });
     expect(byKey['bug-reports']).toMatchObject({ href: '/portal/admin/requests?type=bug-reports', count: 1, newToday: 1 });
-    expect(byKey.signups).toMatchObject({ href: '/portal/admin/people?tab=everyone', count: 4 });
-    // Nav badges: open items per hub page.
+    expect(byKey.signups).toMatchObject({ href: '/portal/admin/onboarding?tab=todo', count: 4 });
+    // The two invites queues share one call.
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/portal/recruiting/invites')).toHaveLength(1);
+    // Nav badge and To do tab: things waiting on you; the pipeline adds to neither.
     expect(counts).toEqual({
-      '/portal/admin/onboarding': 1 + 1 + 3,
+      '/portal/admin/onboarding': 2 + 1 + 2 + 4,
       '/portal/admin/requests': 6,
-      '/portal/admin/people': 4,
     });
+    expect(tabs).toEqual({ todo: 2 + 1 + 2 + 4 });
   });
 
-  it('asks a manager only for the queue their Invites tab shows', async () => {
+  it('asks a manager for nothing: their Recruits tab shows no count', async () => {
     const { queues, counts } = await renderAs({ fieldRole: 'l1_manager' });
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/portal/recruiting/invites']);
-    expect(queues.cards?.map((card) => card.key)).toEqual(['recruiting']);
-    expect(counts).toEqual({ '/portal/admin/onboarding': 1 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(queues.cards).toBeNull();
+    expect(counts).toEqual({});
   });
 
   it('asks a rep for nothing', async () => {

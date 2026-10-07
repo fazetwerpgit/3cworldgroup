@@ -4,12 +4,13 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firestore';
-import { ChevronRight, UserPlus } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Loader2, UserPlus } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
 import {
   AdminEmpty,
   AdminFailed,
   AdminGate,
+  AdminNotice,
   AdminPageHead,
   AdminSkeletonRows,
   StatusDot,
@@ -29,18 +30,32 @@ import { db } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { interestLabels } from '@/lib/forms/applicationInterests';
 import { displayPhone, telHref } from '@/lib/phone';
-import type { ApplicationRecord } from '@/types';
+import { RoleDisplayNames, type ApplicationRecord } from '@/types';
+import { ONBOARDING_ITEMS } from '@/types/onboarding';
+import type { InviteView } from './Invites';
 import { CHECKLIST_STATUS_LEGEND, Review } from './Review';
 
 // To do: everything in hiring that waits on the owner, one group per kind of
-// work. Each group reads the same data as the screen that owns it (the People
-// pending list, Review, the recruiting API, the activation queue) under that
-// screen's gate, and hides when it has nothing.
+// work. Each group reads the same data as the screen that owns it (the pending
+// sign-ups query, Review, the recruiting API) and hides when it has nothing.
+// "N waiting on you" adds up exactly what the Hiring nav badge and this tab's
+// count add up (opsQueues): sign-ups, people with documents to check, invites
+// ready to activate, new applicants. The portal's alerts are shown as
+// information and left out of that total.
 
 /** undefined while loading, null when the group failed to load. */
 type GroupCount = number | null | undefined;
 
 const APPLICANTS_SHOWN = 10;
+
+// The recruiting routes verify the caller from the ID token.
+async function authHeaders(json = false): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return {
+    ...(json ? { 'Content-Type': 'application/json' } : {}),
+    Authorization: `Bearer ${token ?? ''}`,
+  };
+}
 
 function shortDate(value: Date | string | null | undefined): string {
   if (!value) return '';
@@ -48,6 +63,15 @@ function shortDate(value: Date | string | null | undefined): string {
   return Number.isNaN(date.getTime())
     ? ''
     : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatMissingItems(missing: unknown): string {
+  return Array.isArray(missing) && missing.length > 0
+    ? missing
+        .map(String)
+        .map((id) => ONBOARDING_ITEMS.find((item) => item.id === id)?.label ?? id)
+        .join(', ')
+    : '';
 }
 
 function Group({
@@ -61,7 +85,7 @@ function Group({
 }: {
   id: string;
   title: string;
-  count: GroupCount;
+  count?: GroupCount;
   explain: ReactNode;
   action?: ReactNode;
   hidden?: boolean;
@@ -82,19 +106,31 @@ function Group({
   );
 }
 
+function PersonText({ name, sub, extra }: { name: string; sub: ReactNode; extra?: ReactNode }) {
+  return (
+    <span className={u.person}>
+      <span className={u.personText}>
+        <span className={u.personName}>
+          <span>{name}</span>
+        </span>
+        <span className={u.personSub}>{sub}</span>
+        {extra}
+      </span>
+    </span>
+  );
+}
+
 interface Signup {
   uid: string;
   name: string;
   email: string;
-  /** Already given a field role: accepting happens on their member record. */
-  hasRole: boolean;
   createdAt: Date | null;
 }
 
 /**
- * Self-signups awaiting approval: the People page's pending list, read with the
- * same live query as the pending-signups badge (needs the admin/operations
- * read rule, so only mounted behind the Everyone tab's gate).
+ * Self-signups with no role yet: the same live query and filter as the
+ * pending-signups badge (needs the admin/operations read rule, so only
+ * mounted for viewers who pass the badge's gate).
  */
 function Signups({ onCount }: { onCount: (count: number | null) => void }) {
   const [signups, setSignups] = useState<Signup[] | null>(null);
@@ -110,7 +146,7 @@ function Signups({ onCount }: { onCount: (count: number | null) => void }) {
       pendingQuery,
       (snapshot) => {
         const rows = snapshot.docs
-          .filter((doc) => !doc.get('suspectedBot'))
+          .filter((doc) => !doc.get('fieldRole') && !doc.get('suspectedBot'))
           .map((doc): Signup => {
             const created: unknown = doc.get('createdAt');
             const email = String(doc.get('email') ?? '');
@@ -118,7 +154,6 @@ function Signups({ onCount }: { onCount: (count: number | null) => void }) {
               uid: doc.id,
               name: String(doc.get('displayName') || email || 'Unnamed sign-up'),
               email,
-              hasRole: Boolean(doc.get('fieldRole')),
               createdAt: created instanceof Timestamp ? created.toDate() : null,
             };
           })
@@ -143,28 +178,16 @@ function Signups({ onCount }: { onCount: (count: number | null) => void }) {
       <ul className={u.rows}>
         {signups.map((signup) => (
           <li key={signup.uid} className={`${u.row} ${t.row}`}>
-            <span className={u.person}>
-              <span className={u.personText}>
-                <span className={u.personName}>
-                  <span>{signup.name}</span>
-                </span>
-                <span className={u.personSub}>
-                  {[signup.email !== signup.name ? signup.email : '', signup.createdAt ? `signed up ${shortDate(signup.createdAt)}` : '']
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </span>
-            </span>
+            <PersonText
+              name={signup.name}
+              sub={[signup.email !== signup.name ? signup.email : '', signup.createdAt ? `signed up ${shortDate(signup.createdAt)}` : '']
+                .filter(Boolean)
+                .join(' · ')}
+            />
             <span className={t.rowAction}>
-              {signup.hasRole ? (
-                <Link href={`/portal/admin/users/${signup.uid}`} className={`${s.btnSecondary} ${u.sm}`}>
-                  Open profile to accept
-                </Link>
-              ) : (
-                <Link href={PEOPLE_HUB.href} className={`${s.btnSecondary} ${u.sm}`}>
-                  Assign role
-                </Link>
-              )}
+              <Link href={PEOPLE_HUB.href} className={`${s.btnSecondary} ${u.sm}`}>
+                Assign role
+              </Link>
             </span>
           </li>
         ))}
@@ -173,117 +196,123 @@ function Signups({ onCount }: { onCount: (count: number | null) => void }) {
   );
 }
 
-/** Website applications not yet invited, from the recruiting API the Recruits tab reads. */
-function Applicants({ onCount }: { onCount: (count: number | null) => void }) {
+interface Recruiting {
+  /** Invites whose paperwork is in: waiting on Activate. */
+  ready: InviteView[];
+  /** Website applications not invited yet, newest first. */
+  applied: ApplicationRecord[];
+}
+
+/** One read of the recruiting API the Recruits tab uses, for both of its groups. */
+function useRecruiting() {
   const { user } = useAuth();
-  const [applied, setApplied] = useState<ApplicationRecord[] | null>(null);
+  const [data, setData] = useState<Recruiting | null>(null);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      const token = await getIdToken();
-      const response = await fetch('/api/portal/recruiting/invites', {
-        headers: { Authorization: `Bearer ${token ?? ''}` },
-      });
+      const response = await fetch('/api/portal/recruiting/invites', { headers: await authHeaders() });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to load applications');
-      const rows = (Array.isArray(json.applications) ? (json.applications as ApplicationRecord[]) : [])
-        .filter((application) => application.status === 'applied')
-        // Newest first.
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setApplied(rows);
-      onCount(rows.length);
+      if (!response.ok) throw new Error(json.error || 'Failed to load recruiting');
+      const invites: InviteView[] = Array.isArray(json.invites) ? json.invites : [];
+      const applications: ApplicationRecord[] = Array.isArray(json.applications) ? json.applications : [];
+      setData({
+        ready: invites
+          .filter((invite) => invite.status === 'submitted')
+          // Longest wait first.
+          .sort((a, b) => new Date(a.submittedAt ?? 0).getTime() - new Date(b.submittedAt ?? 0).getTime()),
+        applied: applications
+          .filter((application) => application.status === 'applied')
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+      });
+      setFailed(false);
     } catch {
       setFailed(true);
-      onCount(null);
     }
-  }, [user, onCount]);
+  }, [user]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (failed) {
-    return (
-      <AdminFailed
-        what="applicants"
-        onRetry={() => {
-          setFailed(false);
-          void load();
-        }}
-      />
-    );
-  }
-  if (!applied) return <AdminSkeletonRows rows={2} label="Loading applicants" />;
-  return (
-    <div className={s.panel}>
-      <ul className={u.rows}>
-        {applied.slice(0, APPLICANTS_SHOWN).map((application) => {
-          const interests = interestLabels(application.interests);
-          return (
-            <li key={application.id} className={`${u.row} ${t.row}`}>
-              <span className={u.person}>
-                <span className={u.personText}>
-                  <span className={u.personName}>
-                    <span>{application.name}</span>
-                  </span>
-                  <span className={u.personSub}>
-                    {application.city ? `${application.city} · ` : ''}
-                    <a className={`${u.num} ${t.phone}`} href={telHref(application.phone)}>
-                      {displayPhone(application.phone)}
-                    </a>
-                    {application.createdAt ? ` · applied ${shortDate(application.createdAt)}` : ''}
-                  </span>
-                  {interests ? <span className={u.personSub}>Interested in {interests}</span> : null}
-                </span>
-              </span>
-              <span className={t.rowAction}>
-                <Link
-                  href={`${hubTabHref(ONBOARDING_HUB, 'recruits')}&application=${encodeURIComponent(application.id)}`}
-                  className={`${s.btnSecondary} ${u.sm}`}
-                  aria-label={`Invite ${application.name}`}
-                >
-                  <UserPlus size={16} aria-hidden="true" />
-                  Invite
-                </Link>
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
+  return { data, failed, load };
 }
 
 export function Todo({ onChanged }: { onChanged?: () => void }) {
   const { isRole, hasPermission } = useAuth();
   // A ?person= link opens that person's checklist inside Documents to check.
   const linkedPerson = useSearchParams().get('person');
-  // Each group keeps the gate of the screen it comes from.
+  // Sign-ups: the badge's gate (admins approve sign-ups) on top of the People
+  // page's, whose pending list this is.
   const everyoneTab = PEOPLE_HUB.tabs.find((tab) => tab.key === 'everyone');
-  const canSeeSignups = everyoneTab ? canOpenHubTab(everyoneTab, isRole, hasPermission) : false;
+  const canSeeSignups =
+    isRole('admin') && (everyoneTab ? canOpenHubTab(everyoneTab, isRole, hasPermission) : false);
   const canSeeApplicants = isRole(...RECRUITING_ROLES);
 
   const [signups, setSignups] = useState<GroupCount>();
   const [documents, setDocuments] = useState<GroupCount>();
-  const [applicants, setApplicants] = useState<GroupCount>();
   const [followUps, setFollowUps] = useState<GroupCount>();
+  const recruiting = useRecruiting();
   // In place: the full checklist with its New / Handled / All filters.
   const [showAll, setShowAll] = useState(false);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
-  const counts = [
+  const ready: GroupCount = recruiting.failed ? null : recruiting.data?.ready.length;
+  const applicants: GroupCount = recruiting.failed ? null : recruiting.data?.applied.length;
+
+  // What "waiting on you" adds up; the alerts below are information only.
+  const counted = [
     ...(canSeeSignups ? [signups] : []),
     documents,
+    ready,
     ...(canSeeApplicants ? [applicants] : []),
-    followUps,
   ];
-  const loading = counts.some((count) => count === undefined);
-  const waitingTotal = counts.reduce<number>((sum, count) => sum + (count ?? 0), 0);
-  // A group shows once it has something or failed; failures say so with a retry.
+  const loading = [...counted, followUps].some((count) => count === undefined);
+  const waitingTotal = counted.reduce<number>((sum, count) => sum + (count ?? 0), 0);
+  // A group shows once it has something or failed; failures say so.
   const shows = (count: GroupCount) => count === null || (count ?? 0) > 0;
   const showDocuments = showAll || shows(documents) || Boolean(linkedPerson);
-  const nothingWaiting = !loading && counts.every((count) => count === 0) && !showAll;
+  const nothingWaiting = !loading && counted.every((count) => count === 0) && !showAll;
+
+  const activate = async (invite: InviteView) => {
+    setActivatingId(invite.id);
+    setNotice(null);
+    try {
+      const response = await fetch('/api/portal/recruiting/convert', {
+        method: 'POST',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ inviteId: invite.id, action: 'approved' }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 409) {
+          const missing = formatMissingItems(json.missing);
+          throw new Error(
+            missing
+              ? `Can't activate ${invite.candidateName} yet. Missing: ${missing}`
+              : `Can't activate ${invite.candidateName} yet. Required onboarding items are missing.`
+          );
+        }
+        throw new Error(typeof json.error === 'string' ? json.error : 'Failed to activate');
+      }
+      setNotice({ tone: 'ok', text: `${invite.candidateName} is activated.` });
+      await recruiting.load();
+      onChanged?.();
+    } catch (err) {
+      setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'Failed to activate' });
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
+  const recruitingState = (what: string) =>
+    recruiting.failed ? (
+      <AdminFailed what={what} onRetry={() => void recruiting.load()} />
+    ) : (
+      <AdminSkeletonRows rows={2} label={`Loading ${what}`} />
+    );
 
   const showAllButton = (
     <button type="button" className={s.textBtn} onClick={() => setShowAll(true)}>
@@ -304,6 +333,12 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
             )
           }
         />
+
+        {notice ? (
+          <AdminNotice tone={notice.tone} onDismiss={() => setNotice(null)}>
+            {notice.text}
+          </AdminNotice>
+        ) : null}
 
         {loading ? <AdminSkeletonRows rows={3} label="Loading what's waiting" /> : null}
 
@@ -326,7 +361,7 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
           explain={
             showAll
               ? 'Everyone going through onboarding and where each one is. Tap a person to see their list.'
-              : 'New hires uploaded or signed these. Approve them, or ask them to fix something.'
+              : 'New hires uploaded these. Approve them, or ask them to fix something. The number is people.'
           }
           action={
             showAll ? (
@@ -355,6 +390,56 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
           <Review focus={!showAll} embedded onChanged={onChanged} onWaiting={setDocuments} />
         </Group>
 
+        <Group
+          id="todo-activate"
+          title="Ready to activate"
+          count={ready}
+          explain="They finished their paperwork. Activate them so they can start selling."
+          hidden={!shows(ready)}
+        >
+          {recruiting.data && !recruiting.failed ? (
+            <div className={s.panel}>
+              <ul className={u.rows}>
+                {recruiting.data.ready.map((invite) => {
+                  const busy = activatingId === invite.id;
+                  return (
+                    <li key={invite.id} className={`${u.row} ${t.row}`}>
+                      <PersonText
+                        name={invite.candidateName}
+                        sub={[
+                          RoleDisplayNames[invite.intendedFieldRole],
+                          invite.isIBO ? 'IBO' : '',
+                          invite.submittedAt ? `finished ${shortDate(invite.submittedAt)}` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      />
+                      <span className={t.rowAction}>
+                        <button
+                          type="button"
+                          className={`${s.btnSecondary} ${u.sm}`}
+                          disabled={busy}
+                          aria-label={`Activate ${invite.candidateName}`}
+                          onClick={() => void activate(invite)}
+                        >
+                          {busy ? (
+                            <Loader2 size={16} className={u.spin} aria-hidden="true" />
+                          ) : (
+                            <CheckCircle2 size={16} aria-hidden="true" />
+                          )}
+                          Activate
+                        </button>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : (
+            recruitingState('invites')
+          )}
+        </Group>
+
         {canSeeApplicants ? (
           <Group
             id="todo-applicants"
@@ -369,29 +454,65 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
             }
             hidden={!shows(applicants)}
           >
-            <Applicants onCount={setApplicants} />
+            {recruiting.data && !recruiting.failed ? (
+              <div className={s.panel}>
+                <ul className={u.rows}>
+                  {recruiting.data.applied.slice(0, APPLICANTS_SHOWN).map((application) => {
+                    const interests = interestLabels(application.interests);
+                    return (
+                      <li key={application.id} className={`${u.row} ${t.row}`}>
+                        <PersonText
+                          name={application.name}
+                          sub={
+                            <>
+                              {application.city ? `${application.city} · ` : ''}
+                              <a className={`${u.num} ${t.phone}`} href={telHref(application.phone)}>
+                                {displayPhone(application.phone)}
+                              </a>
+                              {application.createdAt ? ` · applied ${shortDate(application.createdAt)}` : ''}
+                            </>
+                          }
+                          extra={interests ? <span className={u.personSub}>Interested in {interests}</span> : null}
+                        />
+                        <span className={t.rowAction}>
+                          <Link
+                            href={`${hubTabHref(ONBOARDING_HUB, 'recruits')}&application=${encodeURIComponent(application.id)}`}
+                            className={`${s.btnSecondary} ${u.sm}`}
+                            aria-label={`Invite ${application.name}`}
+                          >
+                            <UserPlus size={16} aria-hidden="true" />
+                            Invite
+                          </Link>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : (
+              recruitingState('applicants')
+            )}
           </Group>
         ) : null}
 
-        <Group
-          id="todo-follow-ups"
-          title="New hires to follow up on"
-          count={followUps}
-          explain="The portal flagged these: someone is ready to activate, stuck, or needs a manager. Tap I've got it so others know you're on it."
-          hidden={!shows(followUps)}
-        >
-          <ActionQueue onCount={setFollowUps} />
-        </Group>
-
         {nothingWaiting ? (
           <AdminEmpty title="Nothing waiting on you." action={showAllButton}>
-            New sign-ups, documents and applicants show up here when they need you.
+            New sign-ups, documents, finished paperwork and applicants show up here when they need you.
           </AdminEmpty>
         ) : !loading && !showDocuments ? (
           <p className={t.footer}>
             No documents to check. {showAllButton}
           </p>
         ) : null}
+
+        <Group
+          id="todo-alerts"
+          title="For your information"
+          explain="Alerts the portal raised about new hires. Not counted in what's waiting on you. Tap I've got it so others know someone is on it."
+          hidden={!shows(followUps)}
+        >
+          <ActionQueue onCount={setFollowUps} />
+        </Group>
       </div>
     </AdminGate>
   );
