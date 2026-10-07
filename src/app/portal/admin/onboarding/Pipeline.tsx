@@ -89,8 +89,8 @@ export function Pipeline() {
   // Sheet-local: errors raised inside a sheet show there, never the page banner.
   const [sheetError, setSheetError] = useState('');
   const [success, setSuccess] = useState('');
-  // null until the admin picks a chip: then the first stage with anyone in it.
-  const [stagePick, setStagePick] = useState<PipelineStage | null>(null);
+  // '' is the All chip: the whole team in one list.
+  const [stage, setStage] = useState<PipelineStage | ''>('');
   const [managerFilter, setManagerFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
@@ -301,25 +301,36 @@ export function Pipeline() {
     return tally;
   }, [teamReps]);
 
-  const stage: PipelineStage = stagePick ?? PIPELINE_STAGE_ORDER.find((key) => counts[key] > 0) ?? 'processing';
   const query = search.trim().toLowerCase();
 
-  // Chips browse one stage; a search finds people in every stage (each row's
-  // sentence says where they are).
+  // Typing a search goes back to All, so a search always finds people in
+  // every stage (each row's sentence says where they are).
   const visibleReps = useMemo(
     () =>
-      query
-        ? teamReps.filter((r) => [r.displayName, r.managerName].filter(Boolean).join(' ').toLowerCase().includes(query))
-        : teamReps.filter((r) => r.stage === stage),
+      teamReps.filter((r) => {
+        if (stage && r.stage !== stage) return false;
+        if (query && ![r.displayName, r.managerName].filter(Boolean).join(' ').toLowerCase().includes(query)) return false;
+        return true;
+      }),
     [teamReps, query, stage]
   );
 
   const showCounts = !loading && !loadFailed;
 
-  const pickStage = (key: PipelineStage) => {
-    setStagePick(key);
+  const pickStage = (key: PipelineStage | '') => {
+    setStage(key);
     setSearch('');
   };
+
+  const onSearch = (value: string) => {
+    setSearch(value);
+    if (value.trim()) setStage('');
+  };
+
+  const chips: { key: PipelineStage | ''; label: string; count: number }[] = [
+    { key: '', label: 'All', count: teamReps.length },
+    ...PIPELINE_STAGE_ORDER.map((key) => ({ key, label: PipelineStageConfig[key].name, count: counts[key] })),
+  ];
 
   return (
     <AdminGate roles={['admin', 'operations']}>
@@ -331,20 +342,20 @@ export function Pipeline() {
 
         <div className={p.picker}>
           <div className={u.chips} role="group" aria-label="Pipeline stage">
-            {PIPELINE_STAGE_ORDER.map((key) => (
+            {chips.map((chip) => (
               <button
-                key={key}
+                key={chip.key || 'all'}
                 type="button"
                 className={u.chip}
-                aria-pressed={!query && stage === key}
-                onClick={() => pickStage(key)}
+                aria-pressed={stage === chip.key}
+                onClick={() => pickStage(chip.key)}
               >
-                {PipelineStageConfig[key].name}
-                {showCounts ? <span className={`${u.chipCount} ${u.num}`}>{counts[key]}</span> : null}
+                {chip.label}
+                {showCounts ? <span className={`${u.chipCount} ${u.num}`}>{chip.count}</span> : null}
               </button>
             ))}
           </div>
-          <p className={u.hint}>{query ? 'Showing matches from every stage.' : PipelineStageConfig[stage].description}</p>
+          <p className={u.hint}>{stage ? PipelineStageConfig[stage].description : 'Everyone on the team. Each row says where they are.'}</p>
         </div>
 
         <div className={u.toolbar}>
@@ -355,7 +366,7 @@ export function Pipeline() {
               className={u.input}
               placeholder="Search by name or manager"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => onSearch(e.target.value)}
               aria-label="Search by name or manager"
             />
           </label>
@@ -377,7 +388,7 @@ export function Pipeline() {
           ) : null}
         </div>
 
-        <section className={s.panel} aria-label={query ? 'Search results' : PipelineStageConfig[stage].name}>
+        <section className={s.panel} aria-label={query ? 'Search results' : stage ? PipelineStageConfig[stage].name : 'Everyone'}>
           {loading ? (
             <AdminSkeletonRows rows={5} label="Loading pipeline" />
           ) : loadFailed ? (
