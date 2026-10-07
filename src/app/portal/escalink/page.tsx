@@ -82,7 +82,7 @@ function EscalinkGuide() {
             </b>{' '}
             an install is missing from your pay or paid wrong.
           </li>
-          <li>Never for a customer who is already active: they call Fiber Care.</li>
+          <li>EscaLink is never for a customer who is already active: they call Fiber Care themselves.</li>
         </ul>
       </section>
 
