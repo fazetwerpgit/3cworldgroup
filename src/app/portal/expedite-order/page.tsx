@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { ChevronDown } from 'lucide-react';
 import { RepShell } from '@/components/portal/rep/RepShell';
 import {
@@ -113,7 +114,17 @@ function ExpediteOrderForm() {
     <FormFrame
       formId={FORM_ID}
       onSubmit={submit}
-      header={<FormHeader title="Expedite order" lede="Ask for a faster install when the timing matters." />}
+      header={
+        <FormHeader
+          title="Expedite order"
+          lede={
+            <>
+              Ask 3C to push for a faster install. A problem T-Mobile has to fix (stuck install, address, error,
+              missing promo, reschedule the customer won&apos;t do)? Use <Link href="/portal/escalink">EscaLink</Link>.
+            </>
+          }
+        />
+      }
       alert={error ? <FormAlert message={error} alertRef={alertRef} /> : null}
       submitLabel="Send request"
       saving={saving}

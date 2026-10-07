@@ -9,7 +9,8 @@ import { loadRepSnapshot } from '@/lib/ask/liveData';
 import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
 import { AskProviderError, askProviderConfig, callAskModel, type AskContentPart, type AskMessage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
-import { ASK_DAILY_LIMIT, ASK_LOG, giveBackDailyAsk, loadNotes, ownDealerCodes, repHome, takeDailyAsk } from '@/lib/ask/store';
+import { ASK_DAILY_LIMIT, ASK_LOG, giveBackDailyAsk, loadNotes, repHome, takeDailyAsk } from '@/lib/ask/store';
+import { ownDealerCodes } from '@/lib/fiberReport/dealerCodes';
 
 // POST /api/portal/ask (multipart: question, history JSON, optional photo) —
 // Ask 3C: answers a rep's question from the owner's knowledge notes only.

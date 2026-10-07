@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, LifeBuoy } from 'lucide-react';
 import { RepShell } from '@/components/portal/rep/RepShell';
 import { REP_FORMS } from '@/components/portal/rep/repForms';
 import s from '@/components/portal/rep/rep.module.css';
@@ -38,6 +38,22 @@ function FormsHub() {
             </Link>
           </li>
         ))}
+      </ul>
+
+      {/* Not a 3C form: T-Mobile's own ticket app, so it sits apart from the office list. */}
+      <ul className={`${s.panel} ${f.hubList}`} aria-label="T-Mobile support">
+        <li>
+          <Link href="/portal/escalink" className={f.hubRow}>
+            <span className={f.hubIcon} aria-hidden="true">
+              <LifeBuoy size={20} strokeWidth={2} />
+            </span>
+            <span className={f.hubText}>
+              <span className={f.hubName}>EscaLink (T-Mobile)</span>
+              <span className={f.hubDesc}>Install or order problem T-Mobile Fiber Support has to fix.</span>
+            </span>
+            <ChevronRight size={20} className={f.hubChev} aria-hidden="true" />
+          </Link>
+        </li>
       </ul>
     </>
   );

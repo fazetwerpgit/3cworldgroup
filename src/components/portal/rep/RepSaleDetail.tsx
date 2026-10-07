@@ -33,6 +33,8 @@ import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { isCarrierCancelled } from '@/lib/sales/installBucket';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { FIBER_COMPANIES, SALE_TYPES, SaleStatusConfig, type Sale } from '@/types';
+import { escalinkTicketText, isTMobileSale } from '@/lib/escalink';
+import { EscalinkPanel } from './EscalinkPanel';
 import { BodyLayer } from './BodyLayer';
 import { useAttachmentViewer } from './ImageViewer';
 import { formatDay, formatMoney, num } from './saleFormat';
@@ -270,6 +272,33 @@ export function RepSaleDetail() {
   const payout = payWindow ? formatPayoutWindow(payWindow) : null;
   const missedReason = order?.status === 'breakage' ? carrierReasonLabel(order.breakageReason) : null;
 
+  // EscaLink only handles T-Mobile Fiber, and only the seller or the office
+  // would file for this customer. The dealer code is the one the carrier
+  // filed this order under; failing that, any of the seller's own orders, and
+  // for the rep's own sale the codes the office mapped to them.
+  const showEscalink = (ownSale || isAdmin) && isTMobileSale(sale);
+  const dealerCode =
+    order?.repDealerId ||
+    fiber.data?.orders.find((candidate) => candidate.matchedUserId === sale.salesRepId && candidate.repDealerId)?.repDealerId ||
+    (ownSale ? fiber.data?.dealerCodes?.[0] : null) ||
+    null;
+  const ticket = showEscalink
+    ? escalinkTicketText({
+        dealerCode,
+        customerName: sale.customerName,
+        customerPhone: sale.customerPhone ? displayPhone(sale.customerPhone) : null,
+        address: sale.customerAddress,
+        carrierOrderId: order && !order.id.startsWith('brk_') ? order.id : null,
+        orderNumberOrBtn: sale.orderNumberOrBtn,
+        plan: products.map((product) => product.productName || product.productId).filter(Boolean).join(' + '),
+        soldOn: formatDay(sale.saleDate),
+        install:
+          installDay && (status === 'scheduled' || status === 'installed')
+            ? `${status === 'installed' ? 'Installed' : 'Install'} ${installDay}`
+            : chip.label,
+      })
+    : null;
+
   const saleTypeLabel = SALE_TYPES.find((type) => type.value === sale.saleType)?.label;
 
   const payCell = () => {
@@ -406,6 +435,8 @@ export function RepSaleDetail() {
               </div>
             </div>
           </section>
+
+          {ticket && <EscalinkPanel ticket={ticket} className={x.oSupport} />}
 
           {isAdmin && (
             <div className={`${x.actions} ${x.oActions}`}>

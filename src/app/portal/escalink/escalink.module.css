@@ -1,0 +1,126 @@
+/* EscaLink guide. Tokens come from .root / .layer in rep.module.css. */
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s3);
+}
+
+@media (min-width: 640px) {
+  .actions {
+    grid-template-columns: auto auto;
+    justify-content: start;
+  }
+}
+
+.list {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: var(--s2) var(--s4) var(--s4) calc(var(--s4) + 18px);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.5;
+}
+
+.list b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.list a,
+.tip a {
+  color: var(--c-text);
+  text-decoration: underline;
+}
+
+.tip {
+  margin: 0 var(--s4) var(--s4);
+  padding: var(--s3);
+  border-radius: var(--r-control);
+  background: var(--c-lime-wash);
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+}
+
+.steps {
+  display: grid;
+  gap: var(--s5);
+  margin: 0;
+  padding: var(--s3) var(--s4) var(--s4);
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: var(--s3);
+}
+
+.stepNum {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--c-lime);
+  color: var(--c-on-lime);
+  font: 700 var(--t-sm) / 1 var(--f-ui);
+}
+
+.stepBody {
+  display: grid;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.stepTitle {
+  margin: 4px 0 0;
+  font-size: var(--t-ui);
+  font-weight: 700;
+}
+
+.stepText {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.5;
+}
+
+.shot {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+  border: 1px solid var(--c-line);
+  border-radius: var(--r-control);
+}
+
+.types {
+  display: grid;
+  margin: 0;
+  padding: 0 var(--s4) var(--s2);
+}
+
+.type {
+  display: grid;
+  gap: 2px;
+  padding: var(--s3) 0;
+}
+
+.type + .type {
+  border-top: 1px solid var(--c-line);
+}
+
+.type dt {
+  font-size: var(--t-ui);
+  font-weight: 700;
+}
+
+.type dd {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.5;
+}

@@ -113,4 +113,6 @@ export interface FiberStatusResponse {
   unmatched?: FiberOrder[];
   // Own scope only: how many sales this rep has logged in the portal themselves.
   submittedTotal?: number;
+  // Own scope only: the dealer codes config/fiberRepMap maps to this rep (for EscaLink tickets).
+  dealerCodes?: string[];
 }

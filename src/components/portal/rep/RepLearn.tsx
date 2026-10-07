@@ -10,12 +10,14 @@ import {
   FileText,
   Globe2,
   GraduationCap,
+  LifeBuoy,
   ListChecks,
   PlayCircle,
   RadioTower,
   RotateCw,
 } from 'lucide-react';
 import { RESOURCE_TYPES, TRAINING_CATEGORIES, type ResourceType, type TrainingResource } from '@/types';
+import { ESCALINK_URL } from '@/lib/escalink';
 import s from './rep.module.css';
 import p from './rep-page.module.css';
 import l from './rep-learn.module.css';
@@ -39,6 +41,12 @@ export const RESOURCE_QUICK_LINKS = [
     description: 'Check Frontier Fiber service availability.',
     url: 'https://frontier.com/',
     icon: Globe2,
+  },
+  {
+    title: 'EscaLink',
+    description: "T-Mobile's ticket app for install and order problems Fiber Support has to fix.",
+    url: ESCALINK_URL,
+    icon: LifeBuoy,
   },
 ] as const;
 

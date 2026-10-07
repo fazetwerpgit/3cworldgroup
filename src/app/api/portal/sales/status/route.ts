@@ -4,6 +4,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { FiberOrder, FiberStatusResponse } from '@/types';
 import { attachLoggedCustomerNames, LoggedSale } from '@/lib/fiberReport/matchSales';
 import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
+import { ownDealerCodes } from '@/lib/fiberReport/dealerCodes';
 
 function sortByOrderDate(orders: FiberOrder[]): FiberOrder[] {
   return [...orders].sort((a, b) => {
@@ -64,10 +65,10 @@ export async function GET(request: NextRequest) {
       const orders = sortByOrderDate(
         snapshot.docs.map((doc) => toFiberOrder(doc.id, doc.data()))
       );
-      const salesSnapshot = await adminDb
-        .collection('sales')
-        .where('salesRepId', '==', userId)
-        .get();
+      const [salesSnapshot, dealerCodes] = await Promise.all([
+        adminDb.collection('sales').where('salesRepId', '==', userId).get(),
+        ownDealerCodes(adminDb, userId),
+      ]);
       const sales = salesSnapshot.docs.map((doc) => toLoggedSale(doc.data()));
       const ordersWithNames = attachLoggedCustomerNames(orders, sales);
       return NextResponse.json({
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
         lastReportAt,
         orders: ordersWithNames,
         submittedTotal: salesSnapshot.docs.length,
+        dealerCodes,
       } satisfies FiberStatusResponse);
     }
 
