@@ -14,7 +14,7 @@ import {
 } from './adminHubs';
 import { fetchOpenRequests } from './openRequests';
 
-// The admin work queues (what Ops Home used to list): Hiring's To do groups,
+// The admin work queues (what Ops Home used to list): the kinds of row in Hiring's To do,
 // the pipeline and the Requests types. One loader and one cache feed Home's
 // Needs attention (the hiring rows), the Requests switcher counts and the nav
 // badges, so a page and its badges never disagree and a page change does not

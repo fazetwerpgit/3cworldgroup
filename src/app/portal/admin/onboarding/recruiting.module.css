@@ -1,50 +1,72 @@
 /* Recruiting (direction D). Shared pieces are admin-ui.module.css. */
 
-/* Phone-only / desktop-only cells. Two classes so they beat admin-ui's .cell. */
-:is(.invite, .app) > .deskOnly {
-  display: none;
+/* ---------- top row: Send an invite + search ---------- */
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.topBar > button {
+  flex: none;
+}
+
+.topBar > .search {
+  flex: 1 1 260px;
 }
 
 @media (min-width: 1024px) {
-  :is(.invite, .app) > .phoneOnly {
-    display: none;
-  }
-
-  :is(.invite, .app) > .deskOnly {
-    display: block;
+  .topBar > .search {
+    flex: 0 1 380px;
+    margin-left: auto;
   }
 }
 
-.ellipsis {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* ---------- the list ---------- */
+/* Needs action · All, in the list's head. */
+.filterBar {
+  padding: var(--s2) var(--s4);
 }
 
-.stackValue {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  text-align: right;
+.segCount {
+  margin-left: 6px;
+  color: var(--c-text-3);
+  font-weight: 600;
 }
 
-.roleValue {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--s2);
+button[aria-pressed='true'] > .segCount {
+  color: inherit;
 }
 
-/* ---------- invites ---------- */
-.inviteCols {
-  --cols: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) 130px 240px;
+/* Phone: name and contact, the sentence, then the buttons full width.
+   Desktop: person · sentence · buttons. */
+.list {
+  --cols: minmax(0, 1fr) minmax(0, 1.6fr) 240px;
 }
 
-.actions {
+.recruit > .sentence,
+.recruit > .actions {
   grid-column: 1 / -1;
+}
+
+.sentence {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.contact {
+  color: inherit;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .contact:hover {
+    color: var(--c-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
 
 .actions > button {
@@ -64,16 +86,16 @@
 }
 
 @media (min-width: 1024px) {
-  .stackValue {
-    text-align: left;
+  .recruit > .sentence,
+  .recruit > .actions {
+    grid-column: auto;
   }
 
-  .roleValue {
-    justify-content: flex-start;
+  .sentence {
+    font-size: var(--t-ui);
   }
 
   .actions {
-    grid-column: auto;
     justify-content: flex-end;
     flex-wrap: nowrap;
   }
@@ -83,7 +105,7 @@
   }
 }
 
-/* A copied or re-sent link, under its invite row. */
+/* A copied or re-sent link, under its row. */
 .rowLink {
   display: flex;
   flex-wrap: wrap;
@@ -95,15 +117,28 @@
   background: var(--c-well);
 }
 
-/* ---------- invite form ---------- */
-/* Closed: one button and its sentence on a line; the form opens in place. */
-.inviteBar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s2) var(--s4);
+/* "Export list": a small text link under the list. */
+.exportLink {
+  align-self: flex-start;
+  margin-top: calc(var(--s3) * -1);
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text-3);
+  font: 500 var(--t-sm) / 1 var(--f-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
+@media (hover: hover) {
+  .exportLink:hover {
+    color: var(--c-text);
+  }
+}
+
+/* ---------- invite form (opens in place) ---------- */
 .formWrap {
   max-width: 640px;
 }
@@ -144,113 +179,4 @@
   font-size: var(--t-sm);
   line-height: 1.4;
   overflow-wrap: anywhere;
-}
-
-.export:is(button) {
-  margin-right: calc(var(--s2) * -1);
-  padding: 0 var(--s2);
-}
-
-/* ---------- section explainers ---------- */
-/* One plain sentence under each section heading. */
-.lede {
-  padding: var(--s3) var(--s4) 0;
-}
-
-/* What each status word or filter means, as short "word: meaning" pairs. */
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s2) var(--s5);
-  margin: 0;
-  padding: var(--s3) var(--s4);
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-  line-height: 1.4;
-}
-
-.legendItem {
-  display: flex;
-  align-items: baseline;
-  gap: var(--s2);
-}
-
-.legendItem > dt {
-  color: var(--c-text-2);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.legendItem > dd {
-  margin: 0;
-}
-
-.appsPanel {
-  scroll-margin-top: calc(var(--topbar-h, 64px) + var(--s4));
-}
-
-/* Search + status filter inside the applications panel. */
-.filters {
-  padding: var(--s4);
-  border-bottom: 1px solid var(--c-line);
-}
-
-.filters .status {
-  flex: 1 1 100%;
-}
-
-.segCount {
-  margin-left: 6px;
-  color: var(--c-text-3);
-  font-weight: 600;
-}
-
-.status > button[aria-pressed='true'] .segCount {
-  color: inherit;
-}
-
-.contact {
-  color: inherit;
-  text-decoration: none;
-}
-
-@media (hover: hover) {
-  .contact:hover {
-    color: var(--c-text);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-}
-
-.appCols {
-  --cols: minmax(0, 1fr) minmax(0, 1fr) 96px 96px;
-}
-
-.appAction {
-  grid-column: 1 / -1;
-}
-
-.appAction > button {
-  flex: 1 1 auto;
-}
-
-@media (min-width: 1024px) {
-  .filters {
-    padding: var(--s4) var(--s5);
-  }
-
-  .app > .appStatus {
-    order: 9;
-    justify-content: flex-start;
-  }
-
-  .app > .appAction {
-    order: 10;
-    grid-column: auto;
-    justify-content: flex-end;
-  }
-
-  .appAction > button {
-    flex: none;
-  }
 }

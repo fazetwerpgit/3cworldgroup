@@ -10,13 +10,9 @@ import {
   AdminFailed,
   AdminGate,
   AdminNotice,
-  AdminPageHead,
   AdminSkeletonRows,
-  StatusDot,
-  type Tone,
 } from '@/components/portal/admin-d/AdminUi';
 import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
-import { Seg } from '@/components/portal/admin-ops/AdminKit';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import p from './pipeline.module.css';
@@ -37,14 +33,6 @@ interface ChannelRow extends Channel {
   reference: string | null;
 }
 
-const STAGE_TONE: Record<PipelineStage, Tone> = {
-  processing: 'amber',
-  need_logins: 'blue',
-  cleared_to_sell: 'lime',
-  active: 'lime',
-  decommissioned: 'muted',
-};
-
 // These routes verify the caller from the ID token — the acting identity is
 // never sent in the query string or body.
 async function authHeaders(json = false): Promise<Record<string, string>> {
@@ -55,17 +43,54 @@ async function authHeaders(json = false): Promise<Record<string, string>> {
   };
 }
 
+function shortDay(when: string | Date): string {
+  const d = new Date(when);
+  const sameYear = d.getFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString(
+    'en-US',
+    sameYear ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' }
+  );
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** One plain sentence saying where a rep is; it carries the stage, so rows need no stage column. */
+function whereTheyAre(rep: PipelineRep): string {
+  switch (rep.stage) {
+    case 'processing':
+      return rep.onboarding && rep.onboarding.total > 0
+        ? `Paperwork ${rep.onboarding.approved} of ${rep.onboarding.total} approved`
+        : 'Paperwork not finished';
+    case 'need_logins':
+      return 'Never signed into the portal';
+    case 'cleared_to_sell':
+      return rep.lastSignInAt ? `Signed in ${shortDay(rep.lastSignInAt)} · no sales yet` : 'Signed in · no sales yet';
+    case 'active': {
+      const parts: string[] = [];
+      if (rep.approvedSales > 0 || rep.carrierOrders === 0) parts.push(plural(rep.approvedSales, 'sale'));
+      if (rep.carrierOrders > 0) parts.push(plural(rep.carrierOrders, 'carrier order'));
+      return parts.join(' · ');
+    }
+    case 'decommissioned': {
+      const record = rep.decommission;
+      if (!record) return 'Off the team';
+      const when = record.decommissionedAt ? ` ${shortDay(record.decommissionedAt)}` : '';
+      return `Off the team${when} · ${DecommissionReasonLabels[record.reason]}`;
+    }
+  }
+}
+
 export function Pipeline() {
   const { user } = useAuth();
   const [reps, setReps] = useState<PipelineRep[]>([]);
-  const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState('');
   // Sheet-local: errors raised inside a sheet show there, never the page banner.
   const [sheetError, setSheetError] = useState('');
   const [success, setSuccess] = useState('');
-  const [stageFilter, setStageFilter] = useState<PipelineStage | ''>('');
+  // null until the admin picks a chip: then the first stage with anyone in it.
+  const [stagePick, setStagePick] = useState<PipelineStage | null>(null);
   const [managerFilter, setManagerFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
@@ -90,7 +115,6 @@ export function Pipeline() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load pipeline');
       setReps(json.reps);
-      setCounts(json.counts);
       setLoadFailed(false);
     } catch {
       // Load failures render in place (AdminFailed); `error` is for actions only.
@@ -261,51 +285,67 @@ export function Pipeline() {
   };
 
   const managers = useMemo(
-    () => Array.from(new Set(reps.map((r) => r.managerName).filter((m): m is string => Boolean(m)))),
+    () => Array.from(new Set(reps.map((r) => r.managerName).filter((m): m is string => Boolean(m)))).sort(),
     [reps]
   );
+  const showManagers = managers.length > 1;
 
-  const visibleReps = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return reps.filter((r) => {
-      if (stageFilter && r.stage !== stageFilter) return false;
-      if (managerFilter !== 'all' && r.managerName !== managerFilter) return false;
-      if (q && ![r.displayName, r.managerName].filter(Boolean).join(' ').toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [reps, stageFilter, managerFilter, search]);
+  const teamReps = useMemo(
+    () => (showManagers && managerFilter !== 'all' ? reps.filter((r) => r.managerName === managerFilter) : reps),
+    [reps, showManagers, managerFilter]
+  );
 
-  const heroCount = stageFilter ? (counts[stageFilter] ?? 0) : reps.filter((r) => r.stage !== 'decommissioned' && r.stage !== 'active').length;
-  const filtered = Boolean(stageFilter || managerFilter !== 'all' || search.trim());
+  const counts = useMemo(() => {
+    const tally = Object.fromEntries(PIPELINE_STAGE_ORDER.map((key) => [key, 0])) as Record<PipelineStage, number>;
+    for (const r of teamReps) tally[r.stage] += 1;
+    return tally;
+  }, [teamReps]);
+
+  const stage: PipelineStage = stagePick ?? PIPELINE_STAGE_ORDER.find((key) => counts[key] > 0) ?? 'processing';
+  const query = search.trim().toLowerCase();
+
+  // Chips browse one stage; a search finds people in every stage (each row's
+  // sentence says where they are).
+  const visibleReps = useMemo(
+    () =>
+      query
+        ? teamReps.filter((r) => [r.displayName, r.managerName].filter(Boolean).join(' ').toLowerCase().includes(query))
+        : teamReps.filter((r) => r.stage === stage),
+    [teamReps, query, stage]
+  );
+
   const showCounts = !loading && !loadFailed;
+
+  const pickStage = (key: PipelineStage) => {
+    setStagePick(key);
+    setSearch('');
+  };
 
   return (
     <AdminGate roles={['admin', 'operations']}>
       <div className={u.page}>
-        <AdminPageHead
-          title="Recruiting Pipeline"
-          meta={showCounts ? <><b>{heroCount}</b> need attention</> : null}
-        />
-
         {error ? (
           <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice>
         ) : null}
         {success ? <AdminNotice tone="ok">{success}</AdminNotice> : null}
 
-        <Seg<PipelineStage | ''>
-          label="Pipeline stage filter"
-          scroll
-          value={stageFilter}
-          onChange={setStageFilter}
-          options={[
-            { value: '', label: 'All', count: showCounts ? reps.length : undefined },
-            ...PIPELINE_STAGE_ORDER.map((stage) => ({
-              value: stage,
-              label: PipelineStageConfig[stage].name,
-              count: showCounts ? (counts[stage] ?? 0) : undefined,
-            })),
-          ]}
-        />
+        <div className={p.picker}>
+          <div className={u.chips} role="group" aria-label="Pipeline stage">
+            {PIPELINE_STAGE_ORDER.map((key) => (
+              <button
+                key={key}
+                type="button"
+                className={u.chip}
+                aria-pressed={!query && stage === key}
+                onClick={() => pickStage(key)}
+              >
+                {PipelineStageConfig[key].name}
+                {showCounts ? <span className={`${u.chipCount} ${u.num}`}>{counts[key]}</span> : null}
+              </button>
+            ))}
+          </div>
+          <p className={u.hint}>{query ? 'Showing matches from every stage.' : PipelineStageConfig[stage].description}</p>
+        </div>
 
         <div className={u.toolbar}>
           <label className={u.search}>
@@ -313,73 +353,50 @@ export function Pipeline() {
             <input
               type="search"
               className={u.input}
-              placeholder="Search reps or managers"
+              placeholder="Search by name or manager"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search reps or managers"
+              aria-label="Search by name or manager"
             />
           </label>
-          {managers.length > 0 ? (
-            <div className={u.chips} role="group" aria-label="Manager filter">
-              <button type="button" className={u.chip} aria-pressed={managerFilter === 'all'} onClick={() => setManagerFilter('all')}>
-                All managers
-              </button>
-              {managers.map((m) => (
-                <button key={m} type="button" className={u.chip} aria-pressed={managerFilter === m} onClick={() => setManagerFilter(m)}>
-                  {m}
-                </button>
-              ))}
-            </div>
+          {showManagers ? (
+            <span className={`${u.selectWrap} ${p.manager}`}>
+              <select
+                className={u.input}
+                value={managerFilter}
+                onChange={(e) => setManagerFilter(e.target.value)}
+                aria-label="Manager"
+              >
+                <option value="all">All managers</option>
+                {managers.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <ChevronDown size={18} aria-hidden="true" />
+            </span>
           ) : null}
         </div>
 
-        <section className={s.panel} aria-labelledby="pipeline-reps-heading">
-          <div className={`${s.panelHead} ${u.band}`}>
-            <h2 id="pipeline-reps-heading" className={s.kicker}>
-              {stageFilter ? PipelineStageConfig[stageFilter].name : 'Field reps'}
-            </h2>
-            {showCounts ? (
-              <span className={u.panelMeta}>
-                {visibleReps.length} {visibleReps.length === 1 ? 'rep' : 'reps'}
-                {filtered ? ` of ${reps.length}` : ''}
-              </span>
-            ) : null}
-          </div>
-
+        <section className={s.panel} aria-label={query ? 'Search results' : PipelineStageConfig[stage].name}>
           {loading ? (
             <AdminSkeletonRows rows={5} label="Loading pipeline" />
           ) : loadFailed ? (
             <AdminFailed what="the pipeline" onRetry={retry} />
+          ) : reps.length === 0 ? (
+            <AdminEmpty title="No field reps yet">Field reps show up here once their signup is approved.</AdminEmpty>
           ) : visibleReps.length === 0 ? (
-            <AdminEmpty
-              title={stageFilter ? `No reps in ${PipelineStageConfig[stageFilter].name}` : filtered ? 'No reps match' : 'No field reps yet'}
-            >
-              {stageFilter
-                ? 'Pick All to clear the filter.'
-                : filtered
-                  ? 'Try another name or manager.'
-                  : 'Field reps show up here once their signup is approved.'}
-            </AdminEmpty>
+            <AdminEmpty title={query ? 'No one matches' : 'No one here right now'} />
           ) : (
             <ul className={`${u.rows} ${p.cols}`}>
-              <li className={u.tHead} aria-hidden="true">
-                <span>Rep</span>
-                <span>Stage</span>
-                <span>Manager</span>
-                <span>Onboarding</span>
-                <span>Channels</span>
-                <span className={u.alignEnd}>Approved sales</span>
-                <span />
-              </li>
               {visibleReps.map((rep) => {
-                const pct = rep.onboarding && rep.onboarding.total > 0 ? (rep.onboarding.approved / rep.onboarding.total) * 100 : 0;
+                const where = whereTheyAre(rep);
                 return (
                   <li key={rep.uid}>
                     <button
                       type="button"
-                      className={`${u.row} ${p.rep}`}
+                      className={u.row}
                       onClick={() => setSelectedRep(rep)}
-                      aria-label={`${rep.displayName}, ${PipelineStageConfig[rep.stage].name}. Open details`}
+                      aria-label={`${rep.displayName}, ${where}. Open details`}
                     >
                       <span className={`${u.cellMain} ${u.person}`}>
                         <span className={u.personText}>
@@ -392,45 +409,10 @@ export function Pipeline() {
                           </span>
                         </span>
                       </span>
-                      <span className={`${u.cellEnd} ${p.stageCell}`}>
-                        <StatusDot tone={STAGE_TONE[rep.stage]}>{PipelineStageConfig[rep.stage].name}</StatusDot>
-                        <ChevronRight size={20} className={`${u.chev} ${p.phoneChev}`} aria-hidden="true" />
+                      <span className={`${u.cell} ${p.where}`}>{where}</span>
+                      <span className={u.cellEnd}>
+                        <ChevronRight size={20} className={u.chev} aria-hidden="true" />
                       </span>
-                      <span className={u.cell} data-label="Manager">
-                        <span className={p.ellipsis}>{rep.managerName ?? '—'}</span>
-                      </span>
-                      <span className={`${u.cell} ${p.progressCell}`} data-label="Onboarding">
-                        {rep.onboarding && rep.onboarding.total > 0 ? (
-                          <span className={p.progress}>
-                            <span className={`${s.track} ${p.track}`} aria-hidden="true">
-                              <span className={s.fill} style={{ width: `${pct}%` }} />
-                            </span>
-                            <b className={u.num}>
-                              {rep.onboarding.approved}/{rep.onboarding.total}
-                            </b>
-                          </span>
-                        ) : (
-                          <span className={u.toneMuted}>{rep.onboarding ? 'None for this role' : 'Before checklist'}</span>
-                        )}
-                      </span>
-                      <span className={u.cell} data-label="Channels">
-                        <span className={p.channels}>
-                          {rep.channelsCleared > 0 ? (
-                            <span className={u.toneLime}>{rep.channelsCleared} cleared</span>
-                          ) : rep.carrierOrders > 0 ? (
-                            <span className={u.toneLime}>On carrier report</span>
-                          ) : (
-                            <span className={u.toneMuted}>0 cleared</span>
-                          )}
-                          {rep.channelsSubmitted > 0 ? (
-                            <span className={u.toneAmber}>{rep.channelsSubmitted} pending</span>
-                          ) : null}
-                        </span>
-                      </span>
-                      <span className={`${u.cell} ${u.alignEnd} ${u.num}`} data-label="Approved sales">
-                        {rep.approvedSales}
-                      </span>
-                      <ChevronRight size={20} className={`${u.chev} ${p.deskChev}`} aria-hidden="true" />
                     </button>
                   </li>
                 );

@@ -333,23 +333,25 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
     () => sortFiberOrders((data?.unmatched ?? []).filter((order) => filter === 'all' || statusGroup(order.status) === filter)),
     [data?.unmatched, filter]
   );
+  const submissions = useMemo(() => submittedByRep(sales), [sales]);
   // Keyed on the matched portal user rather than the carrier's spelling of the
   // rep's name, so the same person's orders and the same person's submissions
   // land in one group even when the report writes "Noah St John" and the portal
-  // holds "Noah st john". An order with no matched user falls back to the name.
+  // holds "Noah st john". The group is titled with the portal's name when the
+  // rep has logged anything (the report shouts some names, "CASEY RIVERA"); an
+  // order with no matched user falls back to the carrier's name.
   const matchedGroups = useMemo(() => {
     const groups = new Map<string, RepGroup>();
     matchedOrders.forEach((order) => {
       const userId = order.matchedUserId || null;
-      const repName = order.repName || 'Unknown rep';
+      const repName = (userId && submissions.get(userId)?.[0]?.salesRepName) || order.repName || 'Unknown rep';
       const key = userId ? `uid:${userId}` : `name:${repName}`;
       const existing = groups.get(key);
       if (existing) existing.orders.push(order);
       else groups.set(key, { key, repName, userId, orders: [order] });
     });
     return [...groups.values()].sort((a, b) => a.repName.localeCompare(b.repName));
-  }, [matchedOrders]);
-  const submissions = useMemo(() => submittedByRep(sales), [sales]);
+  }, [matchedOrders, submissions]);
   const needle = find.trim().toLowerCase();
 
   // An owner reads every rep's raw feed; an admin reads only their own.
@@ -527,7 +529,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
       <ChevronRight size={18} className={x.chev} aria-hidden="true" />
       <span className={x.exName}>{name}</span>
       <span className={x.exCount} data-part="group-count">{count}</span>
-      <span className={x.exSub}>{summary}</span>
+      {summary ? <span className={x.exSub}>{summary}</span> : null}
     </button>
   );
 

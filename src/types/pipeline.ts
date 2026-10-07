@@ -1,6 +1,7 @@
 import { FieldRole } from './auth';
 
-// Recruiting pipeline stages, derived (never stored) from underlying data:
+// Recruiting pipeline stages, derived (never stored) from underlying data.
+// The keys are internal; `name` and `description` are what admins read.
 //   processing      - onboarding checklist not fully approved
 //   need_logins     - onboarding complete, never signed into the portal
 //   cleared_to_sell - signed into the portal, nothing sold yet
@@ -18,28 +19,28 @@ export const PipelineStageConfig: Record<
   { name: string; description: string; color: string }
 > = {
   processing: {
-    name: 'Processing',
-    description: 'Working through onboarding paperwork',
+    name: 'Paperwork',
+    description: 'Their onboarding paperwork is not all approved yet.',
     color: 'yellow',
   },
   need_logins: {
-    name: 'Need Logins',
-    description: "Hasn't signed into the portal yet",
+    name: 'Not signed in yet',
+    description: 'Paperwork is done, but they have never signed into the portal.',
     color: 'blue',
   },
   cleared_to_sell: {
-    name: 'Cleared to Sell',
-    description: 'Signed into the portal, no sales yet',
+    name: 'Signed in, no sales',
+    description: 'They have signed into the portal but have not sold anything yet.',
     color: 'purple',
   },
   active: {
-    name: 'Active',
-    description: 'Selling - sales in the portal or on the carrier report',
+    name: 'Selling',
+    description: 'They have approved sales or orders on the carrier report.',
     color: 'green',
   },
   decommissioned: {
-    name: 'Decommissioned',
-    description: 'Deactivated',
+    name: 'Off the team',
+    description: 'Their account was turned off (decommissioned). They can be reinstated.',
     color: 'gray',
   },
 };

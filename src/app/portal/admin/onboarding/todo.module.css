@@ -1,42 +1,36 @@
-/* Hiring > To do. Shared pieces are admin-ui.module.css and rep.module.css. */
+/* Hiring > To do and its Check sheet. Shared pieces are admin-ui.module.css and rep.module.css. */
 
-.group {
+/* ---------- one row per thing: words over the button on a phone, side by side above ---------- */
+.row.row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.text {
   display: grid;
-  gap: var(--s3);
+  gap: 2px;
   min-width: 0;
 }
 
-/* Groups stay mounted (their data keeps loading) but show only with work. */
-.group[hidden] {
-  display: none;
+.name {
+  overflow: hidden;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.groupHead {
-  align-items: center;
-}
-
-.groupAction {
-  display: inline-flex;
-  margin-right: calc(var(--s2) * -1);
-}
-
-.textLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  text-decoration: none;
-}
-
-/* ---------- rows: name over action on a phone, side by side above ---------- */
-.row.row {
-  grid-template-columns: minmax(0, 1fr);
+.line {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.35;
 }
 
 .rowAction {
   display: flex;
 }
 
-.rowAction > a {
+.rowAction > :is(a, button) {
   display: inline-flex;
   flex: 1 1 auto;
   align-items: center;
@@ -45,66 +39,38 @@
   text-decoration: none;
 }
 
-.phone {
-  color: inherit;
-}
-
 @media (min-width: 640px) {
   .row.row {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .rowAction > a {
+  .rowAction > :is(a, button) {
     flex: none;
+    min-width: 104px;
   }
 }
 
-/* ---------- status key ---------- */
-.legend {
-  border: 1px solid var(--c-line);
-  border-radius: 10px;
-  background: var(--c-well);
-}
-
-.legend > summary {
+/* ---------- something quiet, folded away (portal alerts, the rest of a checklist) ---------- */
+.fold > summary {
   display: flex;
   align-items: center;
   min-height: var(--tap);
-  padding: 0 var(--s4);
   color: var(--c-text-2);
   font-size: var(--t-sm);
   font-weight: 600;
   cursor: pointer;
 }
 
-.legendList {
+.fold[open] > summary {
+  margin-bottom: var(--s2);
+}
+
+.fold[hidden] {
+  display: none;
+}
+
+/* ---------- Check sheet ---------- */
+.sheetBody {
   display: grid;
-  gap: var(--s2);
-  margin: 0;
-  padding: 0 var(--s4) var(--s4);
-}
-
-.legendRow {
-  display: grid;
-  gap: 2px;
-}
-
-.legendRow dd {
-  margin: 0;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-}
-
-@media (min-width: 640px) {
-  .legendRow {
-    grid-template-columns: 160px minmax(0, 1fr);
-    align-items: baseline;
-    gap: var(--s3);
-  }
-}
-
-.footer {
-  margin: 0;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
+  gap: var(--s3);
 }

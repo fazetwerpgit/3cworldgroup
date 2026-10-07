@@ -7,15 +7,14 @@ import { AdminGate, AdminPageHead } from '@/components/portal/admin-d/AdminUi';
 import { RECRUITING_ROLES } from '@/components/portal/admin-d/adminHubs';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import { ApplicationRecord } from '@/types';
-import { Applicants } from './Applicants';
 import { Invites, type InviteView } from './Invites';
 
-// Hiring → Recruits, top to bottom: the "Send an invite" button (opens the
-// form in place), the website applications, then the invites already sent.
-// One load of the recruiting API feeds both, so an invite sent from an
-// application moves that applicant out of New right away. An applicant's
-// Invite button sets ?application=<id>; Invites opens its form filled from it
-// (the same link works from anywhere in the portal).
+// Hiring → Recruits: one list of everyone being recruited (website
+// applications and invites, one row per person), with "Send an invite" and a
+// search box on top. One load of the recruiting API feeds it, and every action
+// reloads it, so an invited applicant moves on right away. ?application=<id>
+// opens the invite form filled from that application (from anywhere in the
+// portal).
 
 function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
   const { user, hasPermission, isRole } = useAuth();
@@ -76,9 +75,7 @@ function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
         loadFailed={loadFailed}
         reload={load}
         onChanged={onChanged}
-      >
-        <Applicants applications={applications} loading={loading} loadFailed={loadFailed} reload={load} />
-      </Invites>
+      />
     </div>
   );
 }

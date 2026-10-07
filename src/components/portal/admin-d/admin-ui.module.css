@@ -1176,24 +1176,25 @@
   color: var(--c-amber);
 }
 
-/* Desktop: content-sized tabs, each at least 140px, as the canonical rep-page tabs. When
-   they outgrow the page (Admin settings has eight) they wrap onto more rows rather than
-   scroll, so every tab and the selected one stay in sight; each row's tabs grow to fill
-   it so the 1px dividers stay a clean grid. */
+/* Desktop: the strip spans the full content width (never sized to its content, which
+   shrink-wraps a wrapping flex row to one tab per line). Tabs sit side by side, each at
+   least 140px and growing to share the row; only when they outgrow the row (Admin
+   settings has eight) do they wrap onto a second row, still several per row. */
 @media (min-width: 1024px) {
   .tabsWrap {
-    align-self: flex-start;
-    max-width: 100%;
+    align-self: stretch;
+    width: 100%;
     --fade-l: 0px;
     --fade-r: 0px;
   }
   .tabsWrap .tabsScroll {
+    display: flex;
     flex-wrap: wrap;
-    width: auto;
-    max-width: 100%;
+    width: 100%;
     overflow: hidden;
   }
   .tabsWrap .tabItem {
-    flex: 1 0 140px;
+    flex: 1 0 auto;
+    min-width: 140px;
   }
 }

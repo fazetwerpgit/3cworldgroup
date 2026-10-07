@@ -1391,6 +1391,11 @@
   transition: transform 180ms var(--ease);
 }
 
+/* A one-line row (no summary under the name): the chevron sits on that line. */
+.expander:not(:has(.exSub)) .chev {
+  grid-row: 1;
+}
+
 .expander[aria-expanded='true'] .chev {
   transform: rotate(90deg);
   color: var(--c-text);

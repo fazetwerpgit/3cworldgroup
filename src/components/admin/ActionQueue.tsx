@@ -190,21 +190,10 @@ export default function ActionQueue({ onCount }: { onCount?: (count: number | nu
   if (!loading && tasks.length === 0 && !error && !loadFailed) return null;
 
   return (
-    <section className={s.panel} aria-labelledby="activation-tasks-heading">
-      <div className={`${s.panelHead} ${u.band}`}>
-        <h2 id="activation-tasks-heading" className={s.kicker}>
-          Activation tasks
-        </h2>
-        {(!loading || tasks.length > 0) && !(loadFailed && tasks.length === 0) ? (
-          <span className={u.panelMeta}>
-            {tasks.length} task{tasks.length === 1 ? '' : 's'} ready
-          </span>
-        ) : null}
-      </div>
-
+    <div className={s.panel}>
       {loadFailed && tasks.length > 0 ? (
         <div className={q.noticeWrap}>
-          <AdminNotice tone="warn">Couldn&apos;t refresh activation tasks. Showing the last list.</AdminNotice>
+          <AdminNotice tone="warn">Couldn&apos;t refresh the alerts. Showing the last list.</AdminNotice>
         </div>
       ) : null}
 
@@ -217,12 +206,12 @@ export default function ActionQueue({ onCount }: { onCount?: (count: number | nu
       ) : null}
 
       {loadFailed && tasks.length === 0 ? (
-        <AdminFailed what="activation tasks" onRetry={() => void load()} />
+        <AdminFailed what="portal alerts" onRetry={() => void load()} />
       ) : loading && tasks.length === 0 ? (
-        <AdminSkeletonRows rows={1} label="Loading activation tasks" />
+        <AdminSkeletonRows rows={1} label="Loading portal alerts" />
       ) : tasks.length === 0 ? (
         error ? null : (
-          <p className={q.none}>No manager tasks are waiting right now.</p>
+          <p className={q.none}>No alerts right now.</p>
         )
       ) : (
         <ul className={`${u.rows} ${q.list}`}>
@@ -281,6 +270,6 @@ export default function ActionQueue({ onCount }: { onCount?: (count: number | nu
           })}
         </ul>
       )}
-    </section>
+    </div>
   );
 }

@@ -96,8 +96,13 @@ export const REQUESTS_HUB = {
 export const SETTINGS_HUB = {
   href: '/portal/admin/settings',
   param: 'tab',
-  // The owner's everyday tabs first; the rest keep their old order.
+  // Original order; Employee data and Ask 3C (moved in from elsewhere) last.
   tabs: [
+    { key: 'system', label: 'Challenge', roles: ['admin'], permissions: ['settings:read'] },
+    { key: 'form-options', label: 'Form options', roles: ['admin'] },
+    { key: 'chat-channels', label: 'Chat channels', roles: ['admin'] },
+    { key: 'email-templates', label: 'Email templates', roles: PLATFORM_ROLES },
+    { key: 'university', label: 'University content', roles: PLATFORM_ROLES },
     // Same gate as the comp plan at the foot of Learn > Pay & links.
     { key: 'pay-rates', label: 'Pay rates', roles: ['owner'], permissions: ['finance:read'] },
     {
@@ -112,11 +117,6 @@ export const SETTINGS_HUB = {
       roles: ['owner'],
       hint: 'The notes Ask 3C answers from, and the questions people asked it.',
     },
-    { key: 'system', label: 'Challenge', roles: ['admin'], permissions: ['settings:read'] },
-    { key: 'form-options', label: 'Form options', roles: ['admin'] },
-    { key: 'chat-channels', label: 'Chat channels', roles: ['admin'] },
-    { key: 'email-templates', label: 'Email templates', roles: PLATFORM_ROLES },
-    { key: 'university', label: 'University content', roles: PLATFORM_ROLES },
   ],
 } as const satisfies HubConfig;
 

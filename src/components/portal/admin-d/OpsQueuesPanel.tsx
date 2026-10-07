@@ -25,7 +25,7 @@ function isBacked(card: QueueCard): boolean {
   return !card.error && card.oldestWaitMs !== null && card.oldestWaitMs > BACKED_UP_THRESHOLD_MS;
 }
 
-/** Home's Needs attention is the hiring work: To do's groups and the pipeline. */
+/** Home's Needs attention is the hiring work: To do's kinds of row and the pipeline. */
 const HOME_HUBS: string[] = [ONBOARDING_HUB.href];
 
 /**

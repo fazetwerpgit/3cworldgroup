@@ -1,4 +1,4 @@
-/* Activation tasks (direction D), shown on Onboarding Review. Shared pieces are admin-ui.module.css. */
+/* Portal alerts about new hires (direction D), folded at the bottom of Hiring > To do. Shared pieces are admin-ui.module.css. */
 
 .noticeWrap {
   padding: var(--s3) var(--s4) 0;

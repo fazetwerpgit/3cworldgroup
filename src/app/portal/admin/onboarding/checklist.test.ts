@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { signedWithoutCopy, type ChecklistItem } from './Review';
+import { isWaitingOnYou, signedWithoutCopy, type ChecklistItem } from './checklist';
 
 function item(overrides: Partial<ChecklistItem> = {}): ChecklistItem {
   return {
@@ -38,5 +38,18 @@ describe('signedWithoutCopy', () => {
     expect(
       signedWithoutCopy(item({ manualCompletion: { note: 'Signed on paper', byName: 'Owner', at: null } }))
     ).toBe(false);
+  });
+});
+
+describe('isWaitingOnYou', () => {
+  it('is an upload to check or a signature document that never went out', () => {
+    expect(isWaitingOnYou(item({ itemId: 'dl_photos', referenceKind: 'storage', status: 'submitted' }))).toBe(true);
+    expect(isWaitingOnYou(item({ status: 'submitted', esignEnvelopeId: null }))).toBe(true);
+  });
+
+  it('is off once out for signature, on hold, or handled', () => {
+    expect(isWaitingOnYou(item({ status: 'submitted' }))).toBe(false);
+    expect(isWaitingOnYou(item({ itemId: 'dl_photos', status: 'submitted', onHold: true }))).toBe(false);
+    expect(isWaitingOnYou(item({ itemId: 'dl_photos', status: 'approved' }))).toBe(false);
   });
 });
