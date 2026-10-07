@@ -1,16 +1,7 @@
-// What an applicant on /apply says they want to sell (owner request, 2026-10).
-// Shared by the form, the API that stores it, and the Applicants tab.
+import { APPLICATION_INTERESTS, type ApplicationInterest } from '@/types';
 
-export const APPLICATION_INTERESTS = [
-  { value: 'fiber', label: 'Fiber' },
-  { value: 'wireless', label: 'Wireless' },
-  { value: 'tv', label: 'TV' },
-  { value: 'security', label: 'Security' },
-  { value: 'solar', label: 'Solar' },
-  { value: 'business', label: 'Business services' },
-] as const;
-
-export type ApplicationInterest = (typeof APPLICATION_INTERESTS)[number]['value'];
+// Helpers for the /apply "What do you want to sell?" answers, shared by the
+// form, the API that stores them, the sheet and the Applicants tab.
 
 /**
  * Untrusted input (the public API body) down to known values, once each, in the

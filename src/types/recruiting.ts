@@ -1,6 +1,17 @@
 import { FieldRole } from './auth';
 import { OnboardingStatus } from './onboarding';
-import type { ApplicationInterest } from '@/lib/forms/applicationInterests';
+
+// What an applicant on /apply says they want to sell (owner request, 2026-10).
+export const APPLICATION_INTERESTS = [
+  { value: 'fiber', label: 'Fiber' },
+  { value: 'wireless', label: 'Wireless' },
+  { value: 'tv', label: 'TV' },
+  { value: 'security', label: 'Security' },
+  { value: 'solar', label: 'Solar' },
+  { value: 'business', label: 'Business services' },
+] as const;
+
+export type ApplicationInterest = (typeof APPLICATION_INTERESTS)[number]['value'];
 
 export type ApplicationStatus =
   | 'applied'

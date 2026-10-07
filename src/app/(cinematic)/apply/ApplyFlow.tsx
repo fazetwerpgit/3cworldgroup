@@ -8,11 +8,8 @@ import { ArrowRight, Check } from "lucide-react";
 import kit from "../../_cinematic/cinematic.module.css";
 import { findMarket } from "../../_cinematic/markets";
 import styles from "./apply.module.css";
-import {
-  APPLICATION_INTERESTS,
-  cleanInterests,
-  type ApplicationInterest,
-} from "@/lib/forms/applicationInterests";
+import { APPLICATION_INTERESTS, type ApplicationInterest } from "@/types";
+import { cleanInterests } from "@/lib/forms/applicationInterests";
 import {
   INVALID_EMAIL_MESSAGE,
   INVALID_PHONE_MESSAGE,
