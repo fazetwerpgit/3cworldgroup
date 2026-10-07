@@ -11,7 +11,7 @@ import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { RepBoot } from './RepBoot';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, type RepBackLink } from './RepTopBar';
-import { PushSetupSheet } from './PushSetupSheet';
+import { PhoneSetupSheet } from './PhoneSetupSheet';
 import s from './rep.module.css';
 
 export { RepBoot };
@@ -48,8 +48,8 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
         {tabBarHidden ? null : <RepTabBar chatUnread={anyUnread} navCounts={navCounts} />}
         {/* Keeps the portal-wide Ctrl/Cmd+K search working on D pages. */}
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-        {/* The installed app asks for notifications as soon as it opens. */}
-        <PushSetupSheet />
+        {/* On a phone: add to home screen, then notifications, the moment it opens. */}
+        <PhoneSetupSheet />
       </div>
     </TabBarHiddenContext.Provider>
   );

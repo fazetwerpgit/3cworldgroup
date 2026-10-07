@@ -1,26 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bell } from 'lucide-react';
+import { Bell, Share, SquarePlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDevice } from '@/lib/push/enablePushOnDevice';
-import { PUSH_SETUP_SNOOZE_KEY, pushSetupStep, type PushSetupStep } from '@/lib/push/pushPrompt';
+import { PHONE_SETUP_SNOOZE_KEY, phoneSetupStep, type PhoneSetupStep } from '@/lib/push/pushPrompt';
+import { isIosSafari } from '@/lib/pwa/addToHomeScreen';
 import { isStandaloneApp } from '@/lib/pwa/standalone';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
-import x from './push-setup.module.css';
+import x from './phone-setup.module.css';
 
 /**
- * Asks for notifications the moment the installed app opens, as one big button
- * (the tap is the user gesture iOS requires before it will show its own Allow
- * question). A phone that already said no gets the steps to turn them on in
- * its own Settings instead. "Not now" brings it back the next day.
+ * Gets a phone fully set up the moment the portal opens: on iPhone Safari, the
+ * steps to add it to the home screen; in the installed app, one big button for
+ * notifications (the tap is the gesture iOS needs before it shows its own Allow
+ * question), or the phone-settings steps if the phone already said no.
+ * "Not now" brings it back the next day.
  */
-export function PushSetupSheet() {
+export function PhoneSetupSheet() {
   const { user, loading } = useAuth();
   const active = !loading && user?.status === 'active';
-  const [step, setStep] = useState<PushSetupStep | null>(null);
+  const [step, setStep] = useState<PhoneSetupStep | null>(null);
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
   const iphone = typeof navigator !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent);
@@ -33,16 +35,17 @@ export function PushSetupSheet() {
       if (cancelled) return;
       let snoozedAt: string | null = null;
       try {
-        snoozedAt = window.localStorage.getItem(PUSH_SETUP_SNOOZE_KEY);
+        snoozedAt = window.localStorage.getItem(PHONE_SETUP_SNOOZE_KEY);
       } catch {
-        // Storage blocked: ask anyway.
+        // Storage blocked: show it anyway.
       }
       setStep(
-        pushSetupStep({
+        phoneSetupStep({
           active,
           supported,
           permission: supported ? Notification.permission : 'denied',
           standalone: isStandaloneApp(),
+          iosSafari: isIosSafari(navigator.userAgent),
           snoozedAt,
           now: Date.now(),
         })
@@ -57,7 +60,7 @@ export function PushSetupSheet() {
 
   const notNow = () => {
     try {
-      window.localStorage.setItem(PUSH_SETUP_SNOOZE_KEY, String(Date.now()));
+      window.localStorage.setItem(PHONE_SETUP_SNOOZE_KEY, String(Date.now()));
     } catch {
       // Hide for this visit only.
     }
@@ -78,16 +81,38 @@ export function PushSetupSheet() {
   return (
     <BodyLayer>
       <div className={s.backdrop}>
-        <section className={s.sheet} role="dialog" aria-modal="true" aria-labelledby="push-setup-title">
+        <section className={s.sheet} role="dialog" aria-modal="true" aria-labelledby="phone-setup-title" data-step={step}>
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={x.body}>
-            <span className={x.bell} aria-hidden="true">
-              <Bell size={28} />
+            <span className={x.badge} aria-hidden="true">
+              {step === 'install' ? <SquarePlus size={28} /> : <Bell size={28} />}
             </span>
-            <h2 id="push-setup-title" className={x.title}>
-              Turn on notifications
+            <h2 id="phone-setup-title" className={x.title}>
+              {step === 'install' ? 'Add 3C to your home screen' : 'Turn on notifications'}
             </h2>
-            {step === 'ask' ? (
+
+            {step === 'install' && (
+              <>
+                <p className={x.text}>
+                  It opens like an app, keeps you signed in, and is the only way an iPhone can get chat and install
+                  alerts. Takes 10 seconds:
+                </p>
+                <ol className={x.steps}>
+                  <li>
+                    Tap the <b>Share</b> button <Share size={16} className={x.inlineIcon} aria-label="(square with an arrow)" /> at
+                    the bottom of Safari.
+                  </li>
+                  <li>
+                    Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.
+                  </li>
+                  <li>
+                    Open <b>3C Console</b> from your home screen. It will ask about notifications next.
+                  </li>
+                </ol>
+              </>
+            )}
+
+            {step === 'ask' && (
               <>
                 <p className={x.text}>
                   Get a ping on this phone for team chat, install dates, missed installs and cancellations. One tap, then
@@ -102,7 +127,9 @@ export function PushSetupSheet() {
                   {working ? 'Turning on…' : 'Turn on notifications'}
                 </button>
               </>
-            ) : (
+            )}
+
+            {step === 'settings' && (
               <>
                 <p className={x.text}>This phone has notifications off for the 3C app. Turn them on in the phone&apos;s settings:</p>
                 <ol className={x.steps}>
@@ -122,6 +149,7 @@ export function PushSetupSheet() {
                 </ol>
               </>
             )}
+
             <button type="button" className={`${s.btnSecondary} ${s.btnBlock}`} disabled={working} onClick={notNow}>
               Not now
             </button>

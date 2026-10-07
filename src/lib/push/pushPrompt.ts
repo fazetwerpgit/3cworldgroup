@@ -46,24 +46,31 @@ export function shouldShowPushPrompt({
   return !isPushPromptSnoozed(snoozedAt, now);
 }
 
-// The installed app asks the moment it opens (owner request, 2026-10: Wil had the
-// app but never turned notifications on). "Not now" holds only until the next
-// day, and a phone that said no gets the Settings steps, since the app can never
-// show the system question again.
-export const PUSH_SETUP_SNOOZE_KEY = '3c-push-setup-snoozed-at';
-export const PUSH_SETUP_SNOOZE_HOURS = 16;
+// Phone setup, shown the moment the portal opens on a phone (owner request,
+// 2026-10: Miles used Safari, Wil had the app but notifications off).
+//   install  - iPhone Safari: add the portal to the home screen. Notifications
+//              only exist in the installed app on an iPhone.
+//   ask      - installed app, notifications undecided: one tap to turn them on.
+//   settings - installed app, the phone said no: steps in the phone's Settings,
+//              since the app can never show the system question again.
+// "Not now" holds only until the next day.
+export const PHONE_SETUP_SNOOZE_KEY = '3c-phone-setup-snoozed-at';
+export const PHONE_SETUP_SNOOZE_HOURS = 16;
 
-export type PushSetupStep = 'ask' | 'settings';
+export type PhoneSetupStep = 'install' | 'ask' | 'settings';
 
-export function pushSetupStep({
+export function phoneSetupStep({
   active,
   supported,
   permission,
   standalone,
+  iosSafari,
   snoozedAt,
   now,
-}: PushPromptConditions): PushSetupStep | null {
-  if (!active || !standalone || !supported || permission === 'granted') return null;
-  if (isPushPromptSnoozed(snoozedAt, now, PUSH_SETUP_SNOOZE_HOURS * 60 * 60 * 1000)) return null;
+}: PushPromptConditions & { iosSafari: boolean }): PhoneSetupStep | null {
+  if (!active) return null;
+  if (isPushPromptSnoozed(snoozedAt, now, PHONE_SETUP_SNOOZE_HOURS * 60 * 60 * 1000)) return null;
+  if (!standalone) return iosSafari ? 'install' : null;
+  if (!supported || permission === 'granted') return null;
   return permission === 'default' ? 'ask' : 'settings';
 }

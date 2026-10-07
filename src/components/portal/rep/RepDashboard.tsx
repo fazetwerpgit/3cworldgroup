@@ -23,7 +23,6 @@ import {
   type Standing,
 } from '@/lib/dashboard/repSummary';
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
-import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import { CarrierNotice } from './CarrierNotice';
 import { PayHelpSheet } from './PayHelpSheet';
@@ -795,12 +794,7 @@ export function RepDashboard() {
     <>
       <RepHomeView
         firstName={user?.displayName?.split(' ')[0] || 'Your'}
-        banners={
-          <>
-            <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
-            {pushPromptVisible === false && <AddToHomeScreenBanner pushPromptVisible={pushPromptVisible} />}
-          </>
-        }
+        banners={<PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />}
         payStatus={payStatus}
         pay={pay}
         hasPlan={rates !== null}

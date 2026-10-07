@@ -1,4 +1,4 @@
-/* The installed app's "Turn on notifications" sheet. Tokens from .layer (rep.module.css). */
+/* The phone setup sheet (add to home screen, turn on notifications). Tokens from .layer (rep.module.css). */
 
 .body {
   display: grid;
@@ -8,7 +8,7 @@
   text-align: center;
 }
 
-.bell {
+.badge {
   display: grid;
   place-items: center;
   width: 64px;
@@ -47,6 +47,13 @@
   font-size: var(--t-ui);
   line-height: 1.45;
   text-align: left;
+}
+
+.inlineIcon {
+  display: inline;
+  margin: 0 2px;
+  color: var(--c-text);
+  vertical-align: -3px;
 }
 
 .error {

@@ -12,7 +12,6 @@ const state = vi.hoisted(() => ({
 
 vi.mock('@/hooks/useOwnerDashboard', () => ({ useOwnerDashboard: () => ({ ...state.dash, retry: vi.fn() }) }));
 vi.mock('@/components/portal/PushPromptBanner', () => ({ default: () => null, usePushPromptVisible: () => [null, vi.fn()] }));
-vi.mock('@/components/portal/AddToHomeScreenBanner', () => ({ default: () => null }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ isRole: (...roles: string[]) => roles.includes(state.role) }) }));
 vi.mock('@/components/portal/rep/RepDashboard', () => ({ RepDashboard: () => <p>rep-dashboard</p> }));
 vi.mock('@/components/portal/admin-d/opsQueues', () => ({

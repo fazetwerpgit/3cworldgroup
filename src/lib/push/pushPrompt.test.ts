@@ -3,7 +3,7 @@ import {
   PUSH_PROMPT_SNOOZE_DAYS,
   PUSH_PROMPT_SNOOZE_KEY,
   isPushPromptSnoozed,
-  pushSetupStep,
+  phoneSetupStep,
   shouldShowPushPrompt,
   type PushPromptConditions,
 } from './pushPrompt';
@@ -96,28 +96,39 @@ describe('shouldShowPushPrompt', () => {
   });
 });
 
-describe('pushSetupStep (the installed app)', () => {
-  const APP = { ...SHOWABLE, standalone: true };
+describe('phoneSetupStep', () => {
+  const APP = { ...SHOWABLE, standalone: true, iosSafari: true };
+  const SAFARI = { ...SHOWABLE, standalone: false, iosSafari: true, supported: false };
   const HOUR = 60 * 60 * 1000;
 
-  it('asks on open while notifications are undecided, and never in a browser tab', () => {
-    expect(pushSetupStep(APP)).toBe('ask');
-    expect(pushSetupStep({ ...APP, standalone: false })).toBeNull();
+  it('on iPhone Safari, asks to add the portal to the home screen first', () => {
+    expect(phoneSetupStep(SAFARI)).toBe('install');
+  });
+
+  it('asks nothing in a browser that cannot install it (desktop, iPhone Chrome)', () => {
+    expect(phoneSetupStep({ ...SAFARI, iosSafari: false })).toBeNull();
+    expect(phoneSetupStep({ ...SAFARI, iosSafari: false, supported: true })).toBeNull();
+  });
+
+  it('in the installed app, asks for notifications while undecided', () => {
+    expect(phoneSetupStep(APP)).toBe('ask');
   });
 
   it('shows the phone Settings steps once the phone said no, and nothing once allowed', () => {
-    expect(pushSetupStep({ ...APP, permission: 'denied' })).toBe('settings');
-    expect(pushSetupStep({ ...APP, permission: 'granted' })).toBeNull();
+    expect(phoneSetupStep({ ...APP, permission: 'denied' })).toBe('settings');
+    expect(phoneSetupStep({ ...APP, permission: 'granted' })).toBeNull();
   });
 
   it('"Not now" holds until the next day, not for a month', () => {
     const snoozedAt = String(NOW);
-    expect(pushSetupStep({ ...APP, snoozedAt, now: NOW + 8 * HOUR })).toBeNull();
-    expect(pushSetupStep({ ...APP, snoozedAt, now: NOW + 17 * HOUR })).toBe('ask');
+    expect(phoneSetupStep({ ...SAFARI, snoozedAt, now: NOW + 8 * HOUR })).toBeNull();
+    expect(phoneSetupStep({ ...SAFARI, snoozedAt, now: NOW + 17 * HOUR })).toBe('install');
+    expect(phoneSetupStep({ ...APP, snoozedAt, now: NOW + 17 * HOUR })).toBe('ask');
   });
 
-  it('stays away from inactive accounts and phones without push', () => {
-    expect(pushSetupStep({ ...APP, active: false })).toBeNull();
-    expect(pushSetupStep({ ...APP, supported: false })).toBeNull();
+  it('stays away from inactive accounts, and from an app without push', () => {
+    expect(phoneSetupStep({ ...SAFARI, active: false })).toBeNull();
+    expect(phoneSetupStep({ ...APP, active: false })).toBeNull();
+    expect(phoneSetupStep({ ...APP, supported: false })).toBeNull();
   });
 });

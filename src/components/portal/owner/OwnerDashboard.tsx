@@ -18,7 +18,6 @@ import type {
 import { carrierReportStamp } from '@/lib/owner/reportFreshness';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
-import AddToHomeScreenBanner from '@/components/portal/AddToHomeScreenBanner';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import s from '../rep/rep.module.css';
 import o from './owner-dashboard.module.css';
@@ -314,7 +313,6 @@ export function OwnerDashboard() {
 
       <div className={o.banners}>
         <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
-        {pushPromptVisible === false && <AddToHomeScreenBanner pushPromptVisible={pushPromptVisible} />}
       </div>
 
       {/* DOM order is the phone reading order: money, Needs attention, Recruiting.
