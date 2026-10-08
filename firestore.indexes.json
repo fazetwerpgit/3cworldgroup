@@ -57,6 +57,24 @@
       ]
     },
     {
+      "collectionGroup": "saleDrafts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "salesRepId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "soldAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "alertTasks",
       "queryScope": "COLLECTION",
       "fields": [

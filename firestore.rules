@@ -119,6 +119,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Sale drafts from 3C Doors (one per Sold tapped at a door). Server-only:
+    // created, listed and closed through /api/portal/sales/drafts and
+    // /api/portal/sales with the Admin SDK, which stamps the rep from the token.
+    match /saleDrafts/{draftId} {
+      allow read, write: if false;
+    }
+
     // Notifications are created/updated exclusively server-side (Admin SDK via
     // /api/portal/notifications and lib/notifications). Clients may only read
     // their own — at ANY status, so mid-onboarding (pending) reps see their bell.

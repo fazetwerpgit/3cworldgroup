@@ -19,7 +19,9 @@ import {
 } from 'lucide-react';
 import { getPlanById } from '@/types';
 import { useCompPlan } from '@/hooks/useCompPlan';
+import { useKnockDrafts } from '@/hooks/useKnockDrafts';
 import { useSaleFormState } from '@/hooks/useSaleFormState';
+import type { KnockSaleDraft } from '@/lib/sales/knockDrafts';
 import { NO_SIGNAL_SALE_MESSAGE } from '@/hooks/useSales';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
 import { payoutLabelForDraft } from '@/lib/pay/payoutWindow';
@@ -30,6 +32,7 @@ import { saleScanEnabled } from '@/lib/sales/scan/flag';
 import { BULK_MAX_FILES } from '@/lib/sales/bulk/batch';
 import { AiConsentSheet } from './AiConsentSheet';
 import { BodyLayer } from './BodyLayer';
+import { FinishSales } from './FinishSales';
 import { PROOF_ACCEPT, ProofCapture, useProofUploads } from './ProofCapture';
 import { useSoftKeyboardOpen } from './RepForm';
 import { useHideRepTabBar } from './RepShell';
@@ -153,6 +156,8 @@ export function RepLogSale() {
     slotKey: form.proofUploadId,
   });
   const [moreOpen, setMoreOpen] = useState(false);
+  // Solds from 3C Doors still to log ("Finish your sales").
+  const knockDrafts = useKnockDrafts();
   // Start over was tapped on an entry with something in it: ask before clearing.
   const [confirmClear, setConfirmClear] = useState(false);
   const keyboardOpen = useSoftKeyboardOpen();
@@ -245,6 +250,12 @@ export function RepLogSale() {
     else clearSale();
   };
 
+  // Dismissing the draft the entry was filled from clears that entry too.
+  const dismissKnockDraft = (draft: KnockSaleDraft) => {
+    if (draft.id === form.draftId) clearSale();
+    void knockDrafts.dismiss(draft.id);
+  };
+
   const duplicate = form.duplicateOf;
   const duplicateRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -315,6 +326,12 @@ export function RepLogSale() {
       <div className={`${l.main} ${l.mainEntry}`} data-step-move={stepMove ?? undefined}>
         {consentSheet}
         <Steps onDetails={false} />
+        <FinishSales
+          drafts={knockDrafts.drafts}
+          selectedId={form.draftId}
+          onPick={form.fillFromKnockDraft}
+          onDismiss={dismissKnockDraft}
+        />
         <div className={l.defaultGrid}>
           <section className={l.entry} aria-labelledby="entry-h">
             <div className={l.entryBody}>

@@ -5,7 +5,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSales, type CreateSaleResult } from '@/hooks/useSales';
 import type { FiberPlan, Sale, SaleProduct, SaleType } from '@/types';
 import { addPlanToProducts, isExtraPlanId } from '@/lib/sales/planSelection';
+import { isDraftId, type KnockSaleDraft } from '@/lib/sales/knockDrafts';
 import { MAX_PROOF_SCREENSHOTS, proofPathFields, saleProofPaths } from '@/lib/sales/proofPaths';
+import { dateToSaleDateInput } from '@/lib/sales/saleDate';
+import { getPlanById } from '@/types/sales';
 import { randomHex } from '@/lib/randomHex';
 import { nativeHaptic } from '@/lib/app/bridge';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
@@ -61,6 +64,8 @@ export interface SaleDraft {
   keyUsed?: boolean;
   /** Epoch ms of the last edit; absent on a draft from an older build. */
   savedAt?: number;
+  /** The 3C Doors draft this entry finishes (sent as draftId). */
+  draftId?: string;
 }
 
 /** A fresh idempotency key: 32 hex, the CLIENT_SALE_ID_RE shape. */
@@ -125,6 +130,7 @@ export function readSaleDraft(key: string, now = Date.now()): SaleDraft | null {
       saleDateTouched: draft.saleDateTouched === true,
       proofUploadId: typeof draft.proofUploadId === 'string' ? draft.proofUploadId : '',
       keyUsed: draft.keyUsed === true,
+      draftId: isDraftId(draft.draftId) ? draft.draftId : undefined,
       savedAt,
     };
   } catch {
@@ -210,6 +216,8 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
   // merely reopening the page never makes an old draft look fresh. A draft
   // without one (an older build) is stamped with now.
   const [restoredSavedAt, setRestoredSavedAt] = useState<number | undefined>();
+  // The 3C Doors draft the rep picked from "Finish your sales": the sale closes it.
+  const [draftId, setDraftId] = useState<string | null>(null);
   const savedAtSpentRef = useRef(false);
   const submittedRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -243,6 +251,7 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
       }
       setFromDraft(true);
       setRestoredSavedAt(draft.savedAt);
+      setDraftId(draft.draftId ?? null);
     }
   }
 
@@ -262,13 +271,14 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
               saleDateTouched,
               proofUploadId,
               keyUsed,
+              draftId: draftId ?? undefined,
               savedAt,
             }
           : null
       );
     }, DRAFT_SAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [draftKey, draftRestored, formData, products, proofPaths, saleDateTouched, proofUploadId, keyUsed, restoredSavedAt]);
+  }, [draftKey, draftRestored, formData, products, proofPaths, saleDateTouched, proofUploadId, keyUsed, restoredSavedAt, draftId]);
 
   // The rep cleared a submitted entry to start another: that one gets its own
   // key (React's "adjust state when a prop changes" pattern, during render).
@@ -448,14 +458,18 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
       return null;
     }
 
-    const saleData = buildSalePayload({
-      formData,
-      products,
-      proofPaths,
-      user,
-      clientSaleId: options.clientSaleId ?? proofUploadId,
-      allowDuplicate: options.allowDuplicate,
-    });
+    const saleData = {
+      ...buildSalePayload({
+        formData,
+        products,
+        proofPaths,
+        user,
+        clientSaleId: options.clientSaleId ?? proofUploadId,
+        allowDuplicate: options.allowDuplicate,
+      }),
+      // The 3C Doors draft this entry finishes: the server closes it.
+      ...(draftId ? { draftId } : {}),
+    };
 
     // From here the key may name a stored sale, even if no answer comes back.
     setKeyUsed(true);
@@ -479,6 +493,7 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
       // Confirmed: whatever is entered next is a new sale with a new key.
       setProofUploadId(newClientSaleId());
       setKeyUsed(false);
+      setDraftId(null);
     }
     if (!result) nativeHaptic('error');
     return result;
@@ -517,6 +532,7 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
    * old key may already name. The page cancels its own uploads in flight.
    */
   const startOver = () => {
+    setDraftId(null);
     setFormData(emptySaleFields());
     setProducts([]);
     setProofPathsState([]);
@@ -532,6 +548,26 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
     setFromDraft(false);
     setRestoredSavedAt(undefined);
     if (draftKey) writeSaleDraft(draftKey, null);
+  };
+
+  /**
+   * Fill the entry from a 3C Doors draft: address, customer name, plan and the
+   * day it was sold. The rep adds the proof, install date and extras. The
+   * sale date counts as set by the rep, so the install date never moves it.
+   */
+  const fillFromKnockDraft = (draft: KnockSaleDraft) => {
+    setFormData((prev) => ({
+      ...prev,
+      customerAddress: draft.address,
+      customerName: draft.customerName ?? '',
+      saleDate: dateToSaleDateInput(new Date(draft.soldAt)),
+    }));
+    setSaleDateTouched(true);
+    setSaleDateFromInstall(false);
+    const plan = draft.planId ? getPlanById(draft.planId) : undefined;
+    setProducts(plan ? addPlanToProducts([], plan) : []);
+    setErrors({});
+    setDraftId(draft.id);
   };
 
   const provider =
@@ -552,6 +588,8 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
     removeProofPath,
     setProofPaths,
     proofUploadId,
+    draftId,
+    fillFromKnockDraft,
     saleDateFromInstall,
     saleDateTouched,
     errors,

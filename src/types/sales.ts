@@ -47,6 +47,9 @@ export interface CreateSaleData {
   clientSaleId?: string;
   /** Log it even though a live sale already has this order number ("Log as a new sale"). */
   allowDuplicate?: boolean;
+  // The 3C Doors draft this sale finishes (lib/sales/knockDrafts.ts); the
+  // server closes it once the sale is stored.
+  draftId?: string;
 }
 
 export interface Sale {

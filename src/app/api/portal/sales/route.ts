@@ -19,6 +19,7 @@ import {
   type OrderDuplicate,
 } from '@/lib/sales/orderNumber';
 import { isDemoAccount, saleVisibleTo } from '@/lib/users/demoAccount';
+import { SALE_DRAFTS_COLLECTION, isDraftId } from '@/lib/sales/knockDrafts';
 
 // Helper function to create a notification
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -292,6 +293,28 @@ async function findOrderDuplicate(
   };
 }
 
+/**
+ * Close the 3C Doors draft a sale was finished from: only the caller's own,
+ * only while open. The sale is already stored, so a failure here is logged
+ * and swallowed: the rep can dismiss a leftover draft, but must never be told
+ * a sale that landed did not.
+ */
+async function closeDraftForSale(draftId: string, salesRepId: string, saleId: string) {
+  if (!adminDb) return;
+  const db = adminDb;
+  const ref = db.collection(SALE_DRAFTS_COLLECTION).doc(draftId);
+  try {
+    await db.runTransaction(async (tx) => {
+      const data = (await tx.get(ref)).data();
+      if (!data || data.salesRepId !== salesRepId || data.status !== 'open') return;
+      const now = new Date();
+      tx.update(ref, { status: 'submitted', saleId, submittedAt: now, updatedAt: now });
+    });
+  } catch (error) {
+    console.error('Error closing sale draft:', error);
+  }
+}
+
 // POST /api/portal/sales - Create a new sale
 export async function POST(request: NextRequest) {
   try {
@@ -331,6 +354,7 @@ export async function POST(request: NextRequest) {
       installDate,
       clientSaleId: rawClientSaleId,
       allowDuplicate,
+      draftId: rawDraftId,
     } = body;
 
     // The order number / BTN is text, but a scripted or older client may send it
@@ -347,6 +371,16 @@ export async function POST(request: NextRequest) {
     const orderNumberOrBtn: string =
       rawOrderNumberOrBtn === undefined || rawOrderNumberOrBtn === null ? '' : String(rawOrderNumberOrBtn);
 
+    // The 3C Doors draft this sale finishes (optional). Checked for shape up
+    // front; ownership is checked when the draft is closed.
+    let draftId: string | null = null;
+    if (rawDraftId !== undefined && rawDraftId !== null && rawDraftId !== '') {
+      if (!isDraftId(rawDraftId)) {
+        return NextResponse.json({ error: 'Invalid draftId' }, { status: 400 });
+      }
+      draftId = rawDraftId;
+    }
+
     // Idempotency key: the form's per-sale proofUploadId. A retried submit (weak
     // signal, a lost response, a double tap) lands on the same document id, so it
     // returns the sale already written instead of logging it twice. Optional for
@@ -358,7 +392,11 @@ export async function POST(request: NextRequest) {
       }
       clientSaleId = rawClientSaleId;
       const replay = await existingSaleForReplay(clientSaleId, salesRepId);
-      if (replay) return replay;
+      if (replay) {
+        // A retried submit whose first answer was lost: the draft may not have closed.
+        if (draftId && replay.status === 200) await closeDraftForSale(draftId, salesRepId, clientSaleId);
+        return replay;
+      }
     }
 
     // Customer text is stored as typed, but only as text of sane length: every
@@ -520,7 +558,10 @@ export async function POST(request: NextRequest) {
       } catch (createError) {
         if (isAlreadyExistsError(createError)) {
           const replay = await existingSaleForReplay(clientSaleId, salesRepId);
-          if (replay) return replay;
+          if (replay) {
+            if (draftId && replay.status === 200) await closeDraftForSale(draftId, salesRepId, clientSaleId);
+            return replay;
+          }
         }
         throw createError;
       }
@@ -529,6 +570,8 @@ export async function POST(request: NextRequest) {
     }
     // The board snapshot rebuilds on its next read (debounced).
     await markLeaderboardDirty();
+
+    if (draftId) await closeDraftForSale(draftId, salesRepId, docRef.id);
 
     await createNotification(
       salesRepId,
