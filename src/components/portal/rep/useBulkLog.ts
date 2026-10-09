@@ -10,6 +10,7 @@ import {
   BULK_KEY_PREFIX,
   BULK_MAX_FILES,
   applyScanToRow,
+  batchSettled,
   batchSummary,
   findRepeats,
   hashBytes,
@@ -47,8 +48,10 @@ export function useBulkLog() {
   const [lost, setLost] = useState(0);
   const [overCap, setOverCap] = useState(false);
   const [sending, setSending] = useState(false);
-  /** The last send finished: the summary shows and the saved batch is gone. */
+  /** The last "Log N sales" finished: the summary shows. */
   const [finished, setFinished] = useState(false);
+  /** Every ticked row is settled and the saved copy is gone; nothing more is saved until a change. */
+  const [cleared, setCleared] = useState(false);
   /** Upload errors by row, for the card (in memory only). */
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -63,6 +66,9 @@ export function useBulkLog() {
   const controllers = useRef(new Map<string, AbortController>());
   const objectUrls = useRef(new Set<string>());
   const alive = useRef(true);
+  // Bumped by Start over: a send in progress stops before its next sale and
+  // its answers no longer touch the (new) batch.
+  const generation = useRef(0);
 
   // Restore once the user is known, during render, so the first paint shows it.
   if (storageKey && restoredKey !== storageKey) {
@@ -89,9 +95,11 @@ export function useBulkLog() {
       const onAbort = () => timeout.abort();
       signal.addEventListener('abort', onAbort);
       let fields = null;
+      let busy = false;
       try {
         const reply = await requestScan([path], timeout.signal);
         fields = reply?.fields ?? null;
+        busy = reply?.reason === 'rate_limited';
       } catch {
         fields = null;
       } finally {
@@ -102,7 +110,7 @@ export function useBulkLog() {
       if (fields) markScanIntroUsed();
       patch(id, (row) => {
         const { row: next, filled } = applyScanToRow(row, fields);
-        return { ...next, phase: filled ? 'read' : 'read_failed' };
+        return { ...next, phase: filled ? 'read' : 'read_failed', readBusy: busy };
       });
     },
     [patch]
@@ -121,6 +129,15 @@ export function useBulkLog() {
         const file = files.current.get(task.id);
         if (!file) return;
         patch(task.id, { phase: 'uploading' });
+        void makeThumb(file).then((url) => {
+          if (!url) return;
+          if (!alive.current || !rowsRef.current.some((row) => row.id === task.id)) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          objectUrls.current.add(url);
+          setPreviews((prev) => ({ ...prev, [task.id]: url }));
+        });
         // The picture's fingerprint, for "Same screenshot as #2".
         try {
           const hash = await hashBytes(await file.arrayBuffer());
@@ -191,12 +208,30 @@ export function useBulkLog() {
     };
   }, []);
 
-  // Save the batch as it changes; once a send finishes it is cleared instead.
+  // Save the batch as it changes, until it is settled and cleared.
   useEffect(() => {
-    if (!storageKey || restoredKey !== storageKey || finished) return;
+    if (!storageKey || restoredKey !== storageKey || cleared) return;
     const timer = window.setTimeout(() => writeBulkBatch(storageKey, rows), SAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [storageKey, restoredKey, rows, finished]);
+  }, [storageKey, restoredKey, rows, cleared]);
+
+  /** A change after the batch was settled: it is worth saving again. */
+  const changed = () => {
+    setFinished(false);
+    setCleared(false);
+  };
+
+  const dropPreview = (id: string) => {
+    setPreviews((prev) => {
+      const url = prev[id];
+      if (!url) return prev;
+      URL.revokeObjectURL(url);
+      objectUrls.current.delete(url);
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
 
   /** Queue picked files; anything past BULK_MAX_FILES is left off (overCap says so). */
   const addFiles = (picked: File[]) => {
@@ -205,22 +240,12 @@ export function useBulkLog() {
     setOverCap(picked.length > room);
     const taken = picked.slice(0, room);
     if (taken.length === 0) return;
-    setFinished(false);
+    changed();
     const added = taken.map((file) => {
       const row = newBulkRow(randomHex(), file.name);
       files.current.set(row.id, file);
       return row;
     });
-    const urls: Record<string, string> = {};
-    added.forEach((row, i) => {
-      const mime = formFileMime(taken[i]);
-      if (mime.startsWith('image/') && mime !== 'image/heic' && mime !== 'image/heif') {
-        const url = URL.createObjectURL(taken[i]);
-        objectUrls.current.add(url);
-        urls[row.id] = url;
-      }
-    });
-    setPreviews((prev) => ({ ...prev, ...urls }));
     setRows((prev) => [...prev, ...added]);
     rowsRef.current = [...rowsRef.current, ...added];
     enqueue(added.map((row) => ({ id: row.id, kind: 'full' })));
@@ -248,26 +273,28 @@ export function useBulkLog() {
     controllers.current.get(id)?.abort();
     queue.current = queue.current.filter((task) => task.id !== id);
     files.current.delete(id);
-    setFinished(false);
+    dropPreview(id);
+    changed();
     setRows((prev) => prev.filter((row) => row.id !== id));
   };
 
   const setInclude = (id: string, include: boolean) => {
-    setFinished(false);
+    changed();
     patch(id, { include });
   };
 
   /** The edit sheet's values. An edit clears a "Not sent" reason, never a logged result. */
   const save = (id: string, change: Pick<BulkRow, 'formData' | 'products' | 'provider' | 'saleDateTouched' | 'flags'>) => {
-    setFinished(false);
+    changed();
     patch(id, (row) => {
       const stale = row.result?.kind === 'failed' || (row.result?.kind === 'already' && orderChanged(row, change));
       return { ...row, ...change, result: stale ? null : row.result };
     });
   };
 
-  /** Throw the whole batch away. */
+  /** Throw the whole batch away (the page offers it only while nothing is sending). */
   const startOver = () => {
+    generation.current += 1;
     for (const controller of controllers.current.values()) controller.abort();
     queue.current = [];
     files.current.clear();
@@ -277,43 +304,63 @@ export function useBulkLog() {
     setOverCap(false);
     setFromSaved(false);
     setFinished(false);
+    setCleared(false);
     setUploadErrors({});
+    for (const url of objectUrls.current) URL.revokeObjectURL(url);
+    objectUrls.current.clear();
+    setPreviews({});
     if (storageKey) writeBulkBatch(storageKey, null);
   };
 
   const sendingRef = useRef(false);
-  /** `wholeBatch`: "Log N sales", which ends the batch (summary, saved copy cleared). */
+  /**
+   * Send rows one at a time. `wholeBatch` ("Log N sales") shows the summary
+   * after. The saved copy is cleared only once every ticked row is settled;
+   * otherwise it stays, so the rep can close the app and retry the rest.
+   */
   const send = async (targets: BulkRow[], { allowDuplicate, wholeBatch }: { allowDuplicate: boolean; wholeBatch: boolean }) => {
     if (!user || sendingRef.current || targets.length === 0) return;
+    const run = generation.current;
+    const current = () => alive.current && generation.current === run;
     sendingRef.current = true;
     setSending(true);
+    setCleared(false);
     if (wholeBatch) setFinished(false);
+    // This send's answers, laid over the rows as they were, for saving.
+    const results = new Map<string, BulkResult>();
+    const withResults = () =>
+      rowsRef.current.map((row) => {
+        const result = results.get(row.id);
+        return result ? { ...row, sending: false, result } : row;
+      });
     try {
       await submitBulkRows({
         rows: targets,
         user,
         create: createSale,
         allowDuplicate,
-        onStart: (id) => patch(id, { sending: true }),
+        onStart: (id) => {
+          if (current()) patch(id, { sending: true });
+        },
         onResult: (id, result: BulkResult) => {
-          patch(id, { sending: false, result });
+          // After Start over this batch is gone; after closing the page the
+          // answer is still saved, so the rep sees it when they come back.
+          if (generation.current !== run) return;
+          results.set(id, result);
+          if (alive.current) patch(id, { sending: false, result });
           // Keep the saved copy current between sends, so a close mid-batch
           // never forgets which ones are already logged.
-          if (storageKey && alive.current) {
-            writeBulkBatch(
-              storageKey,
-              rowsRef.current.map((row) => (row.id === id ? { ...row, sending: false, result } : row))
-            );
-          }
+          if (storageKey) writeBulkBatch(storageKey, withResults());
         },
-        shouldStop: () => !alive.current,
+        shouldStop: () => !current(),
       });
     } finally {
       sendingRef.current = false;
-      if (alive.current) {
-        setSending(false);
-        if (wholeBatch || finished) {
-          setFinished(true);
+      if (alive.current) setSending(false);
+      if (generation.current === run) {
+        if (alive.current && (wholeBatch || finished)) setFinished(true);
+        if (batchSettled(withResults())) {
+          if (alive.current) setCleared(true);
           if (storageKey) writeBulkBatch(storageKey, null);
         }
       }
@@ -358,6 +405,36 @@ export function useBulkLog() {
     logAll,
     logAnyway,
   };
+}
+
+/**
+ * A small thumbnail for the card: the screenshot drawn once onto an 88px-wide
+ * canvas, so 25 full-size phone screenshots are never kept decoded for the
+ * list. Falls back to the file itself where the browser cannot (HEIC, old
+ * browsers), and to nothing for a file that is not a picture.
+ */
+async function makeThumb(file: File): Promise<string | null> {
+  const mime = formFileMime(file);
+  if (!mime.startsWith('image/')) return null;
+  if (typeof createImageBitmap === 'function' && typeof document !== 'undefined') {
+    try {
+      const bitmap = await createImageBitmap(file);
+      const width = 88;
+      const height = Math.min(176, Math.max(1, Math.round((bitmap.height / bitmap.width) * width)));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      // Top of the screenshot: where the order details start.
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0, width, Math.round((bitmap.height / bitmap.width) * width));
+      bitmap.close();
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+      if (blob) return URL.createObjectURL(blob);
+    } catch {
+      // Fall through to the file itself.
+    }
+  }
+  if (mime === 'image/heic' || mime === 'image/heif') return null;
+  return URL.createObjectURL(file);
 }
 
 /** A new order number is a new question for the server: drop its old "already logged". */

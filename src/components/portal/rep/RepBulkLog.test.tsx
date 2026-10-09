@@ -4,7 +4,7 @@
 // time), the list flags repeats and what is missing, "Log N sales" sends the
 // ready ones one at a time under their own keys, an order already on the books
 // can be logged anyway, and a saved batch never resends what was logged.
-import { act } from 'react';
+import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CreateSaleData } from '@/types';
@@ -49,6 +49,7 @@ vi.mock('./ProofCapture', () => ({
 }));
 
 import { RepBulkLog } from './RepBulkLog';
+import { useBulkLog } from './useBulkLog';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -68,6 +69,7 @@ const SCANS: Record<string, SaleScanResponse> = {
   'a-again.png': read('TMF-1', 'Ana Ruiz'),
   'c.png': { fields: null, reason: 'model_error' },
   'd.png': read('tmf 2', 'Ben Cole'),
+  'busy.png': { fields: null, reason: 'rate_limited' },
 };
 
 let container: HTMLDivElement;
@@ -117,6 +119,37 @@ const logButton = () =>
   Array.from(container.querySelectorAll('button')).find((b) => /^(Log \d+ sales?|Nothing ready|Reading|Logging)/.test(b.textContent ?? ''))!;
 
 const png = (name: string, bytes: string) => new File([bytes], name, { type: 'image/png' });
+const KEY = `${BULK_KEY_PREFIX}r1`;
+const saved = () => JSON.parse(window.localStorage.getItem(KEY) ?? 'null') as { rows: BulkRow[] } | null;
+
+/** A saved, ready row: `letter` picks the id ("aaaa…"), order number and address. */
+function savedRow(letter: string, over: Partial<BulkRow> = {}): BulkRow {
+  const id = letter.repeat(32);
+  const base = newBulkRow(id, `${letter}.png`);
+  return {
+    ...base,
+    phase: 'read',
+    proofPath: `form-attachments/r1/sale-proof/${id}_abcdef/`,
+    products: addPlanToProducts([], getPlanById('tfiber-1gig')!),
+    formData: { ...base.formData, customerAddress: `${letter} Elm St`, installDate: '2099-01-02', orderNumberOrBtn: `ORD-${letter}` },
+    ...over,
+  };
+}
+
+/** createSale calls that wait until the test answers them. */
+function deferredSales() {
+  const waiting: Array<(value: unknown) => void> = [];
+  createSale.mockImplementation(
+    (data: CreateSaleData) =>
+      new Promise((resolve) => waiting.push(() => resolve({ sale: { id: `sale-${data.clientSaleId}` }, duplicate: false })))
+  );
+  return {
+    async answerNext() {
+      await act(async () => waiting.shift()?.(undefined));
+      await settle();
+    },
+  };
+}
 
 beforeEach(() => {
   vi.stubEnv('SALE_SCAN_ENABLED', 'true');
@@ -217,8 +250,9 @@ describe('RepBulkLog', () => {
     expect(cardText(2)).toContain('Already logged by Dana W. on Sep 14.');
     expect(container.textContent).toContain('1 logged, 1 already logged, 1 needs info, 2 skipped');
     expect(container.querySelector('a[href="/portal/sales"]')?.textContent).toBe('Go to Sales');
-    // The batch is done: the saved copy is gone.
-    expect(window.localStorage.getItem(`${BULK_KEY_PREFIX}r1`)).toBeNull();
+    // Sale 4 is ticked but still needs info: the batch stays saved for later.
+    await act(async () => new Promise((r) => setTimeout(r, 400)));
+    expect(saved()?.rows.find((row) => row.id === first.clientSaleId)?.result?.kind).toBe('logged');
 
     await act(async () => button('Log anyway')!.click());
     await settle();
@@ -290,6 +324,126 @@ describe('RepBulkLog', () => {
     await settle();
     expect(createSale).toHaveBeenCalledTimes(1);
     expect((createSale.mock.calls[0][0] as CreateSaleData).clientSaleId).toBe('b'.repeat(32));
+  });
+
+  it('keeps Start over off while sending, and a closed page sends nothing more', async () => {
+    writeBulkBatch(KEY, [savedRow('a'), savedRow('b'), savedRow('c')]);
+    await render();
+    await settle();
+    const sales = deferredSales();
+    await act(async () => logButton().click());
+    await settle();
+    expect(createSale).toHaveBeenCalledTimes(1);
+    expect(button('Start over')!.disabled).toBe(true);
+
+    // The rep closes the app mid-send; the sale in flight still lands.
+    await act(async () => root.unmount());
+    await sales.answerNext();
+    expect(createSale).toHaveBeenCalledTimes(1);
+    expect(saved()?.rows.map((row) => row.result?.kind ?? null)).toEqual(['logged', null, null]);
+
+    // Coming back picks up the rest.
+    container.remove();
+    await render();
+    await settle();
+    expect(cardText(1)).toContain('Logged');
+    expect(logButton().textContent).toBe('Log 2 sales');
+  });
+
+  it('Start over during a send stops the rest and forgets the batch', async () => {
+    writeBulkBatch(KEY, [savedRow('a'), savedRow('b'), savedRow('c')]);
+    let bulk!: ReturnType<typeof useBulkLog>;
+    function Harness({ expose }: { expose: (value: ReturnType<typeof useBulkLog>) => void }) {
+      const value = useBulkLog();
+      useEffect(() => {
+        expose(value);
+      });
+      return null;
+    }
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root.render(<Harness expose={(value) => (bulk = value)} />));
+    await settle();
+    const sales = deferredSales();
+    await act(async () => void bulk.logAll());
+    await settle();
+    expect(createSale).toHaveBeenCalledTimes(1);
+
+    await act(async () => bulk.startOver());
+    await sales.answerNext();
+    await settle();
+    expect(createSale).toHaveBeenCalledTimes(1);
+    expect(bulk.rows).toHaveLength(0);
+    expect(bulk.sending).toBe(false);
+    await act(async () => new Promise((r) => setTimeout(r, 400)));
+    expect(saved()).toBeNull();
+  });
+
+  it('keeps the saved batch until every ticked sale is in', async () => {
+    writeBulkBatch(KEY, [savedRow('a'), savedRow('b')]);
+    await render();
+    await settle();
+    createSale.mockImplementation(async (data: CreateSaleData, options?: { onError?: (m: string) => void }) => {
+      if (data.clientSaleId === 'b'.repeat(32)) {
+        options?.onError?.('No signal. Your entry is saved, tap Submit to retry.');
+        return null;
+      }
+      return { sale: { id: `sale-${data.clientSaleId}` }, duplicate: false };
+    });
+    await act(async () => logButton().click());
+    await settle();
+    expect(cardText(2)).toContain('Not logged. No signal. Tap Log again to retry.');
+    await act(async () => new Promise((r) => setTimeout(r, 400)));
+    expect(saved()?.rows.map((row) => row.result?.kind)).toEqual(['logged', 'failed']);
+
+    createSale.mockResolvedValue({ sale: { id: 'sale-b' }, duplicate: false });
+    await act(async () => logButton().click());
+    await settle();
+    expect(cardText(2)).toContain('Logged');
+    await act(async () => new Promise((r) => setTimeout(r, 400)));
+    expect(saved()).toBeNull();
+  });
+
+  it('says when the reader is busy, and Read again tries once more', async () => {
+    await render();
+    await pick([png('busy.png', 'BUSY')]);
+    await finishUploads();
+    expect(cardText(1)).toContain('Too many reads right now. Try again in a few minutes.');
+
+    await act(async () => button('Read again')!.click());
+    await settle();
+    expect(scanned).toEqual(['busy.png', 'busy.png']);
+    expect(cardText(1)).toContain('Too many reads right now.');
+
+    SCANS['busy.png'] = read('TMF-9', 'Cy Park');
+    try {
+      await act(async () => button('Read again')!.click());
+      await settle();
+    } finally {
+      SCANS['busy.png'] = { fields: null, reason: 'rate_limited' };
+    }
+    expect(cardText(1)).toContain('Cy Park');
+    expect(cardText(1)).toContain('Ready');
+  });
+
+  it('says when an earlier send landed and the edit since did not', async () => {
+    writeBulkBatch(KEY, [savedRow('a', { result: { kind: 'logged', saleId: 's1', editLost: true } })]);
+    await render();
+    await settle();
+    expect(cardText(1)).toContain("Logged, but your changes weren't saved. Edit this sale from Sales.");
+  });
+
+  it('frees the preview of a removed screenshot', async () => {
+    await render();
+    await pick([png('a.png', 'AAAA'), png('b.png', 'BBBB')]);
+    await finishUploads();
+    await finishUploads();
+    const revoke = URL.revokeObjectURL as ReturnType<typeof vi.fn>;
+    expect(revoke).not.toHaveBeenCalled();
+    await act(async () => cards()[0].querySelector<HTMLButtonElement>('button[aria-label="Remove sale 1"]')!.click());
+    expect(revoke).toHaveBeenCalledTimes(1);
+    expect(cards()).toHaveLength(1);
   });
 
   it('takes 25 at most and says so', async () => {

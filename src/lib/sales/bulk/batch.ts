@@ -37,7 +37,15 @@ export type BulkPhase = 'uploading' | 'reading' | 'read' | 'upload_failed' | 're
 
 /** What happened when the row was sent. */
 export type BulkResult =
-  | { kind: 'logged'; saleId: string | null }
+  | {
+      kind: 'logged';
+      saleId: string | null;
+      /**
+       * A retry came back as the sale an earlier, unanswered send already
+       * wrote, and the rep had edited the row since: the edit is not on it.
+       */
+      editLost?: boolean;
+    }
   | { kind: 'already'; duplicate: OrderDuplicate }
   | { kind: 'failed'; reason: string };
 
@@ -59,6 +67,8 @@ export interface BulkRow {
   /** The rep's include/skip pick; null is the default (in, unless it repeats another row). */
   include: boolean | null;
   result: BulkResult | null;
+  /** The last read was turned away by the reader's rate limit. */
+  readBusy?: boolean;
   /** On its way to the server now (never saved). */
   sending?: boolean;
 }
@@ -69,12 +79,12 @@ export type BulkStatus =
   | { kind: 'uploading' }
   | { kind: 'reading' }
   | { kind: 'upload_failed' }
-  | { kind: 'read_failed'; problems: string[] }
+  | { kind: 'read_failed'; problems: string[]; busy: boolean }
   | { kind: 'needs_info'; problems: string[] }
   | { kind: 'repeat'; repeat: BulkRepeat; problems: string[] }
   | { kind: 'ready' }
   | { kind: 'sending' }
-  | { kind: 'logged' }
+  | { kind: 'logged'; editLost: boolean }
   | { kind: 'already'; duplicate: OrderDuplicate }
   | { kind: 'failed'; reason: string };
 
@@ -145,7 +155,7 @@ export function findRepeats(rows: Pick<BulkRow, 'id' | 'hash' | 'formData'>[]): 
 
 /** The row's status, most pressing first. */
 export function rowStatus(row: BulkRow, repeat: BulkRepeat | undefined): BulkStatus {
-  if (row.result?.kind === 'logged') return { kind: 'logged' };
+  if (row.result?.kind === 'logged') return { kind: 'logged', editLost: row.result.editLost === true };
   if (row.sending) return { kind: 'sending' };
   if (row.phase === 'uploading') return { kind: 'uploading' };
   if (row.phase === 'reading') return { kind: 'reading' };
@@ -154,7 +164,9 @@ export function rowStatus(row: BulkRow, repeat: BulkRepeat | undefined): BulkSta
   const problems = rowProblems(row);
   if (repeat) return { kind: 'repeat', repeat, problems };
   if (problems.length > 0) {
-    return row.phase === 'read_failed' ? { kind: 'read_failed', problems } : { kind: 'needs_info', problems };
+    return row.phase === 'read_failed'
+      ? { kind: 'read_failed', problems, busy: row.readBusy === true }
+      : { kind: 'needs_info', problems };
   }
   if (row.result?.kind === 'failed') return { kind: 'failed', reason: row.result.reason };
   return { kind: 'ready' };
@@ -174,6 +186,18 @@ export function isSendable(row: BulkRow, repeat: BulkRepeat | undefined): boolea
     status.kind === 'failed' ||
     (status.kind === 'repeat' && status.problems.length === 0)
   );
+}
+
+/**
+ * Nothing left to do: every ticked row is logged or was already on the books.
+ * Until then the batch stays saved, so a rep can close the app and retry.
+ */
+export function batchSettled(rows: BulkRow[]): boolean {
+  const repeats = findRepeats(rows);
+  return rows.every((row) => {
+    if (row.result?.kind === 'logged' || row.result?.kind === 'already') return true;
+    return !isIncluded(row, repeats.get(row.id));
+  });
 }
 
 /** Rows to send for "Log N sales", in list order. */
@@ -288,7 +312,13 @@ function isOrderDuplicate(value: unknown): value is OrderDuplicate {
 function readResult(value: unknown): BulkResult | null {
   if (!value || typeof value !== 'object') return null;
   const r = value as Record<string, unknown>;
-  if (r.kind === 'logged') return { kind: 'logged', saleId: typeof r.saleId === 'string' ? r.saleId : null };
+  if (r.kind === 'logged') {
+    return {
+      kind: 'logged',
+      saleId: typeof r.saleId === 'string' ? r.saleId : null,
+      ...(r.editLost === true ? { editLost: true } : {}),
+    };
+  }
   if (r.kind === 'already' && isOrderDuplicate(r.duplicate)) return { kind: 'already', duplicate: r.duplicate };
   if (r.kind === 'failed' && typeof r.reason === 'string') return { kind: 'failed', reason: r.reason };
   return null;
@@ -319,6 +349,7 @@ function readRow(value: unknown): BulkRow | null {
     flags,
     include: typeof r.include === 'boolean' ? r.include : null,
     result: readResult(r.result),
+    ...(r.readBusy === true ? { readBusy: true } : {}),
   };
 }
 

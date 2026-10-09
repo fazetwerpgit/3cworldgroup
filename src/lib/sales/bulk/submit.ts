@@ -6,7 +6,8 @@
 
 import type { CreateSaleData } from '@/types';
 import type { CreateSaleResult } from '@/hooks/useSales';
-import { buildSalePayload, type SaleSubmitter } from '@/lib/sales/saleForm';
+import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
+import { buildSalePayload, isSameSaleEntry, type SaleSubmitter } from '@/lib/sales/saleForm';
 import type { BulkResult, BulkRow } from './batch';
 
 export type CreateSaleFn = (
@@ -14,8 +15,28 @@ export type CreateSaleFn = (
   options: { onError: (message: string) => void }
 ) => Promise<CreateSaleResult | null>;
 
+/**
+ * True when the sale the server handed back is the row as it is now. A replay
+ * of an earlier send that landed unseen holds what was sent then; if the rep
+ * edited the row since, the edit is not on the stored sale.
+ */
+export function replayMatchesRow(
+  sale: Partial<Record<string, unknown>> | null | undefined,
+  row: Pick<BulkRow, 'formData' | 'products'>
+): boolean {
+  if (!sale) return false;
+  return (
+    isSameSaleEntry(sale as Parameters<typeof isSameSaleEntry>[0], row) &&
+    normalizeOrderNumber(sale.orderNumberOrBtn) === normalizeOrderNumber(row.formData.orderNumberOrBtn)
+  );
+}
+
 /** The create-sale answer as a row result. */
-export function toBulkResult(created: CreateSaleResult | null, errorMessage: string): BulkResult {
+export function toBulkResult(
+  created: CreateSaleResult | null,
+  errorMessage: string,
+  row?: Pick<BulkRow, 'formData' | 'products'>
+): BulkResult {
   if (!created) {
     const reason = /^no signal/i.test(errorMessage)
       ? 'No signal. Tap Log again to retry.'
@@ -23,8 +44,13 @@ export function toBulkResult(created: CreateSaleResult | null, errorMessage: str
     return { kind: 'failed', reason };
   }
   if (created.orderDuplicate) return { kind: 'already', duplicate: created.orderDuplicate };
-  // A `duplicate` is this row's own key coming back: its sale is stored.
-  return { kind: 'logged', saleId: created.sale.id ?? null };
+  // A `duplicate` is this row's own key coming back: its sale is stored, but
+  // it may be what an earlier send carried, from before the rep's edit.
+  const saleId = created.sale.id ?? null;
+  if (created.duplicate && row && !replayMatchesRow(created.sale as unknown as Record<string, unknown>, row)) {
+    return { kind: 'logged', saleId, editLost: true };
+  }
+  return { kind: 'logged', saleId };
 }
 
 /**
@@ -69,6 +95,6 @@ export async function submitBulkRows({
     } catch (error) {
       message = error instanceof Error ? error.message : '';
     }
-    onResult(row.id, toBulkResult(created, message));
+    onResult(row.id, toBulkResult(created, message, row));
   }
 }

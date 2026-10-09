@@ -10,6 +10,7 @@ import { todaySaleDateInput } from '@/lib/sales/saleDate';
 import {
   BULK_MAX_AGE_MS,
   applyScanToRow,
+  batchSettled,
   batchSummary,
   findRepeats,
   hashBytes,
@@ -101,8 +102,24 @@ describe('rowStatus', () => {
 
   it('a screenshot the reader could not make out says so until the row is complete', () => {
     const blank = { ...newBulkRow(id(1), 'a.png'), phase: 'read_failed' as const, proofPath: PATH(1) };
-    expect(rowStatus(blank, undefined).kind).toBe('read_failed');
+    expect(rowStatus(blank, undefined)).toMatchObject({ kind: 'read_failed', busy: false });
     expect(rowStatus({ ...ready(1), phase: 'read_failed' }, undefined).kind).toBe('ready');
+  });
+
+  it('tells a busy reader apart from one that could not read the picture', () => {
+    const busy = { ...newBulkRow(id(1), 'a.png'), phase: 'read_failed' as const, proofPath: PATH(1), readBusy: true };
+    expect(rowStatus(busy, undefined)).toMatchObject({ kind: 'read_failed', busy: true });
+  });
+
+  it('a logged sale whose later edit never reached the server says so', () => {
+    expect(rowStatus(ready(1, { result: { kind: 'logged', saleId: 's1', editLost: true } }), undefined)).toEqual({
+      kind: 'logged',
+      editLost: true,
+    });
+    expect(rowStatus(ready(1, { result: { kind: 'logged', saleId: 's1' } }), undefined)).toEqual({
+      kind: 'logged',
+      editLost: false,
+    });
   });
 
   it('puts results and repeats ahead of the rest', () => {
@@ -138,6 +155,16 @@ describe('include and send', () => {
       ready(7, { hash: 'hash-1', include: true }), // repeat the rep ticked
     ];
     expect(sendableRows(rows).map((row) => row.id)).toEqual([id(1), id(6), id(7)]);
+  });
+
+  it('is settled only when no ticked row is left unlogged', () => {
+    const dup = { existingSaleId: null, existingRepName: 'Dana W.', existingSaleDate: null, existingCustomerFirstName: null, existingIsMine: false };
+    const logged = ready(1, { result: { kind: 'logged', saleId: 's1' } });
+    expect(batchSettled([logged, ready(2, { result: { kind: 'already', duplicate: dup } })])).toBe(true);
+    expect(batchSettled([logged, ready(2, { include: false }), ready(3, { hash: 'hash-1' })])).toBe(true);
+    expect(batchSettled([logged, ready(2, { result: { kind: 'failed', reason: 'No signal.' } })])).toBe(false);
+    expect(batchSettled([logged, ready(2, { products: [] })])).toBe(false);
+    expect(batchSettled([logged, ready(2)])).toBe(false);
   });
 });
 
@@ -197,6 +224,16 @@ describe('saved batch', () => {
     expect(saved?.rows[0].sending).toBeUndefined();
     expect(saved?.rows[0].result).toEqual({ kind: 'logged', saleId: 's1' });
     expect(saved?.rows[1].products.map((p) => p.productId)).toEqual(['tfiber-1gig']);
+  });
+
+  it('keeps a lost edit and a busy reader across a reload', () => {
+    writeBulkBatch(KEY, [
+      ready(1, { result: { kind: 'logged', saleId: 's1', editLost: true } }),
+      { ...newBulkRow(id(2), 'b.png'), phase: 'read_failed', proofPath: PATH(2), readBusy: true },
+    ]);
+    const saved = readBulkBatch(KEY);
+    expect(saved?.rows[0].result).toEqual({ kind: 'logged', saleId: 's1', editLost: true });
+    expect(saved?.rows[1].readBusy).toBe(true);
   });
 
   it('drops screenshots that never got uploaded and counts them', () => {

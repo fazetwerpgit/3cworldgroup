@@ -8,7 +8,7 @@ import { addPlanToProducts } from '@/lib/sales/planSelection';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
 import type { CreateSaleResult } from '@/hooks/useSales';
 import { newBulkRow, type BulkResult, type BulkRow } from './batch';
-import { submitBulkRows, toBulkResult, type CreateSaleFn } from './submit';
+import { replayMatchesRow, submitBulkRows, toBulkResult, type CreateSaleFn } from './submit';
 
 const id = (n: number) => String(n).padStart(32, 'b');
 const USER = { uid: 'r1', displayName: 'Wil Teasdale', email: 'w@x.com', reportsToId: 'm1' };
@@ -107,13 +107,39 @@ describe('submitBulkRows', () => {
         return null;
       }
       // The first request did land: the server hands back that same sale.
-      return sale('s1', true);
+      return { sale: { ...data, id: 's1' }, duplicate: true } as unknown as CreateSaleResult;
     });
     const first = await run([row(1)], create);
     expect(first.results.get(id(1))).toEqual({ kind: 'failed', reason: 'No signal. Tap Log again to retry.' });
     const second = await run([row(1)], create);
     expect(second.results.get(id(1))).toEqual({ kind: 'logged', saleId: 's1' });
     expect(keys).toEqual([id(1), id(1)]);
+  });
+
+  it('a replay of an earlier send is logged, but says when the edit since was not saved', async () => {
+    let stored: CreateSaleData | null = null;
+    const create = vi.fn<CreateSaleFn>(async (data, { onError }) => {
+      if (!stored) {
+        // The write landed; the answer never made it back.
+        stored = data;
+        onError('No signal. Your entry is saved, tap Submit to retry.');
+        return null;
+      }
+      return { sale: { ...stored, id: 's1' }, duplicate: true } as unknown as CreateSaleResult;
+    });
+    const first = await run([row(1)], create);
+    expect(first.results.get(id(1))?.kind).toBe('failed');
+
+    const edited: BulkRow = { ...row(1), formData: { ...row(1).formData, customerAddress: '9 Oak Ln' } };
+    const second = await run([edited], create);
+    expect(second.results.get(id(1))).toEqual({ kind: 'logged', saleId: 's1', editLost: true });
+
+    const renumbered: BulkRow = { ...row(1), formData: { ...row(1).formData, orderNumberOrBtn: 'ORD-99' } };
+    expect((await run([renumbered], create)).results.get(id(1))).toEqual({ kind: 'logged', saleId: 's1', editLost: true });
+
+    // Unchanged (case and spacing aside), it is simply logged.
+    const same: BulkRow = { ...row(1), formData: { ...row(1).formData, customerAddress: ' 1  main st ' } };
+    expect((await run([same], create)).results.get(id(1))).toEqual({ kind: 'logged', saleId: 's1' });
   });
 
   it('stops before the next sale once the page has gone', async () => {
@@ -133,6 +159,18 @@ describe('submitBulkRows', () => {
     });
     const { results } = await run([row(1)], create);
     expect(results.get(id(1))).toEqual({ kind: 'failed', reason: 'Boom' });
+  });
+});
+
+describe('replayMatchesRow', () => {
+  it('compares customer, address, plan and order number', () => {
+    const r = row(2);
+    const stored = { customerName: r.formData.customerName, customerAddress: '2 Main St', products: r.products, orderNumberOrBtn: 'ord 2' };
+    expect(replayMatchesRow(stored, r)).toBe(true);
+    expect(replayMatchesRow({ ...stored, customerName: 'Someone Else' }, r)).toBe(false);
+    expect(replayMatchesRow({ ...stored, products: [] }, r)).toBe(false);
+    expect(replayMatchesRow({ ...stored, orderNumberOrBtn: 'ORD3' }, r)).toBe(false);
+    expect(replayMatchesRow(null, r)).toBe(false);
   });
 });
 

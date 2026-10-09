@@ -2,7 +2,7 @@
 // and the bulk uploader: the fields, the sale-date inference, validation and
 // the create-sale payload. Pure, so both callers follow exactly the same rules.
 
-import type { CreateSaleData, SaleProduct, SaleType } from '@/types';
+import type { CreateSaleData, Sale, SaleProduct, SaleType } from '@/types';
 import { validateHasInternetPlan } from '@/lib/sales/planSelection';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { proofPathFields } from '@/lib/sales/proofPaths';
@@ -111,4 +111,37 @@ export function buildSalePayload(input: {
     clientSaleId: input.clientSaleId,
     ...(input.allowDuplicate ? { allowDuplicate: true } : {}),
   };
+}
+
+/** Case and spacing never make two entries different ("1 main  st" = "1 Main St"). */
+const normalizeEntryText = (value: unknown) =>
+  (typeof value === 'string' ? value : '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+const entryProductIds = (products: unknown) =>
+  Array.isArray(products)
+    ? products.map((p) => normalizeEntryText((p as { productId?: unknown } | null)?.productId)).sort()
+    : null;
+
+/**
+ * True when a sale the server returned as a duplicate is the entry on screen:
+ * the same customer, address and plan/extras. A retry after a lost response
+ * comes back as exactly that, and it is a logged sale, not a clash. The key
+ * alone does not decide it: a rep can edit the entry into another customer
+ * after a submit that landed unseen, and that one must not be dropped.
+ */
+export function isSameSaleEntry(
+  sale: Partial<Pick<Sale, 'customerName' | 'customerAddress' | 'products'>> | null | undefined,
+  entry: { formData: Pick<SaleFormFields, 'customerName' | 'customerAddress'>; products: SaleProduct[] }
+): boolean {
+  if (!sale) return false;
+  const stored = entryProductIds(sale.products);
+  const onScreen = entryProductIds(entry.products);
+  return (
+    stored !== null &&
+    onScreen !== null &&
+    stored.length === onScreen.length &&
+    stored.every((id, i) => id === onScreen[i]) &&
+    normalizeEntryText(sale.customerName) === normalizeEntryText(entry.formData.customerName) &&
+    normalizeEntryText(sale.customerAddress) === normalizeEntryText(entry.formData.customerAddress)
+  );
 }

@@ -95,7 +95,11 @@ function StatusLine({
       return (
         <div className={`${b.status} ${b.statusWarn}`}>
           <AlertTriangle size={16} strokeWidth={2.25} aria-hidden="true" />
-          <span>Couldn&apos;t read it. Tap to fill in.</span>
+          <span>
+            {status.busy
+              ? 'Too many reads right now. Try again in a few minutes.'
+              : "Couldn't read it. Tap to fill in."}
+          </span>
           <button type="button" className={b.statusAction} onClick={onReadAgain}>
             Read again
           </button>
@@ -136,7 +140,12 @@ function StatusLine({
         </p>
       );
     case 'logged':
-      return (
+      return status.editLost ? (
+        <p className={`${b.status} ${b.statusWarn}`}>
+          <Check size={16} strokeWidth={2.75} aria-hidden="true" />
+          <span>Logged, but your changes weren&apos;t saved. Edit this sale from Sales.</span>
+        </p>
+      ) : (
         <p className={`${b.status} ${b.statusGood}`}>
           <Check size={16} strokeWidth={2.75} aria-hidden="true" />
           Logged
@@ -286,6 +295,7 @@ export function RepBulkLog() {
   }, [bulk.finished]);
 
   const startOver = () => {
+    if (bulk.sending) return;
     bulk.startOver();
     setConfirmClear(false);
   };
@@ -337,7 +347,7 @@ export function RepBulkLog() {
               </p>
               <p className={l.dupeMeta}>Sales already logged stay logged. Everything else here goes.</p>
               <div className={l.dupeActions}>
-                <button type="button" className={s.btnSecondary} onClick={startOver}>
+                <button type="button" className={s.btnSecondary} onClick={startOver} disabled={bulk.sending}>
                   Clear
                 </button>
                 <button type="button" className={l.dupeNew} onClick={() => setConfirmClear(false)}>
@@ -350,7 +360,12 @@ export function RepBulkLog() {
           <div className={`${l.draftBar} ${b.notice}`}>
             <History size={18} strokeWidth={2} aria-hidden="true" />
             <p>Picking up where you left off</p>
-            <button type="button" className={l.draftStartOver} onClick={() => setConfirmClear(true)}>
+            <button
+              type="button"
+              className={l.draftStartOver}
+              onClick={() => setConfirmClear(true)}
+              disabled={bulk.sending}
+            >
               Start over
             </button>
           </div>
@@ -422,7 +437,8 @@ export function RepBulkLog() {
           key={editingRow.id}
           row={editingRow}
           label={`Sale ${editingIndex + 1}`}
-          preview={bulk.previews[editingRow.id] ?? null}
+          // The card thumbnail is small; once uploaded, the sheet opens the full screenshot.
+          preview={editingRow.proofPath ? null : (bulk.previews[editingRow.id] ?? null)}
           onSave={(change) => {
             bulk.save(editingRow.id, change);
             setEditing(null);
