@@ -58,7 +58,8 @@ describe('ReadBySheet', () => {
     await flush();
     const dialog = document.body.querySelector('[role="dialog"]');
     expect(dialog?.textContent).toContain('Dana Reed');
-    expect(dialog?.textContent).toContain(clockTime(readAt));
+    // readAt is when they last opened the channel, not when they read this message, so no time is shown.
+    expect(dialog?.textContent).not.toContain(clockTime(readAt));
     expect(dialog?.textContent).toContain('1 person');
     // Portaled out of the React container (fixed inside <main> breaks on iOS).
     expect(container.contains(dialog)).toBe(false);

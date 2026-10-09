@@ -5,7 +5,6 @@ import { X } from 'lucide-react';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import s from '@/components/portal/rep/rep.module.css';
 import { MemberAvatarChip } from './ChannelInfoSheet';
-import { readTimeLabel } from './chatFormat';
 import c from './chat.module.css';
 
 /** One row of GET /api/portal/chat/channels/[channelId]/reads. */
@@ -130,7 +129,6 @@ function ReadByBody({
                       <div className={c.person}>
                         <MemberAvatarChip name={reader.name} avatarUrl={reader.avatarUrl} />
                         <span className={c.personName}>{reader.name}</span>
-                        <span className={c.personTime}>{readTimeLabel(new Date(reader.readAt))}</span>
                       </div>
                     </li>
                   ))}

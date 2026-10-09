@@ -1077,7 +1077,8 @@ export function MobileThread({
                 onDelete: () => onDelete(actionSheet.id),
                 onTogglePin: () => onTogglePin(actionSheet),
                 onAddReaction: () => setReactionPickerMessageId(actionSheet.id),
-                onReadBy: onReadBy ? () => onReadBy(actionSheet) : undefined,
+                // Nobody can have read a message that hasn't reached the server yet.
+                onReadBy: onReadBy && !actionSheet.pendingState ? () => onReadBy(actionSheet) : undefined,
               } satisfies MessageActionsConfig)
             : null
         }
