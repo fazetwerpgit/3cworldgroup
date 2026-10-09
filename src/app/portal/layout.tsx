@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Archivo } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ChatOutboxProvider } from '@/contexts/ChatOutboxContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import OnboardingGate from '@/components/portal/OnboardingGate';
@@ -62,7 +63,10 @@ export default function PortalLayout({
           {/* .portal-scope gates the portal reskin tokens/overrides in
               globals.css; display:contents keeps it out of the layout. */}
           <div className={`portal-scope contents ${archivo.variable}`}>
-            <OnboardingGate>{children}</OnboardingGate>
+            {/* Queued chat messages keep sending on every portal page. */}
+            <ChatOutboxProvider>
+              <OnboardingGate>{children}</OnboardingGate>
+            </ChatOutboxProvider>
           </div>
         </MobileMenuProvider>
       </AuthProvider>
