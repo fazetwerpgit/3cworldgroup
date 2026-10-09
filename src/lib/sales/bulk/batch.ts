@@ -108,8 +108,9 @@ export interface BulkRow {
   sending?: boolean;
   /**
    * Screenshots were put together only for being picked one after the other,
-   * with a status-bar clock missing: the rep checks they belong together (Save
-   * in the sheet, Combine or Split answers it). See ./group.
+   * with a status-bar clock missing: the rep checks they belong together. Only
+   * Save in the sheet answers it (or the sale being down to one screenshot);
+   * Combine and Split do not. See ./group.
    */
   checkJoin?: boolean;
 }

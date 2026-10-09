@@ -19,7 +19,7 @@
 //   JOIN_CLOCK_MINUTES apart keep the two screenshots apart. When either clock
 //   could not be read the join still happens, but the sale asks the rep to
 //   check (checkJoin: "Check these screenshots belong together") until they
-//   save it, combine or split. The clock never orders anything: it has no
+//   save it in the sheet, or it is down to one screenshot. The clock never orders anything: it has no
 //   date, and reps log several days at once. Pick order comes first.
 // - A sale holds at most BULK_MAX_SHOTS; one more starts a new sale.
 // - The same picture picked twice (same bytes) is never put into a sale: it
@@ -309,8 +309,9 @@ export function combineWithAbove(rows: BulkRow[], id: string): BulkRow[] {
   const upper = rows[index - 1];
   const lower = rows[index];
   if (index < 1 || !canCombine(upper, lower)) return rows;
+  // The upper sale's own "check these belong together" stays: combining is no answer to it.
   const combined: BulkRow = {
-    ...answered(upper),
+    ...upper,
     ...fillFields(pickFields(upper), pickFields(lower)),
     shots: [...upper.shots, ...lower.shots].sort(bySeq).map((shot) => ({ ...shot, merged: true, checked: false })),
     fixed: true,
@@ -333,7 +334,9 @@ export function splitShot(rows: BulkRow[], shotId: string, newId: () => string):
     fixed: true,
   };
   // A sale the rep already edited keeps their values; an untouched one is re-read from what is left.
-  const left: BulkRow = { ...answered(row), ...(row.fixed ? {} : mergeShots(rest)), shots: rest, fixed: true };
+  // Those left behind still need the rep's check, unless only one is left.
+  const kept = rest.length === 1 ? answered(row) : row;
+  const left: BulkRow = { ...kept, ...(row.fixed ? {} : mergeShots(rest)), shots: rest, fixed: true };
   return rows
     .flatMap((r) => (r.id === row.id ? [left, own] : [r]))
     .sort((a, b) => a.shots[0].seq - b.shots[0].seq);

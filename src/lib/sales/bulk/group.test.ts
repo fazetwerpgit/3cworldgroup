@@ -553,14 +553,36 @@ describe('regroup: the status-bar clock', () => {
     const rows = regroup(picked(order('9:00'), plan()), ids());
     const status = rowStatus(rows[0], undefined);
     expect(status).toEqual({ kind: 'needs_info', problems: [CHECK_JOIN_PROBLEM, 'No address'] });
-    // Saving in the sheet answers it, and so do Split and Combine.
+    // Saving in the sheet answers it; a sale down to one screenshot has nothing to check.
     const saved = saveSale(rows, rows[0].id, rows[0], rows[0].shots.map((s) => s.id))!;
     expect(saved[0].checkJoin).toBeUndefined();
     expect(regroup(saved, ids())[0].checkJoin).toBeUndefined();
     const split = splitShot(rows, shotId(2), () => saleId(500));
     expect(split.every((row) => !row.checkJoin)).toBe(true);
-    const combined = combineWithAbove(split, saleId(500));
-    expect(combined[0].checkJoin).toBeUndefined();
+  });
+
+  it('Split and Combine are no answer: the screenshots left together still need the check', () => {
+    // Order screen, another customer's screen, then a failed read; no clocks: one flagged sale.
+    const rows = regroup(
+      picked(
+        shot(1, read({ order: 'TMF-1', plan: true, install: '2099-10-06' })),
+        shot(2, read({ name: 'Bob Lee', address: '9 Oak Ln, Austin, TX' })),
+        shot(3, null, { phase: 'read_failed', readError: true })
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2, 3]]);
+    expect(rows[0].checkJoin).toBe(true);
+    const split = splitShot(rows, shotId(3), () => saleId(600));
+    expect(shotIds(split)).toEqual([[1, 2], [3]]);
+    expect(split[0].checkJoin).toBe(true);
+    expect(rowStatus(split[0], undefined)).toEqual({ kind: 'needs_info', problems: [CHECK_JOIN_PROBLEM] });
+    expect(split[1].checkJoin).toBeUndefined();
+    // Combining the screenshot back keeps the upper sale's question.
+    const combined = combineWithAbove(split, saleId(600));
+    expect(combined[0].checkJoin).toBe(true);
+    // Removing down to one screenshot leaves nothing to check.
+    expect(removeShot(split, shotId(2))[0].checkJoin).toBeUndefined();
   });
 
   it('a read that brings the missing clock settles the question', () => {

@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, ImageIcon, X } from 'lucide-react';
 import { useSaleFormState } from '@/hooks/useSaleFormState';
+import type { SaleProduct } from '@/types';
+import type { SaleFormFields } from '@/lib/sales/saleForm';
 import {
+  isSent,
   isUnread,
   orderConflict,
   rowProblems,
@@ -26,11 +29,51 @@ import b from './rep-bulklog.module.css';
 // again when its read failed (those act right away, not on Save).
 //
 // Save carries the screenshots the sheet showed. When a late reading moved one
-// in or out of the sale while the sheet was open, Save is refused (onSave
-// returns false) and the page opens the sheet again on the sale as it is now,
-// with `notice` saying why.
+// in or out of the sale while the sheet was open, Save is refused and the page
+// opens the sheet again on the sale as it is now, with `notice` saying why and
+// the rep's own edits (`edits`) put back on top.
 
 export type BulkSaleChange = BulkSaleFields;
+
+/** What the rep changed in the sheet, against the sale as the sheet opened on it. */
+export type BulkSheetEdits = {
+  formData: Partial<SaleFormFields>;
+  products?: SaleProduct[];
+  provider?: string | null;
+  saleDateTouched?: boolean;
+  /** "Check this" flags the rep cleared by looking at or changing the field. */
+  seen: ScanTarget[];
+};
+
+/** The rep's edits: only what differs from `opened`. */
+export function sheetEdits(opened: BulkSaleFields, now: BulkSaleFields): BulkSheetEdits {
+  const formData: Partial<SaleFormFields> = {};
+  for (const key of Object.keys(now.formData) as (keyof SaleFormFields)[]) {
+    if (now.formData[key] !== opened.formData[key]) (formData as Record<string, unknown>)[key] = now.formData[key];
+  }
+  const sameProducts = JSON.stringify(now.products) === JSON.stringify(opened.products);
+  return {
+    formData,
+    ...(sameProducts ? {} : { products: now.products }),
+    ...(now.provider !== opened.provider ? { provider: now.provider } : {}),
+    ...(now.saleDateTouched !== opened.saleDateTouched ? { saleDateTouched: now.saleDateTouched } : {}),
+    seen: (Object.keys(opened.flags) as ScanTarget[]).filter((target) => !now.flags[target]),
+  };
+}
+
+/** `fields` with the rep's edits put back on top. */
+export function withSheetEdits(fields: BulkSaleFields, edits: BulkSheetEdits | null | undefined): BulkSaleFields {
+  if (!edits) return fields;
+  const flags = { ...fields.flags };
+  for (const target of edits.seen) delete flags[target];
+  return {
+    formData: { ...fields.formData, ...edits.formData },
+    products: edits.products ?? fields.products,
+    provider: edits.provider !== undefined ? edits.provider : fields.provider,
+    saleDateTouched: edits.saleDateTouched ?? fields.saleDateTouched,
+    flags,
+  };
+}
 
 export function BulkSaleSheet({
   row,
@@ -42,6 +85,7 @@ export function BulkSaleSheet({
   onSave,
   onClose,
   notice,
+  edits,
 }: {
   row: BulkRow;
   /** "Sale 3". */
@@ -53,25 +97,39 @@ export function BulkSaleSheet({
   onRemoveShot: (shotId: string) => void;
   /** "Read again" for a screenshot whose read failed. */
   onReadShot: (shotId: string) => void;
-  /** `shown`: the sale's screenshots as the sheet showed them. */
-  onSave: (change: BulkSaleChange, shown: string[]) => void;
+  /**
+   * `shown`: the sale's screenshots as the sheet showed them; `edits`: what the
+   * rep changed, kept if the page has to open the sheet again.
+   */
+  onSave: (change: BulkSaleChange, shown: string[], edits: BulkSheetEdits) => void;
   onClose: () => void;
   /** Why the sheet was opened again ("This sale changed while you were editing…"). */
   notice?: string | null;
+  /** The rep's unsaved edits from before the sheet was opened again. */
+  edits?: BulkSheetEdits | null;
 }) {
+  // The sale as the sheet opened on it; the form starts there, with any earlier edits on top.
+  const [opened] = useState<BulkSaleFields>(() => ({
+    formData: row.formData,
+    products: row.products,
+    provider: row.provider,
+    saleDateTouched: row.saleDateTouched,
+    flags: row.flags,
+  }));
+  const [start] = useState(() => withSheetEdits(opened, edits));
   // The refs stay out of `form`, which is read during render.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- errorRef: the sheet has no server error box
   const { formRef, errorRef, ...form } = useSaleFormState({
     persist: false,
     initial: {
-      formData: row.formData,
-      products: row.products,
+      formData: start.formData,
+      products: start.products,
       proofPaths: rowProofPaths(row),
-      saleDateTouched: row.saleDateTouched,
+      saleDateTouched: start.saleDateTouched,
     },
   });
-  const [providerChoice, setProviderChoice] = useState<string | null>(row.provider);
-  const [flags, setFlags] = useState(row.flags);
+  const [providerChoice, setProviderChoice] = useState<string | null>(start.provider);
+  const [flags, setFlags] = useState(start.flags);
   const [moreOpen, setMoreOpen] = useState(false);
   const provider = form.provider ?? providerChoice ?? DEFAULT_PROVIDER;
   const viewer = useAttachmentViewer();
@@ -79,6 +137,8 @@ export function BulkSaleSheet({
   // Saving is the rep's answer to "which order number": the note goes then.
   const conflict = orderConflict(row);
   const many = row.shots.length > 1;
+  // A sale already sent (logged, already on the books, or "Not sent") keeps its screenshots.
+  const reshapable = many && !isSent(row);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   // The screenshots the rep has seen in this sheet: those it opened with, less
   // any the rep made its own sale or removed here.
@@ -120,13 +180,14 @@ export function BulkSaleSheet({
 
   const save = (event: React.FormEvent) => {
     event.preventDefault();
-    onSave({
+    const change: BulkSaleChange = {
       formData: form.formData,
       products: form.products,
       provider: form.provider ?? providerChoice,
       saleDateTouched: form.saleDateTouched,
       flags,
-    }, shown);
+    };
+    onSave(change, shown, sheetEdits(opened, change));
   };
 
   // The full screenshot once uploaded; the card thumbnail only until then.
@@ -200,7 +261,7 @@ export function BulkSaleSheet({
                       ) : shot.phase === 'reading' ? (
                         <span className={b.shotNote}>Reading</span>
                       ) : null}
-                      {many ? (
+                      {reshapable ? (
                         <span className={b.shotActions}>
                           <button
                             type="button"
@@ -260,7 +321,9 @@ export function BulkSaleSheet({
                 form={form}
                 provider={provider}
                 onProvider={chooseProvider}
-                orderRequired={rowProofPaths(row).length === 0}
+                // The bulk log needs the order number on every sale, screenshot or not.
+                orderRequired
+                orderHint="Needed for every sale logged in a batch."
                 scan={{ pending: () => false, edited: clearFlag, seen: clearFlag, flags }}
                 moreOpen={moreOpen}
                 onMoreOpen={setMoreOpen}

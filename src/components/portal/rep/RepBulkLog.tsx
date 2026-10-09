@@ -28,7 +28,7 @@ import {
 import { SALE_CHANGED_MESSAGE, canCombine } from '@/lib/sales/bulk/group';
 import { isExtraPlanId } from '@/lib/sales/planSelection';
 import { BodyLayer } from './BodyLayer';
-import { BulkSaleSheet } from './BulkSaleSheet';
+import { BulkSaleSheet, type BulkSheetEdits } from './BulkSaleSheet';
 import { orderDuplicateHeadline } from './RepLogSale';
 import { useHideRepTabBar } from './RepShell';
 import { useBulkLog, type BulkLog } from './useBulkLog';
@@ -303,9 +303,12 @@ export function RepBulkLog() {
   /** Save was refused (the sale changed while the sheet was open): why, and a key bump to open it fresh. */
   const [sheetNotice, setSheetNotice] = useState<string | null>(null);
   const [sheetReloads, setSheetReloads] = useState(0);
+  /** The rep's unsaved edits, put back on the sheet opened again after a refused Save. */
+  const [sheetEdits, setSheetEdits] = useState<BulkSheetEdits | null>(null);
   const closeSheet = () => {
     setEditing(null);
     setSheetNotice(null);
+    setSheetEdits(null);
   };
   const [confirmClear, setConfirmClear] = useState(false);
   const hasRows = bulk.rows.length > 0;
@@ -436,6 +439,7 @@ export function RepBulkLog() {
                 bulk={bulk}
                 onOpen={() => {
                   setSheetNotice(null);
+                  setSheetEdits(null);
                   setEditing(row.id);
                 }}
               />
@@ -473,13 +477,16 @@ export function RepBulkLog() {
           onRemoveShot={bulk.removeShot}
           onReadShot={bulk.readShotAgain}
           notice={sheetNotice}
-          onSave={(change, shown) => {
+          edits={sheetEdits}
+          onSave={(change, shown, edits) => {
             if (bulk.save(editingRow.id, change, shown)) {
               closeSheet();
               return;
             }
-            // The sale's screenshots changed under the sheet: show it as it is now.
+            // The sale's screenshots changed under the sheet: show it as it is
+            // now, with what the rep typed put back.
             setSheetNotice(SALE_CHANGED_MESSAGE);
+            setSheetEdits(edits);
             setSheetReloads((n) => n + 1);
           }}
           onClose={closeSheet}

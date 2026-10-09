@@ -588,6 +588,13 @@ describe('RepBulkLog', () => {
     await act(async () => cards()[0].querySelector<HTMLButtonElement>('button[aria-label="Check sale 1"]')!.click());
     const dialog = () => document.body.querySelector('[role="dialog"]');
     expect(dialog()?.textContent).toContain('View screenshot');
+    const field = (id: string) => document.getElementById(id) as HTMLInputElement;
+    expect(field('installDate').value).toBe('');
+    // The rep fixes the name before saving.
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field('customerName'), 'Cy M. Park');
+      field('customerName').dispatchEvent(new Event('input', { bubbles: true }));
+    });
 
     // The plan screen is read while the sheet is open and joins this sale.
     await release('cy-2.png');
@@ -598,13 +605,49 @@ describe('RepBulkLog', () => {
     expect(cardText(1)).toContain('2 screenshots');
     expect(saved()?.rows[0]?.fixed).toBeUndefined();
 
-    // The sheet now shows both screenshots; Save goes through.
+    // The sheet now shows the sale as it is (both screenshots, the install date
+    // the new one brought) with what the rep typed kept; Save goes through.
     expect(dialog()?.textContent).toContain('View screenshot 2');
+    expect(field('customerName').value).toBe('Cy M. Park');
+    expect(field('installDate').value).toBe('2099-10-06');
     await act(async () => button('Save')!.click());
     expect(dialog()).toBeNull();
     await act(async () => new Promise((r) => setTimeout(r, 400)));
-    expect(saved()?.rows[0]).toMatchObject({ fixed: true });
+    expect(saved()?.rows[0]).toMatchObject({ fixed: true, formData: { customerName: 'Cy M. Park', installDate: '2099-10-06' } });
     expect(saved()?.rows[0].shots.every((shot) => shot.checked)).toBe(true);
+  });
+
+  it('marks the order number required in the sheet, screenshot or not', async () => {
+    writeBulkBatch(KEY, [savedRow('a')]);
+    await render();
+    await settle();
+    await act(async () => cards()[0].querySelector<HTMLButtonElement>('button[aria-label="Check sale 1"]')!.click());
+    const label = document.body.querySelector('label[for="orderNumberOrBtn"]')!;
+    expect(label.textContent).toContain('Required');
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('Needed for every sale logged in a batch.');
+  });
+
+  it('a sale that was sent ("Not sent" or already logged) keeps its screenshots: no Split or Remove, and Save goes through', async () => {
+    const two = (letter: string, result: BulkRow['result']) => {
+      const row = savedRow(letter, { result });
+      const extra = { ...row.shots[0], id: `${letter.repeat(31)}1`, seq: row.shots[0].seq + 1, fileName: `${letter}-2.png` };
+      return { ...row, shots: [row.shots[0], extra] };
+    };
+    writeBulkBatch(KEY, [
+      two('a', { kind: 'failed', reason: 'No signal. Tap Log again to retry.' }),
+      two('b', { kind: 'already', duplicate: { existingRepName: 'Wil Teasdale', existingIsMine: true } as never }),
+    ]);
+    await render();
+    await settle();
+    for (const n of [1, 2]) {
+      await act(async () => cards()[n - 1].querySelector<HTMLButtonElement>(`button[aria-label="Check sale ${n}"]`)!.click());
+      const dialog = document.body.querySelector('[role="dialog"]')!;
+      expect(dialog.textContent).toContain('View screenshot 2');
+      expect(button('Make its own sale')).toBeUndefined();
+      expect(dialog.querySelector('button[aria-label^="Remove screenshot"]')).toBeNull();
+      await act(async () => button('Save')!.click());
+      expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    }
   });
 
   it('says when the reader is busy, and Read again tries once more', async () => {

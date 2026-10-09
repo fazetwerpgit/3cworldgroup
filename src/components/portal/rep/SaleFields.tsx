@@ -113,6 +113,7 @@ export function SaleFields({
   provider,
   onProvider,
   orderRequired,
+  orderHint = 'Needed when there is no screenshot.',
   scan,
   moreOpen,
   onMoreOpen,
@@ -123,6 +124,8 @@ export function SaleFields({
   onProvider: (company: string) => void;
   /** No screenshot: the order number is the proof. */
   orderRequired: boolean;
+  /** Under a required order number (the bulk log needs it even with a screenshot). */
+  orderHint?: string;
   scan: SaleFieldsScan;
   moreOpen: boolean;
   onMoreOpen: (open: boolean) => void;
@@ -217,7 +220,7 @@ export function SaleFields({
             label="Order number or BTN"
             required={orderRequired}
             error={errors.orderNumberOrBtn}
-            hint={orderRequired ? 'Needed when there is no screenshot.' : undefined}
+            hint={orderRequired ? orderHint : undefined}
             {...scanned('orderNumberOrBtn')}
           >
             <input
