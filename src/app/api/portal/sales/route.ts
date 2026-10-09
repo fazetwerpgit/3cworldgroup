@@ -216,9 +216,9 @@ async function existingSaleForReplay(saleId: string, salesRepId: string) {
   });
 }
 
-/** A sale that still stands: not cancelled, not soft-deleted. */
+/** A sale that still stands: not cancelled, rejected or soft-deleted (a rejected sale is meant to be re-logged). */
 function isLiveSale(data: Record<string, unknown>): boolean {
-  return data.status !== 'cancelled' && !data.deletedAt && data.deleted !== true;
+  return data.status !== 'cancelled' && data.status !== 'rejected' && !data.deletedAt && data.deleted !== true;
 }
 
 function saleTime(value: unknown): number {
@@ -271,7 +271,8 @@ async function findOrderDuplicate(
     existingSaleId: mine || caller.isAdmin ? id : null,
     existingRepName: firstNameLastInitial(data.salesRepName) || 'another rep',
     existingSaleDate: saleDate instanceof Date && !Number.isNaN(saleDate.getTime()) ? saleDate.toISOString() : null,
-    existingCustomerFirstName: firstName(data.customerName),
+    // Another rep's customer stays private, even by first name.
+    existingCustomerFirstName: mine || caller.isAdmin ? firstName(data.customerName) : null,
     existingIsMine: mine,
   };
 }

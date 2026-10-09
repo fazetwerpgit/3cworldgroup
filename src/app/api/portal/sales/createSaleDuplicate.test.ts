@@ -117,9 +117,9 @@ describe('POST /api/portal/sales order-number duplicate guard', () => {
     expect(body).toMatchObject({
       duplicateOrder: true,
       existingRepName: 'Dana W.',
-      existingCustomerFirstName: 'Maria',
+      existingCustomerFirstName: null,
       existingIsMine: false,
-      // Another rep's sale is named, never linked.
+      // Another rep's sale is named, never linked, and its customer stays private.
       existingSaleId: null,
     });
     expect(body.existingSaleDate).toBe(new Date(2026, 8, 14, 12).toISOString());
@@ -178,6 +178,15 @@ describe('POST /api/portal/sales order-number duplicate guard', () => {
 
   it('creates the sale when the only match was cancelled', async () => {
     existing('s-cancelled', { orderNumberKey: 'ORD1001', orderNumberOrBtn: 'ORD1001', status: 'cancelled' });
+
+    const response = await POST(post(baseBody));
+
+    expect(response.status).toBe(200);
+    expect(state.added).toHaveLength(1);
+  });
+
+  it('creates the sale when the only match was rejected', async () => {
+    existing('s-rejected', { orderNumberKey: 'ORD1001', orderNumberOrBtn: 'ORD1001', status: 'rejected' });
 
     const response = await POST(post(baseBody));
 

@@ -46,7 +46,7 @@ export interface OrderDuplicate {
   existingRepName: string;
   /** ISO timestamp of the existing sale's date, or null when it has none. */
   existingSaleDate: string | null;
-  existingCustomerFirstName: string;
+  existingCustomerFirstName: string | null;
   /** The existing sale is the caller's own. */
   existingIsMine: boolean;
 }
