@@ -4,6 +4,7 @@ import { periodBounds } from '@/lib/leaderboard/periods';
 import { carrierInstallDate } from '@/lib/sales/carrierInstall';
 import { buildMergedBook } from '@/lib/sales/mergeBook';
 import { saleCommission, saleRevenue } from '@/lib/owner/revenue';
+import { summarizeMarkets, type MarketsSummary } from '@/lib/owner/markets';
 
 // The owner's company view: money, what needs attention, recruiting. Pure and
 // framework-free — every read comes through an injected OwnerSummarySource, so
@@ -366,9 +367,9 @@ export function activationsByWeek(users: ActivatedUser[], periods: OwnerPeriods)
 
 // ---------------------------------------------------------------- assembly
 
-export type OwnerSection = 'money' | 'problems' | 'recruiting';
+export type OwnerSection = 'money' | 'markets' | 'problems' | 'recruiting';
 
-export const OWNER_SECTIONS: readonly OwnerSection[] = ['money', 'problems', 'recruiting'];
+export const OWNER_SECTIONS: readonly OwnerSection[] = ['money', 'markets', 'problems', 'recruiting'];
 
 export async function buildMoney(source: OwnerSummarySource, periods: OwnerPeriods): Promise<MoneySummary> {
   const [{ sales, orders, reportAt }, plan] = await Promise.all([source.loadBook(), source.loadCompPlan()]);
@@ -378,6 +379,16 @@ export async function buildMoney(source: OwnerSummarySource, periods: OwnerPerio
   const repIds = [...new Set(recent.map((install) => install.repId).filter(Boolean))];
   const roles = await source.loadRepRoles(repIds);
   return { ...summarizeMoney(priceInstalls(recent, plan, roles), periods), reportAt };
+}
+
+/**
+ * This month's sales by market (the customer address's state). Counted like the
+ * leaderboard's sales: approved, by sale date, in the Chicago calendar month,
+ * so the total matches the scoreboard's month.
+ */
+export async function buildMarkets(source: OwnerSummarySource, periods: OwnerPeriods): Promise<MarketsSummary> {
+  const { sales } = await source.loadBook();
+  return summarizeMarkets(sales, periods.thisMonth);
 }
 
 export async function buildProblems(source: OwnerSummarySource, periods: OwnerPeriods): Promise<ProblemRow[]> {
@@ -429,6 +440,7 @@ export async function buildRecruiting(
 export interface OwnerSummary {
   generatedAt: string;
   money?: MoneySummary;
+  markets?: MarketsSummary;
   problems?: ProblemRow[];
   recruiting?: RecruitingSummary;
   /** Sections that failed to build. Each is absent above; the rest still render. */
@@ -437,7 +449,7 @@ export interface OwnerSummary {
 
 /**
  * One or more sections, built from ONE read of the sales book however many are
- * asked for (all three sections need it). Each section settles on its own: a
+ * asked for (every section needs it). Each section settles on its own: a
  * failed section is listed in `failed` and left out, never zeroed, so the
  * dashboard can load everything in one request and still retry a section alone.
  */
@@ -457,6 +469,7 @@ export async function buildOwnerSummary(
     sections.map(async (section) => {
       try {
         if (section === 'money') summary.money = await buildMoney(shared, periods);
+        else if (section === 'markets') summary.markets = await buildMarkets(shared, periods);
         else if (section === 'problems') summary.problems = await buildProblems(shared, periods);
         else summary.recruiting = await buildRecruiting(shared, periods);
       } catch (error) {

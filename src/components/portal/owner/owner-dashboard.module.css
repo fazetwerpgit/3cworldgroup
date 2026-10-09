@@ -18,9 +18,9 @@
   gap: var(--s3);
 }
 
-/* Phone: one column in DOM order (money, Needs attention, Recruiting). Desktop:
-   money and Recruiting share the first row, Needs attention runs full width
-   under them. Placement is by explicit grid lines, so reading order stays the
+/* Phone: one column in DOM order (money, markets, Needs attention,
+   Recruiting). Desktop: money and Recruiting share the first row, markets then
+   Needs attention run full width under them. Placement is by explicit grid lines, so reading order stays the
    DOM order. */
 
 /* The banners sit above the grid so an empty slot leaves no grid track. */
@@ -227,6 +227,62 @@
   margin-top: var(--s3);
 }
 
+/* ---------- sales by market ---------- */
+.marketsTotal {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.marketsTotal strong {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.marketList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+}
+
+.marketRow + .marketRow {
+  border-top: 1px solid var(--c-line);
+}
+
+.marketName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketCount {
+  color: var(--c-text);
+  font-family: var(--f-display);
+  font-size: 30px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.marketsEmpty {
+  margin: 0;
+  padding: var(--s4);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
 /* ---------- recruiting ---------- */
 .stats {
   display: grid;
@@ -318,9 +374,33 @@
     grid-row: 1;
   }
 
-  .attention {
+  .markets {
     grid-column: 1 / -1;
     grid-row: 2;
+  }
+
+  .attention {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  /* Full width: the markets sit side by side, ruled like the recruiting tiles. */
+  .marketList {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+
+  .marketRow {
+    padding: var(--s4) var(--s6);
+  }
+
+  .marketRow + .marketRow {
+    border-top: 0;
+    border-left: 1px solid var(--c-line);
+  }
+
+  .marketCount {
+    font-size: 40px;
   }
 
   .cellMargin,

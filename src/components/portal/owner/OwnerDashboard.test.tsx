@@ -40,6 +40,14 @@ const RECRUITING = {
   activations: { thisWeek: 2, lastWeek: 3 },
   firstInstalls: { thisWeek: 1, lastWeek: 2 },
 };
+const MARKETS = {
+  markets: [
+    { market: 'Michigan', count: 24 },
+    { market: 'Texas', count: 20 },
+  ],
+  total: 44,
+  placedByRep: 0,
+};
 const problems = (counts: Partial<Record<ProblemRow['key'], number>>): ProblemRow[] =>
   (['carrierCancellations', 'stalledOnboarding', 'missingInstallDate', 'payrollDisputes'] as const).map((key) => ({
     key,
@@ -69,6 +77,7 @@ beforeEach(() => {
   ];
   state.dash = {
     money: { status: 'ready', data: MONEY },
+    markets: { status: 'ready', data: MARKETS },
     problems: { status: 'ready', data: problems({ stalledOnboarding: 3, carrierCancellations: 5 }) },
     recruiting: { status: 'ready', data: RECRUITING },
   };
@@ -129,10 +138,52 @@ describe('OwnerDashboard', () => {
   });
 
   it('renders skeletons while loading', () => {
-    state.dash = { money: { status: 'loading' }, problems: { status: 'loading' }, recruiting: { status: 'loading' } };
+    state.dash = {
+      money: { status: 'loading' },
+      markets: { status: 'loading' },
+      problems: { status: 'loading' },
+      recruiting: { status: 'loading' },
+    };
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('aria-label="Loading sales by market"');
     expect(html).not.toContain('$');
+  });
+
+  it('shows this month’s sales by market between the money card and Needs attention', () => {
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html).toMatch(/Sales by market · [A-Z][a-z]{2}</);
+    expect(html).toMatch(/Michigan<\/span><span[^>]*>24</);
+    expect(html).toMatch(/Texas<\/span><span[^>]*>20</);
+    expect(html).toContain('<strong>44</strong> sales');
+    expect(html).not.toContain('Other');
+    const money = html.indexOf('Company money');
+    const markets = html.indexOf('Sales by market');
+    const attention = html.indexOf('Needs attention');
+    expect(money).toBeLessThan(markets);
+    expect(markets).toBeLessThan(attention);
+  });
+
+  it('lists Other last when some sales could not be placed', () => {
+    state.dash.markets = {
+      status: 'ready',
+      data: { markets: [...MARKETS.markets, { market: 'Other', count: 2 }], total: 46, placedByRep: 0 },
+    };
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html.indexOf('Texas')).toBeLessThan(html.indexOf('Other'));
+  });
+
+  it('says so when no sales are approved yet this month', () => {
+    state.dash.markets = { status: 'ready', data: { markets: [], total: 0, placedByRep: 0 } };
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html).toContain('No approved sales yet this month.');
+    expect(html).not.toMatch(/\d+<\/strong> sales/);
+  });
+
+  it('shows Couldn’t load · Retry when sales by market fails', () => {
+    state.dash.markets = { status: 'error' };
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html).toContain('Couldn&#x27;t load sales by market');
   });
 });
 

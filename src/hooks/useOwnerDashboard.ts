@@ -3,22 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import type { MarketsSummary } from '@/lib/owner/markets';
 import type { MoneySummary, OwnerSection, OwnerSummary, ProblemRow, RecruitingSummary } from '@/lib/owner/companySummary';
 import type { Section } from '@/hooks/useRepDashboard';
 
-// The owner's company view. The first load is ONE request for all three
-// sections, so the server reads the sales book once. A failed section reports
+// The owner's company view. The first load is ONE request for every
+// section, so the server reads the sales book once. A failed section reports
 // 'error' (never zeros) and its Retry asks for that section alone. Coming back
-// to the app reloads all three quietly: the numbers on screen stay until the
+// to the app reloads them all quietly: the numbers on screen stay until the
 // new ones land, and a failed quiet reload keeps them.
 
 export interface OwnerDashboardState {
   money: Section<MoneySummary>;
+  markets: Section<MarketsSummary>;
   problems: Section<ProblemRow[]>;
   recruiting: Section<RecruitingSummary>;
 }
 
-const SECTIONS: OwnerSection[] = ['money', 'problems', 'recruiting'];
+const SECTIONS: OwnerSection[] = ['money', 'markets', 'problems', 'recruiting'];
 const LOADING = { status: 'loading' } as const;
 
 async function loadSummary(sections: OwnerSection[], token: string | null, signal: AbortSignal) {
@@ -33,7 +35,12 @@ async function loadSummary(sections: OwnerSection[], token: string | null, signa
 }
 
 export function useOwnerDashboard(enabled = true) {
-  const [state, setState] = useState<OwnerDashboardState>({ money: LOADING, problems: LOADING, recruiting: LOADING });
+  const [state, setState] = useState<OwnerDashboardState>({
+    money: LOADING,
+    markets: LOADING,
+    problems: LOADING,
+    recruiting: LOADING,
+  });
   // The request each section is waiting on; a stale response never overwrites a newer one.
   const controllers = useRef(new Map<OwnerSection, AbortController>());
 

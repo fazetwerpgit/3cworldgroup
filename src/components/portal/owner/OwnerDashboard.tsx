@@ -15,6 +15,7 @@ import type {
   RecruitingSummary,
   WeekCount,
 } from '@/lib/owner/companySummary';
+import type { MarketsSummary } from '@/lib/owner/markets';
 import { carrierReportStamp } from '@/lib/owner/reportFreshness';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
@@ -23,8 +24,8 @@ import s from '../rep/rep.module.css';
 import o from './owner-dashboard.module.css';
 
 // The owner's home screen (direction D): the company, not a personal pay card.
-// Money first (estimated from installs × the comp plan), then what needs
-// attention, then recruiting. Each section loads and fails on its own.
+// Money first (estimated from installs × the comp plan), then this month's
+// sales by market, then what needs attention, then recruiting. Each section loads and fails on its own.
 
 // ---------------------------------------------------------------- format
 
@@ -224,6 +225,37 @@ function MoneySkeleton() {
   );
 }
 
+// ---------------------------------------------------------------- markets
+
+const marketsTitle = () => `Sales by market · ${MONTH_SHORT.format(new Date())}`;
+
+/** This month's approved sales by the customer address's state, biggest first. */
+function Markets({ data }: { data: MarketsSummary }) {
+  return (
+    <section className={`${s.panel} ${o.markets}`} aria-labelledby="markets-h">
+      <PanelHead id="markets-h" title={marketsTitle()}>
+        {data.total > 0 ? (
+          <span className={o.marketsTotal}>
+            <strong>{count(data.total)}</strong> {data.total === 1 ? 'sale' : 'sales'}
+          </span>
+        ) : null}
+      </PanelHead>
+      {data.markets.length ? (
+        <ul className={o.marketList}>
+          {data.markets.map((row) => (
+            <li key={row.market} className={o.marketRow}>
+              <span className={o.marketName}>{row.market}</span>
+              <span className={o.marketCount}>{count(row.count)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={o.marketsEmpty}>No approved sales yet this month.</p>
+      )}
+    </section>
+  );
+}
+
 // ---------------------------------------------------------------- needs attention
 
 // Needs attention is the onboarding work (the shared queue panel) plus the
@@ -315,7 +347,7 @@ export function OwnerDashboard() {
         <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
       </div>
 
-      {/* DOM order is the phone reading order: money, Needs attention, Recruiting.
+      {/* DOM order is the phone reading order: money, markets, Needs attention, Recruiting.
           Desktop places each panel with explicit grid lines. */}
       <div className={o.grid}>
         {data.money.status === 'loading' ? (
@@ -329,6 +361,17 @@ export function OwnerDashboard() {
           </section>
         ) : (
           <MoneyBoard data={data.money.data} />
+        )}
+
+        {data.markets.status === 'loading' ? (
+          <SkeletonPanel label="Loading sales by market" title={marketsTitle()} rows={2} className={o.markets} />
+        ) : data.markets.status === 'error' ? (
+          <section className={`${s.panel} ${o.markets}`} aria-labelledby="markets-h">
+            <PanelHead id="markets-h" title={marketsTitle()} />
+            <Failed what="sales by market" onRetry={() => retry('markets')} />
+          </section>
+        ) : (
+          <Markets data={data.markets.data} />
         )}
 
         <OpsQueuesPanel

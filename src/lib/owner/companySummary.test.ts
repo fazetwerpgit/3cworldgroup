@@ -235,7 +235,7 @@ describe('buildOwnerSummary', () => {
     });
   });
 
-  it('reads the book once for all three sections and returns no customer data', async () => {
+  it('reads the book once for every section and returns no customer data', async () => {
     const source = fakeSource();
     let calls = 0;
     const book = await source.loadBook();
@@ -244,10 +244,37 @@ describe('buildOwnerSummary', () => {
       return book;
     });
     const summary = await buildOwnerSummary(source, undefined, NOW);
-    expect(summary.money && summary.problems && summary.recruiting).toBeTruthy();
-    expect(calls).toBe(1); // one read shared by all three sections
+    expect(summary.money && summary.markets && summary.problems && summary.recruiting).toBeTruthy();
+    expect(calls).toBe(1); // one read shared by every section
     const json = JSON.stringify(summary);
     expect(json).not.toMatch(/Oak Street|Pine Avenue|Unique Road|repA/);
+  });
+
+  it('counts this month’s approved sales by the customer address state', async () => {
+    const source = fakeSource();
+    const book = await source.loadBook();
+    const sep = new Date('2026-09-10T17:00:00Z');
+    source.loadBook = vi.fn(async () => ({
+      ...book,
+      sales: [
+        sale({ rep: 'repA', saleDate: sep, customerAddress: '1 Oak Street, Lansing, MI 48823' }),
+        sale({ rep: 'repA', saleDate: sep, customerAddress: '2 Oak Street' }),
+        sale({ rep: 'repB', saleDate: sep, customerAddress: '3 Pine Avenue, Killeen, TX 76542' }),
+        sale({ rep: 'repB', saleDate: sep, status: 'cancelled', customerAddress: '4 Pine Avenue, Waco, TX' }),
+        sale({ rep: 'repB', saleDate: sep, status: 'pending', customerAddress: '5 Pine Avenue, Waco, TX' }),
+        sale({ rep: 'repC', customerAddress: '6 Pine Avenue, Waco, TX' }), // August
+      ],
+    }));
+    const summary = await buildOwnerSummary(source, ['markets'], NOW);
+    expect(summary.markets).toEqual({
+      markets: [
+        { market: 'Michigan', count: 2 },
+        { market: 'Texas', count: 1 },
+      ],
+      total: 3,
+      placedByRep: 1,
+    });
+    expect(JSON.stringify(summary)).not.toMatch(/Oak Street|Pine Avenue|repA/);
   });
 
   it('lets a failing read fail the section instead of reporting zeros', async () => {

@@ -65,10 +65,21 @@ describe('GET /api/portal/owner/summary', () => {
     expect(res.headers.get('cache-control')).toContain('no-store');
   });
 
-  it('serves all three sections when none is named', async () => {
+  it('serves every section when none is named', async () => {
     gate.mockResolvedValue({ ok: true, uid: 'w1', name: 'Owner', isAdmin: true, isOwner: true });
     await GET(req());
-    expect(build.mock.calls[0][1]).toEqual(['money', 'problems', 'recruiting']);
+    expect(build.mock.calls[0][1]).toEqual(['money', 'markets', 'problems', 'recruiting']);
+  });
+
+  it('serves sales by market to the owner only', async () => {
+    gate.mockResolvedValue({ ok: true, uid: 'a1', name: 'Admin', isAdmin: true, isOwner: false });
+    expect((await GET(req('?section=markets'))).status).toBe(403);
+    expect(build).not.toHaveBeenCalled();
+
+    gate.mockResolvedValue({ ok: true, uid: 'w1', name: 'Owner', isAdmin: true, isOwner: true });
+    const res = await GET(req('?section=markets'));
+    expect(res.status).toBe(200);
+    expect(build.mock.calls[0][1]).toEqual(['markets']);
   });
 
   it('rejects an unknown section', async () => {

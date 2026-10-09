@@ -5,11 +5,11 @@ import { createFirestoreOwnerSource } from '@/lib/owner/firestoreSource';
 
 export const dynamic = 'force-dynamic';
 
-// GET /api/portal/owner/summary[?section=money|problems|recruiting]
+// GET /api/portal/owner/summary[?section=money|markets|problems|recruiting]
 // The owner's company view. OWNER ONLY: it carries the "3C Receives" margin,
 // which no admin, operations or field caller may see. Aggregate counts,
 // estimated dollars and page links only — never a customer or a rep's details.
-// No section means all three, built from one read of the sales book; a section
+// No section means every section, built from one read of the sales book; a section
 // that fails is listed in `failed` (the rest still return) so the dashboard can
 // show it as failed and retry just that one with ?section=.
 export async function GET(request: NextRequest) {
