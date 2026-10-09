@@ -1,12 +1,14 @@
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse, after } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ChatAttachment, ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { buildChatPushBody, pushChatMessageOnce } from '@/lib/push/chatPush';
 import { chatMessageDocId, isValidClientMessageId } from '@/lib/chat/outbox';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
+  chatObjectPathFromUrl,
+  chatObjectUrlBase,
   getChatStorageBucketName,
   readStoredAttachment,
   validateMessageAttachment,
@@ -399,6 +401,63 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+// The Storage object behind a deleted message's photo: chat/{channelId}/{name}
+// parsed from its download URL, or null for a GIF, a missing attachment, or any
+// URL outside this bucket + channel folder (never deleted).
+function deletableChatObjectPath(attachment: unknown, channelId: string): string | null {
+  if (!attachment || typeof attachment !== 'object') return null;
+  const { type, url } = attachment as { type?: unknown; url?: unknown };
+  if (type !== 'image') return null;
+  const bucketName = getChatStorageBucketName();
+  if (!bucketName) return null;
+  return chatObjectPathFromUrl(url, bucketName, channelId);
+}
+
+// The error code of a failed Storage/Firestore call, for logs that must never
+// carry the object's download URL or token.
+function errorCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === undefined ? 'unknown' : String(code);
+}
+
+// Deletes the photo of a just-deleted message from Storage, unless another
+// standing message in the channel still points at the same object (the send
+// path accepts any URL in the channel's folder, so one could). A missing object
+// counts as deleted. Never throws: the message is already scrubbed, so a Storage
+// failure is logged (ids and error code only) and the delete still succeeds.
+async function deleteChatPhotoObject(
+  channelId: string,
+  messageId: string,
+  objectPath: string
+): Promise<void> {
+  try {
+    const bucketName = getChatStorageBucketName();
+    if (!bucketName) return;
+    const urlBase = chatObjectUrlBase(bucketName, objectPath);
+    const sharing = await adminDb!
+      .collection('chatChannels')
+      .doc(channelId)
+      .collection('messages')
+      .where('attachment.url', '>=', urlBase)
+      .where('attachment.url', '<', `${urlBase}\uf8ff`)
+      .get();
+    const stillUsed = sharing.docs.some((doc) => {
+      if (doc.id === messageId) return false;
+      const data = doc.data();
+      if (data.deletedAt) return false;
+      return deletableChatObjectPath(data.attachment, channelId) === objectPath;
+    });
+    if (stillUsed) {
+      console.warn(`Chat photo kept: another message still shows it (channel ${channelId}, message ${messageId})`);
+      return;
+    }
+    await getOnboardingBucket().file(objectPath).delete({ ignoreNotFound: true });
+  } catch (error) {
+    if (errorCode(error) === '404') return;
+    console.error(`Error deleting chat photo (channel ${channelId}, message ${messageId}): code ${errorCode(error)}`);
+  }
+}
+
 // DELETE — author (self) or a moderator (admin/operations) can soft-delete.
 export async function DELETE(request: NextRequest) {
   try {
@@ -449,6 +508,12 @@ export async function DELETE(request: NextRequest) {
       },
       { merge: true }
     );
+
+    // The photo goes with the message: its tokened URL would otherwise keep it
+    // reachable. Path resolved from the pre-scrub read, deleted only now that the
+    // doc no longer points at it.
+    const photoPath = deletableChatObjectPath(message?.attachment, channelId);
+    if (photoPath) await deleteChatPhotoObject(channelId, messageId, photoPath);
 
     try {
       await recomputeLastMessageAt(adminDb!.collection('chatChannels').doc(channelId), messageId, message?.createdAt);

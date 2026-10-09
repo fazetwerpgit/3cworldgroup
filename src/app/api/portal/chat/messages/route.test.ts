@@ -145,8 +145,36 @@ function messagesOrderBy() {
   };
 }
 
+// Storage deletes of a deleted message's photo (getOnboardingBucket().file(p).delete()).
+const storageDeleteMock = vi.hoisted(() =>
+  vi.fn<(objectPath: string, options?: { ignoreNotFound?: boolean }) => Promise<unknown>>(async () => [{}])
+);
+// When set, the "does another message still show this photo" query rejects.
+let sharingQueryError: Error | null = null;
+
+// messages.where('attachment.url', '>=', a).where('attachment.url', '<', b) — the
+// messages whose photo URL falls in a range (other messages sharing a photo).
+function attachmentUrlQuery(filters: Array<[string, string]>) {
+  return {
+    where: (_field: string, op: string, value: string) => attachmentUrlQuery([...filters, [op, value]]),
+    get: async () => {
+      if (sharingQueryError) throw sharingQueryError;
+      return {
+        docs: Object.entries({ ...MESSAGE_DOCS, ...createdDocs })
+          .filter(([, data]) => {
+            const url = (data.attachment as { url?: unknown } | undefined)?.url;
+            if (typeof url !== 'string') return false;
+            return filters.every(([op, value]) => (op === '>=' ? url >= value : op === '<' ? url < value : false));
+          })
+          .map(([id, data]) => ({ id, data: () => data })),
+      };
+    },
+  };
+}
+
 // messages.where('replyTo.messageId', '==', id) — the replies quoting a message.
-function messagesWhere(_field: string, _op: string, messageId: string) {
+function messagesWhere(field: string, op: string, messageId: string) {
+  if (field === 'attachment.url') return attachmentUrlQuery([[op, messageId]]);
   return {
     get: async () => ({
       docs: Object.entries(MESSAGE_DOCS)
@@ -200,6 +228,11 @@ const CHANNEL_DOCS: Record<string, Record<string, unknown>> = {
 };
 
 vi.mock('@/lib/firebase/admin', () => ({
+  getOnboardingBucket: () => ({
+    file: (objectPath: string) => ({
+      delete: (options?: { ignoreNotFound?: boolean }) => storageDeleteMock(objectPath, options),
+    }),
+  }),
   adminDb: {
     collection: (name: string) =>
       name === 'users'
@@ -340,6 +373,9 @@ beforeEach(() => {
   for (const id of Object.keys(receipts)) delete receipts[id];
   for (const id of Object.keys(pushLogs)) delete pushLogs[id];
   batchUpdates.length = 0;
+  storageDeleteMock.mockReset();
+  storageDeleteMock.mockResolvedValue([{}]);
+  sharingQueryError = null;
   sendPushMock.mockClear();
   afterTasks.length = 0;
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
@@ -855,6 +891,150 @@ describe('DELETE /api/portal/chat/messages', () => {
       expect(channelLastMessageAt['all-company']).toBeUndefined();
     } finally {
       MESSAGE_DOCS['others-msg'].deletedAt = null;
+    }
+  });
+});
+
+describe('DELETE /api/portal/chat/messages (photo in Storage)', () => {
+  function deleteReq(body: unknown) {
+    return new NextRequest('http://localhost/api/portal/chat/messages', {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    });
+  }
+
+  // An own photo message in all-company (older than the fixtures, so the
+  // lastMessageAt logic is not involved).
+  function storePhoto(id: string, url: string, extra: Record<string, unknown> = {}) {
+    createdDocs[id] = {
+      authorId: 'real-uid',
+      authorName: 'Real User',
+      text: '',
+      attachment: { type: 'image', url, width: 800, height: 600, contentType: 'image/png' },
+      hasAttachment: true,
+      deletedAt: null,
+      createdAt: Timestamp.fromMillis(500_000),
+      ...extra,
+    };
+  }
+
+  it("deletes the photo's object from the channel folder after the doc is scrubbed", async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    storePhoto('photo-msg', imageUrl('all-company', 'photo-1.png'));
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'photo-msg' }));
+    expect(res.status).toBe(200);
+    expect(storageDeleteMock).toHaveBeenCalledTimes(1);
+    expect(storageDeleteMock).toHaveBeenCalledWith('chat/all-company/photo-1.png', { ignoreNotFound: true });
+    expect(msgSetMock.mock.invocationCallOrder[0]).toBeLessThan(storageDeleteMock.mock.invocationCallOrder[0]);
+  });
+
+  it('never deletes an object outside this bucket and channel folder', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const outside = [
+      imageUrl('managers-extra', 'other-channel.png'),
+      imageUrl('all-company', '../managers-extra/x.png'),
+      imageUrl('all-company', 'nested/x.png'),
+      imageUrl('all-company', '.hidden'),
+      imageUrl('all-company', 'x.png').replace(BUCKET, 'other-bucket.appspot.com'),
+      `https://evil.example/v0/b/${BUCKET}/o/${encodeURIComponent('chat/all-company/x.png')}?alt=media`,
+      'not a url',
+    ];
+    for (const [i, url] of outside.entries()) {
+      storePhoto(`outside-${i}`, url);
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: `outside-${i}` }));
+      expect(res.status).toBe(200);
+    }
+    expect(storageDeleteMock).not.toHaveBeenCalled();
+  });
+
+  it('treats a missing object (404) as deleted', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    storageDeleteMock.mockRejectedValue(Object.assign(new Error('No such object'), { code: 404 }));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      storePhoto('photo-msg', imageUrl('all-company', 'gone.png'));
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'photo-msg' }));
+      expect(res.status).toBe(200);
+      expect(storageDeleteMock).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('still succeeds when Storage fails, logging no URL or token', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    storageDeleteMock.mockRejectedValue(Object.assign(new Error(`boom ${imageUrl('all-company', 'p.png')}`), { code: 503 }));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      storePhoto('photo-msg', imageUrl('all-company', 'p.png'));
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'photo-msg' }));
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true });
+      expect(msgSetMock).toHaveBeenCalledTimes(1);
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      const logged = errorSpy.mock.calls.flat().map(String).join(' ');
+      expect(logged).toContain('503');
+      expect(logged).not.toMatch(/https?:|token|firebasestorage|p\.png/);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('makes no Storage call for a message without a photo, or with a GIF', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    expect((await DELETE(deleteReq({ channelId: 'all-company', messageId: 'own-msg' }))).status).toBe(200);
+    createdDocs['gif-msg'] = {
+      authorId: 'real-uid',
+      text: '',
+      attachment: { type: 'gif', url: 'https://media.giphy.com/x.gif' },
+      hasAttachment: true,
+      deletedAt: null,
+    };
+    expect((await DELETE(deleteReq({ channelId: 'all-company', messageId: 'gif-msg' }))).status).toBe(200);
+    expect(storageDeleteMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the object while another standing message still shows it', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const url = imageUrl('all-company', 'shared.png');
+    storePhoto('photo-msg', url);
+    storePhoto('photo-copy', url.replace('token=tok', 'token=other'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'photo-msg' }));
+      expect(res.status).toBe(200);
+      expect(storageDeleteMock).not.toHaveBeenCalled();
+      expect(warnSpy.mock.calls.flat().map(String).join(' ')).not.toMatch(/https?:|token/);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('deletes a shared object once the other message is deleted too', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const url = imageUrl('all-company', 'shared.png');
+    storePhoto('photo-msg', url);
+    storePhoto('photo-copy', url, { deletedAt: { seconds: 1 } });
+    // A different object whose name merely starts the same is not a share.
+    storePhoto('photo-near', imageUrl('all-company', 'shared.png2'));
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'photo-msg' }));
+    expect(res.status).toBe(200);
+    expect(storageDeleteMock).toHaveBeenCalledWith('chat/all-company/shared.png', { ignoreNotFound: true });
+  });
+
+  it('keeps the object (and still succeeds) when the share check fails', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    sharingQueryError = Object.assign(new Error('unavailable'), { code: 14 });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      storePhoto('photo-msg', imageUrl('all-company', 'p.png'));
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'photo-msg' }));
+      expect(res.status).toBe(200);
+      expect(storageDeleteMock).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      errorSpy.mockRestore();
     }
   });
 });

@@ -62,6 +62,53 @@ export function chatImageUrlPrefix(bucketName: string, channelId: string): strin
   )}`;
 }
 
+// A stored chat object's file name as the upload route writes it ({uuid}.{ext}):
+// one path segment of safe characters that does not start with a dot (so never
+// '.' or '..'), and never anything with a slash.
+const CHAT_OBJECT_NAME = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+
+/**
+ * The Storage object path behind a chat image download URL — only when the URL is
+ * a tokened download URL for THIS bucket whose object sits directly in THIS
+ * channel's folder (chat/{channelId}/{name}). Anything else (another bucket or
+ * channel, a nested or traversing path, a malformed URL) yields null, so a caller
+ * deleting by this path can never reach an object outside the channel's folder.
+ */
+export function chatObjectPathFromUrl(url: unknown, bucketName: string, channelId: string): string | null {
+  if (typeof url !== 'string' || !bucketName || !channelId || channelId.includes('/')) return null;
+  if (!url.startsWith(chatImageUrlPrefix(bucketName, channelId))) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:' || parsed.hostname !== 'firebasestorage.googleapis.com') return null;
+  const base = `/v0/b/${bucketName}/o/`;
+  if (!parsed.pathname.startsWith(base)) return null;
+  const encoded = parsed.pathname.slice(base.length);
+  // The object path is ONE encoded segment; a raw slash means a different route.
+  if (!encoded || encoded.includes('/')) return null;
+  let objectPath: string;
+  try {
+    objectPath = decodeURIComponent(encoded);
+  } catch {
+    return null;
+  }
+  const folder = `chat/${channelId}/`;
+  if (!objectPath.startsWith(folder)) return null;
+  if (!CHAT_OBJECT_NAME.test(objectPath.slice(folder.length))) return null;
+  return objectPath;
+}
+
+/**
+ * The download-URL prefix shared by every tokened URL of one chat object (the
+ * part before ?alt=media&token=…), for finding other messages that point at it.
+ */
+export function chatObjectUrlBase(bucketName: string, objectPath: string): string {
+  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(objectPath)}`;
+}
+
 // Only keep a dimension when it is a finite positive number within bounds; else drop it.
 function clampDimension(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
