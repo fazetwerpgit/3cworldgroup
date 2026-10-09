@@ -55,8 +55,10 @@ import { MAX_WINDOW, useMessages } from './useMessages';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-function Probe({ channelId }: { channelId: string | null }) {
-  const { messages, loading, fromCache, snapshotVersion, historyCapped, loadOlder } = useMessages(channelId);
+function Probe({ channelId, followingLatest }: { channelId: string | null; followingLatest?: boolean }) {
+  const { messages, loading, fromCache, snapshotVersion, historyCapped, loadOlder } = useMessages(channelId, {
+    followingLatest,
+  });
   return (
     <div>
       <span data-testid="loading">{String(loading)}</span>
@@ -122,7 +124,8 @@ describe('useMessages loading behavior', () => {
   });
 
   it('keeps the current list rendered (loading=false) across an eviction growth', () => {
-    act(() => root.render(<Probe channelId="c1" />));
+    // A reader scrolled up into history: the eviction guard widens the window.
+    act(() => root.render(<Probe channelId="c1" followingLatest={false} />));
     act(() => listeners[0].next({ docs: makeDocs(75, 10_000) }));
     expect(readProbe()).toEqual({ loading: 'false', count: '75' });
 
@@ -195,5 +198,72 @@ describe('useMessages history cap', () => {
     }
     expect(text('count')).toBe(String(MAX_WINDOW));
     expect(text('capped')).toBe('true');
+  });
+});
+
+describe('useMessages eviction guard vs. a reader at the bottom', () => {
+  const text = (id: string) => container.querySelector(`[data-testid="${id}"]`)?.textContent;
+  const first = () => container.querySelector('[data-testid="first"]')?.textContent;
+
+  function FirstProbe({ followingLatest }: { followingLatest: boolean }) {
+    const { messages, snapshotVersion } = useMessages('c1', { followingLatest });
+    return (
+      <div>
+        <span data-testid="count">{String(messages.length)}</span>
+        <span data-testid="version">{String(snapshotVersion)}</span>
+        <span data-testid="first">{messages[0]?.id ?? ''}</span>
+      </div>
+    );
+  }
+
+  it('commits a new message that slides the full window without re-subscribing', () => {
+    act(() => root.render(<FirstProbe followingLatest />));
+    act(() => listeners[0].next({ docs: makeDocs(75, 10_000) }));
+    expect(first()).toBe('m10000');
+
+    // One new message: the limit(75) window drops its oldest doc.
+    act(() => listeners[0].next({ docs: makeDocs(75, 11_000) }));
+
+    expect(listeners).toHaveLength(1);
+    expect(text('count')).toBe('75');
+    expect(text('version')).toBe('2');
+    expect(first()).toBe('m11000');
+
+    // And again: still the same listener, never widening.
+    act(() => listeners[0].next({ docs: makeDocs(75, 12_000) }));
+    expect(listeners).toHaveLength(1);
+    expect(text('version')).toBe('3');
+  });
+
+  it('widens once the reader scrolls up, and slides again back at the bottom', () => {
+    act(() => root.render(<FirstProbe followingLatest />));
+    act(() => listeners[0].next({ docs: makeDocs(75, 10_000) }));
+
+    act(() => root.render(<FirstProbe followingLatest={false} />));
+    act(() => listeners[0].next({ docs: makeDocs(75, 11_000) }));
+    // Skipped commit + wider resubscribe: the history they're reading stays.
+    expect(listeners).toHaveLength(2);
+    expect(listeners[1].limit).toBe(100);
+    expect(text('version')).toBe('1');
+    expect(first()).toBe('m10000');
+
+    act(() => listeners[1].next({ docs: makeDocs(100, 10_000 - 24_000) }));
+    expect(text('count')).toBe('100');
+
+    act(() => root.render(<FirstProbe followingLatest />));
+    act(() => listeners[1].next({ docs: makeDocs(100, 10_000 - 23_000) }));
+    expect(listeners).toHaveLength(2);
+    expect(text('count')).toBe('100');
+  });
+});
+
+describe('useMessages deselect', () => {
+  it('empties the thread when the channel is cleared', () => {
+    act(() => root.render(<Probe channelId="c1" />));
+    act(() => listeners[0].next({ docs: makeDocs(5, 10_000) }));
+    expect(readProbe()).toEqual({ loading: 'false', count: '5' });
+
+    act(() => root.render(<Probe channelId={null} />));
+    expect(readProbe()).toEqual({ loading: 'false', count: '0' });
   });
 });

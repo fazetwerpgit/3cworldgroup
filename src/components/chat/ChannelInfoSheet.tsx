@@ -76,7 +76,7 @@ function formatMediaTime(iso: string | null): string {
 
 /** Member row avatar: photo when available, else the initials chip, with a
  *  fail-soft fallback (never a broken-image icon) if the photo fails to load. */
-function MemberAvatarChip({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
+export function MemberAvatarChip({ name, avatarUrl }: { name: string; avatarUrl?: string }) {
   const [failed, setFailed] = useState(false);
   const showPhoto = !!avatarUrl && !failed;
   return (

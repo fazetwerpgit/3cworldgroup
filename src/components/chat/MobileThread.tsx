@@ -22,6 +22,7 @@ import { GROW_STEP, MAX_WINDOW } from '@/hooks/chat/useMessages';
 import type { ChatMessageView } from '@/hooks/chat/useMessages';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { countNewArrivals, newestDeliveredId } from '@/lib/chat/unseen';
+import { setScrollTopInstant, useStickToBottom } from '@/hooks/chat/useStickToBottom';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 import c from './chat.module.css';
 
@@ -145,6 +146,11 @@ interface MobileThreadProps {
   onCancelReply: () => void;
   onCancelEdit: () => void;
   onSaveEdit: () => void;
+  // Long-press "Read by": the page owns the sheet (shared with desktop).
+  onReadBy?: (message: ThreadMessage) => void;
+  // Reports whether the reader is following the latest messages (the pinned
+  // observer), so useMessages slides its window instead of widening it.
+  onFollowingChange?: (following: boolean) => void;
 }
 
 /**
@@ -305,8 +311,18 @@ export function MobileThread({
   onCancelReply,
   onCancelEdit,
   onSaveEdit,
+  onReadBy,
+  onFollowingChange,
 }: MobileThreadProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Bottom positioning scoped to the scroller (never scrollIntoView) plus
+  // stick-to-bottom across late layout changes — see useStickToBottom.
+  const { stickRef, snapToBottom, glideToBottom, onScroll: trackStick } = useStickToBottom(scrollRef);
+  // Latest onFollowingChange for the observer callback (which is set up once).
+  const followingChangeRef = useRef(onFollowingChange);
+  useEffect(() => {
+    followingChangeRef.current = onFollowingChange;
+  }, [onFollowingChange]);
   // Long-press → bottom action sheet. A single shared timer/target avoids per-row
   // hooks: touchstart on a bubble arms a 500ms timer; move/scroll/end cancel it;
   // firing opens the sheet for that message.
@@ -423,6 +439,7 @@ export function MobileThread({
       ([entry]) => {
         pinnedRef.current = entry.isIntersecting;
         setPinned(entry.isIntersecting);
+        followingChangeRef.current?.(entry.isIntersecting);
         if (entry.isIntersecting) setNewCount(0);
       },
       { root, rootMargin: '0px 0px 150px 0px', threshold: 0 }
@@ -441,31 +458,10 @@ export function MobileThread({
   // bogus load-older mid-flight.
   const renderedChannelMatches = !loading && renderedChannel === channelId;
 
-  // Pure DOM sync (no setState): opening a channel jumps instantly to the
-  // bottom; an own send/retry (signal bump) always smooth-scrolls; otherwise a
-  // new message only scrolls when the reader is already pinned.
-  useEffect(() => {
-    const anchor = messagesEndRef.current;
-    if (!anchor || !renderedChannelMatches) return;
-    const opening = contextRef.current !== channelId;
-    const forced = signalRef.current !== scrollToBottomSignal;
-    contextRef.current = channelId;
-    signalRef.current = scrollToBottomSignal;
-    if (opening) {
-      // 'instant', not 'auto': the scroller inherits scroll-behavior: smooth,
-      // and 'auto' defers to it — the "jump" then animates up from scrollTop 0,
-      // sweeping through the <=200px zone where handleScroll arms a bogus
-      // load-older that interrupts the landing mid-history.
-      anchor.scrollIntoView({ behavior: 'instant', block: 'end' });
-    } else if (forced || pinnedRef.current) {
-      anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }
-  }, [messages.length, renderedChannelMatches, channelId, scrollToBottomSignal, messagesEndRef]);
-
   const jumpToLatest = () => {
     setPinned(true);
     setNewCount(0);
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    glideToBottom();
   };
 
   // iOS keyboard guard: in the installed PWA the software keyboard shrinks the
@@ -534,6 +530,7 @@ export function MobileThread({
 
   const handleScroll = () => {
     clearLongPress();
+    trackStick();
     const el = scrollRef.current;
     // Scroll events during a channel-switch loading phase are clamp noise from
     // the skeleton content (scrollTop 0) — acting on them arms a phantom
@@ -556,16 +553,10 @@ export function MobileThread({
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // The thread scroller can inherit scroll-behavior: smooth from the
-    // global html rule, which would animate a plain scrollTop assignment —
-    // visibly glide instead of snapping, and re-fire handleScroll mid-animation
-    // while scrollTop still reads <200. Toggle to 'auto' for the instant jump.
-    const setScrollTopInstant = (value: number) => {
-      const previousBehavior = el.style.scrollBehavior;
-      el.style.scrollBehavior = 'auto';
-      el.scrollTop = value;
-      el.style.scrollBehavior = previousBehavior;
-    };
+    // At the bottom (pinned observer, or the stricter stick flag that updates
+    // synchronously from scroll events) the bottom belongs to the auto-scroll
+    // effect below — restoring a top anchor there would pull the reader up.
+    const following = pinnedRef.current || stickRef.current;
     const remeasureFirst = () => {
       const node = el.querySelector('[data-mid]');
       firstMsgRef.current =
@@ -584,8 +575,10 @@ export function MobileThread({
       }
       anchorRef.current = null;
       olderPendingRef.current = false;
-      if (!pinnedRef.current) {
-        setScrollTopInstant(anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight));
+      if (!following) {
+        // setScrollTopInstant: a plain assignment would inherit the global
+        // smooth scroll-behavior and re-fire handleScroll mid-glide (<200px).
+        setScrollTopInstant(el, anchor.scrollTop + (el.scrollHeight - anchor.scrollHeight));
       }
       remeasureFirst();
       return;
@@ -600,12 +593,39 @@ export function MobileThread({
     // one queued scroll event stale right after a programmatic jump), and
     // never on pure appends (they don't move existing content).
     const first = firstMsgRef.current;
-    if (!pinnedRef.current && first?.node.isConnected && el.querySelector('[data-mid]') !== first.node) {
+    if (!following && first?.node.isConnected && el.querySelector('[data-mid]') !== first.node) {
       const target = first.node.offsetTop - first.viewportOffset;
-      if (Math.abs(target - el.scrollTop) > 1) setScrollTopInstant(target);
+      if (Math.abs(target - el.scrollTop) > 1) setScrollTopInstant(el, target);
     }
     remeasureFirst();
-  }, [snapshotVersion, lastSnapshotWindow]);
+  }, [snapshotVersion, lastSnapshotWindow, stickRef]);
+
+  // Bottom positioning, before paint (a layout effect: a passive effect let the
+  // first frame paint at the top and then jump). Runs after the restoration
+  // effect above, preserving the old order. Opening a channel snaps to the
+  // bottom; an own send/retry (signal bump) always glides there; otherwise a
+  // change only follows when the reader is already at the bottom — an append
+  // glides (the new bubble animates in), anything else (history spliced in
+  // above, an echo resolving) snaps so the view never crawls.
+  const lastMessageId = messages.length > 0 ? messages[messages.length - 1].id : '';
+  const lastIdRef = useRef('');
+  useLayoutEffect(() => {
+    if (!scrollRef.current || !renderedChannelMatches) return;
+    const opening = contextRef.current !== channelId;
+    const forced = signalRef.current !== scrollToBottomSignal;
+    const appended = lastIdRef.current !== lastMessageId;
+    contextRef.current = channelId;
+    signalRef.current = scrollToBottomSignal;
+    lastIdRef.current = lastMessageId;
+    if (opening) {
+      snapToBottom();
+    } else if (forced) {
+      glideToBottom();
+    } else if (pinnedRef.current || stickRef.current) {
+      if (appended) glideToBottom();
+      else snapToBottom();
+    }
+  }, [messages.length, lastMessageId, renderedChannelMatches, channelId, scrollToBottomSignal, snapToBottom, glideToBottom, stickRef]);
 
   // The composer takes the tab bar's place while a conversation is open.
   useHideRepTabBar(true);
@@ -1057,6 +1077,7 @@ export function MobileThread({
                 onDelete: () => onDelete(actionSheet.id),
                 onTogglePin: () => onTogglePin(actionSheet),
                 onAddReaction: () => setReactionPickerMessageId(actionSheet.id),
+                onReadBy: onReadBy ? () => onReadBy(actionSheet) : undefined,
               } satisfies MessageActionsConfig)
             : null
         }

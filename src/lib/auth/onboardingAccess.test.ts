@@ -288,6 +288,9 @@ const ALLOWED_SUBPATHS = [
   '/api/portal/chat/channels/x/media',
   // chat channel members has getVerifiedChatUser plus userCanAccessChannelDoc.
   '/api/portal/chat/channels/x/members',
+  // chat channel reads ("Read by") has getVerifiedChatUser plus
+  // userCanAccessChannelDoc, and returns display fields only.
+  '/api/portal/chat/channels/x/reads',
   // training detail uses requireVerifiedRequester to verify the caller before
   // applying the route's management/publication scope.
   '/api/portal/training/x',

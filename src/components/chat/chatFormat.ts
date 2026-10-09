@@ -28,3 +28,14 @@ export function pendingStatusLabel(message: { uploadProgress?: number }): string
   if (typeof progress === 'number' && progress < 1) return `Uploading photo · ${Math.round(progress * 100)}%`;
   return 'Sending…';
 }
+
+/** "9:42 AM" when read today, else "Oct 8, 9:42 AM" — the Read by list's time column. */
+export function readTimeLabel(date: Date, now: Date = new Date()): string {
+  const time = clockTime(date);
+  const sameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  if (sameDay) return time;
+  return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${time}`;
+}

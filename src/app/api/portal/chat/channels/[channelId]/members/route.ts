@@ -9,6 +9,7 @@ import {
   toChatChannel,
   userCanAccessChannelDoc,
 } from '@/lib/chat/channels';
+import { memberAvatarUrl, memberName } from '@/lib/chat/memberDisplay';
 
 // Never resolve an unbounded member list — cap the fan-out of user reads.
 const MAX_MEMBERS = 200;
@@ -27,20 +28,6 @@ interface AddableUser {
   uid: string;
   name: string;
   role: string;
-}
-
-/** displayName, else the local-part of the email, else a neutral fallback. */
-function memberName(data: FirebaseFirestore.DocumentData): string {
-  const displayName = typeof data.displayName === 'string' ? data.displayName.trim() : '';
-  if (displayName) return displayName;
-  const email = typeof data.email === 'string' ? data.email : '';
-  const localPart = email.split('@')[0]?.trim();
-  return localPart || '3C User';
-}
-
-/** Only a well-formed string survives — never leak a malformed avatarUrl field. */
-function memberAvatarUrl(data: FirebaseFirestore.DocumentData): string | undefined {
-  return typeof data.avatarUrl === 'string' && data.avatarUrl ? data.avatarUrl : undefined;
 }
 
 /** The display-relevant role label (e.g. "L1 Manager"), or empty when unknown. */

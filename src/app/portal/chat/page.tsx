@@ -18,12 +18,14 @@ import { clockTime, pendingStatusLabel, type CompanyStats } from '@/components/c
 import c from '@/components/chat/chat.module.css';
 import s from '@/components/portal/rep/rep.module.css';
 import { MobileThread } from '@/components/chat/MobileThread';
+import { ReadBySheet, type ReadByTarget } from '@/components/chat/ReadBySheet';
 import { isAbortError } from '@/lib/fetch/isAbortError';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
-import { useChatUnread, markChannelRead } from '@/hooks/chat/useChatUnread';
+import { useChatUnread } from '@/hooks/chat/useChatUnread';
+import { useMarkChannelRead } from '@/hooks/chat/useMarkChannelRead';
 import { useConnectionNotice } from '@/hooks/chat/useConnectionNotice';
 import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
 import { usePinnedMessage } from '@/hooks/chat/usePinnedMessage';
@@ -203,6 +205,25 @@ export default function TeamChatPage() {
   const [desktopPrevChannel, setDesktopPrevChannel] = useState('');
   const desktopSignalRef = useRef(0);
 
+  // Whether the desktop (>=1024px, the D shell's breakpoint) layout is the one on screen. Both layouts render in
+  // the DOM (CSS toggles them), so mark-read needs the breakpoint to know which
+  // channel is actually being viewed: desktop always shows its active channel,
+  // while mobile only "opens" a channel in the thread view.
+  const [isLgUp, setIsLgUp] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsLgUp(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  // Whether the reader on screen is following the latest messages: the desktop
+  // pane's pinned state, or the phone thread's (reported by MobileThread). The
+  // phone channel list shows no messages, so it never holds history open.
+  const [mobileFollowing, setMobileFollowing] = useState(true);
+  const followingLatest = isLgUp ? desktopPinned : mobileView === 'thread' ? mobileFollowing : true;
+
   const { channels, loading: loadingChannels, error: channelsError, retry: retryChannels } = useChatChannels();
   const {
     messages,
@@ -216,7 +237,7 @@ export default function TeamChatPage() {
     lastSnapshotWindow,
     renderedChannel,
     fromCache: messagesFromCache,
-  } = useMessages(activeChannelId || null);
+  } = useMessages(activeChannelId || null, { followingLatest });
 
   // Desktop "load older" trigger: scrolling near the top of the scroller grows
   // the window (see useMessages). desktopOlderPendingRef guards against
@@ -346,19 +367,6 @@ export default function TeamChatPage() {
   // user's own read receipts. All-read until reads settle (see the hook).
   const { unreadByChannel } = useChatUnread(channels, user?.uid);
 
-  // Whether the desktop (>=1024px, the D shell's breakpoint) layout is the one on screen. Both layouts render in
-  // the DOM (CSS toggles them), so mark-read needs the breakpoint to know which
-  // channel is actually being viewed: desktop always shows its active channel,
-  // while mobile only "opens" a channel in the thread view.
-  const [isLgUp, setIsLgUp] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)');
-    const update = () => setIsLgUp(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
-
   // The channel currently visible to this reader (empty when none is open): the
   // active channel on desktop, or the active channel only while the mobile thread
   // is open. Mark-read keys off this so the auto-selected channel on the mobile
@@ -372,29 +380,9 @@ export default function TeamChatPage() {
   const latestMessageAt =
     messages.length > 0 ? messages[messages.length - 1].createdAt?.getTime() ?? 0 : 0;
 
-  // Mark the open channel read on open, and again as new messages arrive while
-  // viewing — throttled to ~2s so a burst doesn't hammer writes (a trailing write
-  // captures the final state). Switching channels marks immediately.
-  const markReadRef = useRef<{ channelId: string; at: number }>({ channelId: '', at: 0 });
-  useEffect(() => {
-    const uid = user?.uid;
-    if (!uid || !viewingChannelId) return;
-    const now = Date.now();
-    const last = markReadRef.current;
-    const isNewChannel = last.channelId !== viewingChannelId;
-    if (isNewChannel || now - last.at >= 2000) {
-      markReadRef.current = { channelId: viewingChannelId, at: now };
-      void markChannelRead(uid, viewingChannelId);
-      return;
-    }
-    // Within the throttle window: schedule one trailing write so the last message
-    // in a burst is still acknowledged.
-    const timer = setTimeout(() => {
-      markReadRef.current = { channelId: viewingChannelId, at: Date.now() };
-      void markChannelRead(uid, viewingChannelId);
-    }, 2000 - (now - last.at));
-    return () => clearTimeout(timer);
-  }, [viewingChannelId, latestMessageAt, user?.uid]);
+  // Mark the open channel read on open and as messages arrive while viewing —
+  // only while the page is visible (see useMarkChannelRead).
+  useMarkChannelRead(user?.uid, viewingChannelId, latestMessageAt);
 
   // Merged render list: real messages first, then this channel's un-reconciled
   // echoes (in send order). Reconciliation happens HERE, synchronously, so the
@@ -721,6 +709,9 @@ export default function TeamChatPage() {
   // bottom; an own send/retry (signal bump) always smooth-scrolls; otherwise a
   // new message only scrolls when the reader is already pinned.
   const scrollContextRef = useRef('');
+  // The last id is a dep too: a reader at the bottom lets useMessages slide its
+  // window, so a new message can arrive without changing the count.
+  const desktopLastMessageId = threadMessages.length > 0 ? threadMessages[threadMessages.length - 1].id : '';
   useEffect(() => {
     const anchor = messagesEndRef.current;
     if (!anchor || !renderedChannelMatches) return;
@@ -737,7 +728,7 @@ export default function TeamChatPage() {
     } else if (forced || desktopPinnedRef.current) {
       anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
     }
-  }, [threadMessages.length, renderedChannelMatches, activeChannelId, scrollToBottomSignal]);
+  }, [threadMessages.length, desktopLastMessageId, renderedChannelMatches, activeChannelId, scrollToBottomSignal]);
 
   const jumpToLatestDesktop = () => {
     setDesktopPinned(true);
@@ -1115,6 +1106,15 @@ export default function TeamChatPage() {
   // every realtime message while the viewer is open.
   const closeLightbox = useCallback(() => setLightbox(null), []);
 
+  // "Read by" for one delivered message (long-press sheet on phones, the "..."
+  // menu on desktop). The sheet fetches the list each time it opens.
+  const [readByTarget, setReadByTarget] = useState<ReadByTarget | null>(null);
+  const openReadBy = useCallback((message: ThreadMessage) => {
+    if (message.pendingState) return;
+    setReadByTarget({ channelId: message.channelId, messageId: message.id });
+  }, []);
+  const closeReadBy = useCallback(() => setReadByTarget(null), []);
+
   // A tap on "Not sent" starts a fresh auto-retry run from now.
   const retryPending = (echo: ThreadMessage) => {
     const restart = { pendingState: 'sending' as const, sendAttempts: 0, retryWindowStart: Date.now() };
@@ -1444,6 +1444,7 @@ export default function TeamChatPage() {
                                 onEdit: () => startEdit(message),
                                 onDelete: () => deleteMessage(message.id),
                                 onTogglePin: () => void togglePin(message),
+                                onReadBy: () => openReadBy(message),
                               }}
                             />
                           </div>
@@ -1610,6 +1611,8 @@ export default function TeamChatPage() {
             onCancelReply={cancelReply}
             onCancelEdit={cancelEdit}
             onSaveEdit={saveEdit}
+            onReadBy={openReadBy}
+            onFollowingChange={setMobileFollowing}
           />
         ) : (
           <>
@@ -1631,6 +1634,7 @@ export default function TeamChatPage() {
         )}
       </div>
       <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
+      <ReadBySheet target={readByTarget} authedFetch={authedFetch} onClose={closeReadBy} />
       <ChatLightbox image={lightbox} onClose={closeLightbox} />
     </div>
   );

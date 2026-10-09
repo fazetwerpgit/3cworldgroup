@@ -132,9 +132,19 @@ const EVICTION_GROW_STEP = 25;
 // growths) would wait forever for a size the query can never reach.
 export const MAX_WINDOW = 600;
 
-export function useMessages(channelId: string | null) {
+export interface UseMessagesOptions {
+  // Whether the reader is following the latest messages (at the bottom of the
+  // thread). While they are, a new arrival sliding the oldest message out of
+  // the live window is normal and commits as-is; the eviction guard widens the
+  // window only for a reader scrolled up into history. Defaults to true.
+  followingLatest?: boolean;
+}
+
+export function useMessages(channelId: string | null, { followingLatest = true }: UseMessagesOptions = {}) {
   const [messages, setMessages] = useState<ChatMessageView[]>([]);
-  const [loading, setLoading] = useState(false);
+  // A channel starts loading the moment it is selected; channel switches set it
+  // again during render (below), never synchronously inside the effect.
+  const [loading, setLoading] = useState(() => !!db && !!channelId);
   const [error, setError] = useState('');
   const [windowSize, setWindowSize] = useState(INITIAL_WINDOW);
   const [hasMore, setHasMore] = useState(false);
@@ -167,16 +177,6 @@ export function useMessages(channelId: string | null) {
   // app resumed). Drives the thread's calm "Reconnecting…" notice.
   const [fromCache, setFromCache] = useState(false);
 
-  // Ref twin of renderedChannel for the subscribe effect's loading gate (a
-  // state read there would force it into the deps and churn the listener).
-  // A resubscribe for
-  // the SAME channel (window growth — loadOlder or the eviction guard, which
-  // fires on every new incoming message once the window is full) must NOT show
-  // the loading state: both thread UIs unmount the entire message list while
-  // loading, which collapses the scroller and clamps scrollTop to 0 — the
-  // "chat jumps to the top mid-typing" bug. Only a channel switch may blank.
-  const renderedChannelRef = useRef<string | null>(null);
-
   // Oldest createdAt (ms) of the RAW window (before the deletedAt filter) as of
   // the last committed snapshot. Used to detect the sliding window evicting
   // history out from under someone scrolled up (see the eviction guard below).
@@ -184,6 +184,13 @@ export function useMessages(channelId: string | null) {
   // message at the old edge (which stays in the raw window) doesn't register as
   // an eviction. Reset on channel switch.
   const oldestDeliveredRef = useRef<number | null>(null);
+
+  // Read by the snapshot callback (a ref, so a scroll in or out of history
+  // never resubscribes the listener).
+  const followingLatestRef = useRef(followingLatest);
+  useEffect(() => {
+    followingLatestRef.current = followingLatest;
+  }, [followingLatest]);
 
   // Channel-switch state reset, done during render (React's "info from
   // previous renders" pattern) rather than in an effect, so it never causes a
@@ -193,8 +200,21 @@ export function useMessages(channelId: string | null) {
   if (channelId !== prevChannelId) {
     setPrevChannelId(channelId);
     // Deselecting (null) is the one switch where "state still holds the old
-    // channel" must NOT survive: the subscribe effect clears messages for it.
-    if (!channelId) setRenderedChannel(null);
+    // channel" must NOT survive: the thread empties.
+    if (!channelId) {
+      setRenderedChannel(null);
+      setMessages([]);
+      setLoading(false);
+    } else if (db && channelId !== renderedChannel) {
+      // Only a channel switch may show the loading state. A resubscribe for
+      // the SAME channel (window growth — loadOlder or the eviction guard) must
+      // not: both thread UIs unmount the entire message list while loading,
+      // which collapses the scroller and clamps scrollTop to 0 (the "chat jumps
+      // to the top mid-typing" bug). Switching back to the channel still in
+      // state (before the other one committed) doesn't blank either.
+      setLoading(true);
+    }
+    setError('');
     setWindowSize(INITIAL_WINDOW);
     setHasMore(false);
     setHistoryCapped(false);
@@ -206,16 +226,7 @@ export function useMessages(channelId: string | null) {
   }, [channelId]);
 
   useEffect(() => {
-    if (!db || !channelId) {
-      renderedChannelRef.current = null;
-      setMessages([]);
-      setLoading(false);
-      setError(db ? '' : 'Firebase is not configured');
-      return;
-    }
-
-    if (renderedChannelRef.current !== channelId) setLoading(true);
-    setError('');
+    if (!db || !channelId) return;
 
     const q = query(
       collection(db, 'chatChannels', channelId, 'messages'),
@@ -253,7 +264,10 @@ export function useMessages(channelId: string | null) {
         // fresh snapshot covering the wider range, so the reader's view never
         // visibly loses history. Repeats (growing by another step each time)
         // until the previously-delivered floor is covered, capped at MAX_WINDOW.
-        if (evicted && windowSize < MAX_WINDOW) {
+        // A reader following the latest messages never sees the top of the
+        // window, so the slide is invisible there: commit it as-is rather than
+        // resubscribing (and re-reading) a wider window on every new message.
+        if (evicted && windowSize < MAX_WINDOW && !followingLatestRef.current) {
           setWindowSize((size) => Math.min(MAX_WINDOW, size + EVICTION_GROW_STEP));
           setLoading(false);
           return;
@@ -261,7 +275,6 @@ export function useMessages(channelId: string | null) {
 
         committedHere = true;
         oldestDeliveredRef.current = rawOldest ?? prevOldest;
-        renderedChannelRef.current = channelId;
         setRenderedChannel(channelId);
         setMessages(next);
         setHasMore(rawDocs.length >= windowSize && windowSize < MAX_WINDOW);
@@ -269,6 +282,7 @@ export function useMessages(channelId: string | null) {
         setLastSnapshotWindow(windowSize);
         setSnapshotVersion((version) => version + 1);
         setLoading(false);
+        setError('');
       },
       (err) => {
         console.error('Error listening to chat messages:', err);
@@ -287,7 +301,7 @@ export function useMessages(channelId: string | null) {
   return {
     messages,
     loading,
-    error,
+    error: db ? error : 'Firebase is not configured',
     hasMore,
     historyCapped,
     loadOlder,

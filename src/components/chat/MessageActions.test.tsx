@@ -84,6 +84,21 @@ describe('MessageActionSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('offers Read by only when the parent can show it', () => {
+    render();
+    expect(Array.from(document.body.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Read by')).toBe(false);
+    act(() => root.unmount());
+    root = createRoot(container);
+
+    const onReadBy = vi.fn();
+    config = { ...config, onReadBy };
+    render();
+    act(() => vi.advanceTimersByTime(SHEET_TAP_GUARD_MS));
+    act(() => button('Read by').click());
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onReadBy).toHaveBeenCalledTimes(1);
+  });
+
   it('has a Cancel row that just closes', () => {
     render();
     act(() => vi.advanceTimersByTime(SHEET_TAP_GUARD_MS));

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, X } from 'lucide-react';
+import { CheckCheck, Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +31,9 @@ export interface MessageActionsConfig {
   onDelete: () => void;
   onTogglePin: () => void;
   onAddReaction?: () => void;
+  // Opens the "Read by" list for this message. Absent (no row) when the parent
+  // can't show it, e.g. a message that hasn't reached the server yet.
+  onReadBy?: () => void;
 }
 
 interface ActionItem {
@@ -49,6 +52,9 @@ function buildActions(config: MessageActionsConfig): ActionItem[] {
   ];
   if (config.hasText) {
     items.push({ key: 'copy', label: 'Copy text', icon: Copy, onSelect: config.onCopy });
+  }
+  if (config.onReadBy) {
+    items.push({ key: 'readby', label: 'Read by', icon: CheckCheck, onSelect: config.onReadBy });
   }
   if (config.canPin) {
     items.push(
