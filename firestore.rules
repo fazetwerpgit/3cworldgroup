@@ -66,11 +66,15 @@ service cloud.firestore {
     }
 
     // Per-user chat read receipts (client-written). Chat members only.
+    // lastReadAt must be the server's clock (the client writes serverTimestamp()):
+    // these receipts drive the "Read by" sheet, so a hand-picked (e.g. future)
+    // time would claim reads of messages never seen. No client delete — none is
+    // needed, and the old write rule already denied it (no request.resource).
     match /users/{userId}/chatReads/{channelId} {
       allow read: if (isApproved() || isOnboardingMember()) && request.auth.uid == userId;
-      allow write: if (isApproved() || isOnboardingMember()) && request.auth.uid == userId &&
+      allow create, update: if (isApproved() || isOnboardingMember()) && request.auth.uid == userId &&
         request.resource.data.keys().hasOnly(['lastReadAt']) &&
-        request.resource.data.lastReadAt is timestamp;
+        request.resource.data.lastReadAt == request.time;
     }
 
     // Per-user "I've been paid for this sale" marks (client-written). Private to
