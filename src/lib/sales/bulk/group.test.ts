@@ -4,8 +4,27 @@
 // sales that were never sent.
 import { describe, expect, it } from 'vitest';
 import type { SaleScanFields } from '@/lib/sales/scan/types';
-import { findRepeats, newBulkRow, newBulkShot, orderConflict, rowProofPaths, type BulkRow, type BulkShot } from './batch';
-import { addressKey, canCombine, combineWithAbove, nameKey, regroup, removeShot, sameAddress, splitShot } from './group';
+import {
+  findRepeats,
+  isUnread,
+  newBulkRow,
+  newBulkShot,
+  orderConflict,
+  rowProofPaths,
+  type BulkRow,
+  type BulkShot,
+} from './batch';
+import {
+  addressKey,
+  canCombine,
+  combineWithAbove,
+  nameKey,
+  regroup,
+  removeShot,
+  sameAddress,
+  saveSale,
+  splitShot,
+} from './group';
 
 const saleId = (n: number) => `${n}`.padStart(32, 'a');
 const shotId = (n: number) => `${n}`.padStart(32, 'b');
@@ -108,13 +127,13 @@ describe('regroup', () => {
     expect(rows.map(orderConflict)).toEqual([[], []]);
   });
 
-  it('flags the same customer with two order numbers instead of picking one', () => {
+  it('the same customer with two order numbers is two sales (a shared name is not enough when the orders differ)', () => {
     const rows = regroup(
       picked(shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' })), shot(2, read({ order: 'TMF-9', name: 'Ana Ruiz' }))),
       ids()
     );
-    expect(shotIds(rows)).toEqual([[1, 2]]);
-    expect(orderConflict(rows[0])).toEqual(['TMF-1', 'TMF-9']);
+    expect(shotIds(rows)).toEqual([[1], [2]]);
+    expect(rows.map((row) => orderConflict(row))).toEqual([[], []]);
   });
 
   it('keeps the same picture picked twice out of the sale, flagged as a repeat', () => {
@@ -178,13 +197,16 @@ describe('regroup', () => {
       fixed: true,
     };
     const rows = regroup(
-      [edited, ...picked(shot(2, read({ order: 'TMF-1', name: 'Someone Else', install: '2099-10-06' })))],
+      [edited, ...picked(shot(2, read({ order: 'TMF-1', name: 'Ana Ruiz', install: '2099-10-06' })))],
       ids()
     );
     expect(shotIds(rows)).toEqual([[1, 2]]);
     expect(rows[0].id).toBe(sale.id);
     expect(rows[0].formData).toMatchObject({ customerName: 'Ana M. Ruiz', installDate: '2099-10-06' });
     expect(regroup(rows, ids())).toEqual(rows);
+    // The same order number under another customer's name clashes: it is a sale of its own.
+    const other = regroup([edited, ...picked(shot(2, read({ order: 'TMF-1', name: 'Someone Else' })))], ids());
+    expect(shotIds(other)).toEqual([[1], [2]]);
   });
 });
 
@@ -382,6 +404,106 @@ describe('combine and split', () => {
     expect(one[0].id).toBe(saleId(1));
     expect(one[0].formData.installDate).toBe('');
     expect(removeShot(one, shotId(1))).toEqual([]);
+  });
+
+  it('removing a screenshot makes the sale the rep\'s: grouping does not put the screenshot back', () => {
+    const together = regroup(picked(shot(1, read({ order: 'TMF-1' })), shot(2, read({ install: '2099-10-06' }))), ids());
+    expect(together[0].fixed).toBeUndefined();
+    const one = removeShot(together, shotId(2));
+    expect(one[0].fixed).toBe(true);
+    // The removed screenshot comes back as a new pick (picked again): it is a sale of its own.
+    const again = regroup([...one, ...picked(shot(3, read({ install: '2099-10-06' })))], ids());
+    expect(again.find((row) => row.id === saleId(1))?.shots.map((s) => s.seq)).toEqual([1, 3]);
+    expect(regroup(one, ids())).toEqual(one);
+  });
+});
+
+describe('include and the edit sheet follow the screenshots', () => {
+  it('an unticked sale keeps its screenshots skipped when an earlier screenshot is read late', () => {
+    // Screenshot 1 is still being read; the rep unticks the sale of screenshot 2 (setInclude fixes it).
+    const start = regroup(
+      picked(shot(1, null, { phase: 'reading' }), shot(2, read({ order: 'TMF-1', name: 'Ana Ruiz' }))),
+      ids()
+    );
+    const unticked = start.map((row) => (row.id === saleId(2) ? { ...row, include: false, fixed: true } : row));
+    // Screenshot 1 reads as the same order: without the fix the sale would take screenshot 1's id and come back ticked.
+    const late = regroup(
+      unticked.map((row) =>
+        row.id === saleId(1) ? { ...row, shots: [{ ...row.shots[0], phase: 'read' as const, scan: read({ order: 'TMF-1' }) }] } : row
+      ),
+      ids()
+    );
+    const skipped = late.find((row) => row.shots.some((s) => s.seq === 2));
+    expect(skipped?.id).toBe(saleId(2));
+    expect(skipped?.include).toBe(false);
+    expect(late.every((row) => row.include === false || !row.shots.some((s) => s.seq === 2))).toBe(true);
+  });
+
+  it('Save is refused when the sale\'s screenshots changed while the sheet was open', () => {
+    const before = regroup(picked(shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' })), shot(2, null, { phase: 'reading' })), ids());
+    const shown = before[0].shots.map((s) => s.id);
+    // Screenshot 2 is read while the sheet is open and joins the sale.
+    const after = regroup(
+      before.map((row) =>
+        row.id === saleId(2) ? { ...row, shots: [{ ...row.shots[0], phase: 'read' as const, scan: read({ install: '2099-10-06' }) }] } : row
+      ),
+      ids()
+    );
+    expect(shotIds(after)).toEqual([[1, 2]]);
+    const change = { ...before[0], formData: { ...before[0].formData, customerName: 'Ana M. Ruiz' } };
+    expect(saveSale(after, saleId(1), change, shown)).toBeNull();
+    // Opened again on the sale as it is now, Save goes through.
+    const saved = saveSale(after, saleId(1), change, after[0].shots.map((s) => s.id));
+    expect(saved?.[0]).toMatchObject({ fixed: true, formData: { customerName: 'Ana M. Ruiz' } });
+    expect(saveSale(after, saleId(99), change, shown)).toBeNull();
+  });
+
+  it('Save only clears the failed-read hold of screenshots the sheet showed', () => {
+    const failed = (n: number) => shot(n, null, { phase: 'read_failed', readError: true });
+    const row: BulkRow = { ...newBulkRow(saleId(1), failed(1)), shots: [failed(1), failed(2)], fixed: true };
+    const saved = saveSale([row], saleId(1), row, [shotId(1), shotId(2)]) as BulkRow[];
+    expect(saved[0].shots.filter(isUnread)).toHaveLength(0);
+    // A pure check: a shot outside `shown` (refused as a whole here) is never marked looked at.
+    expect(saveSale([row], saleId(1), row, [shotId(1)])).toBeNull();
+  });
+});
+
+describe('a key match that clashes on another key', () => {
+  it('the same street for two customers is two sales (order 111 Ana Ruiz Apt 101, then Bob Lee at the bare street)', () => {
+    const rows = regroup(
+      picked(
+        shot(1, read({ order: '111', name: 'Ana Ruiz', address: '1200 Oak Ave Apt 101' })),
+        shot(2, read({ name: 'Bob Lee', address: '1200 Oak Ave' }))
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1], [2]]);
+    expect(rows[1].formData.customerName).toBe('Bob Lee');
+  });
+
+  it('the bare street with the same customer is still one sale', () => {
+    const rows = regroup(
+      picked(
+        shot(1, read({ order: '111', name: 'Ana Ruiz', address: '1200 Oak Ave Apt 101' })),
+        shot(2, read({ name: 'Ana Ruiz', address: '1200 Oak Ave', install: '2099-10-06' }))
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2]]);
+  });
+
+  it('another unit is another sale, even after the bare street joined the first', () => {
+    const rows = regroup(
+      picked(
+        shot(1, read({ order: '111', name: 'Ana Ruiz', address: '1200 Oak Ave Apt 101' })),
+        shot(2, read({ name: 'Ana Ruiz', address: '1200 Oak Ave' })),
+        shot(3, read({ address: '1200 Oak Ave Apt 102', install: '2099-10-06' }))
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2], [3]]);
+    expect(sameAddress(addressKey('1200 Oak Ave Apt 101'), addressKey('1200 Oak Ave Apt 102'))).toBe(false);
+    expect(sameAddress(addressKey('12 Oak Ave Apt 1'), addressKey('12 Oak Ave Apt 10'))).toBe(false);
   });
 });
 

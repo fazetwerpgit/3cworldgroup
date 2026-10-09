@@ -352,7 +352,8 @@ describe('RepBulkLog', () => {
 
     await act(async () => cards()[0].querySelector<HTMLButtonElement>('button[aria-label="Check sale 1"]')!.click());
     const sheet = document.body.querySelector('[role="dialog"]')!;
-    expect(sheet.textContent).toContain('No plan · No address · No install date');
+    // In the bulk log the order number is needed even with the screenshot attached.
+    expect(sheet.textContent).toContain('No plan · No address · No install date · No order number');
 
     const setValue = async (id: string, value: string, event: 'input' | 'change' = 'input') => {
       const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement;
@@ -365,6 +366,8 @@ describe('RepBulkLog', () => {
     await setValue('plan', 'tfiber-1gig', 'change');
     await setValue('customerAddress', '9 Oak Ln, Austin, TX');
     await setValue('installDate', '2099-11-02');
+    expect(sheet.textContent).toContain('No order number');
+    await setValue('orderNumberOrBtn', 'TMF-55');
     expect(sheet.textContent).toContain('Ready to log');
 
     await act(async () => button('Save')!.click());
@@ -503,6 +506,102 @@ describe('RepBulkLog', () => {
     expect(cardText(2)).toContain('Logged');
     await act(async () => new Promise((r) => setTimeout(r, 400)));
     expect(saved()).toBeNull();
+  });
+
+  it('a sale on its way out when the app is killed comes back under the same id, not regrouped', async () => {
+    // Sale A is ready; another screenshot of the same order could not be read yet.
+    const zShot = '9'.repeat(31) + '0';
+    const zPath = `form-attachments/r1/sale-proof/${zShot}_abcdef/`;
+    const a = savedRow('a', { fixed: undefined });
+    a.shots = [{ ...a.shots[0], seq: 1, scan: SCANS['a.png'].fields!, merged: false, checked: false }];
+    const z = newBulkRow('9'.repeat(32), {
+      ...newBulkShot(zShot, 'z.png', 0),
+      phase: 'read_failed',
+      readError: true,
+      proofPath: zPath,
+    });
+    writeBulkBatch(KEY, [z, a]);
+    await render();
+    await settle();
+    expect(cards()).toHaveLength(2);
+    expect(logButton().textContent).toBe('Log 1 sale');
+    expect(saved()?.rows.find((r) => r.id === 'a'.repeat(32))?.fixed).toBeUndefined();
+
+    createSale.mockImplementation(() => new Promise(() => {}));
+    await act(async () => logButton().click());
+    // Before any save delay: the sale on its way out is already stored as fixed.
+    const atKill = window.localStorage.getItem(KEY)!;
+    const out = (JSON.parse(atKill) as { rows: BulkRow[] }).rows.find((r) => r.id === 'a'.repeat(32))!;
+    expect(out.fixed).toBe(true);
+    expect(out).not.toHaveProperty('sending');
+    expect(createSale).toHaveBeenCalledTimes(1);
+    expect((createSale.mock.calls[0][0] as CreateSaleData).clientSaleId).toBe('a'.repeat(32));
+
+    // Killed: nothing after the send started ran. The app opens again and the
+    // other screenshot is read again: it is the same order.
+    await act(async () => root.unmount());
+    container.remove();
+    window.localStorage.setItem(KEY, atKill);
+    pathByName.set(zPath, 'a-again.png');
+    createSale.mockReset();
+    createSale.mockResolvedValue({ sale: { id: 'sale-a' }, duplicate: true });
+    await render();
+    await settle();
+    await act(async () => button('Read again')!.click());
+    await settle();
+    expect(cards()).toHaveLength(1);
+    expect(cardText(1)).toContain('2 screenshots');
+    await act(async () => logButton().click());
+    await settle();
+    expect(createSale).toHaveBeenCalledTimes(1);
+    // The same id: the server hands back the sale it already wrote.
+    expect((createSale.mock.calls[0][0] as CreateSaleData).clientSaleId).toBe('a'.repeat(32));
+    expect(cardText(1)).toContain('Logged');
+  });
+
+  it('unticking a sale keeps it as it is (its screenshots stay skipped)', async () => {
+    await render();
+    await pick([png('a.png', 'AAAA')]);
+    await finishUploads();
+    const box = cards()[0].querySelector<HTMLInputElement>('input[aria-label="Include sale 1"]')!;
+    await act(async () => box.click());
+    await act(async () => new Promise((r) => setTimeout(r, 400)));
+    expect(saved()?.rows[0]).toMatchObject({ include: false, fixed: true });
+  });
+
+  it('refuses Save when the sale changed while the sheet was open, then saves on the sale as it is', async () => {
+    await render();
+    await pick([png('cy-1.png', 'CY11'), png('cy-2.png', 'CY22')]);
+    const release = async (name: string) => {
+      const index = uploads.findIndex((u) => u.name === name);
+      const [upload] = uploads.splice(index, 1);
+      const path = `form-attachments/r1/sale-proof/${upload.key}_abcdef/`;
+      pathByName.set(path, upload.name);
+      await act(async () => upload.resolve(path));
+      await settle();
+    };
+    await release('cy-1.png');
+    expect(cards()).toHaveLength(2);
+    await act(async () => cards()[0].querySelector<HTMLButtonElement>('button[aria-label="Check sale 1"]')!.click());
+    const dialog = () => document.body.querySelector('[role="dialog"]');
+    expect(dialog()?.textContent).toContain('View screenshot');
+
+    // The plan screen is read while the sheet is open and joins this sale.
+    await release('cy-2.png');
+    expect(cards()).toHaveLength(1);
+    await act(async () => button('Save')!.click());
+    expect(dialog()).not.toBeNull();
+    expect(dialog()?.textContent).toContain('This sale changed while you were editing. Check it again.');
+    expect(cardText(1)).toContain('2 screenshots');
+    expect(saved()?.rows[0]?.fixed).toBeUndefined();
+
+    // The sheet now shows both screenshots; Save goes through.
+    expect(dialog()?.textContent).toContain('View screenshot 2');
+    await act(async () => button('Save')!.click());
+    expect(dialog()).toBeNull();
+    await act(async () => new Promise((r) => setTimeout(r, 400)));
+    expect(saved()?.rows[0]).toMatchObject({ fixed: true });
+    expect(saved()?.rows[0].shots.every((shot) => shot.checked)).toBe(true);
   });
 
   it('says when the reader is busy, and Read again tries once more', async () => {

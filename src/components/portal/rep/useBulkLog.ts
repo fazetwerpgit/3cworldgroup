@@ -23,7 +23,13 @@ import {
   type BulkSaleFields,
   type BulkShot,
 } from '@/lib/sales/bulk/batch';
-import { combineWithAbove, regroup, removeShot as dropShot, splitShot as splitOff } from '@/lib/sales/bulk/group';
+import {
+  combineWithAbove,
+  regroup,
+  removeShot as dropShot,
+  saveSale,
+  splitShot as splitOff,
+} from '@/lib/sales/bulk/group';
 import { submitBulkRows } from '@/lib/sales/bulk/submit';
 import { markScanIntroUsed } from '@/lib/sales/scan/intro';
 import { proofUploadMessage, uploadProofFile } from './ProofCapture';
@@ -356,30 +362,22 @@ export function useBulkLog() {
     update((prev) => combineWithAbove(prev, id));
   };
 
+  /** Tick or untick a sale. The pick goes with these screenshots: grouping no longer reshapes the sale. */
   const setInclude = (id: string, include: boolean) => {
     changed();
-    patchRow(id, { include });
+    patchRow(id, { include, fixed: true });
   };
 
   /**
-   * The edit sheet's values. The sale is the rep's from now on (grouping no
-   * longer reshapes it). An edit clears a "Not sent" reason, never a logged result.
+   * The edit sheet's values; `shown` is the screenshots the sheet showed. False
+   * (nothing saved) when the sale's screenshots changed while the sheet was
+   * open: the sheet says so and shows the sale as it is now (see saveSale).
    */
-  const save = (id: string, change: BulkSaleFields) => {
+  const save = (id: string, change: BulkSaleFields, shown: readonly string[]): boolean => {
+    if (!saveSale(rowsRef.current, id, change, shown)) return false;
     changed();
-    update((prev) =>
-      prev.map((row) => {
-        if (row.id !== id) return row;
-        const stale = row.result?.kind === 'failed' || (row.result?.kind === 'already' && orderChanged(row, change));
-        return {
-          ...row,
-          ...change,
-          shots: row.shots.map((shot) => ({ ...shot, merged: true, checked: true })),
-          fixed: true,
-          result: stale ? null : row.result,
-        };
-      })
-    );
+    update((prev) => saveSale(prev, id, change, shown) ?? prev);
+    return true;
   };
 
   /** Throw the whole batch away (the page offers it only while nothing is sending). */
@@ -430,7 +428,18 @@ export function useBulkLog() {
         create: createSale,
         allowDuplicate,
         onStart: (id) => {
-          if (current()) patchRow(id, { sending: true });
+          if (!current()) return;
+          // From here the server may hold this sale under this id: it is fixed
+          // (never regrouped, never renumbered), and saved as such right now, not
+          // after the save delay, so an app killed mid-send comes back with this
+          // id and a retry lands on the sale already written.
+          patchRow(id, { sending: true, fixed: true });
+          if (storageKey) {
+            writeBulkBatch(
+              storageKey,
+              withResults().map((row) => (row.id === id ? { ...row, sending: true, fixed: true } : row))
+            );
+          }
         },
         onResult: (id, result: BulkResult) => {
           // After Start over this batch is gone; after closing the page the
@@ -536,11 +545,6 @@ async function makeThumb(file: File): Promise<string | null> {
   }
   if (mime === 'image/heic' || mime === 'image/heif') return null;
   return URL.createObjectURL(file);
-}
-
-/** A new order number is a new question for the server: drop its old "already logged". */
-function orderChanged(row: BulkRow, change: Pick<BulkRow, 'formData'>): boolean {
-  return row.formData.orderNumberOrBtn.trim() !== change.formData.orderNumberOrBtn.trim();
 }
 
 export type BulkLog = ReturnType<typeof useBulkLog>;

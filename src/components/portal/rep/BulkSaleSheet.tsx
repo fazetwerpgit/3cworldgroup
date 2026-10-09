@@ -24,6 +24,11 @@ import b from './rep-bulklog.module.css';
 // single-sale draft); Save puts the values back on the sale. Its screenshots
 // are listed on top: each can be viewed, made its own sale, removed, or read
 // again when its read failed (those act right away, not on Save).
+//
+// Save carries the screenshots the sheet showed. When a late reading moved one
+// in or out of the sale while the sheet was open, Save is refused (onSave
+// returns false) and the page opens the sheet again on the sale as it is now,
+// with `notice` saying why.
 
 export type BulkSaleChange = BulkSaleFields;
 
@@ -36,6 +41,7 @@ export function BulkSaleSheet({
   onReadShot,
   onSave,
   onClose,
+  notice,
 }: {
   row: BulkRow;
   /** "Sale 3". */
@@ -47,8 +53,11 @@ export function BulkSaleSheet({
   onRemoveShot: (shotId: string) => void;
   /** "Read again" for a screenshot whose read failed. */
   onReadShot: (shotId: string) => void;
-  onSave: (change: BulkSaleChange) => void;
+  /** `shown`: the sale's screenshots as the sheet showed them. */
+  onSave: (change: BulkSaleChange, shown: string[]) => void;
   onClose: () => void;
+  /** Why the sheet was opened again ("This sale changed while you were editing…"). */
+  notice?: string | null;
 }) {
   // The refs stay out of `form`, which is read during render.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- errorRef: the sheet has no server error box
@@ -71,6 +80,10 @@ export function BulkSaleSheet({
   const conflict = orderConflict(row);
   const many = row.shots.length > 1;
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  // The screenshots the rep has seen in this sheet: those it opened with, less
+  // any the rep made its own sale or removed here.
+  const [shown, setShown] = useState(() => row.shots.map((shot) => shot.id));
+  const dropShown = (shotId: string) => setShown((prev) => prev.filter((id) => id !== shotId));
 
   // The list behind keeps re-rendering while other screenshots are read: the
   // focus and the Escape handler are set up once, not on every new onClose.
@@ -113,7 +126,7 @@ export function BulkSaleSheet({
       provider: form.provider ?? providerChoice,
       saleDateTouched: form.saleDateTouched,
       flags,
-    });
+    }, shown);
   };
 
   // The full screenshot once uploaded; the card thumbnail only until then.
@@ -143,6 +156,12 @@ export function BulkSaleSheet({
           </div>
           <form ref={formRef} className={b.editForm} onSubmit={save} noValidate>
             <div className={`${s.sheetBody} ${b.editBody}`}>
+              {notice ? (
+                <p className={b.editNeeds} role="alert">
+                  <AlertTriangle size={16} strokeWidth={2.25} aria-hidden="true" />
+                  {notice}
+                </p>
+              ) : null}
               <ul className={b.shots} aria-label="Screenshots">
                 {row.shots.map((shot, i) => {
                   const name = many ? `Screenshot ${i + 1}` : 'Screenshot';
@@ -183,13 +202,23 @@ export function BulkSaleSheet({
                       ) : null}
                       {many ? (
                         <span className={b.shotActions}>
-                          <button type="button" className={b.shotAction} onClick={() => onSplit(shot.id)}>
+                          <button
+                            type="button"
+                            className={b.shotAction}
+                            onClick={() => {
+                              dropShown(shot.id);
+                              onSplit(shot.id);
+                            }}
+                          >
                             Make its own sale
                           </button>
                           <button
                             type="button"
                             className={b.shotAction}
-                            onClick={() => onRemoveShot(shot.id)}
+                            onClick={() => {
+                              dropShown(shot.id);
+                              onRemoveShot(shot.id);
+                            }}
                             aria-label={`Remove ${name.toLowerCase()}`}
                           >
                             Remove

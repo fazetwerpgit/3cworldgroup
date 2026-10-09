@@ -99,11 +99,12 @@ export interface BulkRow {
   include: boolean | null;
   result: BulkResult | null;
   /**
-   * The rep shaped this sale (edited it, combined it, split a screenshot off):
-   * automatic grouping no longer moves its screenshots or rewrites its fields.
+   * The rep shaped this sale (edited it, ticked or unticked it, combined it,
+   * split or removed a screenshot), or it was sent: automatic grouping no
+   * longer moves its screenshots, rewrites its fields or changes its id.
    */
   fixed?: boolean;
-  /** On its way to the server now (never saved). */
+  /** On its way to the server now (saved as fixed, never as sending). */
   sending?: boolean;
 }
 
@@ -173,14 +174,18 @@ export const ORDER_CONFLICT_PROBLEM = "Order numbers don't match";
 /**
  * What the create-sale route would turn this sale down for, in short words
  * ("No plan", "Sale date cannot be after the install date"). The same rules as
- * the Log Sale form (validateSaleForm). Empty when the sale can be sent.
+ * the Log Sale form (validateSaleForm), plus one of the bulk log's own: a sale
+ * needs its order number even with a screenshot attached (a bulk sale nobody
+ * typed in is matched to T-Fiber's records by it). Empty when the sale can be
+ * sent.
  */
 export function rowProblems(row: Pick<BulkRow, 'formData' | 'products' | 'shots'>): string[] {
-  const errors = validateSaleForm({
+  const errors: Partial<Record<SaleFieldKey, string>> = validateSaleForm({
     formData: row.formData,
     products: row.products,
     proofPaths: rowProofPaths(row),
   });
+  if (!normalizeOrderNumber(row.formData.orderNumberOrBtn)) errors.orderNumberOrBtn ??= PROBLEM_LABELS.orderNumberOrBtn;
   return PROBLEM_ORDER.flatMap((key) => {
     const error = errors[key];
     if (!error) return [];
@@ -517,10 +522,10 @@ export function writeBulkBatch(key: string, rows: BulkRow[] | null, now = Date.n
       return;
     }
     const saved: SavedBatch = {
-      rows: rows.map(({ sending: _sending, ...row }) => {
-        void _sending;
-        return row;
-      }),
+      // A sale on its way out comes back fixed: the server may already hold it
+      // under its id, so after a kill it is resent as it is (the server replays
+      // it), never regrouped under another id.
+      rows: rows.map(({ sending, ...row }) => (sending ? { ...row, fixed: true } : row)),
       savedAt: now,
     };
     window.localStorage.setItem(key, JSON.stringify(saved));

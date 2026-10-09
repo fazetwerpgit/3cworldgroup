@@ -29,6 +29,7 @@ import {
   type BulkRow,
   type BulkShot,
 } from './batch';
+import { regroup } from './group';
 
 const PATH = (n: number) => `form-attachments/r1/sale-proof/${String(n).padStart(32, 'a')}_00000${n}/`;
 const id = (n: number) => String(n).padStart(32, '0');
@@ -102,6 +103,17 @@ describe('rowStatus', () => {
       kind: 'needs_info',
       problems: ['No plan', 'No address', 'No install date'],
     });
+  });
+
+  it('needs the order number even with a screenshot attached (unlike the Log Sale form)', () => {
+    const row = ready(1);
+    row.formData = { ...row.formData, orderNumberOrBtn: ' - ' };
+    expect(rowProofPaths(row)).toHaveLength(1);
+    expect(rowStatus(row, undefined)).toEqual({ kind: 'needs_info', problems: ['No order number'] });
+    expect(rowProblems(row)).toEqual(['No order number']);
+    expect(sendableRows([row])).toEqual([]);
+    // The rep types it in the sheet: ready.
+    expect(rowStatus({ ...row, formData: { ...row.formData, orderNumberOrBtn: 'TMF-9' } }, undefined)).toEqual({ kind: 'ready' });
   });
 
   it('flags a sale date after the install date', () => {
@@ -280,6 +292,30 @@ describe('saved batch', () => {
     expect(saved?.rows[0].sending).toBeUndefined();
     expect(saved?.rows[0].result).toEqual({ kind: 'logged', saleId: 's1' });
     expect(saved?.rows[1].products.map((p) => p.productId)).toEqual(['tfiber-1gig']);
+  });
+
+  it('a sale on its way out when the app is killed comes back fixed under its id, not regrouped', () => {
+    // Sale 2 (screenshot 2) was being sent; screenshot 1 of the same order was still being read.
+    const sending: BulkRow = { ...ready(2, { scan: { orderNumberOrBtn: { value: 'ORD-1002', confidence: 'high' } } }), sending: true };
+    const reading = blank(1, { phase: 'reading', proofPath: PATH(1) });
+    writeBulkBatch(KEY, [reading, sending]);
+    const raw = JSON.parse(window.localStorage.getItem(KEY) ?? 'null') as { rows: Record<string, unknown>[] };
+    expect(raw.rows[1]).not.toHaveProperty('sending');
+    expect(raw.rows[1].fixed).toBe(true);
+    const restored = readBulkBatch(KEY)!.rows;
+    expect(restored[1]).toMatchObject({ id: id(2), fixed: true, result: null });
+    // The late read of screenshot 1 shows the same order: it joins the sale, which keeps its id.
+    const late = regroup(
+      restored.map((row) =>
+        row.id === id(1)
+          ? { ...row, shots: [{ ...row.shots[0], phase: 'read' as const, scan: { orderNumberOrBtn: { value: 'ORD-1002', confidence: 'high' as const } } }] }
+          : row
+      ),
+      () => id(999)
+    );
+    expect(late.map((row) => row.id)).toEqual([id(2)]);
+    expect(late[0].shots.map((shot) => shot.seq)).toEqual([1, 2]);
+    expect(sendableRows(late).map((row) => row.id)).toEqual([id(2)]);
   });
 
   it('keeps a lost edit and a busy reader across a reload', () => {

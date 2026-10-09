@@ -25,7 +25,7 @@ import {
   type BulkRow,
   type BulkStatus,
 } from '@/lib/sales/bulk/batch';
-import { canCombine } from '@/lib/sales/bulk/group';
+import { SALE_CHANGED_MESSAGE, canCombine } from '@/lib/sales/bulk/group';
 import { isExtraPlanId } from '@/lib/sales/planSelection';
 import { BodyLayer } from './BodyLayer';
 import { BulkSaleSheet } from './BulkSaleSheet';
@@ -300,6 +300,13 @@ function Picker({ label, onPick, primary }: { label: string; onPick: (files: Fil
 export function RepBulkLog() {
   const bulk = useBulkLog();
   const [editing, setEditing] = useState<string | null>(null);
+  /** Save was refused (the sale changed while the sheet was open): why, and a key bump to open it fresh. */
+  const [sheetNotice, setSheetNotice] = useState<string | null>(null);
+  const [sheetReloads, setSheetReloads] = useState(0);
+  const closeSheet = () => {
+    setEditing(null);
+    setSheetNotice(null);
+  };
   const [confirmClear, setConfirmClear] = useState(false);
   const hasRows = bulk.rows.length > 0;
   useHideRepTabBar(hasRows);
@@ -427,7 +434,10 @@ export function RepBulkLog() {
                 index={index}
                 repeat={bulk.repeats.get(row.id)}
                 bulk={bulk}
-                onOpen={() => setEditing(row.id)}
+                onOpen={() => {
+                  setSheetNotice(null);
+                  setEditing(row.id);
+                }}
               />
             ))}
           </ol>
@@ -455,18 +465,24 @@ export function RepBulkLog() {
 
       {editingRow ? (
         <BulkSaleSheet
-          key={editingRow.id}
+          key={`${editingRow.id}:${sheetReloads}`}
           row={editingRow}
           label={`Sale ${editingIndex + 1}`}
           previews={bulk.previews}
           onSplit={bulk.splitShot}
           onRemoveShot={bulk.removeShot}
           onReadShot={bulk.readShotAgain}
-          onSave={(change) => {
-            bulk.save(editingRow.id, change);
-            setEditing(null);
+          notice={sheetNotice}
+          onSave={(change, shown) => {
+            if (bulk.save(editingRow.id, change, shown)) {
+              closeSheet();
+              return;
+            }
+            // The sale's screenshots changed under the sheet: show it as it is now.
+            setSheetNotice(SALE_CHANGED_MESSAGE);
+            setSheetReloads((n) => n + 1);
           }}
-          onClose={() => setEditing(null)}
+          onClose={closeSheet}
         />
       ) : null}
     </div>

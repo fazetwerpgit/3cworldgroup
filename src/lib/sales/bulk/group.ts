@@ -2,7 +2,9 @@
 // four) screenshots of one T-Fiber order, usually one after the other, so:
 //
 // - Each screenshot is read on its own. Screenshots that share an order number,
-//   an address or a customer name are one sale (order number first).
+//   an address or a customer name are one sale (order number first), unless
+//   another of those disagrees ("1200 Oak Ave" for Ana Ruiz and for Bob Lee is
+//   two sales: one is likely an apartment the other screen left off).
 // - A screenshot that shares none of those with any sale joins the sale of the
 //   screenshot picked right before it, unless the two disagree: a different
 //   order number, a different address or a different customer name. T-Fiber
@@ -20,9 +22,10 @@
 //   between (orderConflict in ./batch).
 //
 // Grouping is redone whenever a reading comes in, but only for sales nobody has
-// touched. A sale the rep edited, combined or split ("fixed"), or one already
-// sent, keeps its screenshots and its id; a new screenshot may still join a
-// fixed sale that is not sent yet, filling only its empty fields.
+// touched. A sale the rep edited, ticked or unticked, combined, or split or
+// removed a screenshot from ("fixed"), or one sent or on its way out, keeps its
+// screenshots and its id; a new screenshot may still join a fixed sale that is
+// not sent yet, filling only its empty fields.
 //
 // Ids: an automatic sale keeps the id of the sale its first screenshot was in,
 // unless an earlier sale took that id; a sale that is new gets a fresh id.
@@ -159,28 +162,33 @@ export function regroup(rows: BulkRow[], newId: () => string): BulkRow[] {
   }
 
   const hasRoom = (group: Group) => group.joinable && group.shots.length < BULK_MAX_SHOTS;
+  const hasKeys = (group: Group) => KEY_KINDS.some((kind) => group.keys[kind].size > 0);
+  /**
+   * The sale already holds a different value of a kind this screenshot has
+   * (another order, address or name). Every address the sale holds must be
+   * the same as this one: "1200 Oak Ave" next to "1200 Oak Ave Apt 101" does
+   * not make "1200 Oak Ave Apt 102" the same place.
+   */
+  const disagrees = (group: Group, keys: Keys) =>
+    KEY_KINDS.some((kind) => {
+      const key = keys[kind];
+      const known = group.keys[kind];
+      if (!key || known.size === 0) return false;
+      return kind === 'address' ? ![...known].every((other) => sameAddress(key, other)) : !known.has(key);
+    });
+  /** A sale sharing one of these keys, and clashing on none (one shared value is not enough on its own). */
   const findMatch = (keys: Keys) => {
     for (const kind of KEY_KINDS) {
       const key = keys[kind];
       if (!key) continue;
       for (let i = groups.length - 1; i >= 0; i -= 1) {
-        if (!hasRoom(groups[i])) continue;
+        if (!hasRoom(groups[i]) || disagrees(groups[i], keys)) continue;
         const known = groups[i].keys[kind];
         if (kind === 'address' ? [...known].some((other) => sameAddress(key, other)) : known.has(key)) return groups[i];
       }
     }
     return undefined;
   };
-
-  const hasKeys = (group: Group) => KEY_KINDS.some((kind) => group.keys[kind].size > 0);
-  /** The sale already holds a different value of a kind this screenshot has (another order, address or name). */
-  const disagrees = (group: Group, keys: Keys) =>
-    KEY_KINDS.some((kind) => {
-      const key = keys[kind];
-      const known = group.keys[kind];
-      if (!key || known.size === 0) return false;
-      return kind === 'address' ? ![...known].some((other) => sameAddress(key, other)) : !known.has(key);
-    });
 
   const absorbed = new Set<string>();
   let previous: BulkShot | null = null;
@@ -289,12 +297,45 @@ export function splitShot(rows: BulkRow[], shotId: string, newId: () => string):
     .sort((a, b) => a.shots[0].seq - b.shots[0].seq);
 }
 
-/** Take one screenshot out of an unsent sale; the sale goes when it was the last one. */
+/**
+ * Take one screenshot out of an unsent sale; the sale goes when it was the
+ * last one. What is left is the rep's from then on (grouping would otherwise
+ * put the screenshots back as they were).
+ */
 export function removeShot(rows: BulkRow[], shotId: string): BulkRow[] {
   const row = rows.find((r) => r.shots.some((shot) => shot.id === shotId));
   if (!row || isSent(row)) return rows;
   const rest = row.shots.filter((s) => s.id !== shotId);
   if (rest.length === 0) return rows.filter((r) => r.id !== row.id);
-  const left: BulkRow = { ...row, ...(row.fixed ? {} : mergeShots(rest)), shots: rest };
+  const left: BulkRow = { ...row, ...(row.fixed ? {} : mergeShots(rest)), shots: rest, fixed: true };
   return rows.map((r) => (r.id === row.id ? left : r)).sort((a, b) => a.shots[0].seq - b.shots[0].seq);
+}
+
+/** The edit sheet's Save refused: the sale's screenshots changed while it was open. */
+export const SALE_CHANGED_MESSAGE = 'This sale changed while you were editing. Check it again.';
+
+/**
+ * The edit sheet's values put on sale `id`. `shown` is the screenshots the
+ * sheet showed: when the sale's screenshots are no longer exactly those (a
+ * late reading moved one in or out while the sheet was open), nothing is saved
+ * and null comes back, so old values never land on a different set of
+ * screenshots. The sale is the rep's from now on (fixed); only the screenshots
+ * the sheet showed count as looked at (their failed read no longer holds the
+ * sale back). An edit clears a "Not sent" reason, never a logged result.
+ */
+export function saveSale(rows: BulkRow[], id: string, change: BulkSaleFields, shown: readonly string[]): BulkRow[] | null {
+  const row = rows.find((r) => r.id === id);
+  if (!row) return null;
+  const seen = new Set(shown);
+  if (row.shots.length !== seen.size || row.shots.some((shot) => !seen.has(shot.id))) return null;
+  const orderChanged = row.formData.orderNumberOrBtn.trim() !== change.formData.orderNumberOrBtn.trim();
+  const stale = row.result?.kind === 'failed' || (row.result?.kind === 'already' && orderChanged);
+  const saved: BulkRow = {
+    ...row,
+    ...change,
+    shots: row.shots.map((shot) => (seen.has(shot.id) ? { ...shot, merged: true, checked: true } : shot)),
+    fixed: true,
+    result: stale ? null : row.result,
+  };
+  return rows.map((r) => (r.id === id ? saved : r));
 }
