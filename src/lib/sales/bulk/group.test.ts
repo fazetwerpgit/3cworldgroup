@@ -3,14 +3,17 @@
 // at most; the same picture twice stays out; and sale ids only ever change for
 // sales that were never sent.
 import { describe, expect, it } from 'vitest';
+import { statusBarMinutes } from '@/lib/sales/scan/normalize';
 import type { SaleScanFields } from '@/lib/sales/scan/types';
 import {
+  CHECK_JOIN_PROBLEM,
   findRepeats,
   isUnread,
   newBulkRow,
   newBulkShot,
   orderConflict,
   rowProofPaths,
+  rowStatus,
   type BulkRow,
   type BulkShot,
 } from './batch';
@@ -31,7 +34,16 @@ const shotId = (n: number) => `${n}`.padStart(32, 'b');
 
 const v = (value: string) => ({ value, confidence: 'high' as const });
 /** What the reader got from one screenshot. */
-const read = (fields: { order?: string; name?: string; address?: string; install?: string; plan?: boolean }): SaleScanFields => ({
+const read = (fields: {
+  order?: string;
+  name?: string;
+  address?: string;
+  install?: string;
+  plan?: boolean;
+  /** The status-bar clock, "9:41". */
+  at?: string;
+}): SaleScanFields => ({
+  ...(fields.at ? { statusBarTime: v(String(statusBarMinutes(fields.at))) } : {}),
   ...(fields.order ? { orderNumberOrBtn: v(fields.order) } : {}),
   ...(fields.name ? { customerName: v(fields.name) } : {}),
   ...(fields.address ? { customerAddress: v(fields.address) } : {}),
@@ -504,6 +516,99 @@ describe('a key match that clashes on another key', () => {
     expect(shotIds(rows)).toEqual([[1, 2], [3]]);
     expect(sameAddress(addressKey('1200 Oak Ave Apt 101'), addressKey('1200 Oak Ave Apt 102'))).toBe(false);
     expect(sameAddress(addressKey('12 Oak Ave Apt 1'), addressKey('12 Oak Ave Apt 10'))).toBe(false);
+  });
+});
+
+// The two screens of one sale are taken minutes apart; neighbouring sales a
+// quarter of an hour or more. A join with no key to go on needs both clocks.
+describe('regroup: the status-bar clock', () => {
+  const order = (at?: string) => shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz', at }));
+  const plan = (at?: string, n = 2) => shot(n, read({ install: '2099-10-06', plan: true, at }));
+
+  it('screenshots taken 0 to 9 minutes apart are one sale, with nothing to check', () => {
+    for (const at of ['9:00', '9:04', '9:09']) {
+      const rows = regroup(picked(order('9:00'), plan(at)), ids());
+      expect(shotIds(rows)).toEqual([[1, 2]]);
+      expect(rows[0].checkJoin).toBeUndefined();
+      expect(rowStatus(rows[0], undefined)).toEqual({ kind: 'needs_info', problems: ['No address'] });
+    }
+  });
+
+  it('screenshots 31 minutes apart are two sales', () => {
+    const rows = regroup(picked(order('9:00'), plan('9:31')), ids());
+    expect(shotIds(rows)).toEqual([[1], [2]]);
+    expect(rows.every((row) => !row.checkJoin)).toBe(true);
+  });
+
+  it('a clock that could not be read still joins, but the rep checks the sale', () => {
+    for (const rows of [
+      regroup(picked(order('9:00'), plan()), ids()),
+      regroup(picked(order(), plan('9:02')), ids()),
+      regroup(picked(order('9:00'), shot(2, null)), ids()),
+    ]) {
+      expect(shotIds(rows)).toEqual([[1, 2]]);
+      expect(rows[0].checkJoin).toBe(true);
+      expect(regroup(rows, ids())).toEqual(rows);
+    }
+    const rows = regroup(picked(order('9:00'), plan()), ids());
+    const status = rowStatus(rows[0], undefined);
+    expect(status).toEqual({ kind: 'needs_info', problems: [CHECK_JOIN_PROBLEM, 'No address'] });
+    // Saving in the sheet answers it, and so do Split and Combine.
+    const saved = saveSale(rows, rows[0].id, rows[0], rows[0].shots.map((s) => s.id))!;
+    expect(saved[0].checkJoin).toBeUndefined();
+    expect(regroup(saved, ids())[0].checkJoin).toBeUndefined();
+    const split = splitShot(rows, shotId(2), () => saleId(500));
+    expect(split.every((row) => !row.checkJoin)).toBe(true);
+    const combined = combineWithAbove(split, saleId(500));
+    expect(combined[0].checkJoin).toBeUndefined();
+  });
+
+  it('a read that brings the missing clock settles the question', () => {
+    const unsure = regroup(picked(order('9:00'), plan()), ids());
+    expect(unsure[0].checkJoin).toBe(true);
+    const reread = unsure.map((row) => ({
+      ...row,
+      shots: row.shots.map((s) => (s.seq === 2 ? { ...s, scan: read({ install: '2099-10-06', plan: true, at: '9:03' }), merged: false } : s)),
+    }));
+    expect(regroup(reread, ids())[0].checkJoin).toBeUndefined();
+  });
+
+  it('wraps at midnight (and noon)', () => {
+    expect(shotIds(regroup(picked(order('23:58'), plan('00:03')), ids()))).toEqual([[1, 2]]);
+    expect(shotIds(regroup(picked(order('11:58'), plan('12:03')), ids()))).toEqual([[1, 2]]);
+    expect(shotIds(regroup(picked(order('23:50'), plan('00:10')), ids()))).toEqual([[1], [2]]);
+  });
+
+  it('a key match needs no clock', () => {
+    const rows = regroup(
+      picked(order('9:00'), shot(2, read({ order: 'tmf 1', install: '2099-10-06', at: '14:30' })), shot(3, read({ name: 'Ana Ruiz' }))),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2, 3]]);
+    expect(rows[0].checkJoin).toBeUndefined();
+  });
+
+  it('the order screen of the next customer does not join the customer screen before it (Ana 2h before Bob)', () => {
+    const rows = regroup(
+      picked(
+        shot(1, read({ name: 'Ana Ruiz', address: '5 Pine St, Austin, TX', install: '2099-10-06', at: '10:00' })),
+        shot(2, read({ order: 'TMF-2', plan: true, at: '12:00' })),
+        shot(3, read({ name: 'Bob Lee', address: '9 Oak Ln, Austin, TX', install: '2099-10-07', at: '12:02' }))
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1], [2, 3]]);
+    expect(rows[1].formData).toMatchObject({ orderNumberOrBtn: 'TMF-2', customerName: 'Bob Lee' });
+    expect(rows.every((row) => !row.checkJoin)).toBe(true);
+  });
+
+  it('never sorts by the clock: pick order stays (a later pick with an earlier clock is a later sale)', () => {
+    const rows = regroup(
+      picked(shot(1, read({ order: 'TMF-1', at: '15:00' })), shot(2, read({ order: 'TMF-2', at: '9:00' }))),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1], [2]]);
+    expect(rows.map((row) => row.formData.orderNumberOrBtn)).toEqual(['TMF-1', 'TMF-2']);
   });
 });
 

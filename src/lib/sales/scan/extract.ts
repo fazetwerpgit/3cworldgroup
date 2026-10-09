@@ -53,6 +53,9 @@ export const SCAN_RESPONSE_SCHEMA: Schema = {
     planText: field('Internet plan name and speed exactly as printed, e.g. "Fiber 1 Gig" or "Internet 1000". Not the price.'),
     installDate: field('Scheduled install or appointment date as YYYY-MM-DD.'),
     installWindow: field('Install appointment time window as printed, e.g. "8:00 AM - 12:00 PM".'),
+    statusBarTime: field(
+      'The clock in the phone status bar at the very top edge of the screenshot, exactly as shown, e.g. "9:41" or "21:41" (AM/PM only if shown). Not a time from the page itself.'
+    ),
   },
   required: [
     'orderNumber',
@@ -63,6 +66,7 @@ export const SCAN_RESPONSE_SCHEMA: Schema = {
     'planText',
     'installDate',
     'installWindow',
+    'statusBarTime',
   ],
   propertyOrdering: [
     'orderNumber',
@@ -73,6 +77,7 @@ export const SCAN_RESPONSE_SCHEMA: Schema = {
     'planText',
     'installDate',
     'installWindow',
+    'statusBarTime',
   ],
 };
 
@@ -98,6 +103,7 @@ export const rawExtractionSchema = z.object({
   planText: rawField.optional(),
   installDate: rawField.optional(),
   installWindow: rawField.optional(),
+  statusBarTime: rawField.optional(),
 }) satisfies z.ZodType<RawExtraction>;
 
 export function scanInstructions(today: string): string {
@@ -109,6 +115,7 @@ export function scanInstructions(today: string): string {
     'Install date: only a date printed as the install, installation or appointment date. Never use the order date, the date the screenshot was taken, or today. If no install date is printed, return an empty value with confidence "low".',
     `Return the install date as YYYY-MM-DD. If the year is not printed, use the next such date on or after ${today}, and confidence no higher than "medium".`,
     'Address: the service or install address, split into its parts. Ignore billing and shipping addresses.',
+    'Status bar time: the clock in the phone status bar at the top edge (e.g. "9:41"), as shown. If there is no status bar, return an empty value with confidence "low".',
   ].join('\n');
 }
 

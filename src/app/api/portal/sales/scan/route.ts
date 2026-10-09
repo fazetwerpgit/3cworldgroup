@@ -108,7 +108,8 @@ export async function POST(request: NextRequest) {
     log({ outcome: result.reason, ...timing });
     return quiet(result.reason);
   }
-  const found = Object.keys(result.fields).length;
+  // The status-bar clock alone is not a read: nothing on the order was found.
+  const found = Object.keys(result.fields).filter((key) => key !== 'statusBarTime').length;
   // Which fields came back and how sure (names and confidence only, never a
   // value), so a field report like "the date didn't fill" can be checked.
   const fields = Object.entries(result.fields)

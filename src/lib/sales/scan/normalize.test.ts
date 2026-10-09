@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { cleanIsoDate, cleanOrderNumber, joinAddress, matchCarrier, matchPlanId, planTextMbps } from './normalize';
+import {
+  cleanIsoDate,
+  cleanOrderNumber,
+  clockGap,
+  joinAddress,
+  matchCarrier,
+  matchPlanId,
+  planTextMbps,
+  statusBarMinutes,
+  toFormFields,
+} from './normalize';
+import { parseScanResponse } from './extract';
 
 describe('matchCarrier', () => {
   it.each([
@@ -61,5 +72,43 @@ describe('field cleanup', () => {
     expect(cleanOrderNumber('Order #: TF-100234')).toBe('TF-100234');
     expect(cleanOrderNumber('#A12')).toBe('A12');
     expect(cleanOrderNumber('Pending')).toBeNull();
+  });
+});
+
+describe('status-bar clock', () => {
+  it.each([
+    ['9:41', 581],
+    ['09:41', 581],
+    ['21:41', 1301],
+    ['9:41 PM', 1301],
+    ['9:41 a.m.', 581],
+    ['12:05 AM', 5],
+    ['0:03', 3],
+    ['', null],
+    ['9:61', null],
+    ['24:00', null],
+    ['13:00 PM', null],
+    ['Oct 6', null],
+  ])('%s -> %s minutes past midnight', (text, minutes) => expect(statusBarMinutes(text)).toBe(minutes));
+
+  it('measures the gap on a 12-hour dial, across noon and midnight', () => {
+    expect(clockGap(statusBarMinutes('9:41')!, statusBarMinutes('9:50')!)).toBe(9);
+    expect(clockGap(statusBarMinutes('23:58')!, statusBarMinutes('00:03')!)).toBe(5);
+    expect(clockGap(statusBarMinutes('11:58')!, statusBarMinutes('12:03')!)).toBe(5);
+    // A 12-hour clock without AM/PM may be either half of the day.
+    expect(clockGap(statusBarMinutes('9:41')!, statusBarMinutes('21:45')!)).toBe(4);
+    expect(clockGap(statusBarMinutes('9:00')!, statusBarMinutes('9:31')!)).toBe(31);
+  });
+
+  it('comes back from the reader as minutes past midnight, and not at all when unsure or missing', () => {
+    expect(toFormFields({ statusBarTime: { value: '9:41', confidence: 'high' } })).toEqual({
+      statusBarTime: { value: '581', confidence: 'high' },
+    });
+    expect(toFormFields({ statusBarTime: { value: '12:00', confidence: 'medium' } }).statusBarTime?.value).toBe('720');
+    expect(toFormFields({ statusBarTime: { value: '9:41', confidence: 'low' } })).toEqual({});
+    expect(toFormFields({ statusBarTime: { value: '', confidence: 'low' } })).toEqual({});
+    expect(parseScanResponse(JSON.stringify({ statusBarTime: { value: '21:41', confidence: 'high' } }))).toEqual({
+      statusBarTime: { value: '1301', confidence: 'high' },
+    });
   });
 });

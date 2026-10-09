@@ -76,6 +76,8 @@ const SCANS: Record<string, SaleScanResponse> = {
       orderNumberOrBtn: { value: 'TMF-7', confidence: 'high' },
       customerName: { value: 'Cy Park', confidence: 'high' },
       customerAddress: { value: '7 Elm St, Austin, TX', confidence: 'high' },
+      // Status-bar clocks 9:21 and 9:24: taken together.
+      statusBarTime: { value: '561', confidence: 'high' },
     },
   },
   'cy-2.png': {
@@ -83,6 +85,7 @@ const SCANS: Record<string, SaleScanResponse> = {
       installDate: { value: '2099-10-06', confidence: 'high' },
       provider: { value: 'tfiber', confidence: 'high' },
       plan: { value: 'tfiber-1gig', confidence: 'high' },
+      statusBarTime: { value: '564', confidence: 'high' },
     },
   },
 };

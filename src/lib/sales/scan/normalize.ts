@@ -28,6 +28,7 @@ export type RawExtraction = {
   planText?: RawField;
   installDate?: RawField;
   installWindow?: RawField;
+  statusBarTime?: RawField;
 };
 
 const squash = (value: string) => value.replace(/\s+/g, ' ').trim();
@@ -113,6 +114,36 @@ export function cleanOrderNumber(raw: string): string | null {
   return /\d/.test(value) && value.length <= 40 ? value : null;
 }
 
+/**
+ * The status-bar clock as minutes past midnight: "9:41" -> 581, "21:41" and
+ * "9:41 PM" -> 1301, "12:05 AM" -> 5. Null when it is not a clock. An iPhone
+ * set to 12-hour time shows no AM/PM, so "9:41" may be 21:41: compare with
+ * clockGap, which reads both on a 12-hour dial.
+ */
+export function statusBarMinutes(raw: string): number | null {
+  const match = /^(\d{1,2})[:.](\d{2})\s*(?:([ap])\.?\s*m\.?)?$/i.exec(squash(raw));
+  if (!match) return null;
+  let hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (minutes > 59 || hours > 23) return null;
+  const meridiem = match[3]?.toLowerCase();
+  if (meridiem) {
+    if (hours < 1 || hours > 12) return null;
+    hours = (hours % 12) + (meridiem === 'p' ? 12 : 0);
+  }
+  return hours * 60 + minutes;
+}
+
+/**
+ * Minutes between two status-bar clocks (0 to 360), on a 12-hour dial: it
+ * wraps at noon and midnight ("11:58" to "12:03" is 5), and a 12-hour clock
+ * without AM/PM compares the same as a 24-hour one. A clock has no date.
+ */
+export function clockGap(a: number, b: number): number {
+  const gap = Math.abs(a - b) % 720;
+  return Math.min(gap, 720 - gap);
+}
+
 function text(raw: string, max: number): string | null {
   const value = squash(raw);
   return value && value.length <= max ? value : null;
@@ -131,6 +162,9 @@ export function toFormFields(raw: RawExtraction): SaleScanFields {
     installDate: raw.installDate && keep(cleanIsoDate(raw.installDate.value), raw.installDate.confidence),
     installWindow: raw.installWindow && keep(text(raw.installWindow.value, 60), raw.installWindow.confidence),
   };
+  // A clock read with low confidence is no clock: it only ever keeps screenshots apart.
+  const clock = raw.statusBarTime && raw.statusBarTime.confidence !== 'low' ? statusBarMinutes(raw.statusBarTime.value) : null;
+  if (clock !== null && raw.statusBarTime) fields.statusBarTime = { value: String(clock), confidence: raw.statusBarTime.confidence };
 
   // Carrier: its own line first, else a plan name that names it ("AT&T Internet 1000").
   const carrierHit = matchCarrier(raw.carrier?.value);

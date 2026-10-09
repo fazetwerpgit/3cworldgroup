@@ -236,6 +236,13 @@ export function BulkSaleSheet({
                   right one below and save, or make a screenshot its own sale.
                 </p>
               ) : null}
+              {row.checkJoin && many ? (
+                <p className={b.editNeeds} role="note">
+                  <AlertTriangle size={16} strokeWidth={2.25} aria-hidden="true" />
+                  Check these screenshots belong together: they were put in one sale because they were picked one after
+                  the other. Save if they are one sale, or make a screenshot its own sale.
+                </p>
+              ) : null}
               <p className={problems.length > 0 ? b.editNeeds : b.editReady} role="status">
                 {problems.length > 0 ? (
                   <>

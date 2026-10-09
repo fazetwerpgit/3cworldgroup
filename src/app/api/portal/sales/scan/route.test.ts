@@ -164,6 +164,18 @@ describe('POST /api/portal/sales/scan', () => {
     }
   });
 
+  it('passes the status-bar clock along, but a clock alone is nothing found', async () => {
+    modelSays({ ...GOOD, statusBarTime: { value: '9:41', confidence: 'high' } });
+    const { fields } = await (await POST(req({ paths: [OWN] }))).json();
+    expect(fields.statusBarTime).toEqual({ value: '581', confidence: 'high' });
+    modelSays({ statusBarTime: { value: '9:41', confidence: 'high' } });
+    const body = await (await POST(req({ paths: [OWN] }))).json();
+    expect(body).toEqual({ fields: null, reason: 'nothing_found' });
+    // One call per read: the clock rides on the same request.
+    expect(generateContent).toHaveBeenCalledTimes(2);
+    expect(generateContent.mock.calls[0][0].config.responseSchema.required).toContain('statusBarTime');
+  });
+
   it('answers fields:null when the model call throws', async () => {
     generateContent.mockRejectedValueOnce(new Error('503'));
     const body = await (await POST(req({ paths: [OWN] }))).json();

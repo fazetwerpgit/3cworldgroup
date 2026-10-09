@@ -16,11 +16,17 @@ export const SCAN_FIELD_KEYS = [
   'provider',
   'plan',
   'installWindow',
+  'statusBarTime',
 ] as const;
 
 export type ScanFieldKey = (typeof SCAN_FIELD_KEYS)[number];
 
-/** Only the fields the reader found; an absent key means "not on the screenshot". */
+/**
+ * Only the fields the reader found; an absent key means "not on the screenshot".
+ * `statusBarTime` is the phone's status-bar clock, as minutes past midnight
+ * ("581" for 9:41); see statusBarMinutes in ./normalize. The Log Sale form
+ * ignores it; the bulk log uses it to tell screenshots taken together apart.
+ */
 export type SaleScanFields = Partial<Record<ScanFieldKey, ScanValue>>;
 
 export type SaleScanResponse = { fields: SaleScanFields | null; reason?: string };

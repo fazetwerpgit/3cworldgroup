@@ -106,6 +106,12 @@ export interface BulkRow {
   fixed?: boolean;
   /** On its way to the server now (saved as fixed, never as sending). */
   sending?: boolean;
+  /**
+   * Screenshots were put together only for being picked one after the other,
+   * with a status-bar clock missing: the rep checks they belong together (Save
+   * in the sheet, Combine or Split answers it). See ./group.
+   */
+  checkJoin?: boolean;
 }
 
 export type BulkRepeat = { of: number; by: 'image' };
@@ -170,6 +176,9 @@ const PROBLEM_ORDER: SaleFieldKey[] = ['plan', 'customerAddress', 'installDate',
 
 /** "Order numbers don't match": two screenshots of one sale show different order numbers. */
 export const ORDER_CONFLICT_PROBLEM = "Order numbers don't match";
+
+/** Screenshots joined without a key or both clocks to go on (BulkRow.checkJoin). */
+export const CHECK_JOIN_PROBLEM = 'Check these screenshots belong together';
 
 /**
  * What the create-sale route would turn this sale down for, in short words
@@ -246,7 +255,11 @@ export function rowStatus(row: BulkRow, repeat: BulkRepeat | undefined): BulkSta
   if (phase === 'reading') return { kind: 'reading' };
   if (phase === 'upload_failed') return { kind: 'upload_failed' };
   if (row.result?.kind === 'already') return { kind: 'already', duplicate: row.result.duplicate };
-  const problems = [...(orderConflict(row).length > 0 ? [ORDER_CONFLICT_PROBLEM] : []), ...rowProblems(row)];
+  const problems = [
+    ...(orderConflict(row).length > 0 ? [ORDER_CONFLICT_PROBLEM] : []),
+    ...(row.checkJoin && row.shots.length > 1 ? [CHECK_JOIN_PROBLEM] : []),
+    ...rowProblems(row),
+  ];
   if (repeat) return { kind: 'repeat', repeat, problems };
   // One screenshot whose read failed holds the whole sale back: it is often the
   // screen with the order number or the plan.
@@ -474,6 +487,7 @@ function readSale(value: unknown, index: number): BulkRow | null {
     include: typeof value.include === 'boolean' ? value.include : null,
     result: readResult(value.result),
     ...(legacy || value.fixed === true ? { fixed: true } : {}),
+    ...(value.checkJoin === true ? { checkJoin: true } : {}),
   };
 }
 

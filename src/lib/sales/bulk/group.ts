@@ -12,8 +12,15 @@
 //   screenshots of one order often have no value in common, only no clash (a
 //   sale nothing was read from yet has nothing to agree with, so it is not
 //   joined this way). A screenshot the reader got none of those from (only the
-//   plan or the install date) never disagrees, so it always joins the one
-//   before it.
+//   plan or the install date) never disagrees, so it may join the one before.
+// - Such a join, with no key to go on, also needs the phone's status-bar clock:
+//   the two screens of one sale are taken minutes apart (0-9 in real batches),
+//   neighbouring sales a quarter of an hour or more. Clocks more than
+//   JOIN_CLOCK_MINUTES apart keep the two screenshots apart. When either clock
+//   could not be read the join still happens, but the sale asks the rep to
+//   check (checkJoin: "Check these screenshots belong together") until they
+//   save it, combine or split. The clock never orders anything: it has no
+//   date, and reps log several days at once. Pick order comes first.
 // - A sale holds at most BULK_MAX_SHOTS; one more starts a new sale.
 // - The same picture picked twice (same bytes) is never put into a sale: it
 //   stays on its own, flagged "Repeated: same screenshot".
@@ -33,6 +40,7 @@
 // ever changes.
 
 import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
+import { clockGap } from '@/lib/sales/scan/normalize';
 import type { SaleScanFields } from '@/lib/sales/scan/types';
 import {
   BULK_MAX_SHOTS,
@@ -44,6 +52,23 @@ import {
   type BulkSaleFields,
   type BulkShot,
 } from './batch';
+
+/** Two screenshots joined only for being picked one after the other must have clocks at most this far apart. */
+export const JOIN_CLOCK_MINUTES = 12;
+
+/** The screenshot's status-bar clock (minutes past midnight), or null when it was not read. */
+export function shotClock(shot: Pick<BulkShot, 'scan'>): number | null {
+  const value = shot.scan?.statusBarTime?.value;
+  const minutes = value ? Number(value) : NaN;
+  return Number.isInteger(minutes) && minutes >= 0 && minutes < 1440 ? minutes : null;
+}
+
+/** A row without its "check these belong together" question (the rep answered it). */
+function answered(row: BulkRow): BulkRow {
+  const next = { ...row };
+  delete next.checkJoin;
+  return next;
+}
 
 type KeyKind = 'order' | 'address' | 'name';
 const KEY_KINDS: KeyKind[] = ['order', 'address', 'name'];
@@ -118,7 +143,14 @@ function fillFields(a: BulkSaleFields, b: BulkSaleFields): BulkSaleFields {
   };
 }
 
-type Group = { base: BulkRow | null; shots: BulkShot[]; joinable: boolean; keys: Record<KeyKind, Set<string>> };
+type Group = {
+  base: BulkRow | null;
+  shots: BulkShot[];
+  joinable: boolean;
+  keys: Record<KeyKind, Set<string>>;
+  /** A screenshot joined it next to another without a key or both clocks to go on. */
+  unsure: boolean;
+};
 
 const emptyKeySets = (): Record<KeyKind, Set<string>> => ({ order: new Set(), address: new Set(), name: new Set() });
 function addKeys(group: Group, keys: Keys) {
@@ -150,6 +182,7 @@ export function regroup(rows: BulkRow[], newId: () => string): BulkRow[] {
       shots: [...row.shots],
       joinable: !isSent(row) && row.shots.every(settled),
       keys: emptyKeySets(),
+      unsure: row.checkJoin === true,
     };
     for (const shot of row.shots) addKeys(group, scanKeys(shot.scan));
     addKeys(group, {
@@ -203,14 +236,22 @@ export function regroup(rows: BulkRow[], newId: () => string): BulkRow[] {
         if (!target && previous) {
           const before = groupOf.get(previous.id);
           // A screenshot with keys only joins a sale that has some of its own to agree with.
-          if (before && hasRoom(before) && (keyless || (hasKeys(before) && !disagrees(before, keys)))) target = before;
+          const agrees = keyless || (before !== undefined && hasKeys(before) && !disagrees(before, keys));
+          // And only when taken at about the same time; with a clock missing, the rep is asked.
+          const [mine, theirs] = [shotClock(shot), shotClock(previous)];
+          const clocksKnown = mine !== null && theirs !== null;
+          const together = !clocksKnown || clockGap(mine, theirs) <= JOIN_CLOCK_MINUTES;
+          if (before && hasRoom(before) && agrees && together) {
+            target = before;
+            if (!clocksKnown) target.unsure = true;
+          }
         }
       }
       if (target) {
         target.shots.push(shot);
         if (target.base) absorbed.add(shot.id);
       } else {
-        target = { base: null, shots: [shot], joinable: settled(shot) && !copy, keys: emptyKeySets() };
+        target = { base: null, shots: [shot], joinable: settled(shot) && !copy, keys: emptyKeySets(), unsure: false };
         groups.push(target);
       }
       addKeys(target, keys);
@@ -231,7 +272,7 @@ export function regroup(rows: BulkRow[], newId: () => string): BulkRow[] {
         fields = applyScanToRow(fields, shot.scan).row;
         return { ...shot, merged: true, ...(absorbed.has(shot.id) ? { checked: false } : {}) };
       });
-      return { ...group.base, ...fields, shots: taken };
+      return { ...group.base, ...fields, shots: taken, ...(group.unsure ? { checkJoin: true } : {}) };
     }
     const id = shots.map((shot) => (owner.get(shot.id) as BulkRow).id).find((candidate) => !claimed.has(candidate)) ?? newId();
     claimed.add(id);
@@ -242,6 +283,7 @@ export function regroup(rows: BulkRow[], newId: () => string): BulkRow[] {
       ...mergeShots(shots),
       include: before?.include ?? null,
       result: null,
+      ...(group.unsure ? { checkJoin: true } : {}),
     };
   });
   return out.sort((a, b) => a.shots[0].seq - b.shots[0].seq);
@@ -268,7 +310,7 @@ export function combineWithAbove(rows: BulkRow[], id: string): BulkRow[] {
   const lower = rows[index];
   if (index < 1 || !canCombine(upper, lower)) return rows;
   const combined: BulkRow = {
-    ...upper,
+    ...answered(upper),
     ...fillFields(pickFields(upper), pickFields(lower)),
     shots: [...upper.shots, ...lower.shots].sort(bySeq).map((shot) => ({ ...shot, merged: true, checked: false })),
     fixed: true,
@@ -291,7 +333,7 @@ export function splitShot(rows: BulkRow[], shotId: string, newId: () => string):
     fixed: true,
   };
   // A sale the rep already edited keeps their values; an untouched one is re-read from what is left.
-  const left: BulkRow = { ...row, ...(row.fixed ? {} : mergeShots(rest)), shots: rest, fixed: true };
+  const left: BulkRow = { ...answered(row), ...(row.fixed ? {} : mergeShots(rest)), shots: rest, fixed: true };
   return rows
     .flatMap((r) => (r.id === row.id ? [left, own] : [r]))
     .sort((a, b) => a.shots[0].seq - b.shots[0].seq);
@@ -307,7 +349,8 @@ export function removeShot(rows: BulkRow[], shotId: string): BulkRow[] {
   if (!row || isSent(row)) return rows;
   const rest = row.shots.filter((s) => s.id !== shotId);
   if (rest.length === 0) return rows.filter((r) => r.id !== row.id);
-  const left: BulkRow = { ...row, ...(row.fixed ? {} : mergeShots(rest)), shots: rest, fixed: true };
+  const kept = rest.length === 1 ? answered(row) : row;
+  const left: BulkRow = { ...kept, ...(row.fixed ? {} : mergeShots(rest)), shots: rest, fixed: true };
   return rows.map((r) => (r.id === row.id ? left : r)).sort((a, b) => a.shots[0].seq - b.shots[0].seq);
 }
 
@@ -321,7 +364,8 @@ export const SALE_CHANGED_MESSAGE = 'This sale changed while you were editing. C
  * and null comes back, so old values never land on a different set of
  * screenshots. The sale is the rep's from now on (fixed); only the screenshots
  * the sheet showed count as looked at (their failed read no longer holds the
- * sale back). An edit clears a "Not sent" reason, never a logged result.
+ * sale back), and saving answers "Check these screenshots belong together".
+ * An edit clears a "Not sent" reason, never a logged result.
  */
 export function saveSale(rows: BulkRow[], id: string, change: BulkSaleFields, shown: readonly string[]): BulkRow[] | null {
   const row = rows.find((r) => r.id === id);
@@ -331,8 +375,8 @@ export function saveSale(rows: BulkRow[], id: string, change: BulkSaleFields, sh
   const orderChanged = row.formData.orderNumberOrBtn.trim() !== change.formData.orderNumberOrBtn.trim();
   const stale = row.result?.kind === 'failed' || (row.result?.kind === 'already' && orderChanged);
   const saved: BulkRow = {
-    ...row,
-    ...change,
+    ...answered(row),
+    ...pickFields(change),
     shots: row.shots.map((shot) => (seen.has(shot.id) ? { ...shot, merged: true, checked: true } : shot)),
     fixed: true,
     result: stale ? null : row.result,
