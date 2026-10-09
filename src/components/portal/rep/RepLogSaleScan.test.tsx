@@ -138,6 +138,14 @@ afterEach(async () => {
 });
 
 describe('RepLogSale screenshot reader', () => {
+  it('offers "Log several from screenshots" beside the single-sale way in', async () => {
+    await render();
+    const link = container.querySelector<HTMLAnchorElement>('a[href="/portal/sales/new/bulk"]');
+    expect(link?.textContent).toContain('Log several from screenshots');
+    // The single sale stays the main action.
+    expect(text()).toContain('Choose screenshot');
+  });
+
   it('prefills only the fields the rep has not typed in', async () => {
     await mount();
     await type('customerName', 'Marisol K');

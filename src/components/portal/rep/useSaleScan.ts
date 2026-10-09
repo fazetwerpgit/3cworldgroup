@@ -3,7 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { markScanIntroUsed } from '@/lib/sales/scan/intro';
-import type { SaleScanFields, SaleScanResponse, ScanConfidence, ScanValue } from '@/lib/sales/scan/types';
+import type { SaleScanResponse, ScanConfidence } from '@/lib/sales/scan/types';
+import {
+  KEY_TARGETS,
+  SCAN_SKELETON_TARGETS,
+  SURENESS,
+  isCorrectable,
+  planScanFills,
+  type CanFill,
+  type Correctable,
+  type ScanFill,
+  type ScanFlag as Flag,
+  type ScanTarget,
+} from '@/lib/sales/scan/fills';
 
 // The Log Sale screenshot reader, client side. When a proof screenshot finishes
 // uploading and the form is still blank, ask /api/portal/sales/scan to read it
@@ -14,83 +26,20 @@ import type { SaleScanFields, SaleScanResponse, ScanConfidence, ScanValue } from
 // screenshot often has no install date, and the real one arrives on the
 // second. Any failure is quiet; the manual form always works.
 
-/** Form fields the reader can fill. `plan` covers the provider and plan picker. */
-export type ScanTarget = 'orderNumberOrBtn' | 'customerName' | 'customerPhone' | 'customerAddress' | 'installDate' | 'plan' | 'notes';
-
-/** Fields that show a skeleton while the screenshot is read. */
-export const SCAN_SKELETON_TARGETS: ScanTarget[] = [
-  'plan',
-  'orderNumberOrBtn',
-  'customerName',
-  'customerPhone',
-  'customerAddress',
-  'installDate',
-];
-
-/** The first read only runs on a blank form: these are all still empty. */
-const KEY_TARGETS: ScanTarget[] = ['plan', 'orderNumberOrBtn', 'customerAddress', 'installDate'];
+export {
+  planScanFills,
+  SCAN_SKELETON_TARGETS,
+  type CanFill,
+  type ScanFill,
+  type ScanTarget,
+} from '@/lib/sales/scan/fills';
 
 const CLIENT_TIMEOUT_MS = 30_000;
 
-export type ScanFill =
-  | { target: Exclude<ScanTarget, 'plan'>; value: string; confidence: ScanConfidence }
-  | { target: 'plan'; provider: string; planId: string | null };
-
 export type ScanStatus = 'idle' | 'reading' | 'filled' | 'failed';
 
-type Flag = Exclude<ScanConfidence, 'high'>;
-
-const SURENESS: Record<ScanConfidence, number> = { low: 0, medium: 1, high: 2 };
-
-/** Text fields a surer later read may correct (plan and notes stay fill-once). */
-const CORRECTABLE = ['orderNumberOrBtn', 'customerName', 'customerPhone', 'customerAddress', 'installDate'] as const;
-type Correctable = (typeof CORRECTABLE)[number];
-const isCorrectable = (target: ScanTarget): target is Correctable =>
-  (CORRECTABLE as readonly ScanTarget[]).includes(target);
-
-/** Can `read` go into `target`: it is open, or it beats what an earlier read put there. */
-export type CanFill = (target: ScanTarget, confidence: ScanConfidence) => boolean;
-
-/**
- * What to put where, given the reader's answer and which fields may take it.
- * Pure, so the fill rule is testable alone.
- */
-export function planScanFills(
-  fields: SaleScanFields,
-  canFill: CanFill
-): { fills: ScanFill[]; flags: Partial<Record<ScanTarget, Flag>> } {
-  const fills: ScanFill[] = [];
-  const flags: Partial<Record<ScanTarget, Flag>> = {};
-  const flag = (target: ScanTarget, read: ScanValue) => {
-    if (read.confidence !== 'high') flags[target] = read.confidence;
-  };
-
-  for (const target of CORRECTABLE) {
-    const read = fields[target];
-    if (!read?.value || !canFill(target, read.confidence)) continue;
-    fills.push({ target, value: read.value, confidence: read.confidence });
-    flag(target, read);
-  }
-
-  if (fields.provider && canFill('plan', fields.provider.confidence)) {
-    const planId = fields.plan?.value ?? null;
-    fills.push({ target: 'plan', provider: fields.provider.value, planId });
-    // A provider with no plan is flagged too: the rep still has to pick one.
-    flag('plan', fields.plan ?? { value: '', confidence: 'medium' });
-  }
-
-  if (fields.installWindow?.value && canFill('notes', fields.installWindow.confidence)) {
-    fills.push({
-      target: 'notes',
-      value: `Install window: ${fields.installWindow.value}`,
-      confidence: fields.installWindow.confidence,
-    });
-  }
-
-  return { fills, flags };
-}
-
-async function requestScan(paths: string[], signal: AbortSignal): Promise<SaleScanResponse | null> {
+/** Ask the reader about these proof paths. Null when the reader is switched off (404). */
+export async function requestScan(paths: string[], signal: AbortSignal): Promise<SaleScanResponse | null> {
   const token = await getIdToken();
   const response = await fetch('/api/portal/sales/scan', {
     method: 'POST',

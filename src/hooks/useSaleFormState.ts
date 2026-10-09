@@ -4,12 +4,29 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales, type CreateSaleResult } from '@/hooks/useSales';
 import type { FiberPlan, Sale, SaleProduct, SaleType } from '@/types';
-import { addPlanToProducts, isExtraPlanId, validateHasInternetPlan } from '@/lib/sales/planSelection';
-import { hasSaleProof } from '@/lib/sales/proof';
+import { addPlanToProducts, isExtraPlanId } from '@/lib/sales/planSelection';
 import { MAX_PROOF_SCREENSHOTS, proofPathFields, saleProofPaths } from '@/lib/sales/proofPaths';
-import { todaySaleDateInput } from '@/lib/sales/saleDate';
 import { randomHex } from '@/lib/randomHex';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
+import {
+  buildSalePayload,
+  emptySaleFields,
+  inferSaleDate,
+  validateSaleForm,
+  type SaleFieldErrors,
+  type SaleFieldKey,
+  type SaleFormFields,
+} from '@/lib/sales/saleForm';
+
+export {
+  buildSalePayload,
+  emptySaleFields,
+  inferSaleDate,
+  validateSaleForm,
+  type SaleFieldErrors,
+  type SaleFieldKey,
+  type SaleFormFields,
+};
 
 // Everything a new-sale form needs except its markup, so the old SaleForm and
 // the direction-D Log Sale page share one set of rules: the draft, the
@@ -31,22 +48,6 @@ export const DRAFT_KEY_PREFIX = 'sale-draft:v1:';
 export const DRAFT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const DRAFT_SAVE_DELAY_MS = 400;
 const CLIENT_SALE_ID_RE = /^[a-f0-9]{32}$/;
-
-export type SaleFormFields = {
-  customerName: string;
-  customerPhone: string;
-  customerEmail: string;
-  customerAddress: string;
-  saleType: SaleType;
-  saleDate: string;
-  installDate: string;
-  notes: string;
-  orderNumberOrBtn: string;
-};
-
-/** Keys that can carry an inline error. `plan` is the plan picker. */
-export type SaleFieldKey = 'customerAddress' | 'plan' | 'saleDate' | 'installDate' | 'orderNumberOrBtn';
-export type SaleFieldErrors = Partial<Record<SaleFieldKey, string>>;
 
 export interface SaleDraft {
   formData: SaleFormFields & { proofScreenshotPath?: string; proofScreenshotPaths?: string[] };
@@ -154,53 +155,6 @@ function hasDraftContent(formData: SaleFormFields, products: SaleProduct[], proo
   );
 }
 
-/** True for a YYYY-MM-DD value on a day earlier than today. */
-const isBeforeToday = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && value < todaySaleDateInput();
-
-function emptyFields(): SaleFormFields {
-  return {
-    customerName: '',
-    customerPhone: '',
-    customerEmail: '',
-    customerAddress: '',
-    saleType: 'new_service' as SaleType,
-    saleDate: todaySaleDateInput(),
-    installDate: '',
-    notes: '',
-    orderNumberOrBtn: '',
-  };
-}
-
-/**
- * Field errors in submit order. Pure so the rules are testable without a DOM.
- */
-export function validateSaleForm(input: {
-  formData: SaleFormFields;
-  products: SaleProduct[];
-  proofPaths: string[];
-}): SaleFieldErrors {
-  const { formData, products, proofPaths } = input;
-  const errors: SaleFieldErrors = {};
-  const today = todaySaleDateInput();
-
-  if (!formData.customerAddress.trim()) errors.customerAddress = 'Enter the service address';
-  // Extras ride alongside an internet plan; ticking one is not a plan pick,
-  // except on an Add-On sale (the customer already has internet).
-  if (validateHasInternetPlan(products, formData.saleType)) errors.plan = 'Pick a plan';
-  if (!formData.saleDate) errors.saleDate = 'Pick the sale date';
-  else if (formData.saleDate > today) errors.saleDate = 'Sale date cannot be in the future';
-  if (!formData.installDate) errors.installDate = 'Pick the install date';
-  // An install can never precede its own sale; catch it here so the rep sees
-  // it inline rather than as the server's 400 on submit.
-  if (!errors.saleDate && formData.installDate && formData.saleDate > formData.installDate) {
-    errors.saleDate = 'Sale date cannot be after the install date';
-  }
-  if (!hasSaleProof({ orderNumberOrBtn: formData.orderNumberOrBtn, proofScreenshotPaths: proofPaths })) {
-    errors.orderNumberOrBtn = 'Enter the order number or BTN, or attach a screenshot';
-  }
-  return errors;
-}
-
 /** Case and spacing never make two entries different ("1 main  st" = "1 Main St"). */
 const normalizeEntryText = (value: unknown) =>
   (typeof value === 'string' ? value : '').trim().replace(/\s+/g, ' ').toLowerCase();
@@ -234,17 +188,31 @@ export function isSameSaleEntry(
   );
 }
 
-export function useSaleFormState() {
+/** Start the form from an existing entry (the bulk uploader's edit sheet). */
+export type SaleFormInitial = {
+  formData: SaleFormFields;
+  products: SaleProduct[];
+  proofPaths: string[];
+  saleDateTouched: boolean;
+};
+
+/**
+ * `persist: false` keeps the entry out of the saved single-sale draft (the bulk
+ * uploader edits one row of its own batch with these same fields and rules).
+ */
+export function useSaleFormState({ persist = true, initial }: { persist?: boolean; initial?: SaleFormInitial } = {}) {
   const { user } = useAuth();
   const { createSale, loading, error: serverError } = useSales();
 
-  const [formData, setFormData] = useState<SaleFormFields>(emptyFields);
-  const [products, setProducts] = useState<SaleProduct[]>([]);
-  const [proofPaths, setProofPathsState] = useState<string[]>([]);
+  const [formData, setFormData] = useState<SaleFormFields>(() => initial?.formData ?? emptySaleFields());
+  const [products, setProducts] = useState<SaleProduct[]>(() => initial?.products ?? []);
+  const [proofPaths, setProofPathsState] = useState<string[]>(() => initial?.proofPaths ?? []);
   // Once the rep sets the sale date themselves the install date stops driving
   // it; `saleDateFromInstall` only controls which hint is shown.
-  const [saleDateTouched, setSaleDateTouched] = useState(false);
-  const [saleDateFromInstall, setSaleDateFromInstall] = useState(false);
+  const [saleDateTouched, setSaleDateTouched] = useState(() => initial?.saleDateTouched ?? false);
+  const [saleDateFromInstall, setSaleDateFromInstall] = useState(
+    () => Boolean(initial && !initial.saleDateTouched && inferSaleDate(initial.formData.installDate).fromInstall)
+  );
   const [errors, setErrors] = useState<SaleFieldErrors>({});
   const [formError, setFormError] = useState('');
   // Bumped on every failed submit so the scroll effect re-runs for the same error.
@@ -261,7 +229,7 @@ export function useSaleFormState() {
   const [duplicateOf, setDuplicateOf] = useState<Sale | null>(null);
   /** A live sale already has this order number: who logged it and when. */
   const [orderDuplicate, setOrderDuplicate] = useState<OrderDuplicate | null>(null);
-  const draftKey = user ? `${DRAFT_KEY_PREFIX}${user.uid}` : null;
+  const draftKey = persist && user ? `${DRAFT_KEY_PREFIX}${user.uid}` : null;
   const [draftRestored, setDraftRestored] = useState(false);
   /** The entry came back from a saved draft (drives "N screenshots attached"). */
   const [fromDraft, setFromDraft] = useState(false);
@@ -284,15 +252,15 @@ export function useSaleFormState() {
   if (draftKey && !draftRestored) {
     setDraftRestored(true);
     const draft = readSaleDraft(draftKey);
-    if (draft && hasDraftContent({ ...emptyFields(), ...draft.formData }, draft.products, saleProofPaths(draft.formData))) {
+    if (draft && hasDraftContent({ ...emptySaleFields(), ...draft.formData }, draft.products, saleProofPaths(draft.formData))) {
       const { proofScreenshotPath: _legacy, proofScreenshotPaths: _paths, ...fields } = draft.formData;
       void _legacy;
       void _paths;
-      const restored = { ...emptyFields(), ...fields };
+      const restored = { ...emptySaleFields(), ...fields };
       if (!draft.saleDateTouched) {
-        const backdated = isBeforeToday(restored.installDate);
-        restored.saleDate = backdated ? restored.installDate : todaySaleDateInput();
-        setSaleDateFromInstall(backdated);
+        const inferred = inferSaleDate(restored.installDate);
+        restored.saleDate = inferred.saleDate;
+        setSaleDateFromInstall(inferred.fromInstall);
       }
       setFormData(restored);
       setProducts(draft.products);
@@ -381,12 +349,12 @@ export function useSaleFormState() {
       // the server applies when no sale date is sent. A today or future install
       // is the normal "sold now, installs later" case and leaves the sale on today.
       if (name === 'installDate' && !saleDateTouched) {
-        const backdated = isBeforeToday(value);
-        setSaleDateFromInstall(backdated);
+        const inferred = inferSaleDate(value);
+        setSaleDateFromInstall(inferred.fromInstall);
         setFormData((prev) => ({
           ...prev,
           installDate: value,
-          saleDate: backdated ? value : todaySaleDateInput(),
+          saleDate: inferred.saleDate,
         }));
         clearError('installDate');
         clearError('saleDate');
@@ -509,20 +477,14 @@ export function useSaleFormState() {
       return null;
     }
 
-    const saleData = {
-      ...formData,
-      ...proofPathFields(proofPaths),
-      productSold,
-      salesRepId: user.uid,
-      salesRepName: user.displayName || user.email || '',
-      managerId: user.reportsToId,
+    const saleData = buildSalePayload({
+      formData,
       products,
-      // The server re-prices products from the catalog; these are the preview.
-      totalValue: totals.value,
-      totalPoints: totals.points,
+      proofPaths,
+      user,
       clientSaleId: options.clientSaleId ?? proofUploadId,
-      ...(options.allowDuplicate ? { allowDuplicate: true } : {}),
-    };
+      allowDuplicate: options.allowDuplicate,
+    });
 
     // From here the key may name a stored sale, even if no answer comes back.
     setKeyUsed(true);
@@ -581,7 +543,7 @@ export function useSaleFormState() {
    * old key may already name. The page cancels its own uploads in flight.
    */
   const startOver = () => {
-    setFormData(emptyFields());
+    setFormData(emptySaleFields());
     setProducts([]);
     setProofPathsState([]);
     setSaleDateTouched(false);
@@ -617,6 +579,7 @@ export function useSaleFormState() {
     setProofPaths,
     proofUploadId,
     saleDateFromInstall,
+    saleDateTouched,
     errors,
     formError,
     serverError: shownServerError,

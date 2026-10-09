@@ -46,12 +46,28 @@ async function authHeaders(): Promise<HeadersInit> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function signedProofUrl(path: string): Promise<string | null> {
+export async function signedProofUrl(path: string): Promise<string | null> {
   const response = await fetch(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`, {
     headers: await authHeaders(),
   });
   const data = (await response.json().catch(() => null)) as { url?: string | null } | null;
   return response.ok ? data?.url ?? null : null;
+}
+
+/**
+ * Upload one proof file (already prepared by prepareFormFile) into its own slot
+ * under the sale's key; resolves to the stored folder path.
+ */
+export function uploadProofFile(file: File, saleKey: string, signal?: AbortSignal): Promise<string> {
+  return uploadFormAttachment({
+    file,
+    prepared: true,
+    itemId: 'sale-proof',
+    formType: 'sale-proof',
+    slot: newProofSlot(saleKey),
+    getHeaders: authHeaders,
+    signal,
+  });
 }
 
 /**
@@ -127,15 +143,7 @@ export function useProofUploads({
           file = await prepareFormFile(item.file);
           preparedFiles.current.set(item.key, file);
         }
-        const path = await uploadFormAttachment({
-          file,
-          prepared: true,
-          itemId: 'sale-proof',
-          formType: 'sale-proof',
-          slot: newProofSlot(slotKey),
-          getHeaders: authHeaders,
-          signal: controller.signal,
-        });
+        const path = await uploadProofFile(file, slotKey, controller.signal);
         if (item.preview) setPreviews((prev) => ({ ...prev, [path]: item.preview as Preview }));
         requested.current.add(path);
         preparedFiles.current.delete(item.key);

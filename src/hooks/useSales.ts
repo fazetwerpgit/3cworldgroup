@@ -135,7 +135,14 @@ export function useSales() {
     }
   }, []);
 
-  const createSale = useCallback(async (saleData: CreateSaleData): Promise<CreateSaleResult | null> => {
+  /**
+   * Null when the network or the server said no; the reason lands in `error`
+   * and, for a caller sending several sales in a row, in `onError` too.
+   */
+  const createSale = useCallback(async (
+    saleData: CreateSaleData,
+    { onError }: { onError?: (message: string) => void } = {}
+  ): Promise<CreateSaleResult | null> => {
     setLoading(true);
     setError(null);
     const controller = new AbortController();
@@ -184,6 +191,7 @@ export function useSales() {
             ? err.message
             : 'Failed to create sale';
       setError(message);
+      onError?.(message);
       return null;
     } finally {
       clearTimeout(timer);

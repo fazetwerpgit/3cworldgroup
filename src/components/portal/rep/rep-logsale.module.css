@@ -1330,3 +1330,8 @@ span.thumbView {
     min-width: 300px;
   }
 }
+
+/* "Log several from screenshots" is a link styled as the manual row. */
+a.manual {
+  text-decoration: none;
+}
