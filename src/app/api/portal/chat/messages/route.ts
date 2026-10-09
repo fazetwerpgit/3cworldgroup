@@ -1,9 +1,9 @@
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { ChatChannel } from '@/types';
+import { ChatAttachment, ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { buildChatPushBody, sendChatPush } from '@/lib/push/chatPush';
+import { buildChatPushBody, pushChatMessageOnce } from '@/lib/push/chatPush';
 import { chatMessageDocId, isValidClientMessageId } from '@/lib/chat/outbox';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
@@ -119,6 +119,50 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Raises the channel's lastMessageAt to `createdAt` unless it is already at or
+// past it. Never lowers it: a newer message may have bumped it since.
+async function bumpLastMessageAt(
+  channelRef: FirebaseFirestore.DocumentReference,
+  createdAt: unknown
+): Promise<void> {
+  if (!(createdAt instanceof Timestamp)) return;
+  await adminDb!.runTransaction(async (tx) => {
+    const current = (await tx.get(channelRef)).data()?.lastMessageAt;
+    if (current instanceof Timestamp && current.toMillis() >= createdAt.toMillis()) return;
+    tx.set(channelRef, { lastMessageAt: createdAt }, { merge: true });
+  });
+}
+
+// After the channel's newest message is deleted, lastMessageAt falls back to the
+// newest message still standing (or is cleared when none is), so a dot raised only
+// by the deleted message goes away. Left alone when a newer message exists.
+// Runs in a transaction so a send landing meanwhile is never undercut.
+const RECOMPUTE_WINDOW = 25;
+async function recomputeLastMessageAt(
+  channelRef: FirebaseFirestore.DocumentReference,
+  deletedId: string,
+  deletedCreatedAt: unknown
+): Promise<void> {
+  if (!(deletedCreatedAt instanceof Timestamp)) return;
+  const deletedMs = deletedCreatedAt.toMillis();
+  await adminDb!.runTransaction(async (tx) => {
+    const current = (await tx.get(channelRef)).data()?.lastMessageAt;
+    // Bumped by a later send (pre-atomic bumps trail their message by a moment).
+    if (current instanceof Timestamp && current.toMillis() > deletedMs + 5000) return;
+    const recent = await tx.get(
+      channelRef.collection('messages').orderBy('createdAt', 'desc').limit(RECOMPUTE_WINDOW)
+    );
+    const newest = recent.docs.find((doc) => doc.id !== deletedId && !doc.data().deletedAt);
+    const newestAt = newest?.data().createdAt;
+    if (newestAt instanceof Timestamp && newestAt.toMillis() > deletedMs) return;
+    tx.set(
+      channelRef,
+      { lastMessageAt: newestAt instanceof Timestamp ? newestAt : FieldValue.delete() },
+      { merge: true }
+    );
+  });
+}
+
 // POST — send a message as the VERIFIED caller. Author identity is stamped server-side.
 // Admin SDK create() on an existing doc rejects with gRPC ALREADY_EXISTS (6).
 function isAlreadyExists(error: unknown): boolean {
@@ -158,7 +202,7 @@ export async function POST(request: NextRequest) {
 
     // Validate the attachment shape/origin server-side (post-access, pre-write). A
     // present-but-invalid attachment is rejected, never silently dropped.
-    let attachment;
+    let attachment: ChatAttachment | undefined;
     if (hasAttachmentInput) {
       const bucketName = getChatStorageBucketName();
       if (!bucketName) {
@@ -214,46 +258,61 @@ export async function POST(request: NextRequest) {
     // Idempotent send: a client key becomes the doc id (scoped to the author), and
     // create() refuses to overwrite. A retry after a lost response, or a queued
     // message re-sent after the app was killed, lands on the same doc and is
-    // answered as a success without a second message, bump or push.
+    // answered as a success without a second message.
     const clientMessageId = isValidClientMessageId(body.clientMessageId) ? body.clientMessageId : '';
-    let messageId: string;
-    if (clientMessageId) {
-      const messageRef = channelRef.collection('messages').doc(chatMessageDocId(user.uid, clientMessageId));
-      try {
-        await messageRef.create(messageDoc);
-      } catch (createError) {
-        if (!isAlreadyExists(createError)) throw createError;
-        return NextResponse.json({ success: true, messageId: messageRef.id, duplicate: true });
-      }
-      messageId = messageRef.id;
-    } else {
-      messageId = (await channelRef.collection('messages').add(messageDoc)).id;
-    }
+    const messages = channelRef.collection('messages');
+    const messageRef = clientMessageId ? messages.doc(chatMessageDocId(user.uid, clientMessageId)) : messages.doc();
+    const pushPayload = {
+      title: found.channel.name,
+      // Tapping the notification opens this channel, not just the chat tab.
+      url: `/portal/chat?channel=${encodeURIComponent(channelId)}`,
+    };
 
-    // Stamp the channel's last-activity time so clients can badge unread channels
-    // (users/{uid}/chatReads receipts are compared against this). Merged so the
-    // rest of the channel doc is untouched; a failure here must not fail the send.
+    // The message and the channel's lastMessageAt bump (what unread badges compare
+    // users/{uid}/chatReads receipts against) commit together, so both carry the
+    // same commit timestamp and neither lands without the other.
+    const write = adminDb!.batch();
+    write.create(messageRef, messageDoc);
+    write.set(channelRef, { lastMessageAt: FieldValue.serverTimestamp() }, { merge: true });
     try {
-      await channelRef.set({ lastMessageAt: FieldValue.serverTimestamp() }, { merge: true });
-    } catch (bumpError) {
-      console.error('Error bumping channel lastMessageAt:', bumpError);
+      await write.commit();
+    } catch (createError) {
+      if (!clientMessageId || !isAlreadyExists(createError)) throw createError;
+      // A repeat of a stored send finishes whatever the first attempt did not:
+      // the bump of a message stored before bumps were atomic, and the push
+      // (claimed on the message, so it never goes out twice).
+      const stored = await messageRef.get();
+      const storedData = stored.data();
+      if (storedData && !storedData.deletedAt) {
+        try {
+          await bumpLastMessageAt(channelRef, storedData.createdAt);
+        } catch (bumpError) {
+          console.error('Error bumping channel lastMessageAt:', bumpError);
+        }
+        const storedText = typeof storedData.text === 'string' ? storedData.text : '';
+        const storedAttachment = readStoredAttachment(storedData.attachment) ?? undefined;
+        after(() =>
+          pushChatMessageOnce(messageRef, found.data, user.uid, {
+            ...pushPayload,
+            body: buildChatPushBody(user.displayName, storedText, storedAttachment),
+          })
+        );
+      }
+      return NextResponse.json({ success: true, messageId: messageRef.id, duplicate: true });
     }
 
     // Notify the rest of the channel: memberIds minus the author, re-checked against
     // each recipient's current role/status (sendChatPush). after() runs the sends once
     // the response is on the wire while keeping the function alive — a detached
     // promise would be killed by the serverless freeze.
-    const pushBody = buildChatPushBody(user.displayName, text, attachment);
     after(() =>
-      sendChatPush(found.data, user.uid, {
-        title: found.channel.name,
-        body: pushBody,
-        // Tapping the notification opens this channel, not just the chat tab.
-        url: `/portal/chat?channel=${encodeURIComponent(channelId)}`,
+      pushChatMessageOnce(messageRef, found.data, user.uid, {
+        ...pushPayload,
+        body: buildChatPushBody(user.displayName, text, attachment),
       })
     );
 
-    return NextResponse.json({ success: true, messageId });
+    return NextResponse.json({ success: true, messageId: messageRef.id });
   } catch (error) {
     console.error('Error sending chat message:', error);
     return NextResponse.json({ error: 'Failed to send chat message' }, { status: 500 });
@@ -371,6 +430,12 @@ export async function DELETE(request: NextRequest) {
       },
       { merge: true }
     );
+
+    try {
+      await recomputeLastMessageAt(adminDb!.collection('chatChannels').doc(channelId), messageId, message?.createdAt);
+    } catch (recomputeError) {
+      console.error('Error recomputing channel lastMessageAt:', recomputeError);
+    }
 
     // Replies copied the deleted text into their quote at send time; replace it.
     const quoting = await adminDb!
