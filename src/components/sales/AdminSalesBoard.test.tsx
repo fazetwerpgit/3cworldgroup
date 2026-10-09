@@ -195,6 +195,29 @@ describe('AdminSalesBoard merged rows', () => {
     expect(container.textContent).not.toContain('Not in the report yet');
   });
 
+  it('folds a missed install at the sale\'s door under the sale, not into Not in the portal', async () => {
+    const sold = thisMonth();
+    sold.month -= 1;
+    const missed = {
+      ...carrierOrder,
+      id: 'brk_1',
+      status: 'breakage',
+      orderDate: null,
+      activationDate: null,
+      estInstallDate: '2026-10-07',
+      breakageReason: 'CX Missed — Customer Not Home',
+    } as unknown as FiberOrder;
+    await render([backDatedSale], [carrierOrder, missed], sold);
+    await openRep();
+
+    expect(container.querySelectorAll('[data-part="board-row"]')).toHaveLength(1);
+    expect(container.querySelector('[data-part="board-row"][data-state="never_logged"]')).toBeNull();
+    expect(container.querySelector('[data-part="history-note"]')?.textContent).toBe(
+      'Earlier order: Customer not home Oct 7'
+    );
+    expect(notInPortal()?.querySelector('strong')?.textContent ?? '0').toBe('0');
+  });
+
   // R2: the sale and its carrier order straddle a month boundary, which is the
   // ordinary case the address guess misses. The picker has to reach across it.
   it('offers the rep sales from every month, not the month on screen', async () => {

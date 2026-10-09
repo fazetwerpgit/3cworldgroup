@@ -50,3 +50,12 @@ export interface OrderDuplicate {
   /** The existing sale is the caller's own. */
   existingIsMine: boolean;
 }
+
+/**
+ * A person's name for display: any word that starts lowercase gets a capital
+ * first letter ("Noah st john" -> "Noah St John"). Nothing else changes, so
+ * "McFarland" and "DeShawn" keep their inner capitals. Labels only; never a key.
+ */
+export function displayPersonName(name: string): string {
+  return name.replace(/(^|[\s-])([a-z])/g, (_, lead: string, letter: string) => lead + letter.toUpperCase());
+}

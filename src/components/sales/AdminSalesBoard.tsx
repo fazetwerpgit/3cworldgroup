@@ -24,7 +24,7 @@ import {
   type InstallCounts,
 } from '@/lib/sales/installBucket';
 import { formatInstallDayShort } from '@/lib/sales/saleDate';
-import { bookForMonth, buildMergedBook, type MergedBook, type MergedRow } from '@/lib/sales/mergeBook';
+import { bookForMonth, buildMergedBook, earlierOrderNote, type MergedBook, type MergedRow } from '@/lib/sales/mergeBook';
 import { normalizeAddress } from '@/lib/fiberReport/matchSales';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isCurrentMonth, monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
@@ -618,6 +618,12 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         ) : row.state === 'agreed' && gap ? (
           <span className={`${x.bNote} ${x.bNoteWarn}`} data-part="gap-note">
             Check plan · the carrier report shows a different plan
+          </span>
+        ) : row.history.length ? (
+          // A missed install or cancelled attempt at this sale's door: its
+          // history, folded here instead of a red "not logged" row.
+          <span className={x.bNote} data-part="history-note">
+            {row.history.map(earlierOrderNote).join(' · ')}
           </span>
         ) : null}
       </div>

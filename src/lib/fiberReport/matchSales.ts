@@ -388,3 +388,43 @@ export function attachMatchedUserNames(orders: FiberOrder[], sales: LoggedSale[]
     matchedUserName: (order.matchedUserId && latest.get(order.matchedUserId)?.salesRepName?.trim()) || null,
   }));
 }
+
+/** Statuses a leftover row may fold under a sale with: history, never a live order. */
+const FOLDABLE = new Set<FiberOrder['status']>(['breakage', 'cancelled', 'churned']);
+
+function doorKey(order: FiberOrder): string {
+  const street = normalizeAddress(order.address);
+  return street.length >= 6 ? `${street}|${unitId(order.unit)}|${order.matchedUserId ?? ''}` : '';
+}
+
+/**
+ * Carrier rows nobody's sale holds that sit at the door of a row a sale does
+ * hold: a missed install, a cancelled first attempt, beside the order the sale
+ * matched. They are that customer's history, not a sale nobody logged, so a
+ * page folds them under the sale instead of showing them red.
+ *
+ * Same door means the same normalized street, the same unit (none = none) and
+ * the same matched rep. Only dead and missed rows fold: a live leftover (pending,
+ * active, pre-sale) may be a second, real sale and stays as it was. Linked rows
+ * never fold; an admin already said what they are.
+ *
+ * Returns each folded row → the held row it sits beside.
+ */
+export function foldLeftoverOrders(
+  orders: readonly FiberOrder[],
+  held: Iterable<FiberOrder>
+): Map<FiberOrder, FiberOrder> {
+  const heldSet = new Set(held);
+  const byDoor = new Map<string, FiberOrder>();
+  for (const order of heldSet) {
+    const key = doorKey(order);
+    if (key && !byDoor.has(key)) byDoor.set(key, order);
+  }
+  const folded = new Map<FiberOrder, FiberOrder>();
+  for (const order of orders) {
+    if (heldSet.has(order) || !FOLDABLE.has(order.status) || linkedSaleId(order).linked) continue;
+    const beside = byDoor.get(doorKey(order));
+    if (beside) folded.set(order, beside);
+  }
+  return folded;
+}

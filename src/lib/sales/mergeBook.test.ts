@@ -3,6 +3,7 @@ import type { FiberOrder, Sale } from '@/types';
 import {
   buildMergedBook,
   bookForMonth,
+  earlierOrderNote,
   PORTAL_LOGGING_START,
   VALUE_GAP_MIN,
   type MergedBook,
@@ -751,5 +752,58 @@ describe('order number first — a missed install beside the real order', () => 
     const book = build([sale({ id: 'plain' })], [order()]);
     expect(row(book, 'plain').order?.id).toBe('TMO20260824UZMTV');
     expect(row(book, 'plain').state).toBe('agreed');
+  });
+});
+
+describe('leftover carrier rows at a matched door fold under the sale', () => {
+  const real = order({ id: 'TMO20261005Z30P4', address: '149 VARSITY DR', orderDate: '2026-09-05', estInstallDate: '2026-09-20' });
+  const miss = order({
+    id: 'brk_c07a787f', status: 'breakage', address: '149 VARSITY DR', orderDate: null, estInstallDate: '2026-09-18',
+    breakageReason: 'CX Missed — Customer Not Home',
+  });
+  const sharon = sale({ id: 'sharon', customerAddress: '149 VARSITY DR, HUNTSVILLE, TX 77340', orderNumberOrBtn: 'TMO20261005Z30P4' });
+
+  it('puts the miss under the sale: no red row, one fewer not logged', () => {
+    const noSale = build([], [real, miss]);
+    expect(noSale.notLoggedCount).toBe(2);
+
+    for (const orders of [[miss, real], [real, miss]]) {
+      const book = build([sharon], orders);
+      expect(row(book, 'sharon').history).toEqual([miss]);
+      expect(book.rows.some((r) => r.order === miss)).toBe(false);
+      expect(book.notLoggedCount).toBe(0);
+      expect(book.reps[0].notLogged).toBe(0);
+    }
+  });
+
+  it('drops the count by exactly the folded row', () => {
+    const stray = order({ id: 'TMO-STRAY', address: '31 Undated Ln' });
+    expect(build([sharon], [real, miss, stray]).notLoggedCount).toBe(1);
+    expect(build([sharon], [real, stray]).notLoggedCount).toBe(1);
+  });
+
+  it('leaves an address with no logged sale as it was', () => {
+    const book = build([], [real, miss]);
+    expect(book.neverLogged.map((r) => r.order?.id).sort()).toEqual(['TMO20261005Z30P4', 'brk_c07a787f']);
+  });
+
+  it('keeps a live leftover red: it may be a second, real sale', () => {
+    const second = order({ id: 'TMO-SECOND', address: '149 VARSITY DR', orderDate: '2026-09-06' });
+    const book = build([sharon], [real, second]);
+    expect(row(book, 'order:TMO-SECOND').state).toBe('never_logged');
+    expect(row(book, 'sharon').history).toEqual([]);
+  });
+
+  it('writes the note from the carrier row', () => {
+    expect(earlierOrderNote(miss)).toBe('Earlier order: Customer not home Sep 18');
+    expect(earlierOrderNote(order({ status: 'cancelled', orderDate: '2026-10-08', cancellationDate: null }))).toBe('Earlier order: Cancelled Oct 8');
+    expect(earlierOrderNote(order({ status: 'breakage', breakageReason: null, estInstallDate: null }))).toBe('Earlier order: Missed install');
+  });
+});
+
+describe('rep names for display', () => {
+  it('capitalizes words the portal spelled lowercase, and nothing else', () => {
+    const book = build([sale({ salesRepName: 'Noah st john' })], []);
+    expect(book.reps[0].repName).toBe('Noah St John');
   });
 });

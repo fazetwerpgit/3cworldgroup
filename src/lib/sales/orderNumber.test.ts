@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstName, firstNameLastInitial, normalizeOrderNumber, orderNumberRawVariants } from './orderNumber';
+import { displayPersonName, firstName, firstNameLastInitial, normalizeOrderNumber, orderNumberRawVariants } from './orderNumber';
 
 describe('normalizeOrderNumber', () => {
   it('trims, uppercases and drops spaces and dashes', () => {
@@ -34,5 +34,20 @@ describe('names', () => {
   it("takes a customer's first name", () => {
     expect(firstName(' Maria Lopez ')).toBe('Maria');
     expect(firstName(undefined)).toBe('');
+  });
+});
+
+describe('displayPersonName', () => {
+  it('capitalizes the first letter of a word that starts lowercase', () => {
+    expect(displayPersonName('Noah st john')).toBe('Noah St John');
+    expect(displayPersonName('miles scoonover')).toBe('Miles Scoonover');
+    expect(displayPersonName('mary-jane o\'neil')).toBe("Mary-Jane O'neil");
+  });
+
+  it('leaves every other letter alone', () => {
+    expect(displayPersonName('Jeremy McFarland')).toBe('Jeremy McFarland');
+    expect(displayPersonName('DeShawn deVries')).toBe('DeShawn DeVries');
+    expect(displayPersonName('CASEY RIVERA')).toBe('CASEY RIVERA');
+    expect(displayPersonName('')).toBe('');
   });
 });

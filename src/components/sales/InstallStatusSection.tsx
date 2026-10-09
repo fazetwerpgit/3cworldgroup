@@ -8,6 +8,7 @@ import { useFiberStatus } from '@/hooks/useFiberStatus';
 import type { FiberOrder, FiberOrderStatus, FiberStatusResponse, Sale } from '@/types';
 import { SubmittedRows } from './SubmittedSales';
 import { submittedByRep, submissionMatches } from '@/lib/sales/submittedByRep';
+import { displayPersonName } from '@/lib/sales/orderNumber';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -344,7 +345,8 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
     const groups = new Map<string, RepGroup>();
     matchedOrders.forEach((order) => {
       const userId = order.matchedUserId || null;
-      const repName = (userId && (submissions.get(userId)?.[0]?.salesRepName || order.matchedUserName)) || order.repName || 'Unknown rep';
+      const portalName = userId && (submissions.get(userId)?.[0]?.salesRepName || order.matchedUserName);
+      const repName = (portalName && displayPersonName(portalName)) || order.repName || 'Unknown rep';
       const key = userId ? `uid:${userId}` : `name:${repName}`;
       const existing = groups.get(key);
       if (existing) existing.orders.push(order);
@@ -376,7 +378,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
     const out: RepGroup[] = [];
     for (const [userId, rows] of submissions) {
       if (withOrders.has(userId) || !canSeeSubmissions(userId)) continue;
-      out.push({ key: `uid:${userId}`, repName: rows[0]?.salesRepName || 'Unknown rep', userId, orders: [] });
+      out.push({ key: `uid:${userId}`, repName: rows[0]?.salesRepName ? displayPersonName(rows[0].salesRepName) : 'Unknown rep', userId, orders: [] });
     }
     return out.sort((a, b) => a.repName.localeCompare(b.repName));
   }, [canSeeSubmissions, matchedGroups, submissions]);

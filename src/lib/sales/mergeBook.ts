@@ -9,9 +9,14 @@ import {
   type InstallBucket,
   type InstallCounts,
 } from '@/lib/sales/installBucket';
-import { linkedSaleId, matchFiberOrdersToSalesDetailed } from '@/lib/fiberReport/matchSales';
+import {
+  foldLeftoverOrders,
+  linkedSaleId,
+  matchFiberOrdersToSalesDetailed,
+} from '@/lib/fiberReport/matchSales';
+import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { installDayKey } from '@/lib/sales/saleDate';
-import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
+import { displayPersonName, normalizeOrderNumber } from '@/lib/sales/orderNumber';
 import type { MonthKey } from '@/lib/sales/monthWindow';
 
 // One book. The admin Sales page used to show two lists that disagreed: the
@@ -100,6 +105,13 @@ export interface MergedRow {
    * and cancelled rows (cancelling the extra one is how the flag clears).
    */
   possibleDuplicate: boolean;
+  /**
+   * Carrier rows folded under this sale (foldLeftoverOrders): a missed install
+   * or a cancelled attempt at the same door as the order it matched. History,
+   * not an unlogged sale, so they have no row of their own and never count as
+   * not logged. Always empty on order-only rows.
+   */
+  history: FiberOrder[];
 }
 
 export interface MergedBook {
@@ -242,7 +254,7 @@ function portalNames(sales: readonly Sale[], repNames?: ReadonlyMap<string, stri
         text(repNames?.get(repId)) ??
         fromSales.get(repId) ??
         (order?.matchedUserId === repId ? text(order.matchedUserName) : null);
-      if (name) return name;
+      if (name) return displayPersonName(name);
     }
     return text(order?.repName);
   };
@@ -255,9 +267,11 @@ function saleRow(
   opts: {
     linkedManually: boolean; cancelled: boolean; counted: boolean; possibleDuplicate: boolean; now: Date;
     names: PortalNames;
+    history: FiberOrder[];
   }
 ): MergedRow {
   const repId = text(sale.salesRepId) ?? order?.matchedUserId ?? null;
+  const ownName = text(sale.salesRepName);
   const saleValue = finite(sale.totalValue) ?? 0;
   const carrierMrc = order ? finite(order.mrc) : null;
   const state: MergedRowState = opts.cancelled ? 'cancelled' : order ? 'agreed' : 'waiting';
@@ -268,7 +282,7 @@ function saleRow(
     sale,
     order,
     repId,
-    repName: text(sale.salesRepName) ?? opts.names(repId, order) ?? 'Unassigned',
+    repName: ownName ? displayPersonName(ownName) : opts.names(repId, order) ?? 'Unassigned',
     customerName: text(sale.customerName) ?? text(order?.customerName),
     address: text(sale.customerAddress) ?? text(order?.address) ?? '',
     value: saleValue,
@@ -285,6 +299,7 @@ function saleRow(
     linkBroken: false,
     counted: opts.counted,
     possibleDuplicate: opts.possibleDuplicate && !opts.cancelled,
+    history: opts.history,
   };
 }
 
@@ -336,7 +351,38 @@ function orderRow(order: FiberOrder, now: Date, verdict: OrderVerdict, names: Po
     linkBroken: verdict.linkBroken,
     counted: false,
     possibleDuplicate: false,
+    history: [],
   };
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** A carrier yyyy-mm-dd as "Oct 7", read as the calendar day it is (no time zone). */
+function carrierDay(value: string | null | undefined): string | null {
+  const parts = typeof value === 'string' ? DATE_ONLY.exec(value.trim()) : null;
+  const month = parts ? MONTHS[Number(parts[2]) - 1] : undefined;
+  return parts && month ? `${month} ${Number(parts[3])}` : null;
+}
+
+/**
+ * The note a folded row leaves under its sale: "Earlier order: Customer not
+ * home Oct 7", "Earlier order: Cancelled Oct 8".
+ */
+export function earlierOrderNote(order: FiberOrder): string {
+  const what =
+    order.status === 'breakage'
+      ? carrierReasonLabel(order.breakageReason) ?? 'Missed install'
+      : order.status === 'churned'
+        ? 'Churned'
+        : 'Cancelled';
+  const day = carrierDay(
+    order.status === 'breakage'
+      ? order.estInstallDate
+      : order.status === 'churned'
+        ? order.deactivationDate ?? order.cancellationDate ?? order.orderDate
+        : order.cancellationDate ?? order.orderDate
+  );
+  return `Earlier order: ${what}${day ? ` ${day}` : ''}`;
 }
 
 /**
@@ -530,6 +576,21 @@ export function buildMergedBook(
   // The carrier half of the verdict can only be read once the join is done, so
   // it lands here rather than in the sets above: a carrier cancellation settles
   // the row like a cancellation typed in, and never the other way round.
+  // Leftover rows at the door of an order a sale holds fold under that sale.
+  // Rows an admin dealt with (a verdict) and carrier history from before the
+  // portal keep their own drawers.
+  const saleByOrder = new Map<FiberOrder, Sale>();
+  for (const [sale, order] of orderBySale) saleByOrder.set(order, sale);
+  const folded = foldLeftoverOrders(
+    orders.filter((order) => !claimedOrders.has(order) && !verdicts.has(order) && !isHistoric(order)),
+    claimedOrders
+  );
+  const historyBySale = new Map<Sale, FiberOrder[]>();
+  for (const [leftover, beside] of folded) {
+    const owner = saleByOrder.get(beside);
+    if (owner) historyBySale.set(owner, [...(historyBySale.get(owner) ?? []), leftover]);
+  }
+
   const rows: MergedRow[] = sales.map((sale, index) => {
     const order = orderBySale.get(sale) ?? null;
     const carrierCancelled = isCarrierCancelled(order);
@@ -540,12 +601,13 @@ export function buildMergedBook(
       possibleDuplicate: duplicates.has(sale),
       now,
       names,
+      history: historyBySale.get(sale) ?? [],
     });
   });
 
   const NO_LINK: OrderVerdict = { dismissed: false, linkBroken: false };
   for (const order of orders) {
-    if (claimedOrders.has(order)) continue;
+    if (claimedOrders.has(order) || folded.has(order)) continue;
     rows.push(orderRow(order, now, verdicts.get(order) ?? NO_LINK, names));
   }
 

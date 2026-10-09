@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactK
 import Link from 'next/link';
 import { Check, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
-import type { FiberStatusResponse } from '@/types';
+import type { FiberOrder, FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
@@ -22,7 +22,7 @@ import { SaleDetailSheet } from './SaleDetailSheet';
 import { SalesDialog } from './SalesDialog';
 import { InstallStatusLine } from './InstallStatusLine';
 import { FiberRows, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
-import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
+import { foldLeftoverOrders, matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 
 /** Sales | Pay: switches the VIEW of the page, so it is the canonical page tabs. */
 export function SalesViewTabs({ payView, onChange }: { payView: boolean; onChange: (payView: boolean) => void }) {
@@ -185,14 +185,24 @@ export function SalesTable({
   );
   // The reverse: which of the rep's own sales a carrier order belongs to, so a
   // carrier row can open that sale (name, phone, order number).
+  // A missed install or cancelled attempt at the door of a matched order is
+  // that sale's history (foldLeftoverOrders), so it opens the sale too rather
+  // than reading "Not logged in the portal".
   const saleByOrderId = useMemo(() => {
     const byId = new Map<string, Sale>();
+    const byOrder = new Map<FiberOrder, Sale>();
     for (const sale of sales) {
       const order = fiberBySale.get(sale.id || '');
-      if (order) byId.set(order.id, sale);
+      if (!order) continue;
+      byId.set(order.id, sale);
+      byOrder.set(order, sale);
+    }
+    for (const [leftover, beside] of foldLeftoverOrders(fiberOrders, byOrder.keys())) {
+      const sale = byOrder.get(beside);
+      if (sale && !byId.has(leftover.id)) byId.set(leftover.id, sale);
     }
     return byId;
-  }, [fiberBySale, sales]);
+  }, [fiberBySale, fiberOrders, sales]);
   const monthSales = useMemo(
     () => (month ? salesSoldIn(sales, month) : sales),
     [month, sales]
@@ -289,7 +299,8 @@ export function SalesTable({
   // The sheet steps through what is on screen: the carrier rows that belong to
   // a logged sale when a carrier view is open, otherwise the ledger or pay list.
   const fiberViewSales = useMemo(
-    () => fiberBucketOrders.flatMap((order) => saleByOrderId.get(order.id) ?? []),
+    // A folded row opens the same sale as its order: list that sale once.
+    () => [...new Set(fiberBucketOrders.flatMap((order) => saleByOrderId.get(order.id) ?? []))],
     [fiberBucketOrders, saleByOrderId]
   );
   const sheetSales = showFiberView ? fiberViewSales : listSales;

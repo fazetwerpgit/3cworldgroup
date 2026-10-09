@@ -4,6 +4,7 @@ import {
   attachLoggedCustomerNames,
   attachMatchedUserNames,
   doorOrders,
+  foldLeftoverOrders,
   matchFiberOrdersToSales,
   matchFiberOrdersToSalesDetailed,
   orderMatchKey,
@@ -484,5 +485,34 @@ describe('attachMatchedUserNames', () => {
     ]);
     expect(named.matchedUserName).toBe('Miles Scoonover');
     expect(unnamed.matchedUserName).toBeNull();
+  });
+});
+
+describe('foldLeftoverOrders: history at a matched door', () => {
+  const held = order({ id: 'TMO-REAL', address: '149 VARSITY DR' });
+  const miss = order({ id: 'brk_1', status: 'breakage', address: '149 Varsity Dr.' });
+  const dead = order({ id: 'TMO-DEAD', status: 'cancelled', address: '149 VARSITY DR' });
+
+  it('folds a missed install and a cancelled attempt beside the held order', () => {
+    const folded = foldLeftoverOrders([held, miss, dead], [held]);
+    expect(folded.get(miss)).toBe(held);
+    expect(folded.get(dead)).toBe(held);
+    expect(folded.has(held)).toBe(false);
+  });
+
+  it('leaves live rows, other doors, other units, other reps and linked rows alone', () => {
+    const live = order({ id: 'TMO-LIVE', status: 'pending_install', address: '149 VARSITY DR' });
+    const nextDoor = order({ id: 'brk_2', status: 'breakage', address: '151 VARSITY DR' });
+    const otherUnit = order({ id: 'brk_3', status: 'breakage', address: '149 VARSITY DR', unit: '2' });
+    const otherRep = order({ id: 'brk_4', status: 'breakage', address: '149 VARSITY DR', matchedUserId: 'rep-2' });
+    const linked = order({
+      id: 'brk_5', status: 'breakage', address: '149 VARSITY DR',
+      saleLink: { saleId: null, by: 'a', byName: 'Jacob', at: '2026-10-07T00:00:00.000Z' },
+    });
+    expect(foldLeftoverOrders([held, live, nextDoor, otherUnit, otherRep, linked], [held]).size).toBe(0);
+  });
+
+  it('folds nothing at a door with no held order', () => {
+    expect(foldLeftoverOrders([miss, dead], []).size).toBe(0);
   });
 });
