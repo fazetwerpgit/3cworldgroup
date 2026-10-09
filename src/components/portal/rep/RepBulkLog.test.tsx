@@ -11,7 +11,7 @@ import type { CreateSaleData } from '@/types';
 import type { SaleScanResponse } from '@/lib/sales/scan/types';
 import { getPlanById } from '@/types';
 import { addPlanToProducts } from '@/lib/sales/planSelection';
-import { BULK_KEY_PREFIX, newBulkRow, writeBulkBatch, type BulkRow } from '@/lib/sales/bulk/batch';
+import { BULK_KEY_PREFIX, newBulkRow, newBulkShot, writeBulkBatch, type BulkRow } from '@/lib/sales/bulk/batch';
 
 const createSale = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }), usePathname: () => '/' }));
@@ -70,6 +70,21 @@ const SCANS: Record<string, SaleScanResponse> = {
   'c.png': { fields: null, reason: 'model_error' },
   'd.png': read('tmf 2', 'Ben Cole'),
   'busy.png': { fields: null, reason: 'rate_limited' },
+  // A sale's two screens: the order and customer, then the plan and install.
+  'cy-1.png': {
+    fields: {
+      orderNumberOrBtn: { value: 'TMF-7', confidence: 'high' },
+      customerName: { value: 'Cy Park', confidence: 'high' },
+      customerAddress: { value: '7 Elm St, Austin, TX', confidence: 'high' },
+    },
+  },
+  'cy-2.png': {
+    fields: {
+      installDate: { value: '2099-10-06', confidence: 'high' },
+      provider: { value: 'tfiber', confidence: 'high' },
+      plan: { value: 'tfiber-1gig', confidence: 'high' },
+    },
+  },
 };
 
 let container: HTMLDivElement;
@@ -111,10 +126,13 @@ async function finishUploads() {
   await settle();
 }
 
-const cards = () => Array.from(container.querySelectorAll('li'));
+const cards = () => Array.from(container.querySelectorAll('ol > li'));
 const cardText = (n: number) => cards()[n - 1]?.textContent ?? '';
 const button = (label: string) =>
   Array.from(document.body.querySelectorAll('button')).find((b) => b.textContent?.trim() === label);
+/** A button on card `n`, by its text. */
+const within = (n: number, label: string) =>
+  Array.from(cards()[n - 1]?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === label);
 const logButton = () =>
   Array.from(container.querySelectorAll('button')).find((b) => /^(Log \d+ sales?|Nothing ready|Reading|Logging)/.test(b.textContent ?? ''))!;
 
@@ -122,14 +140,21 @@ const png = (name: string, bytes: string) => new File([bytes], name, { type: 'im
 const KEY = `${BULK_KEY_PREFIX}r1`;
 const saved = () => JSON.parse(window.localStorage.getItem(KEY) ?? 'null') as { rows: BulkRow[] } | null;
 
-/** A saved, ready row: `letter` picks the id ("aaaa…"), order number and address. */
+/** A saved, ready sale the rep checked: `letter` picks the id ("aaaa…"), order number and address. */
 function savedRow(letter: string, over: Partial<BulkRow> = {}): BulkRow {
   const id = letter.repeat(32);
-  const base = newBulkRow(id, `${letter}.png`);
+  const shotId = `${letter.repeat(31)}0`;
+  const seq = letter.charCodeAt(0);
+  const base = newBulkRow(id, {
+    ...newBulkShot(shotId, `${letter}.png`, seq),
+    phase: 'read',
+    proofPath: `form-attachments/r1/sale-proof/${shotId}_abcdef/`,
+    merged: true,
+    checked: true,
+  });
   return {
     ...base,
-    phase: 'read',
-    proofPath: `form-attachments/r1/sale-proof/${id}_abcdef/`,
+    fixed: true,
     products: addPlanToProducts([], getPlanById('tfiber-1gig')!),
     formData: { ...base.formData, customerAddress: `${letter} Elm St`, installDate: '2099-01-02', orderNumberOrBtn: `ORD-${letter}` },
     ...over,
@@ -185,41 +210,53 @@ afterEach(async () => {
 });
 
 describe('RepBulkLog', () => {
-  it('reads a batch three at a time, flags repeats and gaps, then logs the ready ones', async () => {
+  it('reads a batch three at a time, puts each sale together, flags copies and gaps, then logs the ready ones', async () => {
     await render();
-    expect(container.textContent).toContain('Up to 25 at a time');
+    expect(container.textContent).toContain('Up to 50 at a time');
 
     await pick([
-      png('a.png', 'AAAA'),
-      png('b.png', 'BBBB'),
-      png('a-again.png', 'AAAA'),
       png('c.png', 'CCCC'),
+      png('a.png', 'AAAA'),
+      png('a-again.png', 'AAAA'),
+      png('cy-1.png', 'CY11'),
+      png('cy-2.png', 'CY22'),
+      png('b.png', 'BBBB'),
       png('d.png', 'DDDD'),
     ]);
-    expect(cards()).toHaveLength(5);
+    expect(cards()).toHaveLength(7);
     // Three uploads at a time.
     expect(uploadCalls).toBe(3);
     expect(cardText(1)).toContain('Uploading');
-    expect(logButton().textContent).toBe('Reading 5 of 5…');
+    expect(logButton().textContent).toBe('Reading 7 of 7…');
     expect(logButton().disabled).toBe(true);
 
     await finishUploads();
-    expect(uploadCalls).toBe(5);
     await finishUploads();
-    expect(scanned.sort()).toEqual(['a-again.png', 'a.png', 'b.png', 'c.png', 'd.png']);
+    await finishUploads();
+    expect(uploadCalls).toBe(7);
+    // Every screenshot is read once, on its own.
+    expect(scanned.sort()).toEqual(['a-again.png', 'a.png', 'b.png', 'c.png', 'cy-1.png', 'cy-2.png', 'd.png']);
 
-    expect(cardText(1)).toContain('Ana Ruiz');
-    expect(cardText(1)).toContain('Ready');
+    expect(cards()).toHaveLength(5);
+    expect(cardText(1)).toContain("Couldn't read it. Tap to fill in.");
+    expect(cardText(2)).toContain('Ana Ruiz');
     expect(cardText(2)).toContain('Ready');
-    expect(cardText(3)).toContain('Repeated: same screenshot as sale 1');
-    expect(cardText(4)).toContain("Couldn't read it. Tap to fill in.");
-    expect(cardText(5)).toContain('Repeated: same order number as sale 2');
-    // Repeats start unticked.
+    expect(cardText(3)).toContain('Repeated: same screenshot as sale 2');
+    // Cy's two screens: order and customer from one, plan and install from the other.
+    expect(cardText(4)).toContain('Cy Park');
+    expect(cardText(4)).toContain('2 screenshots');
+    expect(cardText(4)).toContain('Installs Oct 6');
+    expect(cardText(4)).toContain('Ready');
+    // The same order number on two screenshots is one sale, not a repeat.
+    expect(cardText(5)).toContain('Ben Cole');
+    expect(cardText(5)).toContain('2 screenshots');
+    expect(container.textContent).not.toContain('same order number');
+    // The copy starts unticked.
     const boxes = cards().map((li) => li.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked);
-    expect(boxes).toEqual([true, true, false, true, false]);
-    expect(logButton().textContent).toBe('Log 2 sales');
+    expect(boxes).toEqual([true, true, false, true, true]);
+    expect(logButton().textContent).toBe('Log 3 sales');
 
-    // Sale 2's order is already on the books.
+    // Ben's order is already on the books.
     createSale.mockImplementation(async (data: CreateSaleData) =>
       data.orderNumberOrBtn === 'TMF-2' && !data.allowDuplicate
         ? {
@@ -236,32 +273,73 @@ describe('RepBulkLog', () => {
     await act(async () => logButton().click());
     await settle();
 
-    expect(createSale).toHaveBeenCalledTimes(2);
-    const [first, second] = createSale.mock.calls.map((call) => call[0] as CreateSaleData);
-    expect(first.clientSaleId).toMatch(/^[a-f0-9]{32}$/);
-    expect(second.clientSaleId).toMatch(/^[a-f0-9]{32}$/);
-    expect(first.clientSaleId).not.toBe(second.clientSaleId);
-    // The proof is the row's own upload, under its own key.
-    expect(first.proofScreenshotPaths).toEqual([`form-attachments/r1/sale-proof/${first.clientSaleId}_abcdef/`]);
-    expect(first).toMatchObject({ customerName: 'Ana Ruiz', orderNumberOrBtn: 'TMF-1', installDate: '2099-10-06' });
-    expect(first.allowDuplicate).toBeUndefined();
+    expect(createSale).toHaveBeenCalledTimes(3);
+    const [ana, cy, ben] = createSale.mock.calls.map((call) => call[0] as CreateSaleData);
+    for (const sent of [ana, cy, ben]) expect(sent.clientSaleId).toMatch(/^[a-f0-9]{32}$/);
+    expect(new Set([ana.clientSaleId, cy.clientSaleId, ben.clientSaleId]).size).toBe(3);
+    expect(ana).toMatchObject({ customerName: 'Ana Ruiz', orderNumberOrBtn: 'TMF-1', installDate: '2099-10-06' });
+    expect(ana.proofScreenshotPaths).toHaveLength(1);
+    expect(ana.allowDuplicate).toBeUndefined();
+    // A sale's proof is all of its screenshots.
+    expect(cy).toMatchObject({ customerName: 'Cy Park', orderNumberOrBtn: 'TMF-7', installDate: '2099-10-06', productSold: 'TFiber 1 Gig (1 Gbps)' });
+    expect(cy.proofScreenshotPaths).toHaveLength(2);
+    for (const path of cy.proofScreenshotPaths ?? []) expect(path).toMatch(/^form-attachments\/r1\/sale-proof\/[a-f0-9]{32}_abcdef\/$/);
+    expect(ben.proofScreenshotPaths).toHaveLength(2);
 
-    expect(cardText(1)).toContain('Logged');
-    expect(cardText(2)).toContain('Already logged by Dana W. on Sep 14.');
-    expect(container.textContent).toContain('1 logged, 1 already logged, 1 needs info, 2 skipped');
+    expect(cardText(2)).toContain('Logged');
+    expect(cardText(4)).toContain('Logged');
+    expect(cardText(5)).toContain('Already logged by Dana W. on Sep 14.');
+    expect(container.textContent).toContain('2 logged, 1 already logged, 1 needs info, 1 skipped');
     expect(container.querySelector('a[href="/portal/sales"]')?.textContent).toBe('Go to Sales');
-    // Sale 4 is ticked but still needs info: the batch stays saved for later.
+    // Sale 1 is ticked but still needs info: the batch stays saved for later.
     await act(async () => new Promise((r) => setTimeout(r, 400)));
-    expect(saved()?.rows.find((row) => row.id === first.clientSaleId)?.result?.kind).toBe('logged');
+    expect(saved()?.rows.find((row) => row.id === ana.clientSaleId)?.result?.kind).toBe('logged');
 
     await act(async () => button('Log anyway')!.click());
     await settle();
-    expect(createSale).toHaveBeenCalledTimes(3);
-    const anyway = createSale.mock.calls[2][0] as CreateSaleData;
-    expect(anyway.clientSaleId).toBe(second.clientSaleId);
+    expect(createSale).toHaveBeenCalledTimes(4);
+    const anyway = createSale.mock.calls[3][0] as CreateSaleData;
+    expect(anyway.clientSaleId).toBe(ben.clientSaleId);
     expect(anyway.allowDuplicate).toBe(true);
-    expect(cardText(2)).toContain('Logged');
-    expect(container.textContent).toContain('2 logged, 1 needs info, 2 skipped');
+    expect(cardText(5)).toContain('Logged');
+    expect(container.textContent).toContain('3 logged, 1 needs info, 1 skipped');
+  });
+
+  it('combines a sale with the one above and splits a screenshot back off, keeping ids', async () => {
+    await render();
+    await pick([png('a.png', 'AAAA'), png('b.png', 'BBBB')]);
+    await finishUploads();
+    expect(cards()).toHaveLength(2);
+    // Nothing above the first sale.
+    expect(within(1, 'Combine with sale above')).toBeUndefined();
+    await act(async () => new Promise((r) => setTimeout(r, 400)));
+    const [first, second] = saved()!.rows.map((row) => row.id);
+
+    await act(async () => within(2, 'Combine with sale above')!.click());
+    expect(cards()).toHaveLength(1);
+    expect(cardText(1)).toContain('2 screenshots');
+    expect(cardText(1)).toContain("Order numbers don't match");
+
+    await act(async () => cards()[0].querySelector<HTMLButtonElement>('button[aria-label="Check sale 1"]')!.click());
+    const sheet = document.body.querySelector('[role="dialog"]')!;
+    expect(sheet.textContent).toContain('These screenshots show different order numbers (#TMF-1, #TMF-2)');
+    const split = Array.from(sheet.querySelectorAll('button')).filter((b) => b.textContent === 'Make its own sale');
+    expect(split).toHaveLength(2);
+    await act(async () => split[1].click());
+    expect(cards()).toHaveLength(2);
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).not.toContain('Make its own sale');
+    await act(async () => document.body.querySelector<HTMLButtonElement>('button[aria-label="Close"]')!.click());
+
+    createSale.mockImplementation(async (data: CreateSaleData) => ({ sale: { id: `sale-${data.clientSaleId}` }, duplicate: false }));
+    await act(async () => logButton().click());
+    await settle();
+    const sent = createSale.mock.calls.map((call) => call[0] as CreateSaleData);
+    expect(sent.map((data) => data.orderNumberOrBtn)).toEqual(['TMF-1', 'TMF-2']);
+    // The first sale kept its id through combine and split; the split-off one is new.
+    expect(sent[0].clientSaleId).toBe(first);
+    expect(sent[1].clientSaleId).not.toBe(first);
+    expect(sent[1].clientSaleId).not.toBe(second);
+    expect(sent.map((data) => data.proofScreenshotPaths?.length)).toEqual([1, 1]);
   });
 
   it('fills in a screenshot it could not read with the Log Sale fields', async () => {
@@ -294,22 +372,34 @@ describe('RepBulkLog', () => {
     expect(logButton().textContent).toBe('Log 1 sale');
   });
 
-  it('picks up a saved batch without sending anything again', async () => {
-    const base = newBulkRow('a'.repeat(32), 'a.png');
-    const row = (id: string, over: Partial<BulkRow>): BulkRow => ({
-      ...base,
-      id,
+  it('picks up a batch saved before sales could hold several screenshots, sending nothing again', async () => {
+    // The old shape: one screenshot per row, its file fields on the row itself.
+    const legacy = (letter: string, over: Record<string, unknown>) => ({
+      id: letter.repeat(32),
+      fileName: `${letter}.png`,
+      hash: null,
+      proofPath: `form-attachments/r1/sale-proof/${letter.repeat(32)}_abcdef/`,
       phase: 'read',
-      proofPath: `form-attachments/r1/sale-proof/${id}_abcdef/`,
+      formData: { customerName: 'Old Row', customerAddress: '1 Elm St', saleDate: '2026-10-01', installDate: '2099-01-02', orderNumberOrBtn: `ORD-${letter}` },
       products: addPlanToProducts([], getPlanById('tfiber-1gig')!),
-      formData: { ...base.formData, customerAddress: '1 Elm St', installDate: '2099-01-02', orderNumberOrBtn: id.slice(0, 6) },
+      provider: 'tfiber',
+      saleDateTouched: false,
+      flags: {},
+      include: null,
+      result: null,
       ...over,
     });
-    writeBulkBatch(`${BULK_KEY_PREFIX}r1`, [
-      row('a'.repeat(32), { result: { kind: 'logged', saleId: 's1' } }),
-      row('b'.repeat(32), {}),
-      { ...newBulkRow('c'.repeat(32), 'c.png') }, // never uploaded
-    ]);
+    window.localStorage.setItem(
+      KEY,
+      JSON.stringify({
+        rows: [
+          legacy('a', { result: { kind: 'logged', saleId: 's1' } }),
+          legacy('b', {}),
+          legacy('c', { phase: 'uploading', proofPath: null }), // never uploaded
+        ],
+        savedAt: Date.now(),
+      })
+    );
     await render();
     await settle();
     expect(createSale).not.toHaveBeenCalled();
@@ -317,13 +407,21 @@ describe('RepBulkLog', () => {
     expect(container.textContent).toContain("1 screenshot didn't finish uploading. Pick it again.");
     expect(cards()).toHaveLength(2);
     expect(cardText(1)).toContain('Logged');
+    // Same address and name, but these are the rep's own rows: they stay apart.
+    expect(cardText(2)).toContain('Old Row');
+    expect(cardText(2)).not.toContain('screenshots');
     expect(logButton().textContent).toBe('Log 1 sale');
 
     createSale.mockResolvedValue({ sale: { id: 's2' }, duplicate: false });
     await act(async () => logButton().click());
     await settle();
     expect(createSale).toHaveBeenCalledTimes(1);
-    expect((createSale.mock.calls[0][0] as CreateSaleData).clientSaleId).toBe('b'.repeat(32));
+    const sent = createSale.mock.calls[0][0] as CreateSaleData;
+    expect(sent.clientSaleId).toBe('b'.repeat(32));
+    expect(sent.proofScreenshotPaths).toEqual([`form-attachments/r1/sale-proof/${'b'.repeat(32)}_abcdef/`]);
+    // Everything is in: the saved copy is gone.
+    await act(async () => new Promise((r) => setTimeout(r, 400)));
+    expect(saved()).toBeNull();
   });
 
   it('keeps Start over off while sending, and a closed page sends nothing more', async () => {
@@ -446,10 +544,10 @@ describe('RepBulkLog', () => {
     expect(cards()).toHaveLength(1);
   });
 
-  it('takes 25 at most and says so', async () => {
+  it('takes 50 at most and says so', async () => {
     await render();
-    await pick(Array.from({ length: 27 }, (_, i) => png(`s${i}.png`, `bytes-${i}`)));
-    expect(cards()).toHaveLength(25);
-    expect(container.textContent).toContain('Only 25 at a time. The extra ones were left off.');
+    await pick(Array.from({ length: 52 }, (_, i) => png(`s${i}.png`, `bytes-${i}`)));
+    expect(cards()).toHaveLength(50);
+    expect(container.textContent).toContain('Only 50 at a time. The extra ones were left off.');
   });
 });

@@ -1,18 +1,22 @@
-// The bulk uploader's batch: one row per order screenshot, each its own sale.
-// Pure, so the rules are testable alone: what each row's status is, which rows
-// repeat another one in the same batch, what goes in from the screenshot
-// reader, and how the batch is saved so an accidental close loses nothing.
+// The bulk uploader's batch: a list of sales, each made of 1 to 4 order
+// screenshots (a T-Fiber order is often two screens). Pure, so the rules are
+// testable alone: each sale's status, which sale repeats another one's
+// screenshot, what goes in from the screenshot reader, and how the batch is
+// saved so an accidental close loses nothing. How screenshots are put together
+// into sales lives in ./group.
 //
-// Each row's id is its sale's idempotency key (clientSaleId) and the stem of
-// its proof upload slot, the same scheme as the single Log Sale form: a retry,
-// or a second tap after the app was closed mid-send, lands on the sale already
-// written instead of logging it twice.
+// Each sale's id is its idempotency key (clientSaleId), the same scheme as the
+// single Log Sale form: a retry, or a second tap after the app was closed
+// mid-send, lands on the sale already written instead of logging it twice.
+// Each screenshot has its own id, the stem of its upload slot, so a
+// screenshot can move between sales before they are sent.
 
 import { getPlanById, type SaleProduct, type SaleType } from '@/types';
 import { addPlanToProducts } from '@/lib/sales/planSelection';
 import { normalizeOrderNumber, type OrderDuplicate } from '@/lib/sales/orderNumber';
+import { MAX_PROOF_SCREENSHOTS } from '@/lib/sales/proofPaths';
 import { planScanFills, type ScanFlag, type ScanTarget } from '@/lib/sales/scan/fills';
-import type { SaleScanFields } from '@/lib/sales/scan/types';
+import { SCAN_FIELD_KEYS, type SaleScanFields } from '@/lib/sales/scan/types';
 import {
   emptySaleFields,
   inferSaleDate,
@@ -22,7 +26,9 @@ import {
 } from '@/lib/sales/saleForm';
 
 /** Screenshots per batch. */
-export const BULK_MAX_FILES = 25;
+export const BULK_MAX_FILES = 50;
+/** Screenshots in one sale: the same cap as the Log Sale form. */
+export const BULK_MAX_SHOTS = MAX_PROOF_SCREENSHOTS;
 /** Screenshots uploaded and read at the same time. */
 export const BULK_CONCURRENCY = 3;
 /** localStorage key stem; the rep's uid follows, so a shared phone never shows another rep's batch. */
@@ -30,50 +36,72 @@ export const BULK_KEY_PREFIX = 'sale-bulk:v1:';
 /** A saved batch older than this is dropped: it is yesterday's, not an interruption. */
 export const BULK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
-const ROW_ID_RE = /^[a-f0-9]{32}$/;
+const ID_RE = /^[a-f0-9]{32}$/;
 
-/** Where a row's screenshot is: on its way up, being read, or done. */
+/** Where a screenshot is: on its way up, being read, or done. */
 export type BulkPhase = 'uploading' | 'reading' | 'read' | 'upload_failed' | 'read_failed';
 
-/** What happened when the row was sent. */
+/** What happened when the sale was sent. */
 export type BulkResult =
   | {
       kind: 'logged';
       saleId: string | null;
       /**
        * A retry came back as the sale an earlier, unanswered send already
-       * wrote, and the rep had edited the row since: the edit is not on it.
+       * wrote, and the rep had edited the sale since: the edit is not on it.
        */
       editLost?: boolean;
     }
   | { kind: 'already'; duplicate: OrderDuplicate }
   | { kind: 'failed'; reason: string };
 
-export interface BulkRow {
-  /** 32 hex: the sale's clientSaleId and its proof slot stem. */
+/** One picked screenshot. */
+export interface BulkShot {
+  /** 32 hex: the stem of its upload slot (never a sale id). */
   id: string;
+  /** Pick order across the whole batch (the camera roll order). */
+  seq: number;
   fileName: string;
   /** SHA-256 of the picked file's bytes; null when it could not be hashed. */
   hash: string | null;
   proofPath: string | null;
   phase: BulkPhase;
+  /** What the reader made of this screenshot on its own; null until read, or when nothing was read. */
+  scan: SaleScanFields | null;
+  /** The last read was turned away by the reader's rate limit. */
+  readBusy?: boolean;
+  /** Its reading is already in its sale's fields (a sale the rep has edited only takes empty fields). */
+  merged?: boolean;
+  /** The rep saved the sale with this screenshot in it: its order number was looked at. */
+  checked?: boolean;
+}
+
+/** One sale: its screenshots and its fields. */
+export interface BulkRow {
+  /** 32 hex: the sale's clientSaleId. */
+  id: string;
+  /** In pick order, 1 to BULK_MAX_SHOTS. */
+  shots: BulkShot[];
   formData: SaleFormFields;
   products: SaleProduct[];
-  /** The provider the reader saw, for a row whose plan it could not match. */
+  /** The provider the reader saw, for a sale whose plan it could not match. */
   provider: string | null;
   saleDateTouched: boolean;
   /** Fields the reader filled without being sure ("Check this"). */
   flags: Partial<Record<ScanTarget, ScanFlag>>;
-  /** The rep's include/skip pick; null is the default (in, unless it repeats another row). */
+  /** The rep's include/skip pick; null is the default (in, unless it repeats another sale). */
   include: boolean | null;
   result: BulkResult | null;
-  /** The last read was turned away by the reader's rate limit. */
-  readBusy?: boolean;
+  /**
+   * The rep shaped this sale (edited it, combined it, split a screenshot off):
+   * automatic grouping no longer moves its screenshots or rewrites its fields.
+   */
+  fixed?: boolean;
   /** On its way to the server now (never saved). */
   sending?: boolean;
 }
 
-export type BulkRepeat = { of: number; by: 'image' | 'order' };
+export type BulkRepeat = { of: number; by: 'image' };
 
 export type BulkStatus =
   | { kind: 'uploading' }
@@ -88,21 +116,40 @@ export type BulkStatus =
   | { kind: 'already'; duplicate: OrderDuplicate }
   | { kind: 'failed'; reason: string };
 
-export function newBulkRow(id: string, fileName: string): BulkRow {
-  return {
-    id,
-    fileName,
-    hash: null,
-    proofPath: null,
-    phase: 'uploading',
-    formData: emptySaleFields(),
-    products: [],
-    provider: null,
-    saleDateTouched: false,
-    flags: {},
-    include: null,
-    result: null,
-  };
+/** The parts of a sale the reader and the edit sheet fill in. */
+export type BulkSaleFields = Pick<BulkRow, 'formData' | 'products' | 'provider' | 'saleDateTouched' | 'flags'>;
+
+export function emptyBulkFields(): BulkSaleFields {
+  return { formData: emptySaleFields(), products: [], provider: null, saleDateTouched: false, flags: {} };
+}
+
+export function newBulkShot(id: string, fileName: string, seq: number): BulkShot {
+  return { id, seq, fileName, hash: null, proofPath: null, phase: 'uploading', scan: null };
+}
+
+/** A sale of one screenshot, as a picked file starts out. */
+export function newBulkRow(id: string, shot: BulkShot): BulkRow {
+  return { id, shots: [shot], ...emptyBulkFields(), include: null, result: null };
+}
+
+/** Every uploaded screenshot of the sale: its proof. */
+export function rowProofPaths(row: Pick<BulkRow, 'shots'>): string[] {
+  return row.shots.flatMap((shot) => (shot.proofPath ? [shot.proofPath] : []));
+}
+
+/** Sent, or being sent: its id and screenshots never change again. */
+export function isSent(row: Pick<BulkRow, 'result' | 'sending'>): boolean {
+  return row.result !== null || row.sending === true;
+}
+
+/** Where the sale's screenshots are, taken together. */
+export function rowPhase(row: Pick<BulkRow, 'shots'>): BulkPhase {
+  const phases = row.shots.map((shot) => shot.phase);
+  if (phases.includes('uploading')) return 'uploading';
+  if (phases.includes('reading')) return 'reading';
+  if (phases.includes('upload_failed')) return 'upload_failed';
+  if (phases.length > 0 && phases.every((phase) => phase === 'read_failed')) return 'read_failed';
+  return 'read';
 }
 
 const PROBLEM_LABELS: Record<Exclude<SaleFieldKey, 'saleDate'>, string> = {
@@ -113,16 +160,19 @@ const PROBLEM_LABELS: Record<Exclude<SaleFieldKey, 'saleDate'>, string> = {
 };
 const PROBLEM_ORDER: SaleFieldKey[] = ['plan', 'customerAddress', 'installDate', 'saleDate', 'orderNumberOrBtn'];
 
+/** "Order numbers don't match": two screenshots of one sale show different order numbers. */
+export const ORDER_CONFLICT_PROBLEM = "Order numbers don't match";
+
 /**
- * What the create-sale route would turn this row down for, in short words
+ * What the create-sale route would turn this sale down for, in short words
  * ("No plan", "Sale date cannot be after the install date"). The same rules as
- * the Log Sale form (validateSaleForm). Empty when the row can be sent.
+ * the Log Sale form (validateSaleForm). Empty when the sale can be sent.
  */
-export function rowProblems(row: Pick<BulkRow, 'formData' | 'products' | 'proofPath'>): string[] {
+export function rowProblems(row: Pick<BulkRow, 'formData' | 'products' | 'shots'>): string[] {
   const errors = validateSaleForm({
     formData: row.formData,
     products: row.products,
-    proofPaths: row.proofPath ? [row.proofPath] : [],
+    proofPaths: rowProofPaths(row),
   });
   return PROBLEM_ORDER.flatMap((key) => {
     const error = errors[key];
@@ -133,39 +183,59 @@ export function rowProblems(row: Pick<BulkRow, 'formData' | 'products' | 'proofP
 }
 
 /**
- * Rows that repeat an earlier row in the batch: the same picture (same bytes)
- * or the same order number once normalized. The earlier row is the original;
- * `of` is its 1-based position in the list.
+ * The order numbers the sale's screenshots disagree on, as read; empty when
+ * they agree. Only screenshots the rep has not saved the sale with count: once
+ * the rep has looked at the sale and saved it, the order number is theirs.
  */
-export function findRepeats(rows: Pick<BulkRow, 'id' | 'hash' | 'formData'>[]): Map<string, BulkRepeat> {
+export function orderConflict(row: Pick<BulkRow, 'formData' | 'shots'>): string[] {
+  const kept = normalizeOrderNumber(row.formData.orderNumberOrBtn);
+  const seen = new Map<string, string>();
+  for (const shot of row.shots) {
+    const value = shot.scan?.orderNumberOrBtn?.value?.trim();
+    const key = normalizeOrderNumber(value);
+    if (key && !seen.has(key)) seen.set(key, value as string);
+  }
+  const unchecked = row.shots.some((shot) => {
+    const key = normalizeOrderNumber(shot.scan?.orderNumberOrBtn?.value);
+    return !shot.checked && key && key !== kept;
+  });
+  return unchecked && seen.size > 1 ? [...seen.values()] : [];
+}
+
+/**
+ * Sales that are only a copy of a screenshot already in an earlier sale (the
+ * same bytes picked twice). `of` is the earlier sale's 1-based position. Two
+ * different screenshots with the same order number are one sale, not a repeat
+ * (./group puts them together).
+ */
+export function findRepeats(rows: Pick<BulkRow, 'id' | 'shots'>[]): Map<string, BulkRepeat> {
   const byHash = new Map<string, number>();
-  const byOrder = new Map<string, number>();
   const repeats = new Map<string, BulkRepeat>();
   rows.forEach((row, index) => {
-    const order = normalizeOrderNumber(row.formData.orderNumberOrBtn);
-    const sameImage = row.hash ? byHash.get(row.hash) : undefined;
-    const sameOrder = order ? byOrder.get(order) : undefined;
-    if (sameImage !== undefined) repeats.set(row.id, { of: sameImage + 1, by: 'image' });
-    else if (sameOrder !== undefined) repeats.set(row.id, { of: sameOrder + 1, by: 'order' });
-    if (row.hash && !byHash.has(row.hash)) byHash.set(row.hash, index);
-    if (order && !byOrder.has(order)) byOrder.set(order, index);
+    const hashes = row.shots.map((shot) => shot.hash);
+    const earlier = hashes.map((hash) => (hash ? byHash.get(hash) : undefined));
+    if (earlier.length > 0 && earlier.every((of) => of !== undefined)) {
+      repeats.set(row.id, { of: (earlier[0] as number) + 1, by: 'image' });
+    }
+    for (const hash of hashes) if (hash && !byHash.has(hash)) byHash.set(hash, index);
   });
   return repeats;
 }
 
-/** The row's status, most pressing first. */
+/** The sale's status, most pressing first. */
 export function rowStatus(row: BulkRow, repeat: BulkRepeat | undefined): BulkStatus {
   if (row.result?.kind === 'logged') return { kind: 'logged', editLost: row.result.editLost === true };
   if (row.sending) return { kind: 'sending' };
-  if (row.phase === 'uploading') return { kind: 'uploading' };
-  if (row.phase === 'reading') return { kind: 'reading' };
-  if (row.phase === 'upload_failed') return { kind: 'upload_failed' };
+  const phase = rowPhase(row);
+  if (phase === 'uploading') return { kind: 'uploading' };
+  if (phase === 'reading') return { kind: 'reading' };
+  if (phase === 'upload_failed') return { kind: 'upload_failed' };
   if (row.result?.kind === 'already') return { kind: 'already', duplicate: row.result.duplicate };
-  const problems = rowProblems(row);
+  const problems = [...(orderConflict(row).length > 0 ? [ORDER_CONFLICT_PROBLEM] : []), ...rowProblems(row)];
   if (repeat) return { kind: 'repeat', repeat, problems };
   if (problems.length > 0) {
-    return row.phase === 'read_failed'
-      ? { kind: 'read_failed', problems, busy: row.readBusy === true }
+    return phase === 'read_failed'
+      ? { kind: 'read_failed', problems, busy: row.shots.some((shot) => shot.readBusy === true) }
       : { kind: 'needs_info', problems };
   }
   if (row.result?.kind === 'failed') return { kind: 'failed', reason: row.result.reason };
@@ -207,11 +277,12 @@ export function sendableRows(rows: BulkRow[]): BulkRow[] {
 }
 
 /**
- * The reader's answer, put into a row. Only empty fields are filled (a re-read
- * never overwrites what the rep typed); the plan goes in when the reader
- * matched one, and an install date dates the sale the same way the form does.
+ * One screenshot's reading, put into a sale. Only empty fields are filled (a
+ * re-read or a second screenshot never overwrites what is there: the first
+ * screenshot with a value wins); the plan goes in when the reader matched one,
+ * and an install date dates the sale the same way the form does.
  */
-export function applyScanToRow(row: BulkRow, fields: SaleScanFields | null): { row: BulkRow; filled: boolean } {
+export function applyScanToRow<T extends BulkSaleFields>(row: T, fields: SaleScanFields | null): { row: T; filled: boolean } {
   if (!fields) return { row, filled: false };
   const hasPlan = row.products.length > 0;
   const { fills, flags } = planScanFills(fields, (target) =>
@@ -290,73 +361,110 @@ const TEXT_FIELDS = [
   'notes',
   'orderNumberOrBtn',
 ] as const;
+const CONFIDENCES: readonly unknown[] = ['high', 'medium', 'low'];
 const isFiniteNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
+const isObject = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
 
 function isProduct(value: unknown): value is SaleProduct {
-  if (!value || typeof value !== 'object') return false;
-  const p = value as Record<string, unknown>;
+  if (!isObject(value)) return false;
   return (
-    typeof p.productId === 'string' &&
-    typeof p.productName === 'string' &&
-    typeof p.company === 'string' &&
-    [p.quantity, p.unitPrice, p.totalPrice, p.points].every(isFiniteNumber)
+    typeof value.productId === 'string' &&
+    typeof value.productName === 'string' &&
+    typeof value.company === 'string' &&
+    [value.quantity, value.unitPrice, value.totalPrice, value.points].every(isFiniteNumber)
   );
 }
 
 function isOrderDuplicate(value: unknown): value is OrderDuplicate {
-  if (!value || typeof value !== 'object') return false;
-  const d = value as Record<string, unknown>;
-  return typeof d.existingRepName === 'string' && typeof d.existingIsMine === 'boolean';
+  return isObject(value) && typeof value.existingRepName === 'string' && typeof value.existingIsMine === 'boolean';
 }
 
 function readResult(value: unknown): BulkResult | null {
-  if (!value || typeof value !== 'object') return null;
-  const r = value as Record<string, unknown>;
-  if (r.kind === 'logged') {
+  if (!isObject(value)) return null;
+  if (value.kind === 'logged') {
     return {
       kind: 'logged',
-      saleId: typeof r.saleId === 'string' ? r.saleId : null,
-      ...(r.editLost === true ? { editLost: true } : {}),
+      saleId: typeof value.saleId === 'string' ? value.saleId : null,
+      ...(value.editLost === true ? { editLost: true } : {}),
     };
   }
-  if (r.kind === 'already' && isOrderDuplicate(r.duplicate)) return { kind: 'already', duplicate: r.duplicate };
-  if (r.kind === 'failed' && typeof r.reason === 'string') return { kind: 'failed', reason: r.reason };
+  if (value.kind === 'already' && isOrderDuplicate(value.duplicate)) return { kind: 'already', duplicate: value.duplicate };
+  if (value.kind === 'failed' && typeof value.reason === 'string') return { kind: 'failed', reason: value.reason };
   return null;
+}
+
+/** A saved reading, keeping only well-formed fields. */
+function readScan(value: unknown): SaleScanFields | null {
+  if (!isObject(value)) return null;
+  const scan: SaleScanFields = {};
+  for (const key of SCAN_FIELD_KEYS) {
+    const field = value[key];
+    if (isObject(field) && typeof field.value === 'string' && CONFIDENCES.includes(field.confidence)) {
+      scan[key] = { value: field.value, confidence: field.confidence as 'high' | 'medium' | 'low' };
+    }
+  }
+  return Object.keys(scan).length > 0 ? scan : null;
 }
 
 const PHASES: readonly unknown[] = ['uploading', 'reading', 'read', 'upload_failed', 'read_failed'] satisfies BulkPhase[];
 
-/** One saved row, reduced to what the page can safely show; null when it is not whole. */
-function readRow(value: unknown): BulkRow | null {
-  if (!value || typeof value !== 'object') return null;
-  const r = value as Record<string, unknown>;
-  if (typeof r.id !== 'string' || !ROW_ID_RE.test(r.id) || !PHASES.includes(r.phase)) return null;
-  const saved = (r.formData && typeof r.formData === 'object' ? r.formData : {}) as Record<string, unknown>;
-  const formData = emptySaleFields();
-  for (const name of TEXT_FIELDS) if (typeof saved[name] === 'string') formData[name] = saved[name];
-  if (SALE_TYPES.includes(saved.saleType)) formData.saleType = saved.saleType as SaleType;
-  const flags = (r.flags && typeof r.flags === 'object' ? r.flags : {}) as BulkRow['flags'];
+function readShot(value: unknown, fallbackSeq: number): BulkShot | null {
+  if (!isObject(value) || typeof value.id !== 'string' || !ID_RE.test(value.id) || !PHASES.includes(value.phase)) {
+    return null;
+  }
   return {
-    id: r.id,
-    fileName: typeof r.fileName === 'string' ? r.fileName : '',
-    hash: typeof r.hash === 'string' ? r.hash : null,
-    proofPath: typeof r.proofPath === 'string' && r.proofPath ? r.proofPath : null,
-    phase: r.phase as BulkPhase,
-    formData,
-    products: Array.isArray(r.products) ? r.products.filter(isProduct) : [],
-    provider: typeof r.provider === 'string' ? r.provider : null,
-    saleDateTouched: r.saleDateTouched === true,
-    flags,
-    include: typeof r.include === 'boolean' ? r.include : null,
-    result: readResult(r.result),
-    ...(r.readBusy === true ? { readBusy: true } : {}),
+    id: value.id,
+    seq: isFiniteNumber(value.seq) ? (value.seq as number) : fallbackSeq,
+    fileName: typeof value.fileName === 'string' ? value.fileName : '',
+    hash: typeof value.hash === 'string' ? value.hash : null,
+    proofPath: typeof value.proofPath === 'string' && value.proofPath ? value.proofPath : null,
+    phase: value.phase as BulkPhase,
+    scan: readScan(value.scan),
+    ...(value.readBusy === true ? { readBusy: true } : {}),
+    ...(value.merged === true ? { merged: true } : {}),
+    ...(value.checked === true ? { checked: true } : {}),
   };
 }
 
 /**
- * The saved batch. A row whose screenshot never got uploaded is dropped (the
- * picked file does not survive a close) and counted in `lost`; a row that
- * was being read comes back as `reading`, for the page to read again.
+ * One saved sale, reduced to what the page can safely show; null when it is
+ * not whole. A batch saved before sales could hold several screenshots has one
+ * screenshot per row (its file fields on the row itself): that row comes back
+ * as a sale of one screenshot, kept as it is (its reading is already in it).
+ */
+function readSale(value: unknown, index: number): BulkRow | null {
+  if (!isObject(value) || typeof value.id !== 'string' || !ID_RE.test(value.id)) return null;
+  const legacy = !Array.isArray(value.shots);
+  const shots = legacy
+    ? [readShot({ ...value, seq: index, merged: true }, index)]
+    : (value.shots as unknown[]).map((shot, i) => readShot(shot, index * BULK_MAX_SHOTS + i));
+  if (shots.length === 0 || shots.some((shot) => !shot)) return null;
+  const saved = (isObject(value.formData) ? value.formData : {}) as Record<string, unknown>;
+  const formData = emptySaleFields();
+  for (const name of TEXT_FIELDS) if (typeof saved[name] === 'string') formData[name] = saved[name];
+  if (SALE_TYPES.includes(saved.saleType)) formData.saleType = saved.saleType as SaleType;
+  const flags = (isObject(value.flags) ? value.flags : {}) as BulkRow['flags'];
+  return {
+    id: value.id,
+    shots: (shots as BulkShot[]).slice(0, BULK_MAX_SHOTS),
+    formData,
+    products: Array.isArray(value.products) ? value.products.filter(isProduct) : [],
+    provider: typeof value.provider === 'string' ? value.provider : null,
+    saleDateTouched: value.saleDateTouched === true,
+    flags,
+    include: typeof value.include === 'boolean' ? value.include : null,
+    result: readResult(value.result),
+    ...(legacy || value.fixed === true ? { fixed: true } : {}),
+  };
+}
+
+const notUploaded = (shot: BulkShot) => shot.phase === 'uploading' || shot.phase === 'upload_failed' || !shot.proofPath;
+
+/**
+ * The saved batch. A screenshot that never got uploaded is dropped (the
+ * picked file does not survive a close) and counted in `lost`; a sale left
+ * with none is dropped. A screenshot that was being read comes back as
+ * `reading`, for the page to read again.
  */
 export function readBulkBatch(key: string, now = Date.now()): { rows: BulkRow[]; lost: number } | null {
   try {
@@ -370,23 +478,24 @@ export function readBulkBatch(key: string, now = Date.now()): { rows: BulkRow[];
     }
     const rows: BulkRow[] = [];
     let lost = 0;
-    for (const value of saved.rows) {
-      const row = readRow(value);
-      if (!row) continue;
-      if (row.phase === 'uploading' || row.phase === 'upload_failed' || !row.proofPath) {
-        lost += 1;
-        continue;
-      }
-      rows.push(row);
-    }
+    let shotCount = 0;
+    saved.rows.forEach((value, index) => {
+      const row = readSale(value, index);
+      if (!row) return;
+      const shots = row.shots.filter((shot) => !notUploaded(shot));
+      lost += row.shots.length - shots.length;
+      if (shots.length === 0 || shotCount + shots.length > BULK_MAX_FILES) return;
+      shotCount += shots.length;
+      rows.push({ ...row, shots });
+    });
     if (rows.length === 0 && lost === 0) return null;
-    return { rows: rows.slice(0, BULK_MAX_FILES), lost };
+    return { rows, lost };
   } catch {
     return null;
   }
 }
 
-/** Save the batch (rows and proof paths, never the pictures); null removes it. */
+/** Save the batch (sales, readings and proof paths, never the pictures); null removes it. */
 export function writeBulkBatch(key: string, rows: BulkRow[] | null, now = Date.now()) {
   try {
     if (!rows || rows.length === 0) {

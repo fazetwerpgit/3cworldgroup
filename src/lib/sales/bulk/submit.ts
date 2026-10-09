@@ -8,7 +8,7 @@ import type { CreateSaleData } from '@/types';
 import type { CreateSaleResult } from '@/hooks/useSales';
 import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
 import { buildSalePayload, isSameSaleEntry, type SaleSubmitter } from '@/lib/sales/saleForm';
-import type { BulkResult, BulkRow } from './batch';
+import { rowProofPaths, type BulkResult, type BulkRow } from './batch';
 
 export type CreateSaleFn = (
   data: CreateSaleData,
@@ -85,7 +85,7 @@ export async function submitBulkRows({
         buildSalePayload({
           formData: row.formData,
           products: row.products,
-          proofPaths: row.proofPath ? [row.proofPath] : [],
+          proofPaths: rowProofPaths(row),
           user,
           clientSaleId: row.id,
           allowDuplicate,

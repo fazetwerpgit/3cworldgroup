@@ -22,21 +22,39 @@ import {
   sendableRows,
   summaryText,
   writeBulkBatch,
+  newBulkShot,
+  orderConflict,
+  rowProofPaths,
   type BulkRow,
+  type BulkShot,
 } from './batch';
 
 const PATH = (n: number) => `form-attachments/r1/sale-proof/${String(n).padStart(32, 'a')}_00000${n}/`;
 const id = (n: number) => String(n).padStart(32, '0');
 const gig = addPlanToProducts([], getPlanById('tfiber-1gig')!);
 
-/** A row the server would take. */
-function ready(n: number, over: Partial<BulkRow> = {}): BulkRow {
-  const row = newBulkRow(id(n), `IMG_${n}.png`);
+type Over = Partial<BulkRow> & Partial<Pick<BulkShot, 'hash' | 'phase' | 'proofPath' | 'readBusy' | 'scan'>>;
+const SHOT_KEYS = ['hash', 'phase', 'proofPath', 'readBusy', 'scan'] as const;
+
+/** A sale of one screenshot; screenshot fields in `over` go on the screenshot. */
+function blank(n: number, over: Over = {}): BulkRow {
+  const shotOver: Partial<BulkShot> = {};
+  const rowOver: Partial<BulkRow> = { ...over };
+  for (const key of SHOT_KEYS) {
+    if (key in over) {
+      (shotOver as Record<string, unknown>)[key] = over[key];
+      delete (rowOver as Record<string, unknown>)[key];
+    }
+  }
+  const row = newBulkRow(id(n), { ...newBulkShot(id(100 + n), `IMG_${n}.png`, n), ...shotOver });
+  return { ...row, ...rowOver };
+}
+
+/** A sale the server would take. */
+function ready(n: number, over: Over = {}): BulkRow {
+  const row = blank(n, { phase: 'read', hash: `hash-${n}`, proofPath: PATH(n), ...over });
   return {
     ...row,
-    phase: 'read',
-    hash: `hash-${n}`,
-    proofPath: PATH(n),
     products: gig,
     formData: {
       ...row.formData,
@@ -45,7 +63,7 @@ function ready(n: number, over: Partial<BulkRow> = {}): BulkRow {
       orderNumberOrBtn: `ORD-${1000 + n}`,
       installDate: '2099-01-10',
     },
-    ...over,
+    ...Object.fromEntries(Object.entries(over).filter(([key]) => !(SHOT_KEYS as readonly string[]).includes(key))),
   };
 }
 
@@ -58,27 +76,21 @@ describe('findRepeats', () => {
     expect(repeats.get(id(3))).toEqual({ of: 1, by: 'image' });
   });
 
-  it('matches order numbers however they were typed', () => {
+  it('two different screenshots with the same order number are not a repeat (they are one sale)', () => {
     const second = ready(2);
     second.formData = { ...second.formData, orderNumberOrBtn: ' ord 1001 ' };
-    const repeats = findRepeats([ready(1), second]);
-    expect(repeats.get(id(2))).toEqual({ of: 1, by: 'order' });
+    expect(findRepeats([ready(1), second]).size).toBe(0);
   });
 
-  it('leaves rows with no order number and no hash alone', () => {
-    const a = ready(1, { hash: null });
-    const b = ready(2, { hash: null });
-    a.formData = { ...a.formData, orderNumberOrBtn: '' };
-    b.formData = { ...b.formData, orderNumberOrBtn: '' };
-    expect(findRepeats([a, b]).size).toBe(0);
+  it('leaves screenshots with no fingerprint alone', () => {
+    expect(findRepeats([ready(1, { hash: null }), ready(2, { hash: null })]).size).toBe(0);
   });
 });
 
 describe('rowStatus', () => {
   it('walks a row from upload to ready', () => {
-    const row = newBulkRow(id(1), 'a.png');
-    expect(rowStatus(row, undefined).kind).toBe('uploading');
-    expect(rowStatus({ ...row, phase: 'reading' }, undefined).kind).toBe('reading');
+    expect(rowStatus(blank(1), undefined).kind).toBe('uploading');
+    expect(rowStatus(blank(1, { phase: 'reading' }), undefined).kind).toBe('reading');
     expect(rowStatus(ready(1), undefined)).toEqual({ kind: 'ready' });
   });
 
@@ -101,13 +113,29 @@ describe('rowStatus', () => {
   });
 
   it('a screenshot the reader could not make out says so until the row is complete', () => {
-    const blank = { ...newBulkRow(id(1), 'a.png'), phase: 'read_failed' as const, proofPath: PATH(1) };
-    expect(rowStatus(blank, undefined)).toMatchObject({ kind: 'read_failed', busy: false });
-    expect(rowStatus({ ...ready(1), phase: 'read_failed' }, undefined).kind).toBe('ready');
+    const unread = blank(1, { phase: 'read_failed', proofPath: PATH(1) });
+    expect(rowStatus(unread, undefined)).toMatchObject({ kind: 'read_failed', busy: false });
+    expect(rowStatus(ready(1, { phase: 'read_failed' }), undefined).kind).toBe('ready');
+  });
+
+  it('flags two screenshots of one sale with different order numbers until the rep saves it', () => {
+    const row = ready(1, { scan: { orderNumberOrBtn: { value: 'ORD-1001', confidence: 'high' } } });
+    row.shots = [
+      ...row.shots,
+      { ...newBulkShot(id(201), 'b.png', 2), phase: 'read', proofPath: PATH(2), scan: { orderNumberOrBtn: { value: 'ORD-2002', confidence: 'high' } } },
+    ];
+    expect(orderConflict(row)).toEqual(['ORD-1001', 'ORD-2002']);
+    expect(rowStatus(row, undefined)).toEqual({ kind: 'needs_info', problems: ["Order numbers don't match"] });
+    const saved = { ...row, shots: row.shots.map((shot) => ({ ...shot, checked: true })) };
+    expect(orderConflict(saved)).toEqual([]);
+    expect(rowStatus(saved, undefined)).toEqual({ kind: 'ready' });
+    // The same number however it was read is no conflict.
+    row.shots[1] = { ...row.shots[1], scan: { orderNumberOrBtn: { value: 'ord 1001', confidence: 'medium' } } };
+    expect(orderConflict(row)).toEqual([]);
   });
 
   it('tells a busy reader apart from one that could not read the picture', () => {
-    const busy = { ...newBulkRow(id(1), 'a.png'), phase: 'read_failed' as const, proofPath: PATH(1), readBusy: true };
+    const busy = blank(1, { phase: 'read_failed', proofPath: PATH(1), readBusy: true });
     expect(rowStatus(busy, undefined)).toMatchObject({ kind: 'read_failed', busy: true });
   });
 
@@ -127,7 +155,7 @@ describe('rowStatus', () => {
     expect(rowStatus(ready(1, { result: { kind: 'logged', saleId: 's1' } }), undefined).kind).toBe('logged');
     expect(rowStatus(ready(1, { result: { kind: 'already', duplicate: dup } }), undefined).kind).toBe('already');
     expect(rowStatus(ready(1, { sending: true }), undefined).kind).toBe('sending');
-    expect(rowStatus(ready(2), { of: 1, by: 'order' })).toEqual({ kind: 'repeat', repeat: { of: 1, by: 'order' }, problems: [] });
+    expect(rowStatus(ready(2), { of: 1, by: 'image' })).toEqual({ kind: 'repeat', repeat: { of: 1, by: 'image' }, problems: [] });
     expect(rowStatus(ready(1, { result: { kind: 'failed', reason: 'No signal.' } }), undefined)).toEqual({
       kind: 'failed',
       reason: 'No signal.',
@@ -170,7 +198,7 @@ describe('include and send', () => {
 
 describe('applyScanToRow', () => {
   it('fills an empty row, picks the plan and dates a past install', () => {
-    const row = { ...newBulkRow(id(1), 'a.png'), phase: 'reading' as const, proofPath: PATH(1) };
+    const row = blank(1, { phase: 'reading', proofPath: PATH(1) });
     const { row: next, filled } = applyScanToRow(row, {
       orderNumberOrBtn: { value: 'TMF-1', confidence: 'high' },
       customerAddress: { value: '1 Elm St', confidence: 'medium' },
@@ -229,18 +257,72 @@ describe('saved batch', () => {
   it('keeps a lost edit and a busy reader across a reload', () => {
     writeBulkBatch(KEY, [
       ready(1, { result: { kind: 'logged', saleId: 's1', editLost: true } }),
-      { ...newBulkRow(id(2), 'b.png'), phase: 'read_failed', proofPath: PATH(2), readBusy: true },
+      blank(2, { phase: 'read_failed', proofPath: PATH(2), readBusy: true }),
     ]);
     const saved = readBulkBatch(KEY);
     expect(saved?.rows[0].result).toEqual({ kind: 'logged', saleId: 's1', editLost: true });
-    expect(saved?.rows[1].readBusy).toBe(true);
+    expect(saved?.rows[1].shots[0].readBusy).toBe(true);
   });
 
   it('drops screenshots that never got uploaded and counts them', () => {
-    writeBulkBatch(KEY, [newBulkRow(id(1), 'a.png'), ready(2), { ...newBulkRow(id(3), 'c.png'), phase: 'upload_failed' }]);
+    const pair = ready(4);
+    pair.shots = [...pair.shots, { ...newBulkShot(id(140), 'IMG_4b.png', 40), phase: 'uploading' }];
+    writeBulkBatch(KEY, [blank(1), ready(2), blank(3, { phase: 'upload_failed' }), pair]);
     const saved = readBulkBatch(KEY);
-    expect(saved?.rows.map((row) => row.id)).toEqual([id(2)]);
-    expect(saved?.lost).toBe(2);
+    expect(saved?.rows.map((row) => row.id)).toEqual([id(2), id(4)]);
+    // The sale keeps the screenshot that made it up.
+    expect(saved?.rows[1].shots.map((shot) => shot.id)).toEqual([id(104)]);
+    expect(saved?.lost).toBe(3);
+  });
+
+  it('round-trips sales of several screenshots with their readings', () => {
+    const pair = ready(1, { scan: { orderNumberOrBtn: { value: 'ORD-1001', confidence: 'high' } } });
+    pair.shots = [
+      { ...pair.shots[0], merged: true },
+      { ...newBulkShot(id(201), 'IMG_1b.png', 2), phase: 'read', proofPath: PATH(9), checked: true },
+    ];
+    writeBulkBatch(KEY, [{ ...pair, fixed: true }]);
+    const saved = readBulkBatch(KEY);
+    expect(saved?.rows).toHaveLength(1);
+    expect(saved?.rows[0].fixed).toBe(true);
+    expect(saved?.rows[0].shots.map((shot) => [shot.id, shot.seq, shot.merged ?? false, shot.checked ?? false])).toEqual([
+      [id(101), 1, true, false],
+      [id(201), 2, false, true],
+    ]);
+    expect(saved?.rows[0].shots[0].scan).toEqual({ orderNumberOrBtn: { value: 'ORD-1001', confidence: 'high' } });
+    expect(rowProofPaths(saved!.rows[0])).toEqual([PATH(1), PATH(9)]);
+  });
+
+  it('loads a batch saved before sales could hold several screenshots', () => {
+    // One screenshot per row, its file fields on the row itself.
+    const legacy = (n: number) => ({
+      id: id(n),
+      fileName: `IMG_${n}.png`,
+      hash: `hash-${n}`,
+      proofPath: PATH(n),
+      phase: 'read',
+      formData: { ...ready(n).formData },
+      products: gig,
+      provider: 'tfiber',
+      saleDateTouched: false,
+      flags: {},
+      include: null,
+      result: n === 1 ? { kind: 'logged', saleId: 's1' } : null,
+    });
+    window.localStorage.setItem(
+      KEY,
+      JSON.stringify({ rows: [legacy(1), legacy(2), { ...legacy(3), phase: 'uploading', proofPath: null }], savedAt: Date.now() })
+    );
+    const saved = readBulkBatch(KEY);
+    expect(saved?.lost).toBe(1);
+    expect(saved?.rows.map((row) => row.id)).toEqual([id(1), id(2)]);
+    const second = saved!.rows[1];
+    expect(second.fixed).toBe(true);
+    expect(second.shots).toEqual([
+      { id: id(2), seq: 1, fileName: 'IMG_2.png', hash: 'hash-2', proofPath: PATH(2), phase: 'read', scan: null, merged: true },
+    ]);
+    expect(second.formData.customerName).toBe('Customer 2');
+    expect(saved!.rows[0].result).toEqual({ kind: 'logged', saleId: 's1' });
   });
 
   it('forgets a batch from yesterday and anything damaged', () => {

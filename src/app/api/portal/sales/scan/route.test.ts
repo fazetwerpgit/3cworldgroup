@@ -193,12 +193,12 @@ describe('POST /api/portal/sales/scan', () => {
     expect(generateContent).not.toHaveBeenCalled();
   });
 
-  it('rate-limits each rep to 40 scans per 10 minutes (a full bulk batch fits)', async () => {
+  it('rate-limits each rep to 60 scans per 10 minutes (a full bulk batch fits)', async () => {
     generateContent.mockResolvedValue({ text: JSON.stringify(GOOD) });
-    for (let i = 0; i < 40; i++) expect((await (await POST(req({ paths: [OWN] }))).json()).fields).not.toBeNull();
+    for (let i = 0; i < 60; i++) expect((await (await POST(req({ paths: [OWN] }))).json()).fields).not.toBeNull();
     const body = await (await POST(req({ paths: [OWN] }))).json();
     expect(body).toEqual({ fields: null, reason: 'rate_limited' });
-    expect(generateContent).toHaveBeenCalledTimes(40);
+    expect(generateContent).toHaveBeenCalledTimes(60);
   });
 
   it('never logs what it read', async () => {

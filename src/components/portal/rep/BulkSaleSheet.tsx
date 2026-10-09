@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, ImageIcon, X } from 'lucide-react';
 import { useSaleFormState } from '@/hooks/useSaleFormState';
-import { rowProblems, type BulkRow } from '@/lib/sales/bulk/batch';
+import { orderConflict, rowProblems, rowProofPaths, type BulkRow, type BulkSaleFields } from '@/lib/sales/bulk/batch';
 import type { ScanTarget } from '@/lib/sales/scan/fills';
 import { BodyLayer } from './BodyLayer';
 import { useAttachmentViewer } from './ImageViewer';
@@ -12,24 +12,31 @@ import { DEFAULT_PROVIDER, SaleFields } from './SaleFields';
 import s from './rep.module.css';
 import b from './rep-bulklog.module.css';
 
-// One row of the bulk batch, opened for checking. The same fields and rules as
+// One sale of the bulk batch, opened for checking. The same fields and rules as
 // the single Log Sale form (SaleFields + useSaleFormState, without the saved
-// single-sale draft); Save puts the values back on the row.
+// single-sale draft); Save puts the values back on the sale. Its screenshots
+// are listed on top: each can be viewed, made its own sale, or removed (those
+// act right away, not on Save).
 
-export type BulkSaleChange = Pick<BulkRow, 'formData' | 'products' | 'provider' | 'saleDateTouched' | 'flags'>;
+export type BulkSaleChange = BulkSaleFields;
 
 export function BulkSaleSheet({
   row,
   label,
-  preview,
+  previews,
+  onSplit,
+  onRemoveShot,
   onSave,
   onClose,
 }: {
   row: BulkRow;
   /** "Sale 3". */
   label: string;
-  /** The picked file's local URL, while it is still in memory. */
-  preview: string | null;
+  /** Card thumbnails by screenshot. */
+  previews: Record<string, string>;
+  /** "Make its own sale". */
+  onSplit: (shotId: string) => void;
+  onRemoveShot: (shotId: string) => void;
   onSave: (change: BulkSaleChange) => void;
   onClose: () => void;
 }) {
@@ -40,7 +47,7 @@ export function BulkSaleSheet({
     initial: {
       formData: row.formData,
       products: row.products,
-      proofPaths: row.proofPath ? [row.proofPath] : [],
+      proofPaths: rowProofPaths(row),
       saleDateTouched: row.saleDateTouched,
     },
   });
@@ -49,7 +56,10 @@ export function BulkSaleSheet({
   const [moreOpen, setMoreOpen] = useState(false);
   const provider = form.provider ?? providerChoice ?? DEFAULT_PROVIDER;
   const viewer = useAttachmentViewer();
-  const problems = rowProblems({ formData: form.formData, products: form.products, proofPath: row.proofPath });
+  const problems = rowProblems({ formData: form.formData, products: form.products, shots: row.shots });
+  // Saving is the rep's answer to "which order number": the note goes then.
+  const conflict = orderConflict(row);
+  const many = row.shots.length > 1;
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
   // The list behind keeps re-rendering while other screenshots are read: the
@@ -96,12 +106,11 @@ export function BulkSaleSheet({
     });
   };
 
-  const viewScreenshot = (button: HTMLElement) => {
-    if (preview) viewer.show(preview, `${label} screenshot`, button);
-    else if (row.proofPath) {
-      const path = row.proofPath;
-      viewer.open(() => signedProofUrl(path), `${label} screenshot`, button);
-    }
+  // The full screenshot once uploaded; the card thumbnail only until then.
+  const viewScreenshot = (shot: BulkRow['shots'][number], name: string, button: HTMLElement) => {
+    const path = shot.proofPath;
+    if (path) viewer.open(() => signedProofUrl(path), name, button);
+    else if (previews[shot.id]) viewer.show(previews[shot.id], name, button);
   };
 
   return (
@@ -124,15 +133,52 @@ export function BulkSaleSheet({
           </div>
           <form ref={formRef} className={b.editForm} onSubmit={save} noValidate>
             <div className={`${s.sheetBody} ${b.editBody}`}>
-              {row.proofPath || preview ? (
-                <button
-                  type="button"
-                  className={b.viewShot}
-                  onClick={(event) => viewScreenshot(event.currentTarget)}
-                >
-                  <ImageIcon size={18} aria-hidden="true" />
-                  View screenshot
-                </button>
+              <ul className={b.shots} aria-label="Screenshots">
+                {row.shots.map((shot, i) => {
+                  const name = many ? `Screenshot ${i + 1}` : 'Screenshot';
+                  return (
+                    <li key={shot.id} className={b.shot}>
+                      <button
+                        type="button"
+                        className={b.viewShot}
+                        onClick={(event) => viewScreenshot(shot, `${label} ${name.toLowerCase()}`, event.currentTarget)}
+                        disabled={!shot.proofPath && !previews[shot.id]}
+                      >
+                        <span className={b.shotThumb}>
+                          {previews[shot.id] ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- local blob: URL
+                            <img src={previews[shot.id]} alt="" />
+                          ) : (
+                            <ImageIcon size={16} aria-hidden="true" />
+                          )}
+                        </span>
+                        View {name.toLowerCase()}
+                      </button>
+                      {many ? (
+                        <span className={b.shotActions}>
+                          <button type="button" className={b.shotAction} onClick={() => onSplit(shot.id)}>
+                            Make its own sale
+                          </button>
+                          <button
+                            type="button"
+                            className={b.shotAction}
+                            onClick={() => onRemoveShot(shot.id)}
+                            aria-label={`Remove ${name.toLowerCase()}`}
+                          >
+                            Remove
+                          </button>
+                        </span>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              {conflict.length > 0 ? (
+                <p className={b.editNeeds} role="note">
+                  <AlertTriangle size={16} strokeWidth={2.25} aria-hidden="true" />
+                  These screenshots show different order numbers ({conflict.map((n) => `#${n}`).join(', ')}). Keep the
+                  right one below and save, or make a screenshot its own sale.
+                </p>
               ) : null}
               <p className={problems.length > 0 ? b.editNeeds : b.editReady} role="status">
                 {problems.length > 0 ? (
@@ -151,7 +197,7 @@ export function BulkSaleSheet({
                 form={form}
                 provider={provider}
                 onProvider={chooseProvider}
-                orderRequired={!row.proofPath}
+                orderRequired={rowProofPaths(row).length === 0}
                 scan={{ pending: () => false, edited: clearFlag, seen: clearFlag, flags }}
                 moreOpen={moreOpen}
                 onMoreOpen={setMoreOpen}

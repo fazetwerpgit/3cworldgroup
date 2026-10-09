@@ -1,0 +1,258 @@
+// Putting screenshots together into sales: shared order number, address or
+// name; a screenshot with none of those joins the one picked before it; four
+// at most; the same picture twice stays out; and sale ids only ever change for
+// sales that were never sent.
+import { describe, expect, it } from 'vitest';
+import type { SaleScanFields } from '@/lib/sales/scan/types';
+import { findRepeats, newBulkRow, newBulkShot, orderConflict, rowProofPaths, type BulkRow, type BulkShot } from './batch';
+import { addressKey, canCombine, combineWithAbove, nameKey, regroup, removeShot, sameAddress, splitShot } from './group';
+
+const saleId = (n: number) => `${n}`.padStart(32, 'a');
+const shotId = (n: number) => `${n}`.padStart(32, 'b');
+
+const v = (value: string) => ({ value, confidence: 'high' as const });
+/** What the reader got from one screenshot. */
+const read = (fields: { order?: string; name?: string; address?: string; install?: string; plan?: boolean }): SaleScanFields => ({
+  ...(fields.order ? { orderNumberOrBtn: v(fields.order) } : {}),
+  ...(fields.name ? { customerName: v(fields.name) } : {}),
+  ...(fields.address ? { customerAddress: v(fields.address) } : {}),
+  ...(fields.install ? { installDate: v(fields.install) } : {}),
+  ...(fields.plan ? { provider: v('tfiber'), plan: v('tfiber-1gig') } : {}),
+});
+
+function shot(n: number, scan: SaleScanFields | null, over: Partial<BulkShot> = {}): BulkShot {
+  return {
+    ...newBulkShot(shotId(n), `IMG_${n}.png`, n),
+    hash: `hash-${n}`,
+    proofPath: `form-attachments/r1/sale-proof/${shotId(n)}_00000${n % 10}/`,
+    phase: scan ? 'read' : 'read_failed',
+    scan,
+    ...over,
+  };
+}
+
+/** Each screenshot as picked: its own sale, ids 1, 2, 3… */
+const picked = (...shots: BulkShot[]): BulkRow[] => shots.map((s) => newBulkRow(saleId(s.seq), s));
+
+function ids() {
+  let n = 900;
+  return () => saleId((n += 1));
+}
+
+const shotIds = (rows: BulkRow[]) => rows.map((row) => row.shots.map((s) => s.seq));
+
+describe('regroup', () => {
+  it('puts a pair together when only the first shows the order number', () => {
+    const rows = regroup(
+      picked(
+        shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' })),
+        shot(2, read({ address: '', install: '2099-10-06', plan: true }))
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2]]);
+    expect(rows[0].id).toBe(saleId(1));
+    expect(rows[0].formData).toMatchObject({ orderNumberOrBtn: 'TMF-1', customerName: 'Ana Ruiz', installDate: '2099-10-06' });
+    expect(rows[0].products.map((p) => p.productId)).toEqual(['tfiber-1gig']);
+    expect(rowProofPaths(rows[0])).toHaveLength(2);
+  });
+
+  it('takes the order number from whichever screenshot has it', () => {
+    const rows = regroup(
+      picked(shot(1, read({ name: 'Ana Ruiz', install: '2099-10-06' })), shot(2, read({ name: 'ana  RUIZ', order: 'TMF-1' }))),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2]]);
+    expect(rows[0].formData.orderNumberOrBtn).toBe('TMF-1');
+    expect(rows[0].formData.customerName).toBe('Ana Ruiz');
+  });
+
+  it('two pairs make two sales', () => {
+    const rows = regroup(
+      picked(
+        shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' })),
+        shot(2, read({ plan: true })),
+        shot(3, read({ order: 'TMF-2', address: '9 Oak Ln, Austin, TX' })),
+        shot(4, read({ address: '9 OAK LN.', install: '2099-11-01' }))
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
+    expect(rows.map((row) => row.id)).toEqual([saleId(1), saleId(3)]);
+    expect(rows[1].formData).toMatchObject({ orderNumberOrBtn: 'TMF-2', installDate: '2099-11-01' });
+  });
+
+  it('three in a row of one order are one sale', () => {
+    const rows = regroup(
+      picked(shot(1, read({ order: 'TMF-1' })), shot(2, read({ order: 'tmf 1' })), shot(3, read({ install: '2099-10-06' }))),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2, 3]]);
+  });
+
+  it('screenshots far apart still go together by order number', () => {
+    const rows = regroup(
+      picked(shot(1, read({ order: 'TMF-1' })), shot(2, read({ order: 'TMF-2' })), shot(3, read({ order: 'TMF-1', plan: true }))),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 3], [2]]);
+  });
+
+  it('different order numbers with nothing else shared are two sales, not a repeat', () => {
+    const rows = regroup(picked(shot(1, read({ order: 'TMF-1' })), shot(2, read({ order: 'TMF-2' }))), ids());
+    expect(shotIds(rows)).toEqual([[1], [2]]);
+    expect(findRepeats(rows).size).toBe(0);
+    expect(rows.map(orderConflict)).toEqual([[], []]);
+  });
+
+  it('flags the same customer with two order numbers instead of picking one', () => {
+    const rows = regroup(
+      picked(shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' })), shot(2, read({ order: 'TMF-9', name: 'Ana Ruiz' }))),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2]]);
+    expect(orderConflict(rows[0])).toEqual(['TMF-1', 'TMF-9']);
+  });
+
+  it('keeps the same picture picked twice out of the sale, flagged as a repeat', () => {
+    const rows = regroup(
+      picked(shot(1, read({ order: 'TMF-1' })), shot(2, read({ order: 'TMF-1' }), { hash: 'hash-1' }), shot(3, read({ plan: true }))),
+      ids()
+    );
+    // The copy stays alone; the next screenshot still joins the first.
+    expect(shotIds(rows)).toEqual([[1, 3], [2]]);
+    expect(findRepeats(rows).get(rows[1].id)).toEqual({ of: 1, by: 'image' });
+  });
+
+  it('puts four in a sale at most', () => {
+    const rows = regroup(picked(...[1, 2, 3, 4, 5].map((n) => shot(n, read({ order: 'TMF-1' })))), ids());
+    expect(shotIds(rows)).toEqual([[1, 2, 3, 4], [5]]);
+  });
+
+  it('a screenshot with nothing to go on joins the one before it, and the first one stays alone', () => {
+    const rows = regroup(picked(shot(1, null), shot(2, read({ order: 'TMF-1' })), shot(3, null)), ids());
+    expect(shotIds(rows)).toEqual([[1], [2, 3]]);
+  });
+
+  it('leaves screenshots still uploading or being read on their own until read', () => {
+    const rows = regroup(
+      picked(shot(1, read({ order: 'TMF-1' })), shot(2, null, { phase: 'reading' }), shot(3, null, { phase: 'uploading' })),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1], [2], [3]]);
+    expect(rows.map((row) => row.id)).toEqual([saleId(1), saleId(2), saleId(3)]);
+  });
+
+  it('gives a sale that splits off a fresh id and changes nothing when run again', () => {
+    const newId = ids();
+    const together = regroup(picked(shot(1, read({ order: 'TMF-1' })), shot(2, null)), newId);
+    expect(together.map((row) => row.id)).toEqual([saleId(1)]);
+    // Read again, the second turns out to be another order.
+    const reread = together.map((row) => ({
+      ...row,
+      shots: row.shots.map((s) => (s.seq === 2 ? { ...s, phase: 'read' as const, scan: read({ order: 'TMF-2' }) } : s)),
+    }));
+    const apart = regroup(reread, newId);
+    expect(shotIds(apart)).toEqual([[1], [2]]);
+    expect(apart.map((row) => row.id)).toEqual([saleId(1), saleId(901)]);
+    expect(regroup(apart, newId)).toEqual(apart);
+  });
+
+  it('never moves a sent sale or changes its id; a new match makes its own sale', () => {
+    const first = regroup(picked(shot(1, read({ order: 'TMF-1' }))), ids());
+    const logged = [{ ...first[0], result: { kind: 'logged' as const, saleId: 's1' } }];
+    const rows = regroup([...logged, ...picked(shot(2, read({ order: 'TMF-1', plan: true })))], ids());
+    expect(shotIds(rows)).toEqual([[1], [2]]);
+    expect(rows[0]).toEqual(logged[0]);
+  });
+
+  it('a sale the rep edited takes a new screenshot into its empty fields only', () => {
+    const [sale] = regroup(picked(shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' }))), ids());
+    const edited: BulkRow = {
+      ...sale,
+      formData: { ...sale.formData, customerName: 'Ana M. Ruiz' },
+      shots: sale.shots.map((s) => ({ ...s, merged: true, checked: true })),
+      fixed: true,
+    };
+    const rows = regroup(
+      [edited, ...picked(shot(2, read({ order: 'TMF-1', name: 'Someone Else', install: '2099-10-06' })))],
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2]]);
+    expect(rows[0].id).toBe(sale.id);
+    expect(rows[0].formData).toMatchObject({ customerName: 'Ana M. Ruiz', installDate: '2099-10-06' });
+    expect(regroup(rows, ids())).toEqual(rows);
+  });
+});
+
+describe('combine and split', () => {
+  const base = () =>
+    regroup(
+      picked(shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' })), shot(2, read({ order: 'TMF-2', install: '2099-10-06' }))),
+      ids()
+    );
+
+  it('"Combine with sale above" keeps the upper sale id and flags two order numbers', () => {
+    const rows = base();
+    expect(canCombine(rows[0], rows[1])).toBe(true);
+    const combined = combineWithAbove(rows, rows[1].id);
+    expect(shotIds(combined)).toEqual([[1, 2]]);
+    expect(combined[0].id).toBe(saleId(1));
+    expect(combined[0].fixed).toBe(true);
+    expect(combined[0].formData).toMatchObject({ orderNumberOrBtn: 'TMF-1', customerName: 'Ana Ruiz', installDate: '2099-10-06' });
+    expect(orderConflict(combined[0])).toEqual(['TMF-1', 'TMF-2']);
+    // Grouping leaves the rep's combination alone.
+    expect(regroup(combined, ids())).toEqual(combined);
+  });
+
+  it('will not combine a sent sale, a sale still reading, or more than four', () => {
+    const rows = base();
+    expect(canCombine(undefined, rows[0])).toBe(false);
+    expect(canCombine({ ...rows[0], result: { kind: 'logged', saleId: 's' } }, rows[1])).toBe(false);
+    expect(canCombine(rows[0], { ...rows[1], sending: true })).toBe(false);
+    expect(canCombine(rows[0], { ...rows[1], shots: [{ ...rows[1].shots[0], phase: 'reading' }] })).toBe(false);
+    const three = { ...rows[0], shots: [shot(1, null), shot(3, null), shot(4, null)] };
+    expect(canCombine(three, rows[1])).toBe(true);
+    expect(canCombine({ ...three, shots: [...three.shots, shot(5, null)] }, rows[1])).toBe(false);
+    expect(combineWithAbove([{ ...rows[0], result: { kind: 'failed', reason: 'x' } }, rows[1]], rows[1].id)).toHaveLength(2);
+  });
+
+  it('"Make its own sale" gives the screenshot a new sale with a fresh id and keeps the old id', () => {
+    const together = regroup(picked(shot(1, read({ order: 'TMF-1' })), shot(2, read({ install: '2099-10-06' }))), ids());
+    const apart = splitShot(together, shotId(2), () => saleId(777));
+    expect(shotIds(apart)).toEqual([[1], [2]]);
+    expect(apart.map((row) => row.id)).toEqual([saleId(1), saleId(777)]);
+    expect(apart[0].formData.installDate).toBe('');
+    expect(apart[1].formData.installDate).toBe('2099-10-06');
+    expect(apart.every((row) => row.fixed)).toBe(true);
+    // It stays apart.
+    expect(regroup(apart, ids())).toEqual(apart);
+    // A sent sale is never split.
+    const sent = [{ ...together[0], result: { kind: 'logged' as const, saleId: 's' } }];
+    expect(splitShot(sent, shotId(2), () => saleId(778))).toBe(sent);
+  });
+
+  it('removing a screenshot keeps the sale and its id; the last one takes the sale with it', () => {
+    const together = regroup(picked(shot(1, read({ order: 'TMF-1' })), shot(2, read({ install: '2099-10-06' }))), ids());
+    const one = removeShot(together, shotId(2));
+    expect(shotIds(one)).toEqual([[1]]);
+    expect(one[0].id).toBe(saleId(1));
+    expect(one[0].formData.installDate).toBe('');
+    expect(removeShot(one, shotId(1))).toEqual([]);
+  });
+});
+
+describe('keys', () => {
+  it('compares addresses however far they are written out, and full names only', () => {
+    expect(addressKey('123 Main St., Apt 4, Austin TX')).toBe('123 main st apt 4 austin tx');
+    expect(addressKey('Austin')).toBe('');
+    expect(sameAddress(addressKey('123 Main St'), addressKey('123 MAIN ST, Austin, TX 78701'))).toBe(true);
+    expect(sameAddress(addressKey('123 Main St Apt 4'), addressKey('123 Main St Apt 5'))).toBe(false);
+    expect(sameAddress(addressKey('12 Main St'), addressKey('123 Main St'))).toBe(false);
+    expect(nameKey('ANA  Ruiz')).toBe('ana ruiz');
+    expect(nameKey('Ana')).toBe('');
+  });
+});

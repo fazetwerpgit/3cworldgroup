@@ -25,6 +25,7 @@ import {
   type BulkRow,
   type BulkStatus,
 } from '@/lib/sales/bulk/batch';
+import { canCombine } from '@/lib/sales/bulk/group';
 import { isExtraPlanId } from '@/lib/sales/planSelection';
 import { BodyLayer } from './BodyLayer';
 import { BulkSaleSheet } from './BulkSaleSheet';
@@ -36,10 +37,12 @@ import l from './rep-logsale.module.css';
 import b from './rep-bulklog.module.css';
 
 // Log several sales from screenshots. The rep picks up to BULK_MAX_FILES order
-// screenshots; each one is uploaded as its sale's proof and read, three at a
-// time. The list shows every sale with what it still needs, flags repeats in
-// the batch, and "Log N sales" sends the ready ones one at a time. The single
-// Log Sale form stays the default way in.
+// screenshots; each one is uploaded and read, three at a time, and screenshots
+// of the same order are put together into one sale (lib/sales/bulk/group). The
+// list shows every sale with its screenshots and what it still needs, and the
+// rep can combine a sale with the one above or split a screenshot off. "Log N
+// sales" sends the ready ones one at a time. The single Log Sale form stays the
+// default way in.
 
 const IMAGE_ACCEPT = 'image/*';
 
@@ -163,12 +166,15 @@ function StatusLine({
 
 function BulkCard({
   row,
+  above,
   index,
   repeat,
   bulk,
   onOpen,
 }: {
   row: BulkRow;
+  /** The sale listed right above, for "Combine with sale above". */
+  above: BulkRow | undefined;
   index: number;
   repeat: BulkRepeat | undefined;
   bulk: BulkLog;
@@ -183,8 +189,8 @@ function BulkCard({
   // the rep's to change here ("Log anyway" sends that one on its own).
   const fixedPick = locked || status.kind === 'already';
   const checked = status.kind === 'logged' || (status.kind !== 'already' && included);
-  const preview = bulk.previews[row.id];
   const { formData } = row;
+  const shotCount = row.shots.length;
   const plan = planName(row);
   const meta = [
     plan,
@@ -214,13 +220,17 @@ function BulkCard({
         disabled={locked || working || status.kind === 'upload_failed' || bulk.sending}
         aria-label={`Check ${label.toLowerCase()}`}
       >
-        <span className={b.thumb}>
-          {preview ? (
-            // eslint-disable-next-line @next/next/no-img-element -- local blob: URL
-            <img src={preview} alt="" />
-          ) : (
-            <ImageIcon size={20} aria-hidden="true" />
-          )}
+        <span className={b.thumbs} data-count={shotCount}>
+          {row.shots.map((shot) => (
+            <span key={shot.id} className={b.thumb}>
+              {bulk.previews[shot.id] ? (
+                // eslint-disable-next-line @next/next/no-img-element -- local blob: URL
+                <img src={bulk.previews[shot.id]} alt="" />
+              ) : (
+                <ImageIcon size={shotCount > 1 ? 14 : 20} aria-hidden="true" />
+              )}
+            </span>
+          ))}
         </span>
         <span className={b.cardText}>
           <span className={b.cardTitle}>
@@ -229,6 +239,7 @@ function BulkCard({
           </span>
           <span className={b.cardLine}>{formData.customerAddress || (working ? ' ' : 'No address')}</span>
           {meta.length > 0 ? <span className={b.cardMeta}>{meta.join(' · ')}</span> : null}
+          {shotCount > 1 ? <span className={b.cardShots}>{shotCount} screenshots</span> : null}
         </span>
       </button>
       {locked ? null : (
@@ -243,9 +254,14 @@ function BulkCard({
         </button>
       )}
       <div className={b.cardStatus} role="status">
+        {canCombine(above, row) && !bulk.sending ? (
+          <button type="button" className={b.combine} onClick={() => bulk.combine(row.id)}>
+            Combine with sale above
+          </button>
+        ) : null}
         <StatusLine
           status={status}
-          uploadError={bulk.uploadErrors[row.id]}
+          uploadError={row.shots.map((shot) => bulk.uploadErrors[shot.id]).find(Boolean)}
           onRetryUpload={() => bulk.retryUpload(row.id)}
           onReadAgain={() => bulk.readAgain(row.id)}
           onLogAnyway={() => bulk.logAnyway(row.id)}
@@ -300,11 +316,10 @@ export function RepBulkLog() {
     setConfirmClear(false);
   };
 
-  const working = bulk.rows.filter((row) => row.phase === 'uploading' || row.phase === 'reading').length;
   const buttonLabel = bulk.sending
     ? 'Logging…'
     : bulk.busy
-      ? `Reading ${working} of ${bulk.rows.length}…`
+      ? `Reading ${bulk.working} of ${bulk.shots}…`
       : bulk.toSend === 0
         ? 'Nothing ready to log'
         : `Log ${bulk.toSend} ${bulk.toSend === 1 ? 'sale' : 'sales'}`;
@@ -333,7 +348,8 @@ export function RepBulkLog() {
       <header className={b.head}>
         <h1 className={l.title}>Log several sales</h1>
         <p className={l.lede}>
-          Pick the order screenshots, one per sale. We&apos;ll fill in each one. You check them, then log them all.
+          Pick the order screenshots. We&apos;ll put each sale&apos;s screenshots together and fill it in. You check
+          them, then log them all.
         </p>
       </header>
 
@@ -405,6 +421,7 @@ export function RepBulkLog() {
               <BulkCard
                 key={row.id}
                 row={row}
+                above={bulk.rows[index - 1]}
                 index={index}
                 repeat={bulk.repeats.get(row.id)}
                 bulk={bulk}
@@ -416,7 +433,7 @@ export function RepBulkLog() {
             <div className={b.more}>
               <Picker label="Add more screenshots" onPick={bulk.addFiles} />
               <p className={b.moreNote}>
-                {bulk.rows.length} of {BULK_MAX_FILES}
+                {bulk.shots} of {BULK_MAX_FILES} screenshots
               </p>
             </div>
           ) : null}
@@ -428,7 +445,9 @@ export function RepBulkLog() {
           <div className={l.entryBody}>
             <Picker label="Choose screenshots" onPick={bulk.addFiles} primary />
           </div>
-          <p className={l.entryWorks}>Up to {BULK_MAX_FILES} at a time. Each screenshot is one sale.</p>
+          <p className={l.entryWorks}>
+            Up to {BULK_MAX_FILES} at a time. Screenshots of the same order go together as one sale.
+          </p>
         </section>
       )}
 
@@ -437,8 +456,9 @@ export function RepBulkLog() {
           key={editingRow.id}
           row={editingRow}
           label={`Sale ${editingIndex + 1}`}
-          // The card thumbnail is small; once uploaded, the sheet opens the full screenshot.
-          preview={editingRow.proofPath ? null : (bulk.previews[editingRow.id] ?? null)}
+          previews={bulk.previews}
+          onSplit={bulk.splitShot}
+          onRemoveShot={bulk.removeShot}
           onSave={(change) => {
             bulk.save(editingRow.id, change);
             setEditing(null);

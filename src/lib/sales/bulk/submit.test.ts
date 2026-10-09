@@ -7,7 +7,7 @@ import { getPlanById, type CreateSaleData } from '@/types';
 import { addPlanToProducts } from '@/lib/sales/planSelection';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
 import type { CreateSaleResult } from '@/hooks/useSales';
-import { newBulkRow, type BulkResult, type BulkRow } from './batch';
+import { newBulkRow, newBulkShot, type BulkResult, type BulkRow } from './batch';
 import { replayMatchesRow, submitBulkRows, toBulkResult, type CreateSaleFn } from './submit';
 
 const id = (n: number) => String(n).padStart(32, 'b');
@@ -21,11 +21,14 @@ const DUP: OrderDuplicate = {
 };
 
 function row(n: number): BulkRow {
-  const base = newBulkRow(id(n), `IMG_${n}.png`);
+  const shot = {
+    ...newBulkShot(String(n).padStart(32, 'c'), `IMG_${n}.png`, n),
+    phase: 'read' as const,
+    proofPath: `form-attachments/r1/sale-proof/${id(n)}_00000${n}/`,
+  };
+  const base = newBulkRow(id(n), shot);
   return {
     ...base,
-    phase: 'read',
-    proofPath: `form-attachments/r1/sale-proof/${id(n)}_00000${n}/`,
     products: addPlanToProducts([], getPlanById('tfiber-1gig')!),
     formData: { ...base.formData, customerAddress: `${n} Main St`, orderNumberOrBtn: `ORD${n}`, installDate: '2099-01-10' },
   };
@@ -73,8 +76,8 @@ describe('submitBulkRows', () => {
       customerAddress: '1 Main St',
       orderNumberOrBtn: 'ORD1',
       productSold: 'TFiber 1 Gig (1 Gbps)',
-      proofScreenshotPaths: [row(1).proofPath],
-      proofScreenshotPath: row(1).proofPath,
+      proofScreenshotPaths: [row(1).shots[0].proofPath],
+      proofScreenshotPath: row(1).shots[0].proofPath,
     });
     expect(sent[0].allowDuplicate).toBeUndefined();
     expect(results.get(id(2))).toEqual({ kind: 'logged', saleId: `s-${id(2)}` });
@@ -140,6 +143,20 @@ describe('submitBulkRows', () => {
     // Unchanged (case and spacing aside), it is simply logged.
     const same: BulkRow = { ...row(1), formData: { ...row(1).formData, customerAddress: ' 1  main st ' } };
     expect((await run([same], create)).results.get(id(1))).toEqual({ kind: 'logged', saleId: 's1' });
+  });
+
+  it('sends every screenshot of a sale as its proof, under the sale id', async () => {
+    const pair = row(1);
+    const second = { ...newBulkShot('d'.repeat(32), 'IMG_1b.png', 9), phase: 'read' as const, proofPath: 'form-attachments/r1/sale-proof/dddd_000009/' };
+    pair.shots = [...pair.shots, second];
+    const sent: CreateSaleData[] = [];
+    await run([pair], async (data) => {
+      sent.push(data);
+      return sale('s1');
+    });
+    expect(sent[0].clientSaleId).toBe(id(1));
+    expect(sent[0].proofScreenshotPaths).toEqual([pair.shots[0].proofPath, second.proofPath]);
+    expect(sent[0].proofScreenshotPath).toBe(pair.shots[0].proofPath);
   });
 
   it('stops before the next sale once the page has gone', async () => {

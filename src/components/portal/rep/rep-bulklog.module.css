@@ -185,6 +185,43 @@
   object-position: top;
 }
 
+/* A sale's screenshots: one fills the slot; two to four sit as a small stack,
+   the first on top. */
+.thumbs {
+  display: grid;
+  width: 44px;
+  height: 56px;
+}
+
+.thumbs > .thumb {
+  grid-area: 1 / 1;
+}
+
+.thumbs:not([data-count='1']) > .thumb {
+  width: 32px;
+  height: 44px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.thumbs > .thumb:nth-child(1) {
+  z-index: 4;
+}
+
+.thumbs > .thumb:nth-child(2) {
+  z-index: 3;
+  transform: translate(4px, 4px);
+}
+
+.thumbs > .thumb:nth-child(3) {
+  z-index: 2;
+  transform: translate(8px, 8px);
+}
+
+.thumbs > .thumb:nth-child(4) {
+  z-index: 1;
+  transform: translate(12px, 12px);
+}
+
 .cardText {
   display: flex;
   flex-direction: column;
@@ -223,6 +260,35 @@
   color: var(--c-text-3);
   font-size: var(--t-min);
   line-height: 1.35;
+}
+
+.cardShots {
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* "Combine with sale above": a quiet text button over the status line. */
+.combine {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-bottom: var(--s1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.combine:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
 }
 
 .remove {
@@ -387,6 +453,65 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+
+/* The sheet's screenshot list: view, make its own sale, remove. */
+.shots {
+  display: grid;
+  gap: var(--s1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0 var(--s3);
+}
+
+.shotThumb {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--c-line);
+  border-radius: 4px;
+  background: var(--c-well);
+  color: var(--c-text-3);
+}
+
+.shotThumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.shotActions {
+  display: flex;
+  gap: var(--s3);
+}
+
+.shotAction {
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.shotAction:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
 }
 
 .editNeeds,
