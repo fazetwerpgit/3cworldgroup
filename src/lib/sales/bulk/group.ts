@@ -3,8 +3,14 @@
 //
 // - Each screenshot is read on its own. Screenshots that share an order number,
 //   an address or a customer name are one sale (order number first).
-// - A screenshot the reader got none of those from (a second screen with only
-//   the plan or the install date) joins the sale of the screenshot picked right
+// - A screenshot that shares none of those with any sale joins the sale of the
+//   screenshot picked right before it, unless the two disagree: a different
+//   order number, a different address or a different customer name. T-Fiber
+//   shows the order number and the customer on separate screens, so the two
+//   screenshots of one order often have no value in common, only no clash (a
+//   sale nothing was read from yet has nothing to agree with, so it is not
+//   joined this way). A screenshot the reader got none of those from (only the
+//   plan or the install date) never disagrees, so it always joins the one
 //   before it.
 // - A sale holds at most BULK_MAX_SHOTS; one more starts a new sale.
 // - The same picture picked twice (same bytes) is never put into a sale: it
@@ -166,6 +172,16 @@ export function regroup(rows: BulkRow[], newId: () => string): BulkRow[] {
     return undefined;
   };
 
+  const hasKeys = (group: Group) => KEY_KINDS.some((kind) => group.keys[kind].size > 0);
+  /** The sale already holds a different value of a kind this screenshot has (another order, address or name). */
+  const disagrees = (group: Group, keys: Keys) =>
+    KEY_KINDS.some((kind) => {
+      const key = keys[kind];
+      const known = group.keys[kind];
+      if (!key || known.size === 0) return false;
+      return kind === 'address' ? ![...known].some((other) => sameAddress(key, other)) : !known.has(key);
+    });
+
   const absorbed = new Set<string>();
   let previous: BulkShot | null = null;
   for (const shot of all) {
@@ -174,10 +190,12 @@ export function regroup(rows: BulkRow[], newId: () => string): BulkRow[] {
       const keys = scanKeys(shot.scan);
       let target: Group | undefined;
       if (settled(shot) && !copy) {
-        if (Object.keys(keys).length > 0) target = findMatch(keys);
-        else if (previous) {
+        const keyless = Object.keys(keys).length === 0;
+        if (!keyless) target = findMatch(keys);
+        if (!target && previous) {
           const before = groupOf.get(previous.id);
-          if (before && hasRoom(before)) target = before;
+          // A screenshot with keys only joins a sale that has some of its own to agree with.
+          if (before && hasRoom(before) && (keyless || (hasKeys(before) && !disagrees(before, keys)))) target = before;
         }
       }
       if (target) {

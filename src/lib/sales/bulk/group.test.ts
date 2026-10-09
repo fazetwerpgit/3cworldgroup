@@ -188,6 +188,124 @@ describe('regroup', () => {
   });
 });
 
+// T-Fiber puts the order number (with the plan) on one screen and the customer
+// (name, address, install date) on another: the two screenshots of one order
+// often share no value at all.
+describe('regroup: order screen and customer screen', () => {
+  const orderScreen = (n: number, order: string) => shot(n, read({ order, plan: true }));
+  const customerScreen = (n: number, name: string, address: string) =>
+    shot(n, read({ name, address, install: '2099-10-06' }));
+
+  it('an order-number-only screenshot and the customer screenshot after it are one sale', () => {
+    const rows = regroup(picked(orderScreen(1, 'TMF-1'), customerScreen(2, 'Ana Ruiz', '9 Oak Ln, Austin, TX')), ids());
+    expect(shotIds(rows)).toEqual([[1, 2]]);
+    expect(rows[0].id).toBe(saleId(1));
+    expect(rows[0].formData).toMatchObject({ orderNumberOrBtn: 'TMF-1', customerName: 'Ana Ruiz', installDate: '2099-10-06' });
+    expect(rowProofPaths(rows[0])).toHaveLength(2);
+  });
+
+  it('the customer screenshot and the order-number-only screenshot after it are one sale', () => {
+    const rows = regroup(picked(customerScreen(1, 'Ana Ruiz', '9 Oak Ln, Austin, TX'), orderScreen(2, 'TMF-1')), ids());
+    expect(shotIds(rows)).toEqual([[1, 2]]);
+    expect(rows[0].formData).toMatchObject({ orderNumberOrBtn: 'TMF-1', customerName: 'Ana Ruiz' });
+  });
+
+  it('two sales in a row make two sales, order screen first', () => {
+    const rows = regroup(
+      picked(
+        orderScreen(1, 'TMF-1'),
+        customerScreen(2, 'Ana Ruiz', '9 Oak Ln, Austin, TX'),
+        orderScreen(3, 'TMF-2'),
+        customerScreen(4, 'Bo Diaz', '12 Elm St, Austin, TX')
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
+    expect(rows.map((row) => row.formData.orderNumberOrBtn)).toEqual(['TMF-1', 'TMF-2']);
+    expect(rows.map((row) => row.formData.customerName)).toEqual(['Ana Ruiz', 'Bo Diaz']);
+  });
+
+  it('two sales in a row make two sales, customer screen first', () => {
+    const rows = regroup(
+      picked(
+        customerScreen(1, 'Ana Ruiz', '9 Oak Ln, Austin, TX'),
+        orderScreen(2, 'TMF-1'),
+        customerScreen(3, 'Bo Diaz', '12 Elm St, Austin, TX'),
+        orderScreen(4, 'TMF-2')
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
+    expect(rows.map((row) => row.formData.orderNumberOrBtn)).toEqual(['TMF-1', 'TMF-2']);
+    expect(rows.map((row) => row.formData.customerName)).toEqual(['Ana Ruiz', 'Bo Diaz']);
+  });
+
+  it('a neighbour with another order number, address or name starts its own sale', () => {
+    const otherOrder = regroup(picked(shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' })), orderScreen(2, 'TMF-2')), ids());
+    expect(shotIds(otherOrder)).toEqual([[1], [2]]);
+    const otherAddress = regroup(
+      picked(shot(1, read({ order: 'TMF-1', address: '9 Oak Ln Apt 1' })), shot(2, read({ address: '9 Oak Ln Apt 2' }))),
+      ids()
+    );
+    expect(shotIds(otherAddress)).toEqual([[1], [2]]);
+    const otherName = regroup(
+      picked(shot(1, read({ order: 'TMF-1', name: 'Ana Ruiz' })), shot(2, read({ name: 'Bo Diaz', install: '2099-10-06' }))),
+      ids()
+    );
+    expect(shotIds(otherName)).toEqual([[1], [2]]);
+  });
+
+  it('the same address written out further is no clash', () => {
+    const rows = regroup(
+      picked(shot(1, read({ order: 'TMF-1', address: '9 Oak Ln' })), shot(2, read({ name: 'Ana Ruiz', address: '9 Oak Ln, Austin, TX' }))),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2]]);
+  });
+
+  it('a full sale is not joined; the next screenshot starts a new one', () => {
+    const rows = regroup(
+      picked(...[1, 2, 3, 4].map((n) => orderScreen(n, 'TMF-1')), customerScreen(5, 'Ana Ruiz', '9 Oak Ln')),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 2, 3, 4], [5]]);
+  });
+
+  it('a repeated picture is skipped over: the next screenshot joins the one before the copy', () => {
+    const rows = regroup(
+      picked(orderScreen(1, 'TMF-1'), orderScreen(2, 'TMF-1'), customerScreen(3, 'Ana Ruiz', '9 Oak Ln')).map((row) =>
+        row.shots[0].seq === 2 ? { ...row, shots: [{ ...row.shots[0], hash: 'hash-1' }] } : row
+      ),
+      ids()
+    );
+    expect(shotIds(rows)).toEqual([[1, 3], [2]]);
+  });
+
+  it('changes nothing when run again', () => {
+    const newId = ids();
+    const rows = regroup(
+      picked(
+        customerScreen(1, 'Ana Ruiz', '9 Oak Ln'),
+        orderScreen(2, 'TMF-1'),
+        orderScreen(3, 'TMF-2'),
+        customerScreen(4, 'Bo Diaz', '12 Elm St')
+      ),
+      newId
+    );
+    expect(shotIds(rows)).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
+    expect(regroup(rows, newId)).toEqual(rows);
+  });
+});
+
 describe('combine and split', () => {
   const base = () =>
     regroup(
