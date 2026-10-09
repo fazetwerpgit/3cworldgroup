@@ -15,6 +15,7 @@ import {
   findRepeats,
   hashBytes,
   isIncluded,
+  isUnread,
   newBulkRow,
   readBulkBatch,
   rowProblems,
@@ -33,8 +34,8 @@ const PATH = (n: number) => `form-attachments/r1/sale-proof/${String(n).padStart
 const id = (n: number) => String(n).padStart(32, '0');
 const gig = addPlanToProducts([], getPlanById('tfiber-1gig')!);
 
-type Over = Partial<BulkRow> & Partial<Pick<BulkShot, 'hash' | 'phase' | 'proofPath' | 'readBusy' | 'scan'>>;
-const SHOT_KEYS = ['hash', 'phase', 'proofPath', 'readBusy', 'scan'] as const;
+type Over = Partial<BulkRow> & Partial<Pick<BulkShot, 'hash' | 'phase' | 'proofPath' | 'readBusy' | 'readError' | 'scan'>>;
+const SHOT_KEYS = ['hash', 'phase', 'proofPath', 'readBusy', 'readError', 'scan'] as const;
 
 /** A sale of one screenshot; screenshot fields in `over` go on the screenshot. */
 function blank(n: number, over: Over = {}): BulkRow {
@@ -137,6 +138,33 @@ describe('rowStatus', () => {
   it('tells a busy reader apart from one that could not read the picture', () => {
     const busy = blank(1, { phase: 'read_failed', proofPath: PATH(1), readBusy: true });
     expect(rowStatus(busy, undefined)).toMatchObject({ kind: 'read_failed', busy: true });
+  });
+
+  it('one screenshot whose read failed holds a complete sale back until it is read, removed or saved', () => {
+    const row = ready(1);
+    const failed: BulkShot = {
+      ...newBulkShot(id(201), 'b.png', 2),
+      phase: 'read_failed',
+      proofPath: PATH(2),
+      scan: null,
+      readError: true,
+      readBusy: true,
+    };
+    const held = { ...row, shots: [...row.shots, failed] };
+    expect(rowStatus(held, undefined)).toEqual({ kind: 'read_failed', problems: [], busy: true, unread: 1, shots: 2 });
+    expect(sendableRows([held])).toEqual([]);
+    expect(isUnread(failed)).toBe(true);
+    // Not busy: just could not be read.
+    const plain = { ...held, shots: [row.shots[0], { ...failed, readBusy: false }] };
+    expect(rowStatus(plain, undefined)).toMatchObject({ kind: 'read_failed', busy: false, unread: 1 });
+    // A read that went through and found nothing does not hold the sale back.
+    const nothing = { ...held, shots: [row.shots[0], { ...failed, readError: false, readBusy: false }] };
+    expect(rowStatus(nothing, undefined)).toEqual({ kind: 'ready' });
+    // The rep saved the sale with it: theirs now.
+    const saved = { ...held, shots: held.shots.map((shot) => ({ ...shot, checked: true })) };
+    expect(rowStatus(saved, undefined)).toEqual({ kind: 'ready' });
+    // A repeat still says repeat first.
+    expect(rowStatus(held, { of: 1, by: 'image' }).kind).toBe('repeat');
   });
 
   it('a logged sale whose later edit never reached the server says so', () => {
@@ -262,6 +290,11 @@ describe('saved batch', () => {
     const saved = readBulkBatch(KEY);
     expect(saved?.rows[0].result).toEqual({ kind: 'logged', saleId: 's1', editLost: true });
     expect(saved?.rows[1].shots[0].readBusy).toBe(true);
+  });
+
+  it('keeps a failed read across a reload', () => {
+    writeBulkBatch(KEY, [blank(1, { phase: 'read_failed', proofPath: PATH(1), readError: true })]);
+    expect(readBulkBatch(KEY)?.rows[0].shots[0].readError).toBe(true);
   });
 
   it('drops screenshots that never got uploaded and counts them', () => {

@@ -101,7 +101,9 @@ function StatusLine({
           <span>
             {status.busy
               ? 'Too many reads right now. Try again in a few minutes.'
-              : "Couldn't read it. Tap to fill in."}
+              : status.shots > 1 && status.unread > 0
+                ? `${status.unread === 1 ? '1 screenshot' : `${status.unread} screenshots`} couldn't be read.`
+                : "Couldn't read it. Tap to fill in."}
           </span>
           <button type="button" className={b.statusAction} onClick={onReadAgain}>
             Read again
@@ -254,7 +256,7 @@ function BulkCard({
         </button>
       )}
       <div className={b.cardStatus} role="status">
-        {canCombine(above, row) && !bulk.sending ? (
+        {status.kind !== 'repeat' && canCombine(above, row) && !bulk.sending ? (
           <button type="button" className={b.combine} onClick={() => bulk.combine(row.id)}>
             Combine with sale above
           </button>
@@ -459,6 +461,7 @@ export function RepBulkLog() {
           previews={bulk.previews}
           onSplit={bulk.splitShot}
           onRemoveShot={bulk.removeShot}
+          onReadShot={bulk.readShotAgain}
           onSave={(change) => {
             bulk.save(editingRow.id, change);
             setEditing(null);

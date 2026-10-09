@@ -48,6 +48,8 @@ export async function requestScan(paths: string[], signal: AbortSignal): Promise
     signal,
   });
   if (response.status === 404) return null;
+  // Turned away by a rate limit in front of the route: the same answer as the route's own limit.
+  if (response.status === 429) return { fields: null, reason: 'rate_limited' };
   const data = (await response.json().catch(() => null)) as SaleScanResponse | null;
   return response.ok && data && 'fields' in data ? data : { fields: null, reason: `http_${response.status}` };
 }

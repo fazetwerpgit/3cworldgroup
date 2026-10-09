@@ -70,6 +70,12 @@ export interface BulkShot {
   scan: SaleScanFields | null;
   /** The last read was turned away by the reader's rate limit. */
   readBusy?: boolean;
+  /**
+   * The last read failed (rate limit, timeout, reader or network error), as
+   * against a read that went through and found nothing. Until it is read again,
+   * removed, or the rep saves the sale with it, its sale is not ready.
+   */
+  readError?: boolean;
   /** Its reading is already in its sale's fields (a sale the rep has edited only takes empty fields). */
   merged?: boolean;
   /** The rep saved the sale with this screenshot in it: its order number was looked at. */
@@ -107,7 +113,8 @@ export type BulkStatus =
   | { kind: 'uploading' }
   | { kind: 'reading' }
   | { kind: 'upload_failed' }
-  | { kind: 'read_failed'; problems: string[]; busy: boolean }
+  /** `unread`: screenshots whose read failed and are still waiting on "Read again"; `shots`: how many the sale has. */
+  | { kind: 'read_failed'; problems: string[]; busy: boolean; unread: number; shots: number }
   | { kind: 'needs_info'; problems: string[] }
   | { kind: 'repeat'; repeat: BulkRepeat; problems: string[] }
   | { kind: 'ready' }
@@ -222,6 +229,9 @@ export function findRepeats(rows: Pick<BulkRow, 'id' | 'shots'>[]): Map<string, 
   return repeats;
 }
 
+/** A screenshot whose read failed, not read again since, that the rep has not saved the sale with. */
+export const isUnread = (shot: BulkShot) => shot.phase === 'read_failed' && shot.readError === true && !shot.checked;
+
 /** The sale's status, most pressing first. */
 export function rowStatus(row: BulkRow, repeat: BulkRepeat | undefined): BulkStatus {
   if (row.result?.kind === 'logged') return { kind: 'logged', editLost: row.result.editLost === true };
@@ -233,11 +243,14 @@ export function rowStatus(row: BulkRow, repeat: BulkRepeat | undefined): BulkSta
   if (row.result?.kind === 'already') return { kind: 'already', duplicate: row.result.duplicate };
   const problems = [...(orderConflict(row).length > 0 ? [ORDER_CONFLICT_PROBLEM] : []), ...rowProblems(row)];
   if (repeat) return { kind: 'repeat', repeat, problems };
-  if (problems.length > 0) {
-    return phase === 'read_failed'
-      ? { kind: 'read_failed', problems, busy: row.shots.some((shot) => shot.readBusy === true) }
-      : { kind: 'needs_info', problems };
+  // One screenshot whose read failed holds the whole sale back: it is often the
+  // screen with the order number or the plan.
+  const unread = row.shots.filter(isUnread).length;
+  if (unread > 0 || (problems.length > 0 && phase === 'read_failed')) {
+    const busy = row.shots.some((shot) => shot.readBusy === true && (unread === 0 || isUnread(shot)));
+    return { kind: 'read_failed', problems, busy, unread, shots: row.shots.length };
   }
+  if (problems.length > 0) return { kind: 'needs_info', problems };
   if (row.result?.kind === 'failed') return { kind: 'failed', reason: row.result.reason };
   return { kind: 'ready' };
 }
@@ -421,6 +434,7 @@ function readShot(value: unknown, fallbackSeq: number): BulkShot | null {
     phase: value.phase as BulkPhase,
     scan: readScan(value.scan),
     ...(value.readBusy === true ? { readBusy: true } : {}),
+    ...(value.readError === true ? { readError: true } : {}),
     ...(value.merged === true ? { merged: true } : {}),
     ...(value.checked === true ? { checked: true } : {}),
   };

@@ -194,6 +194,8 @@ beforeEach(() => {
       const { paths } = JSON.parse(String(init?.body)) as { paths: string[] };
       const name = pathByName.get(paths[0]) ?? '';
       scanned.push(name);
+      // A rate limit in front of the route answers 429 with no reader body.
+      if (name === 'http429.png') return json({ error: 'Too many requests' }, 429);
       return json(SCANS[name] ?? { fields: null, reason: 'unknown' });
     })
   );
@@ -523,6 +525,60 @@ describe('RepBulkLog', () => {
     }
     expect(cardText(1)).toContain('Cy Park');
     expect(cardText(1)).toContain('Ready');
+  });
+
+  it('a sale with one screenshot that failed to read is not ready until that one is read again', async () => {
+    await render();
+    // Cy's order screen, then a screen the reader failed on (model error).
+    await pick([png('cy-1.png', 'CY11'), png('c.png', 'CCCC')]);
+    await finishUploads();
+    expect(cards()).toHaveLength(1);
+    expect(cardText(1)).toContain('Cy Park');
+    expect(cardText(1)).toContain('2 screenshots');
+    expect(cardText(1)).toContain("1 screenshot couldn't be read.");
+    expect(cardText(1)).not.toContain('Ready');
+    expect(logButton().textContent).toBe('Nothing ready to log');
+
+    // The sheet says which one, and reads just that one again.
+    await act(async () => cards()[0].querySelector<HTMLButtonElement>('button[aria-label="Check sale 1"]')!.click());
+    const sheet = document.body.querySelector('[role="dialog"]')!;
+    expect(sheet.textContent).toContain("Couldn't be read");
+    const again = sheet.querySelectorAll<HTMLButtonElement>('button[aria-label^="Read screenshot"]');
+    expect(Array.from(again).map((b) => b.getAttribute('aria-label'))).toEqual(['Read screenshot 2 again']);
+    SCANS['c.png'] = SCANS['cy-2.png'];
+    try {
+      await act(async () => again[0].click());
+      await settle();
+    } finally {
+      SCANS['c.png'] = { fields: null, reason: 'model_error' };
+    }
+    expect(scanned.filter((name) => name === 'c.png')).toHaveLength(2);
+    expect(scanned.filter((name) => name === 'cy-1.png')).toHaveLength(1);
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).not.toContain("Couldn't be read");
+    expect(cardText(1)).toContain('Installs Oct 6');
+    expect(cardText(1)).toContain('Ready');
+  });
+
+  it('a 429 from in front of the reader says the reader is busy, not that the picture is unreadable', async () => {
+    await render();
+    await pick([png('cy-1.png', 'CY11'), png('http429.png', '4290')]);
+    await finishUploads();
+    expect(cards()).toHaveLength(1);
+    expect(cardText(1)).toContain('Too many reads right now. Try again in a few minutes.');
+    expect(cardText(1)).not.toContain("Couldn't read");
+    expect(cardText(1)).not.toContain('Ready');
+  });
+
+  it('does not offer "Combine with sale above" on a repeated screenshot', async () => {
+    await render();
+    // The copy of sale 1 sits under sale 2, which it could otherwise be combined with.
+    await pick([png('a.png', 'AAAA'), png('b.png', 'BBBB'), png('a-again.png', 'AAAA')]);
+    await finishUploads();
+    await finishUploads();
+    expect(cards()).toHaveLength(3);
+    expect(cardText(3)).toContain('Repeated: same screenshot as sale 1');
+    expect(within(3, 'Combine with sale above')).toBeUndefined();
+    expect(within(2, 'Combine with sale above')).toBeDefined();
   });
 
   it('says when an earlier send landed and the edit since did not', async () => {

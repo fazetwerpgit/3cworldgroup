@@ -287,6 +287,28 @@ describe('regroup: order screen and customer screen', () => {
     expect(shotIds(rows)).toEqual([[1, 3], [2]]);
   });
 
+  it('a screenshot whose read failed joins the sale before it, and moves out once a re-read disagrees', () => {
+    const failed = shot(2, null, { readError: true });
+    const newId = ids();
+    const together = regroup(picked(customerScreen(1, 'Ana Ruiz', '9 Oak Ln'), failed), newId);
+    expect(shotIds(together)).toEqual([[1, 2]]);
+    const reread = (rows: BulkRow[], scan: SaleScanFields) =>
+      rows.map((row) => ({
+        ...row,
+        shots: row.shots.map((s) => (s.seq === 2 ? { ...s, phase: 'read' as const, readError: false, merged: false, scan } : s)),
+      }));
+    // Read again: its own order number fits; it stays.
+    expect(shotIds(regroup(reread(together, read({ order: 'TMF-1', plan: true })), newId))).toEqual([[1, 2]]);
+    // Read again: another customer; it leaves for a sale of its own.
+    const apart = regroup(reread(together, read({ name: 'Bo Diaz', address: '12 Elm St' })), newId);
+    expect(shotIds(apart)).toEqual([[1], [2]]);
+    expect(apart[0].id).toBe(saleId(1));
+    expect(regroup(apart, newId)).toEqual(apart);
+    // A sale the rep already shaped keeps it whatever the re-read says.
+    const fixed = together.map((row) => ({ ...row, fixed: true }));
+    expect(shotIds(regroup(reread(fixed, read({ name: 'Bo Diaz', address: '12 Elm St' })), newId))).toEqual([[1, 2]]);
+  });
+
   it('changes nothing when run again', () => {
     const newId = ids();
     const rows = regroup(

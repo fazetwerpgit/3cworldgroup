@@ -125,12 +125,17 @@ export function useBulkLog() {
       signal.addEventListener('abort', onAbort);
       let fields = null;
       let busy = false;
+      // The read itself failed (not a read that found nothing, nor the reader
+      // switched off): the sale waits for "Read again".
+      let failed = false;
       try {
         const reply = await requestScan([path], timeout.signal);
         fields = reply?.fields ?? null;
         busy = reply?.reason === 'rate_limited';
+        failed = reply !== null && !fields && reply.reason !== 'nothing_found';
       } catch {
         fields = null;
+        failed = true;
       } finally {
         clearTimeout(timer);
         signal.removeEventListener('abort', onAbort);
@@ -143,6 +148,7 @@ export function useBulkLog() {
         scan: read,
         phase: read ? 'read' : 'read_failed',
         readBusy: busy,
+        readError: !read && failed,
         merged: false,
         checked: false,
       }));
@@ -309,8 +315,16 @@ export function useBulkLog() {
   };
 
   /** Read a sale's screenshots the reader could not make out again. */
-  const readAgain = (id: string) => {
-    const failed = shotsOf(id).filter((shot) => shot.phase === 'read_failed' && shot.proofPath);
+  const readAgain = (id: string) => rereadShots(shotsOf(id));
+
+  /** Read one screenshot the reader could not make out again (from the sale sheet). */
+  const readShotAgain = (shotId: string) => {
+    const shot = findShot(shotId);
+    if (shot) rereadShots([shot]);
+  };
+
+  const rereadShots = (shots: BulkShot[]) => {
+    const failed = shots.filter((shot) => shot.phase === 'read_failed' && shot.proofPath);
     for (const shot of failed) patchShot(shot.id, { phase: 'reading' });
     enqueue(failed.map((shot) => ({ id: shot.id, kind: 'read' })));
   };
@@ -481,6 +495,7 @@ export function useBulkLog() {
     addFiles,
     retryUpload,
     readAgain,
+    readShotAgain,
     remove,
     removeShot,
     splitShot,

@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, ImageIcon, X } from 'lucide-react';
 import { useSaleFormState } from '@/hooks/useSaleFormState';
-import { orderConflict, rowProblems, rowProofPaths, type BulkRow, type BulkSaleFields } from '@/lib/sales/bulk/batch';
+import {
+  isUnread,
+  orderConflict,
+  rowProblems,
+  rowProofPaths,
+  type BulkRow,
+  type BulkSaleFields,
+} from '@/lib/sales/bulk/batch';
 import type { ScanTarget } from '@/lib/sales/scan/fills';
 import { BodyLayer } from './BodyLayer';
 import { useAttachmentViewer } from './ImageViewer';
@@ -15,8 +22,8 @@ import b from './rep-bulklog.module.css';
 // One sale of the bulk batch, opened for checking. The same fields and rules as
 // the single Log Sale form (SaleFields + useSaleFormState, without the saved
 // single-sale draft); Save puts the values back on the sale. Its screenshots
-// are listed on top: each can be viewed, made its own sale, or removed (those
-// act right away, not on Save).
+// are listed on top: each can be viewed, made its own sale, removed, or read
+// again when its read failed (those act right away, not on Save).
 
 export type BulkSaleChange = BulkSaleFields;
 
@@ -26,6 +33,7 @@ export function BulkSaleSheet({
   previews,
   onSplit,
   onRemoveShot,
+  onReadShot,
   onSave,
   onClose,
 }: {
@@ -37,6 +45,8 @@ export function BulkSaleSheet({
   /** "Make its own sale". */
   onSplit: (shotId: string) => void;
   onRemoveShot: (shotId: string) => void;
+  /** "Read again" for a screenshot whose read failed. */
+  onReadShot: (shotId: string) => void;
   onSave: (change: BulkSaleChange) => void;
   onClose: () => void;
 }) {
@@ -154,6 +164,23 @@ export function BulkSaleSheet({
                         </span>
                         View {name.toLowerCase()}
                       </button>
+                      {isUnread(shot) ? (
+                        <span className={b.shotActions}>
+                          <span className={b.shotNote}>
+                            {shot.readBusy ? 'Too many reads right now' : "Couldn't be read"}
+                          </span>
+                          <button
+                            type="button"
+                            className={b.shotAction}
+                            onClick={() => onReadShot(shot.id)}
+                            aria-label={`Read ${name.toLowerCase()} again`}
+                          >
+                            Read again
+                          </button>
+                        </span>
+                      ) : shot.phase === 'reading' ? (
+                        <span className={b.shotNote}>Reading</span>
+                      ) : null}
                       {many ? (
                         <span className={b.shotActions}>
                           <button type="button" className={b.shotAction} onClick={() => onSplit(shot.id)}>

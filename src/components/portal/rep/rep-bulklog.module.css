@@ -514,6 +514,13 @@
   outline-offset: 2px;
 }
 
+/* A screenshot whose read failed ("Couldn't be read"), or one being read. */
+.shotNote {
+  align-self: center;
+  color: var(--c-amber);
+  font: 600 var(--t-sm) / 1.2 var(--f-ui);
+}
+
 .editNeeds,
 .editReady {
   display: flex;
