@@ -163,6 +163,8 @@ export interface OutboxEntry {
   attachment?: ChatAttachment;
   replyTo?: ChatReplySnippet;
   replyToMessageId?: string;
+  // A photo not uploaded yet: its file waits in IndexedDB (see pendingPhotos).
+  photoPending?: boolean;
   failed: boolean;
 }
 
@@ -184,6 +186,7 @@ interface PersistableEcho {
   attachment?: ChatAttachment;
   uploadedAttachment?: ChatAttachment;
   pendingFile?: File;
+  photoPending?: boolean;
   replyTo?: ChatReplySnippet;
   replyToMessageId?: string;
   pendingState?: 'sending' | 'failed';
@@ -192,15 +195,15 @@ interface PersistableEcho {
 
 /**
  * The echoes worth keeping across a reload: undelivered ones with a client id.
- * A photo still waiting on its upload is left out — the picked file can't be
- * stored in localStorage — while one already uploaded keeps its server URL.
+ * A photo already uploaded keeps its server URL; one still waiting on its upload
+ * is kept as photoPending (its file is stored separately, in IndexedDB).
  */
 export function toOutboxEntries(echoes: PersistableEcho[]): OutboxEntry[] {
   const entries: OutboxEntry[] = [];
   for (const echo of echoes) {
     if (!echo.clientMessageId || echo.deliveredId || !echo.pendingState) continue;
     const attachment = echo.uploadedAttachment ?? (echo.attachment?.type === 'gif' ? echo.attachment : undefined);
-    if (echo.pendingFile && !echo.uploadedAttachment) continue;
+    const photoPending = (!!echo.pendingFile || !!echo.photoPending) && !echo.uploadedAttachment;
     entries.push({
       id: echo.id,
       clientMessageId: echo.clientMessageId,
@@ -213,6 +216,7 @@ export function toOutboxEntries(echoes: PersistableEcho[]): OutboxEntry[] {
       ...(attachment ? { attachment } : {}),
       ...(echo.replyTo ? { replyTo: echo.replyTo } : {}),
       ...(echo.replyToMessageId ? { replyToMessageId: echo.replyToMessageId } : {}),
+      ...(photoPending ? { photoPending: true } : {}),
       failed: echo.pendingState === 'failed',
     });
   }
@@ -268,7 +272,8 @@ export function parseOutbox(raw: string | null, uid: string, now: number): Outbo
     if (typeof createdAt !== 'number' || !Number.isFinite(createdAt)) continue;
     if (now - createdAt > OUTBOX_MAX_AGE_MS) continue;
     const attachment = parseAttachment(row.attachment);
-    if (!text && !attachment) continue;
+    const photoPending = row.photoPending === true && !attachment;
+    if (!text && !attachment && !photoPending) continue;
     const replyTo = parseReplyTo(row.replyTo);
     seen.add(id);
     entries.push({
@@ -285,6 +290,7 @@ export function parseOutbox(raw: string | null, uid: string, now: number): Outbo
       ...(typeof row.replyToMessageId === 'string' && row.replyToMessageId
         ? { replyToMessageId: row.replyToMessageId }
         : {}),
+      ...(photoPending ? { photoPending: true } : {}),
       failed: row.failed === true || now - createdAt >= AUTO_RETRY_MAX_AGE_MS,
     });
   }

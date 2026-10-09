@@ -23,6 +23,11 @@ export interface CompanyStats {
 }
 
 /** Status caption under a pending echo: upload progress for a photo, else "Sending…". */
+// A failed echo's status. A photo says so: it may have been the upload that failed.
+export function failedStatusLabel(message: { pendingFile?: File; photoPending?: boolean; localPreviewUrl?: string }): string {
+  return message.pendingFile || message.photoPending || message.localPreviewUrl ? 'Photo not sent' : 'Not sent';
+}
+
 export function pendingStatusLabel(message: { uploadProgress?: number }): string {
   const progress = message.uploadProgress;
   if (typeof progress === 'number' && progress < 1) return `Uploading photo · ${Math.round(progress * 100)}%`;

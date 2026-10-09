@@ -11,7 +11,7 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { MessageActionSheet } from '@/components/chat/MessageActions';
 import type { MessageActionsConfig } from '@/components/chat/MessageActions';
 import { validateSelectedImage } from '@/components/chat/attachmentUpload';
-import { clockTime, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { clockTime, failedStatusLabel, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
 import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
 import { gifPickerMaxHeight, keyboardInset } from '@/lib/chat/keyboard';
@@ -60,6 +60,8 @@ export type ThreadMessage = ChatMessageView & {
   retryWindowStart?: number;
   preparedUpload?: { file: File; width?: number; height?: number };
   uploadProgress?: number;
+  // A restored photo whose file is still in (or lost from) the device outbox.
+  photoPending?: boolean;
 };
 
 interface MobileThreadProps {
@@ -879,7 +881,7 @@ export function MobileThread({
                         <div className={c.failed}>
                           <button type="button" onClick={() => onRetryPending(message)} className={c.retryBtn}>
                             <RotateCw size={14} aria-hidden="true" />
-                            Not sent · Tap to retry
+                            {failedStatusLabel(message)} · Tap to retry
                           </button>
                           <button
                             type="button"

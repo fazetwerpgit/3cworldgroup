@@ -157,15 +157,23 @@ describe('outbox persistence', () => {
     ]);
   });
 
-  it('skips delivered echoes, echoes without a client id, and photos not yet uploaded', () => {
-    const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' });
+  it('skips delivered echoes and echoes without a client id', () => {
     expect(
       toOutboxEntries([
         { ...base, deliveredId: base.id },
         { ...base, clientMessageId: undefined },
-        { ...base, text: '', pendingFile: file },
       ])
     ).toEqual([]);
+  });
+
+  it('keeps a photo not uploaded yet as photoPending, and restores it', () => {
+    const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' });
+    const entries = toOutboxEntries([{ ...base, text: '', pendingFile: file }]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ photoPending: true, text: '' });
+    expect(entries[0]).not.toHaveProperty('attachment');
+    const [restored] = parseOutbox(JSON.stringify(entries), UID, NOW);
+    expect(restored).toMatchObject({ id: base.id, photoPending: true, failed: false });
   });
 
   it('keeps an uploaded photo by its server URL', () => {
