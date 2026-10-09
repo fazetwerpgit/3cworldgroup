@@ -87,7 +87,14 @@ function DesktopAttachment({
 }) {
   const previewUrl = message.localPreviewUrl;
   const src = previewUrl ?? message.attachment?.url;
-  if (!src) return null;
+  if (!src) {
+    // A restored photo still coming back from the device: the usual uploading tile.
+    return message.photoPending && !message.photoLost && message.pendingState === 'sending' ? (
+      <span className={`${c.attachment} ${c.photoLoading}`} aria-label="Loading photo">
+        <span className={c.uploading} />
+      </span>
+    ) : null;
+  }
   // A local preview means the echo hasn't reconciled yet: not clickable, and
   // shimmering only while the upload is in flight (not once it has failed).
   const isPendingLocal = !!previewUrl && !!message.pendingState;
@@ -1116,9 +1123,19 @@ export default function TeamChatPage() {
                           {isPending ? (
                             isFailed ? (
                               <div className={c.failed}>
-                                <button type="button" onClick={() => retryPending(message)} className={c.retryBtn}>
-                                  <RotateCw size={14} aria-hidden="true" /> {failedStatusLabel(message)} · Retry
-                                </button>
+                                {message.photoLost ? (
+                                  message.text ? (
+                                    <button type="button" onClick={() => outbox.sendTextOnly(message)} className={c.retryBtn}>
+                                      <RotateCw size={14} aria-hidden="true" /> Photo not sent · Send text only
+                                    </button>
+                                  ) : (
+                                    <span className={c.retryBtn}>Photo not sent</span>
+                                  )
+                                ) : (
+                                  <button type="button" onClick={() => retryPending(message)} className={c.retryBtn}>
+                                    <RotateCw size={14} aria-hidden="true" /> {failedStatusLabel(message)} · Retry
+                                  </button>
+                                )}
                                 <button type="button" onClick={() => discardPending(message.id)} aria-label="Discard message" className={c.discardBtn}>
                                   <X size={16} aria-hidden="true" />
                                 </button>
@@ -1310,6 +1327,7 @@ export default function TeamChatPage() {
             onDelete={deleteMessage}
             onReactionError={setError}
             onRetryPending={retryPending}
+            onSendTextOnly={outbox.sendTextOnly}
             connectionNotice={connectionNotice}
             onDiscardPending={discardPending}
             onReply={startReply}

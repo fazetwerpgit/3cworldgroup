@@ -767,6 +767,12 @@
   object-fit: contain;
 }
 
+.photoLoading {
+  max-width: 240px;
+  aspect-ratio: 4 / 3;
+  cursor: default;
+}
+
 .attachmentFailed {
   border-color: rgba(255, 138, 128, 0.6);
 }

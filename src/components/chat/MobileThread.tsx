@@ -60,8 +60,11 @@ export type ThreadMessage = ChatMessageView & {
   retryWindowStart?: number;
   preparedUpload?: { file: File; width?: number; height?: number };
   uploadProgress?: number;
-  // A restored photo whose file is still in (or lost from) the device outbox.
+  // A restored photo whose file is still in the device outbox (photoPending),
+  // or turned out to be gone from it (photoLost: it can only be discarded, or
+  // its caption sent alone).
   photoPending?: boolean;
+  photoLost?: boolean;
 };
 
 interface MobileThreadProps {
@@ -138,6 +141,8 @@ interface MobileThreadProps {
   onReactionError: (message: string) => void;
   onRetryPending: (message: ThreadMessage) => void;
   onDiscardPending: (messageId: string) => void;
+  // A lost photo's caption, sent without the photo.
+  onSendTextOnly: (message: ThreadMessage) => void;
   // Offline / reconnecting chip (already delayed by the page's hook).
   connectionNotice: ConnectionNoticeState;
   // Message-action callbacks (Reply/Copy/Edit) + composer mode cancels/save.
@@ -173,7 +178,14 @@ function BubbleImage({
 }) {
   const previewUrl = message.localPreviewUrl;
   const src = previewUrl ?? message.attachment?.url;
-  if (!src) return null;
+  if (!src) {
+    // A restored photo still coming back from the device: the usual uploading tile.
+    return message.photoPending && !message.photoLost && message.pendingState === 'sending' ? (
+      <span className={`${c.attachment} ${c.photoLoading}`} aria-label="Loading photo">
+        <span className={c.uploading} />
+      </span>
+    ) : null;
+  }
   // A local preview means the echo hasn't reconciled yet: not clickable, and
   // shimmering only while the upload is in flight (not once it has failed).
   const isPendingLocal = !!previewUrl && !!message.pendingState;
@@ -306,6 +318,7 @@ export function MobileThread({
   onRetryPending,
   connectionNotice,
   onDiscardPending,
+  onSendTextOnly,
   onReply,
   onEdit,
   onCopy,
@@ -849,7 +862,7 @@ export function MobileThread({
                             <span>{message.replyTo.text}</span>
                           </div>
                         )}
-                        {(message.attachment || message.localPreviewUrl) && (
+                        {(message.attachment || message.localPreviewUrl || message.photoPending) && (
                           <BubbleImage
                             message={message}
                             isOwn={isOwn}
@@ -879,10 +892,21 @@ export function MobileThread({
                     {isPending ? (
                       isFailed ? (
                         <div className={c.failed}>
-                          <button type="button" onClick={() => onRetryPending(message)} className={c.retryBtn}>
-                            <RotateCw size={14} aria-hidden="true" />
-                            {failedStatusLabel(message)} · Tap to retry
-                          </button>
+                          {message.photoLost ? (
+                            message.text ? (
+                              <button type="button" onClick={() => onSendTextOnly(message)} className={c.retryBtn}>
+                                <RotateCw size={14} aria-hidden="true" />
+                                Photo not sent · Send text only
+                              </button>
+                            ) : (
+                              <span className={c.retryBtn}>Photo not sent</span>
+                            )
+                          ) : (
+                            <button type="button" onClick={() => onRetryPending(message)} className={c.retryBtn}>
+                              <RotateCw size={14} aria-hidden="true" />
+                              {failedStatusLabel(message)} · Tap to retry
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => onDiscardPending(message.id)}

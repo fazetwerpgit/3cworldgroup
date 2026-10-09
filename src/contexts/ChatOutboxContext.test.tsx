@@ -8,12 +8,23 @@ import { chatMessageDocId, outboxKey } from '@/lib/chat/outbox';
 
 const fake = vi.hoisted(() => ({
   user: { uid: 'u1' } as { uid: string } | null,
+  // Who Firebase Auth says is signed in right now (can lag or lead the context).
+  authUid: 'u1' as string | null,
+  canChat: true,
   photos: new Map<string, File>(),
   upload: vi.fn(),
 }));
 
-vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: fake.user }) }));
-vi.mock('@/lib/firebase/config', () => ({ auth: { currentUser: { getIdToken: async () => 'token' } } }));
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: fake.user, hasPermission: (p: string) => p === 'chat:read' && fake.canChat }),
+}));
+vi.mock('@/lib/firebase/config', () => ({
+  auth: {
+    get currentUser() {
+      return fake.authUid ? { uid: fake.authUid, getIdToken: async () => 'token' } : null;
+    },
+  },
+}));
 vi.mock('@/components/chat/attachmentUpload', () => ({
   prepareImageForUpload: async (file: File) => ({ file, width: 10, height: 20 }),
   uploadChatImageWithProgress: fake.upload,
@@ -95,6 +106,8 @@ async function settle() {
 beforeEach(() => {
   vi.useFakeTimers();
   fake.user = { uid: 'u1' };
+  fake.authUid = 'u1';
+  fake.canChat = true;
   fake.photos.clear();
   fake.upload.mockReset();
   fetchMock = vi.fn();
@@ -203,29 +216,67 @@ describe('ChatOutboxProvider', () => {
     expect(posts()).toEqual([expect.objectContaining({ clientMessageId: CID, attachment: UPLOADED })]);
   });
 
-  it('shows "Photo not sent" when a restored photo’s file is gone, never dropping it', async () => {
+  it('marks a restored photo whose file is gone as lost, and can send its caption alone', async () => {
+    window.localStorage.setItem(
+      outboxKey('u1'),
+      JSON.stringify([
+        { id: ECHO_ID, clientMessageId: CID, channelId: 'c1', text: 'the gate code', authorId: 'u1', authorName: 'Rep One', createdAt: Date.now(), photoPending: true, failed: false },
+      ])
+    );
+    fetchMock.mockReturnValue(respond(200, { success: true, messageId: ECHO_ID }));
+    render(false);
+    await settle();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(outbox.echoes).toHaveLength(1);
+    expect(outbox.echoes[0]).toMatchObject({ pendingState: 'failed', photoLost: true });
+    expect(failedStatusLabel(outbox.echoes[0])).toBe('Photo not sent');
+
+    act(() => outbox.sendTextOnly(outbox.echoes[0]));
+    await settle();
+    expect(posts()).toEqual([expect.objectContaining({ clientMessageId: CID, text: 'the gate code' })]);
+    expect(posts()[0]).not.toHaveProperty('attachment');
+  });
+
+  it('loads a restored photo once when an online flush races the restore', async () => {
+    const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' });
+    fake.photos.set(ECHO_ID, file);
     window.localStorage.setItem(
       outboxKey('u1'),
       JSON.stringify([
         { id: ECHO_ID, clientMessageId: CID, channelId: 'c1', text: '', authorId: 'u1', authorName: 'Rep One', createdAt: Date.now(), photoPending: true, failed: false },
       ])
     );
+    fake.upload.mockResolvedValue(UPLOADED);
+    fetchMock.mockReturnValue(respond(200, { success: true, messageId: ECHO_ID }));
+    render(false);
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    await settle();
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never posts a queued message once a different account is signed in', async () => {
+    let finishUpload: (value: typeof UPLOADED) => void = () => undefined;
+    fake.upload.mockReturnValue(new Promise((resolve) => (finishUpload = resolve)));
+    render(false);
+    act(() => outbox.send(echo({ text: '', pendingFile: new File(['x'], 'a.jpg', { type: 'image/jpeg' }) })));
+    await settle();
+    // Firebase Auth already reports the next account before the context catches up.
+    fake.authUid = 'u2';
+    finishUpload(UPLOADED);
+    await settle();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does no outbox storage work for a user without chat access', async () => {
+    fake.canChat = false;
+    const getItem = vi.spyOn(Storage.prototype, 'getItem');
     render(false);
     await settle();
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(outbox.echoes).toHaveLength(1);
-    expect(outbox.echoes[0].pendingState).toBe('failed');
-    expect(failedStatusLabel(outbox.echoes[0])).toBe('Photo not sent');
-
-    // A tap on retry looks again and explains, still without sending.
-    const errors: string[] = [];
-    const stop = outbox.subscribeErrors((message) => errors.push(message));
-    act(() => outbox.retry(outbox.echoes[0]));
-    await settle();
-    stop();
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(outbox.echoes[0].pendingState).toBe('failed');
-    expect(errors.at(-1)).toMatch(/no longer on this phone/);
+    expect(getItem).not.toHaveBeenCalled();
+    getItem.mockRestore();
   });
 
   it('does not carry one account’s queue into the next', async () => {

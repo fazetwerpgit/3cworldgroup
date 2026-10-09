@@ -97,6 +97,7 @@ function props(overrides: Partial<Parameters<typeof MobileThread>[0]> = {}): Par
     onReactionError: vi.fn(),
     onRetryPending: vi.fn(),
     onDiscardPending: vi.fn(),
+    onSendTextOnly: vi.fn(),
     connectionNotice: null,
     onReply: vi.fn(),
     onEdit: vi.fn(),

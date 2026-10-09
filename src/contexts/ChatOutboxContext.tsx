@@ -55,6 +55,8 @@ interface ChatOutboxValue {
   echoes: ThreadMessage[];
   send: (echo: ThreadMessage) => void;
   retry: (echo: ThreadMessage) => void;
+  // A lost photo's caption goes out on its own.
+  sendTextOnly: (echo: ThreadMessage) => void;
   discard: (echoId: string) => void;
   // Drops echoes the open thread's realtime feed has delivered.
   reconcile: (deliveredIds: ReadonlySet<string>, channelId: string, windowFloorMs: number | null) => void;
@@ -71,8 +73,9 @@ export function useChatOutbox(): ChatOutboxValue {
 }
 
 export function ChatOutboxProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const uid = user?.uid ?? null;
+  const { user, hasPermission } = useAuth();
+  // Only chat users have a queue; everyone else skips the storage work.
+  const uid = user && hasPermission('chat:read') ? user.uid : null;
   const [echoes, setEchoes] = useState<ThreadMessage[]>([]);
 
   // Live mirror of echoes for retry timers and lifecycle listeners, which must
@@ -113,15 +116,27 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
   }, []);
   const postMessageRef = useRef<(echo: ThreadMessage) => Promise<void>>(async () => undefined);
 
-  // A restored photo's file comes back from IndexedDB (with a fresh preview).
-  // Null when it is gone: the echo then reads "Photo not sent".
+  // A restored photo's file comes back from IndexedDB (with a fresh preview),
+  // once per echo however many callers ask (restore and an early flush can race).
+  // Null when it is gone: the echo is then marked photoLost and fails.
+  const photoLoadsRef = useRef<Map<string, Promise<File | null>>>(new Map());
   const reloadPhoto = useCallback(
-    async (echo: ThreadMessage): Promise<File | null> => {
-      const file = await loadPendingPhoto(echo.id);
-      if (file) {
-        updateEcho(echo.id, { pendingFile: file, photoPending: false, localPreviewUrl: URL.createObjectURL(file) });
-      }
-      return file;
+    (echoId: string): Promise<File | null> => {
+      const pending = photoLoadsRef.current.get(echoId);
+      if (pending) return pending;
+      const load = loadPendingPhoto(echoId).then((file) => {
+        photoLoadsRef.current.delete(echoId);
+        // Discarded (or the account changed) meanwhile: no preview to make.
+        if (!echoesRef.current.some((p) => p.id === echoId)) return file;
+        const patch: Partial<ThreadMessage> = file
+          ? { pendingFile: file, photoPending: false, localPreviewUrl: URL.createObjectURL(file) }
+          : { pendingState: 'failed', photoLost: true, uploadProgress: undefined };
+        updateEcho(echoId, patch);
+        echoesRef.current = echoesRef.current.map((p) => (p.id === echoId ? { ...p, ...patch } : p));
+        return file;
+      });
+      photoLoadsRef.current.set(echoId, load);
+      return load;
     },
     [updateEcho]
   );
@@ -149,9 +164,11 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
           echo.uploadedAttachment ?? (echo.attachment?.type === 'gif' ? echo.attachment : undefined);
         let pendingFile = echo.pendingFile;
         if (!attachment && !pendingFile && echo.photoPending) {
-          pendingFile = (await reloadPhoto(echo)) ?? undefined;
+          pendingFile = (await reloadPhoto(echo.id)) ?? undefined;
           if (!pendingFile) throw new Error(PHOTO_LOST_ERROR);
         }
+        // Signed out or switched account meanwhile: never post as someone else.
+        if (auth?.currentUser?.uid !== echo.authorId) return;
         if (pendingFile && !attachment) {
           let prepared = echo.preparedUpload;
           if (!prepared) {
@@ -182,6 +199,7 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
           );
           updateEcho(echo.id, { uploadedAttachment: attachment, uploadProgress: 1 });
         }
+        if (auth?.currentUser?.uid !== echo.authorId || uidRef.current !== owner) return;
         const controller = new AbortController();
         const timeout = window.setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
         let response: Response;
@@ -336,26 +354,13 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
     let active = true;
     // Bring back restored photos' files (and previews) first, then send.
     const photos = echoesRef.current.filter((echo) => echo.photoPending && !echo.pendingFile);
-    void Promise.all(
-      photos.map(async (echo) => {
-        const file = await loadPendingPhoto(echo.id);
-        if (!active) return;
-        if (file) {
-          const loaded = { pendingFile: file, photoPending: false, localPreviewUrl: URL.createObjectURL(file) };
-          updateEcho(echo.id, loaded);
-          echoesRef.current = echoesRef.current.map((p) => (p.id === echo.id ? { ...p, ...loaded } : p));
-        } else {
-          updateEcho(echo.id, { pendingState: 'failed' });
-          echoesRef.current = echoesRef.current.map((p) => (p.id === echo.id ? { ...p, pendingState: 'failed' } : p));
-        }
-      })
-    ).then(() => {
+    void Promise.all(photos.map((echo) => reloadPhoto(echo.id))).then(() => {
       if (active) flushOutbox();
     });
     return () => {
       active = false;
     };
-  }, [outboxUid, clearAllRetryTimers, flushOutbox, updateEcho]);
+  }, [outboxUid, clearAllRetryTimers, flushOutbox, reloadPhoto]);
   useEffect(() => {
     if (!outboxUid || outboxUid !== uid) return;
     const entries = toOutboxEntries(echoes);
@@ -417,6 +422,17 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
     [postMessage, updateEcho]
   );
 
+  const sendTextOnly = useCallback(
+    (echo: ThreadMessage) => {
+      if (!echo.text) return;
+      const textOnly = { photoPending: false, photoLost: false, pendingFile: undefined, localPreviewUrl: undefined };
+      updateEcho(echo.id, textOnly);
+      echoesRef.current = echoesRef.current.map((p) => (p.id === echo.id ? { ...p, ...textOnly } : p));
+      retry(echo);
+    },
+    [retry, updateEcho]
+  );
+
   const discard = useCallback(
     (echoId: string) => {
       clearRetryTimer(echoId);
@@ -439,8 +455,8 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
   );
 
   const value = useMemo(
-    () => ({ echoes, send, retry, discard, reconcile, subscribeErrors }),
-    [echoes, send, retry, discard, reconcile, subscribeErrors]
+    () => ({ echoes, send, retry, sendTextOnly, discard, reconcile, subscribeErrors }),
+    [echoes, send, retry, sendTextOnly, discard, reconcile, subscribeErrors]
   );
   return <ChatOutboxContext.Provider value={value}>{children}</ChatOutboxContext.Provider>;
 }
