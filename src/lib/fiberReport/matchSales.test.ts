@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { FiberOrder } from '@/types/fiberOrder';
 import {
   attachLoggedCustomerNames,
+  attachMatchedUserNames,
   doorOrders,
   matchFiberOrdersToSales,
+  matchFiberOrdersToSalesDetailed,
+  orderMatchKey,
   normalizeAddress,
   ordersPlacedForSale,
   saleUnitId,
@@ -383,5 +386,103 @@ describe('ordersPlacedForSale: the 7-day cutoff', () => {
     const eightBefore = placed('2026-09-06');
     const sevenBefore = placed('2026-09-07');
     expect(ordersPlacedForSale(lateNight, [eightBefore, sevenBefore])).toEqual([sevenBefore]);
+  });
+});
+
+describe('order number first: a door with a missed install and the real order', () => {
+  // Sharon T., 149 Varsity Dr (Oct 2026): the carrier printed a "Customer Not
+  // Home" breakage row and her real order, both on the missed day. By address
+  // alone the miss is the current row, so her sale read red and her real order
+  // read "not logged". Her sale carries the real order's number.
+  const real = order({
+    id: 'TMO20261005Z30P4', address: '149 VARSITY DR', orderDate: '2026-10-05', estInstallDate: '2026-10-06',
+  });
+  const miss = order({
+    id: 'brk_c07a787f', status: 'breakage', address: '149 VARSITY DR', orderDate: null, estInstallDate: '2026-10-06',
+    breakageReason: 'CX Missed — Customer Not Home',
+  });
+  const sharon = {
+    id: 'sharon', customerAddress: '149 VARSITY DR, HUNTSVILLE, TX 77340', saleDate: new Date('2026-10-05T12:00:00'),
+    orderNumberOrBtn: 'TMO20261005Z30P4',
+  };
+
+  it('joins the sale to the row with its order number, whichever order the rows come in', () => {
+    for (const orders of [[miss, real], [real, miss]]) {
+      expect(matchFiberOrdersToSales([sharon], orders).get('sharon')).toBe(real);
+    }
+  });
+
+  it('still shows the miss to a sale with no order number (address-only, unchanged)', () => {
+    const { orderNumberOrBtn: _drop, ...noNumber } = sharon;
+    void _drop;
+    for (const orders of [[miss, real], [real, miss]]) {
+      expect(matchFiberOrdersToSales([noNumber], orders).get('sharon')).toBe(miss);
+    }
+  });
+
+  it('falls back to the address when the report does not have the number', () => {
+    for (const orders of [[miss, real], [real, miss]]) {
+      expect(matchFiberOrdersToSales([{ ...sharon, orderNumberOrBtn: 'TMO20261005ZZZZZ' }], orders).get('sharon')).toBe(miss);
+    }
+  });
+
+  it('reads the number however it was typed or scanned', () => {
+    expect(orderMatchKey(' tmo-20261005 z30p4 ')).toBe(orderMatchKey('TMO20261005Z30P4'));
+    // A screenshot reader turned the O of TMO into a zero.
+    expect(orderMatchKey('TM02026100654K46')).toBe(orderMatchKey('TMO2026100654K46'));
+    expect(orderMatchKey('12')).toBe('');
+    const scanned = order({ id: 'TMO2026100654K46', address: '528 MCDOUGAL ST', orderDate: '2026-10-06' });
+    expect(matchFiberOrdersToSales([{ id: 's', customerAddress: '528 McDougal St', orderNumberOrBtn: 'TM02026100654K46' }], [scanned]).get('s')).toBe(scanned);
+  });
+
+  it('joins by number even where the address or the date window would not', () => {
+    const typo = { id: 's', customerAddress: '194 Varsty Drive', orderNumberOrBtn: 'TMO20261005Z30P4', saleDate: new Date('2026-11-30T12:00:00') };
+    expect(matchFiberOrdersToSales([typo], [miss, real]).get('s')).toBe(real);
+  });
+
+  it('never lets another sale take a row claimed by number through the address', () => {
+    const second = { id: 'second', customerAddress: '149 Varsity Dr', saleDate: new Date('2026-10-05T12:00:00') };
+    for (const sales of [[second, sharon], [sharon, second]]) {
+      for (const orders of [[miss, real], [real, miss]]) {
+        const { matches, contested } = matchFiberOrdersToSalesDetailed(sales, orders);
+        expect(matches.get('sharon')).toBe(real);
+        expect(matches.get('second')).toBe(miss);
+        // The duplicate check still sees both sales at one order.
+        expect(contested.get('second')).toBe(real);
+      }
+    }
+    // With no other row at the door, the second sale has none.
+    expect(matchFiberOrdersToSales([second, sharon], [real]).has('second')).toBe(false);
+  });
+
+  it('joins the live order by number at a door with a cancelled one', () => {
+    const cancelled = order({ id: 'TMO20261008UNOT1', status: 'cancelled', address: '411 PALM ST', orderDate: '2026-10-08' });
+    const live = order({ id: 'TMO2026100835WB1', address: '411 PALM ST', orderDate: '2026-10-08' });
+    const sale = { id: 's', customerAddress: '411 Palm St', orderNumberOrBtn: 'TMO2026100835WB1' };
+    for (const orders of [[cancelled, live], [live, cancelled]]) {
+      expect(matchFiberOrdersToSales([sale], orders).get('s')).toBe(live);
+    }
+  });
+
+  it('leaves a saleLink above the number', () => {
+    const link = { by: 'admin-1', byName: 'Jacob', at: '2026-10-07T00:00:00.000Z' };
+    const linked = order({ id: 'TMO2026100577777', address: '9 Elsewhere Rd', saleLink: { saleId: 'sharon', ...link } });
+    expect(matchFiberOrdersToSales([sharon], [real, miss, linked]).get('sharon')).toBe(linked);
+    const notASale = { ...real, saleLink: { saleId: null, ...link } };
+    expect(matchFiberOrdersToSales([sharon], [notASale, miss]).get('sharon')).toBe(miss);
+  });
+});
+
+describe('attachMatchedUserNames', () => {
+  it("names the matched portal rep from their newest sale, never the report's dealer name", () => {
+    const handoff = order({ repName: 'Jeremy McFarland', matchedUserId: 'miles' });
+    const nobody = order({ id: 'o2', repName: 'Someone', matchedUserId: 'quiet-rep' });
+    const [named, unnamed] = attachMatchedUserNames([handoff, nobody], [
+      { salesRepId: 'miles', salesRepName: 'Miles S', createdAt: new Date('2026-10-01') },
+      { salesRepId: 'miles', salesRepName: 'Miles Scoonover', createdAt: new Date('2026-10-05') },
+      { salesRepId: 'jeremy', salesRepName: 'Jeremy McFarland', createdAt: new Date('2026-10-06') },
+    ]);
+    expect(named.matchedUserName).toBe('Miles Scoonover');
+    expect(unnamed.matchedUserName).toBeNull();
   });
 });

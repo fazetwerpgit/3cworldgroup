@@ -1,11 +1,14 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import {
+  carrierOrderKey,
   doorOrders,
   isAddressPrefixPair,
   latestDay,
   linkedSaleId,
   normalizeAddress,
+  orderMatchKey,
+  ordersByNumber,
   ordersPlacedForSale,
   pickCurrentOrder,
 } from '@/lib/fiberReport/matchSales';
@@ -66,6 +69,8 @@ interface SyncSale {
   customerName: string | null;
   customerAddress: string | null;
   normalizedAddress: string;
+  /** The logged order number as the join compares it (orderMatchKey), '' when none. */
+  orderKey: string;
   saleDate: unknown;
   installDate: unknown;
   status: string | null;
@@ -117,6 +122,7 @@ function toSyncSale(
     customerName: text(data.customerName),
     customerAddress,
     normalizedAddress: normalizeAddress(customerAddress),
+    orderKey: orderMatchKey(data.orderNumberOrBtn),
     saleDate: data.saleDate ?? null,
     installDate: data.installDate ?? null,
     status: text(data.status),
@@ -150,14 +156,20 @@ type Current =
  * `saleLink` outranks everything — it is an admin saying out loud which sale an
  * order is (or that it is none) — and a linked order leaves the address pool
  * entirely, exactly as buildMergedBook does it. A sale named by two links is a
- * contradiction an admin has to settle. Otherwise the orders placed too long
+ * contradiction an admin has to settle. Then the order number: a sale whose
+ * logged number is in `orders` is that row, as the page joins it. Otherwise,
+ * leaving out rows another sale holds by number (`claimedByNumber`), the orders placed too long
  * before the sale are set aside (ordersPlacedForSale), the sale's door is read
  * off the address (doorOrders) and its current row picked (pickCurrentOrder),
  * the same steps the page takes. A door that can't be told apart, or a pick
  * that flips when the rows come in reverse (a tie the page settles by input
  * order), is ambiguous: a writer needs a real answer.
  */
-function currentOrderForSale(sale: SyncSale, orders: FiberOrder[]): Current {
+function currentOrderForSale(
+  sale: SyncSale,
+  orders: FiberOrder[],
+  claimedByNumber: ReadonlySet<string> = new Set()
+): Current {
   const links = orders.filter((order) => {
     const link = linkedSaleId(order);
     return link.linked && link.saleId === sale.id;
@@ -165,9 +177,18 @@ function currentOrderForSale(sale: SyncSale, orders: FiberOrder[]): Current {
   if (links.length > 1) return { kind: 'ambiguous' };
   if (links.length === 1) return { kind: 'order', order: links[0] };
 
+  if (sale.orderKey) {
+    const numbered = orders.find(
+      (order) => !linkedSaleId(order).linked && carrierOrderKey(order) === sale.orderKey
+    );
+    if (numbered) return { kind: 'order', order: numbered };
+  }
+
   if (sale.normalizedAddress.length < 6) return { kind: 'none' };
   const candidates = ordersPlacedForSale(sale.saleDate, orders).filter((order) => {
     if (linkedSaleId(order).linked) return false;
+    const key = carrierOrderKey(order);
+    if (key && claimedByNumber.has(key)) return false;
     const orderAddress = normalizeAddress(order.address);
     return orderAddress.length >= 6 && isAddressPrefixPair(sale.normalizedAddress, orderAddress);
   });
@@ -373,7 +394,14 @@ export async function syncInstallDatesFromOrders(
   const sales = snapshot.docs.map((doc) =>
     toSyncSale(doc.id, doc.data() ?? {}, doc.updateTime ?? null)
   );
-  const currents = sales.map((sale) => ({ sale, current: currentOrderForSale(sale, orders) }));
+  // Rows a sale holds by order number are that sale's; no other sale may reach
+  // them by street (the same rule matchFiberOrdersToSales applies).
+  const numbered = ordersByNumber(orders.filter((order) => !linkedSaleId(order).linked));
+  const claimedByNumber = new Set(sales.map((sale) => sale.orderKey).filter((key) => numbered.has(key)));
+  const currents = sales.map((sale) => ({
+    sale,
+    current: currentOrderForSale(sale, orders, claimedByNumber),
+  }));
   const resolved = resolveMatches(currents);
   result.orderSales = orderSalesFor(currents);
   result.checked = orders.filter(isDated).length;

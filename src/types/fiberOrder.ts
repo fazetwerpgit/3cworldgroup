@@ -43,6 +43,10 @@ export interface FiberOrder {
   // Attached at read time only (never stored): customer name from a portal Sale
   // the matched rep logged THEMSELVES, cross-matched by street address.
   loggedCustomerName?: string | null;
+  // Attached at read time only (never stored): the portal's name for
+  // matchedUserId. `repName` is the dealer code's owner as the report prints
+  // it, which under a dealer-code handoff is a different rep.
+  matchedUserName?: string | null;
   // PERSISTED (unlike loggedCustomerName above, which is read-time only): an
   // admin's explicit decision about which portal Sale this carrier order is.
   // Its presence OVERRIDES the address join entirely — when saleLink is set the

@@ -682,3 +682,74 @@ describe('possibleDuplicate — one order logged twice', () => {
     expect(two.counts.scheduled).toBe(2);
   });
 });
+
+describe('a portal rep selling on another rep\'s dealer code (handoff)', () => {
+  // Miles Scoonover sells on Jeremy McFarland's code 4808955 until his own
+  // T-Fiber account is set up, so every carrier row of his prints "Jeremy
+  // McFarland". His rollup was titled with it whenever a carrier row led.
+  const miles = (overrides: Partial<Sale> = {}) =>
+    sale({ salesRepId: 'miles', salesRepName: 'Miles Scoonover', ...overrides });
+  const carrier = (overrides: Partial<FiberOrder> = {}) =>
+    order({ repName: 'Jeremy McFarland', repDealerId: '4808955', matchedUserId: 'miles', ...overrides });
+
+  it("titles the rollup and every row with the portal rep's name, whichever row leads", () => {
+    // The unlogged row sorts first (attention leads scheduled).
+    const unlogged = carrier({ id: 'TMO-UNLOGGED', address: '411 Palm St', status: 'cancelled' });
+    const book = build([miles({ id: 'm1' })], [carrier(), unlogged]);
+    const rep = book.reps.find((r) => r.repId === 'miles');
+
+    expect(rep?.rows[0].key).toBe('order:TMO-UNLOGGED');
+    expect(rep?.repName).toBe('Miles Scoonover');
+    expect(book.rows.every((r) => r.repName === 'Miles Scoonover')).toBe(true);
+  });
+
+  it('names a month with only carrier rows from the portal, not the report', () => {
+    const only = carrier({ id: 'TMO-ONLY', address: '411 Palm St' });
+    expect(build([], [only]).reps[0].repName).toBe('Jeremy McFarland'); // nothing else to go on
+    expect(build([], [{ ...only, matchedUserName: 'Miles Scoonover' }]).reps[0].repName).toBe('Miles Scoonover');
+    expect(
+      buildMergedBook([], [only], { now: NOW, repNames: new Map([['miles', 'Miles Scoonover']]) }).reps[0].repName
+    ).toBe('Miles Scoonover');
+  });
+
+  it('keeps the report name for an order no portal user matched', () => {
+    const stray = order({ id: 'TMO-STRAY', repName: 'Casey Rivera', matchedUserId: null, address: '1 Nowhere Ln' });
+    expect(row(build([miles({ id: 'm1' })], [stray]), 'order:TMO-STRAY').repName).toBe('Casey Rivera');
+  });
+});
+
+describe('order number first — a missed install beside the real order', () => {
+  // Sharon T., 149 Varsity Dr: a breakage row and her real order, both on the
+  // missed day. Her sale carries the real order's number.
+  const real = order({ id: 'TMO20261005Z30P4', address: '149 VARSITY DR', orderDate: '2026-09-05', estInstallDate: '2026-09-20' });
+  const miss = order({
+    id: 'brk_c07a787f', status: 'breakage', address: '149 VARSITY DR', orderDate: null, estInstallDate: '2026-09-20',
+  });
+  const sharon = sale({ id: 'sharon', customerAddress: '149 VARSITY DR, HUNTSVILLE, TX 77340', orderNumberOrBtn: 'TMO20261005Z30P4' });
+
+  it('puts the sale on its own order and never reads that order as not logged', () => {
+    for (const orders of [[miss, real], [real, miss]]) {
+      const book = build([sharon], orders);
+      expect(row(book, 'sharon').order).toBe(real);
+      expect(row(book, 'sharon').state).toBe('agreed');
+      expect(book.rows.some((r) => r.key === `order:${real.id}`)).toBe(false);
+    }
+  });
+
+  it('flags a second, number-less sale at the door as a possible duplicate', () => {
+    const again = sale({ id: 'again', customerAddress: '149 Varsity Dr' });
+    for (const sales of [[sharon, again], [again, sharon]]) {
+      const book = build(sales, [miss, real]);
+      expect(row(book, 'sharon').order).toBe(real);
+      expect(row(book, 'again').order).toBe(miss);
+      expect(row(book, 'sharon').possibleDuplicate).toBe(true);
+      expect(row(book, 'again').possibleDuplicate).toBe(true);
+    }
+  });
+
+  it('matches by address as before when the sale has no order number', () => {
+    const book = build([sale({ id: 'plain' })], [order()]);
+    expect(row(book, 'plain').order?.id).toBe('TMO20260824UZMTV');
+    expect(row(book, 'plain').state).toBe('agreed');
+  });
+});

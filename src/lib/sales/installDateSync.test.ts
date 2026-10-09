@@ -82,6 +82,7 @@ type SaleDoc = {
   installDateSource?: string;
   repEditOrderId?: string | null;
   repEditCarrierDate?: string | null;
+  orderNumberOrBtn?: string;
 };
 
 function setSales(sales: SaleDoc[]): void {
@@ -839,5 +840,45 @@ describe('a sale that changes while the report runs', () => {
 
     expect(updateMock).toHaveBeenCalledTimes(2);
     expect(result).toMatchObject({ updated: 0, errors: 1 });
+  });
+});
+
+describe('order number first, as the page joins it', () => {
+  // A missed-install row and the real order at one door, both on the missed
+  // day: by address the miss is the current row. A sale carrying the real
+  // order's number is that order, and no number-less sale reaches it by street.
+  const real = () => order({ id: 'TMO20261005Z30P4', orderDate: reportDay(-3), estInstallDate: reportDay(2) });
+  const miss = () => order({ id: 'brk_1', status: 'breakage', orderDate: null, estInstallDate: reportDay(2) });
+
+  it('reads the numbered order as the sale\'s row, not the miss, in both row orders', async () => {
+    for (const rows of [[miss(), real()], [real(), miss()]]) {
+      setSales([{ id: 'sharon', salesRepId: 'rep-1', customerAddress: '123 Main St', status: 'approved', orderNumberOrBtn: 'TMO20261005Z30P4' }]);
+      const result = await syncInstallDatesFromOrders({ orders: rows, now: NOW });
+      expect(result.orderSales.get('TMO20261005Z30P4')?.saleId).toBe('sharon');
+      expect(result.orderSales.has('brk_1')).toBe(false);
+      expect(result.skippedAmbiguous).toBe(0);
+      // The page agrees.
+      expect(
+        matchFiberOrdersToSales([{ id: 'sharon', customerAddress: '123 Main St', orderNumberOrBtn: 'TMO20261005Z30P4' }], rows).get('sharon')?.id
+      ).toBe('TMO20261005Z30P4');
+    }
+  });
+
+  it('keeps a number-less sale at the door off the numbered row', async () => {
+    setSales([
+      { id: 'sharon', salesRepId: 'rep-1', customerAddress: '123 Main St', status: 'approved', orderNumberOrBtn: 'TMO20261005Z30P4' },
+      { id: 'other', salesRepId: 'rep-1', customerAddress: '123 Main St', status: 'approved' },
+    ]);
+    const result = await syncInstallDatesFromOrders({ orders: [real(), miss()], now: NOW });
+    expect(result.orderSales.get('TMO20261005Z30P4')?.saleId).toBe('sharon');
+    expect(result.orderSales.get('brk_1')?.saleId).toBe('other');
+  });
+
+  it("records the numbered row for a rep's edit", () => {
+    const snapshot = carrierOrderForSale(
+      { id: 'sharon', data: { customerAddress: '123 Main St', orderNumberOrBtn: 'tmo-20261005-z30p4' } },
+      [miss(), real()]
+    );
+    expect(snapshot?.orderId).toBe('TMO20261005Z30P4');
   });
 });

@@ -163,6 +163,9 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
       : [],
     productSold: str(data.productSold),
     hasOrderNumber: Boolean(str(data.orderNumberOrBtn)),
+    // For the carrier join only (matched by order number first, as the board
+    // does); no line below prints it.
+    orderNumberOrBtn: str(data.orderNumberOrBtn),
     screenshots: saleProofPaths(data).length,
     reason: str(data.status) === 'rejected' ? data.rejectionReason : str(data.status) === 'cancelled' ? data.cancelReason : '',
   }));

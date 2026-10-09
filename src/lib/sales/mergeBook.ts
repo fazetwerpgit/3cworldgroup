@@ -9,7 +9,7 @@ import {
   type InstallBucket,
   type InstallCounts,
 } from '@/lib/sales/installBucket';
-import { linkedSaleId, matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
+import { linkedSaleId, matchFiberOrdersToSalesDetailed } from '@/lib/fiberReport/matchSales';
 import { installDayKey } from '@/lib/sales/saleDate';
 import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
 import type { MonthKey } from '@/lib/sales/monthWindow';
@@ -219,12 +219,45 @@ function byMonthThenBucket(a: MergedRow, b: MergedRow): number {
   return byBucketThenDate(a, b);
 }
 
+/**
+ * The name a row shows for its rep. A portal rep is titled by the portal: the
+ * caller's users-doc names, else the rep's own sales' salesRepName, else the
+ * name the status API attached to the order (matchedUserName). The report's
+ * repName is the dealer code's owner — under a handoff (Miles sells on
+ * Jeremy's code) a different person — so it is only the last resort, and the
+ * whole answer for an order no portal user matched.
+ */
+type PortalNames = (repId: string | null, order: FiberOrder | null) => string | null;
+
+function portalNames(sales: readonly Sale[], repNames?: ReadonlyMap<string, string>): PortalNames {
+  const fromSales = new Map<string, string>();
+  for (const sale of sales) {
+    const uid = text(sale.salesRepId);
+    const name = text(sale.salesRepName);
+    if (uid && name && !fromSales.has(uid)) fromSales.set(uid, name);
+  }
+  return (repId, order) => {
+    if (repId) {
+      const name =
+        text(repNames?.get(repId)) ??
+        fromSales.get(repId) ??
+        (order?.matchedUserId === repId ? text(order.matchedUserName) : null);
+      if (name) return name;
+    }
+    return text(order?.repName);
+  };
+}
+
 function saleRow(
   sale: Sale,
   order: FiberOrder | null,
   index: number,
-  opts: { linkedManually: boolean; cancelled: boolean; counted: boolean; possibleDuplicate: boolean; now: Date }
+  opts: {
+    linkedManually: boolean; cancelled: boolean; counted: boolean; possibleDuplicate: boolean; now: Date;
+    names: PortalNames;
+  }
 ): MergedRow {
+  const repId = text(sale.salesRepId) ?? order?.matchedUserId ?? null;
   const saleValue = finite(sale.totalValue) ?? 0;
   const carrierMrc = order ? finite(order.mrc) : null;
   const state: MergedRowState = opts.cancelled ? 'cancelled' : order ? 'agreed' : 'waiting';
@@ -234,8 +267,8 @@ function saleRow(
     state,
     sale,
     order,
-    repId: text(sale.salesRepId) ?? order?.matchedUserId ?? null,
-    repName: text(sale.salesRepName) ?? text(order?.repName) ?? 'Unassigned',
+    repId,
+    repName: text(sale.salesRepName) ?? opts.names(repId, order) ?? 'Unassigned',
     customerName: text(sale.customerName) ?? text(order?.customerName),
     address: text(sale.customerAddress) ?? text(order?.address) ?? '',
     value: saleValue,
@@ -273,7 +306,7 @@ function isHistoric(order: FiberOrder): boolean {
   return dated.getTime() < cutoff.getTime();
 }
 
-function orderRow(order: FiberOrder, now: Date, verdict: OrderVerdict): MergedRow {
+function orderRow(order: FiberOrder, now: Date, verdict: OrderVerdict, names: PortalNames): MergedRow {
   const matchedUserId = text(order.matchedUserId);
   return {
     key: `order:${order.id}`,
@@ -291,7 +324,7 @@ function orderRow(order: FiberOrder, now: Date, verdict: OrderVerdict): MergedRo
     sale: null,
     order,
     repId: matchedUserId,
-    repName: text(order.repName) ?? 'Unassigned',
+    repName: names(matchedUserId, order) ?? 'Unassigned',
     customerName: text(order.customerName) ?? text(order.loggedCustomerName),
     address: text(order.address) ?? '',
     // CALL 1: nobody logged it, so it is not money. It is a question.
@@ -337,6 +370,7 @@ export function possibleDuplicateSales(
 
 function rollupRows(rows: MergedRow[]): MergedRepRollup[] {
   const byRep = new Map<string, MergedRepRollup>();
+  const namedBySale = new Set<string>();
 
   for (const row of rows) {
     // 'unassigned' rows cannot sit in a rep's list, and a cancelled row belongs
@@ -346,7 +380,14 @@ function rollupRows(rows: MergedRow[]): MergedRepRollup[] {
     // renamed rep must not split into two rows mid-month.
     const key = row.repId || row.repName || 'unassigned';
     let rollup = byRep.get(key);
+    // The label is the rep's own: a row with a sale names them as the portal
+    // does, so it outranks an order-only row that happened to come first.
+    if (rollup && row.sale && !namedBySale.has(key)) {
+      rollup.repName = row.repName;
+      namedBySale.add(key);
+    }
     if (!rollup) {
+      if (row.sale) namedBySale.add(key);
       rollup = {
         repId: key,
         repName: row.repName,
@@ -403,9 +444,14 @@ function assemble(rows: MergedRow[]): MergedBook {
 export function buildMergedBook(
   sales: Sale[],
   orders: FiberOrder[],
-  opts?: { now?: Date }
+  opts?: {
+    now?: Date;
+    /** users/{uid} display names, when the caller has them. Outranks every other source. */
+    repNames?: ReadonlyMap<string, string>;
+  }
 ): MergedBook {
   const now = opts?.now ?? new Date();
+  const names = portalNames(sales, opts?.repNames);
 
   // countedSales is isPayableSale — the one function that decides money — and
   // cancelledSales is its other half. Both filter the caller's own objects, so
@@ -458,9 +504,10 @@ export function buildMergedBook(
 
   const linkedManually = new Set<Sale>(orderBySale.keys());
 
-  // Pass 2 — the address guess, over what neither side has already spoken for.
+  // Pass 2 — the order number, then the address guess, over what neither side
+  // has already spoken for (matchFiberOrdersToSalesDetailed).
   const openSales = sales.filter((sale) => !linkedManually.has(sale));
-  const guessed = matchFiberOrdersToSales(openSales, openOrders);
+  const { matches: guessed, contested } = matchFiberOrdersToSalesDetailed(openSales, openOrders);
   for (const sale of openSales) {
     const id = text(sale.id);
     const order = id ? guessed.get(id) : undefined;
@@ -473,7 +520,12 @@ export function buildMergedBook(
     claimedOrders.add(order);
   }
 
-  const duplicates = possibleDuplicateSales(sales, guessed, (sale) => cancelled.has(sale));
+  // A sale the address put at a door whose row another sale holds by order
+  // number reads as on that row for the duplicate check, as it did before the
+  // number join: two sales at one door is still one customer logged twice.
+  const doorOrder = new Map(guessed);
+  for (const [saleId, order] of contested) doorOrder.set(saleId, order);
+  const duplicates = possibleDuplicateSales(sales, doorOrder, (sale) => cancelled.has(sale));
 
   // The carrier half of the verdict can only be read once the join is done, so
   // it lands here rather than in the sets above: a carrier cancellation settles
@@ -487,13 +539,14 @@ export function buildMergedBook(
       counted: payable.has(sale) && !carrierCancelled,
       possibleDuplicate: duplicates.has(sale),
       now,
+      names,
     });
   });
 
   const NO_LINK: OrderVerdict = { dismissed: false, linkBroken: false };
   for (const order of orders) {
     if (claimedOrders.has(order)) continue;
-    rows.push(orderRow(order, now, verdicts.get(order) ?? NO_LINK));
+    rows.push(orderRow(order, now, verdicts.get(order) ?? NO_LINK, names));
   }
 
   rows.sort(byMonthThenBucket);

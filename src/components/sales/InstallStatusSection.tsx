@@ -344,7 +344,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
     const groups = new Map<string, RepGroup>();
     matchedOrders.forEach((order) => {
       const userId = order.matchedUserId || null;
-      const repName = (userId && submissions.get(userId)?.[0]?.salesRepName) || order.repName || 'Unknown rep';
+      const repName = (userId && (submissions.get(userId)?.[0]?.salesRepName || order.matchedUserName)) || order.repName || 'Unknown rep';
       const key = userId ? `uid:${userId}` : `name:${repName}`;
       const existing = groups.get(key);
       if (existing) existing.orders.push(order);

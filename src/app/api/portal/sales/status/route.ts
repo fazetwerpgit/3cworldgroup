@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { FiberOrder, FiberStatusResponse } from '@/types';
-import { attachLoggedCustomerNames, LoggedSale } from '@/lib/fiberReport/matchSales';
+import { attachLoggedCustomerNames, attachMatchedUserNames, LoggedSale } from '@/lib/fiberReport/matchSales';
 import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 import { ownDealerCodes } from '@/lib/fiberReport/dealerCodes';
 
@@ -21,6 +21,7 @@ function toFiberOrder(id: string, data: FirebaseFirestore.DocumentData): FiberOr
 function toLoggedSale(data: FirebaseFirestore.DocumentData): LoggedSale {
   return {
     salesRepId: data.salesRepId,
+    salesRepName: typeof data.salesRepName === 'string' ? data.salesRepName : null,
     customerName: data.customerName,
     customerAddress: data.customerAddress,
     createdAt: data.createdAt?.toDate?.() ?? null,
@@ -92,7 +93,7 @@ export async function GET(request: NextRequest) {
     const salesSnapshot = await adminDb.collection('sales').get();
     const sales = salesSnapshot.docs.map((doc) => toLoggedSale(doc.data()));
     const orders = sortByOrderDate(
-      attachLoggedCustomerNames(matchedOrders, sales)
+      attachMatchedUserNames(attachLoggedCustomerNames(matchedOrders, sales), sales)
     );
     const unmatched = sortByOrderDate(
       allOrders.filter((order) => order.matchedUserId === null)

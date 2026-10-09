@@ -1,8 +1,10 @@
 import type { FiberOrder } from '@/types/fiberOrder';
 import { installDayKey } from '@/lib/sales/saleDate';
+import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
 
 export type LoggedSale = {
   salesRepId: string;
+  salesRepName?: string | null;
   customerName?: string | null;
   customerAddress?: string | null;
   createdAt?: Date | null;
@@ -13,7 +15,25 @@ export type SaleForFiberMatch = {
   customerAddress?: string | null;
   /** The day the sale was made: orders placed well before it are not this sale's. */
   saleDate?: unknown;
+  /** The carrier order number the rep logged. When the report has it, it is the join. */
+  orderNumberOrBtn?: unknown;
 };
+
+/**
+ * An order number as the join compares it: normalizeOrderNumber, with the
+ * letters a screenshot reader confuses for digits folded onto them ('TM0…' for
+ * 'TMO…'). Both sides fold, so an exact match still matches. '' when there is
+ * no number worth comparing.
+ */
+export function orderMatchKey(value: unknown): string {
+  const key = normalizeOrderNumber(value).replace(/O/g, '0').replace(/I/g, '1');
+  return key.length >= 6 ? key : '';
+}
+
+/** A carrier row's order number (its doc id) as orderMatchKey, '' for a breakage row (no order id). */
+export function carrierOrderKey(order: Pick<FiberOrder, 'id'>): string {
+  return typeof order.id === 'string' && !order.id.startsWith('brk_') ? orderMatchKey(order.id) : '';
+}
 
 /** Normalize a free-text address for conservative street-prefix matching. */
 export function normalizeAddress(value: string | null | undefined): string {
@@ -218,15 +238,46 @@ export function linkedSaleId(
 }
 
 /**
- * Match sales to the rep's own-scope API response in memory; callers own matchedUserId filtering.
- * A linked order leaves the address pool whichever way its link points, and a
- * sale it names takes it over any address match — as buildMergedBook does.
+ * The open (unlinked) carrier rows by order number. A sale whose logged order
+ * number is here IS that row: no address guess, no door, no date window.
  */
-export function matchFiberOrdersToSales(
+export function ordersByNumber(orders: readonly FiberOrder[]): Map<string, FiberOrder> {
+  const byNumber = new Map<string, FiberOrder>();
+  for (const order of orders) {
+    const key = carrierOrderKey(order);
+    if (key && !byNumber.has(key)) byNumber.set(key, order);
+  }
+  return byNumber;
+}
+
+export interface FiberMatchResult {
+  matches: Map<string, FiberOrder>;
+  /**
+   * Address-matched sales (no order number of their own on the report) whose
+   * door holds a row another sale claimed by order number. The address guess
+   * may not take that row, but it is still the evidence that both sales are
+   * one customer, so the possible-duplicate flag reads it from here.
+   */
+  contested: Map<string, FiberOrder>;
+}
+
+/**
+ * Match sales to carrier rows in memory; callers own matchedUserId filtering.
+ *
+ *   1. saleLink. A linked order leaves the pool whichever way its link points,
+ *      and a sale it names takes it over everything else.
+ *   2. Order number. A sale whose logged number is on the report is that row,
+ *      even at a door with a missed-install or cancelled row beside it.
+ *   3. Address, for a sale with no number or a number the report does not
+ *      have. Rows claimed in step 2 are out of this pool: one carrier row is
+ *      one sale's, and a second sale at the door must not take it by street.
+ */
+export function matchFiberOrdersToSalesDetailed(
   sales: SaleForFiberMatch[],
   orders: FiberOrder[],
-): Map<string, FiberOrder> {
+): FiberMatchResult {
   const matches = new Map<string, FiberOrder>();
+  const contested = new Map<string, FiberOrder>();
   const saleIds = new Set(sales.map((sale) => sale.id).filter((id): id is string => !!id?.trim()));
   const openOrders: FiberOrder[] = [];
 
@@ -242,6 +293,17 @@ export function matchFiberOrdersToSales(
     }
   }
 
+  const byNumber = ordersByNumber(openOrders);
+  const claimedByNumber = new Set<FiberOrder>();
+  for (const sale of sales) {
+    const saleId = sale.id;
+    if (!saleId?.trim() || matches.has(saleId)) continue;
+    const order = byNumber.get(orderMatchKey(sale.orderNumberOrBtn));
+    if (!order) continue;
+    matches.set(saleId, order);
+    claimedByNumber.add(order);
+  }
+
   for (const sale of sales) {
     const saleId = sale.id;
     const saleAddress = normalizeAddress(sale.customerAddress);
@@ -250,11 +312,22 @@ export function matchFiberOrdersToSales(
     const atAddress = ordersPlacedForSale(sale.saleDate, openOrders).filter((order) =>
       isAddressPrefixPair(saleAddress, normalizeAddress(order.address))
     );
-    const selectedOrder = pickCurrentOrder(doorOrders(sale.customerAddress, atAddress).orders);
+    const door = doorOrders(sale.customerAddress, atAddress).orders;
+    const taken = door.find((order) => claimedByNumber.has(order));
+    if (taken) contested.set(saleId, taken);
+    const selectedOrder = pickCurrentOrder(door.filter((order) => !claimedByNumber.has(order)));
     if (selectedOrder) matches.set(saleId, selectedOrder);
   }
 
-  return matches;
+  return { matches, contested };
+}
+
+/** matchFiberOrdersToSalesDetailed, the matches alone: what every page and digest reads. */
+export function matchFiberOrdersToSales(
+  sales: SaleForFiberMatch[],
+  orders: FiberOrder[],
+): Map<string, FiberOrder> {
+  return matchFiberOrdersToSalesDetailed(sales, orders).matches;
 }
 
 function timestamp(sale: LoggedSale): number {
@@ -294,4 +367,24 @@ export function attachLoggedCustomerNames(
       loggedCustomerName: latestMatch?.customerName?.trim() ?? null,
     };
   });
+}
+
+/**
+ * The portal's name for each order's matched rep, from the rep's own logged
+ * sales (the newest one's salesRepName), in memory only. The report prints the
+ * dealer code's owner, which under a handoff is another rep entirely (Miles
+ * sells on Jeremy's code), so a page must never title a portal rep with it.
+ * null when the matched rep has logged nothing to take a name from.
+ */
+export function attachMatchedUserNames(orders: FiberOrder[], sales: LoggedSale[]): FiberOrder[] {
+  const latest = new Map<string, LoggedSale>();
+  for (const sale of sales) {
+    if (!sale.salesRepId || !sale.salesRepName?.trim()) continue;
+    const seen = latest.get(sale.salesRepId);
+    if (!seen || timestamp(sale) > timestamp(seen)) latest.set(sale.salesRepId, sale);
+  }
+  return orders.map((order) => ({
+    ...order,
+    matchedUserName: (order.matchedUserId && latest.get(order.matchedUserId)?.salesRepName?.trim()) || null,
+  }));
 }
