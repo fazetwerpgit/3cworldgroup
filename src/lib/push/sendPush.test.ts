@@ -14,6 +14,7 @@ vi.mock('@/lib/firebase/admin', () => ({
             get: vi.fn().mockResolvedValue({
               data: () => ({ pushTokens: ['tok1'] }),
             }),
+            set: vi.fn().mockResolvedValue(undefined),
           }),
         };
       }
@@ -79,17 +80,33 @@ describe('sendPushToTokens', () => {
       responses: [{ success: true }, { success: false, error: { code: 'messaging/internal-error' } }],
     });
     const result = await sendPushToTokens('user-1', ['tok1', 'tok2'], { title: 'T', body: 'B', url: '/portal' });
-    expect(result).toEqual({ delivered: 1, failed: 1 });
+    expect(result).toEqual({ delivered: 1, failed: 1, pruned: 0 });
     expect(sendEachForMulticast.mock.calls[0][0].tokens).toEqual(['tok1', 'tok2']);
   });
 
   it('sends nothing when the user has no devices', async () => {
-    expect(await sendPushToTokens('user-1', [], { title: 'T', body: 'B' })).toEqual({ delivered: 0, failed: 0 });
+    expect(await sendPushToTokens('user-1', [], { title: 'T', body: 'B' })).toEqual({ delivered: 0, failed: 0, pruned: 0 });
     expect(sendEachForMulticast).not.toHaveBeenCalled();
   });
 
   it('never throws: an FCM error counts every device as failed', async () => {
     sendEachForMulticast.mockRejectedValue(new Error('down'));
-    expect(await sendPushToTokens('user-1', ['tok1'], { title: 'T', body: 'B' })).toEqual({ delivered: 0, failed: 1 });
+    expect(await sendPushToTokens('user-1', ['tok1'], { title: 'T', body: 'B' })).toEqual({ delivered: 0, failed: 1, pruned: 0 });
+  });
+
+  it('counts dead tokens it pruned', async () => {
+    sendEachForMulticast.mockResolvedValue({
+      responses: [{ success: true }, { success: false, error: { code: 'messaging/registration-token-not-registered' } }],
+    });
+    const result = await sendPushToTokens('user-1', ['tok1', 'tok2'], { title: 'T', body: 'B' });
+    expect(result).toEqual({ delivered: 1, failed: 1, pruned: 1 });
+  });
+
+  it('sets the Web Push Urgency header only when asked', async () => {
+    await sendPushToTokens('user-1', ['tok1'], { title: 'T', body: 'B' }, { urgency: 'high' });
+    expect(sendEachForMulticast.mock.calls[0][0].webpush).toEqual({ headers: { Urgency: 'high' } });
+
+    await sendPushToTokens('user-1', ['tok1'], { title: 'T', body: 'B' });
+    expect(sendEachForMulticast.mock.calls[1][0]).not.toHaveProperty('webpush');
   });
 });

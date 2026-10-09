@@ -13,6 +13,14 @@ export interface PushResult {
   delivered: number;
   /** Devices it did not (dead tokens included). */
   failed: number;
+  /** Dead tokens removed from the user's token list. */
+  pruned: number;
+}
+
+export interface PushOptions {
+  // Web Push Urgency header. 'high' asks the push service (and iOS) to deliver
+  // now instead of batching for battery; leave unset for routine pushes.
+  urgency?: 'very-low' | 'low' | 'normal' | 'high';
 }
 
 // Sends a web push to every device token registered on a user. Best-effort: never
@@ -35,8 +43,13 @@ export async function sendPushToUser(uid: string, payload: PushPayload): Promise
 // The send itself, for callers that already hold the user's tokens (the
 // announcement fan-out reads every user in one query). Same data-only message
 // and dead-token cleanup as sendPushToUser; never throws, reports counts.
-export async function sendPushToTokens(uid: string, tokens: string[], payload: PushPayload): Promise<PushResult> {
-  if (!app || !adminDb || tokens.length === 0) return { delivered: 0, failed: tokens.length };
+export async function sendPushToTokens(
+  uid: string,
+  tokens: string[],
+  payload: PushPayload,
+  options: PushOptions = {}
+): Promise<PushResult> {
+  if (!app || !adminDb || tokens.length === 0) return { delivered: 0, failed: tokens.length, pruned: 0 };
   try {
     const messaging = getMessaging(app);
     const res = await messaging.sendEachForMulticast({
@@ -46,6 +59,7 @@ export async function sendPushToTokens(uid: string, tokens: string[], payload: P
         body: payload.body,
         url: payload.url ?? '/portal/dashboard',
       },
+      ...(options.urgency ? { webpush: { headers: { Urgency: options.urgency } } } : {}),
     });
 
     // Remove tokens FCM says are no longer valid.
@@ -65,9 +79,9 @@ export async function sendPushToTokens(uid: string, tokens: string[], payload: P
       );
     }
     const delivered = res.responses.filter((r) => r.success).length;
-    return { delivered, failed: tokens.length - delivered };
+    return { delivered, failed: tokens.length - delivered, pruned: dead.length };
   } catch (err) {
     console.error('Failed to send push to user', uid, err);
-    return { delivered: 0, failed: tokens.length };
+    return { delivered: 0, failed: tokens.length, pruned: 0 };
   }
 }

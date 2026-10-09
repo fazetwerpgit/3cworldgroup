@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { isEligibleChatMember, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import { sendPushToTokens, type PushPayload } from '@/lib/push/sendPush';
@@ -36,14 +37,23 @@ export function shouldPushChatRecipient(
   return userCanAccessChannelDoc(channelData, { uid, role, fieldRole });
 }
 
+export interface ChatPushTotals {
+  recipients: number;
+  sent: number;
+  failed: number;
+  pruned: number;
+}
+
 // Pushes a chat message to every qualifying member except the author, batch by
 // batch. Best-effort: a failed batch is logged and the rest still go out.
+// Sent with high urgency so iOS delivers it now rather than deferring it.
 export async function sendChatPush(
   channelData: FirebaseFirestore.DocumentData,
   authorId: string,
   payload: PushPayload
-): Promise<void> {
-  if (!adminDb) return;
+): Promise<ChatPushTotals> {
+  const totals: ChatPushTotals = { recipients: 0, sent: 0, failed: 0, pruned: 0 };
+  if (!adminDb) return totals;
   const db = adminDb;
   const recipients = resolveChatPushRecipients(channelData, authorId);
 
@@ -58,12 +68,52 @@ export async function sendChatPush(
           const tokens = Array.isArray(userData.pushTokens)
             ? userData.pushTokens.filter((t: unknown): t is string => typeof t === 'string' && !!t)
             : [];
-          await sendPushToTokens(snap.id, tokens, payload);
+          totals.recipients += 1;
+          const result = await sendPushToTokens(snap.id, tokens, payload, { urgency: 'high' });
+          totals.sent += result.delivered;
+          totals.failed += result.failed;
+          totals.pruned += result.pruned;
         })
       );
     } catch (err) {
       console.error('[chat] push batch failed', err);
     }
+  }
+  return totals;
+}
+
+// The push for one stored message, at most once: a transaction claims the
+// message (pushClaimedAt) before anything is sent, so a retried send that lands
+// on the same doc never notifies twice. The counts are kept on the message as
+// push { recipients, sent, failed, pruned, at } and logged without text or tokens.
+// Returns false when the push was already claimed or the message is gone.
+export async function pushChatMessageOnce(
+  messageRef: FirebaseFirestore.DocumentReference,
+  channelData: FirebaseFirestore.DocumentData,
+  authorId: string,
+  payload: PushPayload
+): Promise<boolean> {
+  if (!adminDb) return false;
+  try {
+    const claimed = await adminDb.runTransaction(async (tx) => {
+      const snap = await tx.get(messageRef);
+      const data = snap.exists ? snap.data() : undefined;
+      if (!data || data.deletedAt || data.pushClaimedAt || data.push) return false;
+      tx.update(messageRef, { pushClaimedAt: FieldValue.serverTimestamp() });
+      return true;
+    });
+    if (!claimed) return false;
+
+    const totals = await sendChatPush(channelData, authorId, payload);
+    console.info(
+      '[chat] push',
+      JSON.stringify({ channelId: messageRef.parent.parent?.id ?? null, messageId: messageRef.id, ...totals })
+    );
+    await messageRef.update({ push: { ...totals, at: FieldValue.serverTimestamp() } });
+    return true;
+  } catch (err) {
+    console.error('[chat] push failed', messageRef.id, err);
+    return false;
   }
 }
 

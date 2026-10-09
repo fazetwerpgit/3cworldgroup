@@ -5,6 +5,13 @@ const fake = vi.hoisted(() => {
   const getAllSizes: number[] = [];
   const adminDb = {
     collection: vi.fn(() => ({ doc: (id: string) => ({ __id: id }) })),
+    runTransaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        get: (ref: { get: () => Promise<unknown> }) => ref.get(),
+        update: (ref: { update: (data: Record<string, unknown>) => Promise<void> }, data: Record<string, unknown>) =>
+          ref.update(data),
+      })
+    ),
     getAll: vi.fn(async (...refs: Array<{ __id: string }>) => {
       getAllSizes.push(refs.length);
       return refs.map((r) => ({
@@ -14,7 +21,7 @@ const fake = vi.hoisted(() => {
       }));
     }),
   };
-  const sendPushToTokens = vi.fn(async () => ({ delivered: 1, failed: 0 }));
+  const sendPushToTokens = vi.fn(async () => ({ delivered: 1, failed: 0, pruned: 0 }));
   return { users, getAllSizes, adminDb, sendPushToTokens };
 });
 
@@ -24,6 +31,7 @@ vi.mock('@/lib/push/sendPush', () => ({ sendPushToTokens: fake.sendPushToTokens 
 import {
   CHAT_PUSH_BATCH_SIZE,
   buildChatPushBody,
+  pushChatMessageOnce,
   resolveChatPushRecipients,
   sendChatPush,
 } from './chatPush';
@@ -78,14 +86,15 @@ describe('sendChatPush', () => {
     fake.users.set('fired', { status: 'inactive', fieldRole: 'l1_manager', pushTokens: ['t-fired'] });
     fake.users.set('extra-rep', { status: 'active', fieldRole: 'entry_rep', pushTokens: ['t-extra'] });
 
-    await sendChatPush(
+    const totals = await sendChatPush(
       { ...managers, memberIds: ['boss', 'mgr', 'demoted', 'fired', 'extra-rep', 'deleted'], extraMemberIds: ['extra-rep'] },
       'boss',
       payload
     );
 
     expect(pushedTo()).toEqual(['extra-rep', 'mgr']);
-    expect(fake.sendPushToTokens).toHaveBeenCalledWith('mgr', ['t-mgr'], payload);
+    expect(fake.sendPushToTokens).toHaveBeenCalledWith('mgr', ['t-mgr'], payload, { urgency: 'high' });
+    expect(totals).toEqual({ recipients: 2, sent: 2, failed: 0, pruned: 0 });
   });
 
   it('reaches every member of a big channel, batch by batch', async () => {
@@ -96,6 +105,61 @@ describe('sendChatPush', () => {
 
     expect(fake.sendPushToTokens).toHaveBeenCalledTimes(120);
     expect(Math.max(...fake.getAllSizes)).toBeLessThanOrEqual(CHAT_PUSH_BATCH_SIZE);
+  });
+});
+
+describe('pushChatMessageOnce', () => {
+  const channel = { id: 'all-company', name: 'All', audience: 'all', order: 1, active: true, memberIds: ['boss', 'rep'] };
+  const payload = { title: 'All', body: 'Boss: secret text' };
+
+  function messageRef(initial: Record<string, unknown> | undefined) {
+    let data = initial ? { ...initial } : undefined;
+    const ref = {
+      id: 'boss_m1',
+      parent: { parent: { id: 'all-company' } },
+      get: vi.fn(async () => ({ exists: !!data, data: () => data })),
+      update: vi.fn(async (patch: Record<string, unknown>) => {
+        data = { ...data, ...patch };
+      }),
+      current: () => data,
+    };
+    return ref;
+  }
+
+  beforeEach(() => {
+    fake.users.clear();
+    fake.users.set('rep', { status: 'active', fieldRole: 'entry_rep', pushTokens: ['t-rep'] });
+    fake.sendPushToTokens.mockClear();
+    fake.sendPushToTokens.mockResolvedValueOnce({ delivered: 1, failed: 1, pruned: 1 });
+  });
+
+  it('claims, sends once, and records the counts on the message', async () => {
+    const ref = messageRef({ text: 'secret text', deletedAt: null });
+    const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const call = (r: typeof ref) =>
+      pushChatMessageOnce(r as unknown as FirebaseFirestore.DocumentReference, channel, 'boss', payload);
+
+    expect(await call(ref)).toBe(true);
+    expect(await call(ref)).toBe(false);
+
+    expect(fake.sendPushToTokens).toHaveBeenCalledTimes(1);
+    expect(ref.current()).toMatchObject({
+      pushClaimedAt: expect.anything(),
+      push: { recipients: 1, sent: 1, failed: 1, pruned: 1, at: expect.anything() },
+    });
+    const logged = log.mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(logged).toContain('"messageId":"boss_m1"');
+    expect(logged).not.toContain('secret');
+    expect(logged).not.toContain('t-rep');
+    log.mockRestore();
+  });
+
+  it('never pushes a deleted or missing message', async () => {
+    const call = (r: ReturnType<typeof messageRef>) =>
+      pushChatMessageOnce(r as unknown as FirebaseFirestore.DocumentReference, channel, 'boss', payload);
+    expect(await call(messageRef({ deletedAt: { seconds: 1 } }))).toBe(false);
+    expect(await call(messageRef(undefined))).toBe(false);
+    expect(fake.sendPushToTokens).not.toHaveBeenCalled();
   });
 });
 
