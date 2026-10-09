@@ -9,8 +9,8 @@ import type { ActivatedUser, OwnerBook, OwnerSummarySource, RepRoles } from './c
 //
 // Reads per request (the numbers the owner view costs):
 //   sales            saleDate >= PORTAL_LOGGING_START, projected to the fields
-//                    the carrier join and pricing need (no customer name, phone
-//                    or email). This is the same book the admin Sales board
+//                    the carrier join and pricing need, order number included
+//                    (no customer name, phone or email). This is the same book the admin Sales board
 //                    reads; it grows with the business (see report / TODO).
 //   fiberOrders      whole collection, through the shared lastReportAt cache.
 //   users            getAll on the reps with installs in the money window
@@ -26,6 +26,7 @@ const SALE_FIELDS = [
   'salesRepId',
   'salesRepName',
   'customerAddress',
+  'orderNumberOrBtn',
   'products',
   'status',
   'saleDate',
@@ -73,7 +74,9 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
             id: doc.id,
             salesRepId: data.salesRepId ?? '',
             salesRepName: data.salesRepName ?? '',
+            // The carrier join reads the order number first, as the board does.
             customerAddress: data.customerAddress ?? '',
+            orderNumberOrBtn: data.orderNumberOrBtn ?? '',
             products: Array.isArray(data.products) ? data.products : [],
             status: data.status,
             saleDate: toDate(data.saleDate),
