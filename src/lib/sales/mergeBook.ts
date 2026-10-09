@@ -11,6 +11,7 @@ import {
 } from '@/lib/sales/installBucket';
 import { linkedSaleId, matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { installDayKey } from '@/lib/sales/saleDate';
+import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
 import type { MonthKey } from '@/lib/sales/monthWindow';
 
 // One book. The admin Sales page used to show two lists that disagreed: the
@@ -92,6 +93,13 @@ export interface MergedRow {
   linkBroken: boolean;
   /** CALL 1: false for 'never_logged' and 'unassigned'; true otherwise (and false for 'cancelled'). */
   counted: boolean;
+  /**
+   * Another live sale looks like the same order: both matched one carrier
+   * order, or both carry the same order number. A flag for the owner to
+   * check, never a verdict — it changes no figure. Always false on order-only
+   * and cancelled rows (cancelling the extra one is how the flag clears).
+   */
+  possibleDuplicate: boolean;
 }
 
 export interface MergedBook {
@@ -215,7 +223,7 @@ function saleRow(
   sale: Sale,
   order: FiberOrder | null,
   index: number,
-  opts: { linkedManually: boolean; cancelled: boolean; counted: boolean; now: Date }
+  opts: { linkedManually: boolean; cancelled: boolean; counted: boolean; possibleDuplicate: boolean; now: Date }
 ): MergedRow {
   const saleValue = finite(sale.totalValue) ?? 0;
   const carrierMrc = order ? finite(order.mrc) : null;
@@ -243,6 +251,7 @@ function saleRow(
     // A sale row is the link working, so there is nothing dangling to report.
     linkBroken: false,
     counted: opts.counted,
+    possibleDuplicate: opts.possibleDuplicate && !opts.cancelled,
   };
 }
 
@@ -293,7 +302,37 @@ function orderRow(order: FiberOrder, now: Date, verdict: OrderVerdict): MergedRo
     linkedManually: false,
     linkBroken: verdict.linkBroken,
     counted: false,
+    possibleDuplicate: false,
   };
+}
+
+/**
+ * Live sales that look like one order logged twice: 2+ that the address guess
+ * put on the SAME carrier order (only the first keeps the join; the rest read
+ * 'waiting', so without this they look like separate sales still on their way),
+ * or 2+ with the same normalized order number whether or not any order matched.
+ * Cancelled sales are left out, so cancelling the extra one clears the flag.
+ */
+export function possibleDuplicateSales(
+  sales: readonly Sale[],
+  guessed: ReadonlyMap<string, FiberOrder>,
+  isCancelled: (sale: Sale) => boolean
+): Set<Sale> {
+  const byOrder = new Map<FiberOrder, Sale[]>();
+  const byOrderNumber = new Map<string, Sale[]>();
+  for (const sale of sales) {
+    if (isCancelled(sale)) continue;
+    const id = text(sale.id);
+    const order = id ? guessed.get(id) : undefined;
+    if (order) byOrder.set(order, [...(byOrder.get(order) ?? []), sale]);
+    const key = normalizeOrderNumber(sale.orderNumberOrBtn);
+    if (key) byOrderNumber.set(key, [...(byOrderNumber.get(key) ?? []), sale]);
+  }
+  const flagged = new Set<Sale>();
+  for (const group of [...byOrder.values(), ...byOrderNumber.values()]) {
+    if (group.length > 1) for (const sale of group) flagged.add(sale);
+  }
+  return flagged;
 }
 
 function rollupRows(rows: MergedRow[]): MergedRepRollup[] {
@@ -434,6 +473,8 @@ export function buildMergedBook(
     claimedOrders.add(order);
   }
 
+  const duplicates = possibleDuplicateSales(sales, guessed, (sale) => cancelled.has(sale));
+
   // The carrier half of the verdict can only be read once the join is done, so
   // it lands here rather than in the sets above: a carrier cancellation settles
   // the row like a cancellation typed in, and never the other way round.
@@ -444,6 +485,7 @@ export function buildMergedBook(
       linkedManually: linkedManually.has(sale),
       cancelled: cancelled.has(sale) || carrierCancelled,
       counted: payable.has(sale) && !carrierCancelled,
+      possibleDuplicate: duplicates.has(sale),
       now,
     });
   });

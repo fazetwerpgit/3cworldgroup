@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
+import type { OrderDuplicate } from '@/lib/sales/orderNumber';
 
 interface SalesFilters {
   status?: SaleStatus;
@@ -21,15 +22,26 @@ export const NO_SIGNAL_SALE_MESSAGE = 'No signal. Your entry is saved, tap Submi
  */
 export const SALE_SUBMIT_TIMEOUT_MS = 45_000;
 
-export interface CreateSaleResult {
-  sale: Sale;
-  /**
-   * The server already had a sale under this clientSaleId and returned it
-   * instead of writing a new one. The caller must say so, never treat it as a
-   * fresh sale: the entry on screen may be a different customer.
-   */
-  duplicate: boolean;
-}
+export type CreateSaleResult =
+  | {
+      sale: Sale;
+      /**
+       * The server already had a sale under this clientSaleId and returned it
+       * instead of writing a new one. The caller must say so, never treat it as a
+       * fresh sale: the entry on screen may be a different customer.
+       */
+      duplicate: boolean;
+      orderDuplicate?: undefined;
+    }
+  | {
+      /**
+       * Nothing was written: a live sale already carries this order number.
+       * The rep can resubmit with allowDuplicate to log it anyway.
+       */
+      orderDuplicate: OrderDuplicate;
+      sale?: undefined;
+      duplicate?: undefined;
+    };
 
 /**
  * True for a failure that never got a usable answer from the server: fetch
@@ -143,6 +155,21 @@ export function useSales() {
         signal: controller.signal,
       });
       const data = await response.json();
+
+      // Not an error: the form shows who logged this order and lets the rep
+      // decide. Nothing was written.
+      if (response.status === 409 && data?.duplicateOrder === true) {
+        return {
+          orderDuplicate: {
+            existingSaleId: typeof data.existingSaleId === 'string' ? data.existingSaleId : null,
+            existingRepName: typeof data.existingRepName === 'string' ? data.existingRepName : '',
+            existingSaleDate: typeof data.existingSaleDate === 'string' ? data.existingSaleDate : null,
+            existingCustomerFirstName:
+              typeof data.existingCustomerFirstName === 'string' ? data.existingCustomerFirstName : '',
+            existingIsMine: data.existingIsMine === true,
+          },
+        };
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create sale');

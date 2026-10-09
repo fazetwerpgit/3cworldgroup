@@ -54,6 +54,18 @@ const Amount = ({ value }: { value: number }) => (
 const shortSaleDate = (value: Date | string) =>
   new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+/** "Already logged by Dana W. on Sep 14." — "you" when it is the rep's own sale. */
+export function orderDuplicateHeadline(dup: {
+  existingRepName: string;
+  existingSaleDate: string | null;
+  existingIsMine: boolean;
+}): string {
+  const who = dup.existingIsMine ? 'you' : dup.existingRepName || 'another rep';
+  return dup.existingSaleDate
+    ? `Already logged by ${who} on ${shortSaleDate(dup.existingSaleDate)}.`
+    : `Already logged by ${who}.`;
+}
+
 /** Short provider names for the segmented control ("TFiber", not "TFiber (T-Mobile)"). */
 const PROVIDER_SHORT: Record<string, string> = {
   tfiber: 'TFiber',
@@ -248,7 +260,7 @@ export function RepLogSale() {
     if (loggedTimer.current) clearTimeout(loggedTimer.current);
   }, []);
   const afterSubmit = (result: Awaited<ReturnType<typeof form.submit>>, saleDate: string) => {
-    if (!result || result.duplicate) return;
+    if (!result || result.orderDuplicate || result.duplicate) return;
     const href = result.sale.id ? loggedSaleHref(result.sale.id, saleDate) : '/portal/sales';
     setLogged(true);
     loggedTimer.current = setTimeout(() => router.push(href), LOGGED_HOLD_MS);
@@ -263,6 +275,13 @@ export function RepLogSale() {
   const logAsNew = async () => {
     const saleDate = formData.saleDate;
     afterSubmit(await form.logAsNew({ pendingUploads: uploads.uploadingCount }), saleDate);
+  };
+
+  // The order number is already on a live sale and the rep says this one is
+  // separate: the same entry goes again with the override.
+  const logOrderAnyway = async () => {
+    const saleDate = formData.saleDate;
+    afterSubmit(await form.logOrderAnyway({ pendingUploads: uploads.uploadingCount }), saleDate);
   };
 
   // A restored draft keeps its "Picking up where you left off" bar for as long
@@ -298,6 +317,11 @@ export function RepLogSale() {
   useEffect(() => {
     if (duplicate) duplicateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [duplicate]);
+  const orderDuplicate = form.orderDuplicate;
+  const orderDuplicateRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (orderDuplicate) orderDuplicateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [orderDuplicate]);
 
   const input = (
     name: keyof SaleFormFields,
@@ -530,6 +554,45 @@ export function RepLogSale() {
                   </Link>
                   <button type="button" className={l.dupeNew} onClick={logAsNew} disabled={form.submitting}>
                     Log as a new sale
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {orderDuplicate ? (
+            <div ref={orderDuplicateRef} className={l.dupe} role="alert" data-part="order-duplicate">
+              <CopyCheck size={20} strokeWidth={2} aria-hidden="true" />
+              <div className={l.dupeBody}>
+                <p>
+                  <strong>{orderDuplicateHeadline(orderDuplicate)}</strong>
+                </p>
+                <p className={l.dupeMeta}>
+                  {[
+                    'Same order number',
+                    // Another rep's customer stays theirs: named only when the
+                    // rep may open that sale.
+                    orderDuplicate.existingSaleId ? orderDuplicate.existingCustomerFirstName : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                <div className={l.dupeActions}>
+                  {orderDuplicate.existingSaleId ? (
+                    <Link href={`/portal/sales/${orderDuplicate.existingSaleId}`} className={s.btnSecondary}>
+                      View it
+                    </Link>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={l.dupeNew}
+                    onClick={logOrderAnyway}
+                    disabled={form.submitting}
+                  >
+                    Log as a new sale
+                  </button>
+                  <button type="button" className={l.dupeNew} onClick={form.dismissOrderDuplicate}>
+                    Cancel
                   </button>
                 </div>
               </div>

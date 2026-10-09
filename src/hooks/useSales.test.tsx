@@ -92,4 +92,44 @@ describe('useSales.createSale', () => {
     });
     expect(result).toEqual({ sale: { id: 'x' }, duplicate: false });
   });
+
+  it('passes an order-number clash on as orderDuplicate, not as an error', async () => {
+    const body = {
+      error: 'This order number was already logged',
+      duplicateOrder: true,
+      existingSaleId: null,
+      existingRepName: 'Dana W.',
+      existingSaleDate: '2026-09-14T17:00:00.000Z',
+      existingCustomerFirstName: 'Maria',
+      existingIsMine: false,
+    };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 409 })));
+    let result: unknown;
+    await act(async () => {
+      result = await latest.current!.createSale(saleData);
+    });
+    expect(result).toEqual({
+      orderDuplicate: {
+        existingSaleId: null,
+        existingRepName: 'Dana W.',
+        existingSaleDate: '2026-09-14T17:00:00.000Z',
+        existingCustomerFirstName: 'Maria',
+        existingIsMine: false,
+      },
+    });
+    expect(latest.current!.error).toBeNull();
+  });
+
+  it('still reports a sale-id 409 as an error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(JSON.stringify({ error: 'Sale id already in use' }), { status: 409 }))
+    );
+    let result: unknown;
+    await act(async () => {
+      result = await latest.current!.createSale(saleData);
+    });
+    expect(result).toBeNull();
+    expect(latest.current!.error).toBe('Sale id already in use');
+  });
 });

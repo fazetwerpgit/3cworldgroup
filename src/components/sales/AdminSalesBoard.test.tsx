@@ -177,6 +177,24 @@ describe('AdminSalesBoard merged rows', () => {
     expect(container.querySelector('[data-part="gap-note"]')).toBeNull();
   });
 
+  it('marks both sales on one carrier order as a possible duplicate', async () => {
+    const sold = thisMonth();
+    sold.month -= 1;
+    const twice = { ...backDatedSale, id: 's2' } as Sale;
+    await render([backDatedSale, twice], [carrierOrder], sold);
+    await openRep();
+
+    const rows = container.querySelectorAll('[data-part="board-row"]');
+    expect(rows).toHaveLength(2);
+    for (const r of rows) {
+      expect(r.querySelector('[data-part="dup-note"]')?.textContent).toBe(
+        'Possible duplicate · same order as another sale'
+      );
+    }
+    // The second sale lost the join only because of the first: not "on its way".
+    expect(container.textContent).not.toContain('Not in the report yet');
+  });
+
   // R2: the sale and its carrier order straddle a month boundary, which is the
   // ordinary case the address guess misses. The picker has to reach across it.
   it('offers the rep sales from every month, not the month on screen', async () => {

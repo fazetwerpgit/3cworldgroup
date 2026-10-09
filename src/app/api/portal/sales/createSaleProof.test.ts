@@ -21,6 +21,10 @@ vi.mock('@/lib/firebase/admin', () => ({
     collection: vi.fn((name: string) => {
       if (name === 'sales') {
         return {
+          // The order-number duplicate check: no earlier sale carries it.
+          where: vi.fn(() => ({
+            limit: vi.fn(() => ({ get: vi.fn(async () => ({ size: 0, empty: true, forEach: () => {} })) })),
+          })),
           add: vi.fn(async (doc: Record<string, unknown>) => {
             state.added.push(doc);
             return { id: 'sale1' };

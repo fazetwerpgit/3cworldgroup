@@ -276,4 +276,61 @@ describe('RepLogSale', () => {
     expect(document.body.textContent).toContain('This sale was already logged.');
     expect(hasLogAsNew()).toBe(true);
   });
+
+  // Same order number already on a live sale (a rep re-picked one screenshot
+  // while backfilling): nothing was written, the entry stays, the rep decides.
+  const orderDup = (over: Record<string, unknown> = {}) => ({
+    orderDuplicate: {
+      existingSaleId: null,
+      existingRepName: 'Dana W.',
+      existingSaleDate: new Date(2026, 8, 14, 12).toISOString(),
+      existingCustomerFirstName: 'Maria',
+      existingIsMine: false,
+      ...over,
+    },
+  });
+
+  it("names who logged an order number already on another rep's sale, and keeps the entry", async () => {
+    createSale.mockResolvedValue(orderDup());
+    await mountFilled('2026-08-30');
+    await submitForm();
+    expect(push).not.toHaveBeenCalled();
+    const notice = container.querySelector('[data-part="order-duplicate"]')!;
+    expect(notice.textContent).toContain('Already logged by Dana W. on Sep 14.');
+    expect(notice.textContent).toContain('Same order number');
+    expect(notice.textContent).not.toContain('Maria');
+    expect(Array.from(notice.querySelectorAll('a'))).toHaveLength(0);
+    expect(container.querySelector<HTMLInputElement>('#customerName')!.value).toBe('Carla Diaz');
+    expect(window.sessionStorage.getItem(`${DRAFT_KEY_PREFIX}r1`)).not.toBeNull();
+  });
+
+  it('Log as a new sale sends the same entry again with the override', async () => {
+    createSale
+      .mockResolvedValueOnce(orderDup())
+      .mockResolvedValueOnce({ sale: { id: 'new-sale' }, duplicate: false });
+    await mountFilled('2026-08-30');
+    await submitForm();
+    await act(async () => buttonNamed('Log as a new sale')!.click());
+    const [first, second] = createSale.mock.calls.map((call) => call[0]);
+    expect(first.allowDuplicate).toBeUndefined();
+    expect(second.allowDuplicate).toBe(true);
+    expect(second.clientSaleId).toBe(first.clientSaleId);
+    expect(second.customerName).toBe('Carla Diaz');
+    await vi.waitFor(() => expect(push).toHaveBeenCalledWith('/portal/sales?logged=new-sale&month=2026-08'));
+  });
+
+  it("links the rep's own earlier sale; Cancel closes the notice and leaves the entry", async () => {
+    createSale.mockResolvedValue(orderDup({ existingSaleId: 's-mine', existingIsMine: true, existingRepName: 'Wil T.' }));
+    await mountFilled('2026-08-30');
+    await submitForm();
+    const notice = () => container.querySelector('[data-part="order-duplicate"]');
+    expect(notice()!.textContent).toContain('Already logged by you on Sep 14.');
+    expect(notice()!.textContent).toContain('Same order number · Maria');
+    const view = Array.from(notice()!.querySelectorAll('a')).find((a) => a.textContent === 'View it')!;
+    expect(view.getAttribute('href')).toBe('/portal/sales/s-mine');
+    await act(async () => buttonNamed('Cancel')!.click());
+    expect(notice()).toBeNull();
+    expect(container.querySelector<HTMLInputElement>('#customerName')!.value).toBe('Carla Diaz');
+    expect(createSale).toHaveBeenCalledTimes(1);
+  });
 });

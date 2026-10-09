@@ -606,14 +606,20 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         {cancelled
           ? chip(x.st_cancelled, `Cancelled ${formatDate(sale.cancelledAt)}`)
           : chip(BUCKET_TONE[row.bucket], installChip(sale, row.bucket, row.order, now))}
-        {row.state === 'waiting' && (
+        {/* One note per row. A possible duplicate outranks the rest: the
+            second sale on one order reads 'waiting' only because the first
+            kept the join, so "Not in the report yet" would mislead. */}
+        {row.possibleDuplicate ? (
+          <span className={`${x.bNote} ${x.bNoteWarn}`} data-part="dup-note">
+            Possible duplicate · same order as another sale
+          </span>
+        ) : row.state === 'waiting' ? (
           <span className={x.bNote}>Not in the report yet</span>
-        )}
-        {row.state === 'agreed' && gap && (
+        ) : row.state === 'agreed' && gap ? (
           <span className={`${x.bNote} ${x.bNoteWarn}`} data-part="gap-note">
             Check plan · the carrier report shows a different plan
           </span>
-        )}
+        ) : null}
       </div>
     );
   };

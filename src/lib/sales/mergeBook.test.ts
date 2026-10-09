@@ -627,3 +627,58 @@ describe('rep rollups', () => {
     expect(book.rows).toHaveLength(2);
   });
 });
+
+describe('possibleDuplicate — one order logged twice', () => {
+  it('flags both sales the address guess put on the same carrier order', () => {
+    const book = build(
+      [sale({ id: 'a' }), sale({ id: 'b', createdAt: new Date('2026-09-15T13:00:00') })],
+      [order()]
+    );
+    // Both still show: the first keeps the join, the second reads 'waiting'.
+    expect(row(book, 'a').state).toBe('agreed');
+    expect(row(book, 'b').state).toBe('waiting');
+    expect(row(book, 'a').possibleDuplicate).toBe(true);
+    expect(row(book, 'b').possibleDuplicate).toBe(true);
+  });
+
+  it('flags sales sharing a normalized order number with no carrier order matched', () => {
+    const book = build(
+      [
+        sale({ id: 'a', customerAddress: '1 Oak Ave', orderNumberOrBtn: 'TMO-123 45' }),
+        sale({ id: 'b', customerAddress: '99 Elm St', orderNumberOrBtn: ' tmo12345' }),
+        sale({ id: 'c', customerAddress: '7 Pine Rd', orderNumberOrBtn: 'TMO99999' }),
+      ],
+      []
+    );
+    expect(row(book, 'a').possibleDuplicate).toBe(true);
+    expect(row(book, 'b').possibleDuplicate).toBe(true);
+    expect(row(book, 'c').possibleDuplicate).toBe(false);
+  });
+
+  it('does not flag a lone sale, blank order numbers, or order-only rows', () => {
+    const book = build(
+      [
+        sale({ id: 'a', orderNumberOrBtn: '' }),
+        sale({ id: 'b', customerAddress: '99 Elm St', orderNumberOrBtn: '' }),
+      ],
+      [order(), order({ id: 'TMO-OTHER', address: '12 Birch Ln' })]
+    );
+    expect(book.rows.every((r) => r.possibleDuplicate === false)).toBe(true);
+  });
+
+  it('clears once the extra sale is cancelled', () => {
+    const book = build(
+      [sale({ id: 'a', orderNumberOrBtn: 'X1' }), sale({ id: 'b', orderNumberOrBtn: 'X1', status: 'cancelled' })],
+      [order()]
+    );
+    expect(row(book, 'a').possibleDuplicate).toBe(false);
+    expect(row(book, 'b').possibleDuplicate).toBe(false);
+  });
+
+  it('changes no figure', () => {
+    const one = build([sale({ id: 'a' })], [order()]);
+    const two = build([sale({ id: 'a' }), sale({ id: 'b' })], [order()]);
+    expect(two.totalValue).toBe(one.totalValue * 2);
+    expect(two.counts.scheduled).toBe(2);
+  });
+});

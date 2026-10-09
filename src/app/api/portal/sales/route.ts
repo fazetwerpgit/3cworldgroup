@@ -7,6 +7,13 @@ import { proofPathFields, validateProofPaths } from '@/lib/sales/proofPaths';
 import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 import { validateHasInternetPlan, validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { CLIENT_SALE_ID_RE, priceSaleProducts } from '@/lib/sales/pricing';
+import {
+  firstName,
+  firstNameLastInitial,
+  normalizeOrderNumber,
+  orderNumberRawVariants,
+  type OrderDuplicate,
+} from '@/lib/sales/orderNumber';
 
 // Helper function to create a notification
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -209,6 +216,66 @@ async function existingSaleForReplay(saleId: string, salesRepId: string) {
   });
 }
 
+/** A sale that still stands: not cancelled, not soft-deleted. */
+function isLiveSale(data: Record<string, unknown>): boolean {
+  return data.status !== 'cancelled' && !data.deletedAt && data.deleted !== true;
+}
+
+function saleTime(value: unknown): number {
+  const date = (value as { toDate?: () => Date } | null)?.toDate?.() ?? value;
+  const time = date instanceof Date ? date.getTime() : NaN;
+  return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * The live sale (any rep) already carrying this order number, or null. Two
+ * single-field equality queries, so no composite index: `orderNumberKey` for
+ * sales written since the key existed, and `orderNumberOrBtn in [...]` over
+ * the common raw spellings for older ones (they were never backfilled). Every
+ * hit is re-checked on the normalized value, and the earliest-logged one wins:
+ * that is the original the rep is about to repeat.
+ */
+async function findOrderDuplicate(
+  rawOrderNumber: unknown,
+  caller: { uid: string; isAdmin: boolean }
+): Promise<OrderDuplicate | null> {
+  if (!adminDb) return null;
+  const key = normalizeOrderNumber(rawOrderNumber);
+  if (!key) return null;
+  const sales = adminDb.collection('sales');
+  const variants = orderNumberRawVariants(rawOrderNumber);
+  const [byKey, byRaw] = await Promise.all([
+    sales.where('orderNumberKey', '==', key).limit(20).get(),
+    variants.length > 0
+      ? sales.where('orderNumberOrBtn', 'in', variants).limit(20).get()
+      : Promise.resolve(null),
+  ]);
+
+  const seen = new Map<string, Record<string, unknown>>();
+  for (const snap of [byKey, byRaw]) {
+    snap?.forEach((doc) => {
+      const data = doc.data() ?? {};
+      if (!seen.has(doc.id) && isLiveSale(data) && normalizeOrderNumber(data.orderNumberOrBtn) === key) {
+        seen.set(doc.id, data);
+      }
+    });
+  }
+  if (seen.size === 0) return null;
+
+  const [id, data] = [...seen.entries()].sort(
+    (a, b) => saleTime(a[1].createdAt) - saleTime(b[1].createdAt) || a[0].localeCompare(b[0])
+  )[0];
+  const mine = data.salesRepId === caller.uid;
+  const saleDate = (data.saleDate as { toDate?: () => Date } | null)?.toDate?.() ?? data.saleDate;
+  return {
+    existingSaleId: mine || caller.isAdmin ? id : null,
+    existingRepName: firstNameLastInitial(data.salesRepName) || 'another rep',
+    existingSaleDate: saleDate instanceof Date && !Number.isNaN(saleDate.getTime()) ? saleDate.toISOString() : null,
+    existingCustomerFirstName: firstName(data.customerName),
+    existingIsMine: mine,
+  };
+}
+
 // POST /api/portal/sales - Create a new sale
 export async function POST(request: NextRequest) {
   try {
@@ -247,6 +314,7 @@ export async function POST(request: NextRequest) {
       saleDate,
       installDate,
       clientSaleId: rawClientSaleId,
+      allowDuplicate,
     } = body;
 
     // Idempotency key: the form's per-sale proofUploadId. A retried submit (weak
@@ -354,6 +422,24 @@ export async function POST(request: NextRequest) {
       resolvedSaleDate = resolvedInstallDate;
     }
 
+    // Same order number already on a live sale (any rep): say so instead of
+    // logging it twice. The rep can still log it on purpose ("Log as a new
+    // sale" sends allowDuplicate). After the replay check above, so a retried
+    // submit of THIS sale still comes back as itself, not as a clash.
+    if (allowDuplicate !== true) {
+      // Fails open: a check that cannot run must never cost the rep the sale.
+      const existing = await findOrderDuplicate(orderNumberOrBtn, gate).catch((error) => {
+        console.error('Order number duplicate check failed:', error);
+        return null;
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: 'This order number was already logged', duplicateOrder: true, ...existing },
+          { status: 409 }
+        );
+      }
+    }
+
     const newSale = {
       salesRepId,
       salesRepName: salesRepName || '',
@@ -375,6 +461,8 @@ export async function POST(request: NextRequest) {
       installDate: resolvedInstallDate,
       notes: notes || '',
       orderNumberOrBtn: orderNumberOrBtn || '',
+      // Normalized for the duplicate check (see findOrderDuplicate).
+      orderNumberKey: normalizeOrderNumber(orderNumberOrBtn),
       ...proofPathFields(proofPaths),
       productSold: productSold || '',
       createdAt: new Date(),

@@ -81,17 +81,20 @@ async function verifyCaller(
 export async function requireVerifiedUser(
   request: NextRequest
 ): Promise<
-  | { ok: true; uid: string; name: string; email: string; isOwner: boolean }
+  | { ok: true; uid: string; name: string; email: string; isOwner: boolean; isAdmin: boolean }
   | { ok: false; error: string; status: number }
 > {
   const c = await verifyCaller(request);
   if (!c.ok) return c;
+  const { role } = resolveRoles(c.data.role, c.data.fieldRole);
   return {
     ok: true,
     uid: c.uid,
     name: c.data.displayName || c.data.email || c.uid,
     email: c.data.email || '',
-    isOwner: isOwner(resolveRoles(c.data.role, c.data.fieldRole).role),
+    isOwner: isOwner(role),
+    // Admin or owner: may open any sale (same rule as GET /api/portal/sales/[id]).
+    isAdmin: isAdminLevel(role),
   };
 }
 

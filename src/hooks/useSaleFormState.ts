@@ -9,6 +9,7 @@ import { hasSaleProof } from '@/lib/sales/proof';
 import { MAX_PROOF_SCREENSHOTS, proofPathFields, saleProofPaths } from '@/lib/sales/proofPaths';
 import { todaySaleDateInput } from '@/lib/sales/saleDate';
 import { randomHex } from '@/lib/randomHex';
+import type { OrderDuplicate } from '@/lib/sales/orderNumber';
 
 // Everything a new-sale form needs except its markup, so the old SaleForm and
 // the direction-D Log Sale page share one set of rules: the draft, the
@@ -258,6 +259,8 @@ export function useSaleFormState() {
   const [keyUsed, setKeyUsed] = useState(false);
   /** The server already had a sale under this key: the one it returned. */
   const [duplicateOf, setDuplicateOf] = useState<Sale | null>(null);
+  /** A live sale already has this order number: who logged it and when. */
+  const [orderDuplicate, setOrderDuplicate] = useState<OrderDuplicate | null>(null);
   const draftKey = user ? `${DRAFT_KEY_PREFIX}${user.uid}` : null;
   const [draftRestored, setDraftRestored] = useState(false);
   /** The entry came back from a saved draft (drives "N screenshots attached"). */
@@ -391,6 +394,8 @@ export function useSaleFormState() {
       }
 
       setFormData((prev) => ({ ...prev, [name]: value }));
+      // A corrected order number is a different question: drop the old answer.
+      if (name === 'orderNumberOrBtn') setOrderDuplicate(null);
       if (name === 'customerAddress' || name === 'installDate' || name === 'orderNumberOrBtn') {
         clearError(name);
       }
@@ -478,14 +483,17 @@ export function useSaleFormState() {
    * lost, see `isSameSaleEntry`) is that success and comes back as a plain,
    * non-duplicate result. Any other `duplicate` is held in `duplicateOf` for
    * the page to show, and the draft stays, since the entry is a different
-   * customer (see `logAsNew`).
+   * customer (see `logAsNew`). An `orderDuplicate` (another live sale has
+   * this order number; nothing was written) is held in `orderDuplicate` and
+   * the entry and draft stay as they are (see `logOrderAnyway`).
    */
   const submit = async (
-    options: { pendingUploads?: number; clientSaleId?: string } = {}
+    options: { pendingUploads?: number; clientSaleId?: string; allowDuplicate?: boolean } = {}
   ): Promise<CreateSaleResult | null> => {
     setFormError('');
     setServerErrorHidden(false);
     setDuplicateOf(null);
+    setOrderDuplicate(null);
     const nextErrors = validateSaleForm({ formData, products, proofPaths });
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -513,6 +521,7 @@ export function useSaleFormState() {
       totalValue: totals.value,
       totalPoints: totals.points,
       clientSaleId: options.clientSaleId ?? proofUploadId,
+      ...(options.allowDuplicate ? { allowDuplicate: true } : {}),
     };
 
     // From here the key may name a stored sale, even if no answer comes back.
@@ -523,7 +532,11 @@ export function useSaleFormState() {
       created?.duplicate && isSameSaleEntry(created.sale, { formData, products })
         ? { ...created, duplicate: false }
         : created;
-    if (result?.duplicate) {
+    if (result?.orderDuplicate) {
+      // Nothing was written, so the key is still free: the same entry can go
+      // again under it once the rep says to log it anyway.
+      setOrderDuplicate(result.orderDuplicate);
+    } else if (result?.duplicate) {
       setDuplicateOf(result.sale);
     } else if (result) {
       submittedRef.current = true;
@@ -544,6 +557,16 @@ export function useSaleFormState() {
     setProofUploadId(fresh);
     return submit({ ...options, clientSaleId: fresh });
   };
+
+  /**
+   * The rep says this IS a separate sale even though its order number is on
+   * another one: send the same entry again with the override.
+   */
+  const logOrderAnyway = (options: { pendingUploads?: number } = {}) =>
+    submit({ ...options, allowDuplicate: true });
+
+  /** Close the "already logged" notice and leave the entry as it is. */
+  const dismissOrderDuplicate = () => setOrderDuplicate(null);
 
   /** The entry was already logged (the duplicate): drop the saved draft. */
   const discardDraft = () => {
@@ -567,6 +590,7 @@ export function useSaleFormState() {
     setFormError('');
     setServerErrorHidden(true);
     setDuplicateOf(null);
+    setOrderDuplicate(null);
     setProofUploadId(newClientSaleId());
     setKeyUsed(false);
     setFromDraft(false);
@@ -601,6 +625,9 @@ export function useSaleFormState() {
     submit,
     logAsNew,
     duplicateOf,
+    orderDuplicate,
+    logOrderAnyway,
+    dismissOrderDuplicate,
     discardDraft,
     startOver,
     hasContent: hasDraftContent(formData, products, proofPaths),

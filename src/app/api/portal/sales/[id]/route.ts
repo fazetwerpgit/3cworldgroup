@@ -11,6 +11,7 @@ import { hasSaleProof } from '@/lib/sales/proof';
 import { proofPathFields, saleProofPaths, validateProofPaths } from '@/lib/sales/proofPaths';
 import { loadCarrierOrders } from '@/lib/sales/carrierSnapshot';
 import { carrierOrderForSale } from '@/lib/sales/installDateSync';
+import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
@@ -209,6 +210,10 @@ export async function PUT(
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     for (const field of EDITABLE_FIELDS) {
       if (body[field] !== undefined) updateData[field] = body[field];
+    }
+    // Keep the duplicate-check key in step with an edited order number.
+    if (updateData.orderNumberOrBtn !== undefined) {
+      updateData.orderNumberKey = normalizeOrderNumber(updateData.orderNumberOrBtn);
     }
     // Never the raw client values: both proof fields come from the validated list.
     delete updateData.proofScreenshotPath;

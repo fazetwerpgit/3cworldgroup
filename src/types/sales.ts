@@ -45,6 +45,8 @@ export interface CreateSaleData {
   // Idempotency key (32 lowercase hex): the server uses it as the sale doc id so
   // a retried submit returns the existing sale instead of logging a duplicate.
   clientSaleId?: string;
+  /** Log it even though a live sale already has this order number ("Log as a new sale"). */
+  allowDuplicate?: boolean;
 }
 
 export interface Sale {
