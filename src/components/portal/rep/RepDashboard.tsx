@@ -23,6 +23,7 @@ import {
   type Standing,
 } from '@/lib/dashboard/repSummary';
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
+import { isInstallToday } from '@/lib/sales/installBucket';
 import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import { CarrierNotice } from './CarrierNotice';
 import { PayHelpSheet } from './PayHelpSheet';
@@ -59,11 +60,12 @@ function statusLine(row: RecentSaleRow) {
     case 'installed':
       return row.installDate ? `Installed ${shortDate(row.installDate)}` : 'Installed';
     case 'scheduled':
-      return row.installDate ? `Installs ${shortDate(row.installDate)}` : 'Scheduled';
+      if (!row.installDate) return 'Scheduled';
+      return isInstallToday(row.installDate) ? 'Installs today' : `Installs ${shortDate(row.installDate)}`;
     case 'needs-date':
       return 'Needs install date';
     case 'missed':
-      return 'Missed install · reschedule';
+      return row.overdue ? 'Install overdue · reschedule' : 'Missed install · reschedule';
     case 'cancelled':
       return 'Cancelled';
   }
@@ -490,7 +492,7 @@ function TodayPanel({
               onClick={() => onSetDate(row)}
             >
               <span className={`${d.stamp} ${row.missed ? d.stampMissed : d.stampNeeds}`}>
-                <span className={d.stampLabel}>{row.missed ? 'Missed' : 'Needs date'}</span>
+                <span className={d.stampLabel}>{row.overdue ? 'Overdue' : row.missed ? 'Missed' : 'Needs date'}</span>
                 {stampSub ? <span className={d.stampSub}>{stampSub}</span> : null}
               </span>
               <span className={d.tText}>

@@ -13,7 +13,17 @@ import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow'
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
-import { isCarrierCancelled, isStandingBreakage, type InstallBucket, type InstallCounts } from '@/lib/sales/installBucket';
+import {
+  installAttentionReason,
+  isCarrierCancelled,
+  isInstallToday,
+  isStandingBreakage,
+  scheduledInstallDay,
+  type AttentionReason,
+  type InstallBucket,
+  type InstallCounts,
+} from '@/lib/sales/installBucket';
+import { formatInstallDayShort } from '@/lib/sales/saleDate';
 import { bookForMonth, buildMergedBook, type MergedBook, type MergedRow } from '@/lib/sales/mergeBook';
 import { normalizeAddress } from '@/lib/fiberReport/matchSales';
 import { getIdToken } from '@/lib/firebase/getIdToken';
@@ -140,17 +150,21 @@ function afterLoggingStarted(row: MergedRow): boolean {
   );
 }
 
+// 'attention' covers no date, a missed install and an overdue one, so the
+// count says what they share rather than naming one of them.
 const BUCKET_LABEL: Record<InstallBucket, string> = {
   installed: 'installed',
   scheduled: 'scheduled',
-  attention: 'no date',
+  attention: 'need attention',
 };
 
-/** "5 installed · 2 scheduled · 1 no date" — a zero segment is left out entirely. */
+/** "5 installed · 2 scheduled · 1 needs attention" — a zero segment is left out entirely. */
 function countsSummary(counts: InstallCounts): string {
   return (['installed', 'scheduled', 'attention'] as InstallBucket[])
     .filter((bucket) => counts[bucket] > 0)
-    .map((bucket) => `${counts[bucket]} ${BUCKET_LABEL[bucket]}`)
+    .map((bucket) =>
+      `${counts[bucket]} ${bucket === 'attention' && counts[bucket] === 1 ? 'needs attention' : BUCKET_LABEL[bucket]}`
+    )
     .join(' · ');
 }
 
@@ -161,9 +175,24 @@ const BUCKET_TONE: Record<InstallBucket, string> = {
   attention: x.st_needsdate,
 };
 
-function installChip(sale: Sale, bucket: InstallBucket) {
-  if (bucket === 'attention') return 'No install date';
-  return `${bucket === 'installed' ? 'Installed' : 'Installs'} ${formatDate(sale.installDate)}`;
+const ATTENTION_CHIP: Record<AttentionReason, string> = {
+  'no-date': 'No install date',
+  missed: 'Missed install',
+  cancelled: 'Cancelled',
+  overdue: 'Install overdue',
+};
+
+/**
+ * A row's chip, read off the same bucket, order and clock as the counts. A
+ * scheduled chip names the day the bucket rested on (the sale's own date while
+ * it is ahead, else the carrier's estimate) and says "today" on the day itself.
+ */
+export function installChip(sale: Sale, bucket: InstallBucket, order?: FiberOrder | null, now: Date = new Date()) {
+  if (bucket === 'attention') return ATTENTION_CHIP[installAttentionReason(sale, order)];
+  if (bucket === 'installed') return `Installed ${formatDate(sale.installDate)}`;
+  const day = scheduledInstallDay(sale, order, now);
+  if (isInstallToday(day, now)) return 'Installs today';
+  return `Installs ${formatInstallDayShort(day) ?? formatDate(sale.installDate)}`;
 }
 
 /** The carrier's own line for an order nobody logged: what it is and when. */
@@ -576,7 +605,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         </span>
         {cancelled
           ? chip(x.st_cancelled, `Cancelled ${formatDate(sale.cancelledAt)}`)
-          : chip(BUCKET_TONE[row.bucket], installChip(sale, row.bucket))}
+          : chip(BUCKET_TONE[row.bucket], installChip(sale, row.bucket, row.order, now))}
         {row.state === 'waiting' && (
           <span className={x.bNote}>Not in the report yet</span>
         )}

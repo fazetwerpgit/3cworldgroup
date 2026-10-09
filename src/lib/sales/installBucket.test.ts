@@ -4,8 +4,11 @@ import {
   cancelledSales,
   countInstallBuckets,
   countedSales,
+  installAttentionReason,
   installBucketForSale,
+  isInstallToday,
   isStandingBreakage,
+  scheduledInstallDay,
   rollupSalesByRep,
 } from './installBucket';
 
@@ -82,6 +85,41 @@ describe('installBucketForSale', () => {
     const pending = (estInstallDate: string) => ({ status: 'pending_install', estInstallDate }) as FiberOrder;
     expect(installBucketForSale(past, pending('2026-09-18'), now)).toBe('attention');
     expect(installBucketForSale(past, pending('2026-09-24'), now)).toBe('scheduled');
+  });
+
+  it('keeps a pending install scheduled on its install day, overdue from the next', () => {
+    const past = sale({ installDate: new Date('2026-10-08T12:00:00') });
+    const pending = { status: 'pending_install', estInstallDate: '2026-10-09' } as FiberOrder;
+    // Late on the install day itself, the carrier has not activated yet: still scheduled.
+    const installDay = new Date('2026-10-09T18:00:00');
+    expect(installBucketForSale(past, pending, installDay)).toBe('scheduled');
+    expect(scheduledInstallDay(past, pending, installDay)).toBe('2026-10-09');
+    expect(isInstallToday(scheduledInstallDay(past, pending, installDay), installDay)).toBe(true);
+    // The day after, still pending: overdue, not "no install date".
+    const dayAfter = new Date('2026-10-10T09:00:00');
+    expect(installBucketForSale(past, pending, dayAfter)).toBe('attention');
+    expect(installAttentionReason(past, pending)).toBe('overdue');
+    expect(installAttentionReason(past, order('pre_sale'))).toBe('overdue');
+    expect(installAttentionReason(past, null)).toBe('overdue');
+  });
+
+  it('names why a sale needs attention', () => {
+    expect(installAttentionReason(sale({ installDate: undefined }), null)).toBe('no-date');
+    expect(installAttentionReason({ installDate: 'not-a-date' as unknown as Date }, null)).toBe('no-date');
+    const past = sale({ installDate: new Date('2026-09-10T12:00:00') });
+    expect(installAttentionReason(past, { status: 'breakage', estInstallDate: '2026-09-10' } as FiberOrder)).toBe('missed');
+    expect(installAttentionReason(past, order('cancelled'))).toBe('cancelled');
+    expect(installAttentionReason(past, order('churned'))).toBe('cancelled');
+  });
+
+  it('reads the scheduled day off the sale while it is ahead, else the carrier estimate', () => {
+    const ahead = sale({ installDate: new Date('2026-09-20T12:00:00') });
+    expect(scheduledInstallDay(ahead, null, NOW)).toBe('2026-09-20');
+    const pending = { status: 'pending_install', estInstallDate: '2026-09-22' } as FiberOrder;
+    expect(scheduledInstallDay(sale({ installDate: new Date('2026-09-10T12:00:00') }), pending, NOW)).toBe('2026-09-22');
+    expect(isInstallToday('2026-09-15', NOW)).toBe(true);
+    expect(isInstallToday('2026-09-16', NOW)).toBe(false);
+    expect(isInstallToday(null, NOW)).toBe(false);
   });
 
   it('treats an unparseable date as no date', () => {

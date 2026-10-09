@@ -65,9 +65,62 @@ export function installBucketForSale(
   if (fiberOrder?.status === 'pending_install') {
     const estDay = installDayKey(fiberOrder.estInstallDate);
     const today = installDayKey(now);
-    return estDay && today && estDay > today ? 'scheduled' : 'attention';
+    // The install day itself is still scheduled: the crew has all day to get
+    // there, so a pending order only needs chasing from the day after.
+    return estDay && today && estDay >= today ? 'scheduled' : 'attention';
   }
   return 'installed';
+}
+
+/**
+ * Why a sale sits in 'attention', so the words can say what actually went
+ * wrong. Only meaningful when installBucketForSale returned 'attention'; it
+ * walks the same checks in the same order.
+ *   - 'no-date':   nothing usable on the calendar
+ *   - 'missed':    the carrier reported a breakage at the door
+ *   - 'cancelled': the carrier cancelled or churned the order
+ *   - 'overdue':   the install day has passed and the carrier still has it
+ *                  pending (or pre-sale)
+ */
+export type AttentionReason = 'no-date' | 'missed' | 'cancelled' | 'overdue';
+
+export function installAttentionReason(
+  sale: Pick<Sale, 'installDate'>,
+  fiberOrder?: FiberOrder | null
+): AttentionReason {
+  if (!sale.installDate) return 'no-date';
+  if (isStandingBreakage(sale, fiberOrder)) return 'missed';
+  if (isCarrierCancelled(fiberOrder)) return 'cancelled';
+  if (Number.isNaN(new Date(sale.installDate as Date | string).getTime())) return 'no-date';
+  return 'overdue';
+}
+
+/**
+ * The install day (YYYY-MM-DD in INSTALL_DATE_TIME_ZONE) a 'scheduled' sale
+ * rests on, read the way installBucketForSale read it: the sale's own date
+ * while it is still ahead, otherwise the carrier's estimate that kept a
+ * pending order scheduled, falling back to the sale's date.
+ */
+export function scheduledInstallDay(
+  sale: Pick<Sale, 'installDate'>,
+  fiberOrder?: FiberOrder | null,
+  now: Date = new Date()
+): string | null {
+  const saleDay = installDayKey(sale.installDate);
+  if (sale.installDate) {
+    const installed = new Date(sale.installDate as Date | string);
+    if (!Number.isNaN(installed.getTime()) && installed.getTime() > now.getTime()) return saleDay;
+  }
+  if (fiberOrder?.status === 'pending_install') {
+    return installDayKey(fiberOrder.estInstallDate) ?? saleDay;
+  }
+  return saleDay;
+}
+
+/** True when a day key (or any date installDayKey reads) is today's install day. */
+export function isInstallToday(value: unknown, now: Date = new Date()): boolean {
+  const day = installDayKey(value);
+  return !!day && day === installDayKey(now);
 }
 
 /**

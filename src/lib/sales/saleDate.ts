@@ -172,3 +172,13 @@ export function formatInstallDay(value: unknown): string | null {
   const [year, month, day] = key.split('-');
   return `${month}/${day}/${year}`;
 }
+
+const SHORT_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+/** "Oct 9" for the install day in INSTALL_DATE_TIME_ZONE, or null with no usable date. */
+export function formatInstallDayShort(value: unknown): string | null {
+  const key = installDayKey(value);
+  if (!key) return null;
+  const [year, month, day] = key.split('-').map(Number);
+  return SHORT_DAY.format(new Date(Date.UTC(year, month - 1, day, 12)));
+}

@@ -22,7 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useSales } from '@/hooks/useSales';
-import { rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
+import { isOverdue, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
@@ -257,7 +257,11 @@ export function RepSaleDetail() {
   const { order, status } = view;
   const shown = view.sale;
   const settling = fiber.loading;
-  const chip = STATUS_CHIP[status];
+  // An overdue install (day passed, carrier still pending) shares the missed
+  // flow but not its name: nobody reported a no-show at the door.
+  const chip = isOverdue(shown, order, status)
+    ? { ...STATUS_CHIP.missed, label: 'Install overdue' }
+    : STATUS_CHIP[status];
   const name = sale.customerName || sale.customerAddress || 'Customer pending';
   const ownSale = !!user?.uid && sale.salesRepId === user.uid;
   const products = Array.isArray(sale.products) ? sale.products : [];

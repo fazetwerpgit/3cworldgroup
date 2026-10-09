@@ -222,7 +222,7 @@ function needsDateRows(digest: RepDigest): Row[] {
   return digest.needsDate.map((sale) => ({
     title: sale.customer,
     lines: [`${sale.address} · ${sale.plan}`],
-    right: sale.missed ? 'Missed install' : 'No date',
+    right: sale.overdue ? 'Install overdue' : sale.missed ? 'Missed install' : 'No date',
     rightIsStatus: true,
     rightSub: sale.soldDay ? `Sold ${shortDay(sale.soldDay)}` : undefined,
   }));
@@ -399,7 +399,7 @@ function renderText(
     [
       ...digest.needsDate.map(
         (sale) =>
-          `- ${sale.customer}, ${sale.address}, ${sale.plan}. ${sale.missed ? 'Missed install' : 'No date'}${
+          `- ${sale.customer}, ${sale.address}, ${sale.plan}. ${sale.overdue ? 'Install overdue' : sale.missed ? 'Missed install' : 'No date'}${
             sale.soldDay ? `, sold ${shortDay(sale.soldDay)}` : ''
           }.`
       ),

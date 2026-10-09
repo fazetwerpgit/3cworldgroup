@@ -1,7 +1,7 @@
 import type { CompPlanCompanyRates, FiberOrder, Sale } from '@/types';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
-import { countedSales, installBucketForSale, isCarrierCancelled } from '@/lib/sales/installBucket';
+import { countedSales, installAttentionReason, installBucketForSale, isCarrierCancelled } from '@/lib/sales/installBucket';
 import { installDayKey } from '@/lib/sales/saleDate';
 import { formatPayoutWindow, isTFiberSale, payoutWindowForInstall } from '@/lib/pay/payoutWindow';
 import { planLabel } from '@/lib/dashboard/repSummary';
@@ -82,8 +82,10 @@ export interface DigestNeedsDate {
   address: string;
   plan: string;
   soldDay: DayKey | null;
-  /** It had a date, but the install broke at the door. */
+  /** It had a date, but the install broke at the door (or is overdue, see below). */
   missed: boolean;
+  /** It had a date that passed with the carrier still pending: overdue, not a breakage. */
+  overdue?: boolean;
 }
 
 export interface DigestTotal {
@@ -190,6 +192,7 @@ export function buildRepDigest(input: RepDigestInput): RepDigest {
         soldDay: installDayKey(sale.saleDate),
         // A date that broke at the door, rather than a date nobody set.
         missed: !!day,
+        overdue: !!day && installAttentionReason(sale, order) === 'overdue',
       });
       continue;
     }

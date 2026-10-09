@@ -9,7 +9,7 @@ import {
   type FiberOrderStatus,
   type Sale,
 } from '@/types';
-import { planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
+import { isOverdue, planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { periodBounds, type LeaderboardPeriod } from '@/lib/leaderboard/periods';
@@ -119,7 +119,7 @@ const CARRIER_STATUS: Record<FiberOrderStatus, string> = {
   breakage: 'missed install',
 };
 
-function installLine(status: RowStatus, installDate: Date | null, zone: Zone): string {
+function installLine(status: RowStatus, installDate: Date | null, zone: Zone, overdue = false): string {
   switch (status) {
     case 'installed':
       return installDate ? `installed ${dayLabel(installDate, zone)}` : 'installed';
@@ -128,6 +128,9 @@ function installLine(status: RowStatus, installDate: Date | null, zone: Zone): s
     case 'needs-date':
       return 'needs an install date';
     case 'missed':
+      if (overdue) {
+        return `install overdue${installDate ? ` (was ${dayLabel(installDate, zone)})` : ''}, the carrier still shows it pending`;
+      }
       return `missed install${installDate ? ` (was ${dayLabel(installDate, zone)})` : ''}, needs a reschedule`;
     case 'cancelled':
       return 'cancelled';
@@ -179,7 +182,7 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
       `plan ${clean(planLabel(sale as unknown as Sale), 40)}`,
       `sold ${sale.saleDate ? dayLabel(sale.saleDate, zone) : 'date not set'}`,
       `logged ${sale.createdAt ? `${dayLabel(sale.createdAt, zone)} ${timeLabel(sale.createdAt, zone)}` : 'unknown'}`,
-      `install: ${installLine(status, sale.installDate ?? null, zone)}`,
+      `install: ${installLine(status, sale.installDate ?? null, zone, isOverdue(sale as unknown as Sale, order, status))}`,
     ];
     if (SALE_STATUS[sale.status]) {
       parts.push(`in the portal: ${SALE_STATUS[sale.status]}${str(sale.reason) ? ` (${reasonText(sale.reason, 80)})` : ''}`);

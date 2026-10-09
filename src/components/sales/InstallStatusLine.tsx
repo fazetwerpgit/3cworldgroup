@@ -1,7 +1,8 @@
 import type { Sale } from '@/types';
 import type { FiberOrder, FiberOrderStatus } from '@/types/fiberOrder';
 import type { RowStatus } from '@/lib/dashboard/repSummary';
-import { isStandingBreakage } from '@/lib/sales/installBucket';
+import { installAttentionReason, isInstallToday, isStandingBreakage, scheduledInstallDay } from '@/lib/sales/installBucket';
+import { formatInstallDayShort } from '@/lib/sales/saleDate';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import { FiberStatusPill } from './InstallStatusSection';
 
@@ -17,17 +18,27 @@ function formatDate(value: Date | string) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/** The dashboard's status line, so a sale reads the same on both pages. */
-export function statusLine(status: RowStatus, installDate: Date | string | null | undefined) {
+/**
+ * The dashboard's status line, so a sale reads the same on both pages.
+ * `installDate` is the day to name; for a scheduled sale pass the day the bucket
+ * rested on (scheduledInstallDay), so the install day itself reads "Installs today".
+ */
+export function statusLine(
+  status: RowStatus,
+  installDate: Date | string | null | undefined,
+  { overdue = false, now = new Date() }: { overdue?: boolean; now?: Date } = {}
+) {
   switch (status) {
     case 'installed':
       return installDate ? `Installed ${formatDate(installDate)}` : 'Installed';
     case 'scheduled':
-      return installDate ? `Installs ${formatDate(installDate)}` : 'Scheduled';
+      if (!installDate) return 'Scheduled';
+      if (isInstallToday(installDate, now)) return 'Installs today';
+      return `Installs ${formatInstallDayShort(installDate) ?? formatDate(installDate)}`;
     case 'needs-date':
       return 'Needs install date';
     case 'missed':
-      return 'Missed install · reschedule';
+      return overdue ? 'Install overdue · reschedule' : 'Missed install · reschedule';
     case 'cancelled':
       return 'Cancelled';
   }
@@ -63,11 +74,14 @@ export function InstallStatusLine({
   order: FiberOrder | null | undefined;
   status: RowStatus;
 }) {
+  const now = new Date();
+  const day = status === 'scheduled' ? scheduledInstallDay(sale, order, now) : sale.installDate;
+  const overdue = status === 'missed' && installAttentionReason(sale, order) === 'overdue';
   return (
     <>
       <span className={`${x.status} ${STATUS_CLASS[status]}`}>
         <span className={x.dot} aria-hidden="true" />
-        {statusLine(status, sale.installDate)}
+        {statusLine(status, day, { overdue, now })}
       </span>
       {order && carrierAddsInfo(sale, order, status) && (
         <span className={x.carrierSays}>

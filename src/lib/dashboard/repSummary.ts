@@ -11,6 +11,7 @@ import {
 import {
   countedSales,
   emptyInstallCounts,
+  installAttentionReason,
   installBucketForSale,
   isCarrierCancelled,
   type InstallCounts,
@@ -115,6 +116,8 @@ export interface RecentSaleRow {
   address: string;
   status: RowStatus;
   installDate: Date | null;
+  /** A 'missed' row whose day passed with the carrier still pending: "Install overdue", not a breakage. */
+  overdue?: boolean;
   /** Null = no pay plan (show a dash); 0 = no contracted rate yet. */
   estPay: number | null;
   /** "Oct 7–11" for a dated, live T-Fiber sale (scheduled or completed; not missed or cancelled), else null. */
@@ -141,6 +144,15 @@ export function rowStatus(sale: Sale, order: FiberOrder | undefined, now: Date):
   return bucket;
 }
 
+/**
+ * A 'missed' row the carrier never reported broken: the install day passed and
+ * the order is still pending. Same rows, same reschedule flow, but the words
+ * say "overdue" so nobody reads it as a no-show at the door.
+ */
+export function isOverdue(sale: Sale, order: FiberOrder | undefined, status: RowStatus): boolean {
+  return status === 'missed' && installAttentionReason(sale, order) === 'overdue';
+}
+
 /** The newest `limit` sales (the API returns them newest-logged first). */
 export function recentSaleRows(
   sales: Sale[],
@@ -164,6 +176,7 @@ export function recentSaleRows(
       address: sale.customerAddress || '',
       status,
       installDate: toDate(sale.installDate),
+      overdue: isOverdue(sale, orderFor(sale, fiberBySale), status),
       estPay: status === 'cancelled' ? null : expectedPayForSale(sale, rates),
       payoutLabel: window ? formatPayoutWindow(window) : null,
     };
@@ -174,8 +187,10 @@ export interface NeedsDateRow {
   id: string;
   customer: string;
   plan: string;
-  /** True when a date existed but the install broke at the door. */
+  /** True when a date existed but the install broke at the door (or is overdue, see below). */
   missed: boolean;
+  /** A missed row whose day passed with the carrier still pending, not a breakage. */
+  overdue?: boolean;
   /** The carrier's missed install day (its breakage row), when it gave one. */
   missedDay: string | null;
   /** The missed install's day alone ("Sep 19"): the carrier's day, else the sale's old install date. */
@@ -211,6 +226,7 @@ export function needsDateRows(sales: Sale[], fiberBySale: FiberMap, now: Date = 
         customer: sale.customerName || 'Customer',
         plan: planLabel(sale),
         missed,
+        overdue: missed && installAttentionReason(sale, order) === 'overdue',
         missedDay: order?.status === 'breakage' ? order.estInstallDate ?? null : null,
         missedDayLabel: missed ? dayLabel(missedInstallDay(order?.status === 'breakage' ? order.estInstallDate : null, sale.installDate)) : null,
         missedReason: missed ? missedReason(order) : null,

@@ -45,7 +45,7 @@ vi.mock('./UnloggedOrders', () => ({
   },
 }));
 
-import { AdminSalesBoard } from './AdminSalesBoard';
+import { AdminSalesBoard, installChip } from './AdminSalesBoard';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -549,5 +549,28 @@ describe('what the board totals instead of the monthly plan price', () => {
     expect(figure('Points')).toBe('10 pts');
     expect(figure('3C revenue')).toBeUndefined();
     expect(container.textContent).not.toMatch(/\$360|\$560|\/\s?mo/);
+  });
+});
+
+describe('the install chip says what is actually wrong', () => {
+  const now = new Date(2026, 9, 9, 18, 0, 0);
+  const pendingOn = (estInstallDate: string) => ({ status: 'pending_install', estInstallDate }) as FiberOrder;
+  const withInstall = (installDate: Date | undefined) => ({ ...backDatedSale, installDate }) as unknown as Sale;
+
+  it('reads "Installs today" on the install day, even after the sale date passes', () => {
+    const sale = withInstall(new Date(2026, 9, 9, 12, 0, 0));
+    expect(installChip(sale, 'scheduled', pendingOn('2026-10-09'), now)).toBe('Installs today');
+    expect(installChip(withInstall(new Date(2026, 9, 12, 12, 0, 0)), 'scheduled', null, now)).toBe('Installs Oct 12');
+  });
+
+  it('reads "Install overdue" once the day passes with the carrier still pending', () => {
+    const sale = withInstall(new Date(2026, 9, 8, 12, 0, 0));
+    expect(installChip(sale, 'attention', pendingOn('2026-10-08'), now)).toBe('Install overdue');
+  });
+
+  it('keeps "No install date" for a sale with no date, and names a breakage', () => {
+    expect(installChip(withInstall(undefined), 'attention', null, now)).toBe('No install date');
+    const broke = { status: 'breakage', estInstallDate: '2026-10-08' } as FiberOrder;
+    expect(installChip(withInstall(new Date(2026, 9, 8, 12, 0, 0)), 'attention', broke, now)).toBe('Missed install');
   });
 });

@@ -10,6 +10,7 @@ import {
   type InstallCounts,
 } from '@/lib/sales/installBucket';
 import { linkedSaleId, matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
+import { installDayKey } from '@/lib/sales/saleDate';
 import type { MonthKey } from '@/lib/sales/monthWindow';
 
 // One book. The admin Sales page used to show two lists that disagreed: the
@@ -174,9 +175,11 @@ function text(value: string | null | undefined): string | null {
 function bucketForOrder(order: FiberOrder, now: Date): InstallBucket {
   if (order.status === 'active') return 'installed';
   if (order.status !== 'pending_install') return 'attention';
-  const estimated = toDate(order.estInstallDate);
-  if (!estimated) return 'attention';
-  return estimated.getTime() > now.getTime() ? 'scheduled' : 'attention';
+  // Same day-key rule as installBucketForSale: the install day itself is
+  // still scheduled.
+  const estDay = installDayKey(order.estInstallDate);
+  const today = installDayKey(now);
+  return estDay && today && estDay >= today ? 'scheduled' : 'attention';
 }
 
 /** The date a row sorts on inside its bucket: the sale's install, else the carrier's estimate. */
