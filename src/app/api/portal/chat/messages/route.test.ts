@@ -158,6 +158,22 @@ function messagesWhere(_field: string, _op: string, messageId: string) {
 
 // lastMessageAt as written by the route (server timestamps resolved to now).
 const channelLastMessageAt: Record<string, Timestamp> = {};
+// users/{uid}/chatReads/{channelId} writes, keyed `${uid}/${channelId}`.
+const receipts: Record<string, Record<string, unknown>> = {};
+// chatChannels/{c}/pushLog/{messageId}, keyed `${c}/${messageId}`; create() of an
+// existing doc rejects like the Admin SDK.
+const pushLogs: Record<string, Record<string, unknown>> = {};
+function pushLogDoc(key: string) {
+  return {
+    create: async (data: Record<string, unknown>) => {
+      if (key in pushLogs) throw Object.assign(new Error('ALREADY_EXISTS'), { code: 6 });
+      pushLogs[key] = { ...data };
+    },
+    set: async (data: Record<string, unknown>) => {
+      pushLogs[key] = { ...pushLogs[key], ...data };
+    },
+  };
+}
 
 // Two channel docs: the audience-'all' default, and a managers channel that entry_rep
 // CANNOT reach by role but IS listed in extraMemberIds (the manually-added path).
@@ -187,9 +203,21 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: (name: string) =>
       name === 'users'
-        ? { doc: (uid: string) => ({ __user: uid }) }
+        ? {
+            doc: (uid: string) => ({
+              __user: uid,
+              collection: () => ({
+                doc: (channelId: string) => ({
+                  set: async (data: Record<string, unknown>) => {
+                    receipts[`${uid}/${channelId}`] = data;
+                  },
+                }),
+              }),
+            }),
+          }
         : {
             doc: (channelId: string) => ({
+              id: channelId,
               get: vi.fn(async () => ({
                 id: channelId,
                 exists: channelId in CHANNEL_DOCS,
@@ -208,7 +236,10 @@ vi.mock('@/lib/firebase/admin', () => ({
                 }
                 return setMock(data, options);
               },
-              collection: () => ({ doc: messagesDoc, where: messagesWhere, orderBy: messagesOrderBy }),
+              collection: (name: string) =>
+                name === 'pushLog'
+                  ? { doc: (id: string) => pushLogDoc(`${channelId}/${id}`) }
+                  : { doc: messagesDoc, where: messagesWhere, orderBy: messagesOrderBy },
             }),
           },
     getAll: async (...refs: Array<{ __user: string }>) =>
@@ -306,6 +337,8 @@ beforeEach(() => {
   msgUpdateMock.mockClear();
   for (const id of Object.keys(createdDocs)) delete createdDocs[id];
   for (const id of Object.keys(channelLastMessageAt)) delete channelLastMessageAt[id];
+  for (const id of Object.keys(receipts)) delete receipts[id];
+  for (const id of Object.keys(pushLogs)) delete pushLogs[id];
   batchUpdates.length = 0;
   sendPushMock.mockClear();
   afterTasks.length = 0;
@@ -611,29 +644,42 @@ describe('POST /api/portal/chat/messages (idempotent retry)', () => {
     expect(afterTasks).toHaveLength(1);
   });
 
-  it('records the push result on the message', async () => {
+  it('moves the sender’s own read receipt with the send, so their message is never unread to them', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    await POST(req({ channelId: 'managers-extra', text: 'hi', clientMessageId: CLIENT_ID }));
+    expect(receipts['real-uid/managers-extra']).toEqual({ lastReadAt: expect.anything() });
+  });
+
+  it('records the push result in the push log, not on the message', async () => {
     mockGate.mockResolvedValue(VERIFIED);
     await POST(req({ channelId: 'managers-extra', text: 'hi', clientMessageId: CLIENT_ID }));
     await flushAfter();
-    expect(createdDocs[`real-uid_${CLIENT_ID}`]).toMatchObject({
-      pushClaimedAt: expect.anything(),
-      push: { recipients: 1, sent: 1, failed: 0, pruned: 0, at: expect.anything() },
+    expect(pushLogs[`managers-extra/real-uid_${CLIENT_ID}`]).toMatchObject({
+      claimedAt: expect.anything(),
+      recipients: 1,
+      sent: 1,
+      failed: 0,
+      pruned: 0,
+      at: expect.anything(),
     });
+    expect(msgUpdateMock).not.toHaveBeenCalled();
+    expect(createdDocs[`real-uid_${CLIENT_ID}`]).not.toHaveProperty('push');
   });
 
-  it('lets a repeat finish the bump and push a lost first attempt never made, once', async () => {
+  it('lets a repeat finish the bump, receipt and push a lost first attempt never made, once', async () => {
     mockGate.mockResolvedValue(VERIFIED);
-    // Stored by an attempt that died before its push (and before atomic bumps).
+    // Stored a minute ago by an attempt that died before its push (and before atomic bumps).
     const id = `real-uid_${CLIENT_ID}`;
-    const createdAt = Timestamp.fromMillis(5_000_000);
+    const createdAt = Timestamp.fromMillis(Date.now() - 60_000);
     createdIds.add(id);
     createdDocs[id] = { authorId: 'real-uid', text: 'hi', deletedAt: null, createdAt };
-    channelLastMessageAt['managers-extra'] = Timestamp.fromMillis(4_000_000);
+    channelLastMessageAt['managers-extra'] = Timestamp.fromMillis(createdAt.toMillis() - 1000);
 
     const again = await POST(req({ channelId: 'managers-extra', text: 'hi', clientMessageId: CLIENT_ID }));
     expect(await again.json()).toEqual({ success: true, messageId: id, duplicate: true });
     await flushAfter();
-    expect(channelLastMessageAt['managers-extra'].toMillis()).toBe(5_000_000);
+    expect(channelLastMessageAt['managers-extra'].toMillis()).toBe(createdAt.toMillis());
+    expect(receipts['real-uid/managers-extra']).toEqual({ lastReadAt: expect.anything() });
     expect(sendPushMock).toHaveBeenCalledTimes(1);
     expect(sendPushMock.mock.calls[0][2]).toMatchObject({ body: 'Real User: hi' });
 
@@ -641,6 +687,20 @@ describe('POST /api/portal/chat/messages (idempotent retry)', () => {
     await POST(req({ channelId: 'managers-extra', text: 'hi', clientMessageId: CLIENT_ID }));
     await flushAfter();
     expect(sendPushMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('never pushes a repeat of a message stored long ago, but still bumps it', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const id = `real-uid_${CLIENT_ID}`;
+    const createdAt = Timestamp.fromMillis(Date.now() - 6 * 60_000);
+    createdIds.add(id);
+    createdDocs[id] = { authorId: 'real-uid', text: 'hi', deletedAt: null, createdAt };
+    channelLastMessageAt['managers-extra'] = Timestamp.fromMillis(createdAt.toMillis() - 1000);
+
+    await POST(req({ channelId: 'managers-extra', text: 'hi', clientMessageId: CLIENT_ID }));
+    await flushAfter();
+    expect(channelLastMessageAt['managers-extra'].toMillis()).toBe(createdAt.toMillis());
+    expect(sendPushMock).not.toHaveBeenCalled();
   });
 
   it('never pushes a repeat of a message deleted since', async () => {
@@ -767,6 +827,22 @@ describe('DELETE /api/portal/chat/messages', () => {
     expect(setMock).not.toHaveBeenCalledWith(expect.objectContaining({ lastMessageAt: expect.anything() }), {
       merge: true,
     });
+  });
+
+  it('leaves lastMessageAt alone when the newest window holds no standing message', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    channelLastMessageAt['all-company'] = Timestamp.fromMillis(2_000_000);
+    MESSAGE_DOCS['others-msg'].deletedAt = { seconds: 1 };
+    for (let i = 0; i < 25; i++) {
+      createdDocs[`gone-${i}`] = { text: '', deletedAt: { seconds: 1 }, createdAt: Timestamp.fromMillis(2_000_001 + i) };
+    }
+    try {
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'own-msg' }));
+      expect(res.status).toBe(200);
+      expect(channelLastMessageAt['all-company'].toMillis()).toBe(2_000_000);
+    } finally {
+      MESSAGE_DOCS['others-msg'].deletedAt = null;
+    }
   });
 
   it('clears lastMessageAt when no message is left standing', async () => {

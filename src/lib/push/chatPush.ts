@@ -82,37 +82,35 @@ export async function sendChatPush(
   return totals;
 }
 
-// The push for one stored message, at most once: a transaction claims the
-// message (pushClaimedAt) before anything is sent, so a retried send that lands
-// on the same doc never notifies twice. The counts are kept on the message as
-// push { recipients, sent, failed, pruned, at } and logged without text or tokens.
-// Returns false when the push was already claimed or the message is gone.
+// The push for one stored message, at most once. Bookkeeping lives beside the
+// message, in chatChannels/{c}/pushLog/{messageId} (server-only; writing it on the
+// message would re-fire every thread listener): create() claims it before anything
+// is sent, so a retried send never notifies twice, and the counts
+// { recipients, sent, failed, pruned, at } land on the same doc. Logged without
+// text or tokens. Returns false when the push was already claimed.
 export async function pushChatMessageOnce(
-  messageRef: FirebaseFirestore.DocumentReference,
+  channelRef: FirebaseFirestore.DocumentReference,
+  messageId: string,
   channelData: FirebaseFirestore.DocumentData,
   authorId: string,
   payload: PushPayload
 ): Promise<boolean> {
-  if (!adminDb) return false;
+  const logRef = channelRef.collection('pushLog').doc(messageId);
   try {
-    const claimed = await adminDb.runTransaction(async (tx) => {
-      const snap = await tx.get(messageRef);
-      const data = snap.exists ? snap.data() : undefined;
-      if (!data || data.deletedAt || data.pushClaimedAt || data.push) return false;
-      tx.update(messageRef, { pushClaimedAt: FieldValue.serverTimestamp() });
-      return true;
-    });
-    if (!claimed) return false;
+    try {
+      await logRef.create({ claimedAt: FieldValue.serverTimestamp() });
+    } catch (claimError) {
+      const code = (claimError as { code?: unknown } | null)?.code;
+      if (code === 6 || code === 'already-exists' || code === 'ALREADY_EXISTS') return false;
+      throw claimError;
+    }
 
     const totals = await sendChatPush(channelData, authorId, payload);
-    console.info(
-      '[chat] push',
-      JSON.stringify({ channelId: messageRef.parent.parent?.id ?? null, messageId: messageRef.id, ...totals })
-    );
-    await messageRef.update({ push: { ...totals, at: FieldValue.serverTimestamp() } });
+    console.info('[chat] push', JSON.stringify({ channelId: channelRef.id, messageId, ...totals }));
+    await logRef.set({ ...totals, at: FieldValue.serverTimestamp() }, { merge: true });
     return true;
   } catch (err) {
-    console.error('[chat] push failed', messageRef.id, err);
+    console.error('[chat] push failed', messageId, err);
     return false;
   }
 }

@@ -119,23 +119,37 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// The sender's own read receipt, moved to now with their send so their own
+// message never lights their unread dot (a server timestamp only moves it forward).
+function senderReceiptRef(uid: string, channelId: string) {
+  return adminDb!.collection('users').doc(uid).collection('chatReads').doc(channelId);
+}
+
 // Raises the channel's lastMessageAt to `createdAt` unless it is already at or
-// past it. Never lowers it: a newer message may have bumped it since.
+// past it (and with it the sender's receipt). Never lowers it: a newer message
+// may have bumped it since.
 async function bumpLastMessageAt(
   channelRef: FirebaseFirestore.DocumentReference,
-  createdAt: unknown
+  createdAt: unknown,
+  senderId: string
 ): Promise<void> {
   if (!(createdAt instanceof Timestamp)) return;
   await adminDb!.runTransaction(async (tx) => {
     const current = (await tx.get(channelRef)).data()?.lastMessageAt;
     if (current instanceof Timestamp && current.toMillis() >= createdAt.toMillis()) return;
     tx.set(channelRef, { lastMessageAt: createdAt }, { merge: true });
+    tx.set(senderReceiptRef(senderId, channelRef.id), { lastReadAt: FieldValue.serverTimestamp() }, { merge: true });
   });
 }
 
+// A repeat send only pushes a message stored this recently: older ones predate
+// the push log (and were pushed when they were stored).
+const DUPLICATE_PUSH_MAX_AGE_MS = 5 * 60 * 1000;
+
 // After the channel's newest message is deleted, lastMessageAt falls back to the
-// newest message still standing (or is cleared when none is), so a dot raised only
-// by the deleted message goes away. Left alone when a newer message exists.
+// newest message still standing (or is cleared when the channel has none left),
+// so a dot raised only by the deleted message goes away. Left alone when a newer
+// message exists, or when the window holds no standing message but older ones may.
 // Runs in a transaction so a send landing meanwhile is never undercut.
 const RECOMPUTE_WINDOW = 25;
 async function recomputeLastMessageAt(
@@ -155,6 +169,7 @@ async function recomputeLastMessageAt(
     const newest = recent.docs.find((doc) => doc.id !== deletedId && !doc.data().deletedAt);
     const newestAt = newest?.data().createdAt;
     if (newestAt instanceof Timestamp && newestAt.toMillis() > deletedMs) return;
+    if (!newest && recent.docs.length >= RECOMPUTE_WINDOW) return;
     tx.set(
       channelRef,
       { lastMessageAt: newestAt instanceof Timestamp ? newestAt : FieldValue.delete() },
@@ -268,35 +283,39 @@ export async function POST(request: NextRequest) {
       url: `/portal/chat?channel=${encodeURIComponent(channelId)}`,
     };
 
-    // The message and the channel's lastMessageAt bump (what unread badges compare
-    // users/{uid}/chatReads receipts against) commit together, so both carry the
-    // same commit timestamp and neither lands without the other.
+    // The message, the channel's lastMessageAt bump (what unread badges compare
+    // users/{uid}/chatReads receipts against) and the sender's own receipt commit
+    // together, so all carry the same commit timestamp and none lands alone.
     const write = adminDb!.batch();
     write.create(messageRef, messageDoc);
     write.set(channelRef, { lastMessageAt: FieldValue.serverTimestamp() }, { merge: true });
+    write.set(senderReceiptRef(user.uid, channelId), { lastReadAt: FieldValue.serverTimestamp() }, { merge: true });
     try {
       await write.commit();
     } catch (createError) {
       if (!clientMessageId || !isAlreadyExists(createError)) throw createError;
       // A repeat of a stored send finishes whatever the first attempt did not:
-      // the bump of a message stored before bumps were atomic, and the push
-      // (claimed on the message, so it never goes out twice).
+      // the bump of a message stored before bumps were atomic, and the push of a
+      // recent one (claimed in the push log, so it never goes out twice).
       const stored = await messageRef.get();
       const storedData = stored.data();
       if (storedData && !storedData.deletedAt) {
         try {
-          await bumpLastMessageAt(channelRef, storedData.createdAt);
+          await bumpLastMessageAt(channelRef, storedData.createdAt, user.uid);
         } catch (bumpError) {
           console.error('Error bumping channel lastMessageAt:', bumpError);
         }
-        const storedText = typeof storedData.text === 'string' ? storedData.text : '';
-        const storedAttachment = readStoredAttachment(storedData.attachment) ?? undefined;
-        after(() =>
-          pushChatMessageOnce(messageRef, found.data, user.uid, {
-            ...pushPayload,
-            body: buildChatPushBody(user.displayName, storedText, storedAttachment),
-          })
-        );
+        const createdAt = storedData.createdAt;
+        if (createdAt instanceof Timestamp && Date.now() - createdAt.toMillis() <= DUPLICATE_PUSH_MAX_AGE_MS) {
+          const storedText = typeof storedData.text === 'string' ? storedData.text : '';
+          const storedAttachment = readStoredAttachment(storedData.attachment) ?? undefined;
+          after(() =>
+            pushChatMessageOnce(channelRef, messageRef.id, found.data, user.uid, {
+              ...pushPayload,
+              body: buildChatPushBody(user.displayName, storedText, storedAttachment),
+            })
+          );
+        }
       }
       return NextResponse.json({ success: true, messageId: messageRef.id, duplicate: true });
     }
@@ -306,7 +325,7 @@ export async function POST(request: NextRequest) {
     // the response is on the wire while keeping the function alive — a detached
     // promise would be killed by the serverless freeze.
     after(() =>
-      pushChatMessageOnce(messageRef, found.data, user.uid, {
+      pushChatMessageOnce(channelRef, messageRef.id, found.data, user.uid, {
         ...pushPayload,
         body: buildChatPushBody(user.displayName, text, attachment),
       })

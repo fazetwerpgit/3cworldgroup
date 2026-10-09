@@ -112,16 +112,27 @@ describe('pushChatMessageOnce', () => {
   const channel = { id: 'all-company', name: 'All', audience: 'all', order: 1, active: true, memberIds: ['boss', 'rep'] };
   const payload = { title: 'All', body: 'Boss: secret text' };
 
-  function messageRef(initial: Record<string, unknown> | undefined) {
-    let data = initial ? { ...initial } : undefined;
+  // chatChannels/{c} with its pushLog subcollection: create() rejects an existing
+  // doc like the Admin SDK (ALREADY_EXISTS).
+  function channelRef() {
+    const logs = new Map<string, Record<string, unknown>>();
     const ref = {
-      id: 'boss_m1',
-      parent: { parent: { id: 'all-company' } },
-      get: vi.fn(async () => ({ exists: !!data, data: () => data })),
-      update: vi.fn(async (patch: Record<string, unknown>) => {
-        data = { ...data, ...patch };
-      }),
-      current: () => data,
+      id: 'all-company',
+      collection: (name: string) => {
+        expect(name).toBe('pushLog');
+        return {
+          doc: (id: string) => ({
+            create: vi.fn(async (data: Record<string, unknown>) => {
+              if (logs.has(id)) throw Object.assign(new Error('ALREADY_EXISTS'), { code: 6 });
+              logs.set(id, { ...data });
+            }),
+            set: vi.fn(async (data: Record<string, unknown>) => {
+              logs.set(id, { ...logs.get(id), ...data });
+            }),
+          }),
+        };
+      },
+      logs,
     };
     return ref;
   }
@@ -129,37 +140,33 @@ describe('pushChatMessageOnce', () => {
   beforeEach(() => {
     fake.users.clear();
     fake.users.set('rep', { status: 'active', fieldRole: 'entry_rep', pushTokens: ['t-rep'] });
-    fake.sendPushToTokens.mockClear();
-    fake.sendPushToTokens.mockResolvedValueOnce({ delivered: 1, failed: 1, pruned: 1 });
+    fake.sendPushToTokens.mockReset();
+    fake.sendPushToTokens.mockResolvedValue({ delivered: 1, failed: 1, pruned: 1 });
   });
 
-  it('claims, sends once, and records the counts on the message', async () => {
-    const ref = messageRef({ text: 'secret text', deletedAt: null });
+  it('claims the push log, sends once, and records the counts there', async () => {
+    const ref = channelRef();
     const log = vi.spyOn(console, 'info').mockImplementation(() => undefined);
-    const call = (r: typeof ref) =>
-      pushChatMessageOnce(r as unknown as FirebaseFirestore.DocumentReference, channel, 'boss', payload);
+    const call = () =>
+      pushChatMessageOnce(ref as unknown as FirebaseFirestore.DocumentReference, 'boss_m1', channel, 'boss', payload);
 
-    expect(await call(ref)).toBe(true);
-    expect(await call(ref)).toBe(false);
+    expect(await call()).toBe(true);
+    expect(await call()).toBe(false);
 
     expect(fake.sendPushToTokens).toHaveBeenCalledTimes(1);
-    expect(ref.current()).toMatchObject({
-      pushClaimedAt: expect.anything(),
-      push: { recipients: 1, sent: 1, failed: 1, pruned: 1, at: expect.anything() },
+    expect(ref.logs.get('boss_m1')).toMatchObject({
+      claimedAt: expect.anything(),
+      recipients: 1,
+      sent: 1,
+      failed: 1,
+      pruned: 1,
+      at: expect.anything(),
     });
     const logged = log.mock.calls.map((c) => c.join(' ')).join('\n');
     expect(logged).toContain('"messageId":"boss_m1"');
     expect(logged).not.toContain('secret');
     expect(logged).not.toContain('t-rep');
     log.mockRestore();
-  });
-
-  it('never pushes a deleted or missing message', async () => {
-    const call = (r: ReturnType<typeof messageRef>) =>
-      pushChatMessageOnce(r as unknown as FirebaseFirestore.DocumentReference, channel, 'boss', payload);
-    expect(await call(messageRef({ deletedAt: { seconds: 1 } }))).toBe(false);
-    expect(await call(messageRef(undefined))).toBe(false);
-    expect(fake.sendPushToTokens).not.toHaveBeenCalled();
   });
 });
 
