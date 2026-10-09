@@ -346,16 +346,82 @@ export function joinByOrderNumber(sales: readonly SaleForFiberMatch[], openOrder
   return { bySale, superseded, reserved };
 }
 
+/** How one sale resolves against the unlinked rows: shared by every page and the install-date sync. */
+export type SaleResolution =
+  | { kind: 'order'; order: FiberOrder; via: 'number' | 'address' | 'superseded' }
+  | { kind: 'ambiguous' }
+  | { kind: 'none' };
+
+/**
+ * One sale's row, after links: its number (joinByOrderNumber), else the
+ * address pick over the rows no number names, else — for a sale whose
+ * cancelled numbered row was set aside — that row after all. `pick` is the
+ * caller's address rule: the pages take pickCurrentOrder's best guess; the
+ * install-date sync wants a certain door and a pick that does not flip.
+ */
+export function resolveUnlinkedSale(
+  sale: SaleForFiberMatch,
+  openOrders: readonly FiberOrder[],
+  join: NumberJoin,
+  pick: (door: { orders: FiberOrder[]; certain: boolean }) => FiberOrder | 'ambiguous' | undefined
+): SaleResolution {
+  const saleId = sale.id?.trim() ?? '';
+  const numbered = join.bySale.get(saleId);
+  if (numbered) return { kind: 'order', order: numbered, via: 'number' };
+  const door = saleDoor(sale, openOrders.filter((order) => !join.reserved.has(order)));
+  const picked = door.orders.length || !door.certain ? pick(door) : undefined;
+  if (picked === 'ambiguous') return { kind: 'ambiguous' };
+  if (picked) return { kind: 'order', order: picked, via: 'address' };
+  const own = join.superseded.get(saleId);
+  return own ? { kind: 'order', order: own, via: 'superseded' } : { kind: 'none' };
+}
+
+/**
+ * One carrier row is one install: of the sales whose resolution names the same
+ * row, the first in input order keeps it. A sale that loses its row gets its
+ * own set-aside numbered row back (logged A, carrier cancelled A and placed B,
+ * and B is another sale's): it is on A, carrier-cancelled, not on nothing.
+ */
+export function claimOrders(
+  sales: readonly SaleForFiberMatch[],
+  candidates: ReadonlyMap<string, FiberOrder>,
+  superseded: ReadonlyMap<string, FiberOrder>
+): Map<string, FiberOrder> {
+  const claims = new Map<string, FiberOrder>();
+  const held = new Set<FiberOrder>();
+  for (const sale of sales) {
+    const saleId = sale.id?.trim();
+    if (!saleId || claims.has(saleId)) continue;
+    const order = candidates.get(saleId);
+    if (!order) continue;
+    if (!held.has(order)) {
+      claims.set(saleId, order);
+      held.add(order);
+      continue;
+    }
+    const own = superseded.get(saleId);
+    if (own && !held.has(own)) {
+      claims.set(saleId, own);
+      held.add(own);
+    }
+  }
+  return claims;
+}
+
 export interface FiberMatchResult {
+  /** Each sale's own row (resolveUnlinkedSale): two sales may name one row, and two sales naming one row are one customer twice. */
   matches: Map<string, FiberOrder>;
+  /** One row per sale (claimOrders), first in input order: what the owner book counts. */
+  claims: Map<string, FiberOrder>;
   /**
    * Address-matched sales (no order number of their own on the report) whose
-   * door holds a row another sale claimed by order number. The address guess
+   * door holds a row another sale holds by order number. The address guess
    * may not take that row, but it is still the evidence that both sales are
-   * one customer, so the possible-duplicate flag reads it from here.
+   * one customer, so the possible-duplicate flag reads it from here. A row set
+   * aside as superseded is not held, so it never counts here.
    */
   contested: Map<string, FiberOrder>;
-  /** Sale id → its own numbered row the carrier cancelled and replaced (NumberJoin.superseded). */
+  /** Sale id → its own numbered row the carrier cancelled and replaced, when the sale ended up elsewhere. */
   superseded: Map<string, FiberOrder>;
 }
 
@@ -369,8 +435,8 @@ export interface FiberMatchResult {
  *      missed-install row beside it, unless the carrier cancelled it and a
  *      live row stands at the door: then the sale goes on to step 3.
  *   3. Address, for a sale with no number, one the report lacks, or a
- *      superseded one. Rows any number names are out of this pool: one
- *      carrier row is one sale's.
+ *      superseded one. Rows any number names are out of this pool.
+ *   4. claimOrders: one row per sale, first in input order.
  */
 export function matchFiberOrdersToSalesDetailed(
   sales: SaleForFiberMatch[],
@@ -395,26 +461,22 @@ export function matchFiberOrdersToSalesDetailed(
 
   const unlinkedSales = sales.filter((sale) => !sale.id?.trim() || !matches.has(sale.id));
   const join = joinByOrderNumber(unlinkedSales, openOrders);
-  for (const [saleId, order] of join.bySale) matches.set(saleId, order);
+  const heldByNumber = new Set(join.bySale.values());
+  const pickBest = (door: { orders: FiberOrder[] }) => pickCurrentOrder(door.orders);
 
-  for (const sale of sales) {
-    const saleId = sale.id;
-    if (!saleId?.trim() || matches.has(saleId)) continue;
-
-    const own = join.superseded.get(saleId);
-    const door = saleDoor(sale, openOrders).orders.filter((order) => order !== own);
-    const taken = door.find((order) => join.reserved.has(order));
-    if (taken && !own) contested.set(saleId, taken);
-    const selectedOrder = pickCurrentOrder(door.filter((order) => !join.reserved.has(order)));
-    if (selectedOrder) matches.set(saleId, selectedOrder);
+  for (const sale of unlinkedSales) {
+    const saleId = sale.id?.trim();
+    if (!saleId) continue;
+    const resolution = resolveUnlinkedSale(sale, openOrders, join, pickBest);
+    if (resolution.kind === 'order') matches.set(saleId, resolution.order);
+    if (resolution.kind !== 'order' || resolution.via !== 'number') {
+      const taken = saleDoor(sale, openOrders).orders.find((order) => heldByNumber.has(order));
+      if (taken && !join.superseded.has(saleId)) contested.set(saleId, taken);
+    }
   }
 
-  for (const saleId of join.superseded.keys()) {
-    // The live row went to another sale after all: the dead one is still this sale's.
-    if (!matches.has(saleId)) matches.set(saleId, join.superseded.get(saleId)!);
-  }
   const superseded = new Map([...join.superseded].filter(([saleId, order]) => matches.get(saleId) !== order));
-  return { matches, contested, superseded };
+  return { matches, claims: claimOrders(sales, matches, join.superseded), contested, superseded };
 }
 
 /** matchFiberOrdersToSalesDetailed, the matches alone: what every page and digest reads. */

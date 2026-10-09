@@ -1,15 +1,13 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import {
-  doorOrders,
-  isAddressPrefixPair,
   latestDay,
   linkedSaleId,
   normalizeAddress,
   joinByOrderNumber,
   type NumberJoin,
-  ordersPlacedForSale,
   pickCurrentOrder,
+  resolveUnlinkedSale,
 } from '@/lib/fiberReport/matchSales';
 import { formatInstallDay, installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
 import type { FiberOrder, InstallDateSyncCounts } from '@/types/fiberOrder';
@@ -155,7 +153,8 @@ type Current =
  * `saleLink` outranks everything — it is an admin saying out loud which sale an
  * order is (or that it is none) — and a linked order leaves the address pool
  * entirely, exactly as buildMergedBook does it. A sale named by two links is a
- * contradiction an admin has to settle. Then the order number: a sale whose
+ * contradiction an admin has to settle. The rest is resolveUnlinkedSale, the
+ * same resolution every page runs, with the sync's stricter address pick. The order number: a sale whose
  * logged number is in `orders` is that row, as the page joins it
  * (joinByOrderNumber: the sale's own rep, exact before loose, a cancelled row
  * replaced by a live one at the door set aside). Otherwise, leaving out rows
@@ -174,31 +173,18 @@ function currentOrderForSale(sale: SyncSale, orders: FiberOrder[], join: NumberJ
   if (links.length > 1) return { kind: 'ambiguous' };
   if (links.length === 1) return { kind: 'order', order: links[0] };
 
-  const numbered = join.bySale.get(sale.id);
-  if (numbered) return { kind: 'order', order: numbered };
-  const address = currentByAddress(sale, orders, join);
-  // A cancelled numbered row whose live replacement the address could not
-  // settle is still the sale's own row, as the page reads it.
-  const superseded = join.superseded.get(sale.id);
-  return superseded && address.kind === 'none' ? { kind: 'order', order: superseded } : address;
+  const open = orders.filter((order) => !linkedSaleId(order).linked);
+  const resolution = resolveUnlinkedSale(sale, open, join, strictPick);
+  return resolution.kind === 'order' ? { kind: 'order', order: resolution.order } : resolution;
 }
 
-function currentByAddress(sale: SyncSale, orders: FiberOrder[], join: NumberJoin): Current {
-  if (sale.normalizedAddress.length < 6) return { kind: 'none' };
-  const candidates = ordersPlacedForSale(sale.saleDate, orders).filter((order) => {
-    if (linkedSaleId(order).linked) return false;
-    if (join.reserved.has(order)) return false;
-    const orderAddress = normalizeAddress(order.address);
-    return orderAddress.length >= 6 && isAddressPrefixPair(sale.normalizedAddress, orderAddress);
-  });
-  if (!candidates.length) return { kind: 'none' };
-
-  const door = doorOrders(sale.customerAddress, candidates);
-  if (!door.certain) return { kind: 'ambiguous' };
+/** The sync's address rule: a door it can tell apart, and a pick that holds when the rows come in reverse. */
+function strictPick(door: { orders: FiberOrder[]; certain: boolean }): FiberOrder | 'ambiguous' | undefined {
+  if (!door.certain) return 'ambiguous';
   const current = pickCurrentOrder(door.orders);
-  if (!current) return { kind: 'none' };
-  if (pickCurrentOrder([...door.orders].reverse()) !== current) return { kind: 'ambiguous' };
-  return { kind: 'order', order: current };
+  if (!current) return undefined;
+  if (pickCurrentOrder([...door.orders].reverse()) !== current) return 'ambiguous';
+  return current;
 }
 
 /** joinByOrderNumber over the unlinked rows, for the sales no link already names: as the page runs it. */

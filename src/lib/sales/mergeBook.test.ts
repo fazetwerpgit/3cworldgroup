@@ -827,6 +827,39 @@ describe('re-order — the carrier cancels the logged order and places another',
     }
   });
 
+  // Sale 1 logged A; the carrier cancelled A and placed B. Sale 2 at the same
+  // door has no number. Both resolve to B: one customer logged twice.
+  const second = sale({ id: 'second', orderNumberOrBtn: '' });
+
+  it('sale 1 first keeps B; sale 2 waits with no order of its own, both flagged', () => {
+    for (const orders of [[a, b], [b, a]]) {
+      const book = build([logged, second], orders);
+      expect(row(book, 'reorder').possibleDuplicate).toBe(true);
+      expect(row(book, 'second').possibleDuplicate).toBe(true);
+      expect(book.rows.filter((r) => r.order === b)).toHaveLength(1);
+    }
+    const book = build([logged, second], [a, b]);
+    expect(row(book, 'reorder').order).toBe(b);
+    expect(row(book, 'reorder').history).toEqual([a]);
+    expect(row(book, 'second').order).toBeNull();
+    expect(row(book, 'second').state).toBe('waiting');
+  });
+
+  it('sale 2 first takes B; sale 1 is back on its cancelled A and not counted', () => {
+    const book = build([second, logged], [b, a]);
+    const r = row(book, 'reorder');
+    expect(row(book, 'second').order).toBe(b);
+    // Both resolved to B, so sale 2 is flagged; sale 1 reads cancelled, which hides the flag.
+    expect(row(book, 'second').possibleDuplicate).toBe(true);
+    expect(r.order).toBe(a);
+    expect(r.state).toBe('cancelled');
+    expect(r.counted).toBe(false);
+    expect(r.history).toEqual([]);
+    expect(book.rows.filter((x) => x.counted).map((x) => x.key)).toEqual(['second']);
+    expect(book.totalValue).toBe(60);
+    expect(book.rows).toHaveLength(2);
+  });
+
   it('still reads the sale carrier-cancelled when A is all there is', () => {
     const book = build([logged], [a]);
     expect(row(book, 'reorder').order).toBe(a);

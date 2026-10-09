@@ -897,6 +897,29 @@ describe('re-order and the edit snapshot agree with the sync', () => {
     }
   });
 
+  it('writes nothing to either sale when sale 1 (logged A, cancelled) and sale 2 (no number) both land on B', async () => {
+    const a = order({ id: 'TMO20260901AAAAA', status: 'cancelled', orderDate: reportDay(-6), cancellationDate: reportDay(-4), estInstallDate: reportDay(3) });
+    const b = order({ id: 'TMO20260903BBBBB', orderDate: reportDay(-4), estInstallDate: reportDay(9) });
+    const one = { id: 'one', salesRepId: 'rep-1', customerAddress: '123 Main St', status: 'approved', orderNumberOrBtn: 'TMO20260901AAAAA', installDate: noon(3) };
+    const two = { id: 'two', salesRepId: 'rep-1', customerAddress: '123 Main St', status: 'approved', installDate: noon(3) };
+    for (const rows of [[a, b], [b, a]]) {
+      for (const sales of [[one, two], [two, one]]) {
+        updateMock.mockClear();
+        setSales(sales);
+        const result = await syncInstallDatesFromOrders({ orders: rows, now: NOW });
+        // B has two live claimants: whose it is is the owner's call, not the writer's.
+        expect(result.skippedAmbiguous).toBe(1);
+        expect(result.updated).toBe(0);
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(result.orderSales.has(b.id)).toBe(false);
+        expect(result.orderSales.has(a.id)).toBe(false);
+        // The edit snapshot reads the same resolution, whichever sale is edited.
+        const docs = sales.map(({ id, ...data }) => ({ id, data }));
+        for (const doc of docs) expect(carrierOrderForSale(doc, rows, docs)?.orderId).toBe(b.id);
+      }
+    }
+  });
+
   it('records the row the sync would read, leaving out rows another of the rep\'s sales holds by number', async () => {
     // Y holds the newer order by number; X (no number) is on the older one.
     const held = order({ id: 'TMO20260905HELD1', orderDate: reportDay(-3), estInstallDate: reportDay(2) });

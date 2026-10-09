@@ -606,6 +606,23 @@ describe('re-order: the carrier cancels the logged order and places another', ()
     expect(matchFiberOrdersToSales([sale], [a, theirs]).get('s')).toBe(a);
   });
 
+  it('a set-aside A is not contested; claims give sale 1 back A when sale 2 holds B', () => {
+    const second = { id: 'two', salesRepId: 'rep-1', customerAddress: '12 Elm St', saleDate: new Date('2026-10-02T12:00:00') };
+    for (const orders of [[a, b], [b, a]]) {
+      const first = matchFiberOrdersToSalesDetailed([sale, second], orders);
+      expect(first.matches.get('s')).toBe(b);
+      expect(first.matches.get('two')).toBe(b);
+      expect(first.contested.size).toBe(0);
+      expect(first.claims.get('s')).toBe(b);
+      expect(first.claims.has('two')).toBe(false);
+
+      const flipped = matchFiberOrdersToSalesDetailed([second, sale], orders);
+      expect(flipped.contested.size).toBe(0);
+      expect(flipped.claims.get('two')).toBe(b);
+      expect(flipped.claims.get('s')).toBe(a);
+    }
+  });
+
   it("keeps A when B is another sale's by number", () => {
     const other = { id: 'o', salesRepId: 'rep-1', customerAddress: '12 Elm St', orderNumberOrBtn: 'TMO20261003BBBBB' };
     const result = matchFiberOrdersToSales([sale, other], [a, b]);

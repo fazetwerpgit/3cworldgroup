@@ -553,23 +553,24 @@ export function buildMergedBook(
   // Pass 2 — the order number, then the address guess, over what neither side
   // has already spoken for (matchFiberOrdersToSalesDetailed).
   const openSales = sales.filter((sale) => !linkedManually.has(sale));
-  const { matches: guessed, contested, superseded } = matchFiberOrdersToSalesDetailed(openSales, openOrders);
+  // The matcher already settled one row per sale (claimOrders): the first sale
+  // in input order keeps a row two sales resolve to, and the second reads
+  // 'waiting', the truer answer, it has no order of its own. Unless the second
+  // logged a number the carrier cancelled and replaced with that row: then it
+  // is back on its own cancelled row, carrier-cancelled and not counted.
+  const { matches, claims, contested, superseded } = matchFiberOrdersToSalesDetailed(openSales, openOrders);
   for (const sale of openSales) {
     const id = text(sale.id);
-    const order = id ? guessed.get(id) : undefined;
-    // One order is one install. Two sales logged at the same address both match
-    // the same order, and letting both keep it would render one install twice;
-    // the first sale in input order keeps it and the second reads 'waiting',
-    // which is the truer answer — it has no order of its own.
+    const order = id ? claims.get(id) : undefined;
     if (!order || claimedOrders.has(order)) continue;
     orderBySale.set(sale, order);
     claimedOrders.add(order);
   }
 
-  // A sale the address put at a door whose row another sale holds by order
-  // number reads as on that row for the duplicate check, as it did before the
-  // number join: two sales at one door is still one customer logged twice.
-  const doorOrder = new Map(guessed);
+  // The duplicate check reads each sale's own resolution, before exclusivity,
+  // and a sale the address put at a door whose row another sale holds by order
+  // number reads as on that row: two sales at one door is one customer twice.
+  const doorOrder = new Map(matches);
   for (const [saleId, order] of contested) doorOrder.set(saleId, order);
   const duplicates = possibleDuplicateSales(sales, doorOrder, (sale) => cancelled.has(sale));
 
