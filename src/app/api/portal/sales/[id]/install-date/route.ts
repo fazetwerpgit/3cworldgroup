@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
-import { loadCarrierOrders } from '@/lib/sales/carrierSnapshot';
+import { loadCarrierOrders, loadRepSales } from '@/lib/sales/carrierSnapshot';
 import { carrierOrderForSale } from '@/lib/sales/installDateSync';
 
 // A rep setting or moving the install date on their OWN sale — the one edit a
@@ -59,7 +59,7 @@ export async function PATCH(
 
     // Loaded before the transaction (it is a cached read of every order, not a
     // sale field) and matched inside it against the sale as the transaction saw it.
-    const carrierOrders = await loadCarrierOrders();
+    const [carrierOrders, repSales] = await Promise.all([loadCarrierOrders(), loadRepSales(requester.uid)]);
     const docRef = adminDb.collection('sales').doc(id);
     const refusal = await adminDb.runTransaction(async (tx) => {
       const doc = await tx.get(docRef);
@@ -87,7 +87,7 @@ export async function PATCH(
       // Stamped only when the day actually moves, as the full edit does, so the
       // carrier sync and the admin view can tell who set the date last.
       if (installDayKey(existing.installDate) !== nextDay) {
-        const carrier = carrierOrders ? carrierOrderForSale({ id, data: existing }, carrierOrders) : null;
+        const carrier = carrierOrders ? carrierOrderForSale({ id, data: existing }, carrierOrders, repSales) : null;
         const now = new Date();
         tx.update(docRef, {
           installDate: parsed.date,

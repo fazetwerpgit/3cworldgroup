@@ -22,7 +22,7 @@ import { SaleDetailSheet } from './SaleDetailSheet';
 import { SalesDialog } from './SalesDialog';
 import { InstallStatusLine } from './InstallStatusLine';
 import { FiberRows, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
-import { foldLeftoverOrders, matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
+import { foldLeftoverOrders, matchFiberOrdersToSalesDetailed } from '@/lib/fiberReport/matchSales';
 
 /** Sales | Pay: switches the VIEW of the page, so it is the canonical page tabs. */
 export function SalesViewTabs({ payView, onChange }: { payView: boolean; onChange: (payView: boolean) => void }) {
@@ -179,10 +179,11 @@ export function SalesTable({
   // off the install — a sale sold in August that installs in September is
   // August's record and September's money, and it has to appear in both.
   const fiberOrders = useMemo(() => fiber?.data?.orders ?? [], [fiber?.data?.orders]);
-  const fiberBySale = useMemo(
-    () => matchFiberOrdersToSales(sales, fiberOrders),
+  const fiberMatch = useMemo(
+    () => matchFiberOrdersToSalesDetailed(sales, fiberOrders),
     [fiberOrders, sales]
   );
+  const fiberBySale = fiberMatch.matches;
   // The reverse: which of the rep's own sales a carrier order belongs to, so a
   // carrier row can open that sale (name, phone, order number).
   // A missed install or cancelled attempt at the door of a matched order is
@@ -197,12 +198,17 @@ export function SalesTable({
       byId.set(order.id, sale);
       byOrder.set(order, sale);
     }
-    for (const [leftover, beside] of foldLeftoverOrders(fiberOrders, byOrder.keys())) {
+    // The sale's own order the carrier cancelled and replaced is its history too.
+    for (const sale of sales) {
+      const own = fiberMatch.superseded.get(sale.id || '');
+      if (own && !byId.has(own.id)) byId.set(own.id, sale);
+    }
+    for (const [leftover, beside] of foldLeftoverOrders(fiberOrders, byOrder.keys(), (order) => byOrder.get(order))) {
       const sale = byOrder.get(beside);
       if (sale && !byId.has(leftover.id)) byId.set(leftover.id, sale);
     }
     return byId;
-  }, [fiberBySale, fiberOrders, sales]);
+  }, [fiberBySale, fiberMatch.superseded, fiberOrders, sales]);
   const monthSales = useMemo(
     () => (month ? salesSoldIn(sales, month) : sales),
     [month, sales]

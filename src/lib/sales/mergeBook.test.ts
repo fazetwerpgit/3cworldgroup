@@ -807,3 +807,29 @@ describe('rep names for display', () => {
     expect(book.reps[0].repName).toBe('Noah St John');
   });
 });
+
+describe('re-order — the carrier cancels the logged order and places another', () => {
+  const a = order({ id: 'TMO20260902AAAAA', status: 'cancelled', orderDate: '2026-09-02', cancellationDate: '2026-09-04', estInstallDate: null });
+  const b = order({ id: 'TMO20260904BBBBB', orderDate: '2026-09-04', estInstallDate: '2026-09-20' });
+  const logged = sale({ id: 'reorder', orderNumberOrBtn: 'TMO20260902AAAAA' });
+
+  it('counts the sale on B and folds A under it', () => {
+    for (const orders of [[a, b], [b, a]]) {
+      const book = build([logged], orders);
+      const r = row(book, 'reorder');
+      expect(r.order).toBe(b);
+      expect(r.counted).toBe(true);
+      expect(r.state).toBe('agreed');
+      expect(r.history).toEqual([a]);
+      expect(book.rows).toHaveLength(1);
+      expect(book.notLoggedCount).toBe(0);
+      expect(book.totalValue).toBe(60);
+    }
+  });
+
+  it('still reads the sale carrier-cancelled when A is all there is', () => {
+    const book = build([logged], [a]);
+    expect(row(book, 'reorder').order).toBe(a);
+    expect(row(book, 'reorder').state).toBe('cancelled');
+  });
+});

@@ -1,14 +1,13 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import {
-  carrierOrderKey,
   doorOrders,
   isAddressPrefixPair,
   latestDay,
   linkedSaleId,
   normalizeAddress,
-  orderMatchKey,
-  ordersByNumber,
+  joinByOrderNumber,
+  type NumberJoin,
   ordersPlacedForSale,
   pickCurrentOrder,
 } from '@/lib/fiberReport/matchSales';
@@ -69,8 +68,8 @@ interface SyncSale {
   customerName: string | null;
   customerAddress: string | null;
   normalizedAddress: string;
-  /** The logged order number as the join compares it (orderMatchKey), '' when none. */
-  orderKey: string;
+  /** The logged order number, as stored (the join normalizes it). */
+  orderNumberOrBtn: string | null;
   saleDate: unknown;
   installDate: unknown;
   status: string | null;
@@ -122,7 +121,7 @@ function toSyncSale(
     customerName: text(data.customerName),
     customerAddress,
     normalizedAddress: normalizeAddress(customerAddress),
-    orderKey: orderMatchKey(data.orderNumberOrBtn),
+    orderNumberOrBtn: text(data.orderNumberOrBtn),
     saleDate: data.saleDate ?? null,
     installDate: data.installDate ?? null,
     status: text(data.status),
@@ -157,19 +156,17 @@ type Current =
  * order is (or that it is none) — and a linked order leaves the address pool
  * entirely, exactly as buildMergedBook does it. A sale named by two links is a
  * contradiction an admin has to settle. Then the order number: a sale whose
- * logged number is in `orders` is that row, as the page joins it. Otherwise,
- * leaving out rows another sale holds by number (`claimedByNumber`), the orders placed too long
+ * logged number is in `orders` is that row, as the page joins it
+ * (joinByOrderNumber: the sale's own rep, exact before loose, a cancelled row
+ * replaced by a live one at the door set aside). Otherwise, leaving out rows
+ * any sale's number names (`join.reserved`), the orders placed too long
  * before the sale are set aside (ordersPlacedForSale), the sale's door is read
  * off the address (doorOrders) and its current row picked (pickCurrentOrder),
  * the same steps the page takes. A door that can't be told apart, or a pick
  * that flips when the rows come in reverse (a tie the page settles by input
  * order), is ambiguous: a writer needs a real answer.
  */
-function currentOrderForSale(
-  sale: SyncSale,
-  orders: FiberOrder[],
-  claimedByNumber: ReadonlySet<string> = new Set()
-): Current {
+function currentOrderForSale(sale: SyncSale, orders: FiberOrder[], join: NumberJoin): Current {
   const links = orders.filter((order) => {
     const link = linkedSaleId(order);
     return link.linked && link.saleId === sale.id;
@@ -177,18 +174,20 @@ function currentOrderForSale(
   if (links.length > 1) return { kind: 'ambiguous' };
   if (links.length === 1) return { kind: 'order', order: links[0] };
 
-  if (sale.orderKey) {
-    const numbered = orders.find(
-      (order) => !linkedSaleId(order).linked && carrierOrderKey(order) === sale.orderKey
-    );
-    if (numbered) return { kind: 'order', order: numbered };
-  }
+  const numbered = join.bySale.get(sale.id);
+  if (numbered) return { kind: 'order', order: numbered };
+  const address = currentByAddress(sale, orders, join);
+  // A cancelled numbered row whose live replacement the address could not
+  // settle is still the sale's own row, as the page reads it.
+  const superseded = join.superseded.get(sale.id);
+  return superseded && address.kind === 'none' ? { kind: 'order', order: superseded } : address;
+}
 
+function currentByAddress(sale: SyncSale, orders: FiberOrder[], join: NumberJoin): Current {
   if (sale.normalizedAddress.length < 6) return { kind: 'none' };
   const candidates = ordersPlacedForSale(sale.saleDate, orders).filter((order) => {
     if (linkedSaleId(order).linked) return false;
-    const key = carrierOrderKey(order);
-    if (key && claimedByNumber.has(key)) return false;
+    if (join.reserved.has(order)) return false;
     const orderAddress = normalizeAddress(order.address);
     return orderAddress.length >= 6 && isAddressPrefixPair(sale.normalizedAddress, orderAddress);
   });
@@ -200,6 +199,18 @@ function currentOrderForSale(
   if (!current) return { kind: 'none' };
   if (pickCurrentOrder([...door.orders].reverse()) !== current) return { kind: 'ambiguous' };
   return { kind: 'order', order: current };
+}
+
+/** joinByOrderNumber over the unlinked rows, for the sales no link already names: as the page runs it. */
+function numberJoinFor(sales: SyncSale[], orders: FiberOrder[]): NumberJoin {
+  const linkedSales = new Set<string>();
+  const open: FiberOrder[] = [];
+  for (const order of orders) {
+    const link = linkedSaleId(order);
+    if (!link.linked) open.push(order);
+    else if (link.saleId) linkedSales.add(link.saleId);
+  }
+  return joinByOrderNumber(sales.filter((sale) => !linkedSales.has(sale.id)), open);
 }
 
 type Resolved =
@@ -285,9 +296,13 @@ function orderSalesFor(currents: SaleCurrent[]): Map<string, OrderSale> {
  */
 export function carrierOrderForSale(
   sale: { id: string; data: FirebaseFirestore.DocumentData },
-  orders: FiberOrder[]
+  orders: FiberOrder[],
+  /** The rep's other sales, so a row another sale's number names is not this one's (as the sync reads it). */
+  siblings: { id: string; data: FirebaseFirestore.DocumentData }[] = []
 ): CarrierSnapshot | null {
-  const current = currentOrderForSale(toSyncSale(sale.id, sale.data), orders);
+  const own = toSyncSale(sale.id, sale.data);
+  const all = [own, ...siblings.filter((other) => other.id !== sale.id).map((other) => toSyncSale(other.id, other.data))];
+  const current = currentOrderForSale(own, orders, numberJoinFor(all, orders));
   if (current.kind !== 'order') return null;
   return { orderId: current.order.id, estInstallDate: text(current.order.estInstallDate) };
 }
@@ -396,11 +411,10 @@ export async function syncInstallDatesFromOrders(
   );
   // Rows a sale holds by order number are that sale's; no other sale may reach
   // them by street (the same rule matchFiberOrdersToSales applies).
-  const numbered = ordersByNumber(orders.filter((order) => !linkedSaleId(order).linked));
-  const claimedByNumber = new Set(sales.map((sale) => sale.orderKey).filter((key) => numbered.has(key)));
+  const join = numberJoinFor(sales, orders);
   const currents = sales.map((sale) => ({
     sale,
-    current: currentOrderForSale(sale, orders, claimedByNumber),
+    current: currentOrderForSale(sale, orders, join),
   }));
   const resolved = resolveMatches(currents);
   result.orderSales = orderSalesFor(currents);

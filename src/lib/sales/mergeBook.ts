@@ -553,7 +553,7 @@ export function buildMergedBook(
   // Pass 2 — the order number, then the address guess, over what neither side
   // has already spoken for (matchFiberOrdersToSalesDetailed).
   const openSales = sales.filter((sale) => !linkedManually.has(sale));
-  const { matches: guessed, contested } = matchFiberOrdersToSalesDetailed(openSales, openOrders);
+  const { matches: guessed, contested, superseded } = matchFiberOrdersToSalesDetailed(openSales, openOrders);
   for (const sale of openSales) {
     const id = text(sale.id);
     const order = id ? guessed.get(id) : undefined;
@@ -573,23 +573,40 @@ export function buildMergedBook(
   for (const [saleId, order] of contested) doorOrder.set(saleId, order);
   const duplicates = possibleDuplicateSales(sales, doorOrder, (sale) => cancelled.has(sale));
 
+  // History folds under the sale it belongs to, with no row of its own:
+  //   - the sale's own numbered row the carrier cancelled and replaced (the
+  //     sale now stands on the replacement);
+  //   - leftover rows at the door of an order a sale holds (foldLeftoverOrders).
+  // Rows an admin dealt with (a verdict) and carrier history from before the
+  // portal keep their own drawers.
+  const historyBySale = new Map<Sale, FiberOrder[]>();
+  const folded = new Set<FiberOrder>();
+  const addHistory = (sale: Sale, order: FiberOrder) => {
+    historyBySale.set(sale, [...(historyBySale.get(sale) ?? []), order]);
+    folded.add(order);
+  };
+  for (const sale of openSales) {
+    const id = text(sale.id);
+    const own = id ? superseded.get(id) : undefined;
+    if (own && !claimedOrders.has(own)) addHistory(sale, own);
+  }
+  const saleByOrder = new Map<FiberOrder, Sale>();
+  for (const [sale, order] of orderBySale) saleByOrder.set(order, sale);
+  const leftovers = foldLeftoverOrders(
+    orders.filter(
+      (order) => !claimedOrders.has(order) && !folded.has(order) && !verdicts.has(order) && !isHistoric(order)
+    ),
+    claimedOrders,
+    (order) => saleByOrder.get(order)
+  );
+  for (const [leftover, beside] of leftovers) {
+    const owner = saleByOrder.get(beside);
+    if (owner) addHistory(owner, leftover);
+  }
+
   // The carrier half of the verdict can only be read once the join is done, so
   // it lands here rather than in the sets above: a carrier cancellation settles
   // the row like a cancellation typed in, and never the other way round.
-  // Leftover rows at the door of an order a sale holds fold under that sale.
-  // Rows an admin dealt with (a verdict) and carrier history from before the
-  // portal keep their own drawers.
-  const saleByOrder = new Map<FiberOrder, Sale>();
-  for (const [sale, order] of orderBySale) saleByOrder.set(order, sale);
-  const folded = foldLeftoverOrders(
-    orders.filter((order) => !claimedOrders.has(order) && !verdicts.has(order) && !isHistoric(order)),
-    claimedOrders
-  );
-  const historyBySale = new Map<Sale, FiberOrder[]>();
-  for (const [leftover, beside] of folded) {
-    const owner = saleByOrder.get(beside);
-    if (owner) historyBySale.set(owner, [...(historyBySale.get(owner) ?? []), leftover]);
-  }
 
   const rows: MergedRow[] = sales.map((sale, index) => {
     const order = orderBySale.get(sale) ?? null;

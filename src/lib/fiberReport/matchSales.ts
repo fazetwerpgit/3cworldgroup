@@ -17,22 +17,29 @@ export type SaleForFiberMatch = {
   saleDate?: unknown;
   /** The carrier order number the rep logged. When the report has it, it is the join. */
   orderNumberOrBtn?: unknown;
+  /** The sale's rep: a number joins only an order matched to them (or to nobody). */
+  salesRepId?: string | null;
+  customerName?: string | null;
 };
 
-/**
- * An order number as the join compares it: normalizeOrderNumber, with the
- * letters a screenshot reader confuses for digits folded onto them ('TM0…' for
- * 'TMO…'). Both sides fold, so an exact match still matches. '' when there is
- * no number worth comparing.
- */
-export function orderMatchKey(value: unknown): string {
-  const key = normalizeOrderNumber(value).replace(/O/g, '0').replace(/I/g, '1');
+/** An order number as the exact join compares it (normalizeOrderNumber), '' when too short to trust. */
+export function orderExactKey(value: unknown): string {
+  const key = normalizeOrderNumber(value);
   return key.length >= 6 ? key : '';
 }
 
-/** A carrier row's order number (its doc id) as orderMatchKey, '' for a breakage row (no order id). */
-export function carrierOrderKey(order: Pick<FiberOrder, 'id'>): string {
-  return typeof order.id === 'string' && !order.id.startsWith('brk_') ? orderMatchKey(order.id) : '';
+/**
+ * The loose key: the exact key with the letters a screenshot reader confuses
+ * for digits folded onto them ('TM0…' for 'TMO…', '1' for 'I'). Only consulted
+ * when no exact match exists, and only when it points at one order.
+ */
+export function orderMatchKey(value: unknown): string {
+  return orderExactKey(value).replace(/O/g, '0').replace(/I/g, '1');
+}
+
+/** A carrier row's order number (its doc id), '' for a breakage row (no order id). */
+function carrierNumber(order: Pick<FiberOrder, 'id'>): string {
+  return typeof order.id === 'string' && !order.id.startsWith('brk_') ? order.id : '';
 }
 
 /** Normalize a free-text address for conservative street-prefix matching. */
@@ -237,17 +244,106 @@ export function linkedSaleId(
   return { linked: true, saleId };
 }
 
-/**
- * The open (unlinked) carrier rows by order number. A sale whose logged order
- * number is here IS that row: no address guess, no door, no date window.
- */
-export function ordersByNumber(orders: readonly FiberOrder[]): Map<string, FiberOrder> {
-  const byNumber = new Map<string, FiberOrder>();
+function isLive(order: FiberOrder): boolean {
+  return order.status === 'active' || order.status === 'pending_install' || order.status === 'pre_sale';
+}
+
+/** The open (unlinked) carrier rows by order number: exact keys, and the loose keys. */
+export interface OrderNumberIndex {
+  exact: Map<string, FiberOrder>;
+  loose: Map<string, FiberOrder[]>;
+}
+
+export function indexOrdersByNumber(orders: readonly FiberOrder[]): OrderNumberIndex {
+  const exact = new Map<string, FiberOrder>();
+  const loose = new Map<string, FiberOrder[]>();
   for (const order of orders) {
-    const key = carrierOrderKey(order);
-    if (key && !byNumber.has(key)) byNumber.set(key, order);
+    const number = carrierNumber(order);
+    const key = orderExactKey(number);
+    if (!key) continue;
+    if (!exact.has(key)) exact.set(key, order);
+    const folded = orderMatchKey(number);
+    loose.set(folded, [...(loose.get(folded) ?? []), order]);
   }
-  return byNumber;
+  return { exact, loose };
+}
+
+/** A number joins an order matched to the sale's own rep, or to no portal user. */
+function sameRep(sale: Pick<SaleForFiberMatch, 'salesRepId'>, order: FiberOrder): boolean {
+  return !order.matchedUserId || order.matchedUserId === (sale.salesRepId ?? null);
+}
+
+/**
+ * The carrier row a sale's logged order number names. Exact first; the loose
+ * (O/0, I/1) key only when no exact row exists and exactly one of the rep's
+ * rows answers to it. Never another rep's order.
+ */
+export function orderForSaleNumber(
+  sale: Pick<SaleForFiberMatch, 'orderNumberOrBtn' | 'salesRepId'>,
+  index: OrderNumberIndex
+): FiberOrder | undefined {
+  const exactKey = orderExactKey(sale.orderNumberOrBtn);
+  if (!exactKey) return undefined;
+  const exact = index.exact.get(exactKey);
+  if (exact) return sameRep(sale, exact) ? exact : undefined;
+  const loose = (index.loose.get(orderMatchKey(sale.orderNumberOrBtn)) ?? []).filter((order) => sameRep(sale, order));
+  return loose.length === 1 ? loose[0] : undefined;
+}
+
+/** The carrier rows at a sale's door, by address: the date window, the street, then the unit. */
+export function saleDoor(
+  sale: Pick<SaleForFiberMatch, 'customerAddress' | 'saleDate'>,
+  pool: readonly FiberOrder[]
+): { orders: FiberOrder[]; certain: boolean } {
+  const saleAddress = normalizeAddress(sale.customerAddress);
+  if (saleAddress.length < 6) return { orders: [], certain: true };
+  const atAddress = ordersPlacedForSale(sale.saleDate, pool).filter((order) => {
+    const orderAddress = normalizeAddress(order.address);
+    return orderAddress.length >= 6 && isAddressPrefixPair(saleAddress, orderAddress);
+  });
+  return doorOrders(sale.customerAddress, atAddress);
+}
+
+export interface NumberJoin {
+  /** Sale id → the row its number names. */
+  bySale: Map<string, FiberOrder>;
+  /**
+   * Sale id → its numbered row, set aside because the carrier cancelled it and
+   * a live row stands at the same door for the same rep (logged A; the carrier
+   * cancelled A and placed B). The sale goes to the address pick; the dead row
+   * is its history.
+   */
+  superseded: Map<string, FiberOrder>;
+  /** Every row a number names, set aside or not. No other sale takes one by street. */
+  reserved: Set<FiberOrder>;
+}
+
+/** The order-number half of the join, over unlinked rows. Shared by every page and the install-date sync. */
+export function joinByOrderNumber(sales: readonly SaleForFiberMatch[], openOrders: readonly FiberOrder[]): NumberJoin {
+  const index = indexOrdersByNumber(openOrders);
+  const hits = new Map<string, FiberOrder>();
+  for (const sale of sales) {
+    const saleId = sale.id?.trim();
+    if (!saleId || hits.has(saleId)) continue;
+    const order = orderForSaleNumber(sale, index);
+    if (order) hits.set(saleId, order);
+  }
+  const reserved = new Set(hits.values());
+  const bySale = new Map<string, FiberOrder>();
+  const superseded = new Map<string, FiberOrder>();
+  const saleById = new Map(sales.filter((sale) => sale.id?.trim()).map((sale) => [sale.id!.trim(), sale]));
+
+  for (const [saleId, order] of hits) {
+    if (isDead(order)) {
+      const door = saleDoor(saleById.get(saleId)!, openOrders.filter((row) => !reserved.has(row))).orders;
+      if (door.some((row) => isLive(row) && row.matchedUserId === order.matchedUserId)) {
+        superseded.set(saleId, order);
+        continue;
+      }
+    }
+    bySale.set(saleId, order);
+  }
+  return { bySale, superseded, reserved };
 }
 
 export interface FiberMatchResult {
@@ -259,6 +355,8 @@ export interface FiberMatchResult {
    * one customer, so the possible-duplicate flag reads it from here.
    */
   contested: Map<string, FiberOrder>;
+  /** Sale id → its own numbered row the carrier cancelled and replaced (NumberJoin.superseded). */
+  superseded: Map<string, FiberOrder>;
 }
 
 /**
@@ -266,11 +364,13 @@ export interface FiberMatchResult {
  *
  *   1. saleLink. A linked order leaves the pool whichever way its link points,
  *      and a sale it names takes it over everything else.
- *   2. Order number. A sale whose logged number is on the report is that row,
- *      even at a door with a missed-install or cancelled row beside it.
- *   3. Address, for a sale with no number or a number the report does not
- *      have. Rows claimed in step 2 are out of this pool: one carrier row is
- *      one sale's, and a second sale at the door must not take it by street.
+ *   2. Order number (joinByOrderNumber), the sale's own rep only. A sale whose
+ *      logged number is on the report is that row, even at a door with a
+ *      missed-install row beside it, unless the carrier cancelled it and a
+ *      live row stands at the door: then the sale goes on to step 3.
+ *   3. Address, for a sale with no number, one the report lacks, or a
+ *      superseded one. Rows any number names are out of this pool: one
+ *      carrier row is one sale's.
  */
 export function matchFiberOrdersToSalesDetailed(
   sales: SaleForFiberMatch[],
@@ -293,33 +393,28 @@ export function matchFiberOrdersToSalesDetailed(
     }
   }
 
-  const byNumber = ordersByNumber(openOrders);
-  const claimedByNumber = new Set<FiberOrder>();
+  const unlinkedSales = sales.filter((sale) => !sale.id?.trim() || !matches.has(sale.id));
+  const join = joinByOrderNumber(unlinkedSales, openOrders);
+  for (const [saleId, order] of join.bySale) matches.set(saleId, order);
+
   for (const sale of sales) {
     const saleId = sale.id;
     if (!saleId?.trim() || matches.has(saleId)) continue;
-    const order = byNumber.get(orderMatchKey(sale.orderNumberOrBtn));
-    if (!order) continue;
-    matches.set(saleId, order);
-    claimedByNumber.add(order);
-  }
 
-  for (const sale of sales) {
-    const saleId = sale.id;
-    const saleAddress = normalizeAddress(sale.customerAddress);
-    if (!saleId?.trim() || matches.has(saleId) || saleAddress.length < 6) continue;
-
-    const atAddress = ordersPlacedForSale(sale.saleDate, openOrders).filter((order) =>
-      isAddressPrefixPair(saleAddress, normalizeAddress(order.address))
-    );
-    const door = doorOrders(sale.customerAddress, atAddress).orders;
-    const taken = door.find((order) => claimedByNumber.has(order));
-    if (taken) contested.set(saleId, taken);
-    const selectedOrder = pickCurrentOrder(door.filter((order) => !claimedByNumber.has(order)));
+    const own = join.superseded.get(saleId);
+    const door = saleDoor(sale, openOrders).orders.filter((order) => order !== own);
+    const taken = door.find((order) => join.reserved.has(order));
+    if (taken && !own) contested.set(saleId, taken);
+    const selectedOrder = pickCurrentOrder(door.filter((order) => !join.reserved.has(order)));
     if (selectedOrder) matches.set(saleId, selectedOrder);
   }
 
-  return { matches, contested };
+  for (const saleId of join.superseded.keys()) {
+    // The live row went to another sale after all: the dead one is still this sale's.
+    if (!matches.has(saleId)) matches.set(saleId, join.superseded.get(saleId)!);
+  }
+  const superseded = new Map([...join.superseded].filter(([saleId, order]) => matches.get(saleId) !== order));
+  return { matches, contested, superseded };
 }
 
 /** matchFiberOrdersToSalesDetailed, the matches alone: what every page and digest reads. */
@@ -392,10 +487,26 @@ export function attachMatchedUserNames(orders: FiberOrder[], sales: LoggedSale[]
 /** Statuses a leftover row may fold under a sale with: history, never a live order. */
 const FOLDABLE = new Set<FiberOrder['status']>(['breakage', 'cancelled', 'churned']);
 
-function doorKey(order: FiberOrder): string {
-  const street = normalizeAddress(order.address);
-  return street.length >= 6 ? `${street}|${unitId(order.unit)}|${order.matchedUserId ?? ''}` : '';
+function personTokens(name: string | null | undefined): string[] {
+  return normalizeAddress(name).split(' ').filter(Boolean);
 }
+
+/** Same customer by name: the same surname, or the same first name where one side gives only one. */
+export function sameCustomerName(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = personTokens(a);
+  const right = personTokens(b);
+  if (!left.length || !right.length) return false;
+  if (left.length > 1 && right.length > 1) {
+    const [a, b] = [left[left.length - 1], right[right.length - 1]];
+    if (a === b) return true;
+    // "Sharon T" against "Sharon Timmerman": an initial counts with the first name.
+    return left[0] === right[0] && ((a.length === 1 && b.startsWith(a)) || (b.length === 1 && a.startsWith(b)));
+  }
+  return left[0] === right[0];
+}
+
+/** The sale a held row stands for, as far as folding needs it. */
+export type FoldSale = Pick<SaleForFiberMatch, 'customerAddress' | 'customerName'>;
 
 /**
  * Carrier rows nobody's sale holds that sit at the door of a row a sale does
@@ -403,27 +514,49 @@ function doorKey(order: FiberOrder): string {
  * matched. They are that customer's history, not a sale nobody logged, so a
  * page folds them under the sale instead of showing them red.
  *
- * Same door means the same normalized street, the same unit (none = none) and
- * the same matched rep. Only dead and missed rows fold: a live leftover (pending,
- * active, pre-sale) may be a second, real sale and stays as it was. Linked rows
- * never fold; an admin already said what they are.
+ * Same street and same matched rep, and then the same door:
+ *   - both sides name a unit (the held row's, else the sale's typed one): the
+ *     same unit, never across units;
+ *   - either side names none: the carrier row's customer name must match the
+ *     sale's when the row carries one (missed-install rows do); a row with no
+ *     name folds only at a house, where no row and no sale names a unit.
+ * Only dead and missed rows fold: a live leftover (pending, active, pre-sale)
+ * may be a second, real sale and stays as it was. Linked rows never fold; an
+ * admin already said what they are.
  *
  * Returns each folded row → the held row it sits beside.
  */
 export function foldLeftoverOrders(
   orders: readonly FiberOrder[],
-  held: Iterable<FiberOrder>
+  held: Iterable<FiberOrder>,
+  saleFor: (held: FiberOrder) => FoldSale | undefined = () => undefined
 ): Map<FiberOrder, FiberOrder> {
   const heldSet = new Set(held);
-  const byDoor = new Map<string, FiberOrder>();
+  const street = (order: FiberOrder) => {
+    const value = normalizeAddress(order.address);
+    return value.length >= 6 ? `${value}|${order.matchedUserId ?? ''}` : '';
+  };
+  const byStreet = new Map<string, FiberOrder[]>();
   for (const order of heldSet) {
-    const key = doorKey(order);
-    if (key && !byDoor.has(key)) byDoor.set(key, order);
+    const key = street(order);
+    if (key) byStreet.set(key, [...(byStreet.get(key) ?? []), order]);
   }
+  const unitsOnStreet = new Set<string>();
+  for (const order of [...orders, ...heldSet]) {
+    if (unitId(order.unit)) unitsOnStreet.add(normalizeAddress(order.address));
+  }
+
   const folded = new Map<FiberOrder, FiberOrder>();
   for (const order of orders) {
     if (heldSet.has(order) || !FOLDABLE.has(order.status) || linkedSaleId(order).linked) continue;
-    const beside = byDoor.get(doorKey(order));
+    const beside = (byStreet.get(street(order)) ?? []).find((candidate) => {
+      const sale = saleFor(candidate);
+      const leftUnit = unitId(order.unit);
+      const heldUnit = unitId(candidate.unit) || saleUnitId(sale?.customerAddress);
+      if (leftUnit && heldUnit) return leftUnit === heldUnit;
+      if (order.customerName?.trim()) return sameCustomerName(order.customerName, sale?.customerName);
+      return !leftUnit && !heldUnit && !unitsOnStreet.has(normalizeAddress(order.address));
+    });
     if (beside) folded.set(order, beside);
   }
   return folded;

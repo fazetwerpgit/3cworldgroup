@@ -51,6 +51,7 @@ vi.mock('@/lib/fiberReport/ordersCache', () => ({
 const carrier = vi.hoisted(() => ({ orders: null as unknown[] | null }));
 vi.mock('@/lib/sales/carrierSnapshot', () => ({
   loadCarrierOrders: vi.fn(async () => carrier.orders),
+  loadRepSales: vi.fn(async () => []),
 }));
 
 import { DELETE, PUT } from './route';

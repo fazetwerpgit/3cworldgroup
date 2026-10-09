@@ -9,7 +9,7 @@ import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { priceSaleProducts } from '@/lib/sales/pricing';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { proofPathFields, saleProofPaths, validateProofPaths } from '@/lib/sales/proofPaths';
-import { loadCarrierOrders } from '@/lib/sales/carrierSnapshot';
+import { loadCarrierOrders, loadRepSales } from '@/lib/sales/carrierSnapshot';
 import { carrierOrderForSale } from '@/lib/sales/installDateSync';
 import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
 
@@ -263,9 +263,12 @@ export async function PUT(
         // sale stands on now is recorded, and the report sync overrides the
         // date only with carrier news since (installDateSync). Without it the
         // next morning's report would put back the day the admin just fixed.
-        const carrierOrders = await loadCarrierOrders();
+        const [carrierOrders, repSales] = await Promise.all([
+          loadCarrierOrders(),
+          loadRepSales(existing?.salesRepId),
+        ]);
         const carrier = carrierOrders
-          ? carrierOrderForSale({ id, data: existing ?? {} }, carrierOrders)
+          ? carrierOrderForSale({ id, data: existing ?? {} }, carrierOrders, repSales)
           : null;
         updateData.repEditOrderId = carrier?.orderId ?? null;
         updateData.repEditCarrierDate = carrier?.estInstallDate ?? null;

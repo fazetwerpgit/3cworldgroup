@@ -859,7 +859,7 @@ describe('order number first, as the page joins it', () => {
       expect(result.skippedAmbiguous).toBe(0);
       // The page agrees.
       expect(
-        matchFiberOrdersToSales([{ id: 'sharon', customerAddress: '123 Main St', orderNumberOrBtn: 'TMO20261005Z30P4' }], rows).get('sharon')?.id
+        matchFiberOrdersToSales([{ id: 'sharon', salesRepId: 'rep-1', customerAddress: '123 Main St', orderNumberOrBtn: 'TMO20261005Z30P4' }], rows).get('sharon')?.id
       ).toBe('TMO20261005Z30P4');
     }
   });
@@ -876,9 +876,40 @@ describe('order number first, as the page joins it', () => {
 
   it("records the numbered row for a rep's edit", () => {
     const snapshot = carrierOrderForSale(
-      { id: 'sharon', data: { customerAddress: '123 Main St', orderNumberOrBtn: 'tmo-20261005-z30p4' } },
+      { id: 'sharon', data: { salesRepId: 'rep-1', customerAddress: '123 Main St', orderNumberOrBtn: 'tmo-20261005-z30p4' } },
       [miss(), real()]
     );
     expect(snapshot?.orderId).toBe('TMO20261005Z30P4');
+  });
+});
+
+describe('re-order and the edit snapshot agree with the sync', () => {
+  it("writes B's date when the carrier cancelled the logged order A and placed B", async () => {
+    const a = order({ id: 'TMO20260901AAAAA', status: 'cancelled', orderDate: reportDay(-6), cancellationDate: reportDay(-4), estInstallDate: reportDay(3) });
+    const b = order({ id: 'TMO20260903BBBBB', orderDate: reportDay(-4), estInstallDate: reportDay(9) });
+    for (const rows of [[a, b], [b, a]]) {
+      updateMock.mockClear();
+      setSales([{ id: 's', salesRepId: 'rep-1', customerAddress: '123 Main St', status: 'approved', orderNumberOrBtn: 'TMO20260901AAAAA', installDate: noon(3) }]);
+      const result = await syncInstallDatesFromOrders({ orders: rows, now: NOW });
+      expect(result.orderSales.get(b.id)?.saleId).toBe('s');
+      expect(result.orderSales.has(a.id)).toBe(false);
+      expect(installDayKey(updateMock.mock.calls[0][1].installDate)).toBe(reportDay(9));
+    }
+  });
+
+  it('records the row the sync would read, leaving out rows another of the rep\'s sales holds by number', async () => {
+    // Y holds the newer order by number; X (no number) is on the older one.
+    const held = order({ id: 'TMO20260905HELD1', orderDate: reportDay(-3), estInstallDate: reportDay(2) });
+    const older = order({ id: 'TMO20260903OLDER', orderDate: reportDay(-5), estInstallDate: reportDay(6) });
+    const x = { id: 'x', data: { salesRepId: 'rep-1', customerAddress: '123 Main St' } };
+    const y = { id: 'y', data: { salesRepId: 'rep-1', customerAddress: '123 Main St', orderNumberOrBtn: 'TMO20260905HELD1' } };
+
+    expect(carrierOrderForSale(x, [held, older])?.orderId).toBe(held.id); // alone, it can't know
+    expect(carrierOrderForSale(x, [held, older], [x, y])?.orderId).toBe(older.id);
+
+    setSales([{ id: 'x', ...x.data }, { id: 'y', ...y.data }]);
+    const result = await syncInstallDatesFromOrders({ orders: [held, older], now: NOW });
+    expect(result.orderSales.get(older.id)?.saleId).toBe('x');
+    expect(result.orderSales.get(held.id)?.saleId).toBe('y');
   });
 });

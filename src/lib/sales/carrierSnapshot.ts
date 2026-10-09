@@ -20,3 +20,21 @@ export async function loadCarrierOrders(): Promise<FiberOrder[] | null> {
     return null;
   }
 }
+
+/**
+ * The rep's sales, for carrierOrderForSale: a row another of their sales names
+ * by order number is not this sale's, exactly as the report sync reads it.
+ * [] when they can't be read (the snapshot then reads the sale on its own).
+ */
+export async function loadRepSales(
+  salesRepId: unknown
+): Promise<{ id: string; data: FirebaseFirestore.DocumentData }[]> {
+  if (typeof salesRepId !== 'string' || !salesRepId) return [];
+  try {
+    const snapshot = await adminDb!.collection('sales').where('salesRepId', '==', salesRepId).get();
+    return snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() ?? {} }));
+  } catch (error) {
+    console.error('Error reading the rep\'s sales for an install date edit:', error);
+    return [];
+  }
+}

@@ -10,6 +10,7 @@ import {
   orderMatchKey,
   normalizeAddress,
   ordersPlacedForSale,
+  sameCustomerName,
   saleUnitId,
   unitId,
 } from './matchSales';
@@ -404,7 +405,7 @@ describe('order number first: a door with a missed install and the real order', 
   });
   const sharon = {
     id: 'sharon', customerAddress: '149 VARSITY DR, HUNTSVILLE, TX 77340', saleDate: new Date('2026-10-05T12:00:00'),
-    orderNumberOrBtn: 'TMO20261005Z30P4',
+    orderNumberOrBtn: 'TMO20261005Z30P4', salesRepId: 'rep-1',
   };
 
   it('joins the sale to the row with its order number, whichever order the rows come in', () => {
@@ -433,11 +434,11 @@ describe('order number first: a door with a missed install and the real order', 
     expect(orderMatchKey('TM02026100654K46')).toBe(orderMatchKey('TMO2026100654K46'));
     expect(orderMatchKey('12')).toBe('');
     const scanned = order({ id: 'TMO2026100654K46', address: '528 MCDOUGAL ST', orderDate: '2026-10-06' });
-    expect(matchFiberOrdersToSales([{ id: 's', customerAddress: '528 McDougal St', orderNumberOrBtn: 'TM02026100654K46' }], [scanned]).get('s')).toBe(scanned);
+    expect(matchFiberOrdersToSales([{ id: 's', customerAddress: '528 McDougal St', orderNumberOrBtn: 'TM02026100654K46', salesRepId: 'rep-1' }], [scanned]).get('s')).toBe(scanned);
   });
 
   it('joins by number even where the address or the date window would not', () => {
-    const typo = { id: 's', customerAddress: '194 Varsty Drive', orderNumberOrBtn: 'TMO20261005Z30P4', saleDate: new Date('2026-11-30T12:00:00') };
+    const typo = { id: 's', salesRepId: 'rep-1', customerAddress: '194 Varsty Drive', orderNumberOrBtn: 'TMO20261005Z30P4', saleDate: new Date('2026-11-30T12:00:00') };
     expect(matchFiberOrdersToSales([typo], [miss, real]).get('s')).toBe(real);
   });
 
@@ -459,7 +460,7 @@ describe('order number first: a door with a missed install and the real order', 
   it('joins the live order by number at a door with a cancelled one', () => {
     const cancelled = order({ id: 'TMO20261008UNOT1', status: 'cancelled', address: '411 PALM ST', orderDate: '2026-10-08' });
     const live = order({ id: 'TMO2026100835WB1', address: '411 PALM ST', orderDate: '2026-10-08' });
-    const sale = { id: 's', customerAddress: '411 Palm St', orderNumberOrBtn: 'TMO2026100835WB1' };
+    const sale = { id: 's', customerAddress: '411 Palm St', orderNumberOrBtn: 'TMO2026100835WB1', salesRepId: 'rep-1' };
     for (const orders of [[cancelled, live], [live, cancelled]]) {
       expect(matchFiberOrdersToSales([sale], orders).get('s')).toBe(live);
     }
@@ -514,5 +515,101 @@ describe('foldLeftoverOrders: history at a matched door', () => {
 
   it('folds nothing at a door with no held order', () => {
     expect(foldLeftoverOrders([miss, dead], []).size).toBe(0);
+  });
+});
+
+describe('folding never crosses units', () => {
+  // 100 Main St is a building: the sale is unit 3 (Ann Lee). Unit 4's missed
+  // install and a unit-less cancelled row are a neighbour's until proven ours.
+  const held = order({ id: 'TMO-U3', address: '100 MAIN ST', unit: '3' });
+  const ann = { customerAddress: '100 Main St Apt 3', customerName: 'Ann Lee' };
+  const saleFor = (order: FiberOrder) => (order === held ? ann : undefined);
+  const fold = (rows: FiberOrder[]) => foldLeftoverOrders([held, ...rows], [held], saleFor);
+
+  it("never folds a neighbour's unit", () => {
+    const unit4 = order({ id: 'brk_4', status: 'breakage', address: '100 MAIN ST', unit: '4', customerName: 'ANN LEE' });
+    expect(fold([unit4]).size).toBe(0);
+  });
+
+  it('folds a unit-less missed install only when the customer name is the sale\'s', () => {
+    const bob = order({ id: 'brk_bob', status: 'breakage', address: '100 MAIN ST', customerName: 'BOB KING' });
+    const annMiss = order({ id: 'brk_ann', status: 'breakage', address: '100 MAIN ST', customerName: 'ANN LEE' });
+    const folded = fold([bob, annMiss]);
+    expect(folded.has(bob)).toBe(false);
+    expect(folded.get(annMiss)).toBe(held);
+  });
+
+  it('never folds a unit-less, nameless row in a building; does at a house', () => {
+    const cancelled = order({ id: 'TMO-C', status: 'cancelled', address: '100 MAIN ST' });
+    expect(fold([cancelled]).size).toBe(0);
+
+    const house = order({ id: 'TMO-H', address: '7 ELM ST' });
+    const houseCancelled = order({ id: 'TMO-HC', status: 'cancelled', address: '7 ELM ST' });
+    const houseSale = { customerAddress: '7 Elm St', customerName: 'Dana Ruiz' };
+    expect(foldLeftoverOrders([house, houseCancelled], [house], () => houseSale).get(houseCancelled)).toBe(house);
+  });
+
+  it('reads an initial as the surname', () => {
+    expect(sameCustomerName('SHARON TIMMERMAN', 'Sharon T')).toBe(true);
+    expect(sameCustomerName('SHARON TIMMERMAN', 'Karen T')).toBe(false);
+    expect(sameCustomerName('SHARON TIMMERMAN', null)).toBe(false);
+  });
+});
+
+describe('order number: the rep\'s own order, exact before loose', () => {
+  it("never joins a misread number to another rep's order", () => {
+    const theirs = order({ id: 'TMO2026100654K46', address: '9 OTHER ST', matchedUserId: 'rep-2' });
+    const misread = { id: 's', salesRepId: 'rep-1', customerAddress: '528 McDougal St', orderNumberOrBtn: 'TM02026100654K46' };
+    expect(matchFiberOrdersToSales([misread], [theirs]).has('s')).toBe(false);
+    // Nor the exact number, when the report matched it to another rep.
+    expect(matchFiberOrdersToSales([{ ...misread, orderNumberOrBtn: 'TMO2026100654K46' }], [theirs]).has('s')).toBe(false);
+    // An order no portal user matched is anyone's.
+    const unmatched = { ...theirs, matchedUserId: null };
+    expect(matchFiberOrdersToSales([misread], [unmatched]).get('s')).toBe(unmatched);
+  });
+
+  it('joins two orders that differ only by O and 0 each exactly', () => {
+    const oh = order({ id: 'TMO20261005ABO12', address: '1 A ST' });
+    const zero = order({ id: 'TMO20261005AB012', address: '2 B ST' });
+    const sales = [
+      { id: 'oh', salesRepId: 'rep-1', customerAddress: '9 Nowhere', orderNumberOrBtn: 'TMO20261005ABO12' },
+      { id: 'zero', salesRepId: 'rep-1', customerAddress: '9 Nowhere', orderNumberOrBtn: 'TMO20261005AB012' },
+    ];
+    for (const orders of [[oh, zero], [zero, oh]]) {
+      const result = matchFiberOrdersToSales(sales, orders);
+      expect(result.get('oh')).toBe(oh);
+      expect(result.get('zero')).toBe(zero);
+    }
+    // A number that is neither exactly, loose onto both: no guess.
+    const neither = { id: 'n', salesRepId: 'rep-1', customerAddress: '9 Nowhere', orderNumberOrBtn: 'TM020261005AB0I2' };
+    expect(matchFiberOrdersToSales([neither], [oh, zero]).has('n')).toBe(false);
+  });
+});
+
+describe('re-order: the carrier cancels the logged order and places another', () => {
+  // Logged A; the carrier cancelled A and placed B at the same door.
+  const a = order({ id: 'TMO20261001AAAAA', status: 'cancelled', address: '12 ELM ST', orderDate: '2026-10-01', cancellationDate: '2026-10-03' });
+  const b = order({ id: 'TMO20261003BBBBB', address: '12 ELM ST', orderDate: '2026-10-03', estInstallDate: '2026-10-12' });
+  const sale = { id: 's', salesRepId: 'rep-1', customerAddress: '12 Elm St', orderNumberOrBtn: 'TMO20261001AAAAA', saleDate: new Date('2026-10-01T12:00:00') };
+
+  it('puts the sale on B and sets A aside as its history', () => {
+    for (const orders of [[a, b], [b, a]]) {
+      const { matches, superseded } = matchFiberOrdersToSalesDetailed([sale], orders);
+      expect(matches.get('s')).toBe(b);
+      expect(superseded.get('s')).toBe(a);
+    }
+  });
+
+  it('keeps A when no live row stands at the door, or only another rep\'s', () => {
+    expect(matchFiberOrdersToSales([sale], [a]).get('s')).toBe(a);
+    const theirs = { ...b, matchedUserId: 'rep-2' };
+    expect(matchFiberOrdersToSales([sale], [a, theirs]).get('s')).toBe(a);
+  });
+
+  it("keeps A when B is another sale's by number", () => {
+    const other = { id: 'o', salesRepId: 'rep-1', customerAddress: '12 Elm St', orderNumberOrBtn: 'TMO20261003BBBBB' };
+    const result = matchFiberOrdersToSales([sale, other], [a, b]);
+    expect(result.get('s')).toBe(a);
+    expect(result.get('o')).toBe(b);
   });
 });
