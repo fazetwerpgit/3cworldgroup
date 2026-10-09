@@ -132,6 +132,17 @@ const EVICTION_GROW_STEP = 25;
 // growths) would wait forever for a size the query can never reach.
 export const MAX_WINDOW = 600;
 
+// A failed listener is resubscribed after RETRY_BASE_MS, doubling per failure up to
+// RETRY_MAX_MS. permission-denied starts slower: it rarely clears by itself.
+export const RETRY_BASE_MS = 1000;
+const RETRY_DENIED_BASE_MS = 5000;
+export const RETRY_MAX_MS = 30000;
+
+export function messagesRetryDelay(attempt: number, permissionDenied: boolean): number {
+  const base = permissionDenied ? RETRY_DENIED_BASE_MS : RETRY_BASE_MS;
+  return Math.min(RETRY_MAX_MS, base * 2 ** attempt);
+}
+
 export interface UseMessagesOptions {
   // Whether the reader is following the latest messages (at the bottom of the
   // thread). While they are, a new arrival sliding the oldest message out of
@@ -176,6 +187,13 @@ export function useMessages(channelId: string | null, { followingLatest = true }
   // local view without server confirmation (offline, or reconnecting after the
   // app resumed). Drives the thread's calm "Reconnecting…" notice.
   const [fromCache, setFromCache] = useState(false);
+  // Bumped to resubscribe after the listener failed (backoff timer, or the app
+  // coming back online / to the foreground).
+  const [retryNonce, setRetryNonce] = useState(0);
+  const retryAttemptRef = useRef(0);
+  // Set while the current listener has failed: whether a foreground/online
+  // event may resubscribe early (not for permission-denied; see RETRY_*).
+  const failedRef = useRef<{ permissionDenied: boolean } | null>(null);
 
   // Oldest createdAt (ms) of the RAW window (before the deletedAt filter) as of
   // the last committed snapshot. Used to detect the sliding window evicting
@@ -223,7 +241,22 @@ export function useMessages(channelId: string | null, { followingLatest = true }
 
   useEffect(() => {
     oldestDeliveredRef.current = null;
+    retryAttemptRef.current = 0;
   }, [channelId]);
+
+  useEffect(() => {
+    const retryNow = () => {
+      if (!failedRef.current || failedRef.current.permissionDenied) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      setRetryNonce((n) => n + 1);
+    };
+    window.addEventListener('online', retryNow);
+    document.addEventListener('visibilitychange', retryNow);
+    return () => {
+      window.removeEventListener('online', retryNow);
+      document.removeEventListener('visibilitychange', retryNow);
+    };
+  }, []);
 
   useEffect(() => {
     if (!db || !channelId) return;
@@ -237,7 +270,9 @@ export function useMessages(channelId: string | null, { followingLatest = true }
     // Metadata changes are included so the listener reports when it loses and
     // regains the server; those snapshots only move fromCache (see below).
     let committedHere = false;
-    return onSnapshot(
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    failedRef.current = null;
+    const unsubscribe = onSnapshot(
       q,
       { includeMetadataChanges: true },
       (snapshot) => {
@@ -274,6 +309,7 @@ export function useMessages(channelId: string | null, { followingLatest = true }
         }
 
         committedHere = true;
+        retryAttemptRef.current = 0;
         oldestDeliveredRef.current = rawOldest ?? prevOldest;
         setRenderedChannel(channelId);
         setMessages(next);
@@ -288,9 +324,19 @@ export function useMessages(channelId: string | null, { followingLatest = true }
         console.error('Error listening to chat messages:', err);
         setError('Failed to load live messages');
         setLoading(false);
+        // A failed listener is dead; subscribe again after a backoff.
+        const permissionDenied = (err as { code?: unknown }).code === 'permission-denied';
+        failedRef.current = { permissionDenied };
+        const delay = messagesRetryDelay(retryAttemptRef.current, permissionDenied);
+        retryAttemptRef.current += 1;
+        retryTimer = setTimeout(() => setRetryNonce((n) => n + 1), delay);
       }
     );
-  }, [channelId, windowSize]);
+    return () => {
+      clearTimeout(retryTimer);
+      unsubscribe();
+    };
+  }, [channelId, windowSize, retryNonce]);
 
   // Grows the window by GROW_STEP (capped at MAX_WINDOW) so the next snapshot
   // pulls in older history. A no-op once the cap is hit or nothing more exists.

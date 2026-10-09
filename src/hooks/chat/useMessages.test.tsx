@@ -17,6 +17,7 @@ type SnapshotDoc = { id: string; data: () => Record<string, unknown> };
 type RawSnapshot = { docs: SnapshotDoc[]; metadata: { fromCache: boolean }; docChanges: () => SnapshotDoc[] };
 type Listener = {
   limit: number;
+  fail: (err: { code?: string }) => void;
   next: (snapshot: { docs: SnapshotDoc[] }) => void;
   raw: (snapshot: RawSnapshot) => void;
 };
@@ -37,11 +38,13 @@ vi.mock('firebase/firestore', () => ({
     (
       q: { __limit: number },
       _options: { includeMetadataChanges?: boolean },
-      next: (snapshot: RawSnapshot) => void
+      next: (snapshot: RawSnapshot) => void,
+      error: (err: { code?: string }) => void
     ) => {
       // Tests hand over plain { docs }; every doc counts as a change.
       listeners.push({
         limit: q.__limit,
+        fail: error,
         next: ({ docs }) => next({ docs, metadata: { fromCache: false }, docChanges: () => docs }),
         raw: next,
       });
@@ -51,16 +54,17 @@ vi.mock('firebase/firestore', () => ({
   Timestamp: class {},
 }));
 
-import { MAX_WINDOW, useMessages } from './useMessages';
+import { MAX_WINDOW, RETRY_BASE_MS, messagesRetryDelay, useMessages } from './useMessages';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 function Probe({ channelId, followingLatest }: { channelId: string | null; followingLatest?: boolean }) {
-  const { messages, loading, fromCache, snapshotVersion, historyCapped, loadOlder } = useMessages(channelId, {
+  const { messages, loading, error, fromCache, snapshotVersion, historyCapped, loadOlder } = useMessages(channelId, {
     followingLatest,
   });
   return (
     <div>
+      <span data-testid="error">{error}</span>
       <span data-testid="loading">{String(loading)}</span>
       <span data-testid="count">{String(messages.length)}</span>
       <span data-testid="fromCache">{String(fromCache)}</span>
@@ -265,5 +269,69 @@ describe('useMessages deselect', () => {
 
     act(() => root.render(<Probe channelId={null} />));
     expect(readProbe()).toEqual({ loading: 'false', count: '0' });
+  });
+});
+
+describe('useMessages listener recovery', () => {
+  const errorText = () => container.querySelector('[data-testid="error"]')?.textContent;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('resubscribes with backoff after a failure and clears the error once it recovers', () => {
+    act(() => root.render(<Probe channelId="c1" />));
+    act(() => listeners[0].fail({ code: 'unavailable' }));
+    expect(errorText()).toBe('Failed to load live messages');
+
+    act(() => vi.advanceTimersByTime(RETRY_BASE_MS - 1));
+    expect(listeners).toHaveLength(1);
+    act(() => vi.advanceTimersByTime(1));
+    expect(listeners).toHaveLength(2);
+
+    // A second failure waits twice as long.
+    act(() => listeners[1].fail({ code: 'unavailable' }));
+    act(() => vi.advanceTimersByTime(RETRY_BASE_MS * 2 - 1));
+    expect(listeners).toHaveLength(2);
+    act(() => vi.advanceTimersByTime(1));
+    expect(listeners).toHaveLength(3);
+
+    act(() => listeners[2].next({ docs: makeDocs(3, 10_000) }));
+    expect(errorText()).toBe('');
+    expect(readProbe()).toEqual({ loading: 'false', count: '3' });
+  });
+
+  it('resubscribes at once when the device comes back online', () => {
+    act(() => root.render(<Probe channelId="c1" />));
+    act(() => listeners[0].fail({ code: 'unavailable' }));
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    expect(listeners).toHaveLength(2);
+    // The pending backoff timer was dropped with the old listener.
+    act(() => vi.advanceTimersByTime(RETRY_BASE_MS * 4));
+    expect(listeners).toHaveLength(2);
+  });
+
+  it('waits out the slower backoff on permission-denied, even when back in the foreground', () => {
+    act(() => root.render(<Probe channelId="c1" />));
+    act(() => listeners[0].fail({ code: 'permission-denied' }));
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    expect(listeners).toHaveLength(1);
+    act(() => vi.advanceTimersByTime(messagesRetryDelay(0, true)));
+    expect(listeners).toHaveLength(2);
+  });
+
+  it('caps the backoff', () => {
+    expect(messagesRetryDelay(20, false)).toBe(30000);
+    expect(messagesRetryDelay(20, true)).toBe(30000);
   });
 });
