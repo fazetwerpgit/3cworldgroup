@@ -1,0 +1,190 @@
+/* The push nudge: the in-page banner (tokens from .root) and the required
+   full-screen sheet (tokens from .layer). Both in rep.module.css. */
+
+.body {
+  display: grid;
+  justify-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s5) var(--s5);
+  text-align: center;
+}
+
+.badge {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.text {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.5;
+}
+
+.text b,
+.steps b {
+  color: var(--c-text);
+}
+
+.steps {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding-left: 1.4em;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+  text-align: left;
+  list-style: decimal outside;
+}
+
+.steps li::marker {
+  color: var(--c-lime);
+  font-weight: 700;
+}
+
+.inlineIcon {
+  display: inline;
+  margin: 0 2px;
+  color: var(--c-text);
+  vertical-align: -3px;
+}
+
+.error {
+  margin: 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+}
+
+.lead {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.done {
+  margin: 0;
+  color: var(--c-lime);
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+/* ---------- banner ----------
+   A row of the shell between the top bar and the page, outside the scroller,
+   so it never fights position:fixed on iPhone. */
+.banner {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  margin: var(--s3) var(--gutter) 0;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-panel);
+  background: var(--c-raised);
+  box-shadow: var(--c-lift);
+  color: var(--c-text);
+  animation: nudgeIn 220ms var(--ease) both;
+}
+
+@media (min-width: 1024px) {
+  .banner {
+    max-width: calc(1360px - 2 * var(--gutter));
+    margin: var(--s4) auto 0;
+    width: calc(100% - 2 * var(--gutter));
+  }
+}
+
+@keyframes nudgeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}
+
+.bannerIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--c-lime-wash);
+  color: var(--c-lime);
+}
+
+.banner[data-state='blocked'] .bannerIcon {
+  background: var(--c-amber-wash);
+  color: var(--c-amber);
+}
+
+.bannerBody {
+  display: grid;
+  flex: 1;
+  gap: var(--s1);
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.bannerTitle {
+  margin: 0;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.bannerText {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.bannerText b {
+  color: var(--c-text);
+}
+
+.bannerText .inlineIcon {
+  vertical-align: -2px;
+}
+
+.bannerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin-top: var(--s2);
+}
+
+/* The admin kit's compact buttons (admin-ui.module.css .sm / .primarySm). */
+.bannerActions > button {
+  min-height: var(--tap);
+  padding: 0 14px;
+  font-size: 14px;
+}
+
+.bannerActions > .bannerPrimary {
+  padding: 3px 18px 0;
+  font-size: 19px;
+}

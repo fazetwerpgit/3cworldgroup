@@ -24,7 +24,6 @@ import {
 } from '@/lib/dashboard/repSummary';
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
 import { isInstallToday } from '@/lib/sales/installBucket';
-import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import { CarrierNotice } from './CarrierNotice';
 import { PayHelpSheet } from './PayHelpSheet';
 import { AskEntryCard } from './AskEntryCard';
@@ -732,7 +731,6 @@ export function RepDashboard() {
   const showQueues = isRole('admin', 'operations');
   const data = useRepDashboard();
   const { retry } = data;
-  const [pushPromptVisible, hidePushPrompt] = usePushPromptVisible();
   const [helpOpen, setHelpOpen] = useState(false);
   const closeHelp = useCallback(() => setHelpOpen(false), []);
   const [dateRow, setDateRow] = useState<NeedsDateRow | null>(null);
@@ -796,7 +794,6 @@ export function RepDashboard() {
     <>
       <RepHomeView
         firstName={user?.displayName?.split(' ')[0] || 'Your'}
-        banners={<PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />}
         payStatus={payStatus}
         pay={pay}
         hasPlan={rates !== null}

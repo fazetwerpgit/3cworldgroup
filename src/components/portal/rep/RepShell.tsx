@@ -11,7 +11,7 @@ import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { RepBoot } from './RepBoot';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, type RepBackLink } from './RepTopBar';
-import { PhoneSetupSheet } from './PhoneSetupSheet';
+import { PushNudge } from './PushNudge';
 import s from './rep.module.css';
 
 export { RepBoot };
@@ -42,14 +42,14 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
       <div className={s.root} data-shell="rep">
         <RepTopBar chatUnread={anyUnread} navCounts={navCounts} task={task} back={back} />
+        {/* Push not working on this device: a banner here, or a full-screen sheet for a required person. */}
+        <PushNudge />
         <main className={s.scroller} id="rep-main">
           <div className={s.main}>{children}</div>
         </main>
         {tabBarHidden ? null : <RepTabBar chatUnread={anyUnread} navCounts={navCounts} />}
         {/* Keeps the portal-wide Ctrl/Cmd+K search working on D pages. */}
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-        {/* On a phone: add to home screen, then notifications, the moment it opens. */}
-        <PhoneSetupSheet />
       </div>
     </TabBarHiddenContext.Provider>
   );

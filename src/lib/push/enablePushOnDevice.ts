@@ -61,3 +61,28 @@ export async function unregisterPushOnDevice(): Promise<void> {
     // Best-effort; the token stays until FCM reports it dead.
   }
 }
+
+// The "Turn on notifications" tap. Asks FIRST, synchronously inside the click
+// handler: iOS only shows its Allow question from a user gesture, and an await
+// before requestPermission() (enablePushOnDeviceDetailed awaits Firebase setup
+// first) can lose the gesture. Then registers through the shared path, which
+// sees 'granted' and does not ask again.
+export async function askAndEnablePush(): Promise<{
+  result: EnablePushResult;
+  permission: NotificationPermission;
+  detail: string;
+}> {
+  let permission: NotificationPermission;
+  try {
+    permission = await Notification.requestPermission();
+  } catch (error) {
+    return {
+      result: 'failed',
+      permission: Notification.permission,
+      detail: error instanceof Error ? `request-threw: ${error.message}`.slice(0, 200) : 'request-threw',
+    };
+  }
+  if (permission !== 'granted') return { result: 'blocked', permission, detail: `permission-${permission}` };
+  const { result, detail } = await enablePushOnDeviceDetailed();
+  return { result, permission, detail };
+}

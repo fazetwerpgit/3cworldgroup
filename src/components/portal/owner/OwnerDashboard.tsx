@@ -19,7 +19,6 @@ import type { MarketsSummary } from '@/lib/owner/markets';
 import { carrierReportStamp } from '@/lib/owner/reportFreshness';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
-import PushPromptBanner, { usePushPromptVisible } from '@/components/portal/PushPromptBanner';
 import s from '../rep/rep.module.css';
 import o from './owner-dashboard.module.css';
 
@@ -341,15 +340,10 @@ function SkeletonPanel({ label, title, rows, className }: { label: string; title
 export function OwnerDashboard() {
   const data = useOwnerDashboard();
   const { retry } = data;
-  const [pushPromptVisible, hidePushPrompt] = usePushPromptVisible();
 
   return (
     <>
       <h1 className={s.srOnly}>Company dashboard</h1>
-
-      <div className={o.banners}>
-        <PushPromptBanner visible={pushPromptVisible} onDismiss={hidePushPrompt} />
-      </div>
 
       {/* DOM order is the phone reading order: money, markets, Needs attention, Recruiting.
           Desktop places each panel with explicit grid lines. */}
