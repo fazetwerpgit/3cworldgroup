@@ -380,6 +380,10 @@ export interface User {
   // Last time the user was active in the portal (presence heartbeat). Powers the
   // "who's active" green dot. Distinct from updatedAt (which means the record was edited).
   lastActiveAt?: Date;
+  // Set by an admin or owner (People > Notifications). While this device can't
+  // get push, a required person sees a full-screen setup sheet on every open
+  // instead of the dismissible banner. Written only by /api/portal/admin/push.
+  pushRequired?: boolean;
 }
 
 // Auth context state type

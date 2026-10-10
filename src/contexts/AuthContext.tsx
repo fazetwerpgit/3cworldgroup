@@ -121,6 +121,7 @@ function toUser(uid: string, userData: DocumentData): User {
     hireDate: userData.hireDate?.toDate(),
     createdAt: userData.createdAt?.toDate(),
     updatedAt: userData.updatedAt?.toDate(),
+    pushRequired: userData.pushRequired === true,
   } as User;
 }
 
