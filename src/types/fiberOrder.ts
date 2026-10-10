@@ -99,6 +99,23 @@ export interface CarrierNoticeCounts {
 }
 
 // Import log entry, one per received report email (collection: fiberReportImports).
+export interface OverdueAlertCounts {
+  /** INSTALL_OVERDUE_ALERTS_OFF: read and planned, nothing claimed or sent. */
+  dryRun: boolean;
+  /** Sales overdue on the company book (lib/sales/installOverdue). */
+  overdue: number;
+  /** Rep alerts due today (claimed, on a live run). */
+  repAlertsDue: number;
+  repAlertsSent: number;
+  /** Overdue sales already told today or within the week. */
+  alreadySent: number;
+  /** Overdue sales whose rep is not an active user: counted for the owners only. */
+  skippedInactiveRep: number;
+  ownerSummary: 'none' | 'sent' | 'already_sent' | 'dry_run' | 'failed';
+  /** Claim or dispatch failures. Logged, never thrown at the webhook. */
+  errors: number;
+}
+
 export interface FiberReportImport {
   receivedAt: string;
   filename: string;
@@ -111,6 +128,7 @@ export interface FiberReportImport {
   error: string | null;
   installDateSync?: InstallDateSyncCounts | null;
   carrierNotices?: CarrierNoticeCounts | null;
+  overdueAlerts?: OverdueAlertCounts | null;
 }
 
 export interface FiberStatusResponse {

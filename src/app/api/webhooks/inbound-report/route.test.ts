@@ -12,6 +12,7 @@ const {
   syncMock,
   readStoredMock,
   sendNoticesMock,
+  overdueMock,
   runTransaction,
 } = vi.hoisted(() => {
   const addMock = vi.fn();
@@ -23,6 +24,7 @@ const {
   const syncMock = vi.fn();
   const readStoredMock = vi.fn();
   const sendNoticesMock = vi.fn();
+  const overdueMock = vi.fn();
   const collectionMock = vi.fn((name: string) => ({
     add: addMock,
     get: collectionGetMock,
@@ -56,6 +58,7 @@ const {
     syncMock,
     readStoredMock,
     sendNoticesMock,
+    overdueMock,
     runTransaction,
   };
 });
@@ -77,6 +80,9 @@ vi.mock('@/lib/fiberReport/carrierNotices', () => ({
   readStoredOrders: readStoredMock,
   sendCarrierNotices: sendNoticesMock,
 }));
+vi.mock('@/lib/alerts/installOverdueAlerts', () => ({
+  runOverdueInstallAlerts: overdueMock,
+}));
 
 import { POST } from './route';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
@@ -92,6 +98,17 @@ const NO_CHANGES = {
   orderSales: new Map(),
 };
 
+const OVERDUE_COUNTS = {
+  dryRun: false,
+  overdue: 2,
+  repAlertsDue: 1,
+  repAlertsSent: 1,
+  alreadySent: 0,
+  skippedInactiveRep: 1,
+  ownerSummary: 'sent',
+  errors: 0,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.POSTMARK_INBOUND_TOKEN = 'test-token';
@@ -103,6 +120,7 @@ beforeEach(() => {
   syncMock.mockResolvedValue(NO_CHANGES);
   readStoredMock.mockResolvedValue(new Map());
   sendNoticesMock.mockResolvedValue({ found: 0, alreadySent: 0, sent: 0, summarized: 0, errors: 0 });
+  overdueMock.mockResolvedValue({ counts: OVERDUE_COUNTS, repAlerts: [], ownerAlert: null, overdue: [] });
 });
 
 /** One parsed order, posted as a report with an xlsx attachment. */
@@ -296,6 +314,42 @@ describe('POST /api/webhooks/inbound-report install-date sync', () => {
     consoleError.mockRestore();
   });
 
+  it('runs the overdue install alerts after the date sync and the notices, and logs their counts', async () => {
+    const order: string[] = [];
+    syncMock.mockImplementation(async () => {
+      order.push('sync');
+      return NO_CHANGES;
+    });
+    sendNoticesMock.mockImplementation(async () => {
+      order.push('notices');
+      return { found: 0, alreadySent: 0, sent: 0, summarized: 0, errors: 0 };
+    });
+    overdueMock.mockImplementation(async () => {
+      order.push('overdue');
+      return { counts: OVERDUE_COUNTS, repAlerts: [], ownerAlert: null, overdue: [] };
+    });
+
+    const response = await postReport();
+
+    expect(response.status).toBe(200);
+    expect(order).toEqual(['sync', 'notices', 'overdue']);
+    expect(overdueMock).toHaveBeenCalledTimes(1);
+    expect(overdueMock).toHaveBeenCalledWith({ db: expect.anything(), now: expect.any(Date) });
+    expect(addMock).toHaveBeenCalledWith(expect.objectContaining({ error: null, overdueAlerts: OVERDUE_COUNTS }));
+  });
+
+  it('still stores the report when the overdue alerts throw', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    overdueMock.mockRejectedValue(new Error('push down'));
+
+    const response = await postReport();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, upserted: 1 });
+    expect(addMock).toHaveBeenCalledWith(expect.objectContaining({ error: null, upserted: 1, overdueAlerts: null }));
+    consoleError.mockRestore();
+  });
+
   it('still stores the report when the carrier notices throw', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     sendNoticesMock.mockRejectedValue(new Error('bell down'));
@@ -398,6 +452,8 @@ describe('POST /api/webhooks/inbound-report overlapping deliveries', () => {
 
     expect(syncedIds()).toEqual([NEWER.id]);
     expect(status.lastReportSentAt).toBe(NEWER.sentAt);
+    // Only the report that counts tells anyone about overdue installs.
+    expect(overdueMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not write an older report's rows once a newer one has claimed", async () => {

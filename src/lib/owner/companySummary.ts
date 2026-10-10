@@ -3,6 +3,7 @@ import { resolveCompRole } from '@/types/compPlan';
 import { periodBounds } from '@/lib/leaderboard/periods';
 import { carrierInstallDate } from '@/lib/sales/carrierInstall';
 import { buildMergedBook } from '@/lib/sales/mergeBook';
+import { overdueSales } from '@/lib/sales/installOverdue';
 import { saleCommission, saleRevenue } from '@/lib/owner/revenue';
 import { summarizeMarkets, type MarketsSummary } from '@/lib/owner/markets';
 
@@ -132,6 +133,8 @@ export interface CompanyBook {
   installs: InstallRecord[];
   /** Counted sales with no install date at all. */
   missingInstallDate: number;
+  /** Installs the carrier still has open 3+ days past their day (lib/sales/installOverdue). */
+  overdueInstalls: { count: number; oldestDays: number | null };
   orders: FiberOrder[];
 }
 
@@ -154,7 +157,10 @@ export function companyBook(sales: Sale[], orders: FiberOrder[], now: Date): Com
     installs.push({ saleId: row.key, repId: sale.salesRepId, installDate, sale });
   }
 
-  return { installs, missingInstallDate, orders };
+  const overdue = overdueSales(book.rows, now);
+  const overdueInstalls = { count: overdue.length, oldestDays: overdue[0]?.daysOverdue ?? null };
+
+  return { installs, missingInstallDate, overdueInstalls, orders };
 }
 
 // ---------------------------------------------------------------- money
@@ -258,6 +264,7 @@ export function summarizeMoney(priced: PricedInstall[], periods: OwnerPeriods): 
 // ---------------------------------------------------------------- problems
 
 export type ProblemKey =
+  | 'overdueInstalls'
   | 'carrierCancellations'
   | 'payrollDisputes'
   | 'stalledOnboarding'
@@ -272,10 +279,13 @@ export interface ProblemRow {
   count: number;
   /** The page that handles it. */
   href: string;
+  /** How long the oldest item has waited, in days, where the check knows (overdue installs). */
+  oldestDays?: number | null;
 }
 
 /** Display order: money at risk first, then people, then requests. */
 export const PROBLEM_HREFS: Record<ProblemKey, string> = {
+  overdueInstalls: '/portal/sales',
   carrierCancellations: '/portal/sales',
   payrollDisputes: '/portal/admin/requests?type=payroll-disputes',
   stalledOnboarding: '/portal/admin/onboarding',
@@ -313,11 +323,15 @@ export function carrierCancellationsIn(orders: FiberOrder[], window: Window): nu
   }).length;
 }
 
-export function problemRows(counts: Record<ProblemKey, number>): ProblemRow[] {
+export function problemRows(
+  counts: Record<ProblemKey, number>,
+  oldestDays: Partial<Record<ProblemKey, number | null>> = {}
+): ProblemRow[] {
   return (Object.keys(PROBLEM_HREFS) as ProblemKey[]).map((key) => ({
     key,
     count: counts[key],
     href: PROBLEM_HREFS[key],
+    ...(key in oldestDays ? { oldestDays: oldestDays[key] ?? null } : {}),
   }));
 }
 
@@ -403,16 +417,20 @@ export async function buildProblems(source: OwnerSummarySource, periods: OwnerPe
       source.countStalledOnboarding(),
     ]);
   const book = companyBook(bookData.sales, bookData.orders, periods.now);
-  return problemRows({
-    carrierCancellations: carrierCancellationsIn(book.orders, { start: periods.thisWeek.start, end: periods.now }),
-    payrollDisputes,
-    stalledOnboarding,
-    pendingSignups,
-    missingInstallDate: book.missingInstallDate,
-    expediteOrders,
-    leadsRequests,
-    bugReports,
-  });
+  return problemRows(
+    {
+      overdueInstalls: book.overdueInstalls.count,
+      carrierCancellations: carrierCancellationsIn(book.orders, { start: periods.thisWeek.start, end: periods.now }),
+      payrollDisputes,
+      stalledOnboarding,
+      pendingSignups,
+      missingInstallDate: book.missingInstallDate,
+      expediteOrders,
+      leadsRequests,
+      bugReports,
+    },
+    { overdueInstalls: book.overdueInstalls.oldestDays }
+  );
 }
 
 export async function buildRecruiting(

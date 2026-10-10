@@ -109,6 +109,21 @@ describe('OwnerDashboard', () => {
     expect(html).toMatch(/<b>5<\/b> waiting · 1 new today · 1 over 2 days/);
   });
 
+  it('lists overdue installs with how long the oldest has waited', () => {
+    state.dash.problems = {
+      status: 'ready',
+      data: [
+        ...problems({ stalledOnboarding: 0 }),
+        { key: 'overdueInstalls', count: 12, href: '/portal/sales', oldestDays: 69 },
+      ],
+    };
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html).toContain('Installs overdue 3+ days');
+    expect(html).toContain('href="/portal/sales"');
+    expect(html).toContain('69d');
+    expect(html).not.toContain('Stuck in onboarding 3+ days');
+  });
+
   it('leaves out empty rows, the Requests queues and the sales checks', () => {
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html).not.toContain('Onboarding pipeline');

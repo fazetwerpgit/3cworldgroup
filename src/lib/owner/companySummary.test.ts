@@ -177,6 +177,22 @@ describe('companyBook', () => {
     const moved = book.installs.find((install) => install.saleId === 's10')!;
     expect(moved.installDate.getDate()).toBe(21); // the carrier's activation, not Aug 30
     expect(book.missingInstallDate).toBe(1);
+    expect(book.overdueInstalls).toEqual({ count: 0, oldestDays: null });
+  });
+
+  it('counts installs the carrier still has open 3+ days past their day, with the oldest', () => {
+    seq = 0;
+    const sales = [
+      sale({ rep: 'repA', install: noonChicago(8, 1), customerAddress: '1 Late Lane' }), // 52 days
+      sale({ rep: 'repA', install: noonChicago(9, 19), customerAddress: '2 Late Lane' }), // 3 days
+      sale({ rep: 'repA', install: noonChicago(9, 20), customerAddress: '3 Late Lane' }), // 2 days: not yet
+    ];
+    const orders = [
+      order({ address: '1 Late Lane', status: 'pending_install', estInstallDate: '2026-08-01' }),
+      order({ address: '2 Late Lane', status: 'pending_install', estInstallDate: '2026-09-19' }),
+      order({ address: '3 Late Lane', status: 'pending_install', estInstallDate: '2026-09-20' }),
+    ];
+    expect(companyBook(sales, orders, NOW).overdueInstalls).toEqual({ count: 2, oldestDays: 52 });
   });
 });
 
@@ -213,6 +229,7 @@ describe('buildOwnerSummary', () => {
     const summary = await buildOwnerSummary(fakeSource(), ['problems'], NOW);
     const counts = Object.fromEntries(summary.problems!.map((row) => [row.key, row.count]));
     expect(counts).toEqual({
+      overdueInstalls: 0,
       carrierCancellations: 1,
       payrollDisputes: 2,
       stalledOnboarding: 0,
@@ -223,6 +240,12 @@ describe('buildOwnerSummary', () => {
       bugReports: 0,
     });
     expect(summary.problems!.find((row) => row.key === 'payrollDisputes')!.href).toBe('/portal/admin/requests?type=payroll-disputes');
+    expect(summary.problems!.find((row) => row.key === 'overdueInstalls')).toEqual({
+      key: 'overdueInstalls',
+      count: 0,
+      href: '/portal/sales',
+      oldestDays: null,
+    });
   });
 
   it('counts recruiting this week against last week', async () => {

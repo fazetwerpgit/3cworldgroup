@@ -8,11 +8,13 @@ import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
 import { syncInstallDatesFromOrders, type OrderSale } from '@/lib/sales/installDateSync';
 import { readStoredOrders, sendCarrierNotices } from '@/lib/fiberReport/carrierNotices';
+import { runOverdueInstallAlerts } from '@/lib/alerts/installOverdueAlerts';
 import type {
   CarrierNoticeCounts,
   FiberOrder,
   FiberReportImport,
   InstallDateSyncCounts,
+  OverdueAlertCounts,
 } from '@/types/fiberOrder';
 
 export const maxDuration = 60;
@@ -37,7 +39,7 @@ function importLog(
   filename: string,
   fromEmail: string,
   subject: string,
-  values: Partial<Pick<FiberReportImport, 'rowCounts' | 'upserted' | 'matchedReps' | 'unmatchedRepNames' | 'error' | 'installDateSync' | 'carrierNotices'>>
+  values: Partial<Pick<FiberReportImport, 'rowCounts' | 'upserted' | 'matchedReps' | 'unmatchedRepNames' | 'error' | 'installDateSync' | 'carrierNotices' | 'overdueAlerts'>>
 ): FiberReportImport {
   return {
     receivedAt,
@@ -51,6 +53,7 @@ function importLog(
     error: values.error ?? null,
     installDateSync: values.installDateSync ?? null,
     carrierNotices: values.carrierNotices ?? null,
+    overdueAlerts: values.overdueAlerts ?? null,
   };
 }
 
@@ -266,6 +269,7 @@ export async function POST(request: NextRequest) {
     // delivery would be the only way to recover data we already have.
     let installDateSync: InstallDateSyncCounts | null = null;
     let carrierNotices: CarrierNoticeCounts | null = null;
+    let overdueAlerts: OverdueAlertCounts | null = null;
     // A newer report may have claimed the stamp while this one was upserting.
     // Its sync and notices are the ones that count; running this older one's
     // after them would move dates back and tell reps twice.
@@ -298,6 +302,16 @@ export async function POST(request: NextRequest) {
           console.error('[inbound-report] carrier notices failed', error);
         }
       }
+
+      // Installs still open 3+ days past their day: the rep on day 3 and then
+      // weekly, the owners once a day. Read after the date sync, so a sale it
+      // just moved to a future day is not told. Once per sale per day however
+      // many times the report is delivered (claims in installOverdueAlerts).
+      try {
+        overdueAlerts = (await runOverdueInstallAlerts({ db: adminDb, now: new Date() })).counts;
+      } catch (error) {
+        console.error('[inbound-report] overdue install alerts failed', error);
+      }
     }
 
     await statusRef.set(
@@ -317,6 +331,7 @@ export async function POST(request: NextRequest) {
         error: null,
         installDateSync,
         carrierNotices,
+        overdueAlerts,
       })
     );
 

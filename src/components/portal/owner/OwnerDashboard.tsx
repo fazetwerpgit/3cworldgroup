@@ -259,10 +259,14 @@ function Markets({ data }: { data: MarketsSummary }) {
 // ---------------------------------------------------------------- needs attention
 
 // Needs attention is the onboarding work (the shared queue panel) plus the
-// owner's stuck-onboarding check.
+// owner's company checks: installs the carrier still has open 3+ days past
+// their day (the same rule that alerts the reps), and stuck onboarding.
 const COMPANY_CHECKS: Array<{ key: ProblemKey; label: string; href: string }> = [
+  { key: 'overdueInstalls', label: 'Installs overdue 3+ days', href: '/portal/sales' },
   { key: 'stalledOnboarding', label: 'Stuck in onboarding 3+ days', href: '/portal/admin/onboarding' },
 ];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 function companyRows(problems: Section<ProblemRow[]>): QueueCard[] {
   if (problems.status === 'loading') return [];
@@ -275,7 +279,7 @@ function companyRows(problems: Section<ProblemRow[]>): QueueCard[] {
       hub: '',
       tab: '',
       count: row?.count ?? 0,
-      oldestWaitMs: null,
+      oldestWaitMs: typeof row?.oldestDays === 'number' ? row.oldestDays * DAY_MS : null,
       newToday: null,
       error: problems.status === 'error',
     };

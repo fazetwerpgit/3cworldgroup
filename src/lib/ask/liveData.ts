@@ -429,6 +429,7 @@ async function formsSection(db: Db, uid: string, now: Date, zone: Zone): Promise
 const NOTIFICATION_TYPES: Record<string, true> = {
   sale_submitted: true, sale_approved: true, sale_rejected: true,
   install_date_changed: true, carrier_order_issue: true, install_reminder: true,
+  install_overdue: true,
 };
 
 async function notificationsSection(db: Db, uid: string, zone: Zone): Promise<string> {
