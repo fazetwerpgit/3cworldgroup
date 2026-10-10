@@ -43,7 +43,16 @@ export const RECRUITING_ROLES: UserRole[] = [
 export const PEOPLE_HUB = {
   href: '/portal/admin/people',
   param: 'tab',
-  tabs: [{ key: 'everyone', label: 'Everyone', roles: PLATFORM_ROLES, permissions: ['users:read'] }],
+  tabs: [
+    { key: 'everyone', label: 'Everyone', roles: PLATFORM_ROLES, permissions: ['users:read'] },
+    {
+      key: 'notifications',
+      label: 'Notifications',
+      // Admin and owner: the Require switch writes through an admin-only route.
+      roles: ['admin'],
+      hint: 'Who can get chat and sale alerts on their phone. Require shows a full-screen reminder every time they open the app until it works.',
+    },
+  ],
 } as const satisfies HubConfig;
 
 export const ONBOARDING_HUB = {

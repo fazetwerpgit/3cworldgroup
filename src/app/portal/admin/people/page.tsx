@@ -8,11 +8,12 @@ import { PEOPLE_HUB, SETTINGS_HUB, hubTabHref } from '@/components/portal/admin-
 import { useAuth } from '@/contexts/AuthContext';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { Everyone } from './Everyone';
+import { Notifications } from './Notifications';
 
 /** People's old owner tabs, now under Admin settings. */
 const MOVED_TO_SETTINGS: Record<string, string> = { 'employee-data': 'employee-data', knowledge: 'ask' };
 
-// People: Everyone (user management). /portal/admin/users redirects here
+// People: Everyone (user management) and Notifications (who can get push). /portal/admin/users redirects here
 // (next.config.ts); the owner's Employee data and Knowledge moved to Admin
 // settings, and their old ?tab= links are sent there.
 function People() {
@@ -32,7 +33,7 @@ function People() {
       title="People"
       sub="Everyone with a portal account. Tap someone for their details, checklist and pipeline stage."
       counts={{ everyone: pendingSignups || undefined }}
-      panels={{ everyone: () => <Everyone /> }}
+      panels={{ everyone: () => <Everyone />, notifications: () => <Notifications /> }}
     />
   );
 }
