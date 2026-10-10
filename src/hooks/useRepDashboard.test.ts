@@ -40,6 +40,15 @@ describe('fetchRepBook', () => {
     expect(book.carrierFailed).toBe(false);
   });
 
+  it("keeps the rep's report stamp, and none for management's company scope", async () => {
+    const stamp = { lastReportAt: '2026-10-09T15:00:00.000Z', lastReportAsOf: '2026-10-08' };
+    stubFetch({ ok: true, body: { scope: 'own', orders: [], ...stamp } });
+    expect((await fetchRepBook('r1', 'token', new AbortController().signal)).report).toEqual(stamp);
+
+    stubFetch({ ok: true, body: { scope: 'all', orders: [], ...stamp } });
+    expect((await fetchRepBook('r1', 'token', new AbortController().signal)).report).toBeNull();
+  });
+
   it('still fails outright when the sales themselves fail', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'nope' }), { status: 500 })));
     await expect(fetchRepBook('r1', 'token', new AbortController().signal)).rejects.toThrow('nope');

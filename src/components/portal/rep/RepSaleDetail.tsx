@@ -36,6 +36,7 @@ import { FIBER_COMPANIES, SALE_TYPES, SaleStatusConfig, type Sale } from '@/type
 import { escalinkTicketText, isTMobileSale } from '@/lib/escalink';
 import { EscalinkPanel } from './EscalinkPanel';
 import { BodyLayer } from './BodyLayer';
+import { CarrierStaleNote } from './CarrierStaleNote';
 import { useAttachmentViewer } from './ImageViewer';
 import { formatDay, formatMoney, num } from './saleFormat';
 import { displayPhone, telHref } from '@/lib/phone';
@@ -383,6 +384,7 @@ export function RepSaleDetail() {
                   <InstallStatusLine sale={shown} order={order} status={status} />
                 )}
               </p>
+              <CarrierStaleNote report={fiber.data?.scope === 'own' ? fiber.data : null} className={x.fine} />
               {missedReason ? <Row label="Carrier says">{missedReason}</Row> : null}
               {payout ? <Row label="Est. payout">{payout}</Row> : null}
               {ownSale ? <Row label="Est. pay">{payCell()}</Row> : null}

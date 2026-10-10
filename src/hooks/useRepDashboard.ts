@@ -6,6 +6,7 @@ import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
+import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import type { DashboardCall, LeaderboardRow } from '@/lib/dashboard/repSummary';
 import type { CompPlanCompanyRates, CompPlanResponse, FiberOrder, Sale } from '@/types';
 
@@ -36,6 +37,11 @@ export interface RepBook {
    * and the dashboard says so instead of passing them off as complete.
    */
   carrierFailed: boolean;
+  /**
+   * When the last carrier report landed and the day it covers, for the rep's
+   * own book only (null for management, or when the report failed to load).
+   */
+  report?: CarrierReportStamp | null;
 }
 
 export interface RepStanding {
@@ -83,7 +89,12 @@ export async function fetchRepBook(uid: string, token: string | null, signal: Ab
   const own = encodeURIComponent(uid);
   const [salesResult, fiberResult] = await Promise.allSettled([
     getJson<{ sales: Sale[] }>(`/api/portal/sales?salesRepId=${own}&limit=500`, token, signal),
-    getJson<{ orders?: FiberOrder[] }>('/api/portal/sales/status', token, signal),
+    getJson<{
+      scope?: 'own' | 'all';
+      orders?: FiberOrder[];
+      lastReportAt?: string | null;
+      lastReportAsOf?: string | null;
+    }>('/api/portal/sales/status', token, signal),
   ]);
   if (salesResult.status === 'rejected') throw salesResult.reason;
   const logged = salesResult.value.sales ?? [];
@@ -91,7 +102,12 @@ export async function fetchRepBook(uid: string, token: string | null, signal: Ab
   if (carrierFailed && !signal.aborted) console.error('Carrier report failed:', fiberResult.reason);
   const orders = fiberResult.status === 'fulfilled' ? fiberResult.value.orders ?? [] : [];
   const fiberBySale = matchFiberOrdersToSales(logged, orders);
-  return { sales: applyCarrierInstallDates(logged, fiberBySale), fiberBySale, carrierFailed };
+  const fiber = fiberResult.status === 'fulfilled' ? fiberResult.value : null;
+  const report =
+    fiber && fiber.scope === 'own'
+      ? { lastReportAt: fiber.lastReportAt ?? null, lastReportAsOf: fiber.lastReportAsOf ?? null }
+      : null;
+  return { sales: applyCarrierInstallDates(logged, fiberBySale), fiberBySale, carrierFailed, report };
 }
 
 /**

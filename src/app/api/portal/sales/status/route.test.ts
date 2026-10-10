@@ -122,6 +122,28 @@ describe('GET /api/portal/sales/status', () => {
     expect(ownSalesGetMock).toHaveBeenCalledOnce();
   });
 
+  it('gives reps only the report stamp, never the rest of the status doc', async () => {
+    userGetMock.mockResolvedValue({ exists: true, data: () => ({ role: 'rep' }) });
+    configGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({
+        lastReportAt: '2026-10-09T15:00:00.000Z',
+        lastReportAsOf: '2026-10-08',
+        lastFilename: 'report.xlsx',
+        lastUpserted: 12,
+        lastReportSentAt: '2026-10-09T14:58:00.000Z',
+      }),
+    });
+
+    const json = await (await GET(request())).json();
+
+    expect(json.lastReportAt).toBe('2026-10-09T15:00:00.000Z');
+    expect(json.lastReportAsOf).toBe('2026-10-08');
+    expect(json).not.toHaveProperty('lastFilename');
+    expect(json).not.toHaveProperty('lastUpserted');
+    expect(json).not.toHaveProperty('lastReportSentAt');
+  });
+
   it('attaches a matching own sale name and reports submitted sales total', async () => {
     userGetMock.mockResolvedValue({ exists: true, data: () => ({ role: 'rep' }) });
     ownOrdersGetMock.mockResolvedValue({

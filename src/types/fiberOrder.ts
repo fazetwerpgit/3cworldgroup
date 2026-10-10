@@ -134,6 +134,8 @@ export interface FiberReportImport {
 export interface FiberStatusResponse {
   scope: 'own' | 'all';
   lastReportAt: string | null;
+  // 'YYYY-MM-DD', the day the last report covers (null before the first one).
+  lastReportAsOf?: string | null;
   orders: FiberOrder[];
   // Admin scope only: orders whose rep didn't match any portal user.
   unmatched?: FiberOrder[];

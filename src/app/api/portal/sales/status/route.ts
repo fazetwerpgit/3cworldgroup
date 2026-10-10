@@ -57,6 +57,9 @@ export async function GET(request: NextRequest) {
     const lastReportAt = statusDoc.exists
       ? (statusDoc.data()?.lastReportAt ?? null)
       : null;
+    // The day the last report covers: reps see it when the next one is late.
+    const asOfValue = statusDoc.exists ? statusDoc.data()?.lastReportAsOf : null;
+    const lastReportAsOf = typeof asOfValue === 'string' ? asOfValue : null;
 
     if (scope === 'own') {
       const snapshot = await adminDb
@@ -75,6 +78,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         scope,
         lastReportAt,
+        lastReportAsOf,
         orders: ordersWithNames,
         submittedTotal: salesSnapshot.docs.length,
         dealerCodes,
@@ -98,7 +102,7 @@ export async function GET(request: NextRequest) {
     const unmatched = sortByOrderDate(
       allOrders.filter((order) => order.matchedUserId === null)
     );
-    return NextResponse.json({ scope, lastReportAt, orders, unmatched } satisfies FiberStatusResponse);
+    return NextResponse.json({ scope, lastReportAt, lastReportAsOf, orders, unmatched } satisfies FiberStatusResponse);
   } catch (error) {
     console.error('Error fetching fiber status:', error);
     return NextResponse.json(

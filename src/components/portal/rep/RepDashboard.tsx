@@ -25,6 +25,8 @@ import {
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
 import { isInstallToday } from '@/lib/sales/installBucket';
 import { CarrierNotice } from './CarrierNotice';
+import { CarrierStaleNote } from './CarrierStaleNote';
+import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import { PayHelpSheet } from './PayHelpSheet';
 import { AskEntryCard } from './AskEntryCard';
 import { InstallDateSheet } from './InstallDateSheet';
@@ -555,7 +557,7 @@ function TodayPanel({
 
 // ---------------------------------------------------------------- recent sales
 
-function RecentSales({ rows }: { rows: RecentSaleRow[] }) {
+function RecentSales({ rows, report }: { rows: RecentSaleRow[]; report?: CarrierReportStamp | null }) {
   return (
     <section className={`${s.panel} ${d.card} ${d.sales}`} style={rise(4)} aria-labelledby="sales-h">
       <PanelHead id="sales-h" title="Recent sales">
@@ -564,6 +566,8 @@ function RecentSales({ rows }: { rows: RecentSaleRow[] }) {
           <ChevronRight size={16} aria-hidden="true" />
         </Link>
       </PanelHead>
+      {/* Only when the carrier's daily report is late; nothing otherwise. */}
+      <CarrierStaleNote report={report} className={d.staleNote} />
       <ul className={d.saleList}>
         {rows.map((row) => (
           <li key={row.id}>
@@ -602,6 +606,8 @@ export interface RepHomeViewProps {
   zeroSales: boolean;
   canLog: boolean;
   carrierFailed: boolean;
+  /** The rep's carrier report stamp; a late report gets one quiet line on Recent sales. */
+  carrierReport?: CarrierReportStamp | null;
   standing: Section<Standing | null>;
   challenge: Section<RepChallenge>;
   timeLeft: string;
@@ -703,7 +709,7 @@ export function RepHomeView(p: RepHomeViewProps) {
 
           {p.scanIntro ? <div className={d.scanSlot}>{p.scanIntro}</div> : null}
 
-          {p.payStatus === 'ready' && p.rows.length > 0 ? <RecentSales rows={p.rows} /> : null}
+          {p.payStatus === 'ready' && p.rows.length > 0 ? <RecentSales rows={p.rows} report={p.carrierReport} /> : null}
         </div>
       </div>
     </>
@@ -800,6 +806,7 @@ export function RepDashboard() {
         zeroSales={book !== null && book.sales.length === 0}
         canLog={canLog}
         carrierFailed={!!book?.carrierFailed}
+        carrierReport={book?.report ?? null}
         standing={standing}
         challenge={data.challenge}
         timeLeft={weekTimeLeft(now)}

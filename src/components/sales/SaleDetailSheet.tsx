@@ -33,6 +33,8 @@ import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import { InstallStatusLine } from './InstallStatusLine';
+import { CarrierStaleNote } from '@/components/portal/rep/CarrierStaleNote';
+import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import { displayPhone, telHref } from '@/lib/phone';
@@ -72,6 +74,8 @@ interface SaleDetailSheetProps {
   estPay?: number | null;
   /** What 3C keeps from this sale after the rep's pay. Passed only on the owner's board. */
   revenue?: number | null;
+  /** The carrier report stamp. Passed only on the rep's list: a late report gets one quiet line. */
+  carrierReport?: CarrierReportStamp | null;
 }
 
 /** A legacy free-text carrier has no mark; show its name rather than nothing. */
@@ -132,6 +136,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
     fiberOrder = null,
     estPay,
     revenue = null,
+    carrierReport = null,
   } = closing ? kept : props;
   /** Index of the screenshot being fetched, or null when none is. */
   const [proofLoading, setProofLoading] = useState<number | null>(null);
@@ -388,6 +393,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
               </span>
             </div>
             {payout && <p className={x.dSub}>Est. payout <b>{payout}</b></p>}
+            <CarrierStaleNote report={carrierReport} className={x.dSub} />
             {installDraft !== null && (
               <div className={x.dEditor}>
                 <label className={x.dEditorLabel} htmlFor="sale-install-date">

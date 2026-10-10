@@ -52,6 +52,15 @@
   border-bottom: 0;
 }
 
+/* Recent sales: the one quiet line when the carrier's daily report is late.
+   Set like the Sales ledger's .srcNote, right under the head. */
+.staleNote {
+  margin: 0;
+  padding: 0 var(--s4) 10px;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
 .headLink {
   display: inline-flex;
   align-items: center;

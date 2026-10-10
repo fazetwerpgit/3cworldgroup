@@ -18,6 +18,7 @@ import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sa
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
+import { CarrierStaleNote } from '@/components/portal/rep/CarrierStaleNote';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { SalesDialog } from './SalesDialog';
 import { InstallStatusLine } from './InstallStatusLine';
@@ -404,6 +405,8 @@ export function SalesTable({
             ? `${datedPayCount} ${datedPayCount === 1 ? 'sale' : 'sales'}`
             : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · tap a row for detail`}</p>
         </div>
+        {/* Only when the carrier's daily report is late; nothing otherwise. */}
+        <CarrierStaleNote report={fiber?.data} className={x.srcNote} />
 
         {fiberOrders.length > 0 && !showPay && (
           <div className={x.chips} role="group" aria-label="Fiber status views">
@@ -637,6 +640,7 @@ export function SalesTable({
         payout={selectedSale ? payoutBySale[selectedSale.id || ''] ?? null : null}
         fiberOrder={selectedSale ? fiberBySale.get(selectedSale.id || '') ?? null : null}
         estPay={selectedSale && hasPlan ? expectedBySale[selectedSale.id || ''] ?? null : null}
+        carrierReport={fiber?.data ?? null}
       />
 
       <SalesDialog
