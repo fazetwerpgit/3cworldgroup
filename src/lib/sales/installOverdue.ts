@@ -175,12 +175,12 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] || 'Unassigned';
 }
 
-/** "12 installs overdue — oldest: Craig T. (Cooper, 69 days)". null when there are none. */
+/** "12 overdue. Oldest: Craig T. (Cooper, 69 days)". null when there are none. */
 export function overdueOwnerMessage(sales: readonly OverdueSale[]): string | null {
   if (!sales.length) return null;
   const oldest = sales.reduce((a, b) => (b.daysOverdue > a.daysOverdue ? b : a));
   const who = `${oldest.customer} (${firstName(oldest.repName)}, ${oldest.daysOverdue} days)`;
   return sales.length === 1
-    ? `1 install overdue: ${who}`
-    : `${sales.length} installs overdue — oldest: ${who}`;
+    ? `1 overdue: ${who}`
+    : `${sales.length} overdue. Oldest: ${who}`;
 }

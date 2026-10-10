@@ -248,8 +248,8 @@ describe('copy', () => {
   it('summarises for the owners with the oldest, rep by first name', () => {
     expect(
       overdueOwnerMessage([overdue('Dana L.', 'Ava Jones', 5), overdue('Craig T.', 'Cooper Smith', 69), overdue('Ed K.', 'Bo Li', 12)])
-    ).toBe('3 installs overdue — oldest: Craig T. (Cooper, 69 days)');
-    expect(overdueOwnerMessage([overdue('Craig T.', 'Cooper Smith', 69)])).toBe('1 install overdue: Craig T. (Cooper, 69 days)');
+    ).toBe('3 overdue. Oldest: Craig T. (Cooper, 69 days)');
+    expect(overdueOwnerMessage([overdue('Craig T.', 'Cooper Smith', 69)])).toBe('1 overdue: Craig T. (Cooper, 69 days)');
     expect(overdueOwnerMessage([])).toBeNull();
   });
 });

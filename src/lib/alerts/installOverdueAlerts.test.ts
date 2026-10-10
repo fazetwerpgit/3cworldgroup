@@ -172,7 +172,7 @@ describe('runOverdueInstallAlerts', () => {
           userId: owner,
           type: 'install_overdue_summary',
           title: 'Installs overdue',
-          message: '2 installs overdue — oldest: Craig T. (Cooper, 69 days)',
+          message: '2 overdue. Oldest: Craig T. (Cooper, 69 days)',
           link: '/portal/dashboard',
         })
       );
@@ -268,6 +268,6 @@ describe('runOverdueInstallAlerts', () => {
     expect(result.repAlerts.map((alert) => [alert.repName, alert.customer, alert.daysOverdue])).toEqual([
       ['Cooper Smith', 'Craig T.', 69],
     ]);
-    expect(result.ownerAlert?.message).toBe('2 installs overdue — oldest: Craig T. (Cooper, 69 days)');
+    expect(result.ownerAlert?.message).toBe('2 overdue. Oldest: Craig T. (Cooper, 69 days)');
   });
 });
