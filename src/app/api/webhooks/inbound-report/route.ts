@@ -281,6 +281,11 @@ export async function POST(request: NextRequest) {
         if (changes.length) {
           console.log(`[inbound-report] moved ${changes.length} install date(s) from the report`);
         }
+        if (counts.orderNumbersFilled || counts.orderNumberSkippedConflict) {
+          console.log(
+            `[inbound-report] filled ${counts.orderNumbersFilled} order number(s) from the report; ${counts.orderNumberSkippedConflict} left empty (number already on another live sale, or another rep's row)`
+          );
+        }
       } catch (error) {
         console.error('[inbound-report] install date sync failed', error);
       }

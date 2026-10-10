@@ -555,3 +555,21 @@ describe('PUT /api/portal/sales/[id] proof screenshots', () => {
     expect(response.status).toBe(200);
   });
 });
+
+describe('PUT /api/portal/sales/[id] a number the carrier report filled', () => {
+  const filled = { salesRepId: 'rep-1', orderNumberOrBtn: 'TMO20260901ABCDE', orderNumberSource: 'report' };
+
+  it('stops calling it the report\'s once a person changes the number', async () => {
+    saleGetMock.mockResolvedValue({ exists: true, data: () => filled });
+    const response = await put({ orderNumberOrBtn: 'TMO20260901ZZZZZ' });
+    expect(response.status).toBe(200);
+    expect(saleUpdateMock.mock.calls[0][0]).toMatchObject({ orderNumberKey: 'TMO20260901ZZZZZ', orderNumberSource: null });
+  });
+
+  it('keeps the hint when an edit re-saves the same number', async () => {
+    saleGetMock.mockResolvedValue({ exists: true, data: () => filled });
+    const response = await put({ orderNumberOrBtn: 'tmo-20260901-abcde', notes: 'x' });
+    expect(response.status).toBe(200);
+    expect(saleUpdateMock.mock.calls[0][0]).not.toHaveProperty('orderNumberSource');
+  });
+});

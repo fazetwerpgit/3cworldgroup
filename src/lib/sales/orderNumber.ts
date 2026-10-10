@@ -10,6 +10,15 @@ export function normalizeOrderNumber(value: unknown): string {
 }
 
 /**
+ * A sale that still stands: not cancelled, rejected or soft-deleted (a rejected
+ * sale is meant to be re-logged). The duplicate guard and the report's
+ * order-number fill (installDateSync) both ask it.
+ */
+export function isLiveSale(data: Record<string, unknown>): boolean {
+  return data.status !== 'cancelled' && data.status !== 'rejected' && !data.deletedAt && data.deleted !== true;
+}
+
+/**
  * Raw spellings worth an equality query on `orderNumberOrBtn`, for sales
  * written before `orderNumberKey` existed. Older docs only match the exact
  * string they stored, so this covers the common ways the same number is typed.

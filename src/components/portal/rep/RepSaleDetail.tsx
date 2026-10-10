@@ -403,7 +403,10 @@ export function RepSaleDetail() {
             <div className={x.panelBody}>
               <Row label="Order / BTN">
                 {sale.orderNumberOrBtn ? (
-                  <span>{sale.orderNumberOrBtn}</span>
+                  <span>
+                    {sale.orderNumberOrBtn}
+                    {sale.orderNumberSource === 'report' ? <span className={x.none}> · from carrier report</span> : null}
+                  </span>
                 ) : (
                   <span className={x.none}>Not provided</span>
                 )}

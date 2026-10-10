@@ -69,6 +69,13 @@ export interface Sale {
   totalPoints: number;
   commission?: number;
   orderNumberOrBtn?: string;
+  /**
+   * 'report' when the carrier report filled a number the rep never logged
+   * (lib/sales/installDateSync); cleared when a person changes the number.
+   * Absent on a number a person typed.
+   */
+  orderNumberSource?: 'report' | null;
+  orderNumberFilledAt?: Date;
   /** Legacy single proof folder, kept = proofScreenshotPaths[0]. Read both via saleProofPaths(). */
   proofScreenshotPath?: string;
   proofScreenshotPaths?: string[];

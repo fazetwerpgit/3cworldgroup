@@ -10,6 +10,7 @@ import { CLIENT_SALE_ID_RE, priceSaleProducts } from '@/lib/sales/pricing';
 import {
   firstName,
   firstNameLastInitial,
+  isLiveSale,
   normalizeOrderNumber,
   orderNumberRawVariants,
   type OrderDuplicate,
@@ -214,11 +215,6 @@ async function existingSaleForReplay(saleId: string, salesRepId: string) {
       updatedAt: data.updatedAt?.toDate?.() ?? data.updatedAt ?? null,
     },
   });
-}
-
-/** A sale that still stands: not cancelled, rejected or soft-deleted (a rejected sale is meant to be re-logged). */
-function isLiveSale(data: Record<string, unknown>): boolean {
-  return data.status !== 'cancelled' && data.status !== 'rejected' && !data.deletedAt && data.deleted !== true;
 }
 
 function saleTime(value: unknown): number {

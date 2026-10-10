@@ -214,6 +214,14 @@ export async function PUT(
     // Keep the duplicate-check key in step with an edited order number.
     if (updateData.orderNumberOrBtn !== undefined) {
       updateData.orderNumberKey = normalizeOrderNumber(updateData.orderNumberOrBtn);
+      // A number the carrier report filled in is no longer the report's once a
+      // person changes it (re-saving the same number keeps the hint).
+      if (
+        existing?.orderNumberSource === 'report' &&
+        updateData.orderNumberKey !== normalizeOrderNumber(existing?.orderNumberOrBtn)
+      ) {
+        updateData.orderNumberSource = null;
+      }
     }
     // Never the raw client values: both proof fields come from the validated list.
     delete updateData.proofScreenshotPath;

@@ -1,14 +1,19 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import {
+  carrierNumber,
   latestDay,
   linkedSaleId,
   normalizeAddress,
   joinByOrderNumber,
   type NumberJoin,
+  orderExactKey,
+  orderMatchKey,
   pickCurrentOrder,
   resolveUnlinkedSale,
+  sameRep,
 } from '@/lib/fiberReport/matchSales';
+import { isLiveSale, normalizeOrderNumber } from '@/lib/sales/orderNumber';
 import { formatInstallDay, installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
 import type { FiberOrder, InstallDateSyncCounts } from '@/types/fiberOrder';
 
@@ -25,6 +30,11 @@ import type { FiberOrder, InstallDateSyncCounts } from '@/types/fiberOrder';
 // time — same normalisation, same prefix predicate, same door and same
 // current-row pick (matchSales.ts), same saleLink override — so the page and
 // the writer can never disagree about which order a sale is.
+//
+// The same certain join also hands a sale logged with NO order number the
+// carrier's number (numberFillsFor), so the next report joins it by number and
+// the Log Sale duplicate guard sees it. Never over a number a person typed,
+// never one another live sale already carries, never another rep's row.
 
 export interface InstallDateChange {
   saleId: string;
@@ -68,6 +78,10 @@ interface SyncSale {
   normalizedAddress: string;
   /** The logged order number, as stored (the join normalizes it). */
   orderNumberOrBtn: string | null;
+  /** The stored duplicate-guard key (normalizeOrderNumber), when written. */
+  orderNumberKey: string | null;
+  /** Not cancelled, rejected or soft-deleted: the duplicate guard's isLiveSale. */
+  live: boolean;
   saleDate: unknown;
   installDate: unknown;
   status: string | null;
@@ -94,6 +108,8 @@ function emptyResult(): InstallDateSyncResult {
     skippedCancelled: 0,
     unchanged: 0,
     errors: 0,
+    orderNumbersFilled: 0,
+    orderNumberSkippedConflict: 0,
     changes: [],
     orderSales: new Map(),
   };
@@ -120,6 +136,8 @@ function toSyncSale(
     customerAddress,
     normalizedAddress: normalizeAddress(customerAddress),
     orderNumberOrBtn: text(data.orderNumberOrBtn),
+    orderNumberKey: text(data.orderNumberKey),
+    live: isLiveSale(data),
     saleDate: data.saleDate ?? null,
     installDate: data.installDate ?? null,
     status: text(data.status),
@@ -143,7 +161,7 @@ function notificationMessage(sale: SyncSale, previous: Date | null, next: Date):
 }
 
 type Current =
-  | { kind: 'order'; order: FiberOrder }
+  | { kind: 'order'; order: FiberOrder; via: 'link' | 'number' | 'address' | 'superseded' }
   | { kind: 'ambiguous' }
   | { kind: 'none' };
 
@@ -171,11 +189,10 @@ function currentOrderForSale(sale: SyncSale, orders: FiberOrder[], join: NumberJ
     return link.linked && link.saleId === sale.id;
   });
   if (links.length > 1) return { kind: 'ambiguous' };
-  if (links.length === 1) return { kind: 'order', order: links[0] };
+  if (links.length === 1) return { kind: 'order', order: links[0], via: 'link' };
 
   const open = orders.filter((order) => !linkedSaleId(order).linked);
-  const resolution = resolveUnlinkedSale(sale, open, join, strictPick);
-  return resolution.kind === 'order' ? { kind: 'order', order: resolution.order } : resolution;
+  return resolveUnlinkedSale(sale, open, join, strictPick);
 }
 
 /** The sync's address rule: a door it can tell apart, and a pick that holds when the rows come in reverse. */
@@ -272,6 +289,87 @@ function orderSalesFor(currents: SaleCurrent[]): Map<string, OrderSale> {
     });
   }
   return out;
+}
+
+/** A number-less sale's certain carrier row, and the number it takes from it. */
+interface NumberFill {
+  order: FiberOrder;
+  /** As the carrier prints it (the row's doc id). */
+  number: string;
+  /** normalizeOrderNumber(number): the duplicate guard's orderNumberKey. */
+  key: string;
+}
+
+/** The sale may take the fill: still live, still number-less, and the row is its rep's. */
+function canFill(sale: SyncSale, fill: NumberFill): boolean {
+  return sale.live && !sale.orderNumberOrBtn && sameRep(sale, fill.order);
+}
+
+/**
+ * The carrier's order number for each sale logged without one, where the join
+ * is certain: the sale's current row by address (the strict pick: a door told
+ * apart, a pick that holds in reverse) or by an admin's single saleLink, and
+ * that row the current row of no other live sale. Any status but cancelled (an
+ * active row is the usual case: the install happened), and only a row with a
+ * real order number (a breakage row has none).
+ *
+ * Left empty, and counted as a conflict: the row is matched to another rep
+ * (sameRep, the join's own rule), or any other live sale, any rep, already
+ * carries the number, exact or with the O/0 I/1 slips the join forgives.
+ */
+function numberFillsFor(
+  currents: SaleCurrent[],
+  sales: SyncSale[]
+): { fills: Map<string, NumberFill>; conflicts: number } {
+  // Every live sale's number, exact (the duplicate guard's key) and loose.
+  const taken = new Map<string, Set<string>>();
+  const hold = (value: unknown, saleId: string) => {
+    const loose = orderMatchKey(value);
+    for (const key of [normalizeOrderNumber(value), loose && `~${loose}`]) {
+      if (key) taken.set(key, new Set([...(taken.get(key) ?? []), saleId]));
+    }
+  };
+  for (const sale of sales) {
+    if (!sale.live) continue;
+    hold(sale.orderNumberOrBtn, sale.id);
+    hold(sale.orderNumberKey, sale.id);
+  }
+  const heldByOther = (number: string, saleId: string) =>
+    [normalizeOrderNumber(number), `~${orderMatchKey(number)}`].flatMap((key) =>
+      [...(taken.get(key) ?? [])].filter((id) => id !== saleId)
+    );
+
+  const claimants = new Map<FiberOrder, SaleCurrent[]>();
+  for (const entry of currents) {
+    if (entry.current.kind !== 'order') continue;
+    const { order } = entry.current;
+    claimants.set(order, [...(claimants.get(order) ?? []), entry]);
+  }
+
+  const fills = new Map<string, NumberFill>();
+  let conflicts = 0;
+  for (const [order, all] of claimants) {
+    const live = liveClaimants(all.map((entry) => entry.sale));
+    if (live.length !== 1) continue;
+    const [sale] = live;
+    const current = all.find((entry) => entry.sale === sale)!.current;
+    if (current.kind !== 'order' || (current.via !== 'address' && current.via !== 'link')) continue;
+    if (!sale.live || sale.orderNumberOrBtn || order.status === 'cancelled') continue;
+    const number = carrierNumber(order);
+    if (!orderExactKey(number)) continue;
+
+    const fill = { order, number, key: normalizeOrderNumber(number) };
+    const holders = [...new Set(heldByOther(number, sale.id))];
+    if (!sameRep(sale, order) || holders.length) {
+      conflicts += 1;
+      const why = holders.length ? `already on live sale(s) ${holders.join(', ')}` : `matched to another rep (${order.matchedUserId})`;
+      console.warn(`[installDateSync] left sale ${sale.id} without order ${order.id}: ${why}`);
+      continue;
+    }
+    fills.set(sale.id, fill);
+    hold(number, sale.id);
+  }
+  return { fills, conflicts };
 }
 
 /**
@@ -403,32 +501,56 @@ export async function syncInstallDatesFromOrders(
     current: currentOrderForSale(sale, orders, join),
   }));
   const resolved = resolveMatches(currents);
+  const numbers = numberFillsFor(currents, sales);
+  result.orderNumberSkippedConflict = numbers.conflicts;
   result.orderSales = orderSalesFor(currents);
   result.checked = orders.filter(isDated).length;
 
+  // One write per sale: the date (when its row is dated) and the number (when
+  // the sale has none) go in the same update. A sale only the number touches
+  // (an active row, say) is written for the number alone.
+  const work: { sale: SyncSale; order: FiberOrder; dated: boolean }[] = [];
   for (const entry of resolved) {
-    if (entry.kind === 'ambiguous') {
-      result.skippedAmbiguous += 1;
-      continue;
-    }
+    if (entry.kind === 'ambiguous') result.skippedAmbiguous += 1;
+    else work.push({ sale: entry.sale, order: entry.order, dated: true });
+  }
+  const datedSales = new Set(work.map((item) => item.sale.id));
+  for (const { sale } of currents) {
+    const fill = numbers.fills.get(sale.id);
+    if (fill && !datedSales.has(sale.id)) work.push({ sale, order: fill.order, dated: false });
+  }
 
-    const { order } = entry;
-    let sale = entry.sale;
-    let decision = decide(sale, order);
+  for (const item of work) {
+    const { order, dated } = item;
+    let sale = item.sale;
+    const planned = numbers.fills.get(sale.id);
+    const fill = planned && planned.order === order ? planned : null;
+    let decision: Decision | null = dated ? decide(sale, order) : null;
+    let filling = fill !== null && canFill(sale, fill);
     const ref = adminDb.collection('sales').doc(sale.id);
     let written = false;
 
     // The sales were read once for the whole batch; a rep or admin may have set
-    // the date since. The write is conditional on the sale being unchanged, and
-    // a refused write is decided again, once, on a fresh read.
-    for (let attempt = 0; decision.write && !written; attempt += 1) {
-      const update = {
-        installDate: decision.next,
-        installDateSource: 'report',
-        installDatePreviousDate: decision.previous,
-        installDateChangedAt: now,
-        updatedAt: now,
-      };
+    // the date (or typed a number) since. The write is conditional on the sale
+    // being unchanged, and a refused write is decided again, once, on a fresh read.
+    for (let attempt = 0; (decision?.write || filling) && !written; attempt += 1) {
+      const update: Record<string, unknown> = { updatedAt: now };
+      if (decision?.write) {
+        Object.assign(update, {
+          installDate: decision.next,
+          installDateSource: 'report',
+          installDatePreviousDate: decision.previous,
+          installDateChangedAt: now,
+        });
+      }
+      if (filling && fill) {
+        Object.assign(update, {
+          orderNumberOrBtn: fill.number,
+          orderNumberKey: fill.key,
+          orderNumberSource: 'report',
+          orderNumberFilledAt: now,
+        });
+      }
       try {
         if (sale.updateTime) await ref.update(update, { lastUpdateTime: sale.updateTime });
         else await ref.update(update);
@@ -439,11 +561,13 @@ export async function syncInstallDatesFromOrders(
           try {
             const fresh = await ref.get();
             if (!fresh.exists) {
-              decision = { write: false, count: 'unchanged' };
+              decision = dated ? { write: false, count: 'unchanged' } : null;
+              filling = false;
               break;
             }
             sale = toSyncSale(fresh.id, fresh.data() ?? {}, fresh.updateTime ?? null);
-            decision = decide(sale, order);
+            decision = dated ? decide(sale, order) : null;
+            filling = fill !== null && canFill(sale, fill);
             continue;
           } catch (readError) {
             failure = readError;
@@ -455,11 +579,10 @@ export async function syncInstallDatesFromOrders(
       }
     }
 
-    if (!decision.write) {
-      result[decision.count] += 1;
-      continue;
-    }
+    if (decision && !decision.write) result[decision.count] += 1;
     if (!written) continue;
+    if (filling) result.orderNumbersFilled += 1;
+    if (!decision?.write) continue;
 
     const { next, previous, previousDay } = decision;
     result.updated += 1;

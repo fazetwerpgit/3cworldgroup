@@ -78,6 +78,10 @@ export interface InstallDateSyncCounts {
   unchanged: number;
   /** Per-sale failures. Counted and logged, never thrown at the webhook. */
   errors: number;
+  /** Number-less sales given the carrier's order number off a certain match. */
+  orderNumbersFilled: number;
+  /** Certain matches left without a number: another live sale already carries it, or the row is another rep's. */
+  orderNumberSkippedConflict: number;
 }
 
 // What the carrier notices did with one report (see lib/fiberReport/carrierNotices).

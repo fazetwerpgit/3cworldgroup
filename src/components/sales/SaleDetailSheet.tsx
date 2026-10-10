@@ -463,6 +463,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
                 <span className={x.dLine}>
                   <FileText size={16} aria-hidden="true" />
                   {sale.orderNumberOrBtn}
+                  {sale.orderNumberSource === 'report' ? <span className={x.dNone}>· from carrier report</span> : null}
                 </span>
               )}
               {proofPaths.length > 0 ? (

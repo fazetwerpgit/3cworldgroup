@@ -38,7 +38,7 @@ export function orderMatchKey(value: unknown): string {
 }
 
 /** A carrier row's order number (its doc id), '' for a breakage row (no order id). */
-function carrierNumber(order: Pick<FiberOrder, 'id'>): string {
+export function carrierNumber(order: Pick<FiberOrder, 'id'>): string {
   return typeof order.id === 'string' && !order.id.startsWith('brk_') ? order.id : '';
 }
 
@@ -268,8 +268,13 @@ export function indexOrdersByNumber(orders: readonly FiberOrder[]): OrderNumberI
   return { exact, loose };
 }
 
-/** A number joins an order matched to the sale's own rep, or to no portal user. */
-function sameRep(sale: Pick<SaleForFiberMatch, 'salesRepId'>, order: FiberOrder): boolean {
+/**
+ * A number joins an order matched to the sale's own rep, or to no portal user.
+ * matchedUserId is the dealer code's portal user as config/fiberRepMap maps it,
+ * handoffs included (the report import and assignDealer), so this is the one rep rule for the join
+ * and for the install-date sync's order-number fill.
+ */
+export function sameRep(sale: Pick<SaleForFiberMatch, 'salesRepId'>, order: FiberOrder): boolean {
   return !order.matchedUserId || order.matchedUserId === (sale.salesRepId ?? null);
 }
 

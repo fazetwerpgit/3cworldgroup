@@ -83,6 +83,9 @@ type SaleDoc = {
   repEditOrderId?: string | null;
   repEditCarrierDate?: string | null;
   orderNumberOrBtn?: string;
+  orderNumberKey?: string;
+  deletedAt?: Date;
+  deleted?: boolean;
 };
 
 function setSales(sales: SaleDoc[]): void {
@@ -934,5 +937,202 @@ describe('re-order and the edit snapshot agree with the sync', () => {
     const result = await syncInstallDatesFromOrders({ orders: [held, older], now: NOW });
     expect(result.orderSales.get(older.id)?.saleId).toBe('x');
     expect(result.orderSales.get(held.id)?.saleId).toBe('y');
+  });
+});
+
+describe("the carrier's order number on a sale logged without one", () => {
+  const NUMBER = 'TMO20260901ABCDE';
+  const NUMBER_FIELDS = ['orderNumberFilledAt', 'orderNumberKey', 'orderNumberOrBtn', 'orderNumberSource', 'updatedAt'];
+  const installed = (overrides: Partial<FiberOrder> = {}) =>
+    order({ id: NUMBER, status: 'active', activationDate: reportDay(-2), ...overrides });
+  const sale = (overrides: Partial<SaleDoc> = {}): SaleDoc => ({
+    id: 'sale-1',
+    salesRepId: 'rep-1',
+    customerAddress: '123 Main St',
+    status: 'approved',
+    ...overrides,
+  });
+
+  it('fills the number from a certain address match, as the carrier prints it', async () => {
+    setSales([sale()]);
+    const result = await syncInstallDatesFromOrders({ orders: [installed()], now: NOW });
+
+    expect(result).toMatchObject({ orderNumbersFilled: 1, orderNumberSkippedConflict: 0, updated: 0, errors: 0 });
+    expect(updateMock).toHaveBeenCalledOnce();
+    const [saleId, written] = updateMock.mock.calls[0];
+    expect(saleId).toBe('sale-1');
+    expect(written).toEqual({
+      orderNumberOrBtn: NUMBER,
+      orderNumberKey: NUMBER,
+      orderNumberSource: 'report',
+      orderNumberFilledAt: NOW,
+      updatedAt: NOW,
+    });
+    expect(dispatchMock).not.toHaveBeenCalled();
+  });
+
+  it('takes the number from an admin link, and from a row matched to no portal user', async () => {
+    setSales([sale({ customerAddress: '9 Elsewhere Rd' })]);
+    await syncInstallDatesFromOrders({
+      orders: [installed({ matchedUserId: null, saleLink: { saleId: 'sale-1' } as FiberOrder['saleLink'] })],
+      now: NOW,
+    });
+    expect(updateMock.mock.calls[0][1].orderNumberOrBtn).toBe(NUMBER);
+  });
+
+  it('fills nothing when the match is ambiguous', async () => {
+    // Two live sales at the door.
+    setSales([sale(), sale({ id: 'sale-2', salesRepId: 'rep-2' })]);
+    let result = await syncInstallDatesFromOrders({ orders: [installed()], now: NOW });
+    expect(result.orderNumbersFilled).toBe(0);
+    expect(updateMock).not.toHaveBeenCalled();
+
+    // A door of two units the sale's address can't tell apart.
+    setSales([sale()]);
+    result = await syncInstallDatesFromOrders({
+      orders: [
+        order({ id: NUMBER, unit: '1', orderDate: reportDay(-3) }),
+        order({ id: 'TMO20260902FGHIJ', unit: '2', orderDate: reportDay(-2) }),
+      ],
+      now: NOW,
+    });
+    expect(result.orderNumbersFilled).toBe(0);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('fills nothing when another live sale already carries the number, any rep', async () => {
+    for (const other of [
+      { orderNumberOrBtn: 'tmo-20260901-abcde' },
+      { orderNumberKey: NUMBER },
+      { orderNumberOrBtn: 'TM020260901ABCDE' }, // the screenshot reader's O/0 slip
+    ]) {
+      updateMock.mockClear();
+      setSales([sale(), sale({ id: 'sale-2', salesRepId: 'rep-2', customerAddress: '9 Elsewhere Rd', ...other })]);
+      const result = await syncInstallDatesFromOrders({ orders: [installed()], now: NOW });
+      expect(result).toMatchObject({ orderNumbersFilled: 0, orderNumberSkippedConflict: 1 });
+      expect(updateMock).not.toHaveBeenCalled();
+    }
+  });
+
+  it('is not stopped by a cancelled, rejected or deleted sale with the number', async () => {
+    for (const dead of [{ status: 'cancelled' }, { status: 'rejected' }, { deletedAt: NOW }, { deleted: true }]) {
+      updateMock.mockClear();
+      setSales([
+        sale(),
+        sale({ id: 'sale-2', salesRepId: 'rep-2', customerAddress: '9 Elsewhere Rd', orderNumberOrBtn: NUMBER, ...dead }),
+      ]);
+      const result = await syncInstallDatesFromOrders({ orders: [installed()], now: NOW });
+      expect(result.orderNumbersFilled).toBe(1);
+      expect(updateMock.mock.calls[0][0]).toBe('sale-1');
+    }
+  });
+
+  it('never fills a dead sale', async () => {
+    setSales([sale({ deletedAt: NOW })]);
+    const result = await syncInstallDatesFromOrders({ orders: [installed()], now: NOW });
+    expect(result.orderNumbersFilled).toBe(0);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('never overwrites a number the rep logged', async () => {
+    setSales([sale({ orderNumberOrBtn: 'BTN 555 0101', installDate: noon(2) })]);
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: NUMBER, estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+    expect(result).toMatchObject({ updated: 1, orderNumbersFilled: 0 });
+    const written = updateMock.mock.calls[0][1];
+    expect(written).not.toHaveProperty('orderNumberOrBtn');
+    expect(written).not.toHaveProperty('orderNumberKey');
+  });
+
+  it('does not fill from a cancelled carrier row', async () => {
+    setSales([sale()]);
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: NUMBER, status: 'cancelled', cancellationDate: reportDay(-1) })],
+      now: NOW,
+    });
+    expect(result.orderNumbersFilled).toBe(0);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it("does not fill from another rep's row", async () => {
+    setSales([sale()]);
+    const result = await syncInstallDatesFromOrders({ orders: [installed({ matchedUserId: 'rep-2' })], now: NOW });
+    expect(result).toMatchObject({ orderNumbersFilled: 0, orderNumberSkippedConflict: 1 });
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('writes the date and the number in one update', async () => {
+    const previous = noon(2);
+    setSales([sale({ installDate: previous })]);
+    const result = await syncInstallDatesFromOrders({
+      orders: [order({ id: NUMBER, estInstallDate: reportDay(9) })],
+      now: NOW,
+    });
+
+    expect(result).toMatchObject({ updated: 1, orderNumbersFilled: 1, errors: 0 });
+    expect(updateMock).toHaveBeenCalledOnce();
+    const written = updateMock.mock.calls[0][1];
+    expect(Object.keys(written).sort()).toEqual(
+      [...NUMBER_FIELDS, 'installDate', 'installDateChangedAt', 'installDatePreviousDate', 'installDateSource'].sort()
+    );
+    expect(written.orderNumberOrBtn).toBe(NUMBER);
+    expect(dateToSaleDateInput(written.installDate as Date)).toBe(reportDay(9));
+    expect(dispatchMock).toHaveBeenCalledOnce();
+  });
+
+  describe('a sale that changes while the report runs', () => {
+    const updateTime = { isEqual: () => false, label: 'read-1' };
+    const freshTime = { isEqual: () => false, label: 'read-2' };
+    const stale = Object.assign(new Error('stale'), { code: 9 });
+    const base = { salesRepId: 'rep-1', customerAddress: '123 Main St', status: 'approved' };
+
+    beforeEach(() => {
+      salesGetMock.mockResolvedValue({ docs: [{ id: 'sale-1', updateTime, data: () => base }] });
+    });
+
+    it('writes only if the sale is as it was read, and retries once on a fresh read', async () => {
+      updateMock.mockRejectedValueOnce(stale);
+      freshGetMock.mockResolvedValue({
+        id: 'sale-1',
+        exists: true,
+        updateTime: freshTime,
+        data: () => ({ ...base, notes: 'called the customer' }),
+      });
+
+      const result = await syncInstallDatesFromOrders({ orders: [installed()], now: NOW });
+
+      expect(updateMock).toHaveBeenCalledTimes(2);
+      expect(updateMock.mock.calls[0][2]).toEqual({ lastUpdateTime: updateTime });
+      expect(updateMock.mock.calls[1][2]).toEqual({ lastUpdateTime: freshTime });
+      expect(updateMock.mock.calls[1][1].orderNumberOrBtn).toBe(NUMBER);
+      expect(result).toMatchObject({ orderNumbersFilled: 1, errors: 0 });
+    });
+
+    it('keeps a number the rep typed mid-run', async () => {
+      updateMock.mockRejectedValueOnce(stale);
+      freshGetMock.mockResolvedValue({
+        id: 'sale-1',
+        exists: true,
+        updateTime: freshTime,
+        data: () => ({ ...base, orderNumberOrBtn: 'TMO20260901ZZZZZ' }),
+      });
+
+      const result = await syncInstallDatesFromOrders({ orders: [installed()], now: NOW });
+
+      expect(updateMock).toHaveBeenCalledTimes(1);
+      expect(result).toMatchObject({ orderNumbersFilled: 0, errors: 0 });
+    });
+
+    it('counts an error when it changes again', async () => {
+      updateMock.mockRejectedValue(stale);
+      freshGetMock.mockResolvedValue({ id: 'sale-1', exists: true, updateTime: freshTime, data: () => base });
+
+      const result = await syncInstallDatesFromOrders({ orders: [installed()], now: NOW });
+
+      expect(updateMock).toHaveBeenCalledTimes(2);
+      expect(result).toMatchObject({ orderNumbersFilled: 0, errors: 1 });
+    });
   });
 });
