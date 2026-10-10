@@ -23,7 +23,7 @@ import {
   type Standing,
 } from '@/lib/dashboard/repSummary';
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
-import { isInstallToday } from '@/lib/sales/installBucket';
+import { AWAITING_CARRIER_LABEL, isInstallToday } from '@/lib/sales/installBucket';
 import { CarrierNotice } from './CarrierNotice';
 import { CarrierStaleNote } from './CarrierStaleNote';
 import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
@@ -61,6 +61,7 @@ function statusLine(row: RecentSaleRow) {
     case 'installed':
       return row.installDate ? `Installed ${shortDate(row.installDate)}` : 'Installed';
     case 'scheduled':
+      if (row.awaitingCarrier) return AWAITING_CARRIER_LABEL;
       if (!row.installDate) return 'Scheduled';
       return isInstallToday(row.installDate) ? 'Installs today' : `Installs ${shortDate(row.installDate)}`;
     case 'needs-date':
@@ -747,14 +748,14 @@ export function RepDashboard() {
   const rates = data.plan.status === 'ready' ? data.plan.data.rates : null;
 
   const pay = useMemo(
-    () => (book && data.plan.status === 'ready' ? summarizePay(book.sales, book.fiberBySale, rates, now) : null),
+    () => (book && data.plan.status === 'ready' ? summarizePay(book.sales, book.fiberBySale, rates, now, book.reportAsOf) : null),
     [book, data.plan.status, rates, now]
   );
   const rows = useMemo(
-    () => (book && data.plan.status === 'ready' ? recentSaleRows(book.sales, book.fiberBySale, rates, now) : []),
+    () => (book && data.plan.status === 'ready' ? recentSaleRows(book.sales, book.fiberBySale, rates, now, book.reportAsOf) : []),
     [book, data.plan.status, rates, now]
   );
-  const dates = useMemo(() => (book ? needsDateRows(book.sales, book.fiberBySale, now) : []), [book, now]);
+  const dates = useMemo(() => (book ? needsDateRows(book.sales, book.fiberBySale, now, book.reportAsOf) : []), [book, now]);
   const dateSale = dateRow ? book?.sales.find((sale) => sale.id === dateRow.id) ?? null : null;
 
   const standing: Section<Standing | null> =

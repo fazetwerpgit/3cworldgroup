@@ -13,6 +13,7 @@ import {
   emptyInstallCounts,
   installAttentionReason,
   installBucketForSale,
+  isAwaitingCarrier,
   isCarrierCancelled,
   type InstallCounts,
 } from '@/lib/sales/installBucket';
@@ -70,7 +71,9 @@ export function summarizePay(
   sales: Sale[],
   fiberBySale: FiberMap,
   rates: CompPlanCompanyRates | null,
-  now: Date = new Date()
+  now: Date = new Date(),
+  /** config/fiberReportStatus.lastReportAsOf (see carrierReportCovers). */
+  reportAsOf?: string | null
 ): PaySummary {
   const dated = datedSales(sales, fiberBySale);
   const month = chicagoMonthKey(now);
@@ -88,7 +91,7 @@ export function summarizePay(
   // The month's sales COUNT stays by sale date: it is activity, not money.
   const soldThisMonth = countedSales(salesSoldIn(sales, currentMonth(now)), fiberBySale);
   const counts = emptyInstallCounts();
-  for (const sale of soldThisMonth) counts[installBucketForSale(sale, orderFor(sale, fiberBySale), now)] += 1;
+  for (const sale of soldThisMonth) counts[installBucketForSale(sale, orderFor(sale, fiberBySale), now, reportAsOf)] += 1;
 
   return {
     estThisMonth,
@@ -118,6 +121,11 @@ export interface RecentSaleRow {
   installDate: Date | null;
   /** A 'missed' row whose day passed with the carrier still pending: "Install overdue", not a breakage. */
   overdue?: boolean;
+  /**
+   * A 'scheduled' row whose day has come before the carrier report covers it
+   * (awaitingCarrierDay): "Install day passed · waiting on carrier".
+   */
+  awaitingCarrier?: boolean;
   /** Null = no pay plan (show a dash); 0 = no contracted rate yet. */
   estPay: number | null;
   /** "Oct 7–11" for a dated, live T-Fiber sale (scheduled or completed; not missed or cancelled), else null. */
@@ -137,9 +145,15 @@ export function planLabel(sale: Pick<Sale, 'products' | 'productSold'>): string 
   return products.length > 1 ? `${first} +${products.length - 1}` : first;
 }
 
-export function rowStatus(sale: Sale, order: FiberOrder | undefined, now: Date): RowStatus {
+export function rowStatus(
+  sale: Sale,
+  order: FiberOrder | undefined,
+  now: Date,
+  /** config/fiberReportStatus.lastReportAsOf; omitted = unknown (see carrierReportCovers). */
+  reportAsOf?: string | null
+): RowStatus {
   if (sale.status === 'cancelled' || sale.status === 'rejected' || isCarrierCancelled(order)) return 'cancelled';
-  const bucket = installBucketForSale(sale, order, now);
+  const bucket = installBucketForSale(sale, order, now, reportAsOf);
   if (bucket === 'attention') return sale.installDate ? 'missed' : 'needs-date';
   return bucket;
 }
@@ -159,10 +173,12 @@ export function recentSaleRows(
   fiberBySale: FiberMap,
   rates: CompPlanCompanyRates | null,
   now: Date = new Date(),
+  reportAsOf?: string | null,
   limit = 5
 ): RecentSaleRow[] {
   return sales.slice(0, limit).map((sale) => {
-    const status = rowStatus(sale, orderFor(sale, fiberBySale), now);
+    const order = orderFor(sale, fiberBySale);
+    const status = rowStatus(sale, order, now, reportAsOf);
     // A missed install's date is stale, so it has no window until it is rescheduled.
     const window = payoutWindowForSale(sale, status !== 'cancelled' && status !== 'missed');
     const plan = planLabel(sale);
@@ -176,7 +192,8 @@ export function recentSaleRows(
       address: sale.customerAddress || '',
       status,
       installDate: toDate(sale.installDate),
-      overdue: isOverdue(sale, orderFor(sale, fiberBySale), status),
+      overdue: isOverdue(sale, order, status),
+      awaitingCarrier: status === 'scheduled' && isAwaitingCarrier(sale, order, now, reportAsOf),
       estPay: status === 'cancelled' ? null : expectedPayForSale(sale, rates),
       payoutLabel: window ? formatPayoutWindow(window) : null,
     };
@@ -215,9 +232,14 @@ function missedReason(order: FiberOrder | undefined): string | null {
 }
 
 /** Counted sales that still need an install date on the calendar, newest first. */
-export function needsDateRows(sales: Sale[], fiberBySale: FiberMap, now: Date = new Date()): NeedsDateRow[] {
+export function needsDateRows(
+  sales: Sale[],
+  fiberBySale: FiberMap,
+  now: Date = new Date(),
+  reportAsOf?: string | null
+): NeedsDateRow[] {
   return countedSales(sales, fiberBySale)
-    .filter((sale) => installBucketForSale(sale, orderFor(sale, fiberBySale), now) === 'attention')
+    .filter((sale) => installBucketForSale(sale, orderFor(sale, fiberBySale), now, reportAsOf) === 'attention')
     .map((sale) => {
       const order = orderFor(sale, fiberBySale);
       const missed = !!sale.installDate;

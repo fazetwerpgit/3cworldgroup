@@ -42,6 +42,11 @@ export interface RepBook {
    * own book only (null for management, or when the report failed to load).
    */
   report?: CarrierReportStamp | null;
+  /**
+   * The day the newest carrier report covers, for any viewer. An install day
+   * after it is "waiting on carrier", never overdue (carrierReportCovers).
+   */
+  reportAsOf?: string | null;
 }
 
 export interface RepStanding {
@@ -107,7 +112,8 @@ export async function fetchRepBook(uid: string, token: string | null, signal: Ab
     fiber && fiber.scope === 'own'
       ? { lastReportAt: fiber.lastReportAt ?? null, lastReportAsOf: fiber.lastReportAsOf ?? null }
       : null;
-  return { sales: applyCarrierInstallDates(logged, fiberBySale), fiberBySale, carrierFailed, report };
+  const reportAsOf = typeof fiber?.lastReportAsOf === 'string' ? fiber.lastReportAsOf : null;
+  return { sales: applyCarrierInstallDates(logged, fiberBySale), fiberBySale, carrierFailed, report, reportAsOf };
 }
 
 /**

@@ -244,11 +244,13 @@ export function SalesTable({
   }, [fiberBySale, rates, sales]);
   // The dashboard's status and payout window per sale, from one frozen "now".
   const now = useMemo(() => new Date(), []);
+  // The day the newest carrier report covers: a later install day waits on it.
+  const reportAsOf = fiber?.data?.lastReportAsOf ?? null;
   const statusBySale = useMemo(() => {
     const map: Record<string, RowStatus> = {};
-    for (const sale of sales) map[sale.id || ''] = rowStatus(sale, fiberBySale.get(sale.id || ''), now);
+    for (const sale of sales) map[sale.id || ''] = rowStatus(sale, fiberBySale.get(sale.id || ''), now, reportAsOf);
     return map;
-  }, [fiberBySale, now, sales]);
+  }, [fiberBySale, now, reportAsOf, sales]);
   const payoutBySale = useMemo(() => {
     const map: Record<string, string | null> = {};
     for (const sale of sales) {
@@ -377,7 +379,7 @@ export function SalesTable({
     const status = statusBySale[sale.id || ''] ?? 'needs-date';
     return (
       <span className={x.statusStack}>
-        <InstallStatusLine sale={sale} order={order} status={status} />
+        <InstallStatusLine sale={sale} order={order} status={status} reportAsOf={reportAsOf} />
         {(sale.status === 'pending' || sale.status === 'rejected') && (
           <span className={`${x.tag} ${sale.status === 'rejected' ? x.tagWarn : ''}`}>{SaleStatusConfig[sale.status].name}</span>
         )}

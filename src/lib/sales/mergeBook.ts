@@ -2,6 +2,7 @@ import type { Sale } from '@/types/sales';
 import type { FiberOrder } from '@/types/fiberOrder';
 import {
   cancelledSales,
+  carrierReportCovers,
   isCarrierCancelled,
   countedSales,
   emptyInstallCounts,
@@ -192,14 +193,15 @@ function text(value: string | null | undefined): string | null {
  * job, and a pending install is only 'scheduled' while its date is still ahead —
  * a date that has come and gone with no activation needs chasing.
  */
-function bucketForOrder(order: FiberOrder, now: Date): InstallBucket {
+function bucketForOrder(order: FiberOrder, now: Date, reportAsOf: string | null | undefined): InstallBucket {
   if (order.status === 'active') return 'installed';
   if (order.status !== 'pending_install') return 'attention';
   // Same day-key rule as installBucketForSale: the install day itself is
-  // still scheduled.
+  // still scheduled, and so is a day the newest report does not cover yet.
   const estDay = installDayKey(order.estInstallDate);
   const today = installDayKey(now);
-  return estDay && today && estDay >= today ? 'scheduled' : 'attention';
+  if (!estDay || !today) return 'attention';
+  return estDay >= today || !carrierReportCovers(estDay, reportAsOf, now) ? 'scheduled' : 'attention';
 }
 
 /** The date a row sorts on inside its bucket: the sale's install, else the carrier's estimate. */
@@ -266,6 +268,7 @@ function saleRow(
   index: number,
   opts: {
     linkedManually: boolean; cancelled: boolean; counted: boolean; possibleDuplicate: boolean; now: Date;
+    reportAsOf: string | null | undefined;
     names: PortalNames;
     history: FiberOrder[];
   }
@@ -292,7 +295,7 @@ function saleRow(
       Math.abs(cents(carrierMrc) - cents(saleValue)) >= cents(VALUE_GAP_MIN)
         ? { saleValue, carrierMrc }
         : null,
-    bucket: installBucketForSale(sale, order, opts.now),
+    bucket: installBucketForSale(sale, order, opts.now, opts.reportAsOf),
     month: monthKeyOf(sale.saleDate),
     linkedManually: opts.linkedManually,
     // A sale row is the link working, so there is nothing dangling to report.
@@ -321,7 +324,13 @@ function isHistoric(order: FiberOrder): boolean {
   return dated.getTime() < cutoff.getTime();
 }
 
-function orderRow(order: FiberOrder, now: Date, verdict: OrderVerdict, names: PortalNames): MergedRow {
+function orderRow(
+  order: FiberOrder,
+  now: Date,
+  verdict: OrderVerdict,
+  names: PortalNames,
+  reportAsOf: string | null | undefined
+): MergedRow {
   const matchedUserId = text(order.matchedUserId);
   return {
     key: `order:${order.id}`,
@@ -345,7 +354,7 @@ function orderRow(order: FiberOrder, now: Date, verdict: OrderVerdict, names: Po
     // CALL 1: nobody logged it, so it is not money. It is a question.
     value: 0,
     valueGap: null,
-    bucket: bucketForOrder(order, now),
+    bucket: bucketForOrder(order, now, reportAsOf),
     month: monthKeyOf(order.orderDate) ?? monthKeyOf(order.estInstallDate),
     linkedManually: false,
     linkBroken: verdict.linkBroken,
@@ -494,9 +503,15 @@ export function buildMergedBook(
     now?: Date;
     /** users/{uid} display names, when the caller has them. Outranks every other source. */
     repNames?: ReadonlyMap<string, string>;
+    /**
+     * config/fiberReportStatus.lastReportAsOf: an install day after it is not
+     * judged overdue (carrierReportCovers). Omitted = unknown, 2-day grace.
+     */
+    reportAsOf?: string | null;
   }
 ): MergedBook {
   const now = opts?.now ?? new Date();
+  const reportAsOf = opts?.reportAsOf;
   const names = portalNames(sales, opts?.repNames);
 
   // countedSales is isPayableSale — the one function that decides money — and
@@ -618,6 +633,7 @@ export function buildMergedBook(
       counted: payable.has(sale) && !carrierCancelled,
       possibleDuplicate: duplicates.has(sale),
       now,
+      reportAsOf,
       names,
       history: historyBySale.get(sale) ?? [],
     });
@@ -626,7 +642,7 @@ export function buildMergedBook(
   const NO_LINK: OrderVerdict = { dismissed: false, linkBroken: false };
   for (const order of orders) {
     if (claimedOrders.has(order) || folded.has(order)) continue;
-    rows.push(orderRow(order, now, verdicts.get(order) ?? NO_LINK, names));
+    rows.push(orderRow(order, now, verdicts.get(order) ?? NO_LINK, names, reportAsOf));
   }
 
   rows.sort(byMonthThenBucket);

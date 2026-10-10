@@ -76,6 +76,11 @@ interface SaleDetailSheetProps {
   revenue?: number | null;
   /** The carrier report stamp. Passed only on the rep's list: a late report gets one quiet line. */
   carrierReport?: CarrierReportStamp | null;
+  /**
+   * The day the newest carrier report covers, for boards that show no stale
+   * line (falls back to carrierReport's). A later install day waits on it.
+   */
+  reportAsOf?: string | null;
 }
 
 /** A legacy free-text carrier has no mark; show its name rather than nothing. */
@@ -137,6 +142,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
     estPay,
     revenue = null,
     carrierReport = null,
+    reportAsOf: reportAsOfProp = null,
   } = closing ? kept : props;
   /** Index of the screenshot being fetched, or null when none is. */
   const [proofLoading, setProofLoading] = useState<number | null>(null);
@@ -228,7 +234,8 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
   const firstDay = missed ? firstRescheduleDay(brokeDay, installDayKey(sale.saleDate) ?? '') : '';
   // The same status line and est. pay the row behind the sheet shows.
   const lineSale = { ...sale, installDate: shownInstallDate ?? undefined };
-  const lineStatus = rowStatus(lineSale, fiberOrder ?? undefined, new Date());
+  const reportAsOf = reportAsOfProp ?? carrierReport?.lastReportAsOf ?? null;
+  const lineStatus = rowStatus(lineSale, fiberOrder ?? undefined, new Date(), reportAsOf);
   // The carrier's reason for the miss, beside the status line that says it.
   const missedReason = fiberOrder?.status === 'breakage' ? carrierReasonLabel(fiberOrder.breakageReason) : null;
   const shownPay = estPay !== undefined
@@ -437,7 +444,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
             </div>
             {sale.status !== 'cancelled' && (
               <p className={x.dCarrier}>
-                <InstallStatusLine sale={lineSale} order={fiberOrder} status={lineStatus} />
+                <InstallStatusLine sale={lineSale} order={fiberOrder} status={lineStatus} reportAsOf={reportAsOf} />
                 {lineStatus === 'missed' && missedReason ? <span>{missedReason}</span> : null}
               </p>
             )}

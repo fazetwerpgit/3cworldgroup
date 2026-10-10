@@ -14,6 +14,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import {
+  awaitingCarrierLabel,
   installAttentionReason,
   isCarrierCancelled,
   isInstallToday,
@@ -187,9 +188,18 @@ const ATTENTION_CHIP: Record<AttentionReason, string> = {
  * scheduled chip names the day the bucket rested on (the sale's own date while
  * it is ahead, else the carrier's estimate) and says "today" on the day itself.
  */
-export function installChip(sale: Sale, bucket: InstallBucket, order?: FiberOrder | null, now: Date = new Date()) {
+export function installChip(
+  sale: Sale,
+  bucket: InstallBucket,
+  order?: FiberOrder | null,
+  now: Date = new Date(),
+  reportAsOf?: string | null
+) {
   if (bucket === 'attention') return ATTENTION_CHIP[installAttentionReason(sale, order)];
   if (bucket === 'installed') return `Installed ${formatDate(sale.installDate)}`;
+  // A day the carrier report has not caught up to: neutral, never overdue.
+  const awaiting = awaitingCarrierLabel(sale, order, now, reportAsOf);
+  if (awaiting) return awaiting;
   const day = scheduledInstallDay(sale, order, now);
   if (isInstallToday(day, now)) return 'Installs today';
   return `Installs ${formatInstallDayShort(day) ?? formatDate(sale.installDate)}`;
@@ -309,10 +319,12 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   // is re-read whenever either feed arrives, so a resume refetch moves it too.
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the feeds are the trigger, not inputs
   const now = useMemo(() => new Date(), [sales, fiberOrders]);
+  // The day the newest carrier report covers: a later install day waits on it.
+  const reportAsOf = fiber?.data?.lastReportAsOf ?? null;
 
   const fullBook = useMemo(
-    () => buildMergedBook(sales, fiberOrders, { now }),
-    [fiberOrders, now, sales]
+    () => buildMergedBook(sales, fiberOrders, { now, reportAsOf }),
+    [fiberOrders, now, reportAsOf, sales]
   );
   // The sales prop is already month-bounded by the page's fetch; the carrier
   // orders are not, so the month is applied here for both and reports what it
@@ -605,7 +617,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         </span>
         {cancelled
           ? chip(x.st_cancelled, `Cancelled ${formatDate(sale.cancelledAt)}`)
-          : chip(BUCKET_TONE[row.bucket], installChip(sale, row.bucket, row.order, now))}
+          : chip(BUCKET_TONE[row.bucket], installChip(sale, row.bucket, row.order, now, reportAsOf))}
         {/* One note per row. A possible duplicate outranks the rest: the
             second sale on one order reads 'waiting' only because the first
             kept the join, so "Not in the report yet" would mislead. */}
@@ -977,6 +989,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         onSaleUpdated={onSaleUpdated}
         payout={selectedPayout}
         fiberOrder={selectedOrder}
+        reportAsOf={reportAsOf}
         revenue={pricing && selectedSale ? saleNetRevenue(selectedSale, pricing) : null}
       />
 

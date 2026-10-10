@@ -15,6 +15,7 @@ import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { periodBounds, type LeaderboardPeriod } from '@/lib/leaderboard/periods';
 import { boardOrder } from '@/lib/leaderboard/order';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
+import { isAwaitingCarrier } from '@/lib/sales/installBucket';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { LIVE_DEFAULT_ZONE, zoneFor } from './prompt';
 import { redactContact } from './redact';
@@ -119,11 +120,14 @@ const CARRIER_STATUS: Record<FiberOrderStatus, string> = {
   breakage: 'missed install',
 };
 
-function installLine(status: RowStatus, installDate: Date | null, zone: Zone, overdue = false): string {
+function installLine(status: RowStatus, installDate: Date | null, zone: Zone, overdue = false, awaiting = false): string {
   switch (status) {
     case 'installed':
       return installDate ? `installed ${dayLabel(installDate, zone)}` : 'installed';
     case 'scheduled':
+      if (awaiting) {
+        return `install day ${installDate ? `(${dayLabel(installDate, zone)}) ` : ''}passed, waiting on the carrier report to confirm it; not overdue, no reschedule needed`;
+      }
       return installDate ? `installs ${dayLabel(installDate, zone)}` : 'scheduled';
     case 'needs-date':
       return 'needs an install date';
@@ -138,9 +142,17 @@ function installLine(status: RowStatus, installDate: Date | null, zone: Zone, ov
 }
 
 async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise<string> {
-  const [salesSnap, ordersSnap] = await Promise.all([
+  const [salesSnap, ordersSnap, reportAsOf] = await Promise.all([
     db.collection('sales').where('salesRepId', '==', uid).orderBy('saleDate', 'desc').limit(SALES_FETCH).get(),
     db.collection('fiberOrders').where('matchedUserId', '==', uid).get(),
+    // The day the newest carrier report covers; unread, the 2-day grace applies.
+    Promise.resolve()
+      .then(() => db.collection('config').doc('fiberReportStatus').get())
+      .then((snap) => {
+        const asOf = snap.exists ? snap.data()?.lastReportAsOf : null;
+        return typeof asOf === 'string' ? asOf : null;
+      })
+      .catch(() => null),
   ]);
   const raw = salesSnap.docs
     .map((doc) => ({ id: doc.id, data: doc.data() as Data }))
@@ -179,13 +191,14 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
 
   const lines = dated.slice(0, SALES_SHOWN).map((sale) => {
     const order = fiberBySale.get(sale.id);
-    const status = rowStatus(sale as unknown as Sale, order, now);
+    const status = rowStatus(sale as unknown as Sale, order, now, reportAsOf);
+    const awaiting = status === 'scheduled' && isAwaitingCarrier(sale as unknown as Sale, order, now, reportAsOf);
     const parts = [
       `${clean(sale.customerName, 60) || 'Customer (no name)'}, ${clean(sale.customerAddress, 90) || 'no address'}`,
       `plan ${clean(planLabel(sale as unknown as Sale), 40)}`,
       `sold ${sale.saleDate ? dayLabel(sale.saleDate, zone) : 'date not set'}`,
       `logged ${sale.createdAt ? `${dayLabel(sale.createdAt, zone)} ${timeLabel(sale.createdAt, zone)}` : 'unknown'}`,
-      `install: ${installLine(status, sale.installDate ?? null, zone, isOverdue(sale as unknown as Sale, order, status))}`,
+      `install: ${installLine(status, sale.installDate ?? null, zone, isOverdue(sale as unknown as Sale, order, status), awaiting)}`,
     ];
     if (SALE_STATUS[sale.status]) {
       parts.push(`in the portal: ${SALE_STATUS[sale.status]}${str(sale.reason) ? ` (${reasonText(sale.reason, 80)})` : ''}`);

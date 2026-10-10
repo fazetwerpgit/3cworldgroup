@@ -253,3 +253,49 @@ describe('copy', () => {
     expect(overdueOwnerMessage([])).toBeNull();
   });
 });
+
+describe('overdueInstall waits on the carrier report (Noah, 2026-10-10)', () => {
+  const friday = sale({ installDate: noon('2026-10-09') });
+  const pendingFri = order({ estInstallDate: '2026-10-09' });
+  const morningOf = (day: string) => new Date(`${day}T14:00:00Z`);
+
+  it('is never overdue while the newest report predates the install day', () => {
+    // Tue Oct 13, 4 days past, and still no report newer than Thu Oct 8.
+    expect(overdueInstall(friday, pendingFri, morningOf('2026-10-13'), '2026-10-08')).toBeNull();
+    expect(overdueInstall(friday, pendingFri, morningOf('2026-10-30'), '2026-10-08')).toBeNull();
+  });
+
+  it('is overdue once a report covering the day still shows it pending, 3+ days on', () => {
+    expect(overdueInstall(friday, pendingFri, morningOf('2026-10-13'), '2026-10-09')).toEqual({
+      dueDay: '2026-10-09',
+      daysOverdue: 4,
+    });
+    expect(overdueInstall(friday, pendingFri, morningOf('2026-10-12'), '2026-10-11')).toEqual({
+      dueDay: '2026-10-09',
+      daysOverdue: 3,
+    });
+    // Covered but only 2 days on: not yet.
+    expect(overdueInstall(friday, pendingFri, morningOf('2026-10-11'), '2026-10-10')).toBeNull();
+  });
+
+  it('measures coverage from the later day of a rescheduled sale', () => {
+    const rescheduled = sale({ installDate: noon('2026-10-09') });
+    const staleEst = order({ estInstallDate: '2026-10-01' });
+    expect(overdueInstall(rescheduled, staleEst, morningOf('2026-10-13'), '2026-10-08')).toBeNull();
+    expect(overdueInstall(rescheduled, staleEst, morningOf('2026-10-13'), '2026-10-12')?.dueDay).toBe('2026-10-09');
+  });
+
+  it('keeps the old rule with no stamp (the grace is shorter than the 3 days)', () => {
+    expect(overdueInstall(friday, pendingFri, morningOf('2026-10-12'))).toEqual({ dueDay: '2026-10-09', daysOverdue: 3 });
+  });
+
+  it('drops awaiting sales from the company list', () => {
+    const sales = [{ id: 's-fri', salesRepId: 'cooper', salesRepName: 'Cooper Rep', status: 'approved', customerAddress: '12 Oak St', installDate: noon('2026-10-09') } as Sale];
+    const orders = [order({ estInstallDate: '2026-10-09' })];
+    const at = morningOf('2026-10-13');
+    const lagging = buildMergedBook(sales, orders, { now: at, reportAsOf: '2026-10-08' });
+    expect(overdueSales(lagging.rows, at, '2026-10-08')).toEqual([]);
+    const caughtUp = buildMergedBook(sales, orders, { now: at, reportAsOf: '2026-10-12' });
+    expect(overdueSales(caughtUp.rows, at, '2026-10-12').map((row) => row.saleId)).toEqual(['s-fri']);
+  });
+});

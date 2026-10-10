@@ -102,6 +102,8 @@ export interface OwnerBook {
   orders: FiberOrder[];
   /** When the carrier report behind the orders last arrived (ISO), or null if none has. */
   reportAt: string | null;
+  /** The day that report covers (YYYY-MM-DD); later install days are not judged overdue. */
+  reportAsOf?: string | null;
 }
 
 /** Everything the summary reads. The Firestore adapter lives in firestoreSource.ts. */
@@ -139,8 +141,13 @@ export interface CompanyBook {
 }
 
 /** Joins sales to carrier orders exactly as the admin Sales board does (buildMergedBook). */
-export function companyBook(sales: Sale[], orders: FiberOrder[], now: Date): CompanyBook {
-  const book = buildMergedBook(sales, orders, { now });
+export function companyBook(
+  sales: Sale[],
+  orders: FiberOrder[],
+  now: Date,
+  reportAsOf?: string | null
+): CompanyBook {
+  const book = buildMergedBook(sales, orders, { now, reportAsOf });
   const installs: InstallRecord[] = [];
   let missingInstallDate = 0;
 
@@ -157,7 +164,7 @@ export function companyBook(sales: Sale[], orders: FiberOrder[], now: Date): Com
     installs.push({ saleId: row.key, repId: sale.salesRepId, installDate, sale });
   }
 
-  const overdue = overdueSales(book.rows, now);
+  const overdue = overdueSales(book.rows, now, reportAsOf);
   const overdueInstalls = { count: overdue.length, oldestDays: overdue[0]?.daysOverdue ?? null };
 
   return { installs, missingInstallDate, overdueInstalls, orders };
@@ -386,8 +393,8 @@ export type OwnerSection = 'money' | 'markets' | 'problems' | 'recruiting';
 export const OWNER_SECTIONS: readonly OwnerSection[] = ['money', 'markets', 'problems', 'recruiting'];
 
 export async function buildMoney(source: OwnerSummarySource, periods: OwnerPeriods): Promise<MoneySummary> {
-  const [{ sales, orders, reportAt }, plan] = await Promise.all([source.loadBook(), source.loadCompPlan()]);
-  const book = companyBook(sales, orders, periods.now);
+  const [{ sales, orders, reportAt, reportAsOf }, plan] = await Promise.all([source.loadBook(), source.loadCompPlan()]);
+  const book = companyBook(sales, orders, periods.now, reportAsOf);
   const horizon = moneyHorizon(periods);
   const recent = book.installs.filter((install) => install.installDate.getTime() >= horizon.getTime());
   const repIds = [...new Set(recent.map((install) => install.repId).filter(Boolean))];
@@ -416,7 +423,7 @@ export async function buildProblems(source: OwnerSummarySource, periods: OwnerPe
       source.countPendingSignups(),
       source.countStalledOnboarding(),
     ]);
-  const book = companyBook(bookData.sales, bookData.orders, periods.now);
+  const book = companyBook(bookData.sales, bookData.orders, periods.now, bookData.reportAsOf);
   return problemRows(
     {
       overdueInstalls: book.overdueInstalls.count,
@@ -446,7 +453,7 @@ export async function buildRecruiting(
     source.loadActivatedSince(periods.lastWeek.start),
     source.loadBook(),
   ]);
-  const book = companyBook(bookData.sales, bookData.orders, periods.now);
+  const book = companyBook(bookData.sales, bookData.orders, periods.now, bookData.reportAsOf);
   return {
     applications: { thisWeek: appsNow, lastWeek: appsBefore },
     interviews: { thisWeek: interviewsNow, lastWeek: interviewsBefore },

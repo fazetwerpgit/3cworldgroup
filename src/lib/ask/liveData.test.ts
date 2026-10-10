@@ -271,3 +271,20 @@ describe('loadRepSnapshot', () => {
     expect(text).toContain('Monday Team Call: Mon, Sep 28 7:00 PM');
   });
 });
+
+describe('loadRepSnapshot and the carrier report stamp (Noah, 2026-10-10)', () => {
+  // Thu Oct 1, 3 PM Central: Maria's Tue Sep 29 install is still pending.
+  const OCT1 = new Date('2026-10-01T20:00:00.000Z');
+  const withStamp = (lastReportAsOf: string) => ({ ...seed(), config: { fiberReportStatus: { lastReportAsOf } } });
+
+  it('says the install day passed and waits on the carrier while the report predates it', async () => {
+    const text = await loadRepSnapshot(createFakeAskDb(withStamp('2026-09-28')).db as unknown as Firestore, 'r1', OCT1);
+    expect(text).toMatch(/Maria Johnson[^\n]*install: install day \(Tue, Sep 29\) passed, waiting on the carrier report/);
+    expect(text).not.toMatch(/Maria Johnson[^\n]*install overdue/);
+  });
+
+  it('calls it overdue once the report covers the day', async () => {
+    const text = await loadRepSnapshot(createFakeAskDb(withStamp('2026-09-30')).db as unknown as Firestore, 'r1', OCT1);
+    expect(text).toMatch(/Maria Johnson[^\n]*install: install overdue/);
+  });
+});

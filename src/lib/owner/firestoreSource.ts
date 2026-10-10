@@ -67,6 +67,8 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
           db().collection('config').doc('fiberReportStatus').get(),
         ]);
         const lastReportAt = statusDoc.exists ? ((statusDoc.data()?.lastReportAt as string | undefined) ?? null) : null;
+        const asOf = statusDoc.exists ? statusDoc.data()?.lastReportAsOf : null;
+        const reportAsOf = typeof asOf === 'string' ? asOf : null;
         const orders = await getAllFiberOrders(lastReportAt);
         const sales = salesSnap.docs.map((doc) => {
           const data = doc.data();
@@ -85,7 +87,7 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
             createdAt: toDate(data.createdAt),
           } as Sale;
         });
-        return { sales, orders, reportAt: lastReportAt };
+        return { sales, orders, reportAt: lastReportAt, reportAsOf };
       })();
       return book;
     },

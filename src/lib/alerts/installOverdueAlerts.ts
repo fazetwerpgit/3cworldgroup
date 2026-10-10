@@ -176,11 +176,15 @@ export async function runOverdueInstallAlerts(deps: OverdueRunDeps): Promise<Ove
   // The company book exactly as the admin board builds it: every sale, every
   // stored carrier order (read fresh, after this report's upsert), the users'
   // display names.
-  const [usersSnap, salesSnap, ordersSnap] = await Promise.all([
+  const [usersSnap, salesSnap, ordersSnap, statusDoc] = await Promise.all([
     db.collection('users').get(),
     db.collection('sales').get(),
     db.collection('fiberOrders').get(),
+    // The day the newest report covers: an install day after it is not judged.
+    db.collection('config').doc('fiberReportStatus').get(),
   ]);
+  const asOf = statusDoc.exists ? statusDoc.data()?.lastReportAsOf : null;
+  const reportAsOf = typeof asOf === 'string' ? asOf : null;
   const repNames = new Map<string, string>();
   const activeUsers = new Set<string>();
   const ownerIds: string[] = [];
@@ -193,9 +197,9 @@ export async function runOverdueInstallAlerts(deps: OverdueRunDeps): Promise<Ove
   }
   const sales = salesSnap.docs.map((doc) => toSale(doc.id, doc.data() ?? {}));
   const orders = ordersSnap.docs.map((doc) => toFiberOrder(doc.id, doc.data() ?? {}));
-  const book = buildMergedBook(sales, orders, { now, repNames });
+  const book = buildMergedBook(sales, orders, { now, repNames, reportAsOf });
 
-  const overdue = overdueSales(book.rows, now);
+  const overdue = overdueSales(book.rows, now, reportAsOf);
   result.overdue = overdue;
   counts.overdue = overdue.length;
 

@@ -215,13 +215,14 @@ export function RepSaleDetail() {
   // dashboard's status. One frozen "now" keeps the status from flickering.
   const now = useMemo(() => new Date(), []);
   const orders = fiber.data?.orders;
+  const reportAsOf = fiber.data?.lastReportAsOf ?? null;
   const view = useMemo(() => {
     if (!sale) return null;
     const matched = matchFiberOrdersToSales([sale], orders ?? []);
     const order = matched.get(sale.id || '');
     const [applied] = applyCarrierInstallDates([sale], matched);
-    return { order, sale: applied, status: rowStatus(applied, order, now) };
-  }, [sale, orders, now]);
+    return { order, sale: applied, status: rowStatus(applied, order, now, reportAsOf) };
+  }, [sale, orders, now, reportAsOf]);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -381,7 +382,7 @@ export function RepSaleDetail() {
                 {settling ? (
                   'Checking the carrier…'
                 ) : (
-                  <InstallStatusLine sale={shown} order={order} status={status} />
+                  <InstallStatusLine sale={shown} order={order} status={status} reportAsOf={reportAsOf} />
                 )}
               </p>
               <CarrierStaleNote report={fiber.data?.scope === 'own' ? fiber.data : null} className={x.fine} />

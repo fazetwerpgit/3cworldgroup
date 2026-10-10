@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import type { FiberOrder, Sale } from '@/types';
 import {
+  AWAITING_CARRIER_LABEL,
+  awaitingCarrierDay,
+  awaitingCarrierLabel,
   cancelledSales,
+  carrierReportCovers,
+  isAwaitingCarrier,
+  judgedInstallDay,
   countInstallBuckets,
   countedSales,
   installAttentionReason,
@@ -83,7 +89,11 @@ describe('installBucketForSale', () => {
     expect(installBucketForSale(past, order('pre_sale'), now)).toBe('attention');
     expect(installBucketForSale(past, order('pending_install'), now)).toBe('attention');
     const pending = (estInstallDate: string) => ({ status: 'pending_install', estInstallDate }) as FiberOrder;
-    expect(installBucketForSale(past, pending('2026-09-18'), now)).toBe('attention');
+    // A report that covers the 18th still shows it pending: overdue.
+    expect(installBucketForSale(past, pending('2026-09-18'), now, '2026-09-19')).toBe('attention');
+    // With no report stamp, two days back is still inside the grace.
+    expect(installBucketForSale(past, pending('2026-09-18'), now)).toBe('scheduled');
+    expect(installBucketForSale(past, pending('2026-09-17'), now)).toBe('attention');
     expect(installBucketForSale(past, pending('2026-09-24'), now)).toBe('scheduled');
   });
 
@@ -95,9 +105,12 @@ describe('installBucketForSale', () => {
     expect(installBucketForSale(past, pending, installDay)).toBe('scheduled');
     expect(scheduledInstallDay(past, pending, installDay)).toBe('2026-10-09');
     expect(isInstallToday(scheduledInstallDay(past, pending, installDay), installDay)).toBe(true);
-    // The day after, still pending: overdue, not "no install date".
+    // The day after, still pending in a report that covers the day: overdue,
+    // not "no install date".
     const dayAfter = new Date('2026-10-10T09:00:00');
-    expect(installBucketForSale(past, pending, dayAfter)).toBe('attention');
+    expect(installBucketForSale(past, pending, dayAfter, '2026-10-09')).toBe('attention');
+    // A report only through the 8th cannot know: waiting on the carrier.
+    expect(installBucketForSale(past, pending, dayAfter, '2026-10-08')).toBe('scheduled');
     expect(installAttentionReason(past, pending)).toBe('overdue');
     expect(installAttentionReason(past, order('pre_sale'))).toBe('overdue');
     expect(installAttentionReason(past, null)).toBe('overdue');
@@ -225,5 +238,76 @@ describe('rollupSalesByRep', () => {
     );
     expect(reps).toHaveLength(1);
     expect(reps[0].count).toBe(2);
+  });
+});
+
+describe('carrier report coverage (Noah, 2026-10-10)', () => {
+  // Sat Oct 10, mid-morning Chicago. The report on file covers Thu Oct 8.
+  const SAT = new Date('2026-10-10T15:00:00Z');
+  const friday = sale({ installDate: new Date('2026-10-09T17:00:00Z') });
+  const pendingFri = { status: 'pending_install', estInstallDate: '2026-10-09' } as FiberOrder;
+
+  it('judges a day only once the report covers it', () => {
+    expect(carrierReportCovers('2026-10-08', '2026-10-08', SAT)).toBe(true); // D == asOf
+    expect(carrierReportCovers('2026-10-09', '2026-10-08', SAT)).toBe(false); // D == asOf + 1
+    expect(carrierReportCovers('2026-10-01', '2026-10-08', SAT)).toBe(true);
+    // A stamp days behind holds every later day, however old.
+    expect(carrierReportCovers('2026-10-09', '2026-10-08', new Date('2026-10-20T15:00:00Z'))).toBe(false);
+  });
+
+  it('gives an unknown stamp a 2-day grace', () => {
+    for (const asOf of [null, undefined, '', 'garbage']) {
+      expect(carrierReportCovers('2026-10-09', asOf, SAT)).toBe(false); // 1 day back
+      expect(carrierReportCovers('2026-10-08', asOf, SAT)).toBe(false); // 2 days back
+      expect(carrierReportCovers('2026-10-07', asOf, SAT)).toBe(true); // 3 days back
+    }
+  });
+
+  it('judges the later of the sale day and the carrier estimate', () => {
+    expect(judgedInstallDay(friday, { status: 'pending_install', estInstallDate: '2026-10-05' } as FiberOrder)).toBe('2026-10-09');
+    expect(judgedInstallDay(sale({ installDate: new Date('2026-10-05T17:00:00Z') }), pendingFri)).toBe('2026-10-09');
+    expect(judgedInstallDay(friday, null)).toBe('2026-10-09');
+    expect(judgedInstallDay(sale({ installDate: undefined }), null)).toBeNull();
+  });
+
+  it('keeps a Friday install off attention while the report is only through Thursday', () => {
+    expect(installBucketForSale(friday, pendingFri, SAT, '2026-10-08')).toBe('scheduled');
+    expect(installBucketForSale(friday, order('pre_sale'), SAT, '2026-10-08')).toBe('scheduled');
+    expect(awaitingCarrierDay(friday, pendingFri, SAT, '2026-10-08')).toBe('2026-10-09');
+    expect(isAwaitingCarrier(friday, pendingFri, SAT, '2026-10-08')).toBe(true);
+    expect(awaitingCarrierLabel(friday, pendingFri, SAT, '2026-10-08')).toBe(AWAITING_CARRIER_LABEL);
+    expect(AWAITING_CARRIER_LABEL).toBe('Install day passed · waiting on carrier');
+    // Once a report covers Friday and still has it pending, it is overdue.
+    expect(installBucketForSale(friday, pendingFri, SAT, '2026-10-09')).toBe('attention');
+    expect(installAttentionReason(friday, pendingFri)).toBe('overdue');
+    expect(awaitingCarrierLabel(friday, pendingFri, SAT, '2026-10-09')).toBeNull();
+  });
+
+  it('never waits on a carrier breakage, cancellation or install', () => {
+    const broke = { status: 'breakage', estInstallDate: '2026-10-09' } as FiberOrder;
+    expect(installBucketForSale(friday, broke, SAT, '2026-10-08')).toBe('attention');
+    expect(installAttentionReason(friday, broke)).toBe('missed');
+    expect(awaitingCarrierDay(friday, broke, SAT, '2026-10-08')).toBeNull();
+    expect(installBucketForSale(friday, order('cancelled'), SAT, '2026-10-08')).toBe('attention');
+    expect(installBucketForSale(friday, order('active'), SAT, '2026-10-08')).toBe('installed');
+    // No carrier order at all reads installed off its own past date, as before.
+    expect(awaitingCarrierDay(friday, null, SAT, '2026-10-08')).toBeNull();
+    expect(installBucketForSale(friday, null, SAT, '2026-10-08')).toBe('installed');
+  });
+
+  it('reads the install day itself as today, not "passed"', () => {
+    // Rescheduled to today while the carrier still has an older estimate.
+    const today = sale({ installDate: new Date('2026-10-10T05:00:00Z') });
+    const oldEst = { status: 'pending_install', estInstallDate: '2026-10-05' } as FiberOrder;
+    expect(installBucketForSale(today, oldEst, SAT, '2026-10-09')).toBe('scheduled');
+    expect(isAwaitingCarrier(today, oldEst, SAT, '2026-10-09')).toBe(false);
+    expect(awaitingCarrierLabel(today, oldEst, SAT, '2026-10-09')).toBe('Installs today');
+  });
+
+  it('counts awaiting installs as scheduled in the counts and the rollups', () => {
+    const fiber = new Map([['s1', pendingFri]]);
+    expect(countInstallBuckets([friday], fiber, SAT, '2026-10-08')).toEqual({ attention: 0, scheduled: 1, installed: 0 });
+    expect(countInstallBuckets([friday], fiber, SAT, '2026-10-09')).toEqual({ attention: 1, scheduled: 0, installed: 0 });
+    expect(rollupSalesByRep([friday], fiber, SAT, '2026-10-08')[0].counts.scheduled).toBe(1);
   });
 });

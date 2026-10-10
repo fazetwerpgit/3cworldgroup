@@ -1,7 +1,7 @@
 import type { FiberOrder, Sale } from '@/types';
 import { customerLabel } from '@/lib/fiberReport/carrierNotice';
 import { isPayableSale } from '@/lib/pay/expectedPay';
-import { isCarrierCancelled } from '@/lib/sales/installBucket';
+import { carrierReportCovers, daysBetween, isCarrierCancelled, judgedInstallDay } from '@/lib/sales/installBucket';
 import type { MergedRow } from '@/lib/sales/mergeBook';
 import { formatInstallDayShort, installDayKey } from '@/lib/sales/saleDate';
 
@@ -27,14 +27,7 @@ export interface OverdueInstall {
 
 const DAY_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-/** Whole calendar days from one day key to a later one (negative when `to` is earlier). */
-export function daysBetween(from: string, to: string): number {
-  const a = DAY_KEY.exec(from);
-  const b = DAY_KEY.exec(to);
-  if (!a || !b) return Number.NaN;
-  const time = (m: RegExpExecArray) => Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return Math.round((time(b) - time(a)) / 86_400_000);
-}
+export { daysBetween };
 
 /**
  * Whether a sale's install is overdue, given the carrier order the board
@@ -51,13 +44,18 @@ export function daysBetween(from: string, to: string): number {
  *     day is measured from the newer day, never the stale one.
  *   - A sale rescheduled to today or later is waiting on its new day, whatever
  *     the carrier's old estimate says (installBucketForSale reads it scheduled).
+ *   - The newest carrier report covers the install day (carrierReportCovers):
+ *     a report as of Thu cannot say whether a Fri install happened, however
+ *     many days ago Fri was. `reportAsOf` is config/fiberReportStatus
+ *     .lastReportAsOf; without it the 2-day grace applies.
  *
  * Days are Chicago calendar days (installDayKey), as the board counts them.
  */
 export function overdueInstall(
   sale: Pick<Sale, 'installDate' | 'status'>,
   order: FiberOrder | null | undefined,
-  now: Date = new Date()
+  now: Date = new Date(),
+  reportAsOf?: string | null
 ): OverdueInstall | null {
   if (!order) return null;
   if (!isPayableSale(sale)) return null;
@@ -66,13 +64,13 @@ export function overdueInstall(
   const today = installDayKey(now);
   if (!today) return null;
   const saleDay = installDayKey(sale.installDate);
-  const estDay = installDayKey(order.estInstallDate);
   if (saleDay && saleDay >= today) return null;
 
-  const dueDay = [saleDay, estDay].filter((day): day is string => !!day).sort().at(-1);
+  const dueDay = judgedInstallDay(sale, order);
   if (!dueDay) return null;
   const daysOverdue = daysBetween(dueDay, today);
   if (!(daysOverdue >= OVERDUE_AFTER_DAYS)) return null;
+  if (!carrierReportCovers(dueDay, reportAsOf, now)) return null;
   return { dueDay, daysOverdue };
 }
 
@@ -96,11 +94,15 @@ function capitalized(label: string): string {
  * Every overdue sale on a built book, oldest first. Only rows the board counts
  * (a logged, live sale with its matched order) can be overdue.
  */
-export function overdueSales(rows: readonly MergedRow[], now: Date = new Date()): OverdueSale[] {
+export function overdueSales(
+  rows: readonly MergedRow[],
+  now: Date = new Date(),
+  reportAsOf?: string | null
+): OverdueSale[] {
   const out: OverdueSale[] = [];
   for (const row of rows) {
     if (!row.counted || !row.sale || !row.order) continue;
-    const overdue = overdueInstall(row.sale, row.order, now);
+    const overdue = overdueInstall(row.sale, row.order, now, reportAsOf);
     if (!overdue) continue;
     const saleId = row.sale.id?.trim();
     if (!saleId) continue;

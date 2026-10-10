@@ -271,3 +271,46 @@ describe('runOverdueInstallAlerts', () => {
     expect(result.ownerAlert?.message).toBe('2 overdue. Oldest: Craig T. (Cooper, 69 days)');
   });
 });
+
+describe('runOverdueInstallAlerts and the carrier report stamp (Noah, 2026-10-10)', () => {
+  /** Noah's Friday install, still pending in every report so far. */
+  function fridaySeed(lastReportAsOf: string) {
+    const base = seed();
+    return {
+      ...base,
+      sales: {
+        whittington: {
+          salesRepId: 'cooper',
+          salesRepName: 'Cooper Smith',
+          customerName: 'Wes Whittington',
+          customerAddress: '9 Birch Ln',
+          status: 'approved',
+          saleDate: noon('2026-10-01'),
+          installDate: noon('2026-10-09'),
+          totalValue: 90,
+          products: [],
+        },
+      },
+      fiberOrders: {
+        'o-wes': order('o-wes', '9 BIRCH LN', { orderDate: '2026-10-01', estInstallDate: '2026-10-09' }),
+      },
+      config: { fiberReportStatus: { lastReportAt: '2026-10-09T14:00:00Z', lastReportAsOf } },
+    };
+  }
+
+  it('does not call a Fri install overdue on Tue while the report is still as of Thu', async () => {
+    const { db } = fakeDb(fridaySeed('2026-10-08'));
+    const dispatch = vi.fn().mockResolvedValue(undefined);
+    const result = await runOverdueInstallAlerts({ db, now: morning('2026-10-13'), dispatch });
+    expect(result.counts.overdue).toBe(0);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('calls it overdue once a report covering Fri still has it pending', async () => {
+    const { db } = fakeDb(fridaySeed('2026-10-12'));
+    const dispatch = vi.fn().mockResolvedValue(undefined);
+    const result = await runOverdueInstallAlerts({ db, now: morning('2026-10-13'), dispatch });
+    expect(result.counts.overdue).toBe(1);
+    expect(result.overdue[0]).toMatchObject({ saleId: 'whittington', dueDay: '2026-10-09', daysOverdue: 4 });
+  });
+});

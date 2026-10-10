@@ -194,6 +194,22 @@ describe('companyBook', () => {
     ];
     expect(companyBook(sales, orders, NOW).overdueInstalls).toEqual({ count: 2, oldestDays: 52 });
   });
+
+  it('leaves out install days the newest carrier report does not cover yet', () => {
+    seq = 0;
+    const sales = [
+      sale({ rep: 'repA', install: noonChicago(8, 1), customerAddress: '1 Late Lane' }), // 52 days
+      sale({ rep: 'repA', install: noonChicago(9, 19), customerAddress: '2 Late Lane' }), // 3 days
+    ];
+    const orders = [
+      order({ address: '1 Late Lane', status: 'pending_install', estInstallDate: '2026-08-01' }),
+      order({ address: '2 Late Lane', status: 'pending_install', estInstallDate: '2026-09-19' }),
+    ];
+    // The report is still as of Fri Sep 18: Sat the 19th is waiting on the carrier.
+    expect(companyBook(sales, orders, NOW, '2026-09-18').overdueInstalls).toEqual({ count: 1, oldestDays: 52 });
+    // Covered by a report as of the 19th (D == asOf): judged as before.
+    expect(companyBook(sales, orders, NOW, '2026-09-19').overdueInstalls).toEqual({ count: 2, oldestDays: 52 });
+  });
 });
 
 describe('buildOwnerSummary', () => {
@@ -298,6 +314,20 @@ describe('buildOwnerSummary', () => {
       placedByRep: 1,
     });
     expect(JSON.stringify(summary)).not.toMatch(/Oak Street|Pine Avenue|repA/);
+  });
+
+  it('counts Needs attention overdue installs against the report stamp the book carries', async () => {
+    seq = 0;
+    const sales = [sale({ rep: 'repA', install: noonChicago(9, 18), customerAddress: '5 Wait Way' })]; // 4 days
+    const orders = [order({ address: '5 Wait Way', status: 'pending_install', estInstallDate: '2026-09-18' })];
+    const overdueRow = async (reportAsOf: string | null) => {
+      const source = fakeSource({ loadBook: vi.fn(async () => ({ sales, orders, reportAt: null, reportAsOf })) });
+      const summary = await buildOwnerSummary(source, ['problems'], NOW);
+      return summary.problems!.find((row) => row.key === 'overdueInstalls')?.count ?? 0;
+    };
+    expect(await overdueRow('2026-09-17')).toBe(0);
+    expect(await overdueRow('2026-09-18')).toBe(1);
+    expect(await overdueRow(null)).toBe(1); // unknown stamp: 4 days back is past the grace
   });
 
   it('lets a failing read fail the section instead of reporting zeros', async () => {

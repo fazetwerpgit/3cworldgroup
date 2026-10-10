@@ -104,7 +104,7 @@ async function render(
   sales: Sale[],
   orders: FiberOrder[],
   month: MonthKey | undefined,
-  extra?: { truncated?: boolean; ownerPricing?: OwnerPricing }
+  extra?: { truncated?: boolean; ownerPricing?: OwnerPricing; lastReportAsOf?: string | null }
 ) {
   await act(async () => {
     root.render(
@@ -114,7 +114,7 @@ async function render(
         truncated={extra?.truncated}
         ownerPricing={extra?.ownerPricing ?? null}
         fiber={{
-          data: { scope: 'all', lastReportAt: null, orders, unmatched: [] },
+          data: { scope: 'all', lastReportAt: null, lastReportAsOf: extra?.lastReportAsOf ?? null, orders, unmatched: [] },
           loading: false,
           error: null,
           refetch,
@@ -609,9 +609,48 @@ describe('the install chip says what is actually wrong', () => {
     expect(installChip(sale, 'attention', pendingOn('2026-10-08'), now)).toBe('Install overdue');
   });
 
+  it('reads "Install day passed · waiting on carrier" while the report predates the day', () => {
+    const sat = new Date(2026, 9, 10, 10, 0, 0);
+    const friday = withInstall(new Date(2026, 9, 9, 12, 0, 0));
+    expect(installChip(friday, 'scheduled', pendingOn('2026-10-09'), sat, '2026-10-08')).toBe(
+      'Install day passed · waiting on carrier'
+    );
+    // Not waiting once the report covers the day (the bucket says attention then).
+    expect(installChip(friday, 'attention', pendingOn('2026-10-09'), sat, '2026-10-09')).toBe('Install overdue');
+  });
+
   it('keeps "No install date" for a sale with no date, and names a breakage', () => {
     expect(installChip(withInstall(undefined), 'attention', null, now)).toBe('No install date');
     const broke = { status: 'breakage', estInstallDate: '2026-10-08' } as FiberOrder;
     expect(installChip(withInstall(new Date(2026, 9, 8, 12, 0, 0)), 'attention', broke, now)).toBe('Missed install');
+  });
+});
+
+describe('an install day the carrier report has not caught up to (Noah, 2026-10-10)', () => {
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12, 0, 0);
+  const twoDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 2, 12, 0, 0);
+  const sale = { ...backDatedSale, saleDate: monthsAgo(0, 1), installDate: yesterday } as unknown as Sale;
+  const pending = {
+    ...carrierOrder,
+    status: 'pending_install',
+    rawStatus: 'Pending',
+    activationDate: null,
+    estInstallDate: isoDay(yesterday),
+  } as unknown as FiberOrder;
+
+  it('shows the neutral chip and no attention while the report is a day behind', async () => {
+    await render([sale], [pending], undefined, { lastReportAsOf: isoDay(twoDaysAgo) });
+    expect(container.textContent).not.toMatch(/need(s)? attention/);
+    await openRep();
+    expect(container.textContent).toContain('Install day passed · waiting on carrier');
+    expect(container.textContent).not.toContain('Install overdue');
+  });
+
+  it('calls it overdue once the report covers the day', async () => {
+    await render([sale], [pending], undefined, { lastReportAsOf: isoDay(yesterday) });
+    await openRep();
+    expect(container.textContent).toContain('Install overdue');
+    expect(container.textContent).not.toContain('waiting on carrier');
   });
 });

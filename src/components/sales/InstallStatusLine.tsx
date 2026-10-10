@@ -1,7 +1,13 @@
 import type { Sale } from '@/types';
 import type { FiberOrder, FiberOrderStatus } from '@/types/fiberOrder';
 import type { RowStatus } from '@/lib/dashboard/repSummary';
-import { installAttentionReason, isInstallToday, isStandingBreakage, scheduledInstallDay } from '@/lib/sales/installBucket';
+import {
+  awaitingCarrierLabel,
+  installAttentionReason,
+  isInstallToday,
+  isStandingBreakage,
+  scheduledInstallDay,
+} from '@/lib/sales/installBucket';
 import { formatInstallDayShort } from '@/lib/sales/saleDate';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import { FiberStatusPill } from './InstallStatusSection';
@@ -69,19 +75,24 @@ export function InstallStatusLine({
   sale,
   order,
   status,
+  reportAsOf,
 }: {
   sale: Pick<Sale, 'installDate'>;
   order: FiberOrder | null | undefined;
   status: RowStatus;
+  /** The day the newest carrier report covers (status response lastReportAsOf). */
+  reportAsOf?: string | null;
 }) {
   const now = new Date();
   const day = status === 'scheduled' ? scheduledInstallDay(sale, order, now) : sale.installDate;
   const overdue = status === 'missed' && installAttentionReason(sale, order) === 'overdue';
+  // A day that came before the carrier report caught up: neutral, never "reschedule".
+  const awaiting = status === 'scheduled' ? awaitingCarrierLabel(sale, order, now, reportAsOf) : null;
   return (
     <>
       <span className={`${x.status} ${STATUS_CLASS[status]}`}>
         <span className={x.dot} aria-hidden="true" />
-        {statusLine(status, day, { overdue, now })}
+        {awaiting ?? statusLine(status, day, { overdue, now })}
       </span>
       {order && carrierAddsInfo(sale, order, status) && (
         <span className={x.carrierSays}>

@@ -32,6 +32,117 @@ export function isStandingBreakage(
   return saleDay <= brokeDay;
 }
 
+// ---------------------------------------------------------------- report coverage
+
+const DAY_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Whole calendar days from one day key to a later one (negative when `to` is earlier). */
+export function daysBetween(from: string, to: string): number {
+  const a = DAY_KEY.exec(from);
+  const b = DAY_KEY.exec(to);
+  if (!a || !b) return Number.NaN;
+  const time = (m: RegExpExecArray) => Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Math.round((time(b) - time(a)) / 86_400_000);
+}
+
+/**
+ * With no report stamp to go on, an install day this many days back or fewer
+ * is treated as not yet covered: the report lands once a day covering the day
+ * before, and it can skip a weekend day.
+ */
+export const UNKNOWN_REPORT_GRACE_DAYS = 2;
+
+/**
+ * Whether the newest carrier report can speak for install day `day`
+ * (YYYY-MM-DD, Chicago). Owner, 2026-10-10 (Noah: "a bunch of my installs are
+ * saying they need rescheduled but they're installed"): the report dated Thu
+ * covers Thu; it cannot know a Fri install happened. So a day is covered only
+ * when `reportAsOf` (config/fiberReportStatus.lastReportAsOf) is that day or
+ * later. With no usable stamp, a day more than UNKNOWN_REPORT_GRACE_DAYS back
+ * is taken as covered and anything newer is not.
+ */
+export function carrierReportCovers(
+  day: string,
+  reportAsOf: string | null | undefined,
+  now: Date = new Date()
+): boolean {
+  if (typeof reportAsOf === 'string' && DAY_KEY.test(reportAsOf)) return day <= reportAsOf;
+  const today = installDayKey(now);
+  if (!today) return true;
+  return daysBetween(day, today) > UNKNOWN_REPORT_GRACE_DAYS;
+}
+
+/**
+ * The day an install the carrier still has open is judged on: the later of the
+ * sale's own day and the carrier's estimate, so a rescheduled sale (or a moved
+ * estimate) is measured from the newer day, never the stale one.
+ */
+export function judgedInstallDay(
+  sale: Pick<Sale, 'installDate'>,
+  order: FiberOrder | null | undefined
+): string | null {
+  const days = [installDayKey(sale.installDate), installDayKey(order?.estInstallDate)];
+  return days.filter((day): day is string => !!day).sort().at(-1) ?? null;
+}
+
+/** Neutral line for an install whose day passed before the carrier report caught up. */
+export const AWAITING_CARRIER_LABEL = 'Install day passed · waiting on carrier';
+
+/**
+ * The install day a sale is waiting on the carrier report for, or null. Only
+ * the INFERRED overdue qualifies — a dated sale the carrier still has
+ * pending_install or pre_sale, whose day has come (today or earlier) and that
+ * the newest report does not cover yet. Such a sale is not attention, not
+ * overdue and not a reschedule: it reads as scheduled until a report that
+ * covers its day says otherwise. A carrier breakage or cancellation is data
+ * the report actually holds and is never waited on.
+ */
+export function awaitingCarrierDay(
+  sale: Pick<Sale, 'installDate'>,
+  order: FiberOrder | null | undefined,
+  now: Date = new Date(),
+  reportAsOf?: string | null
+): string | null {
+  if (!sale.installDate) return null;
+  if (order?.status !== 'pending_install' && order?.status !== 'pre_sale') return null;
+  const day = judgedInstallDay(sale, order);
+  const today = installDayKey(now);
+  if (!day || !today || day > today) return null;
+  return carrierReportCovers(day, reportAsOf, now) ? null : day;
+}
+
+/**
+ * True when the sale's install day is behind us (before today) and the carrier
+ * report has not caught up to it: the rows that read AWAITING_CARRIER_LABEL.
+ * The install day itself still reads "Installs today".
+ */
+export function isAwaitingCarrier(
+  sale: Pick<Sale, 'installDate'>,
+  order: FiberOrder | null | undefined,
+  now: Date = new Date(),
+  reportAsOf?: string | null
+): boolean {
+  const day = awaitingCarrierDay(sale, order, now, reportAsOf);
+  return !!day && day !== installDayKey(now);
+}
+
+/**
+ * The words for a sale waiting on the carrier (awaitingCarrierDay), or null
+ * when it is not waiting. Its day being today still reads "Installs today".
+ */
+export function awaitingCarrierLabel(
+  sale: Pick<Sale, 'installDate'>,
+  order: FiberOrder | null | undefined,
+  now: Date = new Date(),
+  reportAsOf?: string | null
+): string | null {
+  const day = awaitingCarrierDay(sale, order, now, reportAsOf);
+  if (!day) return null;
+  return day === installDayKey(now) ? 'Installs today' : AWAITING_CARRIER_LABEL;
+}
+
+// ---------------------------------------------------------------- buckets
+
 /**
  * The fiber report is display-only "peace of mind" data (see types/fiberOrder),
  * so it may sharpen a sale's bucket but never invents one: a sale with no
@@ -41,7 +152,9 @@ export function isStandingBreakage(
 export function installBucketForSale(
   sale: Pick<Sale, 'installDate'>,
   fiberOrder?: FiberOrder | null,
-  now: Date = new Date()
+  now: Date = new Date(),
+  /** config/fiberReportStatus.lastReportAsOf; omitted = unknown (see carrierReportCovers). */
+  reportAsOf?: string | null
 ): InstallBucket {
   if (!sale.installDate) return 'attention';
   // Breakage means the customer missed, rescheduled or cancelled at the door —
@@ -58,6 +171,9 @@ export function installBucketForSale(
   // An unparseable date is no date: it can't be scheduled against.
   if (Number.isNaN(installed.getTime())) return 'attention';
   if (installed.getTime() > now.getTime()) return 'scheduled';
+  // The day has come but the newest carrier report predates it: the report
+  // cannot know yet, so the install stays scheduled (awaitingCarrierDay).
+  if (awaitingCarrierDay(sale, fiberOrder, now, reportAsOf)) return 'scheduled';
   // The sale's day has passed, but the carrier says the install has not
   // happened: a pending install is still scheduled while the carrier's own
   // estimate is ahead (as the book reads an order alone), otherwise it needs chasing.
@@ -184,11 +300,12 @@ export function emptyInstallCounts(): InstallCounts {
 export function countInstallBuckets(
   sales: Sale[],
   fiberBySale?: Map<string, FiberOrder>,
-  now: Date = new Date()
+  now: Date = new Date(),
+  reportAsOf?: string | null
 ): InstallCounts {
   const counts = emptyInstallCounts();
   for (const sale of countedSales(sales, fiberBySale)) {
-    counts[installBucketForSale(sale, fiberBySale?.get(sale.id || ''), now)] += 1;
+    counts[installBucketForSale(sale, fiberBySale?.get(sale.id || ''), now, reportAsOf)] += 1;
   }
   return counts;
 }
@@ -223,7 +340,8 @@ function installTime(sale: Sale): number {
 export function rollupSalesByRep(
   sales: Sale[],
   fiberBySale?: Map<string, FiberOrder>,
-  now: Date = new Date()
+  now: Date = new Date(),
+  reportAsOf?: string | null
 ): RepRollup[] {
   const byRep = new Map<string, RepRollup>();
 
@@ -244,13 +362,13 @@ export function rollupSalesByRep(
     rollup.sales.push(sale);
     rollup.count += 1;
     rollup.value += sale.totalValue || 0;
-    rollup.counts[installBucketForSale(sale, fiberBySale?.get(sale.id || ''), now)] += 1;
+    rollup.counts[installBucketForSale(sale, fiberBySale?.get(sale.id || ''), now, reportAsOf)] += 1;
   }
 
   for (const rollup of byRep.values()) {
     rollup.sales.sort((a, b) => {
-      const bucketA = BUCKET_ORDER[installBucketForSale(a, fiberBySale?.get(a.id || ''), now)];
-      const bucketB = BUCKET_ORDER[installBucketForSale(b, fiberBySale?.get(b.id || ''), now)];
+      const bucketA = BUCKET_ORDER[installBucketForSale(a, fiberBySale?.get(a.id || ''), now, reportAsOf)];
+      const bucketB = BUCKET_ORDER[installBucketForSale(b, fiberBySale?.get(b.id || ''), now, reportAsOf)];
       if (bucketA !== bucketB) return bucketA - bucketB;
       // Within scheduled, soonest first (that is the next thing to happen).
       // Within installed, most recent first (that is the money that just landed).

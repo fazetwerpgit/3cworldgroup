@@ -5,6 +5,7 @@ import {
   formatCallTime,
   needsDateRows,
   recentSaleRows,
+  rowStatus,
   shortName,
   standingFrom,
   summarizePay,
@@ -327,5 +328,48 @@ describe('helpers', () => {
     expect(callsToday(calls, new Date('2026-09-22T15:30:00Z')).map((c) => c.id)).toEqual(['a']);
     // 09:30 CDT: both Tuesday calls still show, soonest first.
     expect(callsToday(calls, new Date('2026-09-22T14:30:00Z')).map((c) => c.id)).toEqual(['b', 'a']);
+  });
+});
+
+describe('an install day the carrier report has not caught up to (Noah, 2026-10-10)', () => {
+  // Sat Oct 10; the report on file covers Thu Oct 8. Noah's installs were Fri Oct 9.
+  const SAT = d(2026, 10, 10);
+  const friday = () => sale({ saleDate: d(2026, 10, 1), installDate: d(2026, 10, 9) });
+  const pendingFri = { status: 'pending_install', estInstallDate: '2026-10-09' } as FiberOrder;
+
+  it('reads scheduled, not missed, with the payout window intact', () => {
+    const s = friday();
+    const fiber = new Map([[s.id!, pendingFri]]);
+    expect(rowStatus(s, pendingFri, SAT, '2026-10-08')).toBe('scheduled');
+    const [row] = recentSaleRows([s], fiber, rates, SAT, '2026-10-08');
+    expect(row.status).toBe('scheduled');
+    expect(row.awaitingCarrier).toBe(true);
+    expect(row.overdue).toBe(false);
+    expect(row.estPay).toBe(130);
+    expect(row.payoutLabel).not.toBeNull();
+  });
+
+  it('is overdue (and loses the window) once a report covering Fri still has it pending', () => {
+    const s = friday();
+    const fiber = new Map([[s.id!, pendingFri]]);
+    const [row] = recentSaleRows([s], fiber, rates, SAT, '2026-10-09');
+    expect(row.status).toBe('missed');
+    expect(row.overdue).toBe(true);
+    expect(row.awaitingCarrier).toBe(false);
+    expect(row.payoutLabel).toBeNull();
+  });
+
+  it('is not a reschedule task on Home, and counts as scheduled', () => {
+    const s = friday();
+    const fiber = new Map([[s.id!, pendingFri]]);
+    expect(needsDateRows([s], fiber, SAT, '2026-10-08')).toEqual([]);
+    expect(needsDateRows([s], fiber, SAT, '2026-10-09')).toHaveLength(1);
+    // Without a stamp, a day 1 day back is inside the grace.
+    expect(needsDateRows([s], fiber, SAT)).toEqual([]);
+    const summary = summarizePay([s], fiber, rates, SAT, '2026-10-08');
+    expect(summary.counts).toEqual({ attention: 0, scheduled: 1, installed: 0 });
+    // Pay never depended on the label: est. this month is the same either way.
+    expect(summary.estThisMonth).toBe(summarizePay([s], fiber, rates, SAT, '2026-10-09').estThisMonth);
+    expect(summary.estThisMonth).toBe(130);
   });
 });
