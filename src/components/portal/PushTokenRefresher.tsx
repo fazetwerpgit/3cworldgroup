@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { auth } from '@/lib/firebase/config';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDeviceDetailed } from '@/lib/push/enablePushOnDevice';
-import { isStandaloneApp } from '@/lib/pwa/standalone';
+import { currentPermission, reportPushHealth } from '@/lib/push/reportPushHealth';
 
 // Silently re-registers this device's FCM token on every portal open, but only
 // when the user already granted notifications (permission === 'granted' means
@@ -43,8 +42,7 @@ export default function PushTokenRefresher() {
     let cancelled = false;
     (async () => {
       const supported = await pushSupported();
-      const permission =
-        typeof Notification !== 'undefined' ? Notification.permission : 'no-api';
+      const permission = currentPermission();
       let result = 'skipped';
       if (supported && !cancelled && permission === 'granted') {
         // Fire-and-forget: getToken returns the CURRENT subscription's token and
@@ -55,21 +53,7 @@ export default function PushTokenRefresher() {
       }
       // Health beacon: report what this device saw so silent delivery failures
       // are diagnosable server-side (users/{uid}.pushHealth).
-      try {
-        const idToken = await auth?.currentUser?.getIdToken();
-        await fetch('/api/portal/push/health', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken ?? ''}` },
-          body: JSON.stringify({
-            supported,
-            permission,
-            result,
-            standalone: isStandaloneApp(),
-          }),
-        });
-      } catch {
-        // Diagnostics must never break the app.
-      }
+      await reportPushHealth({ supported, permission, result });
     })();
     return () => {
       cancelled = true;

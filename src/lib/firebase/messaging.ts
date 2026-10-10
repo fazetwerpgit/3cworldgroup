@@ -18,6 +18,12 @@ async function getMessagingInstance(): Promise<Messaging | null> {
   return messaging;
 }
 
+// Whether the app is configured for push at all (true even in a Safari tab,
+// which has no push API until the portal is installed).
+export function pushConfigured(): boolean {
+  return !!VAPID_KEY;
+}
+
 // Whether this browser can do web push AND the app is configured for it.
 export async function pushSupported(): Promise<boolean> {
   if (!VAPID_KEY) return false;
