@@ -166,9 +166,9 @@ function shortDay(day: string): string {
   return formatInstallDayShort(day) ?? day;
 }
 
-/** The rep's push body. With the title it reads "Install overdue: Craig T. was due Aug 1 (69 days). …" */
+/** The rep's push body. With the title it reads "Install overdue: Craig T. was due Aug 1, 69 days ago. …" */
 export function overdueRepMessage(sale: Pick<OverdueSale, 'customer' | 'dueDay' | 'daysOverdue'>): string {
-  return `${sale.customer} was due ${shortDay(sale.dueDay)} (${sale.daysOverdue} days). Check with the customer or reschedule.`;
+  return `${sale.customer} was due ${shortDay(sale.dueDay)}, ${sale.daysOverdue} days ago. Check with the customer or reschedule.`;
 }
 
 function firstName(name: string): string {

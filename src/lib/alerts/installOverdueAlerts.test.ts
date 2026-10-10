@@ -162,7 +162,7 @@ describe('runOverdueInstallAlerts', () => {
       userId: 'cooper',
       type: 'install_overdue',
       title: 'Install overdue',
-      message: 'Craig T. was due Aug 1 (69 days). Check with the customer or reschedule.',
+      message: 'Craig T. was due Aug 1, 69 days ago. Check with the customer or reschedule.',
       link: '/portal/sales/craig',
       metadata: { saleId: 'craig', daysOverdue: 69, alertCount: 1 },
     });
@@ -226,7 +226,7 @@ describe('runOverdueInstallAlerts', () => {
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'cooper',
-        message: 'Craig T. was due Aug 1 (76 days). Check with the customer or reschedule.',
+        message: 'Craig T. was due Aug 1, 76 days ago. Check with the customer or reschedule.',
         metadata: { saleId: 'craig', daysOverdue: 76, alertCount: 2 },
       })
     );

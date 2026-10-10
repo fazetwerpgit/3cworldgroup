@@ -241,7 +241,7 @@ describe('copy', () => {
 
   it('tells the rep who, when it was due, and how long, with no money', () => {
     expect(overdueRepMessage({ customer: 'Craig T.', dueDay: '2026-08-01', daysOverdue: 69 })).toBe(
-      'Craig T. was due Aug 1 (69 days). Check with the customer or reschedule.'
+      'Craig T. was due Aug 1, 69 days ago. Check with the customer or reschedule.'
     );
   });
 
