@@ -15,39 +15,6 @@
 }
 
 /* --------------------------------------------------------------------------
-   0 — Page head
-   --------------------------------------------------------------------------
-   The eyebrow states the constraint ("hiring in selected markets"), so the
-   quiet link that answers it shares the eyebrow's line rather than opening a
-   fourth block under the two buttons. The kit's `pageHeadEyebrow` carries the
-   space under the line, so the row takes that margin over and the paragraph
-   inside it gives its own up.
-   -------------------------------------------------------------------------- */
-
-.headEyebrow {
-  align-items: baseline;
-  column-gap: clamp(1rem, 2.4vw, 1.75rem);
-  display: flex;
-  flex-wrap: wrap;
-  /* The kit's eyebrow spends 1.1rem under itself. The row spends a little more
-     because the link brings a drawn underline with it: at 1.1rem that rule sat
-     close enough to the display line below to read as the headline's own. */
-  margin-bottom: 1.35rem;
-  row-gap: 0.15rem;
-}
-
-.headEyebrow p {
-  margin-bottom: 0;
-}
-
-/* One step under the eyebrow's own scale: the link is the quieter half of the
-   line, and at the kit's 1.04rem it competed with the lime it sits beside. */
-.headMarketsLink {
-  font-size: 0.95rem;
-  letter-spacing: 0.06em;
-}
-
-/* --------------------------------------------------------------------------
    1 — The opportunity at a glance
    --------------------------------------------------------------------------
    Round 16 (owner): the neighbourhood plate that stood beside these terms is
@@ -498,4 +465,43 @@
       var(--ink-deep) 100%
     );
   }
+}
+
+/* --------------------------------------------------------------------------
+   5 — Hiring in (this page's head) and the market openings
+   --------------------------------------------------------------------------
+   /opportunities/[slug] is built from this page's own pieces — the
+   photographic head, then the glance grid on paper — so the little it adds
+   lives here beside them rather than in a second stylesheet.
+   -------------------------------------------------------------------------- */
+
+/* The market list under the head's buttons: body copy on ink, the links in the
+   kit's inline style, so it reads as a sentence rather than a fourth button. */
+.headMarkets {
+  color: var(--on-ink-dim);
+  font-size: 0.98rem;
+  line-height: 1.6;
+  margin-top: 1.35rem;
+  text-wrap: pretty;
+}
+
+.headMarkets a {
+  color: var(--on-ink);
+}
+
+/* The role is a longer line than any authored head ("FIBER INTERNET SALES
+   REP"), so the market heads run one step under the kit's display size. */
+.marketTitle {
+  font-size: clamp(3rem, 5.6vw, 6rem);
+}
+
+/* Apply again under the terms, with the way back beside it. The rule above it
+   closes the grid, which on this page has no stages head to end on. */
+.marketFoot {
+  align-items: center;
+  border-top: 1px solid var(--rule-ink);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem clamp(1.25rem, 3vw, 2.25rem);
+  padding: clamp(1.5rem, 3vw, 2.25rem) 0 calc(var(--section-pad) * 1.5);
 }

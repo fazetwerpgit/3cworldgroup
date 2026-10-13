@@ -3,11 +3,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import { APPLY_HREF } from "../../_cinematic/nav";
+import { marketJobPath } from "../../_cinematic/marketJobs";
+import { MARKETS } from "../../_cinematic/markets";
 import kit from "../../_cinematic/cinematic.module.css";
 import styles from "./careers.module.css";
 
 export const metadata: Metadata = {
-  title: "Career Path | 3C World Group",
+  title: "Fiber Internet Sales Jobs, Now Hiring | 3C World Group",
   description:
     "Build a career with 3C World Group through training, support, and a clear path forward.",
   alternates: { canonical: "/opportunities" },
@@ -114,20 +116,7 @@ export default function OpportunitiesPage() {
 
         <div className={kit.pageHeadInner}>
           <div className={kit.pageHeadCol}>
-            {/*
-              The eyebrow names the constraint, so the link that answers it sits
-              on the same line. The market list itself is the homepage's
-              explorer — this page never had a markets section — so the link
-              crosses to it rather than pointing at an anchor that does not
-              exist here.
-            */}
-            <div className={styles.headEyebrow}>
-              <p className={kit.pageHeadEyebrow}>Hiring in selected markets</p>
-              <Link href="/#markets" className={`${kit.quietLink} ${styles.headMarketsLink}`}>
-                See available markets
-                <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
-              </Link>
-            </div>
+            <p className={kit.pageHeadEyebrow}>Now hiring fiber sales reps</p>
             <h1 className={kit.pageHeadTitle}>
               Build a career.
               <span className={kit.pageHeadLime}>Not just a job.</span>
@@ -145,6 +134,22 @@ export default function OpportunitiesPage() {
                 How the role grows
               </a>
             </div>
+            {/*
+              Each market's opening has its own page. Named here as a sentence,
+              in the kit's inline link style, so it sits under the buttons
+              without competing with them.
+            */}
+            <p className={styles.headMarkets}>
+              Hiring in:{" "}
+              {MARKETS.map((market, index) => (
+                <span key={market.slug}>
+                  {index > 0 ? " · " : null}
+                  <Link href={marketJobPath(market.slug)} className={kit.inlineLink}>
+                    {market.name}
+                  </Link>
+                </span>
+              ))}
+            </p>
           </div>
         </div>
       </header>

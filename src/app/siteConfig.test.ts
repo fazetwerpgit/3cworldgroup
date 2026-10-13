@@ -16,6 +16,9 @@ describe('robots and sitemap', () => {
         'https://www.3cworldgroup.com/contact',
         'https://www.3cworldgroup.com/privacy',
         'https://www.3cworldgroup.com/terms',
+        'https://www.3cworldgroup.com/opportunities/dallas',
+        'https://www.3cworldgroup.com/opportunities/southern-california',
+        'https://www.3cworldgroup.com/opportunities/grand-rapids',
       ]),
     );
     expect(urls.some((url) => /\/(portal|onboard|api|culture|careers)\b/.test(url))).toBe(false);
