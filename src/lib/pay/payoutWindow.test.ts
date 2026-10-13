@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SaleProduct } from '@/types';
 import {
+  defaultPayoutIndex,
   formatPayoutWindow,
+  isPastWindow,
   isTFiberSale,
   nextPayout,
+  payoutsInMonth,
+  upcomingPayouts,
   payoutWindowForInstall,
   payoutLabelForDraft,
   payoutWindowForSale,
@@ -131,6 +135,128 @@ describe('nextPayout', () => {
   it('sums whole-dollar rows, so two $68 installs read $136', () => {
     const result = nextPayout([tfiber(d(2026, 9, 16)), tfiber(d(2026, 9, 17))], { tfiber: { 'tfiber-1gig': 67.5 } }, now);
     expect(result!.amount).toBe(136);
+  });
+});
+
+describe('upcomingPayouts', () => {
+  const now = d(2026, 9, 22);
+
+  it('lists every window not yet over, earliest first, each with its own install week', () => {
+    const result = upcomingPayouts(
+      [
+        tfiber(d(2026, 9, 25)), // Oct 7–11
+        tfiber(d(2026, 9, 2)), // Sep 14–18: over, left out
+        tfiber(d(2026, 10, 3), 'tfiber-500'), // Oct 14–18
+        tfiber(d(2026, 9, 16)), // Sep 28–Oct 3
+        tfiber(d(2026, 9, 30)), // Oct 7–11
+        att(d(2026, 9, 16)), // no schedule
+      ],
+      rates,
+      now
+    );
+    expect(result.map((payout) => formatPayoutWindow(payout.window))).toEqual(['Sep 28–Oct 3', 'Oct 7–11', 'Oct 14–18']);
+    expect(result.map((payout) => [payout.count, payout.amount, payout.scheduled])).toEqual([
+      [1, 130, 0],
+      [2, 260, 2],
+      [1, 110, 1],
+    ]);
+  });
+
+  it('keeps a window ending today and drops one that ended yesterday', () => {
+    expect(upcomingPayouts([tfiber(d(2026, 9, 10))], rates, d(2026, 9, 25))).toHaveLength(1);
+    expect(upcomingPayouts([tfiber(d(2026, 9, 10))], rates, d(2026, 9, 26))).toEqual([]);
+  });
+
+  it('nulls every amount without a pay plan; an unrated plan adds $0, as its row reads', () => {
+    expect(upcomingPayouts([tfiber(d(2026, 9, 16)), tfiber(d(2026, 9, 23))], null, now).map((p) => p.amount)).toEqual([
+      null,
+      null,
+    ]);
+    const result = upcomingPayouts([tfiber(d(2026, 9, 16)), tfiber(d(2026, 9, 17), 'tfiber-unknown')], rates, now);
+    expect(result[0]).toMatchObject({ amount: 130, count: 2 });
+  });
+
+  it('is what nextPayout reads its first entry from', () => {
+    const installs = [tfiber(d(2026, 9, 30)), tfiber(d(2026, 9, 16)), tfiber(d(2026, 9, 1))];
+    expect(nextPayout(installs, rates, now)).toEqual(upcomingPayouts(installs, rates, now)[0]);
+    expect(nextPayout([tfiber(d(2026, 9, 1))], rates, now)).toBeNull();
+  });
+});
+
+describe('payoutsInMonth', () => {
+  const october = { year: 2026, month: 9 };
+  const now = d(2026, 10, 13);
+
+  it('lists the windows that start paying in the month, past ones included, from sales of any month', () => {
+    const result = payoutsInMonth(
+      [
+        tfiber(d(2026, 9, 16)), // Sep 28–Oct 3: starts in September, not October
+        tfiber(d(2026, 9, 25)), // Oct 7–11 (a September install), past
+        tfiber(d(2026, 10, 2)), // Oct 14–18
+        tfiber(d(2026, 10, 18)), // Oct 28–Nov 3: October, though it ends in November
+        tfiber(d(2026, 10, 24)), // Nov 7–11: November
+      ],
+      rates,
+      october,
+      now
+    );
+    expect(result.map((payout) => [formatPayoutWindow(payout.window), payout.past])).toEqual([
+      ['Oct 7–11', true],
+      ['Oct 14–18', false],
+      ['Oct 28–Nov 3', false],
+    ]);
+    expect(result.map((payout) => payout.count)).toEqual([1, 1, 1]);
+    expect(payoutsInMonth([tfiber(d(2026, 9, 16))], rates, { year: 2026, month: 8 }, now)).toHaveLength(1);
+  });
+
+  it('moves a rescheduled install out of its old window and into the new one', () => {
+    const pushed = { ...tfiber(d(2026, 10, 9)), installDatePreviousDate: d(2026, 10, 3) };
+    const stays = tfiber(d(2026, 10, 4));
+    const result = payoutsInMonth([pushed, stays], rates, october, now);
+    expect(result.map((payout) => [formatPayoutWindow(payout.window), payout.count])).toEqual([
+      ['Oct 14–18', 1],
+      ['Oct 21–25', 1],
+    ]);
+    expect(result[0].sales).toEqual([stays]);
+    expect(result[0].movedIn).toEqual([]);
+    expect(result[1].sales).toEqual([pushed]);
+    expect(result[1].movedIn).toEqual([pushed]);
+  });
+
+  it('flags only moves from an EARLIER window', () => {
+    const sameWeek = { ...tfiber(d(2026, 10, 5)), installDatePreviousDate: d(2026, 10, 2) };
+    const pulledIn = { ...tfiber(d(2026, 10, 5)), installDatePreviousDate: d(2026, 10, 12) };
+    const neverDated = { ...tfiber(d(2026, 10, 5)), installDatePreviousDate: null };
+    const [window] = payoutsInMonth([sameWeek, pulledIn, neverDated], rates, october, now);
+    expect(window.count).toBe(3);
+    expect(window.movedIn).toEqual([]);
+  });
+
+  it('is empty for a month with no T-Fiber payouts', () => {
+    expect(payoutsInMonth([att(d(2026, 10, 2)), tfiber(undefined)], rates, october, now)).toEqual([]);
+  });
+});
+
+describe('defaultPayoutIndex', () => {
+  it('opens on the next window not yet over', () => {
+    expect(defaultPayoutIndex([{ past: true }, { past: false }, { past: false }])).toBe(1);
+  });
+  it('opens on the last window of a month that is over', () => {
+    expect(defaultPayoutIndex([{ past: true }, { past: true }, { past: true }])).toBe(2);
+  });
+  it('opens on the first window of a month still ahead', () => {
+    expect(defaultPayoutIndex([{ past: false }, { past: false }])).toBe(0);
+  });
+  it('is 0 with no windows', () => {
+    expect(defaultPayoutIndex([])).toBe(0);
+  });
+});
+
+describe('isPastWindow', () => {
+  it('is past only once the last day is behind us', () => {
+    const window = payoutWindowForInstall(d(2026, 10, 2)); // Oct 14–18
+    expect(isPastWindow(window, new Date(2026, 9, 18, 23, 59))).toBe(false);
+    expect(isPastWindow(window, new Date(2026, 9, 19, 0, 1))).toBe(true);
   });
 });
 

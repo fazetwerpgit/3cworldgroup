@@ -17,8 +17,8 @@ import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { useAuth } from '@/contexts/AuthContext';
 import { isOwner } from '@/types';
-import { datedSales } from '@/lib/pay/payGroups';
-import { nextPayout } from '@/lib/pay/payoutWindow';
+import { datedSales, undatedSales } from '@/lib/pay/payGroups';
+import { isTFiberSale, payoutsInMonth } from '@/lib/pay/payoutWindow';
 import { countedSales } from '@/lib/sales/installBucket';
 import { monthFromParam } from '@/lib/sales/loggedSale';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
@@ -258,12 +258,19 @@ function SalesContent() {
     () => countedSales(mtdSales, fiberBySale),
     [fiberBySale, mtdSales]
   );
-  // Est. pay is PAY-PERIOD based (owner, 2026-09-22): the next T-Fiber payout
-  // window, live from each sale's current install date — scheduled installs
-  // included. It is "now", not the picked month; the window says which period.
-  const upcoming = useMemo(
-    () => nextPayout(datedSales(sales, fiberBySale), hasPlan ? rates : null),
-    [fiberBySale, hasPlan, rates, sales]
+  // Est. pay is PAY-PERIOD based (owner, 2026-09-22): T-Fiber payout windows,
+  // live from each sale's current install date (carrier moves applied above) —
+  // scheduled installs included, cancelled ones out. The card steps through the
+  // windows that PAY in the picked month (owner, 2026-10-13), filled from sales
+  // of any month, and opens on the next one not yet over.
+  const monthPayouts = useMemo(
+    () => payoutsInMonth(datedSales(sales, fiberBySale), hasPlan ? rates : null, month),
+    [fiberBySale, hasPlan, month, rates, sales]
+  );
+  // T-Fiber sales with no install date have no window yet; the card says so.
+  const undatedTFiber = useMemo(
+    () => undatedSales(sales, fiberBySale).filter(isTFiberSale).length,
+    [fiberBySale, sales]
   );
 
   const booting = !fetched || (loading && sales.length === 0);
@@ -374,7 +381,9 @@ function SalesContent() {
               (desktop) or under it (phone) holds the record. */}
           <div className={x.split}>
             <PayoutCard
-              upcoming={upcoming}
+              payouts={monthPayouts}
+              resetKey={`${month.year}-${month.month}`}
+              undatedCount={undatedTFiber}
               saleCount={payableMtd.length}
               monthName={monthName}
               hasPlan={hasPlan}

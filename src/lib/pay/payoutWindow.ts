@@ -118,26 +118,29 @@ function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 }
 
+type PayoutSale = Pick<Sale, 'products' | 'installDate'>;
+
+interface WindowGroup<T> extends UpcomingPayout {
+  sales: T[];
+}
+
 /**
- * The next upcoming payout: the earliest window that ends today or later and
- * has T-Fiber sales in it. `installs` must already be the rep's counted sales
- * (cancelled and carrier-cancelled removed); scheduled installs count toward
- * their window and are tallied in `scheduled`. Anything that is not T-Fiber, or
- * has no install date, is ignored here.
+ * Every payout window the dated T-Fiber `installs` fall into, earliest first,
+ * with the same per-window math everywhere: whole dollars per sale (as each
+ * Pay row shows it, so a window's total matches its rows), the install count,
+ * how many are still scheduled, and a null amount when any rate is missing.
  */
-export function nextPayout(
-  installs: Array<Pick<Sale, 'products' | 'installDate'>>,
+function groupByWindow<T extends PayoutSale>(
+  installs: T[],
   rates: CompPlanCompanyRates | null | undefined,
-  now: Date = new Date()
-): UpcomingPayout | null {
-  const today = startOfDay(now);
-  const byWindow = new Map<number, UpcomingPayout>();
+  now: Date
+): Array<WindowGroup<T>> {
+  const byWindow = new Map<number, WindowGroup<T>>();
 
   for (const sale of installs) {
     const window = payoutWindowForSale(sale, true);
-    if (!window || startOfDay(window.end) < today) continue;
+    if (!window) continue;
     const key = window.start.getTime();
-    // Whole dollars per sale, as each Pay row shows it, so the card matches its window's rows.
     const raw = expectedPayForSale(sale, rates);
     const pay = raw === null ? null : Math.round(raw);
     const scheduled = (toDate(sale.installDate as Date | string | undefined)?.getTime() ?? 0) > now.getTime() ? 1 : 0;
@@ -146,16 +149,110 @@ export function nextPayout(
       entry.count += 1;
       entry.scheduled += scheduled;
       entry.amount = entry.amount === null || pay === null ? null : entry.amount + pay;
+      entry.sales.push(sale);
     } else {
-      byWindow.set(key, { window, amount: pay, count: 1, scheduled });
+      byWindow.set(key, { window, amount: pay, count: 1, scheduled, sales: [sale] });
     }
   }
 
-  let soonest: UpcomingPayout | null = null;
-  for (const entry of byWindow.values()) {
-    if (!soonest || entry.window.start.getTime() < soonest.window.start.getTime()) soonest = entry;
-  }
-  return soonest;
+  return [...byWindow.values()].sort((a, b) => a.window.start.getTime() - b.window.start.getTime());
+}
+
+/** True once the window's last day is behind `now` (a window ending today is still upcoming). */
+export function isPastWindow(window: Pick<PayoutWindow, 'end'>, now: Date = new Date()): boolean {
+  return startOfDay(window.end) < startOfDay(now);
+}
+
+const asUpcoming = ({ window, amount, count, scheduled }: UpcomingPayout): UpcomingPayout => ({
+  window,
+  amount,
+  count,
+  scheduled,
+});
+
+/**
+ * Every upcoming payout, earliest first: each window that ends today or later
+ * and has T-Fiber sales in it. `installs` must already be the rep's counted
+ * sales (cancelled and carrier-cancelled removed); scheduled installs count
+ * toward their window and are tallied in `scheduled`. Anything that is not
+ * T-Fiber, or has no install date, is ignored here.
+ */
+export function upcomingPayouts(
+  installs: PayoutSale[],
+  rates: CompPlanCompanyRates | null | undefined,
+  now: Date = new Date()
+): UpcomingPayout[] {
+  return groupByWindow(installs, rates, now)
+    .filter((entry) => !isPastWindow(entry.window, now))
+    .map(asUpcoming);
+}
+
+/** The next upcoming payout (see upcomingPayouts), or null when none is coming. */
+export function nextPayout(
+  installs: PayoutSale[],
+  rates: CompPlanCompanyRates | null | undefined,
+  now: Date = new Date()
+): UpcomingPayout | null {
+  return upcomingPayouts(installs, rates, now)[0] ?? null;
+}
+
+/** A calendar month, 0-indexed like Date (the Sales page's MonthKey). */
+export interface PayoutMonth {
+  year: number;
+  month: number;
+}
+
+type MonthPayoutSale = PayoutSale & Partial<Pick<Sale, 'installDatePreviousDate'>>;
+
+export interface MonthPayout<T extends MonthPayoutSale = MonthPayoutSale> extends UpcomingPayout {
+  /** The window's last day is behind us. Still an estimate: never "paid". */
+  past: boolean;
+  /** The installs paid in this window. */
+  sales: T[];
+  /**
+   * Installs whose install date was moved here from an EARLIER window: the
+   * date before the most recent change (installDatePreviousDate, stamped by
+   * the rep's edit, an admin's edit and the carrier sync) paid in an earlier
+   * window than the date the sale stands on now.
+   */
+  movedIn: T[];
+}
+
+/**
+ * The payouts that pay in `month`, earliest first, past ones included: each
+ * window whose payout range STARTS in that month (Sep 28–Oct 3 belongs to
+ * September, Oct 7–11 to October). Contents are the rep's dated installs from
+ * any sale month, on the date they stand on now, so a rescheduled install sits
+ * in the window it moved to and has left the one it moved from. Only windows
+ * with installs in them are listed.
+ */
+export function payoutsInMonth<T extends MonthPayoutSale>(
+  installs: T[],
+  rates: CompPlanCompanyRates | null | undefined,
+  month: PayoutMonth,
+  now: Date = new Date()
+): Array<MonthPayout<T>> {
+  return groupByWindow(installs, rates, now)
+    .filter(
+      ({ window }) => window.start.getFullYear() === month.year && window.start.getMonth() === month.month
+    )
+    .map((entry) => ({
+      ...entry,
+      past: isPastWindow(entry.window, now),
+      movedIn: entry.sales.filter((sale) => {
+        const previous = toDate(sale.installDatePreviousDate as Date | string | null | undefined);
+        return !!previous && payoutWindowForInstall(previous).start.getTime() < entry.window.start.getTime();
+      }),
+    }));
+}
+
+/**
+ * Which of a month's payouts the card opens on: the next one not yet over;
+ * when the whole month is behind us, its last; when it is all ahead, its first.
+ */
+export function defaultPayoutIndex(payouts: Array<Pick<MonthPayout, 'past'>>): number {
+  const next = payouts.findIndex((payout) => !payout.past);
+  return next === -1 ? Math.max(0, payouts.length - 1) : next;
 }
 
 const MONTH = new Intl.DateTimeFormat('en-US', { month: 'short' });

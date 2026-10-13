@@ -684,6 +684,50 @@
   font-weight: 600;
 }
 
+/* "Est. payout · Oct 14–18" with ‹ 2 of 4 › beside it: the month's payouts,
+   one at a time. The stepper keeps 44px taps; its negative margins keep the
+   kicker row as short as the kicker alone. */
+.payHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.payHead > p {
+  min-width: 0;
+}
+
+.payWhen {
+  white-space: nowrap;
+}
+
+.payStep {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin: -15px -12px -15px 0;
+}
+
+.payStepPos {
+  min-width: 2.75em;
+  color: var(--c-text-2);
+  font-size: var(--t-min);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Muted footnotes: sales moved into the shown payout, undated sales. */
+.wellNote,
+.payNote {
+  margin: 10px 0 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
 /* A recessed well inside the raised card: the installs in this payout. */
 .moneyWell {
   margin-top: 18px;

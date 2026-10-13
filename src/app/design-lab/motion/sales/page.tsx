@@ -6,7 +6,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { SalesTable, SalesViewTabs } from '@/components/sales/SalesTable';
 import { PayoutCard } from '@/app/portal/sales/PayoutCard';
 import { PayHelpSheet } from '@/components/portal/rep/PayHelpSheet';
-import { nextPayout } from '@/lib/pay/payoutWindow';
+import { payoutsInMonth } from '@/lib/pay/payoutWindow';
 import { datedSales } from '@/lib/pay/payGroups';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import type { Sale } from '@/types';
@@ -92,7 +92,10 @@ function Harness() {
     []
   );
   const bySale = useMemo(() => matchFiberOrdersToSales(SALES, ORDERS), []);
-  const upcoming = useMemo(() => nextPayout(datedSales(SALES, bySale), noPlan ? null : rates, new Date(2026, 8, 23, 12)), [bySale, noPlan]);
+  const payouts = useMemo(
+    () => payoutsInMonth(datedSales(SALES, bySale), noPlan ? null : rates, { year: 2026, month: 8 }, new Date(2026, 8, 23, 12)),
+    [bySale, noPlan]
+  );
   return (
     <div className={s.root} data-shell="rep">
       <main className={s.scroller} id="rep-main">
@@ -108,7 +111,8 @@ function Harness() {
             </header>
             <div className={x.split}>
               <PayoutCard
-                upcoming={upcoming}
+                payouts={payouts}
+                resetKey="2026-8"
                 saleCount={10}
                 monthName="September"
                 hasPlan={!noPlan}
