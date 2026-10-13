@@ -143,6 +143,7 @@ export function OpsQueuesPanel({
                   <span className={`${h.count} ${card.count > 0 ? h.countHot : h.countNone}`}>{card.count}</span>
                   <span className={h.queueText}>
                     <strong className={h.queueName}>{card.label}</strong>
+                    {card.detail && card.count > 0 ? <span className={h.queueDetail}>{card.detail}</span> : null}
                     {card.count > 0 ? (
                       <span className={h.queuePhoneMeta}>
                         {[

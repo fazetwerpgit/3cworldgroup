@@ -259,9 +259,13 @@ function Markets({ data }: { data: MarketsSummary }) {
 
 // Needs attention is the onboarding work (the shared queue panel) plus the
 // owner's company checks: installs the carrier still has open 3+ days past
-// their day (the same rule that alerts the reps), and stuck onboarding.
+// their day (the same rule that alerts the reps), sales called out in chat
+// today but not logged (who, and how many), live carrier orders from the last
+// 30 days nobody logged, and stuck onboarding.
 const COMPANY_CHECKS: Array<{ key: ProblemKey; label: string; href: string }> = [
   { key: 'overdueInstalls', label: 'Installs overdue 3+ days', href: '/portal/sales' },
+  { key: 'calloutsNotLogged', label: 'Called out, not logged today', href: '/portal/sales' },
+  { key: 'unloggedOrders', label: 'Orders not in the portal', href: '/portal/sales' },
   { key: 'stalledOnboarding', label: 'Stuck in onboarding 3+ days', href: '/portal/admin/onboarding' },
 ];
 
@@ -280,6 +284,7 @@ function companyRows(problems: Section<ProblemRow[]>): QueueCard[] {
       count: row?.count ?? 0,
       oldestWaitMs: typeof row?.oldestDays === 'number' ? row.oldestDays * DAY_MS : null,
       newToday: null,
+      detail: row?.reps?.length ? row.reps.map((rep) => `${rep.name} ${rep.count}`).join(' · ') : null,
       error: problems.status === 'error',
     };
   });

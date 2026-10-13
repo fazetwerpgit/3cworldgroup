@@ -9,12 +9,14 @@ import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
 import { syncInstallDatesFromOrders, type OrderSale } from '@/lib/sales/installDateSync';
 import { readStoredOrders, sendCarrierNotices } from '@/lib/fiberReport/carrierNotices';
 import { runOverdueInstallAlerts } from '@/lib/alerts/installOverdueAlerts';
+import { runUnloggedOrderNudges } from '@/lib/alerts/unloggedOrderNudges';
 import type {
   CarrierNoticeCounts,
   FiberOrder,
   FiberReportImport,
   InstallDateSyncCounts,
   OverdueAlertCounts,
+  UnloggedOrderNudgeCounts,
 } from '@/types/fiberOrder';
 
 export const maxDuration = 60;
@@ -39,7 +41,7 @@ function importLog(
   filename: string,
   fromEmail: string,
   subject: string,
-  values: Partial<Pick<FiberReportImport, 'rowCounts' | 'upserted' | 'matchedReps' | 'unmatchedRepNames' | 'error' | 'installDateSync' | 'carrierNotices' | 'overdueAlerts'>>
+  values: Partial<Pick<FiberReportImport, 'rowCounts' | 'upserted' | 'matchedReps' | 'unmatchedRepNames' | 'error' | 'installDateSync' | 'carrierNotices' | 'overdueAlerts' | 'unloggedOrderNudges'>>
 ): FiberReportImport {
   return {
     receivedAt,
@@ -54,6 +56,7 @@ function importLog(
     installDateSync: values.installDateSync ?? null,
     carrierNotices: values.carrierNotices ?? null,
     overdueAlerts: values.overdueAlerts ?? null,
+    unloggedOrderNudges: values.unloggedOrderNudges ?? null,
   };
 }
 
@@ -270,6 +273,7 @@ export async function POST(request: NextRequest) {
     let installDateSync: InstallDateSyncCounts | null = null;
     let carrierNotices: CarrierNoticeCounts | null = null;
     let overdueAlerts: OverdueAlertCounts | null = null;
+    let unloggedOrderNudges: UnloggedOrderNudgeCounts | null = null;
     // A newer report may have claimed the stamp while this one was upserting.
     // Its sync and notices are the ones that count; running this older one's
     // after them would move dates back and tell reps twice.
@@ -312,6 +316,16 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.error('[inbound-report] overdue install alerts failed', error);
       }
+
+      // Live carrier orders a rep never logged (the board's "Not in the
+      // portal", last 30 days): the rep is told once per order, one push per
+      // rep. Read after the date sync filled order numbers, so a sale it just
+      // joined is not told (claims in unloggedOrderNudges).
+      try {
+        unloggedOrderNudges = (await runUnloggedOrderNudges({ db: adminDb, now: new Date() })).counts;
+      } catch (error) {
+        console.error('[inbound-report] unlogged order nudges failed', error);
+      }
     }
 
     await statusRef.set(
@@ -332,6 +346,7 @@ export async function POST(request: NextRequest) {
         installDateSync,
         carrierNotices,
         overdueAlerts,
+        unloggedOrderNudges,
       })
     );
 

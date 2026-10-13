@@ -4,6 +4,8 @@ import { periodBounds } from '@/lib/leaderboard/periods';
 import { carrierInstallDate } from '@/lib/sales/carrierInstall';
 import { buildMergedBook } from '@/lib/sales/mergeBook';
 import { overdueSales } from '@/lib/sales/installOverdue';
+import { calloutDays, shortRepName, type CalloutMessage } from '@/lib/sales/calloutNudge';
+import { unloggedOrders } from '@/lib/sales/unloggedOrders';
 import { saleCommission, saleRevenue } from '@/lib/owner/revenue';
 import { summarizeMarkets, type MarketsSummary } from '@/lib/owner/markets';
 
@@ -17,7 +19,9 @@ import { summarizeMarkets, type MarketsSummary } from '@/lib/owner/markets';
 // is a statement of what the carrier actually paid.
 //
 // Aggregates only: the output carries counts, dollars and links — never a
-// customer, a rep's name, or anything from userSensitive.
+// customer or anything from userSensitive. The one rep name it carries is the
+// owner's ask: "Called out, not logged today" lists who (first name, last
+// initial) with how many.
 
 // ---------------------------------------------------------------- periods
 
@@ -119,6 +123,8 @@ export interface OwnerSummarySource {
   countStalledOnboarding(): Promise<number>;
   countCreated(collection: 'applications' | 'managerInterviews', window: Window): Promise<number>;
   loadActivatedSince(since: Date): Promise<ActivatedUser[]>;
+  /** One Chicago day (YYYY-MM-DD) of All Company chat, for the callout check. */
+  loadDayMessages(day: string): Promise<CalloutMessage[]>;
 }
 
 // ---------------------------------------------------------------- book
@@ -137,6 +143,8 @@ export interface CompanyBook {
   missingInstallDate: number;
   /** Installs the carrier still has open 3+ days past their day (lib/sales/installOverdue). */
   overdueInstalls: { count: number; oldestDays: number | null };
+  /** Live carrier orders from the last 30 days a rep never logged (the reps' backstop push, lib/alerts/unloggedOrderNudges). */
+  unloggedOrders: number;
   orders: FiberOrder[];
 }
 
@@ -167,7 +175,13 @@ export function companyBook(
   const overdue = overdueSales(book.rows, now, reportAsOf);
   const overdueInstalls = { count: overdue.length, oldestDays: overdue[0]?.daysOverdue ?? null };
 
-  return { installs, missingInstallDate, overdueInstalls, orders };
+  return {
+    installs,
+    missingInstallDate,
+    overdueInstalls,
+    unloggedOrders: unloggedOrders(book.rows, chicagoDayKey(now)).length,
+    orders,
+  };
 }
 
 // ---------------------------------------------------------------- money
@@ -272,6 +286,8 @@ export function summarizeMoney(priced: PricedInstall[], periods: OwnerPeriods): 
 
 export type ProblemKey =
   | 'overdueInstalls'
+  | 'calloutsNotLogged'
+  | 'unloggedOrders'
   | 'carrierCancellations'
   | 'payrollDisputes'
   | 'stalledOnboarding'
@@ -288,11 +304,15 @@ export interface ProblemRow {
   href: string;
   /** How long the oldest item has waited, in days, where the check knows (overdue installs). */
   oldestDays?: number | null;
+  /** Who, where the check names reps (callouts not logged): "Miles R." and how many. */
+  reps?: Array<{ name: string; count: number }>;
 }
 
 /** Display order: money at risk first, then people, then requests. */
 export const PROBLEM_HREFS: Record<ProblemKey, string> = {
   overdueInstalls: '/portal/sales',
+  calloutsNotLogged: '/portal/sales',
+  unloggedOrders: '/portal/sales',
   carrierCancellations: '/portal/sales',
   payrollDisputes: '/portal/admin/requests?type=payroll-disputes',
   stalledOnboarding: '/portal/admin/onboarding',
@@ -332,14 +352,36 @@ export function carrierCancellationsIn(orders: FiberOrder[], window: Window): nu
 
 export function problemRows(
   counts: Record<ProblemKey, number>,
-  oldestDays: Partial<Record<ProblemKey, number | null>> = {}
+  oldestDays: Partial<Record<ProblemKey, number | null>> = {},
+  reps: Partial<Record<ProblemKey, ProblemRow['reps']>> = {}
 ): ProblemRow[] {
   return (Object.keys(PROBLEM_HREFS) as ProblemKey[]).map((key) => ({
     key,
     count: counts[key],
     href: PROBLEM_HREFS[key],
     ...(key in oldestDays ? { oldestDays: oldestDays[key] ?? null } : {}),
+    ...(reps[key] ? { reps: reps[key] } : {}),
   }));
+}
+
+/**
+ * Reps who called out more sales in All Company today than they logged for
+ * today (lib/sales/calloutNudge), most missing first. The count is the sales
+ * still missing, summed.
+ */
+export function calloutsNotLogged(
+  messages: CalloutMessage[],
+  sales: Sale[],
+  now: Date
+): { count: number; reps: Array<{ name: string; count: number }> } {
+  const today = chicagoDayKey(now);
+  const short = calloutDays(messages, sales).filter((entry) => entry.day === today && entry.gap > 0);
+  return {
+    count: short.reduce((sum, entry) => sum + entry.gap, 0),
+    reps: short
+      .map((entry) => ({ name: shortRepName(entry.repName) || 'A rep', count: entry.gap }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+  };
 }
 
 // ---------------------------------------------------------------- recruiting
@@ -413,7 +455,7 @@ export async function buildMarkets(source: OwnerSummarySource, periods: OwnerPer
 }
 
 export async function buildProblems(source: OwnerSummarySource, periods: OwnerPeriods): Promise<ProblemRow[]> {
-  const [bookData, payrollDisputes, expediteOrders, leadsRequests, bugReports, pendingSignups, stalledOnboarding] =
+  const [bookData, payrollDisputes, expediteOrders, leadsRequests, bugReports, pendingSignups, stalledOnboarding, messages] =
     await Promise.all([
       source.loadBook(),
       source.countOpen('payrollDisputes'),
@@ -422,11 +464,15 @@ export async function buildProblems(source: OwnerSummarySource, periods: OwnerPe
       source.countOpen('bugReports'),
       source.countPendingSignups(),
       source.countStalledOnboarding(),
+      source.loadDayMessages(chicagoDayKey(periods.now)),
     ]);
   const book = companyBook(bookData.sales, bookData.orders, periods.now, bookData.reportAsOf);
+  const callouts = calloutsNotLogged(messages, bookData.sales, periods.now);
   return problemRows(
     {
       overdueInstalls: book.overdueInstalls.count,
+      calloutsNotLogged: callouts.count,
+      unloggedOrders: book.unloggedOrders,
       carrierCancellations: carrierCancellationsIn(book.orders, { start: periods.thisWeek.start, end: periods.now }),
       payrollDisputes,
       stalledOnboarding,
@@ -436,7 +482,8 @@ export async function buildProblems(source: OwnerSummarySource, periods: OwnerPe
       leadsRequests,
       bugReports,
     },
-    { overdueInstalls: book.overdueInstalls.oldestDays }
+    { overdueInstalls: book.overdueInstalls.oldestDays },
+    { calloutsNotLogged: callouts.reps }
   );
 }
 

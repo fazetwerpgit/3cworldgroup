@@ -13,6 +13,7 @@ const {
   readStoredMock,
   sendNoticesMock,
   overdueMock,
+  unloggedMock,
   runTransaction,
 } = vi.hoisted(() => {
   const addMock = vi.fn();
@@ -25,6 +26,7 @@ const {
   const readStoredMock = vi.fn();
   const sendNoticesMock = vi.fn();
   const overdueMock = vi.fn();
+  const unloggedMock = vi.fn();
   const collectionMock = vi.fn((name: string) => ({
     add: addMock,
     get: collectionGetMock,
@@ -59,6 +61,7 @@ const {
     readStoredMock,
     sendNoticesMock,
     overdueMock,
+    unloggedMock,
     runTransaction,
   };
 });
@@ -82,6 +85,9 @@ vi.mock('@/lib/fiberReport/carrierNotices', () => ({
 }));
 vi.mock('@/lib/alerts/installOverdueAlerts', () => ({
   runOverdueInstallAlerts: overdueMock,
+}));
+vi.mock('@/lib/alerts/unloggedOrderNudges', () => ({
+  runUnloggedOrderNudges: unloggedMock,
 }));
 
 import { POST } from './route';
@@ -109,6 +115,16 @@ const OVERDUE_COUNTS = {
   errors: 0,
 };
 
+const UNLOGGED_COUNTS = {
+  dryRun: false,
+  found: 3,
+  alreadySent: 0,
+  skippedInactiveRep: 0,
+  ordersTold: 3,
+  repsTold: 1,
+  errors: 0,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.POSTMARK_INBOUND_TOKEN = 'test-token';
@@ -121,6 +137,7 @@ beforeEach(() => {
   readStoredMock.mockResolvedValue(new Map());
   sendNoticesMock.mockResolvedValue({ found: 0, alreadySent: 0, sent: 0, summarized: 0, errors: 0 });
   overdueMock.mockResolvedValue({ counts: OVERDUE_COUNTS, repAlerts: [], ownerAlert: null, overdue: [] });
+  unloggedMock.mockResolvedValue({ counts: UNLOGGED_COUNTS, pushes: [], orders: [] });
 });
 
 /** One parsed order, posted as a report with an xlsx attachment. */
@@ -338,6 +355,39 @@ describe('POST /api/webhooks/inbound-report install-date sync', () => {
     expect(addMock).toHaveBeenCalledWith(expect.objectContaining({ error: null, overdueAlerts: OVERDUE_COUNTS }));
   });
 
+  it('tells reps about orders not in the portal after the overdue alerts, and logs the counts', async () => {
+    const order: string[] = [];
+    overdueMock.mockImplementation(async () => {
+      order.push('overdue');
+      return { counts: OVERDUE_COUNTS, repAlerts: [], ownerAlert: null, overdue: [] };
+    });
+    unloggedMock.mockImplementation(async () => {
+      order.push('unlogged');
+      return { counts: UNLOGGED_COUNTS, pushes: [], orders: [] };
+    });
+
+    const response = await postReport();
+
+    expect(response.status).toBe(200);
+    expect(order).toEqual(['overdue', 'unlogged']);
+    expect(unloggedMock).toHaveBeenCalledWith({ db: expect.anything(), now: expect.any(Date) });
+    expect(addMock).toHaveBeenCalledWith(expect.objectContaining({ error: null, unloggedOrderNudges: UNLOGGED_COUNTS }));
+  });
+
+  it('still stores the report when the unlogged order nudges throw', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    unloggedMock.mockRejectedValue(new Error('push down'));
+
+    const response = await postReport();
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true, upserted: 1 });
+    expect(addMock).toHaveBeenCalledWith(
+      expect.objectContaining({ error: null, upserted: 1, overdueAlerts: OVERDUE_COUNTS, unloggedOrderNudges: null })
+    );
+    consoleError.mockRestore();
+  });
+
   it('still stores the report when the overdue alerts throw', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     overdueMock.mockRejectedValue(new Error('push down'));
@@ -434,6 +484,8 @@ describe('POST /api/webhooks/inbound-report overlapping deliveries', () => {
     expect(older.json).toEqual({ ok: true, skipped: 'older_report' });
     expect(syncedIds()).toEqual([NEWER.id]);
     expect(status.lastReportSentAt).toBe(NEWER.sentAt);
+    // A skipped report tells nobody about orders not in the portal.
+    expect(unloggedMock).toHaveBeenCalledTimes(1);
   });
 
   it('does not sync an older report a newer one overtook, nor move the stamp back', async () => {
@@ -452,8 +504,9 @@ describe('POST /api/webhooks/inbound-report overlapping deliveries', () => {
 
     expect(syncedIds()).toEqual([NEWER.id]);
     expect(status.lastReportSentAt).toBe(NEWER.sentAt);
-    // Only the report that counts tells anyone about overdue installs.
+    // Only the report that counts tells anyone about overdue installs or unlogged orders.
     expect(overdueMock).toHaveBeenCalledTimes(1);
+    expect(unloggedMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not write an older report's rows once a newer one has claimed", async () => {

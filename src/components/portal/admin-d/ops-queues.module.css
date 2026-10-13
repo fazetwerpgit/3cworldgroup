@@ -56,6 +56,14 @@
   font-weight: 500;
 }
 
+/* Who, where a row names reps: shown on every width, unlike the phone meta. */
+.queueDetail {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
 .queueFail {
   color: var(--c-red);
   font-size: var(--t-sm);

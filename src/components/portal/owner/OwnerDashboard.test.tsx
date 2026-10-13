@@ -123,6 +123,38 @@ describe('OwnerDashboard', () => {
     expect(html).not.toContain('Stuck in onboarding 3+ days');
   });
 
+  it('lists reps who called out sales today but did not log them, and orders not in the portal', () => {
+    state.dash.problems = {
+      status: 'ready',
+      data: [
+        ...problems({ stalledOnboarding: 0 }),
+        {
+          key: 'calloutsNotLogged',
+          count: 4,
+          href: '/portal/sales',
+          reps: [
+            { name: 'Miles R.', count: 3 },
+            { name: 'Mason S.', count: 1 },
+          ],
+        },
+        { key: 'unloggedOrders', count: 5, href: '/portal/sales' },
+      ],
+    };
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html).toContain('Called out, not logged today');
+    expect(html).toContain('Miles R. 3 · Mason S. 1');
+    expect(html).toContain('Orders not in the portal');
+  });
+
+  it('leaves out the callout row when nobody is short', () => {
+    state.dash.problems = {
+      status: 'ready',
+      data: [...problems({}), { key: 'calloutsNotLogged', count: 0, href: '/portal/sales', reps: [] }],
+    };
+    const html = renderToStaticMarkup(<OwnerDashboard />);
+    expect(html).not.toContain('Called out, not logged today');
+  });
+
   it('leaves out empty rows, the Requests queues and the sales checks', () => {
     const html = renderToStaticMarkup(<OwnerDashboard />);
     expect(html).not.toContain('Onboarding pipeline');

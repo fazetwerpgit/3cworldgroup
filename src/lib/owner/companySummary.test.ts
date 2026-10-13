@@ -126,6 +126,7 @@ function fakeSource(over: Partial<OwnerSummarySource> = {}): OwnerSummarySource 
     countOpen: vi.fn(async (queue: OpenQueue) => ({ payrollDisputes: 2, expediteOrders: 0, leadsRequests: 1, bugReports: 0 })[queue]),
     countPendingSignups: vi.fn(async () => 3),
     countStalledOnboarding: vi.fn(async () => 0),
+    loadDayMessages: vi.fn(async () => []),
     countCreated: vi.fn(async (collection, window) => {
       const thisWeek = window.start.getTime() === ownerPeriods(NOW).thisWeek.start.getTime();
       if (collection === 'applications') return thisWeek ? 11 : 14;
@@ -246,6 +247,8 @@ describe('buildOwnerSummary', () => {
     const counts = Object.fromEntries(summary.problems!.map((row) => [row.key, row.count]));
     expect(counts).toEqual({
       overdueInstalls: 0,
+      calloutsNotLogged: 0,
+      unloggedOrders: 0,
       carrierCancellations: 1,
       payrollDisputes: 2,
       stalledOnboarding: 0,
@@ -262,6 +265,58 @@ describe('buildOwnerSummary', () => {
       href: '/portal/sales',
       oldestDays: null,
     });
+  });
+
+  it('lists reps who called out more sales today than they logged, most missing first', async () => {
+    // Tuesday Sep 22 in Chicago. repA called out 3 and logged 1; repB called out
+    // 1 and logged it; repC's callout was yesterday; a deleted callout and a
+    // story about a 2gig do not count.
+    const at = (iso: string) => new Date(iso);
+    const messages = [
+      { authorId: 'repA', authorName: 'Miles Rivera', text: '1 gig', createdAt: at('2026-09-22T15:00:00Z') },
+      { authorId: 'repA', authorName: 'Miles Rivera', text: '2gig 🔥', createdAt: at('2026-09-22T16:00:00Z') },
+      { authorId: 'repA', authorName: 'Miles Rivera', text: '1 gig!!', createdAt: at('2026-09-22T16:30:00Z') },
+      { authorId: 'repA', authorName: 'Miles Rivera', text: '500 mb', createdAt: at('2026-09-22T16:40:00Z'), deletedAt: at('2026-09-22T16:41:00Z') },
+      { authorId: 'repB', authorName: 'Mason Smith', text: '300mb', createdAt: at('2026-09-22T15:00:00Z') },
+      { authorId: 'repB', authorName: 'Mason Smith', text: 'Dead ass just was signing a wife up for a 2gig that was paying', createdAt: at('2026-09-22T15:10:00Z') },
+      { authorId: 'repC', authorName: 'Noah Kent', text: '1 gig', createdAt: at('2026-09-21T15:00:00Z') },
+    ];
+    const { sales, orders } = fixture();
+    const today = { saleDate: noonChicago(9, 22), createdAt: noonChicago(9, 22) };
+    const book = {
+      sales: [...sales, sale({ rep: 'repA', ...today }), sale({ rep: 'repB', ...today })],
+      orders,
+      reportAt: '2026-09-22T12:00:00.000Z',
+    };
+    const source = fakeSource({ loadBook: vi.fn(async () => book), loadDayMessages: vi.fn(async () => messages) });
+
+    const summary = await buildOwnerSummary(source, ['problems'], NOW);
+
+    expect(source.loadDayMessages).toHaveBeenCalledWith('2026-09-22');
+    expect(summary.problems!.find((row) => row.key === 'calloutsNotLogged')).toEqual({
+      key: 'calloutsNotLogged',
+      count: 2,
+      href: '/portal/sales',
+      reps: [{ name: 'Miles R.', count: 2 }],
+    });
+  });
+
+  it('counts live carrier orders from the last 30 days that no sale claims', async () => {
+    const { sales, orders } = fixture();
+    const book = {
+      sales,
+      orders: [
+        ...orders,
+        order({ address: '1205 Southwood Dr', status: 'pre_sale', orderDate: '2026-09-20' }), // counted
+        order({ address: '7 Elm Ct', status: 'pending_install', orderDate: '2026-09-21' }), // counted
+        order({ address: '8 Elm Ct', status: 'cancelled', orderDate: '2026-09-21' }), // carrier cancelled
+        order({ address: '9 Elm Ct', status: 'breakage', orderDate: '2026-09-21' }), // a missed install
+        order({ address: '10 Elm Ct', status: 'active', orderDate: '2026-08-01' }), // older than 30 days
+      ],
+      reportAt: '2026-09-22T12:00:00.000Z',
+    };
+    const summary = await buildOwnerSummary(fakeSource({ loadBook: vi.fn(async () => book) }), ['problems'], NOW);
+    expect(summary.problems!.find((row) => row.key === 'unloggedOrders')!.count).toBe(2);
   });
 
   it('counts recruiting this week against last week', async () => {

@@ -27,6 +27,14 @@
     {
       "path": "/api/cron/install-reminders?slot=cst",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/callout-nudges?slot=cdt",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/callout-nudges?slot=cst",
+      "schedule": "0 3 * * *"
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 import { PORTAL_LOGGING_START } from '@/lib/sales/mergeBook';
+import { loadDayMessages } from '@/lib/alerts/calloutNudges';
 import { COMP_PLAN_MARGIN, COMP_PLAN_RATES } from '@/data/compPlan.generated';
 import type { CompPlanMargin, CompPlanRates, Sale } from '@/types';
 import type { ActivatedUser, OwnerBook, OwnerSummarySource, RepRoles } from './companySummary';
@@ -17,6 +18,7 @@ import type { ActivatedUser, OwnerBook, OwnerSummarySource, RepRoles } from './c
 //                    (fieldRole/role only); status == 'pending' (small);
 //                    hireDate >= last Sunday-week start (small).
 //   alertTasks       status in [open, claimed] (small).
+//   chatChannels/all-company/messages  today's, Chicago (createdAt range).
 //   form queues      count() aggregations on status == 'new'.
 //   applications,
 //   managerInterviews count() aggregations on a createdAt range.
@@ -161,6 +163,10 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
         });
       }
       return [...byId.values()];
+    },
+
+    loadDayMessages(day) {
+      return loadDayMessages(db(), day);
     },
   };
 }

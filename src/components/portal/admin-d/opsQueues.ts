@@ -35,6 +35,8 @@ export interface QueueCard {
   /** null when the queue has no per-item timestamps (pipeline, signups). */
   newToday: number | null;
   error: boolean;
+  /** One line under the name on every width ("Miles R. 3 · Mason S. 1"), where the row names who. */
+  detail?: string | null;
   /**
    * false: listed on Home but not waiting on anyone (the pipeline), so it adds
    * to no nav badge, tab count or waiting total.

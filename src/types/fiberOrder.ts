@@ -116,6 +116,23 @@ export interface OverdueAlertCounts {
   errors: number;
 }
 
+// What the unlogged-order backstop did with one report (see lib/alerts/unloggedOrderNudges).
+export interface UnloggedOrderNudgeCounts {
+  /** UNLOGGED_ORDER_NUDGE_OFF: read and planned, nothing claimed or sent. */
+  dryRun: boolean;
+  /** Live, recent carrier orders matched to a rep that no sale claims. */
+  found: number;
+  /** Of those, already told by an earlier report. */
+  alreadySent: number;
+  /** Orders whose rep is not an active user. */
+  skippedInactiveRep: number;
+  ordersTold: number;
+  /** One push per rep per report. */
+  repsTold: number;
+  /** Claim or dispatch failures. Logged, never thrown at the webhook. */
+  errors: number;
+}
+
 export interface FiberReportImport {
   receivedAt: string;
   filename: string;
@@ -129,6 +146,7 @@ export interface FiberReportImport {
   installDateSync?: InstallDateSyncCounts | null;
   carrierNotices?: CarrierNoticeCounts | null;
   overdueAlerts?: OverdueAlertCounts | null;
+  unloggedOrderNudges?: UnloggedOrderNudgeCounts | null;
 }
 
 export interface FiberStatusResponse {

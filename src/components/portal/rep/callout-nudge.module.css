@@ -1,0 +1,42 @@
+/* The callout nudge on rep Home: a neutral line, not an alert. Tokens from
+   .root in rep.module.css. */
+
+.nudge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s3) var(--s3) var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-panel);
+  color: var(--c-text);
+}
+
+.body {
+  display: grid;
+  flex: 1 1 16em;
+  gap: var(--s1);
+  min-width: 0;
+}
+
+.line {
+  margin: 0;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.why {
+  margin: 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+/* The admin kit's compact button, as the push nudge uses. */
+.log {
+  flex: none;
+  min-height: var(--tap);
+  padding: 0 14px;
+  font-size: 14px;
+}

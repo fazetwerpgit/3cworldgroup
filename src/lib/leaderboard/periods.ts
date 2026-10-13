@@ -60,3 +60,13 @@ export function periodBounds(period: LeaderboardPeriod, now = new Date()) {
 
   return { start: chicagoMidnight(toParts(startDate)), end: chicagoMidnight(toParts(endDate)) };
 }
+
+/** Chicago midnight to the next Chicago midnight for a YYYY-MM-DD day (23 or 25 hours across DST). */
+export function chicagoDayBounds(day: string): { start: Date; end: Date } {
+  const [year, month, date] = day.split('-').map(Number);
+  const next = new Date(Date.UTC(year, month - 1, date + 1));
+  return {
+    start: chicagoMidnight({ year, month, day: date }),
+    end: chicagoMidnight({ year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: next.getUTCDate() }),
+  };
+}

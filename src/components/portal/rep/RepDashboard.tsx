@@ -26,6 +26,7 @@ import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
 import { AWAITING_CARRIER_LABEL, isInstallToday } from '@/lib/sales/installBucket';
 import { CarrierNotice } from './CarrierNotice';
 import { CarrierStaleNote } from './CarrierStaleNote';
+import { CalloutNudge } from './CalloutNudge';
 import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import { PayHelpSheet } from './PayHelpSheet';
 import { AskEntryCard } from './AskEntryCard';
@@ -598,7 +599,7 @@ function RecentSales({ rows, report }: { rows: RecentSaleRow[]; report?: Carrier
 
 export interface RepHomeViewProps {
   firstName: string;
-  /** Push / add-to-home-screen prompts (rendered above everything). */
+  /** Quiet prompts above everything: sales called out today but not logged (CalloutNudge). */
   banners?: ReactNode;
   /** 'ready' with pay null means the book is empty or not loaded yet. */
   payStatus: 'loading' | 'error' | 'ready';
@@ -816,6 +817,7 @@ export function RepDashboard() {
         todayLoading={data.calls.status === 'loading' || data.book.status === 'loading'}
         extraDates={Math.max(dates.length - MAX_DATE_ROWS, 0)}
         callsFailed={data.calls.status === 'error'}
+        banners={canLog ? <CalloutNudge now={now} /> : null}
         scanIntro={canLog ? <ScanIntroCard now={now} /> : null}
         askEntry={<AskEntryCard />}
         queues={showQueues ? <OpsQueuesPanel title="Needs attention" /> : null}

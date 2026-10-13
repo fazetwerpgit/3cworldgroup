@@ -7,6 +7,8 @@ export type NotificationType =
   | 'install_reminder'
   | 'install_overdue'
   | 'install_overdue_summary'
+  | 'unlogged_callouts'
+  | 'unlogged_orders'
   | 'points_earned'
   | 'leaderboard_rank'
   | 'onboarding_submitted'
@@ -49,6 +51,8 @@ export const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   install_reminder: 'bg-blue-50 text-blue-700',
   install_overdue: 'bg-orange-50 text-orange-700',
   install_overdue_summary: 'bg-orange-50 text-orange-700',
+  unlogged_callouts: 'bg-blue-50 text-blue-700',
+  unlogged_orders: 'bg-blue-50 text-blue-700',
   points_earned: 'bg-purple-50 text-purple-700',
   leaderboard_rank: 'bg-blue-50 text-blue-700',
   onboarding_submitted: 'bg-blue-50 text-blue-700',
