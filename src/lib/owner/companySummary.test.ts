@@ -216,10 +216,10 @@ describe('companyBook', () => {
 describe('buildOwnerSummary', () => {
   it('prices installs from 3C Receives and each rep’s own rate', async () => {
     const summary = await buildOwnerSummary(fakeSource(), ['money'], NOW);
-    expect(summary.money!.week.current).toEqual({ installs: 3, revenue: 1270, commissions: 414, margin: 856 });
-    expect(summary.money!.week.prior).toEqual({ installs: 1, revenue: 400, commissions: 120, margin: 280 });
-    expect(summary.money!.month.current).toEqual({ installs: 5, revenue: 2230, commissions: 870, margin: 1360 });
-    expect(summary.money!.month.prior).toEqual({ installs: 1, revenue: 325, commissions: 98, margin: 227 });
+    expect(summary.money!.week.current).toEqual({ installs: 3, chargebacks: 0, revenue: 1270, commissions: 414, margin: 856 });
+    expect(summary.money!.week.prior).toEqual({ installs: 1, chargebacks: 0, revenue: 400, commissions: 120, margin: 280 });
+    expect(summary.money!.month.current).toEqual({ installs: 5, chargebacks: 0, revenue: 2230, commissions: 870, margin: 1360 });
+    expect(summary.money!.month.prior).toEqual({ installs: 1, chargebacks: 0, revenue: 325, commissions: 98, margin: 227 });
     expect(summary.money!.unratedInstalls).toBe(1);
     expect(summary.money!.unpricedInstalls).toBe(0);
     expect(summary.problems).toBeUndefined();
@@ -233,6 +233,66 @@ describe('buildOwnerSummary', () => {
     expect(summary.money).toBeUndefined();
     expect(summary.problems).toBeDefined();
     expect(summary.recruiting).toBeDefined();
+  });
+
+  it('lands a chargeback (churn within 120 days) in the deactivation month as a negative, leaving the install month alone', async () => {
+    const base = fixture();
+    // Installed Aug 12, the customer disconnected Sep 18: 37 days, a full chargeback.
+    const churned = sale({ rep: 'repA', install: noonChicago(8, 12), customerAddress: '77 Elm Court' });
+    const disconnect = order({
+      address: '77 Elm Court',
+      matchedUserId: 'repA',
+      orderDate: '2026-08-01',
+      status: 'churned',
+      activationDate: '2026-08-12',
+      deactivationDate: '2026-09-18',
+    });
+    const book = companyBook([...base.sales, churned], [...base.orders, disconnect], NOW);
+    expect(book.installs.map((install) => install.saleId)).toContain(churned.id);
+    expect(book.chargebacks.map((back) => [back.saleId, back.chargebackDate.getDate()])).toEqual([[churned.id, 18]]);
+
+    const summary = await buildOwnerSummary(
+      fakeSource({
+        loadBook: vi.fn(async () => ({
+          sales: [...base.sales, churned],
+          orders: [...base.orders, disconnect],
+          reportAt: '2026-09-22T12:00:00.000Z',
+        })),
+      }),
+      ['money'],
+      NOW
+    );
+    // September: the same 5 installs, less 460 revenue (3C Receives) and 138 commission.
+    expect(summary.money!.month.current).toEqual({ installs: 5, chargebacks: 1, revenue: 1770, commissions: 732, margin: 1038 });
+    // August keeps the install (history does not change).
+    expect(summary.money!.month.prior).toEqual({ installs: 2, chargebacks: 0, revenue: 785, commissions: 236, margin: 549 });
+    // The week windows hold neither.
+    expect(summary.money!.week.current).toEqual({ installs: 3, chargebacks: 0, revenue: 1270, commissions: 414, margin: 856 });
+  });
+
+  it('charges back nothing on a churn after 120 days or a carrier cancel before install', () => {
+    const base = fixture();
+    const late = sale({
+      rep: 'repA',
+      install: noonChicago(4, 28),
+      saleDate: noonChicago(4, 18),
+      customerAddress: '5 Late Road',
+    });
+    const neverInstalled = sale({ rep: 'repA', install: noonChicago(9, 8), customerAddress: '6 Gone Road' });
+    const book = companyBook(
+      [...base.sales, late, neverInstalled],
+      [
+        ...base.orders,
+        // May 1 → Sep 10: 132 days, a normal install.
+        order({ address: '5 Late Road', orderDate: '2026-04-20', status: 'churned', activationDate: '2026-05-01', deactivationDate: '2026-09-10' }),
+        order({ address: '6 Gone Road', orderDate: '2026-08-01', status: 'cancelled', cancellationDate: '2026-09-07' }),
+      ],
+      NOW
+    );
+    expect(book.chargebacks).toEqual([]);
+    // Joined: dated by the carrier's activation (May 1), not the sale's Apr 28.
+    expect(book.installs.find((install) => install.saleId === late.id)?.installDate.getMonth()).toBe(4);
+    expect(book.installs.map((install) => install.saleId)).not.toContain(neverInstalled.id);
   });
 
   it('only looks up the reps who installed inside the money window', async () => {

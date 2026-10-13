@@ -66,7 +66,8 @@ export function installsOn(day: DayKey, sales: Sale[], fiberBySale: Map<string, 
     .filter((sale) => installDayKey(sale.installDate) === day)
     .flatMap((sale) => {
       const order = fiberBySale.get(sale.id || '');
-      if (order?.status === 'active' || isStandingBreakage(sale, order)) return [];
+      // Active or churned: the carrier already installed it.
+      if (order?.status === 'active' || order?.status === 'churned' || isStandingBreakage(sale, order)) return [];
       return [toInstall(sale, order, day)];
     });
 }

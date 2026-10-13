@@ -9,6 +9,7 @@ import { useCountUp } from '@/hooks/useCountUp';
 import { useRepDashboard, type RepChallenge, type RepSectionKey, type Section } from '@/hooks/useRepDashboard';
 import {
   callsToday,
+  CHARGEBACK_STATUS_LABEL,
   formatCallTime,
   needsDateRows,
   recentSaleRows,
@@ -55,6 +56,7 @@ const STATUS_CLASS: Record<RowStatus, string> = {
   'needs-date': d.st_needsdate,
   missed: d.st_missed,
   cancelled: d.st_cancelled,
+  chargeback: d.st_cancelled,
 };
 
 function statusLine(row: RecentSaleRow) {
@@ -71,6 +73,8 @@ function statusLine(row: RecentSaleRow) {
       return row.overdue ? 'Install overdue · reschedule' : 'Missed install · reschedule';
     case 'cancelled':
       return 'Cancelled';
+    case 'chargeback':
+      return CHARGEBACK_STATUS_LABEL;
   }
 }
 
@@ -86,6 +90,7 @@ function payCell(row: RecentSaleRow): ReactNode {
 }
 
 function payoutLine(row: RecentSaleRow) {
+  if (row.status === 'chargeback') return 'Est. pay charged back';
   if (row.payoutLabel) return `Est. payout ${row.payoutLabel}`;
   if (row.status === 'cancelled') return 'No pay';
   if (row.status === 'installed') return '';
@@ -166,13 +171,25 @@ function MonthStack({ counts, total }: { counts: PaySummary['counts']; total: nu
 
 /** The big est. pay numeral: counts up from $0 on the first Home of a session. */
 function PayAmount({ amount }: { amount: number }) {
-  const shown = useCountUp(Math.round(amount), { sessionKey: '3c:countup:home-pay' });
+  // A month whose chargebacks outweigh its installs reads "−$280", never "$-280".
+  const shown = useCountUp(Math.round(Math.abs(amount)), { sessionKey: '3c:countup:home-pay' });
   return (
     <>
+      {amount < 0 ? '−' : null}
       <span className={d.cur}>$</span>
       {shown.toLocaleString('en-US')}
     </>
   );
+}
+
+/** "Includes est. −$280 chargeback · Rosaria M. cancelled within 120 days of install". */
+export function chargebackNote(lines: PaySummary['chargebacks']): string {
+  const total = lines.reduce((sum, line) => sum + (line.amount ?? 0), 0);
+  const amount = `−${money(Math.abs(total))}`;
+  if (lines.length === 1) {
+    return `Includes est. ${amount} chargeback · ${lines[0].customer} cancelled within 120 days of install`;
+  }
+  return `Includes est. ${amount} in chargebacks · ${lines.length} customers cancelled within 120 days of install`;
 }
 
 function MoneyCard({ pay, hasPlan, tucked }: { pay: PaySummary; hasPlan: boolean; tucked: boolean }) {
@@ -204,6 +221,8 @@ function MoneyCard({ pay, hasPlan, tucked }: { pay: PaySummary; hasPlan: boolean
         ) : null}
         {/* Money on sales with nothing on the calendar yet: it has no month. */}
         {hasPlan && pay.estNoDate ? <p className={d.moneyNote}>est. {money(pay.estNoDate)} has no install date yet</p> : null}
+        {/* Est. chargebacks landing this month, already netted into the figure above. */}
+        {hasPlan && pay.chargebacks.length ? <p className={d.moneyNote}>{chargebackNote(pay.chargebacks)}</p> : null}
         {/* Missed installs: their date is stale, so their money waits on a new one. */}
         {hasPlan && pay.estMissed ? (
           <p className={d.moneyNote}>est. {money(pay.estMissed)} needs a new install date</p>

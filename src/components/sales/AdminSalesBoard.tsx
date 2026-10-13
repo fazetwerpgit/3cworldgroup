@@ -25,14 +25,14 @@ import {
   type InstallCounts,
 } from '@/lib/sales/installBucket';
 import { formatInstallDayShort } from '@/lib/sales/saleDate';
-import { bookForMonth, buildMergedBook, earlierOrderNote, type MergedBook, type MergedRow } from '@/lib/sales/mergeBook';
+import { bookForMonth, buildMergedBook, earlierOrderNote, fiberBySaleFromBook, type MergedBook, type MergedRow } from '@/lib/sales/mergeBook';
 import { normalizeAddress } from '@/lib/fiberReport/matchSales';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isCurrentMonth, monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { LinkOrderDialog, UnassignedOrders } from './UnloggedOrders';
 import { SalesDialog } from './SalesDialog';
-import { PayGroupHead } from './SalesTable';
+import { ChargebackRow, PayGroupHead } from './SalesTable';
 import { Collapse } from '@/components/portal/Collapse';
 
 // The company book, for admins and owners. One row per CUSTOMER — the sales the
@@ -385,11 +385,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   // — by payout window off the INSTALL date, then other carriers by install
   // month, then missed and undated installs (owner, 2026-09-22). The book's
   // own carrier join decides cancellations and breakage.
-  const fiberBySale = useMemo(() => {
-    const map = new Map<string, FiberOrder>();
-    for (const row of fullBook.rows) if (row.sale?.id && row.order) map.set(row.sale.id, row.order);
-    return map;
-  }, [fullBook.rows]);
+  const fiberBySale = useMemo(() => fiberBySaleFromBook(fullBook), [fullBook]);
   const myPayGroups = useMemo(
     () => groupPaySales(
       sales.filter((sale) => sale.salesRepId === user?.uid),
@@ -402,7 +398,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
   const mySales = useMemo(() => myPayGroups.flatMap((group) => group.sales), [myPayGroups]);
   // Money with a date that stands: missed and undated sales wait on a new date.
   const myExpected = myPayGroups
-    .filter((group) => group.kind === 'window' || group.kind === 'other')
+    .filter((group) => group.kind === 'window' || group.kind === 'other' || group.kind === 'chargeback')
     .reduce((sum, group) => sum + (group.amount ?? 0), 0);
 
   // Every post-write refetch is `fresh`. The order cache is invalidated only on
@@ -920,6 +916,9 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
             myPayGroups.map((group) => (
               <div key={group.key} role="group" aria-labelledby={`pay-${group.key}`} data-part="pay-group">
                 <PayGroupHead group={group} hasPlan={hasPlan} />
+                {group.chargebacks.map((line) => (
+                  <ChargebackRow key={`chargeback-${line.sale.id}`} line={line} hasPlan={hasPlan} />
+                ))}
                 {group.sales.map((sale) => {
                   const expected = expectedPayForSale(sale, payPlan?.rates ?? null);
                   return (

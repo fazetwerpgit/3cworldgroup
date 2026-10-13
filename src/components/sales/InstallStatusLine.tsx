@@ -1,6 +1,6 @@
 import type { Sale } from '@/types';
 import type { FiberOrder, FiberOrderStatus } from '@/types/fiberOrder';
-import type { RowStatus } from '@/lib/dashboard/repSummary';
+import { CHARGEBACK_STATUS_LABEL, type RowStatus } from '@/lib/dashboard/repSummary';
 import {
   awaitingCarrierLabel,
   installAttentionReason,
@@ -18,6 +18,7 @@ export const STATUS_CLASS: Record<RowStatus, string> = {
   'needs-date': x.st_needsdate,
   missed: x.st_missed,
   cancelled: x.st_cancelled,
+  chargeback: x.st_cancelled,
 };
 
 function formatDate(value: Date | string) {
@@ -47,6 +48,8 @@ export function statusLine(
       return overdue ? 'Install overdue · reschedule' : 'Missed install · reschedule';
     case 'cancelled':
       return 'Cancelled';
+    case 'chargeback':
+      return CHARGEBACK_STATUS_LABEL;
   }
 }
 
@@ -56,7 +59,7 @@ const LINE_SAYS: Record<FiberOrderStatus, RowStatus[]> = {
   pending_install: ['scheduled', 'needs-date'],
   pre_sale: ['scheduled', 'needs-date'],
   cancelled: ['cancelled'],
-  churned: [],
+  churned: ['chargeback'],
   breakage: ['missed'],
 };
 

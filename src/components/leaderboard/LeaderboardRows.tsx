@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { Avatar } from './Avatar';
 import { MetricValue } from './MetricValue';
+import { PlanMixLine } from './PlanMixLine';
 import type { LeaderboardEntry, LeaderboardMetric } from './LeaderboardTable';
 import styles from './leaderboard.module.css';
 
@@ -48,10 +49,13 @@ export function LeaderboardRows({ entries, metric, currentUser, zeros = [] }: Le
           >
             <span className={styles.rank}>{String(entry.rank).padStart(2, '0')}</span>
             <Avatar entry={entry} />
-            <strong className={styles.rowName}>
-              <span>{entry.salesRepName}</span>
-              {isCurrentUser ? <em>You</em> : null}
-            </strong>
+            <span className={styles.rowWho}>
+              <strong className={styles.rowName}>
+                <span>{entry.salesRepName}</span>
+                {isCurrentUser ? <em>You</em> : null}
+              </strong>
+              <PlanMixLine mix={entry.planMix} className={styles.rowMix} />
+            </span>
             <MetricValue entry={entry} metric={metric} />
           </div>
         );

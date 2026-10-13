@@ -74,16 +74,33 @@ describe('summarizePay', () => {
     expect(summary.estNoDate).toBe(260);
   });
 
-  it('keeps carrier cancellations out of the month and out of no-date', () => {
-    const churned = sale({ installDate: d(2026, 9, 9) });
+  it('keeps carrier cancellations (before install) out of the month and out of no-date', () => {
+    const cancelled = sale({ installDate: d(2026, 9, 9) });
     const undatedCancel = sale({});
     const fiber = new Map<string, FiberOrder>([
-      [churned.id!, { status: 'churned' } as FiberOrder],
+      [cancelled.id!, { status: 'cancelled' } as FiberOrder],
       [undatedCancel.id!, { status: 'cancelled' } as FiberOrder],
     ]);
-    const summary = summarizePay([churned, undatedCancel], fiber, rates, NOW);
+    const summary = summarizePay([cancelled, undatedCancel], fiber, rates, NOW);
     expect(summary.estThisMonth).toBe(0);
     expect(summary.estNoDate).toBe(0);
+    expect(summary.chargebacks).toEqual([]);
+  });
+
+  it('keeps a churned install in its install month and nets an est. chargeback in the disconnect month', () => {
+    // Installed Aug 10, disconnected Sep 9 (30 days): counted in August, −130 in September.
+    const churned = sale({ customerName: 'Rosaria Mendez', installDate: d(2026, 8, 10) });
+    const live = sale({ installDate: d(2026, 9, 10) });
+    const fiber = new Map<string, FiberOrder>([
+      [churned.id!, { status: 'churned', activationDate: '2026-08-10', deactivationDate: '2026-09-09' } as FiberOrder],
+    ]);
+    const september = summarizePay([churned, live], fiber, rates, NOW);
+    expect(september.estThisMonth).toBe(0); // 130 install − 130 chargeback
+    expect(september.chargebacks.map((line) => [line.customer, line.amount])).toEqual([['Rosaria M.', -130]]);
+    // In August the install still stands: history does not change.
+    const august = summarizePay([churned, live], fiber, rates, d(2026, 8, 20));
+    expect(august.estThisMonth).toBe(130);
+    expect(august.chargebacks).toEqual([]);
   });
 
   it('follows a reschedule into the new month', () => {

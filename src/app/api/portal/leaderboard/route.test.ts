@@ -4,8 +4,8 @@ import { NextRequest } from 'next/server';
 const state: {
   docs: Array<Record<string, unknown>>;
   users: Array<{ id: string; data: Record<string, unknown> }>;
-  recent: Array<Record<string, unknown>>;
-} = { docs: [], users: [], recent: [] };
+  orders: Array<Record<string, unknown>>;
+} = { docs: [], users: [], orders: [] };
 
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedRequester: vi.fn(async () => ({ ok: true, uid: 'u1', isManagement: true })),
@@ -21,23 +21,26 @@ function snapshot(rows: Array<{ id: string; data: Record<string, unknown> }>) {
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
-    collection: vi.fn((name: string) =>
-      name === 'users'
-        ? { where: vi.fn(() => ({ get: vi.fn(async () => snapshot(state.users)) })) }
-        : {
-            where: vi.fn(() => ({
-              limit: vi.fn(() => ({
-                get: vi.fn(async () => snapshot(state.docs.map((data, i) => ({ id: `s${i}`, data })))),
-              })),
-            })),
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(() => ({
-                get: vi.fn(async () => snapshot(state.recent.map((data, i) => ({ id: `r${i}`, data })))),
-              })),
-            })),
-          }
-    ),
+    collection: vi.fn((name: string) => {
+      if (name === 'users') return { where: vi.fn(() => ({ get: vi.fn(async () => snapshot(state.users)) })) };
+      if (name === 'config') {
+        return {
+          doc: vi.fn(() => ({
+            get: vi.fn(async () => ({ exists: true, data: () => ({ lastReportAt: '2026-09-16T12:00:00.000Z' }) })),
+          })),
+        };
+      }
+      return {
+        limit: vi.fn(() => ({
+          get: vi.fn(async () => snapshot(state.docs.map((data, i) => ({ id: `s${i}`, data })))),
+        })),
+      };
+    }),
   },
+}));
+
+vi.mock('@/lib/fiberReport/ordersCache', () => ({
+  getAllFiberOrders: vi.fn(async () => state.orders),
 }));
 
 import { GET } from './route';
@@ -47,7 +50,7 @@ function request(period: string) {
 }
 
 function sale(saleDate: string, salesRepId = 'u1') {
-  return { saleDate: new Date(saleDate), salesRepId, salesRepName: 'Rep', totalPoints: 10 };
+  return { saleDate: new Date(saleDate), salesRepId, salesRepName: 'Rep', totalPoints: 10, status: 'approved' };
 }
 
 async function response(period: string) {
@@ -58,7 +61,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   state.docs = [];
   state.users = [];
-  state.recent = [];
+  state.orders = [];
 });
 
 afterEach(() => vi.useRealTimers());
@@ -160,7 +163,7 @@ describe('GET /api/portal/leaderboard ?include=team', () => {
       estimatedCommission: 500,
       products: [{ productName: 'TFiber 1 Gig', company: 'tfiber' }],
     };
-    state.recent = [
+    state.docs = [
       { ...base, status: 'cancelled', createdAt: at(0), saleDate: at(0) },
       ...[1, 2, 3, 4, 5, 6].map((m) => ({ ...base, status: m === 2 ? 'rejected' : 'approved', createdAt: at(m), saleDate: at(m) })),
       { ...base, status: 'pending', createdAt: at(7), saleDate: at(7) },
@@ -171,5 +174,77 @@ describe('GET /api/portal/leaderboard ?include=team', () => {
     expect(json.recent[0]).toEqual({ repName: 'Rep Name', plan: expect.any(String), at: at(1).toISOString() });
     for (const row of json.recent) expect(Object.keys(row).sort()).toEqual(['at', 'plan', 'repName']);
     expect(JSON.stringify(json.recent)).not.toMatch(/Private|Hidden|500/);
+  });
+});
+
+describe('GET /api/portal/leaderboard reads the carrier report', () => {
+  beforeEach(() => vi.setSystemTime(new Date('2026-09-16T17:00:00.000Z')));
+
+  const at = new Date('2026-09-15T17:00:00.000Z');
+  const doc = (address: string, productId: string, totalPoints: number, extra: Record<string, unknown> = {}) => ({
+    status: 'approved',
+    salesRepId: 'u1',
+    salesRepName: 'Braeden Carter',
+    customerName: 'Private Person',
+    customerAddress: address,
+    saleDate: at,
+    createdAt: at,
+    installDate: at,
+    totalPoints,
+    estimatedCommission: 500,
+    products: [{ productId, productName: productId, company: 'tfiber', quantity: 1 }],
+    ...extra,
+  });
+  const carrier = (address: string, status: string, extra: Record<string, unknown> = {}) => ({
+    id: `o-${address}`,
+    status,
+    address,
+    matchedUserId: 'u1',
+    orderDate: '2026-09-15',
+    activationDate: null,
+    deactivationDate: null,
+    cancellationDate: null,
+    estInstallDate: null,
+    ...extra,
+  });
+
+  it('drops a carrier-cancelled sale from the board and the feed, and adds the plan mix (counts only)', async () => {
+    state.docs = [
+      doc('1 Oak St', 'tfiber-1gig', 8),
+      doc('2 Oak St', 'tfiber-2gig', 10),
+      doc('3 Oak St', 'tfiber-1gig', 8),
+      doc('4 Oak St', 'tfiber-300', 3),
+    ];
+    state.orders = [
+      carrier('1 Oak St', 'active', { activationDate: '2026-09-15' }),
+      carrier('2 Oak St', 'active', { activationDate: '2026-09-15' }),
+      carrier('3 Oak St', 'cancelled', { cancellationDate: '2026-09-15' }),
+      // Disconnected the next day: within 120 days, so the points come off.
+      carrier('4 Oak St', 'churned', { activationDate: '2026-09-15', deactivationDate: '2026-09-16' }),
+    ];
+    const json = await (
+      await GET(new NextRequest('http://localhost/api/portal/leaderboard?period=week&include=team'))
+    ).json();
+
+    expect(json.leaderboard).toHaveLength(1);
+    expect(json.leaderboard[0]).toMatchObject({
+      salesRepId: 'u1',
+      totalSales: 2,
+      totalPoints: 18,
+      planMix: [
+        { tier: '2 Gig', count: 1 },
+        { tier: '1 Gig', count: 1 },
+      ],
+    });
+    expect(json.recent).toHaveLength(2);
+    expect(JSON.stringify(json)).not.toMatch(/Private|Oak|500|commission/i);
+  });
+
+  it('keeps the board standing on the portal counts when the report read fails', async () => {
+    const { getAllFiberOrders } = await import('@/lib/fiberReport/ordersCache');
+    (getAllFiberOrders as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('down'));
+    state.docs = [doc('1 Oak St', 'tfiber-1gig', 8)];
+    const json = await response('week');
+    expect(json.leaderboard[0]).toMatchObject({ totalSales: 1, totalPoints: 8 });
   });
 });

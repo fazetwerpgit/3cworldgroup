@@ -8,6 +8,7 @@ import { calloutDays, shortRepName, type CalloutMessage } from '@/lib/sales/call
 import { unloggedOrders } from '@/lib/sales/unloggedOrders';
 import { saleCommission, saleRevenue } from '@/lib/owner/revenue';
 import { summarizeMarkets, type MarketsSummary } from '@/lib/owner/markets';
+import { chargebackFor, dayKeyDate } from '@/lib/pay/chargeback';
 
 // The owner's company view: money, what needs attention, recruiting. Pure and
 // framework-free — every read comes through an injected OwnerSummarySource, so
@@ -136,9 +137,20 @@ export interface InstallRecord {
   sale: Sale;
 }
 
+/**
+ * An install the customer disconnected within 120 days of (lib/pay/chargeback).
+ * The install stays in `installs` in its own month; this is the separate
+ * negative that lands on `chargebackDate`, the deactivation day.
+ */
+export interface ChargebackRecord extends InstallRecord {
+  chargebackDate: Date;
+}
+
 export interface CompanyBook {
   /** Counted sales that have installed, dated by the carrier's activation when it has one. */
   installs: InstallRecord[];
+  /** Est. chargebacks: installs disconnected within 120 days, dated by the deactivation. */
+  chargebacks: ChargebackRecord[];
   /** Counted sales with no install date at all. */
   missingInstallDate: number;
   /** Installs the carrier still has open 3+ days past their day (lib/sales/installOverdue). */
@@ -157,6 +169,7 @@ export function companyBook(
 ): CompanyBook {
   const book = buildMergedBook(sales, orders, { now, reportAsOf });
   const installs: InstallRecord[] = [];
+  const chargebacks: ChargebackRecord[] = [];
   let missingInstallDate = 0;
 
   for (const row of book.rows) {
@@ -164,6 +177,18 @@ export function companyBook(
     const sale = row.sale;
     const carrierDate = carrierInstallDate(row.order);
     const installDate = carrierDate ?? toDate(sale.installDate);
+    // Owner, 2026-10-13: a disconnect within 120 days of install charges the
+    // install back in the month it happened. The install itself stays put.
+    const chargeback = chargebackFor(sale, row.order);
+    if (chargeback) {
+      chargebacks.push({
+        saleId: row.key,
+        repId: sale.salesRepId,
+        installDate: installDate ?? dayKeyDate(chargeback.installDay),
+        sale,
+        chargebackDate: dayKeyDate(chargeback.deactivationDay),
+      });
+    }
     if (!sale.installDate && !carrierDate) {
       missingInstallDate += 1;
       continue;
@@ -177,6 +202,7 @@ export function companyBook(
 
   return {
     installs,
+    chargebacks,
     missingInstallDate,
     overdueInstalls,
     unloggedOrders: unloggedOrders(book.rows, chicagoDayKey(now)).length,
@@ -188,6 +214,8 @@ export function companyBook(
 
 export interface MoneyFigures {
   installs: number;
+  /** Est. chargebacks landing in the window, already netted out of revenue and commissions. */
+  chargebacks: number;
   revenue: number;
   commissions: number;
   margin: number;
@@ -218,11 +246,11 @@ export interface PricedInstall extends InstallRecord {
   hasRepPlan: boolean;
 }
 
-export function priceInstalls(
-  installs: InstallRecord[],
+export function priceInstalls<T extends InstallRecord>(
+  installs: T[],
   plan: CompPlanTables,
   roles: Map<string, RepRoles>
-): PricedInstall[] {
+): Array<T & PricedInstall> {
   return installs.map((install) => {
     const rep = roles.get(install.repId);
     const compRole = rep ? resolveCompRole(rep.fieldRole, rep.role) : null;
@@ -235,13 +263,23 @@ export function priceInstalls(
   });
 }
 
-function figuresIn(priced: PricedInstall[], window: Window): MoneyFigures {
-  const figures: MoneyFigures = { installs: 0, revenue: 0, commissions: 0, margin: 0 };
+export type PricedChargeback = PricedInstall & Pick<ChargebackRecord, 'chargebackDate'>;
+
+function figuresIn(priced: PricedInstall[], window: Window, chargebacks: PricedChargeback[] = []): MoneyFigures {
+  const figures: MoneyFigures = { installs: 0, chargebacks: 0, revenue: 0, commissions: 0, margin: 0 };
   for (const install of priced) {
     if (!inWindow(install.installDate, window)) continue;
     figures.installs += 1;
     figures.revenue += install.revenue;
     figures.commissions += install.commission;
+  }
+  // The carrier takes 3C's revenue back and 3C takes the rep's commission back,
+  // both in the deactivation's window: the margin moves by the difference.
+  for (const chargeback of chargebacks) {
+    if (!inWindow(chargeback.chargebackDate, window)) continue;
+    figures.chargebacks += 1;
+    figures.revenue -= chargeback.revenue;
+    figures.commissions -= chargeback.commission;
   }
   figures.revenue = Math.round(figures.revenue);
   figures.commissions = Math.round(figures.commissions);
@@ -254,12 +292,17 @@ export function moneyHorizon(periods: OwnerPeriods): Date {
   return new Date(Math.min(periods.lastWeek.start.getTime(), periods.lastMonth.start.getTime()));
 }
 
-export function summarizeMoney(priced: PricedInstall[], periods: OwnerPeriods): Omit<MoneySummary, 'reportAt'> {
+export function summarizeMoney(
+  priced: PricedInstall[],
+  periods: OwnerPeriods,
+  chargebacks: PricedChargeback[] = []
+): Omit<MoneySummary, 'reportAt'> {
   const { now, thisWeek, lastWeek, thisMonth, lastMonth } = periods;
   const weekNow = { start: thisWeek.start, end: now };
   const monthNow = { start: thisMonth.start, end: now };
   const horizon = { start: moneyHorizon(periods), end: now };
   const inScope = priced.filter((install) => inWindow(install.installDate, horizon));
+  const backs = chargebacks.filter((chargeback) => inWindow(chargeback.chargebackDate, horizon));
   const current = inScope.filter(
     (install) => inWindow(install.installDate, weekNow) || inWindow(install.installDate, monthNow)
   );
@@ -268,13 +311,13 @@ export function summarizeMoney(priced: PricedInstall[], periods: OwnerPeriods): 
   const monthPrior = sameElapsed(thisMonth, lastMonth, now);
   return {
     week: {
-      current: figuresIn(inScope, weekNow),
-      prior: figuresIn(inScope, weekPrior),
+      current: figuresIn(inScope, weekNow, backs),
+      prior: figuresIn(inScope, weekPrior, backs),
       priorEnd: weekPrior.end.toISOString(),
     },
     month: {
-      current: figuresIn(inScope, monthNow),
-      prior: figuresIn(inScope, monthPrior),
+      current: figuresIn(inScope, monthNow, backs),
+      prior: figuresIn(inScope, monthPrior, backs),
       priorEnd: monthPrior.end.toISOString(),
     },
     unpricedInstalls: current.filter((install) => install.revenue === 0).length,
@@ -439,9 +482,13 @@ export async function buildMoney(source: OwnerSummarySource, periods: OwnerPerio
   const book = companyBook(sales, orders, periods.now, reportAsOf);
   const horizon = moneyHorizon(periods);
   const recent = book.installs.filter((install) => install.installDate.getTime() >= horizon.getTime());
-  const repIds = [...new Set(recent.map((install) => install.repId).filter(Boolean))];
+  const recentBacks = book.chargebacks.filter((chargeback) => chargeback.chargebackDate.getTime() >= horizon.getTime());
+  const repIds = [...new Set([...recent, ...recentBacks].map((install) => install.repId).filter(Boolean))];
   const roles = await source.loadRepRoles(repIds);
-  return { ...summarizeMoney(priceInstalls(recent, plan, roles), periods), reportAt };
+  return {
+    ...summarizeMoney(priceInstalls(recent, plan, roles), periods, priceInstalls(recentBacks, plan, roles)),
+    reportAt,
+  };
 }
 
 /**

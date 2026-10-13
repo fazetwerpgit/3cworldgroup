@@ -13,7 +13,9 @@ import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow'
 import { groupPaySales, type PayGroup } from '@/lib/pay/payGroups';
 import { planLabel, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
-import { countedSales, isCarrierCancelled } from '@/lib/sales/installBucket';
+import { isCarrierCancelled } from '@/lib/sales/installBucket';
+import { boardCountedSales, CHARGEBACK_REASON, dayKeyDate, type ChargebackLine } from '@/lib/pay/chargeback';
+import { formatPlanMix, planMix } from '@/lib/sales/planMix';
 import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
@@ -65,8 +67,10 @@ interface SalesTableProps {
   arriveId?: string | null;
 }
 
+/** "$280", or "−$280" for a chargeback. */
 function formatMoney(value: number) {
-  return `$${Math.round(value).toLocaleString('en-US')}`;
+  const rounded = Math.round(value);
+  return `${rounded < 0 ? '−' : ''}$${Math.abs(rounded).toLocaleString('en-US')}`;
 }
 
 function formatDate(value: Date | string | null | undefined) {
@@ -122,9 +126,50 @@ function EstPay({ value, hasPlan }: { value: number | null | undefined; hasPlan:
 const GROUP_NOTE: Record<PayGroup['kind'], string> = {
   window: 'T-Fiber payout window',
   other: 'No published payout window',
+  chargeback: CHARGEBACK_REASON,
   missed: 'Gets a window once it is rescheduled',
   undated: 'Gets a window once it has a date',
 };
+
+function groupCount(group: PayGroup): string {
+  if (group.kind === 'chargeback') {
+    return `${group.chargebacks.length} ${group.chargebacks.length === 1 ? 'chargeback' : 'chargebacks'}`;
+  }
+  return `${group.sales.length} ${group.sales.length === 1 ? 'sale' : 'sales'}`;
+}
+
+/** One est. chargeback: the customer who disconnected, the est. pay coming back off, and why. */
+export function ChargebackRow({ line, hasPlan }: { line: ChargebackLine; hasPlan: boolean }) {
+  const mark = saleCarrier(line.sale);
+  return (
+    <div className={`${x.pRow} ${hasPlan ? '' : x.noMoney}`} data-part="chargeback-row">
+      <DateStamp value={dayKeyDate(line.chargeback.deactivationDay)} label="Cancelled" />
+      <span className={x.sName}>
+        <strong>{line.customer}</strong>
+      </span>
+      {hasPlan && (
+        <span className={x.sPay}>
+          <EstPay value={line.amount} hasPlan={hasPlan} />
+        </span>
+      )}
+      <span className={x.sStatus}>
+        <span className={`${x.status} ${x.st_cancelled}`}>
+          <span className={x.dot} aria-hidden="true" />
+          {CHARGEBACK_REASON}
+        </span>
+      </span>
+      <span className={x.sMeta}>
+        {mark ? <span className={x.carrierMark}>{mark}</span> : null}
+        <span className={x.sMetaText}>
+          {[salePlan(line.sale, mark), `Installed ${formatDate(dayKeyDate(line.chargeback.installDay))}`].join(' · ')}
+        </span>
+      </span>
+      <span className={x.sPaid}>
+        <span className={x.noTick} aria-hidden="true">—</span>
+      </span>
+    </div>
+  );
+}
 
 /** "Sep 21–25 · est. $280" — a pay period, always a range, always an estimate. */
 export function PayGroupHead({ group, hasPlan }: { group: PayGroup; hasPlan: boolean }) {
@@ -141,7 +186,7 @@ export function PayGroupHead({ group, hasPlan }: { group: PayGroup; hasPlan: boo
           ) : null}
         </strong>
         <span className={x.pgMeta}>
-          {[GROUP_NOTE[group.kind], installs, `${group.sales.length} ${group.sales.length === 1 ? 'sale' : 'sales'}`]
+          {[GROUP_NOTE[group.kind], installs, groupCount(group)]
             .filter(Boolean)
             .join(' · ')}
         </span>
@@ -229,7 +274,10 @@ export function SalesTable({
   );
   const paySales = useMemo(() => payGroups.flatMap((group) => group.sales), [payGroups]);
   // Money with a date that stands: missed and undated sales wait on a new date.
-  const datedPayGroups = payGroups.filter((group) => group.kind === 'window' || group.kind === 'other');
+  // Est. chargebacks land in their month too, netted into its total.
+  const datedPayGroups = payGroups.filter(
+    (group) => group.kind === 'window' || group.kind === 'other' || group.kind === 'chargeback'
+  );
   const datedPayCount = datedPayGroups.reduce((sum, group) => sum + group.sales.length, 0);
   const datedPayTotal = hasPlan
     ? datedPayGroups.reduce((sum, group) => sum + (group.amount ?? 0), 0)
@@ -279,7 +327,14 @@ export function SalesTable({
   const arriveClass = (sale: Sale) => (arriving && sale.id === arriving ? x.arrive : '');
   // Points under the list, like the Board: a cancellation drops out of it,
   // whoever cancelled it, us or the carrier. The row itself stays on screen, marked.
-  const totalPoints = countedSales(listSales, fiberBySale).reduce((sum, sale) => sum + (sale.totalPoints || 0), 0);
+  // A customer who disconnected within 120 days of install takes the points off
+  // too (boardCountedSales), exactly as the Board counts them.
+  const totalPoints = boardCountedSales(listSales, fiberBySale).reduce((sum, sale) => sum + (sale.totalPoints || 0), 0);
+  // "Plan mix · 10× 1 Gig · 6× 2 Gig": the ledger's month, counted like the Board.
+  const mixLine = useMemo(
+    () => formatPlanMix(planMix(boardCountedSales(monthSales, fiberBySale))),
+    [fiberBySale, monthSales]
+  );
   // Whole dollars per row first, as each row prints, so the total adds up.
   const expectedTotal = hasPlan
     ? listSales.reduce((sum, sale) => sum + Math.round(expectedBySale[sale.id || ''] ?? 0), 0)
@@ -409,6 +464,9 @@ export function SalesTable({
         </div>
         {/* Only when the carrier's daily report is late; nothing otherwise. */}
         <CarrierStaleNote report={fiber?.data} className={x.srcNote} />
+        {!showPay && mixLine ? (
+          <p className={x.planMix} data-testid="plan-mix">Plan mix · {mixLine}</p>
+        ) : null}
 
         {fiberOrders.length > 0 && !showPay && (
           <div className={x.chips} role="group" aria-label="Fiber status views">
@@ -484,6 +542,9 @@ export function SalesTable({
               payGroups.map((group) => (
                 <div key={group.key} role="group" aria-labelledby={`pay-${group.key}`}>
                   <PayGroupHead group={group} hasPlan={hasPlan} />
+                  {group.chargebacks.map((line) => (
+                    <ChargebackRow key={`chargeback-${line.sale.id}`} line={line} hasPlan={hasPlan} />
+                  ))}
                   {group.sales.map((sale) => {
                     const expected = expectedBySale[sale.id || ''] ?? null;
                     const paid = !!paidBySale[sale.id || ''];
@@ -492,7 +553,7 @@ export function SalesTable({
                     const name = sale.customerName || sale.customerAddress || 'Customer pending';
                     // Money only lands on an install, so the tick shows there;
                     // a tick already set stays reachable so it can be undone.
-                    const canTick = status === 'installed' || paid;
+                    const canTick = status === 'installed' || status === 'chargeback' || paid;
                     return (
                       <div
                         className={`${x.pRow} ${hasPlan ? '' : x.noMoney} ${status === 'cancelled' ? x.saleOff : ''} ${arriveClass(sale)}`}

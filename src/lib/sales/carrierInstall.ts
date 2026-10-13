@@ -24,9 +24,13 @@ function carrierDate(value: string | null | undefined): Date | null {
   return new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]), 12, 0, 0);
 }
 
-/** The day the carrier says it went live, or null when it has not. */
+/**
+ * The day the carrier says it went live, or null when it has not. A churned
+ * order went live too, so its activation stays the install day: a later
+ * disconnect must not move the sale back to the date the rep typed.
+ */
 export function carrierInstallDate(order: FiberOrder | null | undefined): Date | null {
-  if (!order || order.status !== 'active') return null;
+  if (!order || (order.status !== 'active' && order.status !== 'churned')) return null;
   return carrierDate(order.activationDate);
 }
 

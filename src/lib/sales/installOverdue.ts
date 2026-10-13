@@ -1,7 +1,7 @@
 import type { FiberOrder, Sale } from '@/types';
 import { customerLabel } from '@/lib/fiberReport/carrierNotice';
 import { isPayableSale } from '@/lib/pay/expectedPay';
-import { carrierReportCovers, daysBetween, isCarrierCancelled, judgedInstallDay } from '@/lib/sales/installBucket';
+import { carrierReportCovers, daysBetween, isCarrierEnded, judgedInstallDay } from '@/lib/sales/installBucket';
 import type { MergedRow } from '@/lib/sales/mergeBook';
 import { formatInstallDayShort, installDayKey } from '@/lib/sales/saleDate';
 
@@ -36,7 +36,7 @@ export { daysBetween };
  *   - There is a matched carrier order: with none, the carrier has not spoken
  *     and the sale's own date is all anyone has (the board reads it installed).
  *   - The sale is live (not cancelled or rejected) and the order is neither
- *     installed ('active') nor cancelled/churned (isCarrierCancelled).
+ *     installed ('active') nor cancelled/churned (isCarrierEnded).
  *   - The install day is OVERDUE_AFTER_DAYS or more in the past. The install
  *     day is the carrier's estimate, else the sale's own day; when both are
  *     there the LATER one counts, so a sale rescheduled past a missed install
@@ -59,7 +59,7 @@ export function overdueInstall(
 ): OverdueInstall | null {
   if (!order) return null;
   if (!isPayableSale(sale)) return null;
-  if (order.status === 'active' || isCarrierCancelled(order)) return null;
+  if (order.status === 'active' || isCarrierEnded(order)) return null;
 
   const today = installDayKey(now);
   if (!today) return null;

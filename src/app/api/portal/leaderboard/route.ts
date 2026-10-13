@@ -5,8 +5,11 @@ import {
   computeHistory,
   dayKey,
   type HistoryEnrichment,
-  type SaleRecord,
 } from '@/lib/leaderboard/history';
+import { boardSales, companyFiberBySale, tallyBoard } from '@/lib/leaderboard/board';
+import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
+import { boardCountedSales } from '@/lib/pay/chargeback';
+import type { FiberOrder, Sale } from '@/types';
 import { periodBounds } from '@/lib/leaderboard/periods';
 import { boardOrder } from '@/lib/leaderboard/order';
 import { recentSales, unrankedReps, type RecentSale, type UnrankedRep } from '@/lib/leaderboard/team';
@@ -20,6 +23,26 @@ const NON_MANAGEMENT_LIMIT_CAP = 100;
 const UNRANKED_CAP = 200;
 const RECENT_SCAN = 25;
 const RECENT_COUNT = 5;
+
+// Firestore hands back Timestamps; the carrier join and the tally read Dates.
+function asDate(value: unknown): Date | undefined {
+  if (!value) return undefined;
+  if (value instanceof Date) return value;
+  const maybe = value as { toDate?: () => Date };
+  if (typeof maybe.toDate === 'function') return maybe.toDate();
+  const date = new Date(value as string);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function toSale(id: string, data: Record<string, unknown>): Sale {
+  return {
+    ...data,
+    id,
+    saleDate: asDate(data.saleDate),
+    installDate: asDate(data.installDate),
+    createdAt: asDate(data.createdAt),
+  } as unknown as Sale;
+}
 
 // GET /api/portal/leaderboard - Get leaderboard data (points-based)
 export async function GET(request: NextRequest) {
@@ -59,62 +82,41 @@ export async function GET(request: NextRequest) {
     const bounds = periodBounds(period === 'week' || period === 'year' || period === 'all' ? period : 'month', now);
     const startDate = bounds?.start ?? new Date(0);
 
-    // Get approved sales - filter by date in code to avoid compound index requirement
-    // Limit to prevent memory issues with large datasets
-    const salesSnapshot = await adminDb
-      .collection('sales')
-      .where('status', scope === 'submitted' ? 'in' : '==', scope === 'submitted' ? ['pending', 'approved'] : 'approved')
-      .limit(5000)
-      .get();
-
-    // Convert startDate to timestamp for comparison
-    const startTimestamp = startDate.getTime();
-
-    // Aggregate by sales rep - now tracking points instead of revenue
-    const salesByRep: Record<string, {
-      salesRepId: string;
-      salesRepName: string;
-      totalSales: number;
-      totalPoints: number;
-    }> = {};
-
-    const allSales: SaleRecord[] = [];
-    const periodSales: SaleRecord[] = [];
-
+    // EVERY sale, any status: the carrier join below is the owner book's
+    // (buildMergedBook over every sale and every order), and which order a sale
+    // lands on can depend on the other sales at its door. Status and date are
+    // filtered in code (no composite index). The limit bounds memory.
+    const [salesSnapshot, statusDoc] = await Promise.all([
+      adminDb.collection('sales').limit(5000).get(),
+      adminDb.collection('config').doc('fiberReportStatus').get(),
+    ]);
+    const sales: Sale[] = [];
+    const rawById = new Map<string, Record<string, unknown>>();
     salesSnapshot.forEach((doc) => {
-      const sale = doc.data();
-
-      const saleDate = sale.saleDate?.toDate ? sale.saleDate.toDate() : new Date(sale.saleDate);
-      const record: SaleRecord = {
-        salesRepId: sale.salesRepId,
-        saleDate,
-        totalPoints: sale.totalPoints || 0,
-      };
-      allSales.push(record);
-
-      // Filter by date in code (avoids needing composite index)
-      if (saleDate.getTime() < startTimestamp) {
-        return; // Skip sales before the period
-      }
-      periodSales.push(record);
-
-      const repId = sale.salesRepId;
-
-      if (!salesByRep[repId]) {
-        salesByRep[repId] = {
-          salesRepId: repId,
-          salesRepName: sale.salesRepName || 'Unknown',
-          totalSales: 0,
-          totalPoints: 0,
-        };
-      }
-
-      salesByRep[repId].totalSales += 1;
-      salesByRep[repId].totalPoints += sale.totalPoints || 0;
+      const data = doc.data() as Record<string, unknown>;
+      rawById.set(doc.id, data);
+      sales.push(toSale(doc.id, data));
     });
 
-    // Convert to array and sort by metric
-    const leaderboard = Object.values(salesByRep);
+    // The carrier report, read once per request (cached per instance against
+    // the report stamp). Fail-soft: without it the board still ranks the
+    // portal's own counts, as it did before it read the report.
+    const status = statusDoc.exists ? statusDoc.data() : undefined;
+    const lastReportAt = typeof status?.lastReportAt === 'string' ? status.lastReportAt : null;
+    const reportAsOf = typeof status?.lastReportAsOf === 'string' ? status.lastReportAsOf : null;
+    let fiberBySale = new Map<string, FiberOrder>();
+    try {
+      const orders = await getAllFiberOrders(lastReportAt);
+      fiberBySale = companyFiberBySale(sales, orders, { now, reportAsOf });
+    } catch (carrierError) {
+      console.error('Leaderboard carrier report failed:', carrierError);
+    }
+
+    // What the estimate counts, less a disconnect within 120 days of install.
+    const { totals: leaderboard, allSales, periodSales } = tallyBoard(
+      boardSales(sales, fiberBySale, scope),
+      startDate.getTime()
+    );
 
     const score = metric === 'totalSales' ? 'totalSales' : 'totalPoints';
     leaderboard.sort((a, b) => boardOrder(
@@ -175,13 +177,16 @@ export async function GET(request: NextRequest) {
         console.error('Leaderboard team list failed:', teamError);
       }
       try {
-        const recentSnapshot = await adminDb
-          .collection('sales')
-          .orderBy('createdAt', 'desc')
-          .limit(RECENT_SCAN)
-          .get();
-        const docs: Array<Record<string, unknown>> = [];
-        recentSnapshot.forEach((doc) => docs.push(doc.data()));
+        // The newest logged sales that still stand, from the read above: a
+        // carrier cancellation (or a disconnect within 120 days) leaves the
+        // feed as it leaves the board.
+        const docs = boardCountedSales(sales, fiberBySale)
+          .sort((a, b) => (asDate(b.createdAt)?.getTime() ?? 0) - (asDate(a.createdAt)?.getTime() ?? 0))
+          .slice(0, RECENT_SCAN)
+          .flatMap((sale): Array<Record<string, unknown>> => {
+            const raw = rawById.get(sale.id || '');
+            return raw ? [raw] : [];
+          });
         team.recent = recentSales(docs, RECENT_COUNT);
       } catch (recentError) {
         console.error('Leaderboard recent sales failed:', recentError);

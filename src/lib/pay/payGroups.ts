@@ -2,6 +2,7 @@ import type { CompPlanCompanyRates, FiberOrder, Sale } from '@/types';
 import { expectedPayForSale } from '@/lib/pay/expectedPay';
 import { formatPayoutWindow, payoutWindowForSale, type PayoutWindow } from '@/lib/pay/payoutWindow';
 import { countedSales, isStandingBreakage } from '@/lib/sales/installBucket';
+import { chargebackLines, dayKeyDate, dayKeyMonth, type ChargebackLine } from '@/lib/pay/chargeback';
 import { isInMonth, type MonthKey } from '@/lib/sales/monthWindow';
 
 // Owner, 2026-09-22: pay is estimated off the INSTALL date, scheduled or
@@ -63,19 +64,22 @@ export function sumExpectedPay(sales: Array<Pick<Sale, 'products'>>, rates: Comp
   return sales.reduce((sum, sale) => sum + Math.round(expectedPayForSale(sale, rates) ?? 0), 0);
 }
 
-export type PayGroupKind = 'window' | 'other' | 'missed' | 'undated';
+export type PayGroupKind = 'window' | 'other' | 'chargeback' | 'missed' | 'undated';
 
 export interface PayGroup<T extends Sale = Sale> {
   kind: PayGroupKind;
   key: string;
-  /** "Sep 21–25", "Other carriers · Sep", "Missed install", "No install date". */
+  /** "Sep 21–25", "Other carriers · Sep", "Est. chargebacks · Oct", "Missed install", "No install date". */
   label: string;
   /** The T-Fiber payout window ('window' groups only). */
   window: PayoutWindow | null;
-  /** The install month ('other' groups only). */
+  /** The install month ('other' groups), or the deactivation month ('chargeback' groups). */
   month: MonthKey | null;
+  /** Empty on a 'chargeback' group: its rows are `chargebacks`, not pay. */
   sales: T[];
-  /** Σ est. pay; null = no pay plan. */
+  /** 'chargeback' groups only: the customers who disconnected within 120 days of install. */
+  chargebacks: ChargebackLine<T>[];
+  /** Σ est. pay (negative on a 'chargeback' group); null = no pay plan. */
   amount: number | null;
 }
 
@@ -101,6 +105,9 @@ export interface GroupPayOptions {
  *      it is rescheduled
  *   4. "No install date": counted sales with nothing on the calendar yet
  *
+ * Between 2 and 3: "Est. chargebacks" by deactivation month (lib/pay/chargeback),
+ * a negative amount netted into that month's estimate.
+ *
  * Every figure is an estimate and every window is a range; nothing here ever
  * produces a single pay date.
  */
@@ -123,7 +130,7 @@ export function groupPaySales<T extends Sale>(
       const key = window.start.getTime();
       let group = windows.get(key);
       if (!group) {
-        group = { kind: 'window', key: `window-${key}`, label: formatPayoutWindow(window), window, month: null, sales: [], amount: null };
+        group = { kind: 'window', key: `window-${key}`, label: formatPayoutWindow(window), window, month: null, sales: [], chargebacks: [], amount: null };
         windows.set(key, group);
       }
       group.sales.push(sale);
@@ -141,6 +148,7 @@ export function groupPaySales<T extends Sale>(
         window: null,
         month: installMonth,
         sales: [],
+        chargebacks: [],
         amount: null,
       };
       others.set(key, group);
@@ -155,18 +163,47 @@ export function groupPaySales<T extends Sale>(
     ),
   ];
   for (const group of groups) group.sales.sort(newestInstallFirst);
+  for (const group of groups) group.amount = sumExpectedPay(group.sales, rates);
+
+  // Est. chargebacks (owner, 2026-10-13): a customer who disconnected within
+  // 120 days of install takes back that sale's est. pay, in the month of the
+  // disconnect. The sale itself stays in its install month above.
+  const chargebacks = new Map<string, PayGroup<T>>();
+  for (const line of chargebackLines(sales, fiberBySale, rates)) {
+    const landed = dayKeyMonth(line.chargeback.deactivationDay);
+    if (month && (landed.year !== month.year || landed.month !== month.month)) continue;
+    const key = `chargeback-${landed.year}-${landed.month}`;
+    let group = chargebacks.get(key);
+    if (!group) {
+      group = {
+        kind: 'chargeback',
+        key,
+        label: `Est. chargebacks · ${SHORT_MONTH.format(dayKeyDate(line.chargeback.deactivationDay))}`,
+        window: null,
+        month: landed,
+        sales: [],
+        chargebacks: [],
+        amount: rates ? 0 : null,
+      };
+      chargebacks.set(key, group);
+    }
+    group.chargebacks.push(line);
+    if (group.amount !== null) group.amount += line.amount ?? 0;
+  }
+  groups.push(
+    ...[...chargebacks.values()].sort((a, b) => b.month!.year - a.month!.year || b.month!.month - a.month!.month)
+  );
 
   if (includeUndated) {
     const missed = missedInstallSales(sales, fiberBySale);
     if (missed.length) {
-      groups.push({ kind: 'missed', key: 'missed', label: 'Missed install', window: null, month: null, sales: missed, amount: null });
+      groups.push({ kind: 'missed', key: 'missed', label: 'Missed install', window: null, month: null, sales: missed, chargebacks: [], amount: sumExpectedPay(missed, rates) });
     }
     const undated = undatedSales(sales, fiberBySale);
     if (undated.length) {
-      groups.push({ kind: 'undated', key: 'undated', label: 'No install date', window: null, month: null, sales: undated, amount: null });
+      groups.push({ kind: 'undated', key: 'undated', label: 'No install date', window: null, month: null, sales: undated, chargebacks: [], amount: sumExpectedPay(undated, rates) });
     }
   }
 
-  for (const group of groups) group.amount = sumExpectedPay(group.sales, rates);
   return groups;
 }

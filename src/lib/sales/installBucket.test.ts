@@ -72,10 +72,11 @@ describe('installBucketForSale', () => {
     expect(installBucketForSale(sale({ installDate: new Date('2026-09-05T12:00:00') }), broke, NOW)).toBe('attention');
   });
 
-  it('does not call a cancelled or churned order installed off the sale date', () => {
+  it('does not call a cancelled order installed off the sale date; a churned one did install', () => {
     const past = sale({ installDate: new Date('2026-09-08T12:00:00') });
     expect(installBucketForSale(past, order('cancelled'), NOW)).toBe('attention');
-    expect(installBucketForSale(past, order('churned'), NOW)).toBe('attention');
+    // Owner, 2026-10-13: a churn installed first, so it stays an install (lib/pay/chargeback).
+    expect(installBucketForSale(past, order('churned'), NOW)).toBe('installed');
   });
 
   it('trusts an active fiber order over a future date', () => {
@@ -122,7 +123,7 @@ describe('installBucketForSale', () => {
     const past = sale({ installDate: new Date('2026-09-10T12:00:00') });
     expect(installAttentionReason(past, { status: 'breakage', estInstallDate: '2026-09-10' } as FiberOrder)).toBe('missed');
     expect(installAttentionReason(past, order('cancelled'))).toBe('cancelled');
-    expect(installAttentionReason(past, order('churned'))).toBe('cancelled');
+    expect(installAttentionReason(past, order('churned'))).toBe('overdue');
   });
 
   it('reads the scheduled day off the sale while it is ahead, else the carrier estimate', () => {

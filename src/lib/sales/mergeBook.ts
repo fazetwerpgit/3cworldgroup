@@ -34,6 +34,10 @@ import type { MonthKey } from '@/lib/sales/monthWindow';
 //            AMENDED 2026-09-10 (Jacob): a carrier 'cancelled' or 'churned'
 //            takes the MONEY too. It used to leave value and pay untouched, so
 //            a rep's month read "15 installs" with three of them cancelled.
+//            AMENDED 2026-10-13 (owner, the 120-day rule): only 'cancelled'
+//            (before install) does. A 'churned' order installed, so its sale
+//            stays counted in its install month; a disconnect within 120 days
+//            is a separate chargeback in its own month (lib/pay/chargeback).
 
 /**
  * How far back Jacob wants to be SHOWN carrier orders with no matching sale.
@@ -647,6 +651,17 @@ export function buildMergedBook(
 
   rows.sort(byMonthThenBucket);
   return assemble(rows);
+}
+
+/**
+ * The book's own carrier join as a sale id → order map: the order each sale row
+ * stands on. Every caller that needs the owner book's join (the admin board's
+ * pay view, the leaderboard) reads it from here rather than re-deriving it.
+ */
+export function fiberBySaleFromBook(book: Pick<MergedBook, 'rows'>): Map<string, FiberOrder> {
+  const map = new Map<string, FiberOrder>();
+  for (const row of book.rows) if (row.sale?.id && row.order) map.set(row.sale.id, row.order);
+  return map;
 }
 
 /**

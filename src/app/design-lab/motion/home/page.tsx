@@ -13,6 +13,7 @@ const noon = (m: number, d: number) => new Date(2026, m - 1, d, 12);
 
 const PAY: PaySummary = {
   estThisMonth: 2340,
+  chargebacks: [],
   deltaPct: 12,
   estNoDate: 210,
   estMissed: null,

@@ -138,6 +138,8 @@ function installLine(status: RowStatus, installDate: Date | null, zone: Zone, ov
       return `missed install${installDate ? ` (was ${dayLabel(installDate, zone)})` : ''}, needs a reschedule`;
     case 'cancelled':
       return 'cancelled';
+    case 'chargeback':
+      return `installed${installDate ? ` ${dayLabel(installDate, zone)}` : ''}, then the customer cancelled within 120 days of install, so its est. pay is charged back`;
   }
 }
 

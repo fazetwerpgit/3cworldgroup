@@ -1,7 +1,7 @@
 import type { CompPlanCompanyRates, FiberOrder, Sale } from '@/types';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
-import { countedSales, installAttentionReason, installBucketForSale, isCarrierCancelled } from '@/lib/sales/installBucket';
+import { countedSales, installAttentionReason, installBucketForSale, isCarrierEnded } from '@/lib/sales/installBucket';
 import { installDayKey } from '@/lib/sales/saleDate';
 import { formatPayoutWindow, isTFiberSale, payoutWindowForInstall } from '@/lib/pay/payoutWindow';
 import { planLabel } from '@/lib/dashboard/repSummary';
@@ -220,7 +220,7 @@ export function buildRepDigest(input: RepDigestInput): RepDigest {
   }
   const cancelled: DigestCancel[] = [];
   for (const order of ownOrders) {
-    if (!isCarrierCancelled(order)) continue;
+    if (!isCarrierEnded(order)) continue;
     const day = carrierCancelDay(order);
     if (!inRange(day, week.last)) continue;
     const sale = saleByOrder.get(order);

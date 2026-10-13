@@ -161,11 +161,14 @@ export function installBucketForSale(
   // the date on the sale is stale and somebody has to chase it.
   if (isStandingBreakage(sale, fiberOrder)) return 'attention';
   // The carrier is the record of what actually happened (CALL 2). A cancelled
-  // or churned order never installed, or no longer is, so the install date on
-  // the sale is stale — without this the row reads 'installed' off its own past
-  // date and a rep's month counts a cancellation as a completed install.
-  if (fiberOrder?.status === 'cancelled' || fiberOrder?.status === 'churned') return 'attention';
-  if (fiberOrder?.status === 'active') return 'installed';
+  // order never installed, so the install date on the sale is stale — without
+  // this the row reads 'installed' off its own past date and a rep's month
+  // counts a cancellation as a completed install.
+  if (fiberOrder?.status === 'cancelled') return 'attention';
+  // A churned order DID install; the customer disconnected later. It stays an
+  // install in its install month (owner, 2026-10-13: history never rewrites
+  // itself); any chargeback is a separate line (lib/pay/chargeback).
+  if (fiberOrder?.status === 'active' || fiberOrder?.status === 'churned') return 'installed';
 
   const installed = new Date(sale.installDate as Date | string);
   // An unparseable date is no date: it can't be scheduled against.
@@ -194,7 +197,7 @@ export function installBucketForSale(
  * walks the same checks in the same order.
  *   - 'no-date':   nothing usable on the calendar
  *   - 'missed':    the carrier reported a breakage at the door
- *   - 'cancelled': the carrier cancelled or churned the order
+ *   - 'cancelled': the carrier cancelled the order before install
  *   - 'overdue':   the install day has passed and the carrier still has it
  *                  pending (or pre-sale)
  */
@@ -245,12 +248,23 @@ export function isInstallToday(value: unknown, now: Date = new Date()): boolean 
  * CALL 2 originally said the carrier won the status while the sale kept its
  * value. The result was a rep's month reading "15 installs" with three of those
  * customers cancelled — the carrier's word changed a chip somewhere and nothing
- * else. A carrier 'cancelled' or 'churned' now settles the row exactly like a
- * cancellation typed into the portal: out of the count, out of the value, out of
- * expected pay. The reverse still never happens — a carrier status cannot
- * un-cancel what a human cancelled.
+ * else. A carrier 'cancelled' now settles the row exactly like a cancellation
+ * typed into the portal: out of the count, out of the value, out of expected
+ * pay. The reverse still never happens — a carrier status cannot un-cancel what
+ * a human cancelled.
+ *
+ * Owner, 2026-10-13 (the 120-day rule): a 'churned' order is NOT a
+ * cancellation. It installed, so it stays counted in its install month; a
+ * disconnect within 120 days of install is a separate chargeback in the month
+ * it happened (lib/pay/chargeback). Only an order cancelled before install
+ * counts here.
  */
 export function isCarrierCancelled(order: FiberOrder | null | undefined): boolean {
+  return order?.status === 'cancelled';
+}
+
+/** The carrier ended the order, before install ('cancelled') or after it ('churned'). */
+export function isCarrierEnded(order: FiberOrder | null | undefined): boolean {
   return order?.status === 'cancelled' || order?.status === 'churned';
 }
 
@@ -269,7 +283,7 @@ function orderFor(
  * it drops out of the pipeline bar, the rep sub-lines and the month totals
  * rather than sitting in a bucket nobody will ever act on. Pass `fiberBySale`
  * wherever the carrier report is on hand, so a carrier cancellation drops out
- * of the same figures.
+ * of the same figures. A churned sale stays (see isCarrierCancelled).
  */
 export function countedSales<T extends SaleForCount>(
   sales: T[],

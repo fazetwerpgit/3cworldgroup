@@ -156,10 +156,27 @@ describe('groupPaySales', () => {
   });
 
   it('drops carrier cancellations and scopes to the picked install month', () => {
-    const churned = sale({ installDate: d(2026, 9, 5) });
-    const fiber = new Map<string, FiberOrder>([[churned.id!, { status: 'churned' } as FiberOrder]]);
-    const groups = groupPaySales([churned, sale({ installDate: d(2026, 8, 5) })], fiber, rates, { month: SEP });
+    const cancelled = sale({ installDate: d(2026, 9, 5) });
+    const fiber = new Map<string, FiberOrder>([[cancelled.id!, { status: 'cancelled' } as FiberOrder]]);
+    const groups = groupPaySales([cancelled, sale({ installDate: d(2026, 8, 5) })], fiber, rates, { month: SEP });
     expect(groups).toEqual([]);
+  });
+
+  it('keeps a churned install in its month and adds an est. chargeback group in the disconnect month', () => {
+    // Installed Aug 20, disconnected Sep 15 (26 days): the full est. pay comes back off in September.
+    const churned = sale({ customerName: 'Darrel Nunez', installDate: d(2026, 8, 20) });
+    const fiber = new Map<string, FiberOrder>([
+      [churned.id!, { status: 'churned', activationDate: '2026-08-20', deactivationDate: '2026-09-15' } as FiberOrder],
+    ]);
+    const sep = groupPaySales([churned], fiber, rates, { month: SEP });
+    expect(sep.map((g) => [g.kind, g.label, g.sales.length, g.amount])).toEqual([
+      ['chargeback', 'Est. chargebacks · Sep', 0, -140],
+    ]);
+    expect(sep[0].chargebacks.map((line) => [line.customer, line.chargeback.days])).toEqual([['Darrel N.', 26]]);
+    // August still holds the install itself: the past month does not change.
+    const aug = groupPaySales([churned], fiber, rates, { month: { year: 2026, month: 7 } });
+    expect(aug.map((g) => [g.kind, g.sales.length])).toEqual([['window', 1]]);
+    expect(aug[0].amount).toBe(140);
   });
 
   it('keeps sales but drops the dollars when the rep has no plan', () => {

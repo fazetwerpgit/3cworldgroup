@@ -20,8 +20,9 @@ vi.mock('@/components/portal/admin-d/opsQueues', () => ({
 import { OwnerDashboard } from './OwnerDashboard';
 import DashboardPage from '@/app/portal/dashboard/page';
 
-const figures = (installs: number, revenue: number, commissions: number) => ({
+const figures = (installs: number, revenue: number, commissions: number, chargebacks = 0) => ({
   installs,
+  chargebacks,
   revenue,
   commissions,
   margin: revenue - commissions,

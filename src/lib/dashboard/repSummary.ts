@@ -25,6 +25,13 @@ import {
   shiftMonth,
 } from '@/lib/sales/monthWindow';
 import { datedSales, missedInstallSales, sumExpectedPay, undatedSales } from '@/lib/pay/payGroups';
+import {
+  chargebackFor,
+  chargebackLines,
+  chargebacksIn,
+  sumChargebacks,
+  type ChargebackLine,
+} from '@/lib/pay/chargeback';
 import { periodBounds } from '@/lib/leaderboard/periods';
 import { missedInstallDay } from '@/lib/sales/rescheduleDay';
 
@@ -44,10 +51,13 @@ const orderFor = (sale: Pick<Sale, 'id'>, fiberBySale: FiberMap) => fiberBySale.
 export interface PaySummary {
   /**
    * Est. pay on non-cancelled sales whose INSTALL DATE — scheduled or completed
-   * — falls in this calendar month (America/Chicago). Owner, 2026-09-22: pay
+   * — falls in this calendar month (America/Chicago), net of any est.
+   * chargeback landing this month (lib/pay/chargeback). Owner, 2026-09-22: pay
    * follows the install, not the sale. Null = no pay plan.
    */
   estThisMonth: number | null;
+  /** Est. chargebacks landing this month (deactivated within 120 days of install), already netted above. */
+  chargebacks: ChargebackLine[];
   /**
    * % change vs last month, counted the same way. Null when there is no plan or
    * last month had fewer than MIN_DELTA_BASE installs (no "+315%" off one sale).
@@ -79,12 +89,19 @@ export function summarizePay(
   const month = chicagoMonthKey(now);
   const installsIn = (key: typeof month) =>
     dated.filter((sale) => isInChicagoMonth(sale.installDate as Date | string | undefined, key));
+  // A chargeback lands in the month the customer disconnected, as a negative.
+  const lines = chargebackLines(sales, fiberBySale, rates);
+  const netOf = (key: typeof month) => {
+    const pay = sumExpectedPay(installsIn(key), rates);
+    const back = sumChargebacks(chargebacksIn(lines, key), rates);
+    return pay === null ? null : pay + (back ?? 0);
+  };
 
-  const estThisMonth = sumExpectedPay(installsIn(month), rates);
+  const estThisMonth = netOf(month);
   const lastMonth = installsIn(shiftMonth(month, -1));
-  const estLastMonth = sumExpectedPay(lastMonth, rates);
+  const estLastMonth = netOf(shiftMonth(month, -1));
   const deltaPct =
-    estThisMonth !== null && estLastMonth && lastMonth.length >= MIN_DELTA_BASE
+    estThisMonth !== null && estLastMonth !== null && estLastMonth > 0 && lastMonth.length >= MIN_DELTA_BASE
       ? Math.round(((estThisMonth - estLastMonth) / estLastMonth) * 100)
       : null;
 
@@ -95,6 +112,7 @@ export function summarizePay(
 
   return {
     estThisMonth,
+    chargebacks: chargebacksIn(lines, month),
     deltaPct,
     estNoDate: sumExpectedPay(undatedSales(sales, fiberBySale), rates),
     estMissed: sumExpectedPay(missedInstallSales(sales, fiberBySale), rates),
@@ -106,7 +124,15 @@ export function summarizePay(
 
 // ---------------------------------------------------------------- sales rows
 
-export type RowStatus = 'installed' | 'scheduled' | 'needs-date' | 'missed' | 'cancelled';
+/**
+ * 'chargeback': installed, then disconnected within 120 days of install
+ * (lib/pay/chargeback). Still counted in its install month; a disconnect after
+ * 120 days reads 'installed'.
+ */
+/** A 'chargeback' row's status words, the same on every page. */
+export const CHARGEBACK_STATUS_LABEL = 'Cancelled after install · chargeback';
+
+export type RowStatus = 'installed' | 'scheduled' | 'needs-date' | 'missed' | 'cancelled' | 'chargeback';
 
 export interface RecentSaleRow {
   id: string;
@@ -153,6 +179,7 @@ export function rowStatus(
   reportAsOf?: string | null
 ): RowStatus {
   if (sale.status === 'cancelled' || sale.status === 'rejected' || isCarrierCancelled(order)) return 'cancelled';
+  if (chargebackFor(sale, order)) return 'chargeback';
   const bucket = installBucketForSale(sale, order, now, reportAsOf);
   if (bucket === 'attention') return sale.installDate ? 'missed' : 'needs-date';
   return bucket;

@@ -22,11 +22,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useSales } from '@/hooks/useSales';
-import { isOverdue, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
+import { CHARGEBACK_STATUS_LABEL, isOverdue, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
+import { CHARGEBACK_REASON, chargebackFor, dayKeyDate } from '@/lib/pay/chargeback';
 import { auth } from '@/lib/firebase/config';
 import { carrierMark, planWithoutCarrier } from '@/lib/sales/carrierMark';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
@@ -54,7 +55,13 @@ const STATUS_CHIP: Record<RowStatus, { label: string; className: string }> = {
   'needs-date': { label: 'Needs install date', className: x.st_needsdate },
   missed: { label: 'Missed install', className: x.st_missed },
   cancelled: { label: 'Cancelled', className: x.st_cancelled },
+  chargeback: { label: CHARGEBACK_STATUS_LABEL, className: x.st_cancelled },
 };
+
+/** "Oct 2026": the month an est. chargeback lands in. */
+function chargebackMonth(day: string): string {
+  return dayKeyDate(day).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
 
 function longDay(value: Date | string | null | undefined): string | null {
   if (!value) return null;
@@ -277,6 +284,8 @@ export function RepSaleDetail() {
   const payWindow = payoutWindowForSale(shown, status !== 'cancelled' && status !== 'missed');
   const payout = payWindow ? formatPayoutWindow(payWindow) : null;
   const missedReason = order?.status === 'breakage' ? carrierReasonLabel(order.breakageReason) : null;
+  // Disconnected within 120 days of install: the est. pay comes back off in the disconnect month.
+  const chargeback = status === 'chargeback' ? chargebackFor(sale, order) : null;
 
   // EscaLink only handles T-Mobile Fiber, and only the seller or the office
   // would file for this customer. The dealer code is the one the carrier filed
@@ -389,6 +398,12 @@ export function RepSaleDetail() {
               {missedReason ? <Row label="Carrier says">{missedReason}</Row> : null}
               {payout ? <Row label="Est. payout">{payout}</Row> : null}
               {ownSale ? <Row label="Est. pay">{payCell()}</Row> : null}
+              {ownSale && chargeback ? (
+                <Row label="Est. chargeback">
+                  {comp.hasPlan && estPay ? `−${formatMoney(estPay)} · ` : ''}
+                  {CHARGEBACK_REASON} ({chargebackMonth(chargeback.deactivationDay)})
+                </Row>
+              ) : null}
               {ownSale || payout ? (
                 <p className={x.fine}>
                   Estimates before chargebacks and claims; the carrier&apos;s final report decides what pays.

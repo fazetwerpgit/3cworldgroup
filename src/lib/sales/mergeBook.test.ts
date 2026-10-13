@@ -249,13 +249,15 @@ describe('CALL 2 amended — a carrier cancellation takes the money', () => {
     expect(cancelled().notLoggedCount).toBe(0);
   });
 
-  it('does the same on a churn', () => {
+  it('does NOT do the same on a churn: the install stands in its month (the 120-day rule)', () => {
     const book = build(
       [sale({ installDate: new Date('2026-09-08T12:00:00') })],
-      [order({ status: 'churned', deactivationDate: '2026-09-10' })]
+      [order({ status: 'churned', activationDate: '2026-09-08', deactivationDate: '2026-09-10' })]
     );
-    expect(row(book, 's1').state).toBe('cancelled');
-    expect(book.totalValue).toBe(0);
+    expect(row(book, 's1').state).toBe('agreed');
+    expect(row(book, 's1').counted).toBe(true);
+    expect(row(book, 's1').bucket).toBe('installed');
+    expect(book.cancelled).toEqual([]);
   });
 });
 

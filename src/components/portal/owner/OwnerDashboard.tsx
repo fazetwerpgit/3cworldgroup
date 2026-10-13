@@ -137,6 +137,12 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
       ? `${data.unratedInstalls} ${data.unratedInstalls === 1 ? 'install has' : 'installs have'} no rep rate`
       : null,
   ].filter(Boolean);
+  // Netted into this month's revenue, commissions and margin already.
+  const backs = month.current.chargebacks;
+  const chargebackNote =
+    backs > 0
+      ? ` Includes ${backs} est. ${backs === 1 ? 'chargeback' : 'chargebacks'} this month (cancelled within 120 days of install).`
+      : null;
 
   return (
     <section className={`${s.panel} ${o.board}`} aria-labelledby="money-h">
@@ -198,6 +204,7 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
         Estimates from installs × current comp-plan rates. &ldquo;vs&rdquo; is the same point last week or last month.
         <ReportStamp reportAt={data.reportAt} />
         {gaps.length ? <span className={o.footGap}> {gaps.join(' · ')} (counted at $0).</span> : null}
+        {chargebackNote ? <span className={o.footGap}>{chargebackNote}</span> : null}
       </p>
     </section>
   );

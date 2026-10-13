@@ -874,6 +874,19 @@
   font-size: var(--t-sm);
 }
 
+/* "Plan mix · 10× 1 Gig · 6× 2 Gig": one muted line under the head. It never
+   wraps; on a narrow phone the tail ellipsises. */
+.planMix {
+  margin: 0;
+  padding: 0 var(--s4) 10px;
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .fiberView {
   border-top: 1px solid var(--c-line);
 }

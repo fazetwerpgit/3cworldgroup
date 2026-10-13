@@ -7,6 +7,7 @@ import { LeaderboardStage } from './LeaderboardStage';
 import { RecentSales } from './RecentSales';
 import { spotLine, zeroEntries } from './belowPodium';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
+import type { PlanMixEntry } from '@/lib/sales/planMix';
 import styles from './leaderboard.module.css';
 
 export interface LeaderboardEntry {
@@ -19,6 +20,8 @@ export interface LeaderboardEntry {
   movement?: number | null;
   spark?: (number | null)[];
   streakDays?: number;
+  /** Counts per internet tier this period, most sold first (lib/sales/planMix). Never money. */
+  planMix?: PlanMixEntry[];
 }
 
 export type LeaderboardMetric = 'totalPoints' | 'totalSales';

@@ -113,3 +113,30 @@ describe('current-user treatment', () => {
     expect(container.querySelector('[aria-label="Your standing"]')).toBeNull();
   });
 });
+
+describe('plan mix', () => {
+  const mix = [
+    { tier: '1 Gig', count: 10 },
+    { tier: '2 Gig', count: 6 },
+    { tier: '300', count: 4 },
+  ];
+
+  it('prints one muted line under the name, on the rows and the podium', () => {
+    renderBoard([entry(1, { planMix: mix }), entry(2), entry(3), entry(4, { planMix: mix })]);
+
+    const row = container.querySelector<HTMLElement>('[aria-label="Ranking"] > div')!;
+    const line = row.querySelector<HTMLElement>('[data-testid="plan-mix"]')!;
+    expect(line.textContent).toBe('Plan mix: 10× 1 Gig · 6× 2 Gig · 4× 300');
+    // Under the name, inside the same column (one grid cell, so the row keeps its four columns).
+    expect(line.parentElement?.querySelector('strong')?.textContent).toBe('Rep 4');
+    expect(row.children).toHaveLength(4);
+
+    const gold = container.querySelector<HTMLElement>('[data-rank="1"]')!;
+    expect(gold.querySelector('[data-testid="plan-mix"]')?.textContent).toContain('10× 1 Gig');
+  });
+
+  it('prints nothing for a rep without a mix', () => {
+    renderBoard([entry(1), entry(2), entry(3), entry(4)]);
+    expect(container.querySelector('[data-testid="plan-mix"]')).toBeNull();
+  });
+});
