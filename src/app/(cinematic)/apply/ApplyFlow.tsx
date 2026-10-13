@@ -436,7 +436,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
               <span className={kit.pageHeadLime}>five fields.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              No resume. Door-to-door sales of fiber internet, TV and home security.
+              No resume. Door-to-door sales of fiber internet, home security, solar and TV.
               1099 contractor, commission only, training included.
             </p>
             <div className={`${kit.pageHeadActions} ${styles.headActions}`}>
@@ -746,7 +746,7 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
               </h2>
               <p className={styles.asideBody}>
                 Face-to-face sales in residential neighborhoods. You work an area on foot,
-                knock, find out what a household is paying for internet, TV or security, and
+                knock, find out what a household needs from internet, security, solar or TV, and
                 offer something that fits.
               </p>
               <hr className={styles.asideRule} />

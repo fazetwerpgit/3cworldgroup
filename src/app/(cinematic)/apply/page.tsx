@@ -7,7 +7,7 @@ import styles from "./apply.module.css";
 export const metadata: Metadata = {
   title: "Apply | 3C World Group",
   description:
-    "Apply to sell fiber internet, TV and home security door to door with 3C World Group. A 1099, commission-only role with full training and no experience needed.",
+    "Apply to sell fiber internet, home security, solar and TV door to door with 3C World Group. A 1099, commission-only role with full training and no experience needed.",
   // Static: ?market= prefills the form but is the same page.
   alternates: { canonical: "/apply" },
 };
@@ -57,7 +57,7 @@ const GOOD_TO_KNOW = [
   },
   {
     term: "What you would represent",
-    def: "Fiber internet, TV service and home security systems from the providers 3C represents, individually or bundled.",
+    def: "Fiber internet, home security systems, solar and TV service from the providers 3C represents, individually or bundled.",
   },
 ];
 

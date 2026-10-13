@@ -122,7 +122,7 @@ export default function OpportunitiesPage() {
               <span className={kit.pageHeadLime}>Not just a job.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              Door-to-door sales of fiber, TV and home security in a market that is hiring.
+              Door-to-door sales of fiber, home security, solar and TV in a market that is hiring.
               Training first, then a route with a leader who checks in.
             </p>
             <div className={kit.pageHeadActions}>

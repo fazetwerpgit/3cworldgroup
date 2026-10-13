@@ -51,7 +51,7 @@ const { props: heroTall } = getImageProps({
 export const metadata: Metadata = {
   title: "Door-to-Door Sales Careers | 3C World Group",
   description:
-    "Sell fiber internet, TV, and home security face to face. A 1099, commission-only role with real training and support. Apply to 3C World Group.",
+    "Sell fiber internet, home security, solar, and TV face to face. A 1099, commission-only role with real training and support. Apply to 3C World Group.",
   alternates: { canonical: "/" },
 };
 
@@ -150,8 +150,8 @@ export default function Home() {
           </h1>
 
           <p className={styles.heroLede}>
-            Door-to-door sales for fiber internet, TV and home security, with training to sell
-            all three. 1099 independent contractor, commission-only, uncapped.
+            Door-to-door sales for fiber internet, home security, solar and TV, with training to
+            sell all four. 1099 independent contractor, commission-only, uncapped.
           </p>
 
           <div className={styles.heroActions}>

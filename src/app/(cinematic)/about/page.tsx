@@ -78,8 +78,8 @@ export default function AboutPage() {
               <span className={kit.pageHeadLime}>One door at a time.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              3C World Group is a face-to-face sales company. We sell fiber, TV and home
-              security at the door for the providers who serve each market.
+              3C World Group is a face-to-face sales company. We sell fiber, home security,
+              solar and TV at the door for the providers who serve each market.
             </p>
             <div className={kit.pageHeadActions}>
               <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>

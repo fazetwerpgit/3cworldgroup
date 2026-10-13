@@ -20,8 +20,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "3C World Group | Fiber Internet, TV & Security Solutions",
-  description: "Nationwide B2C sales solutions for fiber internet, TV services, and security systems. Join our team of successful independent contractors.",
+  title: "3C World Group | Fiber Internet, Security, Solar & TV",
+  description: "Nationwide B2C sales solutions for fiber internet, security systems, solar, and TV services. Join our team of successful independent contractors.",
   // Shared-link cards. No title or description here: Next fills them from each
   // page's own, so every page's card names that page.
   openGraph: {

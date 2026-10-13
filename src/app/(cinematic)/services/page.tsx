@@ -9,7 +9,7 @@ import styles from "./services.module.css";
 export const metadata: Metadata = {
   title: "Our Services | 3C World Group",
   description:
-    "Explore fiber internet, TV, and security solutions from 3C World Group.",
+    "Explore fiber internet, security, solar, and TV solutions from 3C World Group.",
   alternates: { canonical: "/services" },
 };
 
@@ -101,12 +101,12 @@ export default function ServicesPage() {
           <div className={kit.pageHeadCol}>
             <p className={kit.pageHeadEyebrow}>What you&apos;ll sell</p>
             <h1 className={kit.pageHeadTitle}>
-              Three services.
-              <span className={kit.pageHeadLime}>One connection.</span>
+              Four services.
+              <span className={kit.pageHeadLime}>One door.</span>
             </h1>
             <p className={kit.pageHeadLede}>
-              Fiber internet, TV and home security, sold at the door. Three products,
-              one conversation, and you learn all three before your first route.
+              Fiber internet, home security, solar and TV, sold at the door. Four products,
+              one conversation, and you learn all four before your first route.
             </p>
             <div className={kit.pageHeadActions}>
               <Link href={APPLY_HREF} className={`${kit.btn} ${kit.btnLime} ${kit.btnLg}`}>
@@ -133,7 +133,7 @@ export default function ServicesPage() {
               the home.
             </h2>
             <p className={kit.sectionLedeInk}>
-              Fiber internet, TV and home security, each from the provider that serves
+              Fiber internet, home security, solar and TV, each from the provider that serves
               that market. You sell what is actually available on the street you are on.
             </p>
           </header>
@@ -274,7 +274,7 @@ export default function ServicesPage() {
               <span className={styles.closingLime}>Start here.</span>
             </h2>
             <p className={styles.closingLede}>
-              Fiber, TV and home security, sold at the door on a route in one of our
+              Fiber, home security, solar and TV, sold at the door on a route in one of our
               markets. Training included. No experience needed.
             </p>
           </div>

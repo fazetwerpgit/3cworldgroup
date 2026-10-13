@@ -20,11 +20,11 @@ import styles from "../cinematic-home.module.css";
 const FAQS = [
   {
     q: "What is the job, day to day?",
-    a: "Face-to-face sales in residential neighborhoods. You work an area on foot, knock, introduce yourself, find out what a household is paying for internet, TV or security, and offer something that fits. It is outdoor, conversational work, and the number of conversations you have is the part of it you control.",
+    a: "Face-to-face sales in residential neighborhoods. You work an area on foot, knock, introduce yourself, find out what a household needs from internet, security, solar or TV, and offer something that fits. It is outdoor, conversational work, and the number of conversations you have is the part of it you control.",
   },
   {
     q: "What would I be selling?",
-    a: "Fiber internet, TV service, and home security systems from the providers 3C represents, individually or bundled. These are established products people already recognize, not something you have to explain from scratch.",
+    a: "Fiber internet, home security systems, solar, and TV service from the providers 3C represents, individually or bundled. These are established products people already recognize, not something you have to explain from scratch.",
   },
   {
     q: "How does the pay work?",

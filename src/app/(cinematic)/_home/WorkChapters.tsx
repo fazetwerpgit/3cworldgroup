@@ -17,14 +17,14 @@ const CHAPTERS = [
     title: "The conversation",
     lede: "You start with a conversation.",
     body:
-      "Knock, introduce yourself, and learn what a household needs from internet, TV, or security. The pitch is short; the questions come first.",
+      "Knock, introduce yourself, and learn what a household needs from internet, security, solar, or TV. The pitch is short; the questions come first.",
   },
   {
     n: "02",
     title: "The right fit",
     lede: "Then you match the need to a product.",
     body:
-      "You offer fiber internet, TV service, or home security from the providers 3C represents, on its own or bundled. Good selling means explaining the fit clearly and saying when it is not a fit.",
+      "You offer fiber internet, home security, solar, or TV service from the providers 3C represents, on its own or bundled. Good selling means explaining the fit clearly and saying when it is not a fit.",
   },
   {
     n: "03",
