@@ -11,7 +11,7 @@ import styles from "./careers.module.css";
 export const metadata: Metadata = {
   title: "Fiber Internet Sales Jobs, Now Hiring | 3C World Group",
   description:
-    "Build a career with 3C World Group through training, support, and a clear path forward.",
+    "Now hiring door-to-door fiber internet sales reps in Dallas, Houston, Southern California, Lansing and Grand Rapids. 1099, commission-based, uncapped earnings, with training and a clear path forward.",
   alternates: { canonical: "/opportunities" },
 };
 
