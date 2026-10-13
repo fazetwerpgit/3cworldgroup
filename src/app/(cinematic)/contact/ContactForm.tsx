@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
+import { APPLY_HREF } from "../../_cinematic/nav";
 import kit from "../../_cinematic/cinematic.module.css";
 import styles from "./contact.module.css";
 import {
@@ -26,7 +28,12 @@ import {
 const SUBJECTS = [
   { value: "services", label: "Service Inquiry" },
   { value: "careers", label: "Career Opportunity" },
-  { value: "support", label: "Customer Support" },
+  /*
+    Was "Customer Support" until 2026-10: job seekers read it as "I am good at
+    customer support" and sent applications here. The value stays `support` so
+    stored messages keep their meaning.
+  */
+  { value: "support", label: "Help With My Service" },
   { value: "partnership", label: "Partnership Inquiry" },
   { value: "other", label: "Other" },
 ];
@@ -448,7 +455,13 @@ export default function ContactForm() {
               id="contact-subject"
               name="subject"
               aria-invalid={invalid.subject ? true : undefined}
-              aria-describedby={invalid.subject ? "contact-subject-error" : undefined}
+              aria-describedby={
+                invalid.subject
+                  ? "contact-subject-error"
+                  : formData.subject === "careers"
+                    ? "contact-subject-note"
+                    : undefined
+              }
               onInvalid={handleInvalid}
               required
               value={formData.subject}
@@ -466,6 +479,16 @@ export default function ContactForm() {
             <span className={styles.fieldError} id="contact-subject-error">
               {invalid.subject}
             </span>
+          ) : null}
+          {/*
+            A job seeker who picks "Career Opportunity" is pointed at the
+            application, where a recruiter will see it. Only a pointer: the
+            form still sends, and nothing is read out of the message.
+          */}
+          {formData.subject === "careers" ? (
+            <p className={styles.fieldNote} id="contact-subject-note">
+              Looking for a job? <Link href={APPLY_HREF}>Apply here</Link> so a recruiter gets it.
+            </p>
           ) : null}
         </div>
       </div>

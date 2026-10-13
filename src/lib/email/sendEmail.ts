@@ -7,6 +7,8 @@ export interface EmailInput {
   textBody: string;
   /** Optional sender override; falls back to EMAIL_FROM so a missing env can never block delivery. */
   from?: string;
+  /** Optional Reply-To address (Postmark `ReplyTo`), e.g. the person who wrote in. CR/LF are stripped. */
+  replyTo?: string;
   attachments?: { name: string; contentBase64: string; contentType: string }[];
 }
 
@@ -27,6 +29,8 @@ export async function sendEmail(input: EmailInput): Promise<{ ok: boolean; error
     console.warn('[email] not configured; skipping send:', input.subject);
     return { ok: false, error: 'not_configured' };
   }
+  // Header-injection guard: an address never contains a line break.
+  const replyTo = input.replyTo?.replace(/[\r\n]/g, '').trim();
   try {
     const res = await fetch(POSTMARK_URL, {
       method: 'POST',
@@ -42,6 +46,7 @@ export async function sendEmail(input: EmailInput): Promise<{ ok: boolean; error
         HtmlBody: input.htmlBody,
         TextBody: input.textBody,
         MessageStream: 'outbound',
+        ...(replyTo ? { ReplyTo: replyTo } : {}),
         ...(input.attachments?.length
           ? {
               Attachments: input.attachments.map((attachment) => ({

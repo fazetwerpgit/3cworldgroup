@@ -31,7 +31,7 @@ import {
 const SUBJECTS: Record<string, string> = {
   services: 'Service inquiry',
   careers: 'Career opportunity',
-  support: 'Customer support',
+  support: 'Help with my service',
   partnership: 'Partnership inquiry',
   other: 'Other',
 };
@@ -118,7 +118,15 @@ export async function POST(request: NextRequest) {
       }
       const results = await Promise.all(
         recipients.map((to) =>
-          sendEmail({ to, subject: `Website message: ${subjectLabel} from ${name}`, htmlBody, textBody })
+          sendEmail({
+            to,
+            subject: `Website message: ${subjectLabel} from ${name}`,
+            htmlBody,
+            textBody,
+            // Reply goes to the person who wrote in, not the alerts sender.
+            // `email` passed isValidEmail above, so it holds no CR/LF.
+            replyTo: email,
+          })
         )
       );
       results.forEach((result, index) => {

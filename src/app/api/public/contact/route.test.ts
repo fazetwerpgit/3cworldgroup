@@ -57,6 +57,21 @@ describe('POST /api/public/contact', () => {
     expect(htmlBody).toContain('Second line.');
   });
 
+  it('sets Reply-To on every owner alert to the validated, lowercased submitter email', async () => {
+    await POST(request(VALID));
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+    for (const [input] of sendEmailMock.mock.calls) {
+      expect(input.replyTo).toBe('sam@example.com');
+    }
+  });
+
+  it('labels the support subject "Help with my service" and keeps the stored value', async () => {
+    await POST(request({ ...VALID, subject: 'support' }));
+    expect(addMock).toHaveBeenCalledWith(expect.objectContaining({ subject: 'support' }));
+    expect(sendEmailMock.mock.calls[0][0].subject).toBe('Website message: Help with my service from Sam Caller');
+    expect(sendEmailMock.mock.calls[0][0].textBody).toContain('Subject: Help with my service');
+  });
+
   it('escapes html in the message body', async () => {
     await POST(request({ ...VALID, message: '<script>alert(1)</script>' }));
     const { htmlBody } = sendEmailMock.mock.calls[0][0];

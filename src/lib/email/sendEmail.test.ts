@@ -25,6 +25,20 @@ describe('sendEmail', () => {
     expect(body.To).toBe('a@b.c');
   });
 
+  it('passes replyTo through as Postmark ReplyTo, stripping CR/LF', async () => {
+    await sendEmail({ ...INPUT, replyTo: 'sam@example.com\r\nBcc: x@evil.test' });
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.ReplyTo).toBe('sam@example.comBcc: x@evil.test');
+    expect(body.ReplyTo).not.toMatch(/[\r\n]/);
+  });
+
+  it('omits ReplyTo when replyTo is not given', async () => {
+    await sendEmail(INPUT);
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(init.body as string)).not.toHaveProperty('ReplyTo');
+  });
+
   it('returns ok:false (never throws) when unconfigured', async () => {
     vi.stubEnv('POSTMARK_SERVER_TOKEN', '');
     const result = await sendEmail(INPUT);

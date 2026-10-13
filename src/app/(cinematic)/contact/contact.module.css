@@ -392,6 +392,23 @@
   top: 100%;
 }
 
+/* The pointer under the subject when it is "Career Opportunity". In flow,
+   unlike the error line: it may wrap to two lines at 390px, and only ever
+   shows when the subject has a value, so it never sits beside an error.
+   Type matches the counter; the link matches the form's other link. */
+.fieldNote {
+  color: var(--on-paper-dim);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  margin: 0;
+  padding-top: 0.35rem;
+}
+
+.fieldNote a {
+  color: var(--lime-ink);
+  text-decoration: underline;
+}
+
 .fieldLabel {
   color: var(--on-paper);
   display: block;

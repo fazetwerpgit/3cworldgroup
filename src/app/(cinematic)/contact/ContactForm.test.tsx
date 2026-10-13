@@ -50,6 +50,31 @@ async function fillValid() {
 const submit = () => act(async () => container.querySelector<HTMLButtonElement>('button[type=submit]')!.click());
 
 describe('ContactForm', () => {
+  it('labels the support subject "Help With My Service" and keeps its value', () => {
+    const option = container.querySelector<HTMLOptionElement>('#contact-subject option[value="support"]')!;
+    expect(option.textContent).toBe('Help With My Service');
+  });
+
+  it('points job seekers at the application only when the subject is careers, and still sends', async () => {
+    expect(container.querySelector('#contact-subject-note')).toBeNull();
+    await type('contact-subject', 'careers');
+    const note = field('contact-subject-note');
+    expect(note.textContent).toBe('Looking for a job? Apply here so a recruiter gets it.');
+    expect(note.querySelector('a')!.getAttribute('href')).toBe('/apply');
+    expect(field('contact-subject').getAttribute('aria-describedby')).toBe('contact-subject-note');
+
+    await type('contact-subject', 'services');
+    expect(container.querySelector('#contact-subject-note')).toBeNull();
+
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{"success":true}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await fillValid();
+    await type('contact-subject', 'careers');
+    await submit();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).subject).toBe('careers');
+  });
+
   it('scrolls the sent panel into view and focuses its heading', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"success":true}', { status: 200 })));
     await fillValid();
