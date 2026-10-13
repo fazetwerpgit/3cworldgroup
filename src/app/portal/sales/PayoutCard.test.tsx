@@ -207,7 +207,10 @@ describe('Sales page payout data', () => {
     expect(result.map((p) => formatPayoutWindow(p.window))).toEqual(['Oct 21–25']);
   });
 
-  it('drops portal-cancelled and carrier-cancelled sales from the windows', () => {
+  // A customer who disconnects after install stays in its install window (the
+  // 120-day chargeback is its own line, lib/pay/chargeback); a cancel before
+  // install never pays.
+  it('drops portal-cancelled and carrier-cancelled sales from the windows, keeps churned', () => {
     const kept = sale({ installDate: d(2026, 10, 2) });
     const cancelled = sale({ installDate: d(2026, 10, 2), status: 'cancelled' });
     const churned = sale({ installDate: d(2026, 10, 3) });
@@ -217,7 +220,7 @@ describe('Sales page payout data', () => {
       [carrierCancelled.id!, order({ status: 'cancelled' })],
     ]);
     const [window] = pagePayouts([kept, cancelled, churned, carrierCancelled], fiber);
-    expect(window.count).toBe(1);
-    expect(window.sales).toEqual([kept]);
+    expect(window.count).toBe(2);
+    expect(window.sales).toEqual([kept, churned]);
   });
 });
