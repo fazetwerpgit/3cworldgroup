@@ -93,6 +93,22 @@ describe('leaderboard join parity', () => {
     expect(periodSales).toHaveLength(3);
   });
 
+  it('stops at the end of a closed window', () => {
+    const october = new Date('2026-10-01T05:00:00.000Z').getTime();
+    const november = new Date('2026-11-01T05:00:00.000Z').getTime();
+    const late = sale('late', 'wil', '9 Late St', { saleDate: noon('2026-11-01') });
+    const { totals, allSales, periodSales } = tallyBoard(
+      boardSales([...SALES, late], companyFiberBySale([...SALES, late], []), 'approved'),
+      october,
+      november
+    );
+    expect(periodSales.some((s) => s.saleDate.getTime() >= november)).toBe(false);
+    expect(allSales.some((s) => s.saleDate.getTime() >= november)).toBe(true);
+    expect(totals.find((t) => t.salesRepId === 'wil')?.totalSales).toBe(
+      tallyBoard(boardSales(SALES, companyFiberBySale(SALES, []), 'approved'), october).totals.find((t) => t.salesRepId === 'wil')?.totalSales
+    );
+  });
+
   it('still ranks the portal’s own counts when the carrier report is missing', () => {
     const board = boardSales(SALES, companyFiberBySale(SALES, []), 'approved').map((s) => s.id);
     expect(board).toEqual(['b-live', 'b-cancel', 'b-churn', 'b-wait', 'w-live', 'w-old']);

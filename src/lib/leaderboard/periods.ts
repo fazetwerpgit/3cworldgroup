@@ -1,3 +1,5 @@
+import { chicagoMonthKey, compareMonths, type MonthKey } from '@/lib/sales/monthWindow';
+
 const CHICAGO_TIME_ZONE = 'America/Chicago';
 const DAY_MS = 86_400_000;
 
@@ -69,4 +71,49 @@ export function chicagoDayBounds(day: string): { start: Date; end: Date } {
     start: chicagoMidnight({ year, month, day: date }),
     end: chicagoMidnight({ year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: next.getUTCDate() }),
   };
+}
+
+/**
+ * One calendar month on the office clock: Chicago midnight on the 1st up to
+ * (not including) Chicago midnight on the 1st of the next month. Sale dates
+ * are stored at the server's local noon, so every day of the month sits well
+ * inside it whichever side of a DST change it falls on.
+ */
+export function chicagoMonthBounds({ year, month }: MonthKey): { start: Date; end: Date } {
+  const next = new Date(Date.UTC(year, month + 1, 1));
+  return {
+    start: chicagoMidnight({ year, month: month + 1, day: 1 }),
+    end: chicagoMidnight({ year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: 1 }),
+  };
+}
+
+/** `YYYY-MM`, the leaderboard's `month` query value. */
+export function formatMonthParam({ year, month }: MonthKey): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
+const MONTH_PARAM_RE = /^(\d{4})-(0[1-9]|1[0-2])$/;
+
+/** A `YYYY-MM` value as a MonthKey, or null when it isn't one. No range check. */
+export function monthKeyFromParam(value: string | null | undefined): MonthKey | null {
+  const match = MONTH_PARAM_RE.exec(value ?? '');
+  return match ? { year: Number(match[1]), month: Number(match[2]) - 1 } : null;
+}
+
+export type LeaderboardMonthResult =
+  | { ok: true; month: MonthKey; current: boolean }
+  | { ok: false; error: string };
+
+/**
+ * The leaderboard's `month` query value. Absent means this month (on the office
+ * clock); a malformed value or a month that hasn't started yet is an error.
+ */
+export function parseLeaderboardMonth(value: string | null | undefined, now = new Date()): LeaderboardMonthResult {
+  const current = chicagoMonthKey(now);
+  if (value === null || value === undefined || value === '') return { ok: true, month: current, current: true };
+  const month = monthKeyFromParam(value);
+  if (!month) return { ok: false, error: 'month must be YYYY-MM' };
+  const order = compareMonths(month, current);
+  if (order > 0) return { ok: false, error: 'month cannot be in the future' };
+  return { ok: true, month, current: order === 0 };
 }

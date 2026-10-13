@@ -142,3 +142,32 @@ describe('plan mix', () => {
     expect(container.querySelector('[data-testid="plan-mix"]')).toBeNull();
   });
 });
+
+describe('leaderboard past month', () => {
+  it('heads the stage with the month, with no countdown or chase line', () => {
+    act(() => {
+      root.render(
+        <LeaderboardTable
+          entries={[entry(1), entry(2), entry(3), entry(4), entry(5)]}
+          currentUser={entry(5, { salesRepId: 'me' })}
+          viewer={{ uid: 'me' }}
+          metric="totalPoints"
+          period="month"
+          pastMonth={{ year: 2026, month: 8 }}
+        />
+      );
+    });
+    expect(container.querySelector('h2')?.textContent).toBe('September 2026');
+    expect(container.textContent).not.toContain('left');
+    expect(container.querySelector('[data-testid="spot-line"]')).toBeNull();
+  });
+
+  it('says the month had no sales when it is empty', () => {
+    act(() => {
+      root.render(
+        <LeaderboardTable entries={[]} metric="totalPoints" period="month" pastMonth={{ year: 2026, month: 8 }} />
+      );
+    });
+    expect(container.textContent).toContain('Nothing was approved in September 2026.');
+  });
+});

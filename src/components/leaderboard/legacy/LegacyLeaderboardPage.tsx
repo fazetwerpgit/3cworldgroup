@@ -20,6 +20,9 @@ import { auth } from '@/lib/firebase/config';
 import { weekTimeLeft } from '@/lib/dashboard/repSummary';
 import { PageTitle } from '@/components/portal/PageTitle';
 import type { LeaderboardEntry } from '../LeaderboardTable';
+import type { MonthNav } from '../MonthNav';
+import { MonthPicker } from '@/components/portal/rep/MonthPicker';
+import type { MonthKey } from '@/lib/sales/monthWindow';
 
 type Period = 'week' | 'month' | 'year' | 'all';
 type Metric = 'totalPoints' | 'totalSales';
@@ -44,11 +47,13 @@ function LegacyLeaderboardFilters({
   metric,
   setPeriod,
   setMetric,
+  monthNav,
 }: {
   period: Period;
   metric: Metric;
   setPeriod: (period: Period) => void;
   setMetric: (metric: Metric) => void;
+  monthNav?: MonthNav | null;
 }) {
   return (
     <div className="portal-leaderboard-filters border-b border-[#0A1F44]/20 pb-4 dark:border-white/15">
@@ -78,6 +83,10 @@ function LegacyLeaderboardFilters({
             </button>
           ))}
       </div>
+      {/* Earlier months on This Month: the Sales page's stepper. */}
+      {period === 'month' && monthNav ? (
+        <MonthPicker month={monthNav.month} min={monthNav.min} max={monthNav.max} onChange={monthNav.onChange} />
+      ) : null}
       <span className="portal-live-label">Live</span>
       </div>
   );
@@ -206,6 +215,8 @@ interface LegacyLeaderboardPageProps {
   metric: Metric;
   onPeriodChange: (period: Period) => void;
   onMetricChange: (metric: Metric) => void;
+  monthNav?: MonthNav | null;
+  pastMonth?: MonthKey | null;
   viewerName?: string | null;
   viewerId?: string | null;
   unranked?: UnrankedRep[];
@@ -222,6 +233,8 @@ export function LegacyLeaderboardPage({
   metric,
   onPeriodChange,
   onMetricChange,
+  monthNav = null,
+  pastMonth = null,
   viewerName,
   viewerId,
   unranked,
@@ -284,7 +297,7 @@ export function LegacyLeaderboardPage({
       {/* No side padding: the D shell's gutter already lines the board up with its top bar. */}
       <div className="relative z-10 mx-auto w-full max-w-[1500px] pb-8">
         <PageTitle title="Leaderboard" meta={`${entries.length} ranked`} />
-        <LegacyLeaderboardFilters period={period} metric={metric} setPeriod={onPeriodChange} setMetric={onMetricChange} />
+        <LegacyLeaderboardFilters period={period} metric={metric} setPeriod={onPeriodChange} setMetric={onMetricChange} monthNav={monthNav} />
         <div className="portal-leaderboard-summary-grid">
           <WeeklyChallenge
             sales={weeklySales}
@@ -299,7 +312,7 @@ export function LegacyLeaderboardPage({
         {error && <div className="my-5 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
 
         <div className="pt-4">
-          {loading ? <BoardSkeleton /> : <LegacyLeaderboardTable entries={entries} currentUser={currentUser} metric={metric} period={period} unranked={unranked} recent={recent} viewerId={viewerId} />}
+          {loading ? <BoardSkeleton /> : <LegacyLeaderboardTable entries={entries} currentUser={currentUser} metric={metric} period={period} pastMonth={pastMonth} unranked={unranked} recent={recent} viewerId={viewerId} />}
         </div>
       </div>
     </>

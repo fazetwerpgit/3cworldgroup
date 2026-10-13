@@ -4,12 +4,19 @@ import { useEffect, useState } from 'react';
 import { Clock3 } from 'lucide-react';
 import type { LeaderboardMetric, LeaderboardPeriod } from './LeaderboardTable';
 import { periodBounds as sharedPeriodBounds } from '@/lib/leaderboard/periods';
+import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import styles from './leaderboard.module.css';
 
 const DAY_MS = 86_400_000;
 
-export function periodLabel(period: LeaderboardPeriod, metric: LeaderboardMetric = 'totalPoints') {
+export function periodLabel(
+  period: LeaderboardPeriod,
+  metric: LeaderboardMetric = 'totalPoints',
+  pastMonth: MonthKey | null = null,
+) {
   const subject = metric === 'totalPoints' ? 'points' : 'sales';
+
+  if (period === 'month' && pastMonth) return `Monthly ${subject} · ${monthLabel(pastMonth)}`;
 
   if (period === 'week') return `Weekly ${subject} · resets Sunday`;
   if (period === 'month') return `Monthly ${subject} · resets on the 1st`;
@@ -18,7 +25,8 @@ export function periodLabel(period: LeaderboardPeriod, metric: LeaderboardMetric
 }
 
 /** The stage band's short sport head: set in Bebas, so a few words only. */
-export function periodTitle(period: LeaderboardPeriod) {
+export function periodTitle(period: LeaderboardPeriod, pastMonth: MonthKey | null = null) {
+  if (period === 'month' && pastMonth) return monthLabel(pastMonth);
   if (period === 'week') return 'This week';
   if (period === 'month') return 'This month';
   if (period === 'year') return 'This year';

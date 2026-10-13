@@ -11,7 +11,8 @@ import { boardSales, companyFiberBySale, tallyBoard } from '@/lib/leaderboard/bo
 import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 import { boardCountedSales } from '@/lib/pay/chargeback';
 import type { FiberOrder, Sale } from '@/types';
-import { periodBounds } from '@/lib/leaderboard/periods';
+import { chicagoMonthBounds, formatMonthParam, parseLeaderboardMonth, periodBounds } from '@/lib/leaderboard/periods';
+import { chicagoMonthKey, type MonthKey } from '@/lib/sales/monthWindow';
 import { boardOrder } from '@/lib/leaderboard/order';
 import { recentSales, unrankedReps, type RecentSale, type UnrankedRep } from '@/lib/leaderboard/team';
 
@@ -85,8 +86,21 @@ export async function GET(request: NextRequest) {
 
     // Calculate date range
     const now = new Date();
-    const bounds = periodBounds(period === 'week' || period === 'year' || period === 'all' ? period : 'month', now);
+    const boardPeriod = period === 'week' || period === 'year' || period === 'all' ? period : 'month';
+    // Month view: `month=YYYY-MM` reads a past month, recomputed live from the
+    // sales below (no snapshots); absent is this month. Both are bounded
+    // [1st, next 1st) on the office clock. A month not yet begun is refused.
+    let monthView: { key: MonthKey; current: boolean } | null = null;
+    if (boardPeriod === 'month') {
+      const parsed = parseLeaderboardMonth(searchParams.get('month'), now);
+      if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+      monthView = { key: parsed.month, current: parsed.current };
+    }
+    const pastMonth = monthView !== null && !monthView.current;
+    const bounds = monthView ? chicagoMonthBounds(monthView.key) : periodBounds(boardPeriod, now);
     const startDate = bounds?.start ?? new Date(0);
+    // Week, year and all time keep their open end (nothing is sold in the future).
+    const endTime = monthView && bounds ? bounds.end.getTime() : Infinity;
 
     // EVERY sale, any status: the carrier join below is the owner book's
     // (buildMergedBook over every sale and every order), and which order a sale
@@ -121,7 +135,8 @@ export async function GET(request: NextRequest) {
     // What the estimate counts, less a disconnect within 120 days of install.
     const { totals: leaderboard, allSales, periodSales } = tallyBoard(
       boardSales(sales, fiberBySale, scope),
-      startDate.getTime()
+      startDate.getTime(),
+      endTime
     );
 
     const score = metric === 'totalSales' ? 'totalSales' : 'totalPoints';
@@ -136,18 +151,21 @@ export async function GET(request: NextRequest) {
 
     // Phase 2: rank history (movement vs yesterday, 7-day spark, streaks).
     // Fail-soft — a history bug must never take down the leaderboard.
+    // A past month is closed: no movement, trend or streaks to show for it.
     let history: Map<string, HistoryEnrichment> | null = null;
-    try {
-      history = computeHistory({
-        periodSales,
-        allSales,
-        currentRanks: new Map(fullyRanked.map((e) => [e.salesRepId, e.rank])),
-        periodStartKey: dayKey(startDate),
-        metric: metric === 'totalSales' ? 'totalSales' : 'totalPoints',
-        now: new Date(),
-      });
-    } catch (historyError) {
-      console.error('Leaderboard history enrichment failed:', historyError);
+    if (!pastMonth) {
+      try {
+        history = computeHistory({
+          periodSales,
+          allSales,
+          currentRanks: new Map(fullyRanked.map((e) => [e.salesRepId, e.rank])),
+          periodStartKey: dayKey(startDate),
+          metric: metric === 'totalSales' ? 'totalSales' : 'totalPoints',
+          now: new Date(),
+        });
+      } catch (historyError) {
+        console.error('Leaderboard history enrichment failed:', historyError);
+      }
     }
 
     const withHistory = <T extends { salesRepId: string }>(entry: T) => {
@@ -170,7 +188,8 @@ export async function GET(request: NextRequest) {
     // only when the whole ranked list fits in `limit` (so rows can follow it);
     // `recent` — the newest standing sales, rep name + plan + time only.
     let team: { unranked: UnrankedRep[]; recent: RecentSale[] } | null = null;
-    if (searchParams.get('include') === 'team') {
+    // A past month skips both: today's roster and today's sales aren't its.
+    if (searchParams.get('include') === 'team' && !pastMonth) {
       team = { unranked: [], recent: [] };
       try {
         if (fullyRanked.length <= limit) {
@@ -199,10 +218,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // The month view's range: the earliest counted sale's month bounds how far
+    // back the picker goes (null when nothing has been sold yet).
+    let monthFields: { month: string; firstMonth: string | null; endDate: Date } | null = null;
+    if (monthView && bounds) {
+      let earliest = Infinity;
+      for (const record of allSales) {
+        const time = record.saleDate.getTime();
+        if (time < earliest) earliest = time;
+      }
+      monthFields = {
+        month: formatMonthParam(monthView.key),
+        firstMonth: Number.isFinite(earliest) ? formatMonthParam(chicagoMonthKey(new Date(earliest))) : null,
+        endDate: bounds.end,
+      };
+    }
+
     return NextResponse.json({
       period,
       metric,
       startDate,
+      ...(monthFields ?? {}),
       leaderboard: rankedLeaderboard,
       totalRanked: fullyRanked.length,
       currentUser: rawCurrentUser ? withHistory(rawCurrentUser) : null,

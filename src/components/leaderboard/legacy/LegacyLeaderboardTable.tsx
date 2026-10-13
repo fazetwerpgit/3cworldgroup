@@ -15,6 +15,7 @@ import { LegacySparkline } from './LegacySparkline';
 import type { LeaderboardEntry } from '../LeaderboardTable';
 import { recentSaleLabel, recentSaleWhen, spotLine, useMinuteClock, zeroEntries } from '../belowPodium';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
+import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 
 type Metric = 'totalPoints' | 'totalSales';
 type Period = 'week' | 'month' | 'year' | 'all';
@@ -29,6 +30,8 @@ interface LegacyLeaderboardTableProps {
   /** The newest standing sales, team-wide: name, plan, time. */
   recent?: RecentSale[];
   viewerId?: string | null;
+  /** A past month on the month board: closed, so no days left or movement. */
+  pastMonth?: MonthKey | null;
 }
 
 const formatNumber = (n: number) => new Intl.NumberFormat('en-US').format(n);
@@ -48,7 +51,8 @@ function metricUnit(metric: Metric) {
   return metric === 'totalPoints' ? 'pts' : 'sales';
 }
 
-function periodLabel(period: Period) {
+function periodLabel(period: Period, pastMonth: MonthKey | null = null) {
+  if (period === 'month' && pastMonth) return monthLabel(pastMonth);
   return period === 'week' ? 'week to date' : period === 'month' ? 'month to date' : period === 'year' ? 'year to date' : 'all time';
 }
 
@@ -131,16 +135,16 @@ function periodDaysLeft(period: Period) {
   return Math.max(1, Math.ceil((end.getTime() - now.getTime()) / 86_400_000));
 }
 
-function EmptyState() {
+function EmptyState({ pastMonth }: { pastMonth: MonthKey | null }) {
   return (
     <div className="border-y border-[#0A1F44] py-14 text-center dark:border-[#e7edf4]">
-      <p className="portal-display text-lg font-black tracking-[-0.02em]">The board is wide open</p>
-      <p className="mt-1 text-sm text-[#687384]">First approved sale of the period takes #1.</p>
+      <p className="portal-display text-lg font-black tracking-[-0.02em]">{pastMonth ? 'No approved sales' : 'The board is wide open'}</p>
+      <p className="mt-1 text-sm text-[#687384]">{pastMonth ? `Nothing was approved in ${monthLabel(pastMonth)}.` : 'First approved sale of the period takes #1.'}</p>
     </div>
   );
 }
 
-function AcrossTheBoard({ entries, currentUser, metric, period }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric; period: Period }) {
+function AcrossTheBoard({ entries, currentUser, metric, period, pastMonth }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric; period: Period; pastMonth: MonthKey | null }) {
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
   const unit = metricUnit(metric);
   const topCloser = [...entries].sort((a, b) => b.totalSales - a.totalSales)[0];
@@ -157,7 +161,7 @@ function AcrossTheBoard({ entries, currentUser, metric, period }: { entries: Lea
   const lead = currentUser?.rank === 1 && belowUser ? Math.max(0, userValue - metricValue(belowUser, metric)) : null;
   const soleLeader = currentUser?.rank === 1 && !belowUser;
   const totalPoints = entries.reduce((sum, entry) => sum + entry.totalPoints, 0);
-  const daysLeft = periodDaysLeft(period);
+  const daysLeft = pastMonth ? null : periodDaysLeft(period);
 
   return (
     <section className="mb-[45px] grid grid-cols-2 border-y border-[#0A1F44] dark:border-[#e7edf4] sm:grid-cols-4" aria-label="Team pulse">
@@ -179,13 +183,13 @@ function AcrossTheBoard({ entries, currentUser, metric, period }: { entries: Lea
       <div className="min-h-[109px] border-t border-[#0A1F44] p-[15px_17px_18px] dark:border-[#e7edf4] sm:border-t-0">
         <span className="text-[12px] font-black uppercase tracking-[0.16em] text-[#687384]">Team pulse</span>
         <strong className="mt-[18px] block portal-display text-[20px] font-black tracking-[-0.02em]">{formatNumber(totalPoints)} pts</strong>
-        <span className="portal-display mt-1 block text-[12px] text-[#687384]">{entries.length} reps, {daysLeft ? `${daysLeft} days left` : 'all time'}</span>
+        <span className="portal-display mt-1 block text-[12px] text-[#687384]">{entries.length} reps, {pastMonth ? monthLabel(pastMonth) : daysLeft ? `${daysLeft} days left` : 'all time'}</span>
       </div>
     </section>
   );
 }
 
-function Podium({ entries, currentUser, metric, period }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric; period: Period }) {
+function Podium({ entries, currentUser, metric, period, pastMonth }: { entries: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric; period: Period; pastMonth: MonthKey | null }) {
   const podium = entries.filter((entry) => entry.rank <= 3).sort((a, b) => a.rank - b.rank);
   const podiumEntries = podium.length === 3 ? [podium[1], podium[0], podium[2]] : podium;
   const gridColumns = podium.length === 3 ? 'sm:grid-cols-[1fr_1.25fr_1fr]' : podium.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1';
@@ -195,7 +199,7 @@ function Podium({ entries, currentUser, metric, period }: { entries: Leaderboard
     <section className="mb-[46px]" aria-labelledby="podium-heading">
       <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
         <h2 id="podium-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">Top performers</h2>
-        <p className="text-right text-[12px] uppercase tracking-[0.15em] text-[#687384]">Approved {metric === 'totalPoints' ? 'points' : 'sales'} · {periodLabel(period)}</p>
+        <p className="text-right text-[12px] uppercase tracking-[0.15em] text-[#687384]">Approved {metric === 'totalPoints' ? 'points' : 'sales'} · {periodLabel(period, pastMonth)}</p>
       </div>
       <div className={`grid gap-0 bg-[#0A1F44] text-white dark:bg-[var(--c-panel)] dark:text-[#f6f7f8] dark:shadow-[0_25px_70px_rgba(0,0,0,0.24)] ${gridColumns}`}>
         {podiumEntries.map((entry) => {
@@ -214,7 +218,7 @@ function Podium({ entries, currentUser, metric, period }: { entries: Leaderboard
                 <span className={`grid size-[43px] shrink-0 place-items-center rounded-full bg-[#31537b] text-[12px] font-black ${winner ? 'bg-[#0A1F44] text-white' : ''}`}>{initialsOf(entry.salesRepName)}</span>
                 <div className="min-w-0">
                   <strong className="block truncate text-[16px] font-black">{entry.salesRepName}</strong>
-                  <span className="portal-display mt-[3px] block text-[12px]">{formatNumber(entry.totalSales)} approved sales{winner ? ', current leader' : ''}</span>
+                  <span className="portal-display mt-[3px] block text-[12px]">{formatNumber(entry.totalSales)} approved sales{winner && !pastMonth ? ', current leader' : ''}</span>
                   {mine && <span className="mt-1 inline-block bg-[#8dc63f] px-1.5 py-[3px] text-[12px] font-black uppercase tracking-[0.1em] text-[#0A1F44]">YOU</span>}
                 </div>
               </div>
@@ -227,7 +231,7 @@ function Podium({ entries, currentUser, metric, period }: { entries: Leaderboard
   );
 }
 
-function ChaseTable({ entries, zeros, currentUser, metric }: { entries: LeaderboardEntry[]; zeros: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric }) {
+function ChaseTable({ entries, zeros, currentUser, metric, pastMonth = null }: { entries: LeaderboardEntry[]; zeros: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric; pastMonth?: MonthKey | null }) {
   const rest = entries.filter((entry) => entry.rank >= 4).sort((a, b) => a.rank - b.rank);
   if (rest.length === 0 && zeros.length === 0) return null;
   const lastRank = (zeros.length > 0 ? zeros[zeros.length - 1] : rest[rest.length - 1]).rank;
@@ -238,10 +242,10 @@ function ChaseTable({ entries, zeros, currentUser, metric }: { entries: Leaderbo
     <section className="mb-[25px]" aria-labelledby="chase-heading">
       <div className="flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
         <h2 id="chase-heading" className="portal-display text-[22px] font-black tracking-[-0.02em]">{lastRank <= 4 ? 'Rank 4' : `Ranks 4-${lastRank}`}</h2>
-        <p className="text-right text-[12px] uppercase tracking-[0.14em] text-[#687384]">Movement since yesterday</p>
+        <p className="text-right text-[12px] uppercase tracking-[0.14em] text-[#687384]">{pastMonth ? monthLabel(pastMonth) : 'Movement since yesterday'}</p>
       </div>
       <div className="border-b border-[#0A1F44] dark:border-[#e7edf4]">
-        <div className="hidden min-h-[38px] grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] items-center gap-[15px] whitespace-nowrap px-3 text-[12px] font-black uppercase tracking-[0.16em] text-[#687384] sm:grid"><span>Rank / move</span><span>Rep</span><span>7-day trend</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span></div>
+        <div className="hidden min-h-[38px] grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] items-center gap-[15px] whitespace-nowrap px-3 text-[12px] font-black uppercase tracking-[0.16em] text-[#687384] sm:grid"><span>{pastMonth ? 'Rank' : 'Rank / move'}</span><span>Rep</span><span>{pastMonth ? '' : '7-day trend'}</span><span className="text-right">{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className="text-right">Gap to next</span></div>
         {rest.map((entry, index) => {
           const mine = entry.salesRepId === currentUser?.salesRepId;
           const above = entries.find((candidate) => candidate.rank === entry.rank - 1);
@@ -252,7 +256,7 @@ function ChaseTable({ entries, zeros, currentUser, metric }: { entries: Leaderbo
           const gapLabel = gap === null || !below ? '—' : `${formatNumber(gap)} ${unit}`;
           return (
             <div key={entry.salesRepId} className={`relative grid min-h-[77px] grid-cols-[43px_minmax(0,1fr)_auto] items-center gap-[9px] border-b border-[rgba(10,31,68,0.22)] px-1 py-2.5 transition-colors duration-150 last:border-0 hover:bg-[rgba(141,198,63,0.12)] dark:border-white/15 dark:hover:bg-[rgba(245,215,128,0.08)] sm:grid-cols-[100px_minmax(200px,1.5fr)_112px_132px_110px] sm:gap-[15px] sm:px-3 ${mine ? 'bg-[#0A1F44] text-white shadow-[inset_7px_0_#8dc63f] dark:bg-[#8dc63f] dark:text-[#0A1F44] dark:border-[#8dc63f] dark:shadow-[inset_7px_0_#d7edaf]' : ''}`} style={{ animationDelay: `${Math.min(index * 42, 420)}ms` }}>
-              <div className="portal-display flex items-center gap-[9px]"><b className="text-[21px]">{String(entry.rank).padStart(2, '0')}</b><MovementIndicator movement={entry.movement} noHistory={noHistory} /></div>
+              <div className="portal-display flex items-center gap-[9px]"><b className="text-[21px]">{String(entry.rank).padStart(2, '0')}</b>{pastMonth ? null : <MovementIndicator movement={entry.movement} noHistory={noHistory} />}</div>
               <div className="flex min-w-0 items-center gap-[11px]">
                 <span className={`grid size-[35px] shrink-0 place-items-center rounded-full bg-[#0A1F44] text-[12px] font-black text-white ${mine ? 'dark:bg-[#0A1F44]' : ''}`}>{initialsOf(entry.salesRepName)}</span>
                 <div className="min-w-0">
@@ -260,7 +264,7 @@ function ChaseTable({ entries, zeros, currentUser, metric }: { entries: Leaderbo
                   <span className={`mt-1 flex flex-wrap items-center gap-1 text-[12px] text-[#687384] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : ''}`}>{formatNumber(entry.totalSales)} sales <StreakChip streakDays={entry.streakDays} mine={mine} /></span>
                 </div>
               </div>
-              <span className="hidden justify-center sm:flex"><LegacySparkline spark={entry.spark ?? []} mine={mine} /></span>
+              <span className="hidden justify-center sm:flex">{pastMonth ? null : <LegacySparkline spark={entry.spark ?? []} mine={mine} />}</span>
               <div className="num portal-display text-right text-[17px] font-black">{formatNumber(currentValue)} <small className={`text-[12px] tracking-[0.12em] ${mine ? 'text-white/70 dark:text-[#0A1F44]/70' : 'text-[#687384]'}`}>{unit}</small></div>
               <div className={`${gap === null || !below ? 'grid size-7 place-items-center rounded-full p-0 text-[13px]' : 'rounded-[99px] px-2 py-1'} portal-display col-span-2 justify-self-start border border-[#0A1F44] text-[12px] whitespace-nowrap sm:col-span-1 sm:justify-self-end ${mine ? 'border-[#0A1F44] bg-[#0A1F44] text-white dark:border-[#0A1F44] dark:bg-[#0A1F44]' : 'dark:border-[#e7edf4]'}`}>{gapLabel}</div>
               {mine && <ChaseProgress current={currentValue} target={aboveValue} highlighted />}
@@ -310,7 +314,7 @@ function RecentSales({ sales }: { sales: RecentSale[] }) {
   );
 }
 
-export function LegacyLeaderboardTable({ entries, currentUser, metric, period, unranked = [], recent = [], viewerId }: LegacyLeaderboardTableProps) {
+export function LegacyLeaderboardTable({ entries, currentUser, metric, period, unranked = [], recent = [], viewerId, pastMonth = null }: LegacyLeaderboardTableProps) {
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
   const zeros = zeroEntries(ordered, unranked);
   const mine = currentUser ?? (viewerId ? zeros.find((entry) => entry.salesRepId === viewerId) : undefined);
@@ -321,10 +325,10 @@ export function LegacyLeaderboardTable({ entries, currentUser, metric, period, u
     const spot = spotLine({ entries: ordered, currentUser, unranked, viewerId, metric });
     return (
       <div>
-        <EmptyState />
+        <EmptyState pastMonth={pastMonth} />
         {spot && <p data-testid="spot-line" className="mt-5 text-[15px] font-bold">{spot}</p>}
         <div className="mt-[34px]">
-          <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} />
+          <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} pastMonth={pastMonth} />
           <RecentSales sales={recent} />
         </div>
       </div>
@@ -333,9 +337,9 @@ export function LegacyLeaderboardTable({ entries, currentUser, metric, period, u
 
   return (
     <div>
-      <Podium entries={ordered} currentUser={currentUser} metric={metric} period={period} />
-      <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} />
-      <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} />
+      <Podium entries={ordered} currentUser={currentUser} metric={metric} period={period} pastMonth={pastMonth} />
+      <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} pastMonth={pastMonth} />
+      <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} pastMonth={pastMonth} />
       <RecentSales sales={recent} />
       <footer className="flex justify-between gap-3 border-t border-[#0A1F44] pt-3 text-[12px] text-[#687384] dark:border-[#e7edf4] max-sm:block">
         <span>Rankings use approved sales for the selected period.</span>

@@ -1,4 +1,6 @@
 import type { LeaderboardMetric, LeaderboardPeriod } from './LeaderboardTable';
+import type { MonthNav } from './MonthNav';
+import { MonthPicker } from '@/components/portal/rep/MonthPicker';
 import styles from './leaderboard.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 
@@ -19,6 +21,8 @@ interface LeaderboardFiltersProps {
   metric: LeaderboardMetric;
   onPeriodChange: (period: LeaderboardPeriod) => void;
   onMetricChange: (metric: LeaderboardMetric) => void;
+  /** ‹ Month › under the chips, on the month board only. */
+  monthNav?: MonthNav | null;
 }
 
 export function LeaderboardFilters({
@@ -26,6 +30,7 @@ export function LeaderboardFilters({
   metric,
   onPeriodChange,
   onMetricChange,
+  monthNav,
 }: LeaderboardFiltersProps) {
   return (
     <div className={styles.filters}>
@@ -57,6 +62,10 @@ export function LeaderboardFilters({
           </button>
         ))}
       </div>
+      {/* The Sales page's month stepper: earlier months, recounted live. */}
+      {period === 'month' && monthNav ? (
+        <MonthPicker month={monthNav.month} min={monthNav.min} max={monthNav.max} onChange={monthNav.onChange} />
+      ) : null}
     </div>
   );
 }

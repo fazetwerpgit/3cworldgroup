@@ -60,12 +60,14 @@ function saleTime(sale: Pick<Sale, 'saleDate'>): number {
 }
 
 /**
- * One row per rep over the counted sales sold at or after `startTime`, plus the
- * records rank history reads. Unsorted: the route orders it (boardOrder).
+ * One row per rep over the counted sales sold at or after `startTime` (and
+ * before `endTime`, when a closed window is asked for), plus the records rank
+ * history reads. Unsorted: the route orders it (boardOrder).
  */
 export function tallyBoard(
   counted: Sale[],
-  startTime: number
+  startTime: number,
+  endTime: number = Infinity
 ): { totals: BoardTotals[]; allSales: SaleRecord[]; periodSales: SaleRecord[] } {
   const byRep = new Map<string, { totals: BoardTotals; sales: Sale[] }>();
   const allSales: SaleRecord[] = [];
@@ -75,7 +77,7 @@ export function tallyBoard(
     const time = saleTime(sale);
     const record: SaleRecord = { salesRepId: sale.salesRepId, saleDate: new Date(time), totalPoints: sale.totalPoints || 0 };
     allSales.push(record);
-    if (!(time >= startTime)) continue;
+    if (!(time >= startTime) || !(time < endTime)) continue;
     periodSales.push(record);
 
     let rep = byRep.get(sale.salesRepId);

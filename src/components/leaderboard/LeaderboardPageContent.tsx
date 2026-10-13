@@ -12,6 +12,8 @@ import {
 } from './LeaderboardTable';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { periodLabel } from './PeriodCountdown';
+import type { MonthNav } from './MonthNav';
+import type { MonthKey } from '@/lib/sales/monthWindow';
 import styles from './leaderboard.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 
@@ -28,6 +30,10 @@ interface LeaderboardPageContentProps {
   metric: LeaderboardMetric;
   onPeriodChange: (period: LeaderboardPeriod) => void;
   onMetricChange: (metric: LeaderboardMetric) => void;
+  /** The month board's stepper (period 'month' only). */
+  monthNav?: MonthNav | null;
+  /** The past month on show; null for the live board. */
+  pastMonth?: MonthKey | null;
   /** False while the desktop board is the visible one. The countdown's clock
    *  stops there; nothing on this page is on screen to read it. */
   active?: boolean;
@@ -50,6 +56,8 @@ export function LeaderboardPageContent({
   metric,
   onPeriodChange,
   onMetricChange,
+  monthNav = null,
+  pastMonth = null,
   active = true,
 }: LeaderboardPageContentProps) {
   if (!active) return null;
@@ -58,13 +66,14 @@ export function LeaderboardPageContent({
     <div className={`${styles.scope} ${styles.shell}`}>
       <header className={p.head}>
         <h1 className={p.title}>Leaderboard</h1>
-        <p className={p.lede}>{periodLabel(period, metric)}</p>
+        <p className={p.lede}>{periodLabel(period, metric, pastMonth)}</p>
       </header>
       <LeaderboardFilters
         period={period}
         metric={metric}
         onPeriodChange={onPeriodChange}
         onMetricChange={onMetricChange}
+        monthNav={monthNav}
       />
       {error ? (
         <div className={styles.error} role="alert">
@@ -83,6 +92,7 @@ export function LeaderboardPageContent({
           recent={recent}
           metric={metric}
           period={period}
+          pastMonth={pastMonth}
         />
       )}
     </div>

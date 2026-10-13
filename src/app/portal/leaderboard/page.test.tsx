@@ -22,6 +22,7 @@ const testState = vi.hoisted(() => ({
   } | null,
   unranked: [] as Array<{ salesRepId: string; salesRepName: string }>,
   recent: [] as Array<{ repName: string; plan: string; at: string; dayOnly?: boolean }>,
+  firstMonth: null as string | null,
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -43,6 +44,9 @@ vi.mock('@/hooks/useLeaderboard', () => ({
     },
     get recent() {
       return testState.recent;
+    },
+    get firstMonth() {
+      return testState.firstMonth;
     },
     loading: false,
     error: null,
@@ -89,6 +93,7 @@ beforeEach(() => {
   testState.currentUser = null;
   testState.unranked = [];
   testState.recent = [];
+  testState.firstMonth = null;
   setViewport(false);
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -154,6 +159,54 @@ describe('leaderboard page filters', () => {
     await act(async () => root.render(<LeaderboardRoute />));
 
     expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · #17 · 320 pts');
+  });
+});
+
+describe('past months', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('steps the month board back to the first month with a sale and forward to this month', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T15:00:00.000Z'));
+    testState.leaderboard = board();
+    testState.firstMonth = '2026-08';
+
+    await act(async () => root.render(<LeaderboardRoute />));
+    // Only the month board carries the stepper.
+    expect(container.querySelector('[aria-label="Previous month"]')).toBeNull();
+
+    const month = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Month');
+    await act(async () => month?.click());
+    const prev = () => container.querySelector<HTMLButtonElement>('[aria-label="Previous month"]')!;
+    const next = () => container.querySelector<HTMLButtonElement>('[aria-label="Next month"]')!;
+    expect(container.querySelector('[role="group"][aria-label="Month"]')?.textContent).toBe('October 2026');
+    expect(next().disabled).toBe(true);
+    expect(prev().disabled).toBe(false);
+
+    await act(async () => prev().click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'totalPoints', 100, 'approved', { team: true, month: '2026-09' });
+    expect(container.textContent).toContain('Monthly points · September 2026');
+    expect(container.querySelector('h2')?.textContent).toBe('September 2026');
+    expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 pts in September 2026');
+
+    await act(async () => prev().click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'totalPoints', 100, 'approved', { team: true, month: '2026-08' });
+    expect(prev().disabled).toBe(true);
+
+    // Another period ignores the month; back on Month the pick is kept.
+    const week = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Week');
+    await act(async () => week?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'totalPoints', 100, 'approved', { team: true });
+    await act(async () => month?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'totalPoints', 100, 'approved', { team: true, month: '2026-08' });
+
+    await act(async () => next().click());
+    await act(async () => next().click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'totalPoints', 100, 'approved', { team: true });
+    expect(next().disabled).toBe(true);
+    expect(container.textContent).toContain('Monthly points · resets on the 1st');
   });
 });
 

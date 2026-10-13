@@ -8,6 +8,7 @@ import { RecentSales } from './RecentSales';
 import { spotLine, zeroEntries } from './belowPodium';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import type { PlanMixEntry } from '@/lib/sales/planMix';
+import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import styles from './leaderboard.module.css';
 
 export interface LeaderboardEntry {
@@ -37,6 +38,8 @@ export interface LeaderboardProps {
   unranked?: UnrankedRep[];
   /** The newest standing sales, team-wide: name, plan, time. */
   recent?: RecentSale[];
+  /** A past month on the month board: closed, so no clock and no chase line. */
+  pastMonth?: MonthKey | null;
 }
 
 export interface LeaderboardViewer {
@@ -57,7 +60,15 @@ export function formatLeaderboardValue(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
-function EmptyState() {
+function EmptyState({ pastMonth }: { pastMonth: MonthKey | null }) {
+  if (pastMonth) {
+    return (
+      <div className={styles.empty}>
+        <p className="portal-display">No approved sales</p>
+        <span>Nothing was approved in {monthLabel(pastMonth)}.</span>
+      </div>
+    );
+  }
   return (
     <div className={styles.empty}>
       <p className="portal-display">The board is open</p>
@@ -66,7 +77,8 @@ function EmptyState() {
   );
 }
 
-function periodSuffix(period: LeaderboardPeriod) {
+function periodSuffix(period: LeaderboardPeriod, pastMonth: MonthKey | null = null) {
+  if (period === 'month' && pastMonth) return `in ${monthLabel(pastMonth)}`;
   if (period === 'month') return 'this month';
   if (period === 'year') return 'this year';
   if (period === 'all') return 'all time';
@@ -81,6 +93,7 @@ export function LeaderboardTable({
   period,
   unranked = [],
   recent = [],
+  pastMonth = null,
 }: LeaderboardProps) {
   const ordered = [...entries].sort((a, b) => a.rank - b.rank);
   const podiumEntries = ordered.filter((entry) => entry.rank <= 3);
@@ -94,7 +107,8 @@ export function LeaderboardTable({
     effectiveCurrentUser &&
       [...ordered, ...zeros].some((entry) => entry.salesRepId === effectiveCurrentUser.salesRepId)
   );
-  const spot = spotLine({ entries: ordered, currentUser, unranked, viewerId: viewer?.uid, metric });
+  // The chase line ("1 sale passes …") is for a board still open.
+  const spot = pastMonth ? null : spotLine({ entries: ordered, currentUser, unranked, viewerId: viewer?.uid, metric });
   const viewerFallback: LeaderboardEntry | undefined = viewer && !currentUser
     ? {
       rank: 0,
@@ -121,11 +135,11 @@ export function LeaderboardTable({
 
   return (
     <div className={styles.board}>
-      <LeaderboardStage period={period}>
+      <LeaderboardStage period={period} pastMonth={pastMonth}>
         <Podium entries={podiumEntries} currentUser={effectiveCurrentUser} metric={metric} />
       </LeaderboardStage>
       {spot ? <p className={styles.spot} data-testid="spot-line">{spot}</p> : null}
-      {entries.length === 0 ? <EmptyState /> : null}
+      {entries.length === 0 ? <EmptyState pastMonth={pastMonth} /> : null}
       <LeaderboardRows entries={rowEntries} zeros={zeros} currentUser={effectiveCurrentUser} metric={metric} />
       <RecentSales sales={recent} />
       {showsStandingBar ? (
@@ -136,7 +150,7 @@ export function LeaderboardTable({
               You · #{currentUser.rank} · {formatLeaderboardValue(leaderboardValue(currentUser, metric))} {leaderboardUnit(metric)}
             </span>
           ) : (
-            <span className={styles.standingCopy} data-testid="standing-copy">You · unranked · 0 {leaderboardUnit(metric)} {periodSuffix(period)}</span>
+            <span className={styles.standingCopy} data-testid="standing-copy">You · unranked · 0 {leaderboardUnit(metric)} {periodSuffix(period, pastMonth)}</span>
           )}
         </div>
       ) : null}

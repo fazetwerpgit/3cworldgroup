@@ -27,6 +27,9 @@ export function useLeaderboard() {
   // newest sales (name, plan, time). Empty unless the caller opts in.
   const [unranked, setUnranked] = useState<UnrankedRep[]>([]);
   const [recent, setRecent] = useState<RecentSale[]>([]);
+  // Month view only: the earliest month with a sale on the board (YYYY-MM),
+  // so a month picker knows how far back it can go. Null until known.
+  const [firstMonth, setFirstMonth] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Only the newest request may land: a slow answer for the old period (or a
@@ -36,13 +39,15 @@ export function useLeaderboard() {
   /**
    * `quiet` reloads the board in place (the app was reopened): no loading
    * flag, so no skeleton, and a failure keeps the board on screen.
+   * `month` (YYYY-MM) reads a past month on the month board; omit it for this
+   * month.
    */
   const fetchLeaderboard = useCallback(async (
     period: Period = 'month',
     metric: Metric = 'totalPoints',
     limit: number = 10,
     scope: 'approved' | 'submitted' = 'approved',
-    options: { team?: boolean; quiet?: boolean } = {}
+    options: { team?: boolean; quiet?: boolean; month?: string | null } = {}
   ) => {
     const request = ++latest.current;
     if (!options.quiet) {
@@ -56,6 +61,7 @@ export function useLeaderboard() {
       params.append('limit', limit.toString());
       if (scope === 'submitted') params.append('scope', scope);
       if (options.team) params.append('include', 'team');
+      if (period === 'month' && options.month) params.append('month', options.month);
 
       const token = await auth?.currentUser?.getIdToken();
       const response = await fetch(`/api/portal/leaderboard?${params.toString()}`, {
@@ -72,6 +78,7 @@ export function useLeaderboard() {
       setCurrentUser(data.currentUser ?? null);
       setUnranked(Array.isArray(data.unranked) ? data.unranked : []);
       setRecent(Array.isArray(data.recent) ? data.recent : []);
+      if ('firstMonth' in data) setFirstMonth(typeof data.firstMonth === 'string' ? data.firstMonth : null);
       setError(null);
     } catch (err) {
       if (request !== latest.current) return;
@@ -94,6 +101,7 @@ export function useLeaderboard() {
     currentUser,
     unranked,
     recent,
+    firstMonth,
     loading,
     error,
     fetchLeaderboard,

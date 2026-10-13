@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
@@ -8,6 +8,9 @@ import { LeaderboardPageContent } from './LeaderboardPageContent';
 import { LegacyLeaderboardPage } from './legacy/LegacyLeaderboardPage';
 import type { LeaderboardMetric, LeaderboardPeriod } from './LeaderboardTable';
 import { useWideViewport } from './useWideViewport';
+import type { MonthNav } from './MonthNav';
+import { formatMonthParam, monthKeyFromParam } from '@/lib/leaderboard/periods';
+import { chicagoMonthKey, compareMonths, type MonthKey } from '@/lib/sales/monthWindow';
 import split from './routeSplit.module.css';
 
 /* Two leaderboards, one board.
@@ -18,23 +21,43 @@ import split from './routeSplit.module.css';
  *  The filter controls in each page write back through the callbacks. */
 export function LeaderboardRoute() {
   const { user } = useAuth();
-  const { leaderboard, currentUser, unranked, recent, loading, error, fetchLeaderboard } = useLeaderboard();
+  const { leaderboard, currentUser, unranked, recent, firstMonth, loading, error, fetchLeaderboard } = useLeaderboard();
   const [period, setPeriod] = useState<LeaderboardPeriod>('week');
   const [metric, setMetric] = useState<LeaderboardMetric>('totalPoints');
+  // The month board's month: null is this month (on the office clock, as the
+  // server counts it). A past month stays picked across period taps.
+  const [month, setMonth] = useState<MonthKey | null>(null);
   const wide = useWideViewport();
 
+  const monthParam = period === 'month' && month ? formatMonthParam(month) : null;
+  const pastMonth = monthParam ? month : null;
+
   useEffect(() => {
-    if (user) fetchLeaderboard(period, metric, 100, 'approved', { team: true });
-  }, [user, period, metric, fetchLeaderboard]);
+    if (user) fetchLeaderboard(period, metric, 100, 'approved', { team: true, ...(monthParam ? { month: monthParam } : {}) });
+  }, [user, period, metric, monthParam, fetchLeaderboard]);
 
   // Reopened after a while: the same board, reloaded in place. A load already
   // under way (a filter tap) is left to land on its own.
   const refreshQuietly = useCallback(() => {
-    if (user && !loading) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true });
-  }, [user, loading, period, metric, fetchLeaderboard]);
+    if (user && !loading) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true, ...(monthParam ? { month: monthParam } : {}) });
+  }, [user, loading, period, metric, monthParam, fetchLeaderboard]);
   useRefreshOnResume(refreshQuietly, { enabled: !!user });
 
   const busy = loading || !user;
+
+  // ‹ Month › on the month board: back to the first month with a sale, forward
+  // to this month. Until the first answer lands there is no going back.
+  const monthNav = useMemo<MonthNav | null>(() => {
+    if (period !== 'month') return null;
+    const current = chicagoMonthKey(new Date());
+    const shown = month ?? current;
+    return {
+      month: shown,
+      max: current,
+      min: monthKeyFromParam(firstMonth) ?? shown,
+      onChange: (next) => setMonth(compareMonths(next, current) >= 0 ? null : next),
+    };
+  }, [period, month, firstMonth]);
 
   return (
     <>
@@ -51,6 +74,8 @@ export function LeaderboardRoute() {
           metric={metric}
           onPeriodChange={setPeriod}
           onMetricChange={setMetric}
+          monthNav={monthNav}
+          pastMonth={pastMonth}
           active={!wide}
         />
       </div>
@@ -69,6 +94,8 @@ export function LeaderboardRoute() {
             metric={metric}
             onPeriodChange={setPeriod}
             onMetricChange={setMetric}
+            monthNav={monthNav}
+            pastMonth={pastMonth}
             viewerName={user?.displayName ?? user?.email ?? null}
             viewerId={user?.uid ?? null}
             unranked={unranked}

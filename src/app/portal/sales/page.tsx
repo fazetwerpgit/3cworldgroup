@@ -3,7 +3,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { CheckCircle2, ChevronLeft, ChevronRight, Plus, RotateCw, X } from 'lucide-react';
+import { CheckCircle2, Plus, RotateCw, X } from 'lucide-react';
+import { MonthPicker } from '@/components/portal/rep/MonthPicker';
 import { CarrierNotice } from '@/components/portal/rep/CarrierNotice';
 import { PayHelpSheet } from '@/components/portal/rep/PayHelpSheet';
 import { RepShell } from '@/components/portal/rep/RepShell';
@@ -25,53 +26,16 @@ import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import {
   clampMonth,
-  compareMonths,
   currentMonth,
   latestPickableMonth,
   monthLabel,
   salesSoldIn,
-  shiftMonth,
   type MonthKey,
 } from '@/lib/sales/monthWindow';
 import { PayoutCard } from './PayoutCard';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
-
-function MonthPicker({
-  month,
-  max,
-  onChange,
-}: {
-  month: MonthKey;
-  max: MonthKey;
-  onChange: (next: MonthKey) => void;
-}) {
-  return (
-    <div className={x.month} role="group" aria-label="Month">
-      <button
-        type="button"
-        className={x.monthBtn}
-        onClick={() => onChange(shiftMonth(month, -1))}
-        aria-label="Previous month"
-      >
-        <ChevronLeft size={20} aria-hidden="true" />
-      </button>
-      <span className={x.monthLabel} aria-live="polite">
-        {monthLabel(month)}
-      </span>
-      <button
-        type="button"
-        className={x.monthBtn}
-        onClick={() => onChange(shiftMonth(month, 1))}
-        disabled={compareMonths(month, max) >= 0}
-        aria-label="Next month"
-      >
-        <ChevronRight size={20} aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
 
 function PageHead({
   month,
