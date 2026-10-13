@@ -4,10 +4,41 @@ import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { appBaseUrl, managerAlertEmail } from '@/lib/email/templates';
 import { createNotificationForMany } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
-import { MANAGEMENT_PLATFORM_ROLES } from '@/types/auth';
+import { isEsignItem } from '@/lib/onboarding/esign';
+import { MANAGEMENT_PLATFORM_ROLES, roleRequiresOnboarding, type FieldRole } from '@/types/auth';
+import { getOnboardingItemsForUser } from '@/types/onboarding';
+import { isHeldOnboardingItem } from '@/types/onboardingHold';
 import type { AlertTaskKind } from '@/types/alerts';
 
 const RENAG_MS = 24 * 3600 * 1000;
+
+/**
+ * review_needed titles raised by code that was removed with the old signing
+ * vendor (4012b570). Nothing raises or resolves these any more, so an open one
+ * would otherwise re-nag forever.
+ */
+const RETIRED_SIGNING_ALERT_TITLES: ReadonlySet<string> = new Set([
+  'In-portal signing failed to load', // api/portal/onboarding/esign-embed-error
+  'E-signature signing link missing', // vendor signing-URL fetch in esign/autoSend
+  'E-signature identity mismatch needs attention', // vendor completion webhook
+]);
+
+/**
+ * review_needed titles that are about e-signing. Alert tasks carry no item id
+ * and dedupe on kind + subject, so one task can stand for several documents:
+ * a signing alert is known by its title and is settled only once the rep has
+ * nothing left to sign.
+ */
+const SIGNING_ALERT_TITLES: ReadonlySet<string> = new Set([
+  'E-signature delivery needs attention', // esign/autoSend dispatch failure
+  ...RETIRED_SIGNING_ALERT_TITLES,
+]);
+
+export function isSigningAlertTask(task: { kind: unknown; title: unknown }): boolean {
+  return task.kind === 'review_needed' && typeof task.title === 'string' && SIGNING_ALERT_TITLES.has(task.title);
+}
+
+type FieldReader = { get: (field: string) => unknown };
 
 export interface NewAlertTask {
   kind: AlertTaskKind;
@@ -169,7 +200,8 @@ export async function dismissAlertTask(
 /** Marks matching open/claimed tasks resolved, e.g. after activation. */
 export async function resolveAlertTasks(
   subjectUserId: string,
-  kinds?: AlertTaskKind[]
+  kinds?: AlertTaskKind[],
+  options: { match?: (task: FieldReader) => boolean; reason?: string } = {}
 ): Promise<void> {
   const db = requireDb();
   const snap = await db
@@ -182,8 +214,75 @@ export async function resolveAlertTasks(
   await Promise.all(
     snap.docs
       .filter((doc) => !kinds || kinds.includes(doc.get('kind') as AlertTaskKind))
-      .map((doc) => doc.ref.update({ status: 'resolved', resolvedAt: now }))
+      .filter((doc) => !options.match || options.match(doc))
+      .map((doc) =>
+        doc.ref.update({
+          status: 'resolved',
+          resolvedAt: now,
+          ...(options.reason ? { resolvedReason: options.reason } : {}),
+        })
+      )
   );
+}
+
+/**
+ * True while the rep has an e-sign document that is not signed: any e-sign row
+ * on file that is not approved, or, while they are still onboarding, any e-sign
+ * item on their checklist that is not approved. Held items are never signed, so
+ * they never count.
+ */
+export async function hasOutstandingEsignItems(userId: string, user?: FieldReader): Promise<boolean> {
+  const db = requireDb();
+  const [userSnap, rows] = await Promise.all([
+    user ?? db.collection('users').doc(userId).get(),
+    db.collection('userOnboarding').where('userId', '==', userId).get(),
+  ]);
+
+  const statuses = new Map<string, unknown>();
+  rows.docs.forEach((doc) => statuses.set(String(doc.get('itemId')), doc.get('status')));
+
+  const required = new Set([...statuses.keys()].filter((id) => isEsignItem(id) && !isHeldOnboardingItem(id)));
+  const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
+  if (fieldRole && roleRequiresOnboarding(fieldRole)) {
+    getOnboardingItemsForUser(fieldRole, !!userSnap.get('isIBO'))
+      .filter((item) => isEsignItem(item.id))
+      .forEach((item) => required.add(item.id));
+  }
+
+  return [...required].some((id) => statuses.get(id) !== 'approved');
+}
+
+/**
+ * Closes the rep's open/claimed e-sign review_needed tasks once every e-sign
+ * document they owe is signed. Called after a signature is approved; the
+ * re-nag cron applies the same rule to tasks that predate this.
+ */
+export async function resolveSigningAlertTasks(userId: string): Promise<void> {
+  if (await hasOutstandingEsignItems(userId)) return;
+  await resolveAlertTasks(userId, ['review_needed'], {
+    match: (task) => isSigningAlertTask({ kind: task.get('kind'), title: task.get('title') }),
+    reason: 'every e-sign document is signed',
+  });
+}
+
+/** Why an open signing alert no longer needs anyone, or null while it still does. */
+async function staleSigningAlertReason(
+  title: string,
+  subjectUserId: string,
+  subject: FieldReader
+): Promise<string | null> {
+  if (RETIRED_SIGNING_ALERT_TITLES.has(title) && subject.get('status') === 'active') {
+    return 'retired alert source (removed signing vendor) and the subject is active';
+  }
+  try {
+    if (!(await hasOutstandingEsignItems(subjectUserId, subject))) {
+      return 'every e-sign document is signed';
+    }
+  } catch (error) {
+    // Unknown means keep nagging: a missed close costs an email, a wrong one hides work.
+    console.error('[alertTasks] failed to check outstanding e-sign items', { subjectUserId, error });
+  }
+  return null;
 }
 
 /** Pure: open tasks re-nag the whole group every 24h until claimed. */
@@ -230,11 +329,22 @@ export async function renagStaleTasks(now: Date): Promise<number> {
       continue;
     }
 
+    // A signing alert outlives its cause when the rep signs (or the source
+    // that raised it is gone): close it rather than nag about finished work.
+    const title = doc.get('title') as string;
+    if (isSigningAlertTask({ kind: doc.get('kind'), title })) {
+      const resolvedReason = await staleSigningAlertReason(title, subjectUserId, subject);
+      if (resolvedReason) {
+        await doc.ref.update({ status: 'resolved', resolvedAt: now, resolvedReason });
+        continue;
+      }
+    }
+
     await broadcast({
       kind: doc.get('kind') as AlertTaskKind,
       subjectUserId,
       subjectName: doc.get('subjectName') as string,
-      title: `Still unclaimed: ${doc.get('title')}`,
+      title: `Still unclaimed: ${title}`,
       message: doc.get('message') as string,
       link: doc.get('link') as string,
       id: doc.id,

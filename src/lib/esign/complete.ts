@@ -1,4 +1,5 @@
 import { adminDb, adminStorage } from '@/lib/firebase/admin';
+import { resolveSigningAlertTasks } from '@/lib/alerts/alertTasks';
 import { createNotification } from '@/lib/notifications/createNotification';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { notifyDocSigned } from '@/lib/onboarding/ownerNotify';
@@ -70,8 +71,8 @@ async function resolveRepName(userId: string): Promise<string> {
 
 /**
  * Records a signed e-sign document as approved and runs everything that hangs
- * off that: storing the signed PDF, notifying the rep and the owners, and
- * re-checking activation readiness.
+ * off that: storing the signed PDF, notifying the rep and the owners, closing
+ * signing alerts the rep no longer needs, and re-checking activation readiness.
  *
  * Called by the sign act (signEnvelope), which hands over the stamped bytes.
  * Ordering matters: the approval write
@@ -129,6 +130,15 @@ export async function completeEsignItem({
     await notifyDocSigned({ userId, repName, itemLabel: item.label });
   } catch (error) {
     console.error(`${LOG} owner signed notification failed`, { userId, itemId, error });
+  }
+
+  // An active rep never passes through activation again, which is the other
+  // place their alerts get closed, so a signing alert would otherwise re-nag
+  // the back office daily about a document that is already signed.
+  try {
+    await resolveSigningAlertTasks(userId);
+  } catch (error) {
+    console.error(`${LOG} failed to resolve signing alerts`, { userId, itemId, error });
   }
 
   try {

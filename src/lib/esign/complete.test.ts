@@ -10,6 +10,7 @@ const {
   createNotificationMock,
   notifyDocSignedMock,
   maybeFlagActivationReadyMock,
+  resolveSigningAlertTasksMock,
   consoleErrorMock,
 } = vi.hoisted(() => ({
   docMock: vi.fn(),
@@ -21,6 +22,7 @@ const {
   createNotificationMock: vi.fn(),
   notifyDocSignedMock: vi.fn(),
   maybeFlagActivationReadyMock: vi.fn(),
+  resolveSigningAlertTasksMock: vi.fn(),
   consoleErrorMock: vi.fn(),
 }));
 
@@ -36,6 +38,9 @@ vi.mock('@/lib/notifications/createNotification', () => ({
 vi.mock('@/lib/onboarding/ownerNotify', () => ({ notifyDocSigned: notifyDocSignedMock }));
 vi.mock('@/lib/onboarding/activation', () => ({
   maybeFlagActivationReady: maybeFlagActivationReadyMock,
+}));
+vi.mock('@/lib/alerts/alertTasks', () => ({
+  resolveSigningAlertTasks: resolveSigningAlertTasksMock,
 }));
 vi.mock('@/types/onboarding', () => ({
   ONBOARDING_ITEMS: [
@@ -76,6 +81,7 @@ beforeEach(() => {
   createNotificationMock.mockResolvedValue('notification-1');
   notifyDocSignedMock.mockResolvedValue(undefined);
   maybeFlagActivationReadyMock.mockResolvedValue(undefined);
+  resolveSigningAlertTasksMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -239,6 +245,37 @@ describe('completeEsignItem', () => {
       '[esign complete] failed to flag activation readiness',
       expect.objectContaining({ userId: 'user-1', itemId: 'contract' })
     );
+  });
+
+  it('closes the rep\'s signing alerts after the approval is written', async () => {
+    // An active rep never re-enters activation, so without this a signing
+    // alert re-nagged the back office daily about a signed document.
+    await completeEsignItem(input());
+
+    expect(resolveSigningAlertTasksMock).toHaveBeenCalledWith('user-1');
+    expect(onboardingSetMock.mock.invocationCallOrder[0]).toBeLessThan(
+      resolveSigningAlertTasksMock.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('does not throw when closing signing alerts fails', async () => {
+    resolveSigningAlertTasksMock.mockRejectedValueOnce(new Error('alerts query failed'));
+
+    await expect(completeEsignItem(input())).resolves.toEqual({
+      completedPdfPath: 'esign-completed/user-1/contract.pdf',
+    });
+    expect(consoleErrorMock).toHaveBeenCalledWith(
+      '[esign complete] failed to resolve signing alerts',
+      expect.objectContaining({ userId: 'user-1', itemId: 'contract' })
+    );
+    expect(maybeFlagActivationReadyMock).toHaveBeenCalledWith('user-1');
+  });
+
+  it('does not close signing alerts when the approval write fails', async () => {
+    onboardingSetMock.mockRejectedValueOnce(new Error('firestore unavailable'));
+
+    await expect(completeEsignItem(input())).rejects.toThrow('firestore unavailable');
+    expect(resolveSigningAlertTasksMock).not.toHaveBeenCalled();
   });
 
   it('propagates a failed approval write', async () => {
