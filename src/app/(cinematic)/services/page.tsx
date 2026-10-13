@@ -18,7 +18,7 @@ export const metadata: Metadata = {
  * the chrome, the `.page` element and the motion root are all in
  * src/app/(cinematic)/layout.tsx.
  *
- * The composition pairs a photographic hero with three light editorial rows,
+ * The composition pairs a photographic hero with four light editorial rows,
  * a navy bundle chapter, and a dark map close.
  */
 
@@ -39,23 +39,8 @@ const SERVICES = [
     ],
   },
   {
-    id: "tv",
-    number: "02",
-    title: "TV Services",
-    accent: "The second question, if it fits.",
-    body: "Once the internet is settled, some households want TV on the same bill. You lay out the packages and let them pick.",
-    image: "/redesign/cinematic/tv-room-dusk-1920.webp",
-    alt: "Living room at dusk with a wall-mounted television and the street outside the window",
-    position: "60% 50%",
-    points: [
-      "Sold with the internet, one bill",
-      "Channel packages by what they watch",
-      "Not every door; only the ones that ask",
-    ],
-  },
-  {
     id: "security",
-    number: "03",
+    number: "02",
     title: "Security Systems",
     accent: "For the households that want it.",
     body: "Doorbell camera, door and window sensors, a keypad. Professionally installed, monitored monthly, sold when the household brings it up.",
@@ -66,6 +51,38 @@ const SERVICES = [
       "Doorbell camera, sensors, keypad",
       "Professional install, monthly monitoring",
       "Runs on the same connection you just sold",
+    ],
+  },
+  {
+    id: "solar",
+    number: "03",
+    title: "Solar",
+    accent: "For the homes it suits.",
+    body: "Panels on the household's own roof, from the provider that serves that market. You explain how it works and leave the choice with them.",
+    // TODO(solar-art): placeholder. Swap for a solar photograph from the
+    // scratchpad candidates once one is picked; update `alt` and `position` with it.
+    image: "/redesign/cinematic/services-aerial-dusk-1920.webp",
+    alt: "Aerial view of lit houses along a wooded street at dusk",
+    position: "60% 60%",
+    points: [
+      "Rooftop panels on the home itself",
+      "Explained on the porch, in plain terms",
+      "Offered where it fits, not at every door",
+    ],
+  },
+  {
+    id: "tv",
+    number: "04",
+    title: "TV Services",
+    accent: "The second question, if it fits.",
+    body: "Once the internet is settled, some households want TV on the same bill. You lay out the packages and let them pick.",
+    image: "/redesign/cinematic/tv-room-dusk-1920.webp",
+    alt: "Living room at dusk with a wall-mounted television and the street outside the window",
+    position: "60% 50%",
+    points: [
+      "Sold with the internet, one bill",
+      "Channel packages by what they watch",
+      "Not every door; only the ones that ask",
     ],
   },
 ] as const;
