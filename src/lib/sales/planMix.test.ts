@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SaleProduct } from '@/types';
-import { formatPlanMix, planMix, productTier } from './planMix';
+import { compactTier, formatPlanMix, formatPlanMixCompact, planMix, planMixForms, productTier } from './planMix';
 
 const p = (productId: string, quantity = 1): SaleProduct => ({
   company: productId.split('-')[0],
@@ -66,5 +66,47 @@ describe('planMix', () => {
     expect(planMix([sale('mystery-9000'), { products: [] }, {} as { products: SaleProduct[] }])).toEqual([]);
     expect(formatPlanMix(planMix([]))).toBe('');
     expect(formatPlanMix(undefined)).toBe('');
+  });
+});
+
+describe('compact plan mix', () => {
+  const worst = [
+    { tier: '1 Gig', count: 23 },
+    { tier: '2 Gig', count: 14 },
+    { tier: '500', count: 9 },
+    { tier: '300', count: 6 },
+  ];
+
+  it('drops the Gig word and the spaces around ×', () => {
+    expect(compactTier('1 Gig')).toBe('1G');
+    expect(compactTier('2.5 Gig')).toBe('2.5G');
+    expect(compactTier('300')).toBe('300');
+    expect(formatPlanMixCompact(worst)).toBe('23×1G · 14×2G · 9×500 · 6×300');
+  });
+
+  it('keeps the top tiers and adds the rest as +N sales', () => {
+    expect(formatPlanMixCompact(worst, 2)).toBe('23×1G · 14×2G +15');
+    expect(formatPlanMixCompact(worst, 1)).toBe('23×1G +29');
+    expect(formatPlanMixCompact(worst, 0)).toBe('23×1G +29');
+    expect(formatPlanMixCompact(worst, 9)).toBe('23×1G · 14×2G · 9×500 · 6×300');
+    expect(formatPlanMixCompact([])).toBe('');
+    expect(formatPlanMixCompact(null, 2)).toBe('');
+  });
+
+  it('lists every form longest first, without repeats', () => {
+    expect(planMixForms(worst)).toEqual([
+      '23× 1 Gig · 14× 2 Gig · 9× 500 · 6× 300',
+      '23×1G · 14×2G · 9×500 · 6×300',
+      '23×1G · 14×2G +15',
+      '23×1G +29',
+    ]);
+    expect(planMixForms([{ tier: '1 Gig', count: 9 }, { tier: '300', count: 1 }])).toEqual([
+      '9× 1 Gig · 1× 300',
+      '9×1G · 1×300',
+      '9×1G +1',
+    ]);
+    expect(planMixForms([{ tier: '300', count: 4 }])).toEqual(['4× 300', '4×300']);
+    expect(planMixForms([{ tier: '500', count: 4 }]).length).toBe(2);
+    expect(planMixForms(undefined)).toEqual([]);
   });
 });

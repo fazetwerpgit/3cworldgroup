@@ -70,3 +70,33 @@ export function planMix(sales: readonly SaleProducts[]): PlanMixEntry[] {
 export function formatPlanMix(mix: readonly PlanMixEntry[] | null | undefined): string {
   return (mix ?? []).map((entry) => `${entry.count}× ${entry.tier}`).join(' · ');
 }
+
+/** "1 Gig" → "1G"; "300" and "500" stay as they are. */
+export function compactTier(tier: string): string {
+  return tier.replace(/\s*Gig$/, 'G');
+}
+
+/** The compact line: "13×1G · 4×2G · 3×300". With `maxTiers`, only the first
+ *  (most sold) tiers, then "+N" for the sales the rest hold: "13×1G · 4×2G +7". */
+export function formatPlanMixCompact(
+  mix: readonly PlanMixEntry[] | null | undefined,
+  maxTiers?: number
+): string {
+  const entries = mix ?? [];
+  const shown = maxTiers === undefined ? entries : entries.slice(0, Math.max(1, maxTiers));
+  const rest = entries.slice(shown.length).reduce((sum, entry) => sum + entry.count, 0);
+  const line = shown.map((entry) => `${entry.count}×${compactTier(entry.tier)}`).join(' · ');
+  return rest > 0 ? `${line} +${rest}` : line;
+}
+
+/** Every way the line can be written, longest first, for a slot to take the
+ *  first that fits its width: full, compact, top two +N, top one +N.
+ *  Duplicates (a short mix compacts no further) are dropped; [] when empty. */
+export function planMixForms(mix: readonly PlanMixEntry[] | null | undefined): string[] {
+  const entries = mix ?? [];
+  if (entries.length === 0) return [];
+  const forms = [formatPlanMix(entries), formatPlanMixCompact(entries)];
+  if (entries.length > 2) forms.push(formatPlanMixCompact(entries, 2));
+  if (entries.length > 1) forms.push(formatPlanMixCompact(entries, 1));
+  return [...new Set(forms)];
+}

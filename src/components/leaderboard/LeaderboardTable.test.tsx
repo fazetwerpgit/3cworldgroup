@@ -126,7 +126,9 @@ describe('plan mix', () => {
 
     const row = container.querySelector<HTMLElement>('[aria-label="Ranking"] > div')!;
     const line = row.querySelector<HTMLElement>('[data-testid="plan-mix"]')!;
-    expect(line.textContent).toBe('Plan mix: 10× 1 Gig · 6× 2 Gig · 4× 300');
+    // The full line for screen readers; the shown form is aria-hidden.
+    expect(line.querySelector('[class*="srOnly"]')?.textContent).toBe('Plan mix: 10× 1 Gig · 6× 2 Gig · 4× 300');
+    expect(line.querySelector('[class*="mixText"]')?.getAttribute('aria-hidden')).toBe('true');
     // Under the name, inside the same column (one grid cell, so the row keeps its four columns).
     expect(line.parentElement?.querySelector('strong')?.textContent).toBe('Rep 4');
     expect(row.children).toHaveLength(4);

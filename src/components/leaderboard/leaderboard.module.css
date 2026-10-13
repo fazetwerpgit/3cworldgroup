@@ -241,19 +241,23 @@
   font-size: 14px;
 }
 
-/* The plan mix under a podium name: one muted line that ellipsises inside the
-   slot, so it never widens or wraps the stack. */
+/* The plan mix under a podium name: one muted line that PlanMixLine fits to
+   the slot (the compact forms take over before it would cut). Unlike the name,
+   it never overhangs its block: it stays 8px inside the slot's own edges, so it
+   cannot reach a neighbour's name or slip under the centre block. The stack
+   starts 4px (sides) or 10px (centre) outside the slot, hence the margins. */
 .podiumMix {
-  width: 100%;
-  margin-top: -2px;
-  overflow: hidden;
+  align-self: stretch;
+  margin: -2px 12px 0;
   color: var(--c-text-3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 11px;
   font-weight: 500;
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
+}
+
+.podiumSlot[data-rank='1'] .podiumMix {
+  margin-inline: 18px;
 }
 
 /* ---------- the blocks ---------- */
@@ -592,24 +596,55 @@
   color: var(--c-lime-hi, #a6e052);
 }
 
-/* Name over its plan mix. The column shrinks, so both lines ellipsise. */
+/* Name over its plan mix. The column shrinks and clips, so neither line can
+   push into the points: the name ellipsises, the mix compacts. */
 .rowWho {
   display: flex;
   min-width: 0;
+  overflow: hidden;
   flex-direction: column;
   gap: 1px;
 }
 
-/* "10× 1 Gig · 6× 2 Gig · 4× 300": one muted line, the row's secondary text. */
+/* "10× 1 Gig · 6× 2 Gig · 4× 300": one muted line, the row's secondary text.
+   It lives in the name column only and PlanMixLine fits it to that width. */
 .rowMix {
-  overflow: hidden;
   color: var(--c-text-3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.3;
   font-variant-numeric: tabular-nums;
+}
+
+/* PlanMixLine's frame: the line on show, plus a hidden copy of every form so
+   it can measure which one fits. The ellipsis is only a backstop: the last
+   form is short enough for any slot the board has. */
+.mix {
+  position: relative;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mixText {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mixMeasure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.mixMeasure > span {
+  display: block;
+  width: max-content;
+  white-space: nowrap;
 }
 
 /* The name ellipsises; the You tag after it never does. */
