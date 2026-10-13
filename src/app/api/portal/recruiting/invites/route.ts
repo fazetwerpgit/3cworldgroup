@@ -11,6 +11,7 @@ import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens'
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
 import { inviteUrlFor, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
 import { findActivePortalAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
+import { storedSource } from '@/lib/forms/applicationSource';
 
 const APPLICATION_LIMIT = 1000;
 
@@ -51,6 +52,7 @@ function serializeApplication(doc: FirebaseFirestore.QueryDocumentSnapshot): App
     city: data.city ?? '',
     referredBy: data.referredBy ?? '',
     interests: Array.isArray(data.interests) ? data.interests : [],
+    source: storedSource(data.source),
     status: data.status ?? 'applied',
     createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
     updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,

@@ -10,6 +10,7 @@ import { findMarket } from "../../_cinematic/markets";
 import styles from "./apply.module.css";
 import { APPLICATION_INTERESTS, type ApplicationInterest } from "@/types";
 import { cleanInterests } from "@/lib/forms/applicationInterests";
+import { readFirstTouch } from "@/lib/forms/applicationSource";
 import {
   INVALID_EMAIL_MESSAGE,
   INVALID_PHONE_MESSAGE,
@@ -300,6 +301,8 @@ export default function ApplyFlow({ children }: { children: React.ReactNode }) {
           city: formData.city,
           referredBy: formData.referredBy,
           interests,
+          // How they found the site, noted by the public layout on their first page.
+          source: readFirstTouch(),
         }),
       });
 

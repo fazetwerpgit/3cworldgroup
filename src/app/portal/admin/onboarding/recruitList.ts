@@ -1,5 +1,6 @@
 import type { ApplicationRecord, OnboardingInviteStatus } from '@/types';
 import { interestLabels } from '@/lib/forms/applicationInterests';
+import { sourceLabel } from '@/lib/forms/applicationSource';
 import type { InviteView } from './Invites';
 
 // The Recruits list: website applications and invites as one list, one row per
@@ -160,6 +161,13 @@ function ago(value: unknown, now: number): string {
 
 const sentence = (...parts: string[]) => parts.map((part) => part.trim()).filter(Boolean).join(' · ');
 
+/** How they found the site: "via Google", "came in direct", '' for older applications. */
+function sourcePhrase(application: ApplicationRecord | null): string {
+  const label = sourceLabel(application?.source);
+  if (!label) return '';
+  return application?.source?.channel === 'direct' ? 'came in direct' : `via ${label}`;
+}
+
 /** Where the person is, in one plain sentence ("Invited Oct 6 · hasn't opened the link"). */
 export function recruitSentence(row: RecruitRow, now = Date.now()): string {
   const { application, invite } = row;
@@ -171,7 +179,8 @@ export function recruitSentence(row: RecruitRow, now = Date.now()): string {
       return sentence(
         applied,
         application?.status === 'contacted' ? 'contacted, not invited yet' : 'not invited yet',
-        wants ? `wants ${wants}` : ''
+        wants ? `wants ${wants}` : '',
+        sourcePhrase(application)
       );
     }
     case 'invitedElsewhere':
@@ -212,6 +221,7 @@ export const EXPORT_COLUMNS = [
   { key: 'email', label: 'Email' },
   { key: 'referredBy', label: 'Referred by' },
   { key: 'interestedIn', label: 'Interested in' },
+  { key: 'source', label: 'Source' },
   { key: 'status', label: 'Status' },
   { key: 'createdAt', label: 'Submitted' },
 ];
@@ -237,6 +247,7 @@ export function exportRow(row: RecruitRow): Record<string, unknown> {
     email: row.email,
     referredBy: row.application?.referredBy ?? '',
     interestedIn: interestLabels(row.application?.interests),
+    source: sourceLabel(row.application?.source),
     status: STATE_WORD[row.state],
     createdAt: row.application?.createdAt ?? row.invite?.createdAt ?? '',
   };

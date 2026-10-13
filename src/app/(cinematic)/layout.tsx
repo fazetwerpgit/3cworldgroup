@@ -1,4 +1,8 @@
 import { Bebas_Neue } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import FirstTouch from "../_cinematic/FirstTouch";
+import JsonLdScript from "../_cinematic/JsonLdScript";
+import { SITE_JSON_LD } from "../_cinematic/jsonLd";
 import MotionRoot from "../_cinematic/MotionRoot";
 import SiteHeader from "../_cinematic/SiteHeader";
 import SiteFooter from "../_cinematic/SiteFooter";
@@ -82,6 +86,10 @@ const MOTION_BOOT = `try{var d=document.documentElement;if(!matchMedia("(prefers
  * Three things live here and nowhere else: the motion root that turns authored
  * motion on, the `.page` element that declares every design token, and the
  * chrome. A page under this layout renders sections and nothing else.
+ *
+ * The public-only measurement lives here too, so the portal never carries it:
+ * the Organization structured data, Vercel's cookieless page analytics, and the
+ * first-touch note an application reports its source from.
  */
 export default function CinematicLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -129,6 +137,10 @@ export default function CinematicLayout({ children }: { children: React.ReactNod
 
         <SiteFooter />
       </div>
+
+      <JsonLdScript data={SITE_JSON_LD} />
+      <FirstTouch />
+      <Analytics />
     </MotionRoot>
   );
 }

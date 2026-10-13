@@ -11,5 +11,13 @@ export const APPLY_HREF = "/apply";
 
 export const SITE_URL = "https://www.3cworldgroup.com";
 
+// The company's own social profiles: the footer's icons and the Organization
+// structured data's `sameAs` both read these, so a new profile is added once.
+export const SOCIAL_LINKS = {
+  linkedin: "https://www.linkedin.com/company/3cworldgroup",
+  facebook: "https://www.facebook.com/3cworldgroup",
+  instagram: "https://www.instagram.com/3cworldgroup",
+} as const;
+
 // Every indexable public page (the sitemap's list).
 export const PUBLIC_PATHS = ["/", ...NAV_LINKS.map((link) => link.href), APPLY_HREF, "/privacy", "/terms"];

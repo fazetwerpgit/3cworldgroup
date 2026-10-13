@@ -103,6 +103,46 @@ describe('POST /api/public/applications', () => {
     expect(addApplicationMock).toHaveBeenCalledWith(expect.objectContaining({ interests: [] }));
   });
 
+  it('stores the cleaned first touch with a server-derived channel', async () => {
+    const response = await POST(
+      request({
+        ...VALID_APPLICATION,
+        source: {
+          referrerHost: 'www.google.com',
+          landingPath: '/opportunities',
+          utm_source: '',
+          utm_medium: '',
+          utm_campaign: '<b>spring</b>',
+          channel: 'indeed',
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(addApplicationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: {
+          referrerHost: 'www.google.com',
+          landingPath: '/opportunities',
+          utmSource: '',
+          utmMedium: '',
+          utmCampaign: '',
+          channel: 'google',
+        },
+      })
+    );
+  });
+
+  it('accepts an application with no source or a malformed one, as a direct visit', async () => {
+    for (const source of [undefined, 'google', { referrerHost: 42 }]) {
+      const response = await POST(request({ ...VALID_APPLICATION, source }));
+      expect(response.status).toBe(200);
+    }
+    for (const [record] of addApplicationMock.mock.calls) {
+      expect(record.source).toMatchObject({ referrerHost: '', channel: 'direct' });
+    }
+  });
+
   it('validates required fields before checking for an existing account', async () => {
     const response = await POST(request({ ...VALID_APPLICATION, email: '' }));
 

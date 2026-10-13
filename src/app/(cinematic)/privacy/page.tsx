@@ -18,7 +18,7 @@ export const metadata: Metadata = {
  * its original numbering. Only the presentation changed: the kit's page head
  * instead of the old gradient hero, and one paper section set for reading.
  */
-const LAST_UPDATED = "May 6, 2026";
+const LAST_UPDATED = "October 13, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -120,6 +120,8 @@ export default function PrivacyPolicyPage() {
                 We use cookies and similar technologies to keep you signed in to the portal, remember
                 preferences, and understand how visitors use our site. You can control cookies through
                 your browser settings. Disabling cookies may limit some functionality of the portal.
+                Our public pages use cookieless page analytics, and when you submit a contractor
+                application we record how you found our website, such as the referring site or campaign.
               </p>
             </LegalSection>
 

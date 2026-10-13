@@ -13,6 +13,31 @@ export const APPLICATION_INTERESTS = [
 
 export type ApplicationInterest = (typeof APPLICATION_INTERESTS)[number]['value'];
 
+/** Where an applicant first came from, sorted server-side from their first-touch data. */
+export type ApplicationChannel =
+  | 'google'
+  | 'indeed'
+  | 'bing'
+  | 'facebook'
+  | 'instagram'
+  | 'tiktok'
+  | 'direct'
+  | 'other';
+
+/**
+ * How an applicant found the site: the first public page they loaded in that
+ * browser session and what sent them there. Cookieless, recorded only with the
+ * application. Empty strings where the browser had nothing to give.
+ */
+export interface ApplicationSource {
+  referrerHost: string;
+  landingPath: string;
+  utmSource: string;
+  utmMedium: string;
+  utmCampaign: string;
+  channel: ApplicationChannel;
+}
+
 export type ApplicationStatus =
   | 'applied'
   | 'contacted'
@@ -38,6 +63,8 @@ export interface ApplicationRecord {
   referredBy?: string;
   /** What they want to sell, ticked on /apply. Absent on applications from before the question. */
   interests?: ApplicationInterest[];
+  /** Absent on applications from before source tracking. */
+  source?: ApplicationSource;
   status: ApplicationStatus;
   createdAt: Date;
   updatedAt: Date;

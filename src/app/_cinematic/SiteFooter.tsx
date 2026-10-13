@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { FaFacebookF, FaInstagram, FaLinkedinIn } from "react-icons/fa6";
-import { APPLY_HREF, NAV_LINKS } from "./nav";
+import { APPLY_HREF, NAV_LINKS, SOCIAL_LINKS } from "./nav";
 import styles from "./cinematic.module.css";
 
 /**
@@ -37,13 +37,13 @@ export default function SiteFooter() {
         </nav>
 
         <div className={styles.footerSocial}>
-          <a href="https://www.linkedin.com/company/3cworldgroup" aria-label="3C World Group on LinkedIn">
+          <a href={SOCIAL_LINKS.linkedin} aria-label="3C World Group on LinkedIn">
             <FaLinkedinIn aria-hidden="true" />
           </a>
-          <a href="https://www.facebook.com/3cworldgroup" aria-label="3C World Group on Facebook">
+          <a href={SOCIAL_LINKS.facebook} aria-label="3C World Group on Facebook">
             <FaFacebookF aria-hidden="true" />
           </a>
-          <a href="https://www.instagram.com/3cworldgroup" aria-label="3C World Group on Instagram">
+          <a href={SOCIAL_LINKS.instagram} aria-label="3C World Group on Instagram">
             <FaInstagram aria-hidden="true" />
           </a>
         </div>

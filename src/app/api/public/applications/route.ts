@@ -15,6 +15,7 @@ import {
   readJsonObject,
 } from '@/lib/forms/publicFields';
 import { cleanInterests } from '@/lib/forms/applicationInterests';
+import { cleanApplicationSource } from '@/lib/forms/applicationSource';
 
 /*
   Trim, cap, and drop control characters.
@@ -68,6 +69,8 @@ export async function POST(request: NextRequest) {
     const city = clean(body.city, PUBLIC_FIELD_LIMITS.city);
     const referredBy = clean(body.referredBy, PUBLIC_FIELD_LIMITS.referredBy);
     const interests = cleanInterests(body.interests);
+    // How they found the site. Cleaned field by field, never a reason to refuse.
+    const source = cleanApplicationSource(body.source);
 
     if (!name || !phone || !email || !city) {
       return NextResponse.json(
@@ -98,7 +101,7 @@ export async function POST(request: NextRequest) {
       referredBy,
       interests,
       status: 'applied',
-      source: 'website',
+      source,
       createdAt: now,
       updatedAt: now,
     });
