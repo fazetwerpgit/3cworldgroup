@@ -18,13 +18,15 @@ import type {
 import type { MarketsSummary } from '@/lib/owner/markets';
 import { carrierReportStamp } from '@/lib/owner/reportFreshness';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
+import { SearchHiringCard } from './SearchHiringCard';
 import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
 import s from '../rep/rep.module.css';
 import o from './owner-dashboard.module.css';
 
 // The owner's home screen (direction D): the company, not a personal pay card.
 // Money first (estimated from installs × the comp plan), then this month's
-// sales by market, then what needs attention, then recruiting. Each section loads and fails on its own.
+// sales by market, then what needs attention, then recruiting, then hiring from
+// search. Each section loads and fails on its own.
 
 // ---------------------------------------------------------------- format
 
@@ -357,7 +359,8 @@ export function OwnerDashboard() {
     <>
       <h1 className={s.srOnly}>Company dashboard</h1>
 
-      {/* DOM order is the phone reading order: money, markets, Needs attention, Recruiting.
+      {/* DOM order is the phone reading order: money, markets, Needs attention, Recruiting,
+          Hiring from search.
           Desktop places each panel with explicit grid lines. */}
       <div className={o.grid}>
         {data.money.status === 'loading' ? (
@@ -402,6 +405,8 @@ export function OwnerDashboard() {
         ) : (
           <Recruiting data={data.recruiting.data} />
         )}
+
+        <SearchHiringCard className={o.search} />
       </div>
     </>
   );

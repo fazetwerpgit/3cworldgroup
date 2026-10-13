@@ -239,10 +239,17 @@ describe('/portal/dashboard', () => {
     expect(renderToStaticMarkup(<DashboardPage />)).toContain('Company dashboard');
   });
 
+  it('ends the owner view with Hiring from search', () => {
+    const html = renderToStaticMarkup(<DashboardPage />);
+    expect(html).toContain('Hiring from search');
+    expect(html.indexOf('Hiring from search')).toBeGreaterThan(html.indexOf('Recruiting · this week'));
+  });
+
   it.each(['admin', 'operations', 'ae_tier_1'])('keeps the rep dashboard for %s', (role) => {
     state.role = role;
     const html = renderToStaticMarkup(<DashboardPage />);
     expect(html).toContain('rep-dashboard');
     expect(html).not.toContain('Company dashboard');
+    expect(html).not.toContain('Hiring from search');
   });
 });
