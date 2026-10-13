@@ -1,0 +1,47 @@
+/* Owner Lead lists page (Admin settings). Shared pieces are admin-ui.module.css and rep.module.css. */
+
+.packCols {
+  --cols: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.notes {
+  display: grid;
+  gap: var(--s1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+/* Confirm before writing: neutral, like the Employee data import confirm. */
+.confirm {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: var(--c-well);
+}
+
+.confirmText {
+  margin: 0;
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1.35 var(--f-ui);
+}
+
+.confirmSub {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.progress {
+  display: grid;
+  gap: var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-variant-numeric: tabular-nums;
+}

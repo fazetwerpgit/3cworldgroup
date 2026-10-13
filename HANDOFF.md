@@ -17,6 +17,23 @@ background (intent, stack, design system, constraints) and still applies.
 > from `sendPendingEsignDocs`. Signed documents with no stored copy show
 > "Signed (no stored copy)" in Review.
 
+> **3C Doors lead lists (2026-10-13, branch `knock-sale-drafts`, not deployed):** owner-only
+> tab Admin settings > Lead lists (`src/components/knock/LeadListUpload.tsx`) uploads an AT&T
+> lead list or SalesRabbit export (CSV, ≤ 10 MB / 20,000 rows; the page gzips the body to fit
+> Vercel's 4.5 MB cap) into the app's top-level `houses` collection. APIs (all owner only):
+> `GET /api/portal/knock/leads` (campaigns, active people, switch state),
+> `POST /api/portal/knock/leads/preview` and `POST /api/portal/knock/leads/import`
+> (`{ csvText, campaignId, assignTo? }`). Both plan on the server with
+> `src/lib/knock/leadImport.ts`, a verbatim copy of 3c-knock-logic `src/lib/leadImport.ts`
+> (commit `55ca6ae`; re-copy when the app changes it, never edit it here) against the
+> campaign's houses plus the leads' ids in other campaigns; import writes 450 per batch with
+> `create` (same file twice adds nothing; existing doors are never overwritten) and streams
+> NDJSON progress. **Kill-switch:** import refuses (403 `not-enabled`) unless the server env
+> `KNOCK_LEAD_IMPORT_LIVE=1`; preview always runs. Set it in Vercel only once Jacob says
+> production imports may start (the phone's `LEAD_IMPORT_LIVE` is the matching switch).
+> Emulator check: `FIRESTORE_EMULATOR_HOST=127.0.0.1:<port> GCLOUD_PROJECT=demo-… npx vitest run
+> src/app/api/portal/knock/leads/import/route.emulator.test.ts` (skipped without the env).
+
 ## Session Handoff 2026-07-11 — Leaderboard Spotlight Arena re-skin DEPLOYED
 
 ### Completed (this session)

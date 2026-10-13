@@ -5,6 +5,7 @@ import { AdminGate } from '@/components/portal/admin-d/AdminUi';
 import { SETTINGS_HUB } from '@/components/portal/admin-d/adminHubs';
 import { EmployeeDataManager } from '@/components/employee-data/EmployeeDataManager';
 import { KnowledgeManager } from '@/components/knowledge/KnowledgeManager';
+import { LeadListUpload } from '@/components/knock/LeadListUpload';
 import { ChatChannels } from './ChatChannels';
 import { EmailTemplates } from './EmailTemplates';
 import { FormOptions } from './FormOptions';
@@ -13,7 +14,7 @@ import { SystemSettings } from './SystemSettings';
 import { UniversityContent } from './UniversityContent';
 
 // Admin settings: System, Form options, Chat channels, Email templates, University
-// content, and the owner's Pay rates, Employee data and Ask 3C, each under its old
+// content, and the owner's Pay rates, Employee data, Ask 3C and Lead lists, each under its old
 // gate. /portal/admin/form-options and the other old URLs redirect to their tab
 // (next.config.ts); People's old ?tab=employee-data / knowledge links land here.
 export default function SettingsPage() {
@@ -39,6 +40,12 @@ export default function SettingsPage() {
         ask: () => (
           <AdminGate roles={['owner']}>
             <KnowledgeManager />
+          </AdminGate>
+        ),
+        // Owner only: upload a lead file into a 3C Doors campaign (writes `houses`).
+        'lead-lists': () => (
+          <AdminGate roles={['owner']}>
+            <LeadListUpload />
           </AdminGate>
         ),
       }}

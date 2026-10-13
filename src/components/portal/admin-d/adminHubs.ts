@@ -114,7 +114,7 @@ export const CHAT_REPORTS_HUB = {
 export const SETTINGS_HUB = {
   href: '/portal/admin/settings',
   param: 'tab',
-  // Original order; Employee data and Ask 3C (moved in from elsewhere) last.
+  // Original order; Employee data and Ask 3C (moved in from elsewhere) last, then Lead lists (3C Doors).
   tabs: [
     { key: 'system', label: 'Challenge', roles: ['admin'], permissions: ['settings:read'] },
     { key: 'form-options', label: 'Form options', roles: ['admin'] },
@@ -134,6 +134,13 @@ export const SETTINGS_HUB = {
       label: 'Ask 3C',
       roles: ['owner'],
       hint: 'The notes Ask 3C answers from, and the questions people asked it.',
+    },
+    // 3C Doors: an AT&T / SalesRabbit lead file becomes doors in a campaign.
+    {
+      key: 'lead-lists',
+      label: 'Lead lists',
+      roles: ['owner'],
+      hint: 'Upload an AT&T lead list or SalesRabbit export to add doors to a 3C Doors campaign.',
     },
   ],
 } as const satisfies HubConfig;
