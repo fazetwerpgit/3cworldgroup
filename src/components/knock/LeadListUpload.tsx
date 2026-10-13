@@ -22,11 +22,12 @@ type Preview = LeadPlanSummary & { live: boolean };
 
 type Done = Extract<LeadImportEvent, { type: 'done' }>;
 
+/** How each left-out row reads in the rows sentence ("10 listed twice"). */
 const SKIPPED: Record<LeadSkipReason, string> = {
   'not-door-knock-allowed': 'not allowed to knock',
   'no-coordinates': 'without a map location',
   'no-pack': 'without a pack',
-  'in-other-campaign': 'already in another campaign',
+  'repeated-row': 'listed twice',
 };
 
 const FORMAT: Record<LeadPlanSummary['format'], string> = {
@@ -36,6 +37,19 @@ const FORMAT: Record<LeadPlanSummary['format'], string> = {
 
 const n = (count: number) => count.toLocaleString('en-US');
 const doorsWord = (count: number) => `${n(count)} ${count === 1 ? 'door' : 'doors'}`;
+
+/** Where every row went: "3,486 rows: 596 houses, 2,880 apartments in 134 buildings, 10 listed twice." */
+export function rowsSentence({ rows, rowsBreakdown: b, skipped }: Pick<LeadPlanSummary, 'rows' | 'rowsBreakdown' | 'skipped'>): string {
+  const parts: string[] = [];
+  if (b.houseRows > 0) parts.push(`${n(b.houseRows)} ${b.houseRows === 1 ? 'house' : 'houses'}`);
+  if (b.apartmentRows > 0) {
+    parts.push(
+      `${n(b.apartmentRows)} ${b.apartmentRows === 1 ? 'apartment' : 'apartments'} in ${n(b.buildings)} ${b.buildings === 1 ? 'building' : 'buildings'}`
+    );
+  }
+  for (const skip of skipped) parts.push(`${n(skip.count)} ${SKIPPED[skip.reason]}`);
+  return `${n(rows)} ${rows === 1 ? 'row' : 'rows'}: ${parts.join(', ')}.`;
+}
 
 /** POSTs `{ csvText, campaignId, assignTo }`, gzipped when the browser can (big files fit Vercel's body cap). */
 async function postLeads(path: string, payload: { csvText: string; campaignId: string; assignTo: string | null }) {
@@ -342,17 +356,13 @@ export function LeadListUpload() {
               </div>
             </dl>
             <ul className={l.notes}>
+              <li>{rowsSentence(preview)}</li>
               {preview.mdus > 0 ? (
                 <li>
-                  {n(preview.mdus)} apartment {preview.mdus === 1 ? 'building' : 'buildings'} with {n(preview.units)}{' '}
-                  units in total.
+                  The new doors include {n(preview.mdus)} apartment {preview.mdus === 1 ? 'building' : 'buildings'} with{' '}
+                  {n(preview.units)} units.
                 </li>
               ) : null}
-              {preview.skipped.map((skip) => (
-                <li key={skip.reason}>
-                  {n(skip.count)} {skip.count === 1 ? 'row' : 'rows'} left out: {SKIPPED[skip.reason]}.
-                </li>
-              ))}
               {preview.format === 'sr' ? (
                 <li>SalesRabbit files have no street addresses. Each address fills in the first time someone opens that door in the app.</li>
               ) : null}

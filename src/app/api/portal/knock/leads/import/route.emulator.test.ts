@@ -75,7 +75,7 @@ describe.skipIf(!host)('lead import against the Firestore emulator', () => {
     });
     const houses = await db.collection('houses').where('campaignId', '==', 'camp-1').get();
     expect(houses.size).toBe(1001);
-    expect((await db.collection('houses').doc('att-n0').get()).data()).toMatchObject({
+    expect((await db.collection('houses').doc('camp-1__att-n0').get()).data()).toMatchObject({
       assignedRepId: 'rep-1',
       managerId: 'mgr-1',
       last: null,
@@ -90,19 +90,20 @@ describe.skipIf(!host)('lead import against the Firestore emulator', () => {
     expect((await db.collection('houses').where('campaignId', '==', 'camp-1').get()).size).toBe(1001);
   });
 
-  it('never moves a door of another campaign, and keeps a door written after planning', async () => {
+  it('leaves the same door in another campaign alone, and keeps a door written after planning', async () => {
     const done = await last(await POST(req({ csvText: ATT_CSV, campaignId: 'camp-1' })));
-    expect(done).toMatchObject({ type: 'done', written: 3, summary: { skipped: expect.arrayContaining([{ reason: 'in-other-campaign', count: 1 }]) } });
-    expect((await db.collection('houses').doc('att-l9').get()).data()).toMatchObject({ campaignId: 'camp-2' });
+    expect(done).toMatchObject({ type: 'done', written: 4, summary: { duplicates: 1 } });
+    expect((await db.collection('houses').doc('camp-2__att-l9').get()).data()).toMatchObject({ campaignId: 'camp-2' });
+    expect((await db.collection('houses').doc('camp-1__att-l9').get()).data()).toMatchObject({ campaignId: 'camp-1' });
 
     // A real ALREADY_EXISTS from a batched create: the route's retry writes the rest.
     // Firestore data of a house this suite just wrote through the route.
-    const doc = (await db.collection('houses').doc('att-l1').get()).data() as HouseDoc;
+    const doc = (await db.collection('houses').doc('camp-1__att-l1').get()).data() as HouseDoc;
     const result = await writeLeadHouses(db, [
-      { id: 'att-l1', ...doc },
-      { id: 'att-fresh', ...doc },
+      { id: 'camp-1__att-l1', ...doc },
+      { id: 'camp-1__att-fresh', ...doc },
     ]);
     expect(result).toEqual({ written: 1, alreadyThere: 1 });
-    expect((await db.collection('houses').doc('att-fresh').get()).exists).toBe(true);
+    expect((await db.collection('houses').doc('camp-1__att-fresh').get()).exists).toBe(true);
   });
 });

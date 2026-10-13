@@ -16,8 +16,6 @@ export const MAX_CSV_BYTES = 10 * 1024 * 1024;
 export const MAX_LEAD_ROWS = 20_000;
 /** Houses per batched write (Firestore allows 500 writes per batch). */
 export const WRITE_BATCH_SIZE = 450;
-/** Doc refs per getAll when looking lead ids up in other campaigns. */
-const LOOKUP_CHUNK = 300;
 /** JSON framing around the CSV text (campaign id, rep, escaping headroom is in the CSV check). */
 const MAX_BODY_BYTES = 2 * MAX_CSV_BYTES;
 
@@ -112,8 +110,8 @@ export interface ServerLeadPlan {
 }
 
 /**
- * Plans the import against the server: every door of the campaign, plus the leads' ids looked up
- * in other campaigns (a door there is never moved). Same steps as the app's previewLeadImport.
+ * Plans the import against the campaign's doors on the server. Lead ids are campaign-scoped
+ * (`leadDocId`), so other campaigns never matter. Same steps as the app's previewLeadImport.
  */
 export async function planLeadsOnServer(
   db: Firestore,
@@ -134,37 +132,21 @@ export async function planLeadsOnServer(
     assignTo = { repId: input.assignTo, managerId: typeof user.managerId === 'string' ? user.managerId : null };
   }
 
-  const plan = (existing: readonly House[]) =>
-    planLeadImport(input.csvText, { campaignId: input.campaignId, existing, assignTo, now });
-  // Lead ids don't depend on existing doors: plan once without them to know which ids to look up.
-  const draft = plan([]);
-  if (!draft.ok) {
-    return draft.reason === 'empty'
+  const snap = await db.collection(HOUSES_COLLECTION).where('campaignId', '==', input.campaignId).get();
+  const existing = snap.docs.map((doc): House => ({ id: doc.id, ...(doc.data() as HouseDoc) }));
+  const result = planLeadImport(input.csvText, { campaignId: input.campaignId, existing, assignTo, now });
+  if (!result.ok) {
+    return result.reason === 'empty'
       ? fail(400, 'empty', 'This file has no rows.')
       : fail(400, 'unknown-format', "This isn't an AT&T or SalesRabbit lead file.");
   }
-  if (draft.plan.rows > MAX_LEAD_ROWS) {
+  if (result.plan.rows > MAX_LEAD_ROWS) {
     return fail(
       413,
       'too-many-rows',
-      `This file has ${draft.plan.rows.toLocaleString('en-US')} rows. The most at once is ${MAX_LEAD_ROWS.toLocaleString('en-US')}: split it into smaller files.`
+      `This file has ${result.plan.rows.toLocaleString('en-US')} rows. The most at once is ${MAX_LEAD_ROWS.toLocaleString('en-US')}: split it into smaller files.`
     );
   }
-
-  const houses = db.collection(HOUSES_COLLECTION);
-  const existing = new Map<string, House>();
-  const campaignHouses = await houses.where('campaignId', '==', input.campaignId).get();
-  for (const doc of campaignHouses.docs) existing.set(doc.id, { id: doc.id, ...(doc.data() as HouseDoc) });
-  const unknown = draft.plan.houses.map((h) => h.id).filter((id) => !existing.has(id));
-  for (let i = 0; i < unknown.length; i += LOOKUP_CHUNK) {
-    const snaps = await db.getAll(...unknown.slice(i, i + LOOKUP_CHUNK).map((id) => houses.doc(id)));
-    for (const snap of snaps) {
-      if (snap.exists) existing.set(snap.id, { id: snap.id, ...(snap.data() as HouseDoc) });
-    }
-  }
-
-  const result = plan([...existing.values()]);
-  if (!result.ok) return fail(400, result.reason, "This isn't an AT&T or SalesRabbit lead file.");
   return { ok: true, plan: result.plan, campaign: { id: input.campaignId, name: campaignName }, assignee };
 }
 
@@ -175,6 +157,8 @@ export interface LeadPlanSummary {
   assignee: ServerLeadPlan['assignee'];
   /** Data rows in the file. */
   rows: number;
+  /** Where the rows went: houses, apartments in buildings (the rest are in `skipped`). */
+  rowsBreakdown: LeadImportPlan['rowsBreakdown'];
   /** New doors the import adds. */
   doors: number;
   packs: LeadImportPlan['packs'];
@@ -190,6 +174,7 @@ export function planSummary({ plan, campaign, assignee }: ServerLeadPlan): LeadP
     campaign,
     assignee,
     rows: plan.rows,
+    rowsBreakdown: plan.rowsBreakdown,
     doors: plan.houses.length,
     packs: plan.packs,
     skipped: plan.skipped,

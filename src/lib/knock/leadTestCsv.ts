@@ -21,10 +21,11 @@ function csv(rows: string[][]): string {
 }
 
 /**
- * An AT&T list in campaign `camp-1` whose plan is: 3 doors (two houses in pack 1111PA, one
- * two-unit apartment building in 2222PB), 1 already in the campaign (att-l8), and one row each
- * not allowed to knock, without a map location, without a pack, and already in another campaign
- * (att-l9).
+ * An AT&T list of 11 rows whose plan into campaign `camp-1` is: 4 doors (three houses in pack
+ * 1111PA, one two-unit apartment building in 2222PB), 1 already in the campaign (L8), one row
+ * each not allowed to knock, without a map location and without a pack, and 2 listed twice (L1
+ * again, and apartment 2 of 200 Elm again). L9 is also a door of `camp-2`, which doesn't matter:
+ * lead ids are campaign-scoped.
  */
 export const ATT_CSV = csv([
   ATT_HEADER,
@@ -37,6 +38,8 @@ export const ATT_CSV = csv([
   ['L7', '304', '', 'PINE', 'RD', '', '', 'TESTVILLE', '35.1300', '-97.1300', 'Y', 'null'],
   ['L8', '400', '', 'MAPLE', 'DR', '', '', 'TESTVILLE', '35.1400', '-97.1400', 'Y', '1111PA'],
   ['L9', '500', '', 'BIRCH', 'LN', '', '', 'TESTVILLE', '35.1500', '-97.1500', 'Y', '1111PA'],
+  ['L1', '100', '', 'OAK', 'ST', '', '', 'TESTVILLE', '35.1000', '-97.1000', 'Y', 'null,1111PA'],
+  ['L4b', '200', '', 'ELM', 'AVE', '', '2', 'TESTVILLE', '35.1100', '-97.1100', 'Y', '2222PB'],
 ]);
 
 /** `count` door-knock-allowed houses in pack 1111PA, ~110 m apart (no duplicates among them). */
@@ -96,8 +99,8 @@ export function leadSeed(): Record<string, Record<string, Record<string, unknown
       'rep-gone': { status: 'inactive', displayName: 'Former Rep' },
     },
     houses: {
-      'att-l8': house('camp-1', 'att-1111pa', '1111PA', '400 Maple Dr', 35.14, -97.14),
-      'att-l9': house('camp-2', 'att-9999pz', '9999PZ', '500 Birch Ln', 35.15, -97.15),
+      'camp-1__att-l8': house('camp-1', 'att-1111pa', '1111PA', '400 Maple Dr', 35.14, -97.14),
+      'camp-2__att-l9': house('camp-2', 'att-9999pz', '9999PZ', '500 Birch Ln', 35.15, -97.15),
     },
   };
 }

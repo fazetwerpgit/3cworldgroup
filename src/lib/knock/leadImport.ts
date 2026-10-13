@@ -1,4 +1,4 @@
-// COPIED VERBATIM from 3c-knock-logic src/lib/leadImport.ts at commit 55ca6ae
+// COPIED VERBATIM from 3c-knock-logic src/lib/leadImport.ts at commit 8090861
 // (/home/fazetwerpnerd69/dev/3c-knock-logic/src/lib/leadImport.ts, LEAD_IMPORT_SPEC.md there).
 // Do not edit here: change it in the app repo and copy it again, so the phone and the portal
 // plan an import the same way. ./types.ts holds the House/HouseDoc types it imports.
@@ -116,7 +116,12 @@ export interface LeadHouse {
 }
 export interface LeadMapResult {
   houses: LeadHouse[];
-  skipped: { notAllowed: number; noCoords: number; noPack: number };
+  /**
+   * Rows left out at mapping. `repeated`: the same door listed again (the same apartment of a
+   * building, or the same AT&T Living Unit ID). Every row is either a house, an apartment of an
+   * MDU, or one of these.
+   */
+  skipped: { notAllowed: number; noCoords: number; noPack: number; repeated: number };
 }
 
 const naturalCompare = new Intl.Collator('en', { numeric: true }).compare;
@@ -127,7 +132,7 @@ const naturalCompare = new Intl.Collator('en', { numeric: true }).compare;
  * Number collapse into one MDU house, positioned at the first unit's coordinates.
  */
 export function mapAttLeads(records: Record<string, string>[]): LeadMapResult {
-  const skipped = { notAllowed: 0, noCoords: 0, noPack: 0 };
+  const skipped = { notAllowed: 0, noCoords: 0, noPack: 0, repeated: 0 };
   const singles: LeadHouse[] = [];
   const buildings = new Map<string, { base: LeadHouse; luids: string[]; units: Set<string> }>();
 
@@ -169,6 +174,7 @@ export function mapAttLeads(records: Record<string, string>[]): LeadMapResult {
     }
     const key = `${address}|${city}`.toLowerCase();
     const b = buildings.get(key) ?? { base, luids: [], units: new Set<string>() };
+    if (b.units.has(unit)) skipped.repeated++;
     b.luids.push(luid);
     b.units.add(unit);
     buildings.set(key, b);
@@ -182,7 +188,14 @@ export function mapAttLeads(records: Record<string, string>[]): LeadMapResult {
   }));
   const houses = [...singles, ...mdus];
   const seen = new Set<string>();
-  const unique = houses.filter((h) => !seen.has(h.id) && seen.add(h.id));
+  const unique = houses.filter((h) => {
+    if (!seen.has(h.id)) {
+      seen.add(h.id);
+      return true;
+    }
+    skipped.repeated += h.unitOrder?.length ?? 1;
+    return false;
+  });
   return { houses: unique, skipped };
 }
 
@@ -220,7 +233,7 @@ export function mapSrLeads(records: Record<string, string>[]): LeadMapResult {
 
 /** `mapSrLeads` without packs (packId/packName ''), so duplicates can be dropped before packing. */
 function srLeadHouses(records: Record<string, string>[]): LeadMapResult {
-  const skipped = { notAllowed: 0, noCoords: 0, noPack: 0 };
+  const skipped = { notAllowed: 0, noCoords: 0, noPack: 0, repeated: 0 };
   const rows: { lat: number; lng: number; apt: string; name: string }[] = [];
   for (const r of records) {
     const lat = Number.parseFloat(r.Latitude ?? '');
@@ -254,6 +267,7 @@ function srLeadHouses(records: Record<string, string>[]): LeadMapResult {
       }
     }
     if (found) {
+      if (found.units.has(row.apt)) skipped.repeated++;
       found.units.add(row.apt);
       continue;
     }
@@ -451,18 +465,23 @@ export interface LeadDedupe {
   kept: LeadHouse[];
   /** Leads that are already doors in this campaign. */
   duplicates: number;
-  /** Leads whose id is a door in another campaign (writing them would move that door here). */
-  inOtherCampaign: number;
 }
 
 /**
- * Drops leads that are already doors. Same id as an existing house: a duplicate when it is in
- * this campaign, else `inOtherCampaign`. Otherwise a duplicate when a door of this campaign has
- * the same normalized address, or is within DUPLICATE_RADIUS_M (see there).
+ * A lead's house doc id in a campaign. Scoped by campaign so the same door can be in two campaigns
+ * (each keeps its own houses and marks) and an import never needs to look at other campaigns.
+ */
+export function leadDocId(campaignId: string, leadId: string): string {
+  return `${campaignId}__${leadId}`;
+}
+
+/**
+ * Drops leads that are already doors of this campaign: the same id, the same normalized address,
+ * or within DUPLICATE_RADIUS_M (see there). Doors of other campaigns are ignored.
  */
 export function dedupeLeads(leads: readonly LeadHouse[], existing: readonly House[], campaignId: string): LeadDedupe {
-  const campaignOf = new Map(existing.map((h) => [h.id, h.campaignId]));
   const mine = existing.filter((h) => h.campaignId === campaignId);
+  const ids = new Set(mine.map((h) => h.id));
   const addresses = new Set(mine.map((h) => normalizeAddress(h.address, h.city)).filter(Boolean));
   // Cells of 0.0001° (~11 m; ~9 m of longitude at 35°N), so a 3x3 block covers the radius.
   const cell = (v: number) => Math.floor(v * 10_000);
@@ -476,15 +495,9 @@ export function dedupeLeads(leads: readonly LeadHouse[], existing: readonly Hous
 
   const kept: LeadHouse[] = [];
   let duplicates = 0;
-  let inOtherCampaign = 0;
   for (const lead of leads) {
-    const owner = campaignOf.get(lead.id);
-    if (owner !== undefined && owner !== campaignId) {
-      inOtherCampaign++;
-      continue;
-    }
     const key = normalizeAddress(lead.address, lead.city);
-    let duplicate = owner !== undefined || (key !== '' && addresses.has(key));
+    let duplicate = ids.has(lead.id) || (key !== '' && addresses.has(key));
     for (let dy = -1; dy <= 1 && !duplicate; dy++) {
       for (let dx = -1; dx <= 1 && !duplicate; dx++) {
         duplicate = (grid.get(`${cell(lead.lat) + dy}:${cell(lead.lng) + dx}`) ?? []).some((h) => {
@@ -497,10 +510,10 @@ export function dedupeLeads(leads: readonly LeadHouse[], existing: readonly Hous
     if (duplicate) duplicates++;
     else kept.push(lead);
   }
-  return { kept, duplicates, inOtherCampaign };
+  return { kept, duplicates };
 }
 
-export type LeadSkipReason = 'not-door-knock-allowed' | 'no-coordinates' | 'no-pack' | 'in-other-campaign';
+export type LeadSkipReason = 'not-door-knock-allowed' | 'no-coordinates' | 'no-pack' | 'repeated-row';
 
 export interface LeadPackSummary {
   packId: string;
@@ -527,14 +540,18 @@ export interface LeadImportPlan {
   /** Apartment buildings among `houses`, and their units in total. */
   mdus: number;
   units: number;
+  /**
+   * Where the file's rows went, before dropping doors already in the campaign: `houseRows` became
+   * one house each; `apartmentRows` became apartments of `buildings` MDUs (many rows, one door
+   * each building). rows = houseRows + apartmentRows + the row reasons in `skipped`
+   * (not-door-knock-allowed, no-coordinates, no-pack, repeated-row).
+   */
+  rowsBreakdown: { houseRows: number; apartmentRows: number; buildings: number };
 }
 
 export interface LeadPlanOptions {
   campaignId: string;
-  /**
-   * Houses already on the server (and queued): every door of `campaignId`, plus any others known
-   * (used only to catch id collisions with other campaigns).
-   */
+  /** Houses already on the server (and queued) in `campaignId`; doors of other campaigns are ignored. */
   existing: readonly House[];
   /** Rep the houses go to (with that rep's manager); omitted/null = unassigned. */
   assignTo?: { repId: string; managerId: string | null } | null;
@@ -548,8 +565,8 @@ export type LeadPlanResult = { ok: true; plan: LeadImportPlan } | { ok: false; r
 /**
  * What importing this CSV into the campaign would write: detects the format, maps rows to houses
  * (AT&T: PSA packs, MDUs by building; SR: ~2 km packs continuing the campaign's SR pack numbers,
- * MDUs by 3 m apt clusters, `addressPending`), and drops leads already in the campaign. Nothing is
- * written.
+ * MDUs by 3 m apt clusters, `addressPending`), gives them campaign-scoped ids (`leadDocId`), and
+ * drops leads already in the campaign. Nothing is written.
  */
 export function planLeadImport(text: string, opts: LeadPlanOptions): LeadPlanResult {
   const [header, ...rows] = parseCsv(text);
@@ -558,7 +575,8 @@ export function planLeadImport(text: string, opts: LeadPlanOptions): LeadPlanRes
   if (!format) return { ok: false, reason: 'unknown-format' };
   const records = toRecords(header, rows);
   const mapped = format === 'att' ? mapAttLeads(records) : srLeadHouses(records);
-  const { kept, duplicates, inOtherCampaign } = dedupeLeads(mapped.houses, opts.existing, opts.campaignId);
+  const scoped = mapped.houses.map((h) => ({ ...h, id: leadDocId(opts.campaignId, h.id) }));
+  const { kept, duplicates } = dedupeLeads(scoped, opts.existing, opts.campaignId);
   const mine = opts.existing.filter((h) => h.campaignId === opts.campaignId);
   if (format === 'sr') packSrHouses(kept, mine);
 
@@ -581,12 +599,13 @@ export function planLeadImport(text: string, opts: LeadPlanOptions): LeadPlanRes
       ['not-door-knock-allowed', mapped.skipped.notAllowed],
       ['no-coordinates', mapped.skipped.noCoords],
       ['no-pack', mapped.skipped.noPack],
-      ['in-other-campaign', inOtherCampaign],
+      ['repeated-row', mapped.skipped.repeated],
     ] as const
   )
     .filter(([, count]) => count > 0)
     .map(([reason, count]) => ({ reason, count }));
   const mdus = houses.filter((h) => h.unitOrder);
+  const mappedMdus = mapped.houses.filter((h) => h.unitOrder);
   return {
     ok: true,
     plan: {
@@ -599,6 +618,11 @@ export function planLeadImport(text: string, opts: LeadPlanOptions): LeadPlanRes
       duplicates,
       mdus: mdus.length,
       units: mdus.reduce((n, h) => n + (h.unitOrder?.length ?? 0), 0),
+      rowsBreakdown: {
+        houseRows: mapped.houses.length - mappedMdus.length,
+        apartmentRows: mappedMdus.reduce((n, h) => n + (h.unitOrder?.length ?? 0), 0),
+        buildings: mappedMdus.length,
+      },
     },
   };
 }

@@ -62,17 +62,19 @@ describe('POST /api/portal/knock/leads/preview', () => {
       format: 'att',
       campaign: { id: 'camp-1', name: 'Test Fiber' },
       assignee: null,
-      rows: 9,
-      doors: 3,
+      rows: 11,
+      // 11 rows = 4 houses + 2 apartments + 1 + 1 + 1 left out + 2 listed twice.
+      rowsBreakdown: { houseRows: 4, apartmentRows: 2, buildings: 1 },
+      doors: 4,
       packs: [
-        { packId: 'att-1111pa', name: '1111PA', count: 2, isNew: false },
+        { packId: 'att-1111pa', name: '1111PA', count: 3, isNew: false },
         { packId: 'att-2222pb', name: '2222PB', count: 1, isNew: true },
       ],
       skipped: [
         { reason: 'not-door-knock-allowed', count: 1 },
         { reason: 'no-coordinates', count: 1 },
         { reason: 'no-pack', count: 1 },
-        { reason: 'in-other-campaign', count: 1 },
+        { reason: 'repeated-row', count: 2 },
       ],
       duplicates: 1,
       mdus: 1,
@@ -80,7 +82,7 @@ describe('POST /api/portal/knock/leads/preview', () => {
       live: false,
     });
     expect(fake.commits).toEqual([]);
-    expect([...fake.docs('houses').keys()].sort()).toEqual(['att-l8', 'att-l9']);
+    expect([...fake.docs('houses').keys()].sort()).toEqual(['camp-1__att-l8', 'camp-2__att-l9']);
   });
 
   it('says whether Import is switched on', async () => {
@@ -100,7 +102,14 @@ describe('POST /api/portal/knock/leads/preview', () => {
     );
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body).toMatchObject({ format: 'sr', rows: 2, doors: 2, duplicates: 0, skipped: [] });
+    expect(body).toMatchObject({
+      format: 'sr',
+      rows: 2,
+      rowsBreakdown: { houseRows: 2, apartmentRows: 0, buildings: 0 },
+      doors: 2,
+      duplicates: 0,
+      skipped: [],
+    });
     expect(body.packs).toEqual([{ packId: 'att-sr-1', name: 'SR OKC 1', count: 2, isNew: true }]);
   });
 

@@ -70,7 +70,7 @@ describe('POST /api/portal/knock/leads/import', () => {
     expect(fake.commits).toEqual([]);
     const preview = await PREVIEW(req({ csvText: ATT_CSV, campaignId: 'camp-1' }, 'preview'));
     expect(preview.status).toBe(200);
-    expect((await preview.json()).doors).toBe(3);
+    expect((await preview.json()).doors).toBe(4);
   });
 
   it('writes the server plan as house docs, with the rep and their manager', async () => {
@@ -78,11 +78,11 @@ describe('POST /api/portal/knock/leads/import', () => {
     const res = await POST(req({ csvText: ATT_CSV, campaignId: 'camp-1', assignTo: 'rep-1' }));
     expect(res.status).toBe(200);
     const lines = await events(res);
-    expect(lines.at(-1)).toMatchObject({ type: 'done', written: 3, alreadyThere: 0, summary: { doors: 3, duplicates: 1 } });
-    expect(fake.commits).toEqual([['att-l1', 'att-l2', 'att-mdu-l3']]);
+    expect(lines.at(-1)).toMatchObject({ type: 'done', written: 4, alreadyThere: 0, summary: { doors: 4, duplicates: 1 } });
+    expect(fake.commits).toEqual([['camp-1__att-l1', 'camp-1__att-l2', 'camp-1__att-l9', 'camp-1__att-mdu-l3']]);
 
     const houses = fake.docs('houses');
-    expect(houses.get('att-l1')).toEqual({
+    expect(houses.get('camp-1__att-l1')).toEqual({
       campaignId: 'camp-1',
       packId: 'att-1111pa',
       packName: '1111PA',
@@ -100,9 +100,10 @@ describe('POST /api/portal/knock/leads/import', () => {
       createdBy: null,
       updatedAt: expect.any(Number),
     });
-    expect(houses.get('att-mdu-l3')).toMatchObject({ unitOrder: ['1', '2'], units: {}, packId: 'att-2222pb' });
-    // The door of another campaign with a lead's id is not moved.
-    expect(houses.get('att-l9')).toMatchObject({ campaignId: 'camp-2', packId: 'att-9999pz' });
+    expect(houses.get('camp-1__att-mdu-l3')).toMatchObject({ unitOrder: ['1', '2'], units: {}, packId: 'att-2222pb' });
+    // The same door in another campaign is a separate doc there, untouched.
+    expect(houses.get('camp-2__att-l9')).toMatchObject({ campaignId: 'camp-2', packId: 'att-9999pz' });
+    expect(houses.get('camp-1__att-l9')).toMatchObject({ campaignId: 'camp-1', packId: 'att-1111pa' });
   });
 
   it('is idempotent: the same file again adds nothing', async () => {
@@ -110,7 +111,7 @@ describe('POST /api/portal/knock/leads/import', () => {
     await events(await POST(req({ csvText: ATT_CSV, campaignId: 'camp-1' })));
     const before = structuredClone(Object.fromEntries(fake.docs('houses')));
     const again = await events(await POST(req({ csvText: ATT_CSV, campaignId: 'camp-1' })));
-    expect(again.at(-1)).toMatchObject({ type: 'done', written: 0, alreadyThere: 0, summary: { doors: 0, duplicates: 4 } });
+    expect(again.at(-1)).toMatchObject({ type: 'done', written: 0, alreadyThere: 0, summary: { doors: 0, duplicates: 5 } });
     expect(fake.commits).toHaveLength(1);
     expect(Object.fromEntries(fake.docs('houses'))).toEqual(before);
   });
@@ -118,11 +119,11 @@ describe('POST /api/portal/knock/leads/import', () => {
   it('leaves alone a door that appeared after planning and writes the rest', async () => {
     mockGate.mockResolvedValue(OWNER);
     const theirs = { campaignId: 'camp-1', packId: 'att-1111pa', address: 'someone else wrote this' };
-    fake.beforeNextCommit = () => fake.docs('houses').set('att-l2', theirs);
+    fake.beforeNextCommit = () => fake.docs('houses').set('camp-1__att-l2', theirs);
     const lines = await events(await POST(req({ csvText: ATT_CSV, campaignId: 'camp-1' })));
-    expect(lines.at(-1)).toMatchObject({ type: 'done', written: 2, alreadyThere: 1 });
-    expect(fake.docs('houses').get('att-l2')).toEqual(theirs);
-    expect(fake.commits).toEqual([['att-l1', 'att-mdu-l3']]);
+    expect(lines.at(-1)).toMatchObject({ type: 'done', written: 3, alreadyThere: 1 });
+    expect(fake.docs('houses').get('camp-1__att-l2')).toEqual(theirs);
+    expect(fake.commits).toEqual([['camp-1__att-l1', 'camp-1__att-l9', 'camp-1__att-mdu-l3']]);
   });
 
   it('writes at most 450 houses per batch and reports progress after each', async () => {

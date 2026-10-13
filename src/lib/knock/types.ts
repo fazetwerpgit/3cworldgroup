@@ -1,4 +1,4 @@
-// The 3C Doors house shape, copied from 3c-knock-logic src/lib/types.ts at commit 55ca6ae: only
+// The 3C Doors house shape, copied from 3c-knock-logic src/lib/types.ts at commit 8090861: only
 // the types leadImport.ts needs. A house is a top-level Firestore doc `houses/{id}` written by
 // the app and, for lead imports, by the portal (admin SDK). Keep in step with the app repo.
 

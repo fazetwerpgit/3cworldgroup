@@ -25,8 +25,9 @@ background (intent, stack, design system, constraints) and still applies.
 > `POST /api/portal/knock/leads/preview` and `POST /api/portal/knock/leads/import`
 > (`{ csvText, campaignId, assignTo? }`). Both plan on the server with
 > `src/lib/knock/leadImport.ts`, a verbatim copy of 3c-knock-logic `src/lib/leadImport.ts`
-> (commit `55ca6ae`; re-copy when the app changes it, never edit it here) against the
-> campaign's houses plus the leads' ids in other campaigns; import writes 450 per batch with
+> (commit `8090861`; re-copy when the app changes it, never edit it here) against the
+> campaign's houses only (house ids are campaign-scoped, `<campaignId>__<leadId>`, so the same
+> door can be in two campaigns and other campaigns are never read); import writes 450 per batch with
 > `create` (same file twice adds nothing; existing doors are never overwritten) and streams
 > NDJSON progress. **Kill-switch:** import refuses (403 `not-enabled`) unless the server env
 > `KNOCK_LEAD_IMPORT_LIVE=1`; preview always runs. Set it in Vercel only once Jacob says
