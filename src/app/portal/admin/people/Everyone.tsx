@@ -17,7 +17,8 @@ import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { FieldRole, FieldRoles, User, RoleDisplayNames } from '@/types';
+import { FieldRole, FieldRoles, User, RoleDisplayNames, isOwner } from '@/types';
+import { useViewAs } from '@/contexts/ViewAsContext';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import p from './users.module.css';
@@ -78,6 +79,22 @@ function timeAgo(date: Date | string | number | undefined) {
 export function Everyone() {
   const router = useRouter();
   const { user: currentUser } = useAuth();
+  // Owner only: "View as rep" opens the rep's Home, read only (ViewAsContext).
+  const { start: startViewAs } = useViewAs();
+  const ownerViewer = isOwner(currentUser?.role);
+  const viewAsRep = useCallback(
+    (rep: User) => {
+      startViewAs({
+        uid: rep.uid,
+        displayName: rep.displayName || '',
+        email: rep.email || '',
+        fieldRole: rep.fieldRole ?? '',
+        avatarUrl: rep.avatarUrl ?? null,
+      });
+      router.push('/portal/dashboard');
+    },
+    [router, startViewAs]
+  );
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -388,6 +405,7 @@ export function Everyone() {
               users={filteredUsers}
               onApprove={openAssignRole}
               onPersonLink={(uid) => router.push(`/portal/admin/users/${uid}`)}
+              onViewAs={ownerViewer ? viewAsRep : undefined}
               loading={loading || approving}
               salesCounts={salesCounts}
             />

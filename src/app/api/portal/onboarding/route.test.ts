@@ -45,8 +45,10 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedSelfOrManagement: gateMock }));
 vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignDocsMock }));
+vi.mock('@/lib/auth/viewAs', async () => (await import('@/lib/auth/viewAsTestStub')).viewAsStubModule());
 
 import { GET } from './route';
+import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';
 
 function makeRequest(userId: string) {
   return new NextRequest(`http://localhost/api/portal/onboarding?userId=${userId}`);
@@ -236,5 +238,37 @@ describe('GET /api/portal/onboarding status gate', () => {
 
     expect(item.status).toBe('approved');
     expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/portal/onboarding — owner viewing as a rep', () => {
+  it("lists what the rep still has to sign, with no signing links and no resend", async () => {
+    userDocGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ fieldRole: 'entry_rep', isIBO: false, status: 'active' }),
+    });
+    gateMock.mockResolvedValue({ ok: true, uid: 'owner-1', name: 'Owner', isManagement: true, isOwner: true });
+    store.set('userOnboarding/rep-noah_contract', { status: 'approved', esignEnvelopeId: 'env_1' });
+    store.set('userOnboarding/rep-noah_w9', { status: 'submitted', esignEnvelopeId: 'env_2' });
+    store.set('esignEnvelopes/env_2', { status: 'sent' });
+    store.set('userOnboarding/rep-noah_pay_structure', { status: 'submitted', esignEnvelopeId: 'legacy-1' });
+
+    const res = await GET(
+      new NextRequest('http://localhost/api/portal/onboarding?userId=rep-noah', { headers: viewAsHeaders() })
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.items.map((i: { id: string }) => i.id)).toEqual(['w9']);
+    expect(json.items[0].signPath).toBeNull();
+    expect(sendPendingEsignDocsMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a manager (not the owner) sending the header', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'admin1', name: 'Admin', isManagement: true, isOwner: false });
+    const res = await GET(
+      new NextRequest('http://localhost/api/portal/onboarding?userId=rep-noah', { headers: viewAsHeaders() })
+    );
+    expect(res.status).toBe(403);
   });
 });

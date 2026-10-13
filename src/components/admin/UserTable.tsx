@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Eye } from 'lucide-react';
 import { User, UserRole, RoleDisplayNames, getEffectiveRole } from '@/types';
 import { isOnline } from '@/lib/presence/isOnline';
 import { AdminEmpty, StatusDot, type Tone } from '@/components/portal/admin-d/AdminUi';
@@ -18,6 +18,13 @@ interface UserTableProps {
    * Absent from the board = zero approved sales, so a missing entry renders
    * "0", the honest value — never "—". */
   salesCounts?: Record<string, number>;
+  /** Owner only: "View as rep" on each active field rep (read only). */
+  onViewAs?: (user: User) => void;
+}
+
+/** An active field rep (no platform role): the accounts "View as rep" can open. */
+export function canViewAsRep(user: Pick<User, 'status' | 'role' | 'fieldRole'>): boolean {
+  return (user.status || 'active') === 'active' && !user.role && !!user.fieldRole;
 }
 
 const STATUS_TONE: Record<string, Tone> = {
@@ -45,6 +52,7 @@ export function UserTable({
   onPersonLink,
   loading,
   salesCounts,
+  onViewAs,
 }: UserTableProps) {
   if (users.length === 0) {
     return (
@@ -55,7 +63,7 @@ export function UserTable({
   }
 
   return (
-    <ul className={`${u.rows} ${t.cols}`} id="people-list">
+    <ul className={`${u.rows} ${t.cols} ${onViewAs ? t.withViewAs : ''}`} id="people-list">
       <li className={u.tHead} aria-hidden="true">
         <span>Person</span>
         <span>Role</span>
@@ -64,6 +72,7 @@ export function UserTable({
         <span>Shirt</span>
         <span className={u.alignEnd}>Sales</span>
         <span />
+        {onViewAs ? <span /> : null}
         <span />
       </li>
       {users.map((user) => {
@@ -75,6 +84,7 @@ export function UserTable({
         const displayName = user.displayName || user.email || 'this user';
         const approvedSales = salesCounts?.[user.uid] ?? 0;
         const canAssign = !!onApprove && isPending && !user.fieldRole;
+        const viewable = !!onViewAs && canViewAsRep(user);
 
         return (
           <li
@@ -146,6 +156,23 @@ export function UserTable({
                 </button>
               ) : null}
             </span>
+
+            {onViewAs ? (
+              <span className={t.viewAs}>
+                {viewable ? (
+                  <button
+                    type="button"
+                    className={t.viewAsBtn}
+                    onClick={() => onViewAs(user)}
+                    aria-label={`View as ${displayName} (read only)`}
+                    title="View as rep (read only)"
+                  >
+                    <Eye size={18} aria-hidden="true" />
+                    <span className={t.viewAsWord}>View as rep</span>
+                  </button>
+                ) : null}
+              </span>
+            ) : null}
 
             <ChevronRight size={20} className={`${u.chev} ${t.chev}`} aria-hidden="true" />
           </li>

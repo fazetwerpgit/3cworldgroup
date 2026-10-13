@@ -27,9 +27,11 @@ vi.mock('@/lib/firebase/admin', () => ({
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedUser: gateMock,
 }));
+vi.mock('@/lib/auth/viewAs', async () => (await import('@/lib/auth/viewAsTestStub')).viewAsStubModule());
 
 import { GET } from './route';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
+import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';
 
 function request() {
   return new NextRequest('http://localhost/api/portal/sales/status');
@@ -275,5 +277,46 @@ describe('GET /api/portal/sales/status', () => {
     });
     await GET(request());
     expect(allOrdersGetMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('GET /api/portal/sales/status — owner viewing as a rep', () => {
+  it("answers with the rep's own scope and orders, never the owner's company-wide one", async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'owner-1', name: 'Owner', email: '', isOwner: true, isAdmin: true });
+    const userIds: string[] = [];
+    const wheres: unknown[][] = [];
+    collectionMock.mockImplementation((name: string) => {
+      if (name === 'users') {
+        return {
+          doc: vi.fn((id: string) => {
+            userIds.push(id);
+            return { get: async () => ({ exists: true, data: () => (id === 'owner-1' ? { role: 'owner' } : { fieldRole: 'entry_rep' }) }) };
+          }),
+        };
+      }
+      if (name === 'config') return { doc: vi.fn(() => ({ get: configGetMock })) };
+      return {
+        get: name === 'fiberOrders' ? allOrdersGetMock : allSalesGetMock,
+        where: vi.fn((...args: unknown[]) => {
+          wheres.push([name, ...args]);
+          return { get: name === 'fiberOrders' ? ownOrdersGetMock : ownSalesGetMock };
+        }),
+      };
+    });
+
+    const response = await GET(new NextRequest('http://localhost/api/portal/sales/status', { headers: viewAsHeaders() }));
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json.scope).toBe('own');
+    expect(userIds).toEqual(['rep-noah']);
+    expect(wheres).toContainEqual(['fiberOrders', 'matchedUserId', '==', 'rep-noah']);
+    expect(wheres).toContainEqual(['sales', 'salesRepId', '==', 'rep-noah']);
+    expect(allOrdersGetMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a non-owner sending the header', async () => {
+    const response = await GET(new NextRequest('http://localhost/api/portal/sales/status', { headers: viewAsHeaders() }));
+    expect(response.status).toBe(403);
   });
 });

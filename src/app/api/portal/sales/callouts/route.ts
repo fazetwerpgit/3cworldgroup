@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import { repCalloutDay } from '@/lib/alerts/calloutNudges';
 import type { CalloutStatus } from '@/lib/sales/calloutNudge';
 
@@ -19,7 +20,11 @@ export async function GET(request: NextRequest) {
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
-    const { day, callouts, logged, gap } = await repCalloutDay(adminDb, gate.uid);
+    const subject = await resolveSubject(request, gate);
+    if (!subject.ok) {
+      return NextResponse.json({ error: subject.error }, { status: subject.status });
+    }
+    const { day, callouts, logged, gap } = await repCalloutDay(adminDb, subject.uid);
     const body: CalloutStatus = { day, callouts, logged, gap };
     return NextResponse.json(body, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {

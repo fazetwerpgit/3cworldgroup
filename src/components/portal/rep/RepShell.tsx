@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { CommandPalette } from '@/components/portal/CommandPalette';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +9,8 @@ import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
 import { useAdminNavCounts } from '@/components/portal/admin-d/opsQueues';
 import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
+import { isViewAsPath, useViewAs, ViewAsScope } from '@/contexts/ViewAsContext';
+import { ViewAsBanner } from '@/components/portal/viewAs/ViewAsBanner';
 import { RepBoot } from './RepBoot';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, type RepBackLink } from './RepTopBar';
@@ -31,7 +34,11 @@ export function useHideRepTabBar(hidden: boolean) {
 
 function RepChrome({ children, task, back }: { children: ReactNode; task?: string; back?: RepBackLink }) {
   const { user } = useAuth();
-  usePresenceHeartbeat();
+  const pathname = usePathname();
+  // The owner viewing as a rep (read only): no presence ping or push nudge
+  // while the session is on, and the in-scope screens render as the rep.
+  const { viewing } = useViewAs();
+  usePresenceHeartbeat({ enabled: !viewing });
   const { channels } = useChatChannels();
   const { anyUnread } = useChatUnread(channels, user?.uid);
   const navCounts = useAdminNavCounts();
@@ -42,16 +49,32 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
       <div className={s.root} data-shell="rep">
         <RepTopBar chatUnread={anyUnread} navCounts={navCounts} task={task} back={back} />
+        <ViewAsBanner />
         {/* Push not working on this device: a banner here, or a full-screen sheet for a required person. */}
-        <PushNudge />
+        {viewing ? null : <PushNudge />}
         <main className={s.scroller} id="rep-main">
-          <div className={s.main}>{children}</div>
+          <div className={s.main}>
+            {viewing && isViewAsPath(pathname) ? (
+              <ViewAsScope loading={<ViewAsLoading />}>{children}</ViewAsScope>
+            ) : (
+              children
+            )}
+          </div>
         </main>
         {tabBarHidden ? null : <RepTabBar chatUnread={anyUnread} navCounts={navCounts} />}
         {/* Keeps the portal-wide Ctrl/Cmd+K search working on D pages. */}
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>
     </TabBarHiddenContext.Provider>
+  );
+}
+
+/** Until the server confirms the rep: never the owner's own screen and its reads. */
+function ViewAsLoading() {
+  return (
+    <div aria-busy="true" aria-label="Loading the rep's view">
+      <span className={s.skel} style={{ display: 'block', height: 120, borderRadius: 14 }} />
+    </div>
   );
 }
 

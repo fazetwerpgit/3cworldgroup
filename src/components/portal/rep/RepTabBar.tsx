@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useViewAs } from '@/contexts/ViewAsContext';
 import { useNavAccess } from '@/components/portal/NavSheet';
 import { isOwner } from '@/types';
 import { BodyLayer } from './BodyLayer';
-import { activeRepHref, repTabsFor } from './repNav';
+import { activeRepHref, repTabsFor, viewAsTabs } from './repNav';
 import s from './rep.module.css';
 import t from './rep-tabbar.module.css';
 
@@ -28,7 +29,9 @@ export function RepTabBar({
   const { user } = useAuth();
   const { canAccess } = useNavAccess();
   const active = activeRepHref(pathname);
-  const tabs = repTabsFor(isOwner(user?.role ?? undefined)).filter(canAccess);
+  // Viewing as a rep (read only): just the rep screens the owner can see.
+  const { viewing } = useViewAs();
+  const tabs = (viewing ? viewAsTabs() : repTabsFor(isOwner(user?.role ?? undefined))).filter(canAccess);
   const waiting = Object.values(navCounts).reduce((sum, n) => sum + n, 0);
 
   return (

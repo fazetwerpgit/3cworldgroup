@@ -178,3 +178,81 @@
     clip: auto;
   }
 }
+
+/* Owner only: "View as rep" (read only). Desktop: its own column, before the
+   chevron. Phone: an icon button at the end of the first line, in a 44px slot
+   every row keeps so the status and sales columns stay aligned. */
+.withViewAs {
+  --cols: minmax(0, 1.5fr) minmax(0, 1.25fr) 100px 116px 48px 56px 124px 132px 20px;
+}
+
+.viewAs {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.viewAsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--r-control);
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--t-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 120ms ease-out;
+}
+
+.viewAsBtn:active {
+  transform: scale(0.97);
+}
+
+.viewAsBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .viewAsBtn:hover {
+    border-color: var(--c-amber);
+  }
+}
+
+@media (max-width: 1023px) {
+  .withViewAs .row {
+    grid-template-columns: minmax(0, 1fr) auto auto var(--tap);
+  }
+
+  .withViewAs .viewAs {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .viewAsBtn {
+    padding: 0;
+  }
+
+  .viewAsWord {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 1024px) {
+  .viewAsBtn {
+    min-height: 36px;
+  }
+}

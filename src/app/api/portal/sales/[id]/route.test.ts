@@ -45,6 +45,7 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedAdmin: gateMock,
   requireVerifiedRequester: requesterMock,
 }));
+vi.mock('@/lib/auth/viewAs', async () => (await import('@/lib/auth/viewAsTestStub')).viewAsStubModule());
 vi.mock('@/lib/fiberReport/ordersCache', () => ({
   invalidateFiberOrdersCache: invalidateMock,
 }));
@@ -54,7 +55,8 @@ vi.mock('@/lib/sales/carrierSnapshot', () => ({
   loadRepSales: vi.fn(async () => []),
 }));
 
-import { DELETE, PUT } from './route';
+import { DELETE, GET, PUT } from './route';
+import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';
 import { dateToSaleDateInput } from '@/lib/sales/saleDate';
 
 function del(id = 'sale-1') {
@@ -571,5 +573,34 @@ describe('PUT /api/portal/sales/[id] a number the carrier report filled', () => 
     const response = await put({ orderNumberOrBtn: 'tmo-20260901-abcde', notes: 'x' });
     expect(response.status).toBe(200);
     expect(saleUpdateMock.mock.calls[0][0]).not.toHaveProperty('orderNumberSource');
+  });
+});
+
+describe('GET /api/portal/sales/[id] — owner viewing as a rep', () => {
+  const asOwner = () =>
+    requesterMock.mockResolvedValue({ ok: true, uid: 'owner-1', name: 'Owner', isAdmin: true, isManagement: true, isOwner: true });
+  const getSale = (id = 'sale-1') =>
+    GET(new NextRequest(`http://localhost/api/portal/sales/${id}`, { headers: viewAsHeaders() }), {
+      params: Promise.resolve({ id }),
+    });
+
+  it("opens the rep's own sale", async () => {
+    asOwner();
+    saleGetMock.mockResolvedValue({ exists: true, data: () => ({ salesRepId: 'rep-noah', customerName: 'Carla Diaz' }) });
+    const response = await getSale();
+    expect(response.status).toBe(200);
+    expect((await response.json()).sale).toMatchObject({ salesRepId: 'rep-noah', customerName: 'Carla Diaz' });
+  });
+
+  it("refuses another rep's sale, as the rep would be refused", async () => {
+    asOwner();
+    saleGetMock.mockResolvedValue({ exists: true, data: () => ({ salesRepId: 'rep-other' }) });
+    expect((await getSale()).status).toBe(403);
+  });
+
+  it('refuses an admin sending the header', async () => {
+    requesterMock.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true, isManagement: true, isOwner: false });
+    expect((await getSale()).status).toBe(403);
+    expect(saleGetMock).not.toHaveBeenCalled();
   });
 });

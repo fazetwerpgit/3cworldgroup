@@ -18,6 +18,7 @@ import {
 import { Sale, FIBER_COMPANIES, SaleStatusConfig, type FiberOrder } from '@/types';
 import { auth } from '@/lib/firebase/config';
 import { useAuth } from '@/contexts/AuthContext';
+import { useViewAsReadOnly } from '@/contexts/ViewAsContext';
 import { useSales } from '@/hooks/useSales';
 import { useSheetExit } from '@/hooks/useSheetExit';
 import { isCarrierCancelled, isStandingBreakage } from '@/lib/sales/installBucket';
@@ -154,6 +155,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
   // it (a rep may edit their own sale); only the UI held it back, and the full
   // edit page stays admin-only — this is the one field a rep can correct here.
   const { user } = useAuth();
+  const readOnly = useViewAsReadOnly();
   const { updateSale } = useSales();
   /** The value in the date input, or null when the row is not being edited. */
   const [installDraft, setInstallDraft] = useState<string | null>(null);
@@ -226,8 +228,9 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
     : storedInstallDate;
   // The owning rep, or an admin. A cancelled or rejected sale has no install to move.
   const ownSale = !!user?.uid && sale.salesRepId === user.uid;
+  // Never while the owner views as the rep (read only).
   const canEditInstallDate =
-    sale.status !== 'cancelled' && sale.status !== 'rejected' && (isAdmin || ownSale);
+    !readOnly && sale.status !== 'cancelled' && sale.status !== 'rejected' && (isAdmin || ownSale);
   // A missed install: the new day has to land after the one that broke.
   const missed = isStandingBreakage({ installDate: shownInstallDate ?? undefined }, fiberOrder);
   const brokeDay = missed ? missedInstallDay(fiberOrder?.estInstallDate, shownInstallDate) : '';

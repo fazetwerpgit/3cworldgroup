@@ -5,6 +5,7 @@ import {
   requireVerifiedRequester,
 } from '@/lib/auth/requireVerifiedAdmin';
 import { changedLeaves, writeAdminAudit } from '@/lib/audit/adminAudit';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import { COMP_PLAN_MARGIN, COMP_PLAN_RATES, COMP_PLAN_VERSION } from '@/data/compPlan.generated';
 import {
   COMP_PLAN_ROLES,
@@ -90,10 +91,16 @@ export async function GET(request: NextRequest) {
 
     // requireVerifiedRequester is the token-verified caller lookup: it returns
     // the resolved role/fieldRole from the user doc, so scoping never trusts input.
-    const gate = await requireVerifiedRequester(request);
-    if (!gate.ok) {
-      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    const caller = await requireVerifiedRequester(request);
+    if (!caller.ok) {
+      return NextResponse.json({ error: caller.error }, { status: caller.status });
     }
+    // View as rep: the rep's own slice only, never the owner's rates/margin payload.
+    const subject = await resolveSubject(request, caller);
+    if (!subject.ok) {
+      return NextResponse.json({ error: subject.error }, { status: subject.status });
+    }
+    const gate = subject.viewing ? subject.target : caller;
 
     const { rates, version, updatedAt, updatedByName } = await loadRates();
     const base = {

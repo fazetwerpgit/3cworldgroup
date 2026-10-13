@@ -4,6 +4,7 @@ import {
   requireVerifiedManagement,
   requireVerifiedUser,
 } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import {
   CALL_DAY_ORDER,
   CallAudience,
@@ -42,8 +43,12 @@ export async function GET(request: NextRequest) {
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
-    // Audience scoping keys off the caller's own role.
-    const userId = gate.uid;
+    // Audience scoping keys off the caller's own role (the rep's, viewing as one).
+    const subject = await resolveSubject(request, gate);
+    if (!subject.ok) {
+      return NextResponse.json({ error: subject.error }, { status: subject.status });
+    }
+    const userId = subject.uid;
 
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) {

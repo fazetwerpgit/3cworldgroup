@@ -11,6 +11,8 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedRequester: vi.fn(async () => ({ ok: true, uid: 'u1', isManagement: true })),
 }));
 
+vi.mock('@/lib/auth/viewAs', async () => (await import('@/lib/auth/viewAsTestStub')).viewAsStubModule());
+
 function snapshot(rows: Array<{ id: string; data: Record<string, unknown> }>) {
   return {
     forEach: (fn: (doc: { id: string; data: () => Record<string, unknown> }) => void) => {
@@ -44,6 +46,8 @@ vi.mock('@/lib/fiberReport/ordersCache', () => ({
 }));
 
 import { GET } from './route';
+import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';
 
 function request(period: string) {
   return new NextRequest(`http://localhost/api/portal/leaderboard?period=${period}`);
@@ -246,5 +250,35 @@ describe('GET /api/portal/leaderboard reads the carrier report', () => {
     state.docs = [doc('1 Oak St', 'tfiber-1gig', 8)];
     const json = await response('week');
     expect(json.leaderboard[0]).toMatchObject({ totalSales: 1, totalPoints: 8 });
+  });
+});
+
+describe('GET /api/portal/leaderboard — owner viewing as a rep', () => {
+  it('makes the rep "you", and the rows still carry no dollars for anyone', async () => {
+    vi.setSystemTime(new Date('2026-09-16T17:00:00.000Z'));
+    vi.mocked(requireVerifiedRequester).mockResolvedValueOnce({
+      ok: true, uid: 'owner-1', name: 'Owner', email: '', isManagement: true, isAdmin: true,
+      isManagerOrAbove: true, isOwner: true,
+    });
+    state.docs = [
+      { ...sale('2026-09-15T17:00:00.000Z', 'rep-noah'), salesRepName: 'Noah Smith', totalValue: 900 },
+      { ...sale('2026-09-15T18:00:00.000Z', 'rep-other'), salesRepName: 'Other Rep', totalValue: 500 },
+      { ...sale('2026-09-15T19:00:00.000Z', 'rep-other'), salesRepName: 'Other Rep', totalValue: 500 },
+    ];
+
+    const json = await (
+      await GET(new NextRequest('http://localhost/api/portal/leaderboard?period=week&limit=100', { headers: viewAsHeaders() }))
+    ).json();
+
+    expect(json.currentUser).toMatchObject({ salesRepId: 'rep-noah', rank: 2 });
+    const money = /value|pay|commission|revenue|margin|amount/i;
+    for (const row of json.leaderboard as Array<Record<string, unknown>>) {
+      expect(Object.keys(row).filter((key) => money.test(key))).toEqual([]);
+    }
+  });
+
+  it('refuses a non-owner sending the header', async () => {
+    const res = await GET(new NextRequest('http://localhost/api/portal/leaderboard?period=week', { headers: viewAsHeaders() }));
+    expect(res.status).toBe(403);
   });
 });

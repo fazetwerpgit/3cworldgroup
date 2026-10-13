@@ -6,6 +6,7 @@ import {
   OnboardingStatus,
 } from '@/types';
 import { requireVerifiedSelfOrManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { envelopeExists, inhouseSignPath } from '@/lib/esign/inhouse';
 import { isEsignItem } from '@/lib/onboarding/esign';
@@ -38,6 +39,14 @@ export async function GET(request: NextRequest) {
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
+    // View as rep: the rep's Home reads their own checklist (what they still
+    // have to sign). The list is the rep's; signing links and the stale-envelope
+    // resend below stay with the real checklist owner only.
+    const subject = await resolveSubject(request, gate);
+    if (!subject.ok) {
+      return NextResponse.json({ error: subject.error }, { status: subject.status });
+    }
+    const ownChecklist = subject.uid === userId;
 
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) {
@@ -64,21 +73,23 @@ export async function GET(request: NextRequest) {
           console.error('[onboarding] esign auto-send failed', error);
         })
       );
-    } else if (gate.uid === userId && userData?.status !== 'active') {
+    } else if (ownChecklist && userData?.status !== 'active') {
       // Own checklist, neither pending nor active: nothing to work through.
       return NextResponse.json({ items: [], fieldRole, isIBO });
     }
     // An activated rep can still owe signatures: reps activated before e-sign
     // existed, or approved before they signed (Bryan, Mason 9/23). Their own
     // checklist is just the documents still unsigned; empty once all are signed.
-    const signOff = gate.uid === userId && userData?.status === 'active';
+    const signOff = ownChecklist && userData?.status === 'active';
     // Management reading someone else's non-pending checklist falls through:
     // Onboarding Review still has to show what a now-active hire completed.
     const checklist = getOnboardingItemsForUser(fieldRole, isIBO).filter((item) => !signOff || isEsignItem(item.id));
 
     // The signing page link only goes to the checklist owner; management
-    // viewing someone else's checklist gets null.
-    const isOwner = gate.uid === userId;
+    // viewing someone else's checklist gets null. The owner viewing as the rep
+    // reads the links only to list what the rep can act on (below); they are
+    // stripped from the response and nothing is ever resent on that read.
+    const isOwner = ownChecklist;
 
     // Fetch all progress docs for this user in one batch read
     const refs = checklist.map((item) =>
@@ -118,7 +129,7 @@ export async function GET(request: NextRequest) {
       );
       // An active rep approved before signing still owes these documents.
       // Replace only the stale envelopes; never send anything new.
-      if (signOff && hasStale) {
+      if (signOff && hasStale && !subject.viewing) {
         after(() =>
           sendPendingEsignDocs(userId, { onlyStale: true }).catch((error) => {
             console.error('[onboarding] stale envelope resend failed', error);
@@ -148,9 +159,10 @@ export async function GET(request: NextRequest) {
     });
     // Only what the rep can act on: sent (it has a signing page) and unsigned.
     // Reps activated before e-sign existed have nothing sent, so nothing shows.
-    const items = signOff
+    const listed = signOff
       ? merged.filter((item) => item.status !== 'approved' && item.signPath)
       : merged;
+    const items = subject.viewing ? listed.map((item) => ({ ...item, signPath: null })) : listed;
 
     const approvedCount = items.filter((i) => i.status === 'approved').length;
 

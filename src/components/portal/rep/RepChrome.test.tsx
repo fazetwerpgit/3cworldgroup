@@ -17,9 +17,11 @@ const state = vi.hoisted(() => ({
     signOut: vi.fn(async () => {}),
   },
   pathname: '/portal/dashboard',
+  viewing: false,
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => state.auth }));
+vi.mock('@/contexts/ViewAsContext', () => ({ useViewAs: () => ({ viewing: state.viewing }) }));
 vi.mock('next/navigation', () => ({
   usePathname: () => state.pathname,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -61,7 +63,19 @@ function RepMenu({ counts }: { counts?: Record<string, number> }) {
 describe('RepTabBar', () => {
   beforeEach(() => {
     state.pathname = '/portal/dashboard';
+    state.viewing = false;
     setUser({ status: 'active', fieldRole: 'entry_rep', uid: 'rep-1' });
+  });
+
+  it('owner viewing as a rep: only Home / Sales / Board (no Log sale, no Chat)', () => {
+    setUser({ status: 'active', role: 'owner', uid: 'owner-1' }, [...REP_PERMISSIONS, 'chat:write']);
+    state.viewing = true;
+    const html = renderToStaticMarkup(<RepTabBar />);
+    expect(html).toContain('Home</a>');
+    expect(html).toContain('Sales</a>');
+    expect(html).toContain('Board</a>');
+    expect(html).not.toContain('Log sale');
+    expect(html).not.toContain('Chat</a>');
   });
 
   it('shows Home / Sales / Log sale / Board / Chat in that order and no Pay tab', () => {

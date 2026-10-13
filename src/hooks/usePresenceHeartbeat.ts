@@ -8,11 +8,11 @@ const HEARTBEAT_MS = 60_000;
 
 // Stamps the current user's lastActiveAt on mount and every 60s while the tab is
 // visible, powering the "who's active" green dot. Best-effort — failures are ignored.
-export function usePresenceHeartbeat() {
+export function usePresenceHeartbeat({ enabled = true }: { enabled?: boolean } = {}) {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !enabled) return;
     let cancelled = false;
 
     const ping = async () => {
@@ -43,5 +43,5 @@ export function usePresenceHeartbeat() {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [user]);
+  }, [user, enabled]);
 }

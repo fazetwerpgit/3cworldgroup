@@ -40,6 +40,11 @@ export function repTabsFor(owner: boolean): RepTab[] {
   return owner ? [...REP_TABS.filter((tab) => !tab.log), ADMIN_TAB] : REP_TABS;
 }
 
+/** The owner viewing as a rep (read only): Home, Sales and Board only. */
+export function viewAsTabs(): RepTab[] {
+  return REP_TABS.filter((tab) => !tab.log && tab.href !== '/portal/chat');
+}
+
 /** Which primary destination the current path belongs to. Log sale wins over Sales; every admin page is Admin. */
 export function activeRepHref(pathname: string): string | null {
   if (pathname.startsWith(LOG_SALE_HREF)) return LOG_SALE_HREF;

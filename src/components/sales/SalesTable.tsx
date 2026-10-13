@@ -7,6 +7,7 @@ import { Sale, SaleStatusConfig } from '@/types';
 import type { FiberOrder, FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { useViewAsReadOnly } from '@/contexts/ViewAsContext';
 import { useSalePaid } from '@/hooks/useSalePaid';
 import { expectedPayForSale, isPayableSale } from '@/lib/pay/expectedPay';
 import { formatPayoutWindow, payoutWindowForSale } from '@/lib/pay/payoutWindow';
@@ -211,7 +212,10 @@ export function SalesTable({
   const showPay = payView;
   const rates = payPlan?.rates ?? null;
   const hasPlan = !!payPlan?.hasPlan;
-  const { paidBySale, togglePaid } = useSalePaid(user?.uid ?? null);
+  // The Paid ticks are the rep's PRIVATE reconciliation (useSalePaid): the
+  // owner viewing as the rep neither reads nor sets them.
+  const readOnly = useViewAsReadOnly();
+  const { paidBySale, togglePaid } = useSalePaid(readOnly ? null : user?.uid ?? null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [fiberView, setFiberView] = useState<FiberBucket | null>(null);
@@ -553,7 +557,7 @@ export function SalesTable({
                     const name = sale.customerName || sale.customerAddress || 'Customer pending';
                     // Money only lands on an install, so the tick shows there;
                     // a tick already set stays reachable so it can be undone.
-                    const canTick = status === 'installed' || status === 'chargeback' || paid;
+                    const canTick = !readOnly && (status === 'installed' || status === 'chargeback' || paid);
                     return (
                       <div
                         className={`${x.pRow} ${hasPlan ? '' : x.noMoney} ${status === 'cancelled' ? x.saleOff : ''} ${arriveClass(sale)}`}

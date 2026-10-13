@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import {
   computeHistory,
   dayKey,
@@ -49,8 +50,13 @@ export async function GET(request: NextRequest) {
   try {
     // Require a verified active login — a pending hire lands on
     // /portal/onboarding and cannot open the dashboard or its leaderboard.
-    const gate = await requireVerifiedRequester(request);
-    if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+    const caller = await requireVerifiedRequester(request);
+    if (!caller.ok) return NextResponse.json({ error: caller.error }, { status: caller.status });
+    // View as rep: "you" is the rep, and the rep's row cap applies. Rows never
+    // carry dollars for anyone, so nothing more is exposed to the owner.
+    const subject = await resolveSubject(request, caller);
+    if (!subject.ok) return NextResponse.json({ error: subject.error }, { status: subject.status });
+    const gate = subject.viewing ? subject.target : caller;
 
     if (!adminDb) {
       return NextResponse.json(

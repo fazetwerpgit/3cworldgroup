@@ -134,7 +134,10 @@ export async function requireVerifiedManagement(
 export async function requireVerifiedSelfOrManagement(
   request: NextRequest,
   targetUserId: string | null | undefined
-): Promise<{ ok: true; uid: string; name: string; isManagement: boolean } | { ok: false; error: string; status: number }> {
+): Promise<
+  | { ok: true; uid: string; name: string; isManagement: boolean; isOwner: boolean }
+  | { ok: false; error: string; status: number }
+> {
   const c = await verifyCaller(request);
   if (!c.ok) return c;
   const { role } = resolveRoles(c.data.role, c.data.fieldRole);
@@ -147,6 +150,7 @@ export async function requireVerifiedSelfOrManagement(
     uid: c.uid,
     name: c.data.displayName || c.data.email || c.uid,
     isManagement,
+    isOwner: isOwner(role),
   };
 }
 
@@ -212,6 +216,8 @@ export async function requireVerifiedRequester(
       isAdmin: boolean;
       /** admin, operations, owner, or a management field role */
       isManagerOrAbove: boolean;
+      /** the owner role only (the finance tier; never an admin) */
+      isOwner: boolean;
     }
   | { ok: false; error: string; status: number }
 > {
@@ -230,5 +236,6 @@ export async function requireVerifiedRequester(
     isAdmin: isAdminLevel(role),
     isManagerOrAbove:
       isManagement || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false),
+    isOwner: isOwner(role),
   };
 }

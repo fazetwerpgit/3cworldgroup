@@ -23,9 +23,11 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedManagement: vi.fn(),
   requireVerifiedUser: vi.fn(async () => ({ ok: true, uid: 'caller' })),
 }));
+vi.mock('@/lib/auth/viewAs', async () => (await import('@/lib/auth/viewAsTestStub')).viewAsStubModule());
 
 import { DELETE, GET } from './route';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedManagement, requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';
 
 async function titlesFor(profile: Record<string, unknown>): Promise<string[]> {
   db.users.set('caller', profile);
@@ -58,5 +60,22 @@ describe('GET /api/portal/calls audience scoping', () => {
 
   it('shows platform users the managers call', async () => {
     expect(await titlesFor({ role: 'operations', status: 'active' })).toEqual(['Monday Team Call', 'Managers Sync']);
+  });
+});
+
+describe('GET /api/portal/calls — owner viewing as a rep', () => {
+  it("scopes the calls by the rep's role, not the owner's", async () => {
+    db.users.set('owner-1', { role: 'owner', status: 'active' });
+    db.users.set('rep-noah', { fieldRole: 'entry_rep', status: 'active' });
+    vi.mocked(requireVerifiedUser).mockResolvedValueOnce({ ok: true, uid: 'owner-1', isOwner: true } as never);
+    const res = await GET(new NextRequest('http://localhost/api/portal/calls', { headers: viewAsHeaders() }));
+    const body = await res.json();
+    expect(body.calls.map((c: { title: string }) => c.title)).toEqual(['Monday Team Call']);
+  });
+
+  it('refuses a non-owner sending the header', async () => {
+    db.users.set('caller', { fieldRole: 'entry_rep', status: 'active' });
+    const res = await GET(new NextRequest('http://localhost/api/portal/calls', { headers: viewAsHeaders() }));
+    expect(res.status).toBe(403);
   });
 });

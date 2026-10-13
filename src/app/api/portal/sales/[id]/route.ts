@@ -4,6 +4,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
 import { Sale, SaleProduct } from '@/types';
 import { requireVerifiedAdmin, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import { parseSaleDateInput, parseInstallDateInput, installDayKey } from '@/lib/sales/saleDate';
 import { validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { priceSaleProducts } from '@/lib/sales/pricing';
@@ -31,10 +32,16 @@ export async function GET(
     // A sale row carries customer PII; only its owning rep or management may read
     // it. Gate before the lookup so an unauthorised caller cannot use the 404 to
     // probe which sale ids exist.
-    const requester = await requireVerifiedRequester(request);
-    if (!requester.ok) {
-      return NextResponse.json({ error: requester.error }, { status: requester.status });
+    const caller = await requireVerifiedRequester(request);
+    if (!caller.ok) {
+      return NextResponse.json({ error: caller.error }, { status: caller.status });
     }
+    // View as rep: the rep's own-sale rule, so the owner sees only what the rep could open.
+    const subject = await resolveSubject(request, caller);
+    if (!subject.ok) {
+      return NextResponse.json({ error: subject.error }, { status: subject.status });
+    }
+    const requester = subject.viewing ? subject.target : caller;
 
     const doc = await adminDb.collection('sales').doc(id).get();
 

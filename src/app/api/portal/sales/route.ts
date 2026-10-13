@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, initError } from '@/lib/firebase/admin';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import { Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { proofPathFields, validateProofPaths } from '@/lib/sales/proofPaths';
@@ -79,10 +80,16 @@ export async function GET(request: NextRequest) {
     // This route remains active-only: the shared API allowlist intentionally
     // excludes pending hires because the ledger and approval queue are not
     // available to an unactivated account.
-    const gate = await requireVerifiedRequester(request);
-    if (!gate.ok) {
-      return NextResponse.json({ error: gate.error }, { status: gate.status });
+    const caller = await requireVerifiedRequester(request);
+    if (!caller.ok) {
+      return NextResponse.json({ error: caller.error }, { status: caller.status });
     }
+    // View as rep: the owner reads the rep's book exactly as the rep would.
+    const subject = await resolveSubject(request, caller);
+    if (!subject.ok) {
+      return NextResponse.json({ error: subject.error }, { status: subject.status });
+    }
+    const gate = subject.viewing ? subject.target : caller;
 
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status') as SaleStatus | null;

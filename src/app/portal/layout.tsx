@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Archivo } from 'next/font/google';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ChatOutboxProvider } from '@/contexts/ChatOutboxContext';
+import { ViewAsProvider } from '@/contexts/ViewAsContext';
 import { MobileMenuProvider } from '@/contexts/MobileMenuContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import OnboardingGate from '@/components/portal/OnboardingGate';
@@ -52,6 +53,8 @@ export default function PortalLayout({
   return (
     <ThemeProvider>
       <AuthProvider>
+        {/* The owner's read-only "View as rep" session (see ViewAsContext). */}
+        <ViewAsProvider>
         <MobileMenuProvider>
           <ServiceWorkerRegistrar />
           {/* Heals iOS push-subscription rotation on every open — see component. */}
@@ -69,6 +72,7 @@ export default function PortalLayout({
             </ChatOutboxProvider>
           </div>
         </MobileMenuProvider>
+        </ViewAsProvider>
       </AuthProvider>
     </ThemeProvider>
   );

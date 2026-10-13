@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type Rea
 import Link from 'next/link';
 import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, TrendingDown, TrendingUp, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useViewAsReadOnly } from '@/contexts/ViewAsContext';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import { useCountUp } from '@/hooks/useCountUp';
 import { useRepDashboard, type RepChallenge, type RepSectionKey, type Section } from '@/hooks/useRepDashboard';
@@ -491,8 +492,8 @@ function TodayPanel({
   extraDates: number;
   callsFailed: boolean;
   onRetryCalls: () => void;
-  /** Opens the install-date sheet: the rep's own sale, never the admin edit page. */
-  onSetDate: (row: NeedsDateRow) => void;
+  /** Opens the install-date sheet: the rep's own sale, never the admin edit page. Absent = read only. */
+  onSetDate?: (row: NeedsDateRow) => void;
 }) {
   return (
     <section className={`${s.panel} ${d.card} ${d.today}`} style={rise(3)} aria-labelledby="today-h">
@@ -506,13 +507,8 @@ function TodayPanel({
             : row.soldDate
               ? `Sold ${shortDate(row.soldDate)}`
               : null;
-          return (
-            <button
-              key={`date-${row.id}`}
-              type="button"
-              className={`${d.tRow} ${d.tRowBtn}`}
-              onClick={() => onSetDate(row)}
-            >
+          const body = (
+            <>
               <span className={`${d.stamp} ${row.missed ? d.stampMissed : d.stampNeeds}`}>
                 <span className={d.stampLabel}>{row.overdue ? 'Overdue' : row.missed ? 'Missed' : 'Needs date'}</span>
                 {stampSub ? <span className={d.stampSub}>{stampSub}</span> : null}
@@ -522,6 +518,24 @@ function TodayPanel({
                 <span className={d.tSub}>{row.plan}</span>
                 {row.missedReason ? <span className={d.tNote}>{row.missedReason}</span> : null}
               </span>
+            </>
+          );
+          // Read only (the owner viewing as the rep): the row, not the action.
+          if (!onSetDate) {
+            return (
+              <div key={`date-${row.id}`} className={d.tRow} data-part="date-row">
+                {body}
+              </div>
+            );
+          }
+          return (
+            <button
+              key={`date-${row.id}`}
+              type="button"
+              className={`${d.tRow} ${d.tRowBtn}`}
+              onClick={() => onSetDate(row)}
+            >
+              {body}
               <span className={d.tAct}>{verb}</span>
             </button>
           );
@@ -645,7 +659,8 @@ export interface RepHomeViewProps {
   queues?: ReactNode;
   onHelp: () => void;
   onRetry: (key: RepSectionKey | 'pay') => void;
-  onSetDate: (row: NeedsDateRow) => void;
+  /** Absent while read only (the owner viewing as the rep). */
+  onSetDate?: (row: NeedsDateRow) => void;
 }
 
 /**
@@ -754,8 +769,11 @@ function useNow(intervalMs = 60_000) {
  */
 export function RepDashboard() {
   const { user, isRole, hasPermission } = useAuth();
+  // The owner viewing as this rep: the rep's screen with nothing that writes or
+  // belongs to the owner (Ask 3C, queues, the install-date sheet).
+  const readOnly = useViewAsReadOnly();
   // Admin and operations get the onboarding work (Needs attention) on top.
-  const showQueues = isRole('admin', 'operations');
+  const showQueues = !readOnly && isRole('admin', 'operations');
   const data = useRepDashboard();
   const { retry } = data;
   const [helpOpen, setHelpOpen] = useState(false);
@@ -838,15 +856,15 @@ export function RepDashboard() {
         callsFailed={data.calls.status === 'error'}
         banners={canLog ? <CalloutNudge now={now} /> : null}
         scanIntro={canLog ? <ScanIntroCard now={now} /> : null}
-        askEntry={<AskEntryCard />}
+        askEntry={readOnly ? null : <AskEntryCard />}
         queues={showQueues ? <OpsQueuesPanel title="Needs attention" /> : null}
         onHelp={() => setHelpOpen(true)}
         onRetry={onRetry}
-        onSetDate={setDateRow}
+        onSetDate={readOnly ? undefined : setDateRow}
       />
 
       {helpOpen ? <PayHelpSheet onClose={closeHelp} /> : null}
-      {dateSale && dateRow ? (
+      {dateSale && dateRow && !readOnly ? (
         <InstallDateSheet
           sale={dateSale}
           plan={dateRow.plan}

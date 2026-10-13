@@ -10,9 +10,14 @@ import type { FiberOrder, FiberStatusResponse, Sale } from '@/types';
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { uid: 'rep1', displayName: 'Braeden', role: 'rep' }, isRole: () => false }),
 }));
+const view = vi.hoisted(() => ({ readOnly: false, paidUid: undefined as string | null | undefined }));
 vi.mock('@/hooks/useSalePaid', () => ({
-  useSalePaid: () => ({ paidBySale: {}, togglePaid: vi.fn() }),
+  useSalePaid: (uid: string | null) => {
+    view.paidUid = uid;
+    return { paidBySale: {}, togglePaid: vi.fn() };
+  },
 }));
+vi.mock('@/contexts/ViewAsContext', () => ({ useViewAsReadOnly: () => view.readOnly }));
 vi.mock('@/lib/firebase/config', () => ({ auth: null }));
 vi.mock('./SaleDetailSheet', () => ({ SaleDetailSheet: () => null }));
 
@@ -101,6 +106,8 @@ function render(payView: boolean) {
 }
 
 beforeEach(() => {
+  view.readOnly = false;
+  view.paidUid = undefined;
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -129,5 +136,19 @@ describe('SalesTable', () => {
     // 140 + 140 + 160 + 70 installed, − 70 charged back.
     expect(container.textContent).toContain('$440');
     expect(container.textContent).not.toMatch(/pays on|pay date/i);
+  });
+
+  it('the rep\'s own Pay view has the private Paid ticks', () => {
+    render(true);
+    expect(view.paidUid).toBe('rep1');
+    expect(container.querySelectorAll('input[type="checkbox"]').length).toBeGreaterThan(0);
+  });
+
+  it('owner viewing as the rep (read only): no Paid ticks, and the rep\'s private ticks are not read', () => {
+    view.readOnly = true;
+    render(true);
+    expect(view.paidUid).toBeNull();
+    expect(container.querySelectorAll('input[type="checkbox"]').length).toBe(0);
+    expect(container.textContent).toContain('$440');
   });
 });

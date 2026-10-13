@@ -5,6 +5,7 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedRequester: vi.fn(),
   requireVerifiedUser: vi.fn(),
 }));
+vi.mock('@/lib/auth/viewAs', async () => (await import('@/lib/auth/viewAsTestStub')).viewAsStubModule());
 
 
 // A tiny stand-in for a Firestore query: it records the wheres it was given so
@@ -53,6 +54,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 
 import { GET } from './route';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';
 
 const mockRequester = requireVerifiedRequester as unknown as ReturnType<typeof vi.fn>;
 
@@ -191,5 +193,30 @@ describe('GET /api/portal/sales truncation', () => {
 
     expect(json.truncated).toBe(false);
     expect(json.sales).toHaveLength(2);
+  });
+});
+
+describe('GET /api/portal/sales — owner viewing as a rep', () => {
+  it("returns the rep's own book, pinned to the rep whatever salesRepId asks for", async () => {
+    mockRequester.mockResolvedValue({
+      ok: true, uid: 'o1', name: 'Owner', email: 'o@x.com',
+      role: 'owner', isManagement: true, isAdmin: true, isManagerOrAbove: true, isOwner: true,
+    });
+    state.docs = [saleDoc(new Date(2026, 8, 3, 12), 'rep-noah')];
+    const res = await GET(
+      new NextRequest('http://localhost/api/portal/sales?salesRepId=someone-else&limit=500', { headers: viewAsHeaders() })
+    );
+    expect(res.status).toBe(200);
+    expect(state.wheres).toContainEqual({ field: 'salesRepId', op: '==', value: 'rep-noah' });
+    expect(state.wheres.some((w) => w.value === 'someone-else')).toBe(false);
+    const body = await res.json();
+    expect(body.sales.map((sale: { salesRepId: string }) => sale.salesRepId)).toEqual(['rep-noah']);
+  });
+
+  it('refuses an admin sending the header (owner only)', async () => {
+    asAdmin();
+    const res = await GET(new NextRequest('http://localhost/api/portal/sales', { headers: viewAsHeaders() }));
+    expect(res.status).toBe(403);
+    expect(state.wheres).toEqual([]);
   });
 });

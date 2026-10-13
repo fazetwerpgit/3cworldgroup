@@ -7,6 +7,8 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedManagement: vi.fn(),
 }));
 
+vi.mock('@/lib/auth/viewAs', async () => (await import('@/lib/auth/viewAsTestStub')).viewAsStubModule());
+
 // config/compPlan and config/compPlanMargin are absent by default, so the route
 // falls back to the committed module — the pre-seed state.
 const docs = new Map<string, Record<string, unknown>>();
@@ -46,6 +48,7 @@ import {
   requireVerifiedRequester,
 } from '@/lib/auth/requireVerifiedAdmin';
 import { COMP_PLAN_RATES } from '@/data/compPlan.generated';
+import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';
 
 const mockRequester = requireVerifiedRequester as unknown as ReturnType<typeof vi.fn>;
 const mockManagement = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
@@ -266,5 +269,31 @@ describe('PUT /api/portal/comp-plan', () => {
     expect(details?.rates).toEqual([
       { path: 'ae_tier_1.att.att-1gig', from: COMP_PLAN_RATES.ae_tier_1!.att!['att-1gig'], to: COMP_PLAN_RATES.ae_tier_1!.att!['att-1gig'] + 10 },
     ]);
+  });
+});
+
+describe('GET /api/portal/comp-plan — owner viewing as a rep', () => {
+  it("gives the rep's own slice only: no full table, no margin, no pay roles", async () => {
+    mockRequester.mockResolvedValue({
+      ok: true, uid: 'o1', name: 'Owner', email: 'o@x.com',
+      role: 'owner', isManagement: true, isAdmin: true, isManagerOrAbove: true, isOwner: true,
+    });
+    const res = await GET(new NextRequest('http://localhost/api/portal/comp-plan', { headers: viewAsHeaders() }));
+    const json = await res.json();
+    expect(res.status).toBe(200);
+    expect(json.scope).toBe('own');
+    expect(json.fieldRole).toBe('entry_rep');
+    expect(json.rates).toEqual(COMP_PLAN_RATES.ae_tier_1);
+    expect('margin' in json).toBe(false);
+    expect('repCompRoles' in json).toBe(false);
+  });
+
+  it('refuses an admin sending the header', async () => {
+    mockRequester.mockResolvedValue({
+      ok: true, uid: 'a1', name: 'Admin', email: 'a@x.com',
+      role: 'admin', isManagement: true, isAdmin: true, isManagerOrAbove: true, isOwner: false,
+    });
+    const res = await GET(new NextRequest('http://localhost/api/portal/comp-plan', { headers: viewAsHeaders() }));
+    expect(res.status).toBe(403);
   });
 });

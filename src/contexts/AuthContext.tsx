@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useRef, ReactNode } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -23,9 +23,10 @@ import { ASK_CONVERSATION_KEY } from '@/lib/ask/chat';
 import { PRACTICE_SESSION_KEY } from '@/lib/ask/practice';
 import { ProfileLoadRetry } from '@/components/auth/ProfileLoadRetry';
 import { unregisterPushOnDevice } from '@/lib/push/enablePushOnDevice';
+import { clearViewAs } from '@/lib/viewAs/storage';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 
-interface AuthContextType extends AuthState {
+export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string, teamCode: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -436,6 +437,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // onboarding documents. Drop it here so a shared phone never hands one
       // rep's signature to whoever signs in next.
       clearSignature();
+      // The owner's "View as rep" session ends with the sign-in it belongs to.
+      clearViewAs();
       // Same for the Ask 3C conversation and practice: the next rep must not see or send them.
       try {
         window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);
@@ -540,6 +543,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       )}
     </AuthContext.Provider>
   );
+}
+
+/** A read permission ('sales:read', 'sales:read:all'): anything else can write. */
+export function isReadPermission(permission: string): boolean {
+  return permission.split(':')[1] === 'read';
+}
+
+/**
+ * "View as rep": re-provides auth to the rep screens with the REP as the user,
+ * so every `useAuth()` below renders the rep's view (their uid, role and
+ * permissions). READ ONLY: hasPermission answers only read permissions, so
+ * every control gated on a write permission (Log sale, bulk log, delete...)
+ * disappears. Sign-out and the Firebase session stay the owner's own; the
+ * data itself is the rep's because ViewAsScope tags the screens' reads.
+ */
+export function AuthSubjectProvider({ user, children }: { user: User; children: ReactNode }) {
+  const parent = useAuth();
+  const value = useMemo(() => subjectAuthValue(parent, user), [parent, user]);
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+/** The auth value the rep screens see while the owner views as `user` (read only). */
+export function subjectAuthValue(parent: AuthContextType, user: User): AuthContextType {
+  const roleKey = user.role ?? user.fieldRole;
+  const permissions = roleKey ? RolePermissions[roleKey] : [];
+  return {
+    ...parent,
+    user,
+    pendingApproval: false,
+    hasPermission: (permission: string) => isReadPermission(permission) && permissions.includes(permission),
+    isRole: (...roles: UserRole[]) =>
+      roles.some((r) => r === user.role || r === user.fieldRole) || (isOwner(user.role) && roles.includes('admin')),
+  };
 }
 
 export function useAuth() {

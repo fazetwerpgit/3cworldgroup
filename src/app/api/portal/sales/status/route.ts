@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import { FiberOrder, FiberStatusResponse } from '@/types';
 import { attachLoggedCustomerNames, attachMatchedUserNames, LoggedSale } from '@/lib/fiberReport/matchSales';
 import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
@@ -43,7 +44,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
-    const userId = gate.uid;
+    // View as rep: the rep's own scope, never the owner's company-wide one.
+    const subject = await resolveSubject(request, gate);
+    if (!subject.ok) {
+      return NextResponse.json({ error: subject.error }, { status: subject.status });
+    }
+    const userId = subject.uid;
     const userDoc = await adminDb.collection('users').doc(userId).get();
     if (!userDoc.exists) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
