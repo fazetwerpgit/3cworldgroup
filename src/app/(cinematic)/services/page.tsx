@@ -59,11 +59,9 @@ const SERVICES = [
     title: "Solar",
     accent: "For the homes it suits.",
     body: "Panels on the household's own roof, from the provider that serves that market. You explain how it works and leave the choice with them.",
-    // TODO(solar-art): placeholder. Swap for a solar photograph from the
-    // scratchpad candidates once one is picked; update `alt` and `position` with it.
-    image: "/redesign/cinematic/services-aerial-dusk-1920.webp",
-    alt: "Aerial view of lit houses along a wooded street at dusk",
-    position: "60% 60%",
+    image: "/redesign/cinematic/services-solar-sunset-1920.webp",
+    alt: "Brick house with solar panels on the roof at sunset, the porch light on and pines behind",
+    position: "62% 50%",
     points: [
       "Rooftop panels on the home itself",
       "Explained on the porch, in plain terms",
