@@ -13,8 +13,15 @@ import type { JsonLd } from "./jsonLd";
  * Dallas says fiber. No pay figure appears anywhere, by rule.
  */
 
-/** When these postings went up. Open-ended: no validThrough. */
+/** When these postings went up. */
 export const DATE_POSTED = "2026-10-13";
+/**
+ * When they lapse: 90 days after DATE_POSTED. When the postings are refreshed,
+ * roll DATE_POSTED and VALID_THROUGH forward together.
+ */
+export const VALID_THROUGH = "2027-01-11";
+
+type Location = { locality: string; region: string };
 
 export type MarketJob = {
   slug: string;
@@ -29,14 +36,14 @@ export type MarketJob = {
   intro: string;
   /** The terms, in page order. */
   terms: { title: string; body: string }[];
-  /** For JobPosting.jobLocation. A region with no single city has no locality. */
-  address: { locality?: string; region: string };
+  /** For JobPosting.jobLocation, one Place each. A region lists the cities it hires in. */
+  locations: Location[];
 };
 
 const PAY = "1099 independent contractor, commission only, uncapped. There is no base pay.";
 
 /** The four markets Will leads share one shape; only the place changes. */
-function fiberMarket(slug: string, name: string, place: string, address: MarketJob["address"]): MarketJob {
+function fiberMarket(slug: string, name: string, place: string, locations: Location[]): MarketJob {
   return {
     slug,
     role: "Fiber Internet Sales Rep",
@@ -50,7 +57,7 @@ function fiberMarket(slug: string, name: string, place: string, address: MarketJ
       { title: "Leads", body: `Your leads are placed where they work best for you, in and around ${name}.` },
       { title: "Pay", body: PAY },
     ],
-    address,
+    locations,
   };
 }
 
@@ -70,12 +77,20 @@ export const MARKET_JOBS: readonly MarketJob[] = [
       { title: "Leads", body: "Your leads are placed where they work best for you, in and around Dallas." },
       { title: "Pay", body: PAY },
     ],
-    address: { locality: "Dallas", region: "TX" },
+    locations: [{ locality: "Dallas", region: "TX" }],
   },
-  fiberMarket("houston", "Houston", "Houston, TX", { locality: "Houston", region: "TX" }),
-  fiberMarket("southern-california", "Southern California", "Southern California", { region: "CA" }),
-  fiberMarket("lansing", "Lansing", "Lansing, MI", { locality: "Lansing", region: "MI" }),
-  fiberMarket("grand-rapids", "Grand Rapids", "Grand Rapids, MI", { locality: "Grand Rapids", region: "MI" }),
+  fiberMarket("houston", "Houston", "Houston, TX", [{ locality: "Houston", region: "TX" }]),
+  fiberMarket(
+    "southern-california",
+    "Southern California",
+    "Southern California",
+    ["Los Angeles", "Ontario", "Riverside", "San Bernardino", "Anaheim", "San Diego"].map((locality) => ({
+      locality,
+      region: "CA",
+    })),
+  ),
+  fiberMarket("lansing", "Lansing", "Lansing, MI", [{ locality: "Lansing", region: "MI" }]),
+  fiberMarket("grand-rapids", "Grand Rapids", "Grand Rapids, MI", [{ locality: "Grand Rapids", region: "MI" }]),
 ];
 
 export const marketJobPath = (slug: string) => `/opportunities/${slug}`;
@@ -103,6 +118,7 @@ export function jobPostingJsonLd(job: MarketJob): JsonLd {
     title: job.role,
     description: jobDescriptionHtml(job),
     datePosted: DATE_POSTED,
+    validThrough: VALID_THROUGH,
     employmentType: "CONTRACTOR",
     directApply: true,
     url: `${SITE_URL}${marketJobPath(job.slug)}`,
@@ -112,14 +128,15 @@ export function jobPostingJsonLd(job: MarketJob): JsonLd {
       sameAs: SITE_URL,
       logo: `${SITE_URL}/logo.png`,
     },
-    jobLocation: {
+    /* Always an array, even for one city: Google reads each Place as a location. */
+    jobLocation: job.locations.map((location) => ({
       "@type": "Place",
       address: {
         "@type": "PostalAddress",
-        ...(job.address.locality ? { addressLocality: job.address.locality } : {}),
-        addressRegion: job.address.region,
+        addressLocality: location.locality,
+        addressRegion: location.region,
         addressCountry: "US",
       },
-    },
+    })),
   };
 }

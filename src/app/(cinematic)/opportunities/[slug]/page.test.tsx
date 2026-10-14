@@ -13,7 +13,7 @@ vi.mock('next/image', () => ({ default: () => <img alt="" /> }));
 
 import MarketJobPage, { generateMetadata, generateStaticParams } from './page';
 import { MARKETS } from '../../../_cinematic/markets';
-import { DATE_POSTED, MARKET_JOBS, jobPostingJsonLd } from '../../../_cinematic/marketJobs';
+import { DATE_POSTED, MARKET_JOBS, VALID_THROUGH, jobPostingJsonLd } from '../../../_cinematic/marketJobs';
 
 const render = async (slug: string) =>
   renderToStaticMarkup(await MarketJobPage({ params: Promise.resolve({ slug }) }));
@@ -39,6 +39,7 @@ describe('market job postings', () => {
       '@type': 'JobPosting',
       title: job.role,
       datePosted: DATE_POSTED,
+      validThrough: VALID_THROUGH,
       employmentType: 'CONTRACTOR',
       directApply: true,
       hiringOrganization: {
@@ -47,9 +48,14 @@ describe('market job postings', () => {
         sameAs: 'https://www.3cworldgroup.com',
         logo: 'https://www.3cworldgroup.com/logo.png',
       },
-      jobLocation: { '@type': 'Place', address: { '@type': 'PostalAddress', addressCountry: 'US' } },
     });
-    expect(posting).not.toHaveProperty('validThrough');
+    const places = posting.jobLocation as { address: Record<string, string> }[];
+    expect(places.length).toBeGreaterThan(0);
+    for (const place of places) {
+      expect(place).toMatchObject({ '@type': 'Place', address: { '@type': 'PostalAddress', addressCountry: 'US' } });
+      expect(place.address.addressLocality).toBeTruthy();
+      expect(place.address.addressRegion).toBeTruthy();
+    }
     expect(posting).not.toHaveProperty('baseSalary');
     expect(typeof posting.description).toBe('string');
   });
@@ -64,12 +70,19 @@ describe('market job postings', () => {
     }
   });
 
-  it('names Southern California by region alone', () => {
+  it('lists each Southern California city as its own location', () => {
     const job = MARKET_JOBS.find((entry) => entry.slug === 'southern-california')!;
-    expect(jobPostingJsonLd(job).jobLocation).toEqual({
-      '@type': 'Place',
-      address: { '@type': 'PostalAddress', addressRegion: 'CA', addressCountry: 'US' },
-    });
+    expect(jobPostingJsonLd(job).jobLocation).toEqual(
+      ['Los Angeles', 'Ontario', 'Riverside', 'San Bernardino', 'Anaheim', 'San Diego'].map((city) => ({
+        '@type': 'Place',
+        address: { '@type': 'PostalAddress', addressLocality: city, addressRegion: 'CA', addressCountry: 'US' },
+      })),
+    );
+  });
+
+  it('runs 90 days from the posting date', () => {
+    const days = (Date.parse(VALID_THROUGH) - Date.parse(DATE_POSTED)) / 86_400_000;
+    expect(days).toBe(90);
   });
 
   it('never says fiber or names a person for Dallas', async () => {
