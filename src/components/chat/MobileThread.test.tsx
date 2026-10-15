@@ -12,6 +12,7 @@ vi.mock('@/components/portal/rep/RepShell', () => ({ useHideRepTabBar: () => {} 
 vi.mock('@/lib/firebase/config', () => ({ auth: null, db: null }));
 
 import { MobileThread, type ThreadMessage } from './MobileThread';
+import { toChatMessageView } from '@/hooks/chat/useMessages';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -282,6 +283,40 @@ describe('MobileThread PDF attachments', () => {
     expect(tile?.textContent).toContain('Route map.pdf');
     act(() => (tile as HTMLAnchorElement).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     expect(onOpenImage).not.toHaveBeenCalled();
+  });
+
+  it('keeps the preview tile once the realtime feed delivers the stored PDF message', () => {
+    // Regression: the Firestore listener's parser (toChatMessageView) rebuilt the
+    // attachment field by field and dropped previewUrl, so the pending echo's
+    // tile turned into the plain chip as soon as the real message reconciled in.
+    const PREVIEW_URL = 'https://firebasestorage.googleapis.com/v0/b/b/o/chat%2Fc1%2Fthumb.webp?alt=media&token=t';
+    const stored = toChatMessageView(
+      'pdf',
+      {
+        text: '',
+        authorId: 'me',
+        authorName: 'Me',
+        createdAt: new Date(),
+        hasAttachment: true,
+        attachment: {
+          type: 'file',
+          url: PDF_URL,
+          name: 'Rate card.pdf',
+          size: 4096,
+          contentType: 'application/pdf',
+          previewUrl: PREVIEW_URL,
+          previewWidth: 618,
+          previewHeight: 800,
+        },
+      },
+      'c1',
+      'me'
+    );
+    expect(stored.attachment).toMatchObject({ previewUrl: PREVIEW_URL, previewWidth: 618, previewHeight: 800 });
+    act(() => root.render(<MobileThread {...props({ messages: [...MESSAGES, stored] })} />));
+    const tile = container.querySelector('[data-pdf-preview="true"]');
+    expect(tile?.getAttribute('href')).toBe(PDF_URL);
+    expect(tile?.querySelector('img')?.getAttribute('src')).toBe(PREVIEW_URL);
   });
 
   it('keeps an old PDF without a preview as a chip', () => {

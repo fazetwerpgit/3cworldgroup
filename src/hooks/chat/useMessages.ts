@@ -78,6 +78,18 @@ function toAttachment(value: unknown): ChatAttachment | undefined {
     attachment.height = raw.height;
   }
   if (typeof raw.contentType === 'string') attachment.contentType = raw.contentType;
+  // A PDF's first-page preview (server-validated to this channel's folder at
+  // write time). Dropping it here would turn every delivered preview back into
+  // the plain chip the moment the realtime feed replaces the pending echo.
+  if (raw.type === 'file' && typeof raw.previewUrl === 'string' && raw.previewUrl.startsWith('https://')) {
+    attachment.previewUrl = raw.previewUrl;
+    if (typeof raw.previewWidth === 'number' && Number.isFinite(raw.previewWidth) && raw.previewWidth > 0) {
+      attachment.previewWidth = raw.previewWidth;
+    }
+    if (typeof raw.previewHeight === 'number' && Number.isFinite(raw.previewHeight) && raw.previewHeight > 0) {
+      attachment.previewHeight = raw.previewHeight;
+    }
+  }
   return attachment;
 }
 
