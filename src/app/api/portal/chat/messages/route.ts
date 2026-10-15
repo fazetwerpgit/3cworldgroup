@@ -7,6 +7,7 @@ import { buildChatPushBody, pushChatMessageOnce } from '@/lib/push/chatPush';
 import { chatMessageDocId, isValidClientMessageId } from '@/lib/chat/outbox';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
+  attachmentSnippet,
   chatObjectPathFromUrl,
   chatObjectUrlBase,
   getChatStorageBucketName,
@@ -19,7 +20,8 @@ const DELETED_REPLY_TEXT = 'Message deleted';
 
 // Build the server-stamped reply snippet from the SOURCE message's stored doc.
 // Client-supplied snippet fields are never used: text is the source's own text
-// sliced to 140 chars, or 'Photo' / 'GIF' when the source was attachment-only.
+// sliced to 140 chars, or 'Photo' / 'GIF' / 'PDF: <name>' when the source was
+// attachment-only.
 function buildReplySnippet(
   messageId: string,
   data: FirebaseFirestore.DocumentData
@@ -31,7 +33,7 @@ function buildReplySnippet(
   if (rawText) {
     text = rawText.slice(0, 140);
   } else if (data.attachment && typeof data.attachment === 'object') {
-    text = (data.attachment as { type?: unknown }).type === 'gif' ? 'GIF' : 'Photo';
+    text = attachmentSnippet(data.attachment as { type?: unknown; name?: unknown }).slice(0, 140);
   }
   return { messageId, authorName, text };
 }
@@ -401,13 +403,13 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// The Storage object behind a deleted message's photo: chat/{channelId}/{name}
+// The Storage object behind a deleted message's photo or PDF: chat/{channelId}/{name}
 // parsed from its download URL, or null for a GIF, a missing attachment, or any
 // URL outside this bucket + channel folder (never deleted).
 function deletableChatObjectPath(attachment: unknown, channelId: string): string | null {
   if (!attachment || typeof attachment !== 'object') return null;
   const { type, url } = attachment as { type?: unknown; url?: unknown };
-  if (type !== 'image') return null;
+  if (type !== 'image' && type !== 'file') return null;
   const bucketName = getChatStorageBucketName();
   if (!bucketName) return null;
   return chatObjectPathFromUrl(url, bucketName, channelId);

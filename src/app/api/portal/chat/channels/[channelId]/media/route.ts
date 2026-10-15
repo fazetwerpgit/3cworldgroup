@@ -62,7 +62,8 @@ export async function GET(
       .map((doc) => {
         const data = doc.data();
         const attachment = readStoredAttachment(data.attachment);
-        if (!attachment) return null;
+        // The gallery is photos/GIFs only; PDFs stay in the thread as file chips.
+        if (!attachment || attachment.type === 'file') return null;
         return {
           messageId: doc.id,
           attachment,

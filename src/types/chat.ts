@@ -13,18 +13,23 @@ export interface ChatChannel {
 
 // A single media attachment on a message. `image` is a file the sender uploaded
 // to our own storage bucket (url is a Firebase tokened download URL scoped to the
-// channel's folder); `gif` is a Tenor-hosted GIF (url host is media.tenor.com).
+// channel's folder); `gif` is a Tenor-hosted GIF (url host is media.tenor.com);
+// `file` is an uploaded document (PDF only today) stored in the same channel
+// folder, shown as a tappable chip with its sanitized name and byte size.
 export interface ChatAttachment {
-  type: 'image' | 'gif';
+  type: 'image' | 'gif' | 'file';
   url: string;
   width?: number;
   height?: number;
   contentType?: string;
+  name?: string;
+  size?: number;
 }
 
 // A server-resolved quote of the message being replied to. The snippet text is
 // stamped from the SOURCE doc at send time (never trusted from the client) and
-// capped at 140 chars, or 'Photo' / 'GIF' when the source was attachment-only.
+// capped at 140 chars, or 'Photo' / 'GIF' / 'PDF: <name>' when the source was
+// attachment-only.
 export interface ChatReplySnippet {
   messageId: string;
   authorName: string;

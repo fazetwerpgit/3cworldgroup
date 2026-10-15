@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
+import { FileText, ImageIcon, Loader2, Lock, Pin, Settings2, UserPlus, Users, X } from 'lucide-react';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import s from '@/components/portal/rep/rep.module.css';
 import { getInitials } from '@/lib/chat/authorColor';
+import { attachmentSnippet } from '@/lib/chat/media';
 import { ChatAttachment, ChatChannel } from '@/types';
 import c from './chat.module.css';
 
@@ -457,13 +458,7 @@ export function ChannelInfoSheet({
               ) : (
                 <ul className={c.people}>
                   {pins.map((pin) => {
-                    const snippet = pin.text
-                      ? pin.text
-                      : pin.attachment
-                        ? pin.attachment.type === 'gif'
-                          ? 'GIF'
-                          : 'Photo'
-                        : '';
+                    const snippet = pin.text ? pin.text : attachmentSnippet(pin.attachment);
                     const isImage = pin.attachment?.type === 'image' || pin.attachment?.type === 'gif';
                     const openImage = () => {
                       if (!pin.attachment) return;
@@ -479,6 +474,8 @@ export function ChannelInfoSheet({
                           {pin.attachment && isImage ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={pin.attachment.url} alt="" loading="lazy" />
+                          ) : pin.attachment?.type === 'file' ? (
+                            <FileText size={16} aria-hidden="true" />
                           ) : (
                             <Pin size={16} aria-hidden="true" />
                           )}
@@ -492,7 +489,17 @@ export function ChannelInfoSheet({
                     );
                     return (
                       <li key={pin.messageId}>
-                        {pin.attachment && isImage ? (
+                        {pin.attachment?.type === 'file' ? (
+                          <a
+                            href={pin.attachment.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Open pinned PDF from ${pin.authorName}`}
+                            className={c.person}
+                          >
+                            {rowInner}
+                          </a>
+                        ) : pin.attachment && isImage ? (
                           <button type="button" onClick={openImage} aria-label={`Pinned photo from ${pin.authorName}`} className={c.person}>
                             {rowInner}
                           </button>

@@ -210,3 +210,50 @@ describe('MobileThread opening scroll', () => {
     expect(scrollIntoView).not.toHaveBeenCalled();
   });
 });
+
+describe('MobileThread PDF attachments', () => {
+  const PDF_URL = 'https://firebasestorage.googleapis.com/v0/b/b/o/chat%2Fc1%2Fdoc.pdf?alt=media&token=t';
+
+  it('renders a delivered PDF as a new-tab link chip, never an img', () => {
+    const pdf: ThreadMessage = {
+      ...message('pdf', 40),
+      text: '',
+      attachment: { type: 'file', url: PDF_URL, name: 'Route map.pdf', size: 1258291, contentType: 'application/pdf' },
+      hasAttachment: true,
+    };
+    act(() => root.render(<MobileThread {...props({ messages: [...MESSAGES, pdf] })} />));
+    const chip = container.querySelector('[data-attachment-type="file"]');
+    expect(chip).toBeInstanceOf(HTMLAnchorElement);
+    expect(chip?.getAttribute('href')).toBe(PDF_URL);
+    expect(chip?.getAttribute('target')).toBe('_blank');
+    expect(chip?.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(chip?.textContent).toContain('Route map.pdf');
+    expect(chip?.textContent).toContain('1.2 MB');
+    expect(chip?.querySelector('img')).toBeNull();
+    expect(container.querySelector(`img[src="${PDF_URL}"]`)).toBeNull();
+  });
+
+  it('shows a pending PDF echo as an inert chip with its file name', () => {
+    const file = new File([new Uint8Array(2048)], 'scan.pdf', { type: '' });
+    const echo: ThreadMessage = {
+      ...message('echo', 41),
+      text: '',
+      authorId: 'me',
+      pendingState: 'sending',
+      pendingFile: file,
+      localPreviewUrl: 'blob:local',
+    };
+    act(() => root.render(<MobileThread {...props({ messages: [...MESSAGES, echo] })} />));
+    const chip = container.querySelector('[data-attachment-type="file"]');
+    expect(chip?.tagName).toBe('SPAN');
+    expect(chip?.textContent).toContain('scan.pdf');
+    expect(container.querySelector('img[src="blob:local"]')).toBeNull();
+  });
+
+  it('accepts images and PDFs in the picker, without capture', () => {
+    act(() => root.render(<MobileThread {...props()} />));
+    const input = container.querySelector('input[type="file"]');
+    expect(input?.getAttribute('accept')).toBe('image/*,application/pdf');
+    expect(input?.hasAttribute('capture')).toBe(false);
+  });
+});

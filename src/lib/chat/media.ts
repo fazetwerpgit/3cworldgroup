@@ -22,7 +22,69 @@ export function imageExtForMime(mime: string): string | null {
   return isAllowedImageMime(mime) ? ALLOWED_IMAGE_TYPES[mime] : null;
 }
 
-// Hard byte ceiling for an uploaded image. Enforced against the actual decoded
+// Allowed document MIME types (shown as a file chip, never decoded). Same
+// own-property rule as ALLOWED_IMAGE_TYPES: go through uploadExtForMime.
+export const PDF_MIME = 'application/pdf';
+export const ALLOWED_FILE_TYPES: Record<string, string> = {
+  [PDF_MIME]: 'pdf',
+};
+
+/** The stored extension for an allowed upload MIME (image or document), or null. */
+export function uploadExtForMime(mime: string): string | null {
+  const image = imageExtForMime(mime);
+  if (image) return image;
+  return typeof mime === 'string' && Object.prototype.hasOwnProperty.call(ALLOWED_FILE_TYPES, mime)
+    ? ALLOWED_FILE_TYPES[mime]
+    : null;
+}
+
+/** True when the bytes start with the PDF magic header `%PDF-`. */
+export function hasPdfMagic(bytes: Uint8Array): boolean {
+  const magic = [0x25, 0x50, 0x44, 0x46, 0x2d]; // %PDF-
+  if (bytes.length < magic.length) return false;
+  return magic.every((byte, index) => bytes[index] === byte);
+}
+
+// Longest stored file name; longer names are cut, keeping the extension.
+export const MAX_ATTACHMENT_NAME_LENGTH = 120;
+
+/**
+ * A display-safe file name: the last path segment only, control characters and
+ * slashes removed, whitespace collapsed, capped at 120 chars (extension kept).
+ * Falls back to `fallback` when nothing usable is left.
+ */
+export function sanitizeAttachmentFileName(raw: unknown, fallback = 'document.pdf'): string {
+  if (typeof raw !== 'string') return fallback;
+  const lastSegment = raw.split(/[\\/]/).pop() ?? '';
+  let name = lastSegment.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ').trim();
+  if (!name || name === '.' || name === '..') return fallback;
+  if (name.length > MAX_ATTACHMENT_NAME_LENGTH) {
+    const ext = name.match(/\.[A-Za-z0-9]{1,8}$/)?.[0] ?? '';
+    name = `${name.slice(0, MAX_ATTACHMENT_NAME_LENGTH - ext.length - 1).trimEnd()}…${ext}`;
+  }
+  return name;
+}
+
+/** "PDF: name.pdf" / "GIF" / "Photo" — the attachment-only text for snippets, pins and pushes. */
+export function attachmentSnippet(attachment: { type?: unknown; name?: unknown } | null | undefined): string {
+  if (!attachment) return '';
+  if (attachment.type === 'gif') return 'GIF';
+  if (attachment.type === 'file') {
+    return typeof attachment.name === 'string' && attachment.name ? `PDF: ${attachment.name}` : 'PDF';
+  }
+  return 'Photo';
+}
+
+/** Human byte size: "820 KB", "1.2 MB". */
+export function formatFileSize(bytes: number | undefined): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  const mb = bytes / (1024 * 1024);
+  return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
+}
+
+// Hard byte ceiling for an uploaded image or PDF. Enforced against the actual decoded
 // byte length, not a client-supplied Content-Length header.
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -109,6 +171,13 @@ export function chatObjectUrlBase(bucketName: string, objectPath: string): strin
   return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(objectPath)}`;
 }
 
+// Only keep a byte size when it is a finite positive number within the upload cap.
+function clampFileSize(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  if (value <= 0 || value > MAX_UPLOAD_BYTES) return undefined;
+  return Math.floor(value);
+}
+
 // Only keep a dimension when it is a finite positive number within bounds; else drop it.
 function clampDimension(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
@@ -122,7 +191,10 @@ type AttachmentValidation =
 
 /**
  * Validate a client-supplied attachment for a message POST. Image URLs must live
- * under this channel's storage folder; gif URLs must be https on a giphy.com host.
+ * under this channel's storage folder; file (PDF) URLs must name a .pdf object
+ * directly in that folder and carry contentType application/pdf (name is
+ * sanitized, size kept only within the upload cap); gif URLs must be https on a
+ * giphy.com host.
  * width/height are clamped (dropped if not finite/positive/≤4096). Returns a
  * sanitized attachment that is safe to persist.
  */
@@ -138,11 +210,31 @@ export function validateMessageAttachment(
   const type = input.type;
   const url = typeof input.url === 'string' ? input.url : '';
 
-  if (type !== 'image' && type !== 'gif') {
+  if (type !== 'image' && type !== 'gif' && type !== 'file') {
     return { ok: false, error: 'Unsupported attachment type' };
   }
   if (!url) {
     return { ok: false, error: 'Attachment url is required' };
+  }
+
+  if (type === 'file') {
+    // A PDF the upload route stored in THIS channel's folder (as {uuid}.pdf).
+    const objectPath = chatObjectPathFromUrl(url, bucketName, channelId);
+    if (!objectPath || !objectPath.endsWith('.pdf')) {
+      return { ok: false, error: 'Attachment url is not permitted for this channel' };
+    }
+    if (input.contentType !== PDF_MIME) {
+      return { ok: false, error: 'Unsupported attachment type' };
+    }
+    const file: ChatAttachment = {
+      type: 'file',
+      url,
+      contentType: PDF_MIME,
+      name: sanitizeAttachmentFileName(input.name),
+    };
+    const size = clampFileSize(input.size);
+    if (size !== undefined) file.size = size;
+    return { ok: true, attachment: file };
   }
 
   if (type === 'image') {
@@ -187,8 +279,23 @@ export function validateMessageAttachment(
 export function readStoredAttachment(raw: unknown): ChatAttachment | null {
   if (!raw || typeof raw !== 'object') return null;
   const data = raw as Record<string, unknown>;
-  if ((data.type !== 'image' && data.type !== 'gif') || typeof data.url !== 'string' || !data.url) {
+  if (
+    (data.type !== 'image' && data.type !== 'gif' && data.type !== 'file') ||
+    typeof data.url !== 'string' ||
+    !data.url
+  ) {
     return null;
+  }
+  if (data.type === 'file') {
+    const file: ChatAttachment = {
+      type: 'file',
+      url: data.url,
+      contentType: PDF_MIME,
+      name: sanitizeAttachmentFileName(data.name),
+    };
+    const size = clampFileSize(data.size);
+    if (size !== undefined) file.size = size;
+    return file;
   }
   const attachment: ChatAttachment = { type: data.type, url: data.url };
   // Clamp dimensions on read too (mirror the write path) so a hand-edited/legacy doc

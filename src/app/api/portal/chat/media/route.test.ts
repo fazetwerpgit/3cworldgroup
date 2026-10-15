@@ -64,6 +64,12 @@ function form(fields: { channelId?: string; file?: File | null }) {
   return new NextRequest('http://localhost/api/portal/chat/media', { method: 'POST', body: fd });
 }
 
+function pdfFile(bytes: number, name = 'Pay stub.pdf', body: string = '%PDF-1.7\n') {
+  const data = new Uint8Array(bytes);
+  data.set(new TextEncoder().encode(body).slice(0, bytes));
+  return new File([data], name, { type: 'application/pdf' });
+}
+
 function pngFile(bytes: number, type = 'image/png') {
   return new File([new Uint8Array(bytes)], 'client-name.png', { type });
 }
@@ -113,7 +119,7 @@ describe('POST /api/portal/chat/media', () => {
 
   it('rejects a disallowed mime type', async () => {
     mockGate.mockResolvedValue(REP);
-    const res = await POST(form({ channelId: 'all-company', file: pngFile(10, 'application/pdf') }));
+    const res = await POST(form({ channelId: 'all-company', file: pngFile(10, 'application/x-msdownload') }));
     expect(res.status).toBe(400);
     expect(saveMock).not.toHaveBeenCalled();
   });
@@ -159,5 +165,42 @@ describe('POST /api/portal/chat/media', () => {
       metadata: { metadata: { firebaseStorageDownloadTokens: string } };
     };
     expect(saveOpts.metadata.metadata.firebaseStorageDownloadTokens).toBeTruthy();
+  });
+
+  it('uploads a PDF stored as .pdf and returns its name and size', async () => {
+    mockGate.mockResolvedValue(REP);
+    const res = await POST(form({ channelId: 'all-company', file: pdfFile(2048) }));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(fileMock.mock.calls[0][0]).toMatch(/^chat\/all-company\/[0-9a-f-]+\.pdf$/);
+    expect(json).toMatchObject({ contentType: 'application/pdf', name: 'Pay stub.pdf', size: 2048 });
+    const saveOpts = saveMock.mock.calls[0][1] as { metadata: { contentType: string } };
+    expect(saveOpts.metadata.contentType).toBe('application/pdf');
+  });
+
+  it('rejects an application/x-msdownload upload', async () => {
+    mockGate.mockResolvedValue(REP);
+    const exe = new File([new Uint8Array([0x4d, 0x5a, 0, 0])], 'setup.exe', { type: 'application/x-msdownload' });
+    const res = await POST(form({ channelId: 'all-company', file: exe }));
+    expect(res.status).toBe(400);
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a fake PDF whose bytes fail the %PDF- magic check', async () => {
+    mockGate.mockResolvedValue(REP);
+    const res = await POST(form({ channelId: 'all-company', file: pdfFile(64, 'fake.pdf', 'MZ not a pdf') }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/not a valid PDF/);
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a PDF over 10 MB with the PDF size message', async () => {
+    mockGate.mockResolvedValue(REP);
+    const res = await POST(form({ channelId: 'all-company', file: pdfFile(10 * 1024 * 1024 + 1) }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('File too large — PDFs up to 10 MB.');
+    expect(saveMock).not.toHaveBeenCalled();
   });
 });

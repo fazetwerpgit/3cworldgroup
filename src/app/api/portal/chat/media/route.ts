@@ -7,12 +7,15 @@ import {
   MAX_UPLOAD_BYTES,
   buildTokenedDownloadUrl,
   chatObjectPath,
+  PDF_MIME,
   getChatStorageBucketName,
-  imageExtForMime,
+  hasPdfMagic,
+  sanitizeAttachmentFileName,
+  uploadExtForMime,
 } from '@/lib/chat/media';
 
 // POST /api/portal/chat/media — verified caller who can access the channel uploads
-// an image (multipart: channelId, file). Writes to the admin storage bucket under
+// an image or a PDF (multipart: channelId, file). Writes to the admin storage bucket under
 // chat/{channelId}/{uuid}.{ext} with a download token, returns the tokened URL.
 export async function POST(request: NextRequest) {
   try {
@@ -50,12 +53,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Extension is derived from the validated MIME type, never the client filename.
-    // imageExtForMime gates on own-property so prototype keys (__proto__, constructor)
+    // uploadExtForMime gates on own-property so prototype keys (__proto__, constructor)
     // can't slip past the allow-list.
-    const ext = imageExtForMime(file.type);
+    const ext = uploadExtForMime(file.type);
     if (!ext) {
       return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
     }
+    const isPdf = file.type === PDF_MIME;
 
     // Enforce the size cap against the ACTUAL bytes, not any header.
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -63,8 +67,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File is empty' }, { status: 400 });
     }
     if (buffer.length > MAX_UPLOAD_BYTES) {
-      return NextResponse.json({ error: 'File exceeds the 10 MB limit' }, { status: 400 });
+      return NextResponse.json(
+        { error: isPdf ? 'File too large — PDFs up to 10 MB.' : 'File exceeds the 10 MB limit' },
+        { status: 400 }
+      );
     }
+    // A PDF must actually be one: the declared MIME alone is client-controlled.
+    if (isPdf && !hasPdfMagic(buffer)) {
+      return NextResponse.json({ error: 'That file is not a valid PDF.' }, { status: 400 });
+    }
+    const name = isPdf ? sanitizeAttachmentFileName(file.name) : '';
 
     const bucketName = getChatStorageBucketName();
     if (!bucketName) {
@@ -78,13 +90,17 @@ export async function POST(request: NextRequest) {
       resumable: false,
       metadata: {
         contentType: file.type,
+        // Open PDFs in the browser's viewer under their original name.
+        ...(isPdf ? { contentDisposition: `inline; filename*=UTF-8''${encodeURIComponent(name)}` } : {}),
         // The download token that makes the ?token= URL readable while rules deny-all.
         metadata: { firebaseStorageDownloadTokens: token },
       },
     });
 
     const url = buildTokenedDownloadUrl(bucketName, objectPath, token);
-    return NextResponse.json({ url, contentType: file.type });
+    return NextResponse.json(
+      isPdf ? { url, contentType: file.type, name, size: buffer.length } : { url, contentType: file.type }
+    );
   } catch (error) {
     console.error('Error uploading chat media:', error);
     return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });

@@ -55,16 +55,22 @@ function toCountMap(value: unknown): Record<string, number> {
   );
 }
 
-// Defensive parse of a stored attachment: only a well-formed image/gif with a
+// Defensive parse of a stored attachment: only a well-formed image/gif/file with a
 // string url survives; anything malformed is dropped so a bad doc can't crash
 // the thread (or render a broken tile). Dimensions are kept only when finite.
 function toAttachment(value: unknown): ChatAttachment | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const raw = value as Record<string, unknown>;
-  if ((raw.type !== 'image' && raw.type !== 'gif') || typeof raw.url !== 'string' || !raw.url) {
+  if (
+    (raw.type !== 'image' && raw.type !== 'gif' && raw.type !== 'file') ||
+    typeof raw.url !== 'string' ||
+    !raw.url
+  ) {
     return undefined;
   }
   const attachment: ChatAttachment = { type: raw.type, url: raw.url };
+  if (typeof raw.name === 'string') attachment.name = raw.name;
+  if (typeof raw.size === 'number' && Number.isFinite(raw.size) && raw.size > 0) attachment.size = raw.size;
   if (typeof raw.width === 'number' && Number.isFinite(raw.width) && raw.width > 0) {
     attachment.width = raw.width;
   }

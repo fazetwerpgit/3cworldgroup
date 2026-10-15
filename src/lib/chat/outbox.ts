@@ -229,8 +229,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function parseAttachment(value: unknown): ChatAttachment | undefined {
   if (!isRecord(value)) return undefined;
-  if ((value.type !== 'image' && value.type !== 'gif') || typeof value.url !== 'string' || !value.url) return undefined;
+  if (
+    (value.type !== 'image' && value.type !== 'gif' && value.type !== 'file') ||
+    typeof value.url !== 'string' ||
+    !value.url
+  ) {
+    return undefined;
+  }
   const attachment: ChatAttachment = { type: value.type, url: value.url };
+  if (typeof value.name === 'string') attachment.name = value.name;
+  if (typeof value.size === 'number' && Number.isFinite(value.size) && value.size > 0) attachment.size = value.size;
   if (typeof value.width === 'number' && value.width > 0) attachment.width = value.width;
   if (typeof value.height === 'number' && value.height > 0) attachment.height = value.height;
   if (typeof value.contentType === 'string') attachment.contentType = value.contentType;

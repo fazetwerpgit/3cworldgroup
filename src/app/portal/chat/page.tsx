@@ -2,13 +2,15 @@
 
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { AlertCircle, ArrowDown, Check, Clock, ImagePlus, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, Check, Clock, FileText, ImagePlus, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
-import { validateSelectedImage } from '@/components/chat/attachmentUpload';
+import { isPdfFile, validateSelectedImage } from '@/components/chat/attachmentUpload';
+import { FileChip, messageFileInfo } from '@/components/chat/FileChip';
+import { attachmentSnippet, formatFileSize } from '@/lib/chat/media';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
@@ -85,6 +87,18 @@ function DesktopAttachment({
   eager: boolean;
   onOpen: () => void;
 }) {
+  const fileInfo = messageFileInfo(message);
+  if (fileInfo) {
+    return (
+      <FileChip
+        {...fileInfo}
+        isOwn={false}
+        uploading={message.pendingState === 'sending'}
+        failed={message.pendingState === 'failed'}
+        progress={message.uploadProgress}
+      />
+    );
+  }
   const previewUrl = message.localPreviewUrl;
   const src = previewUrl ?? message.attachment?.url;
   if (!src) {
@@ -702,7 +716,7 @@ export default function TeamChatPage() {
   const makeReplySnippet = (message: ThreadMessage): ChatReplySnippet => {
     const trimmed = message.text?.trim();
     if (trimmed) return { messageId: message.id, authorName: message.authorName, text: trimmed.slice(0, 140) };
-    const kind = message.attachment ? (message.attachment.type === 'gif' ? 'GIF' : 'Photo') : '';
+    const kind = attachmentSnippet(message.attachment).slice(0, 140);
     return { messageId: message.id, authorName: message.authorName, text: kind };
   };
 
@@ -954,7 +968,7 @@ export default function TeamChatPage() {
 
   const pinnedMessage = usePinnedMessage(activeChannelId || null);
   const pinnedCopy = pinnedMessage
-    ? pinnedMessage.text || (pinnedMessage.attachment?.type === 'gif' ? 'GIF' : 'Photo')
+    ? pinnedMessage.text || attachmentSnippet(pinnedMessage.attachment)
     : '';
   // Role labels carry comp tiers, manager titles and IBO levels: admins only.
   const activeMemberCount = activeChannel ? memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0 : 0;
@@ -1191,7 +1205,7 @@ export default function TeamChatPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,application/pdf"
               hidden
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -1201,13 +1215,24 @@ export default function TeamChatPage() {
             />
             {attachFile && attachPreview && (
               <div className={c.strip}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={attachPreview} alt="Selected image preview" className={c.stripThumb} />
+                {isPdfFile(attachFile) ? (
+                  <span className={`${c.stripThumb} ${c.stripFileThumb}`} aria-hidden="true">
+                    <FileText size={20} strokeWidth={1.75} />
+                  </span>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={attachPreview} alt="Selected image preview" className={c.stripThumb} />
+                )}
                 <div className={c.stripCopy}>
-                  <strong>Photo ready</strong>
+                  <strong>{isPdfFile(attachFile) ? `PDF ready · ${formatFileSize(attachFile.size)}` : 'Photo ready'}</strong>
                   <span>{attachFile.name}</span>
                 </div>
-                <button type="button" onClick={clearDesktopAttachment} aria-label="Remove image" className={c.iconBtn}>
+                <button
+                  type="button"
+                  onClick={clearDesktopAttachment}
+                  aria-label={isPdfFile(attachFile) ? 'Remove PDF' : 'Remove image'}
+                  className={c.iconBtn}
+                >
                   <X size={18} aria-hidden="true" />
                 </button>
               </div>
@@ -1235,7 +1260,7 @@ export default function TeamChatPage() {
               </div>
             )}
             <div className={c.composeRow}>
-              <button type="button" className={c.tool} onClick={() => fileInputRef.current?.click()} disabled={!activeChannelId || !!editTarget} aria-label="Attach an image">
+              <button type="button" className={c.tool} onClick={() => fileInputRef.current?.click()} disabled={!activeChannelId || !!editTarget} aria-label="Attach a photo or PDF">
                 <ImagePlus size={22} aria-hidden="true" />
               </button>
               {gifEnabled && (

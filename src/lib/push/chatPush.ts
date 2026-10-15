@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { isEligibleChatMember, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import { sendPushToTokens, type PushPayload } from '@/lib/push/sendPush';
 import { ChatAttachment, resolveRoles } from '@/types';
+import { attachmentSnippet } from '@/lib/chat/media';
 
 // Recipients are handled in batches of this size (one getAll plus one round of FCM
 // sends each) so a company-wide channel never fans out hundreds of sends at once,
@@ -116,7 +117,7 @@ export async function pushChatMessageOnce(
 }
 
 // Notification body: who said what, or what they posted when the message carries only
-// an attachment (same Photo/GIF vocabulary buildReplySnippet uses for reply quotes).
+// an attachment (same Photo/GIF/PDF vocabulary buildReplySnippet uses for reply quotes).
 export function buildChatPushBody(
   senderName: string,
   text: string,
@@ -128,7 +129,9 @@ export function buildChatPushBody(
     return `${senderName}: ${body}`;
   }
   if (attachment) {
-    return attachment.type === 'gif' ? `${senderName} sent a GIF` : `${senderName} sent a photo`;
+    if (attachment.type === 'gif') return `${senderName} sent a GIF`;
+    if (attachment.type === 'file') return `${senderName} sent a ${attachmentSnippet(attachment)}`;
+    return `${senderName} sent a photo`;
   }
   return `${senderName} sent a message`;
 }

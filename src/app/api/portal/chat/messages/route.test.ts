@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { readStoredAttachment } from '@/lib/chat/media';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 
 // Mock the verified-chat-user gate so we control identity, and adminDb for the write.
@@ -62,6 +63,13 @@ const MESSAGE_DOCS: Record<string, Record<string, unknown>> = {
     authorName: 'Author One',
     text: '',
     attachment: { type: 'gif', url: 'https://media.giphy.com/x.gif' },
+    deletedAt: null,
+  },
+  'src-pdf': {
+    authorId: 'other-uid',
+    authorName: 'Author One',
+    text: '',
+    attachment: { type: 'file', url: 'https://example/x.pdf', name: 'Route map.pdf', size: 2048, contentType: 'application/pdf' },
     deletedAt: null,
   },
   'src-deleted': { authorId: 'other-uid', authorName: 'Author One', text: 'gone', deletedAt: { seconds: 1 } },
@@ -456,6 +464,68 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     expect(written.attachment).toMatchObject({ type: 'image', width: 800, height: 600 });
   });
 
+  it('accepts a PDF file attachment, sanitizing its name, and round-trips it', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const url = imageUrl('all-company', 'doc-1.pdf');
+    const res = await POST(
+      req({
+        channelId: 'all-company',
+        attachment: {
+          type: 'file',
+          url,
+          contentType: 'application/pdf',
+          name: '../../etc/Route\u0007 map.pdf',
+          size: 2048,
+          width: 800,
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    const written = addMock.mock.calls[0][0] as { hasAttachment?: boolean; attachment?: Record<string, unknown> };
+    expect(written.hasAttachment).toBe(true);
+    expect(written.attachment).toEqual({
+      type: 'file',
+      url,
+      contentType: 'application/pdf',
+      name: 'Route map.pdf',
+      size: 2048,
+    });
+    // What GET reads back is exactly what was stored.
+    expect(readStoredAttachment(written.attachment)).toEqual(written.attachment);
+  });
+
+  it('truncates a very long PDF name to 120 chars, keeping the extension', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    await POST(
+      req({
+        channelId: 'all-company',
+        attachment: {
+          type: 'file',
+          url: imageUrl('all-company', 'doc-2.pdf'),
+          contentType: 'application/pdf',
+          name: `${'a'.repeat(300)}.pdf`,
+        },
+      })
+    );
+    const name = (addMock.mock.calls[0][0] as { attachment: { name: string } }).attachment.name;
+    expect(name).toHaveLength(120);
+    expect(name.endsWith('.pdf')).toBe(true);
+  });
+
+  it('rejects a file attachment that is not a PDF object in this channel folder', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    for (const attachment of [
+      { type: 'file', url: imageUrl('managers', 'doc.pdf'), contentType: 'application/pdf', name: 'x.pdf' },
+      { type: 'file', url: imageUrl('all-company', 'abc.png'), contentType: 'application/pdf', name: 'x.pdf' },
+      { type: 'file', url: imageUrl('all-company', 'doc.pdf'), contentType: 'application/x-msdownload', name: 'x.exe' },
+      { type: 'file', url: 'https://evil.example/doc.pdf', contentType: 'application/pdf', name: 'x.pdf' },
+    ]) {
+      const res = await POST(req({ channelId: 'all-company', attachment }));
+      expect(res.status).toBe(400);
+    }
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
   it('accepts a valid GIPHY gif attachment', async () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(
@@ -584,6 +654,11 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     await POST(req({ channelId: 'all-company', text: 'lol', replyToMessageId: 'src-gif' }));
     const gifReply = (addMock.mock.calls[0][0] as { replyTo?: { text: string } }).replyTo;
     expect(gifReply?.text).toBe('GIF');
+
+    addMock.mockClear();
+    await POST(req({ channelId: 'all-company', text: 'got it', replyToMessageId: 'src-pdf' }));
+    const pdfReply = (addMock.mock.calls[0][0] as { replyTo?: { text: string } }).replyTo;
+    expect(pdfReply?.text).toBe('PDF: Route map.pdf');
   });
 
   it('truncates a long source snippet to 140 chars', async () => {
@@ -629,6 +704,25 @@ describe('POST /api/portal/chat/messages (push fan-out)', () => {
     expect(res.status).toBe(200);
     await flushAfter();
     expect(sendPushMock.mock.calls[0][2]).toMatchObject({ body: 'Real User sent a photo' });
+  });
+
+  it('names the PDF in the push for a PDF-only message', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(
+      req({
+        channelId: 'managers-extra',
+        attachment: {
+          type: 'file',
+          url: imageUrl('managers-extra', 'doc.pdf'),
+          contentType: 'application/pdf',
+          name: 'Install guide.pdf',
+          size: 900,
+        },
+      })
+    );
+    expect(res.status).toBe(200);
+    await flushAfter();
+    expect(sendPushMock.mock.calls[0][2]).toMatchObject({ body: 'Real User sent a PDF: Install guide.pdf' });
   });
 });
 
@@ -926,6 +1020,16 @@ describe('DELETE /api/portal/chat/messages (photo in Storage)', () => {
     expect(storageDeleteMock).toHaveBeenCalledTimes(1);
     expect(storageDeleteMock).toHaveBeenCalledWith('chat/all-company/photo-1.png', { ignoreNotFound: true });
     expect(msgSetMock.mock.invocationCallOrder[0]).toBeLessThan(storageDeleteMock.mock.invocationCallOrder[0]);
+  });
+
+  it("deletes a PDF's object too", async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    storePhoto('pdf-msg', imageUrl('all-company', 'doc-9.pdf'), {
+      attachment: { type: 'file', url: imageUrl('all-company', 'doc-9.pdf'), name: 'a.pdf', contentType: 'application/pdf' },
+    });
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'pdf-msg' }));
+    expect(res.status).toBe(200);
+    expect(storageDeleteMock).toHaveBeenCalledWith('chat/all-company/doc-9.pdf', { ignoreNotFound: true });
   });
 
   it('never deletes an object outside this bucket and channel folder', async () => {

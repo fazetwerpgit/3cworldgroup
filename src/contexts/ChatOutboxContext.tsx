@@ -336,7 +336,8 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
         reactionCounts: {},
         myReactions: [],
         attachment: entry.attachment,
-        uploadedAttachment: entry.attachment?.type === 'image' ? entry.attachment : undefined,
+        uploadedAttachment:
+          entry.attachment && entry.attachment.type !== 'gif' ? entry.attachment : undefined,
         replyTo: entry.replyTo,
         replyToMessageId: entry.replyToMessageId,
         ...(entry.photoPending ? { photoPending: true } : {}),

@@ -14,6 +14,8 @@ export const ALLOWED_IMAGE_TYPES = [
   'image/heic',
   'image/heif',
 ];
+// Documents the picker may hand us. PDFs upload as-is (never decoded/resized).
+export const PDF_MIME = 'application/pdf';
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // Prepared upload; same as the server.
 export const MAX_SELECTED_IMAGE_BYTES = 30 * 1024 * 1024; // Original phone photo before compression.
 
@@ -30,6 +32,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   gif: 'image/gif',
   heic: 'image/heic',
   heif: 'image/heif',
+  pdf: PDF_MIME,
 };
 
 function selectedImageMime(file: File): string {
@@ -38,6 +41,15 @@ function selectedImageMime(file: File): string {
   if (supplied && supplied !== 'application/octet-stream') return supplied;
   const extension = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '';
   return MIME_BY_EXTENSION[extension] ?? supplied;
+}
+
+/**
+ * True when the picked file is a PDF: by MIME, or by a `.pdf` name when the
+ * picker supplied no useful MIME (Android content URIs give '' or
+ * application/octet-stream).
+ */
+export function isPdfFile(file: File): boolean {
+  return selectedImageMime(file) === PDF_MIME;
 }
 
 function fileWithMime(file: File, mime: string): File {
@@ -50,12 +62,12 @@ function fileWithMime(file: File, mime: string): File {
 // content-URI photo whose backing file has since moved or changed aborts the
 // request as a bare "Failed to fetch". An in-memory File cannot go stale, and a
 // file that is already unreadable fails here with a message the user can act on.
-async function snapshotFile(file: File): Promise<File> {
+async function snapshotFile(file: File, noun = 'photo'): Promise<File> {
   let bytes: ArrayBuffer;
   try {
     bytes = await file.arrayBuffer();
   } catch {
-    throw new Error('That photo could not be read from your phone. Pick it again and resend.');
+    throw new Error(`That ${noun} could not be read from your phone. Pick it again and resend.`);
   }
   return new File([bytes], file.name, { type: file.type, lastModified: file.lastModified });
 }
@@ -115,11 +127,19 @@ async function decodeImage(file: File): Promise<DecodedImage> {
   }
 }
 
-/** Friendly pre-check on the originally selected file. Returns an error string or null. */
+/**
+ * Friendly pre-check on the originally selected file (an image or a PDF).
+ * Returns an error string or null.
+ */
 export function validateSelectedImage(file: File): string | null {
   const mime = selectedImageMime(file);
+  if (mime === PDF_MIME) {
+    if (file.size === 0) return 'That file is empty. Choose another PDF.';
+    if (file.size > MAX_UPLOAD_BYTES) return 'File too large — PDFs up to 10 MB.';
+    return null;
+  }
   if (!ALLOWED_IMAGE_TYPES.includes(mime)) {
-    return 'Unsupported file — use a PNG, JPEG, WebP, GIF, HEIC, or HEIF image.';
+    return 'Unsupported file — use an image or PDF.';
   }
   if (file.size === 0) {
     return 'That image is empty. Choose another photo.';
@@ -141,6 +161,8 @@ export async function prepareImageForUpload(
   file: File
 ): Promise<{ file: File; width?: number; height?: number }> {
   const mime = selectedImageMime(file);
+  // PDFs go up untouched, labelled application/pdf even when the picker gave no MIME.
+  if (mime === PDF_MIME) return { file: await snapshotFile(fileWithMime(file, mime), 'file') };
   const normalizedFile = await snapshotFile(fileWithMime(file, mime));
   if (mime === 'image/gif') return { file: normalizedFile };
 
@@ -234,6 +256,16 @@ function toUploadedAttachment(
     );
   }
   if (typeof json.url !== 'string' || !json.url) throw new Error('Photo upload returned no image.');
+  if (json.contentType === PDF_MIME) {
+    const file: ChatAttachment = {
+      type: 'file',
+      url: json.url,
+      contentType: PDF_MIME,
+      name: typeof json.name === 'string' && json.name ? json.name : 'document.pdf',
+    };
+    if (typeof json.size === 'number') file.size = json.size;
+    return file;
+  }
   const attachment: ChatAttachment = { type: 'image', url: json.url as string };
   if (typeof json.contentType === 'string') attachment.contentType = json.contentType;
   if (typeof width === 'number') attachment.width = width;

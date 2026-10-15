@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject, TouchEvent } from 'react';
-import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, ImagePlus, Info, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, FileText, ImagePlus, Info, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
@@ -10,7 +10,9 @@ import type { GifResult } from '@/components/chat/GifPicker';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { MessageActionSheet } from '@/components/chat/MessageActions';
 import type { MessageActionsConfig } from '@/components/chat/MessageActions';
-import { validateSelectedImage } from '@/components/chat/attachmentUpload';
+import { isPdfFile, validateSelectedImage } from '@/components/chat/attachmentUpload';
+import { FileChip, messageFileInfo } from '@/components/chat/FileChip';
+import { attachmentSnippet, formatFileSize } from '@/lib/chat/media';
 import { clockTime, failedStatusLabel, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
 import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
@@ -176,6 +178,18 @@ function BubbleImage({
   eager: boolean;
   onOpen: () => void;
 }) {
+  const fileInfo = messageFileInfo(message);
+  if (fileInfo) {
+    return (
+      <FileChip
+        {...fileInfo}
+        isOwn={isOwn}
+        uploading={message.pendingState === 'sending'}
+        failed={message.pendingState === 'failed'}
+        progress={message.uploadProgress}
+      />
+    );
+  }
   const previewUrl = message.localPreviewUrl;
   const src = previewUrl ?? message.attachment?.url;
   if (!src) {
@@ -705,7 +719,7 @@ export function MobileThread({
 
   const memberTotal = channel ? memberCount ?? channel.memberIds?.length ?? 0 : 0;
   const pinnedCopy = pinnedMessage
-    ? pinnedMessage.text || (pinnedMessage.attachment?.type === 'gif' ? 'GIF' : 'Photo')
+    ? pinnedMessage.text || attachmentSnippet(pinnedMessage.attachment)
     : '';
 
   return (
@@ -976,7 +990,7 @@ export function MobileThread({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           hidden
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -1009,13 +1023,24 @@ export function MobileThread({
         )}
         {attachFile && attachPreview && (
           <div className={c.strip}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={attachPreview} alt="Selected image preview" className={c.stripThumb} />
+            {isPdfFile(attachFile) ? (
+              <span className={`${c.stripThumb} ${c.stripFileThumb}`} aria-hidden="true">
+                <FileText size={20} strokeWidth={1.75} />
+              </span>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={attachPreview} alt="Selected image preview" className={c.stripThumb} />
+            )}
             <div className={c.stripCopy}>
-              <strong>Photo ready</strong>
+              <strong>{isPdfFile(attachFile) ? `PDF ready · ${formatFileSize(attachFile.size)}` : 'Photo ready'}</strong>
               <span>{attachFile.name}</span>
             </div>
-            <button type="button" onClick={clearAttachment} aria-label="Remove image" className={c.iconBtn}>
+            <button
+              type="button"
+              onClick={clearAttachment}
+              aria-label={isPdfFile(attachFile) ? 'Remove PDF' : 'Remove image'}
+              className={c.iconBtn}
+            >
               <X size={18} aria-hidden="true" />
             </button>
           </div>
@@ -1025,7 +1050,7 @@ export function MobileThread({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={!channelId || !!editTarget}
-            aria-label="Attach an image"
+            aria-label="Attach a photo or PDF"
             className={c.tool}
           >
             <ImagePlus size={22} aria-hidden="true" />

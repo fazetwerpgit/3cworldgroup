@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MAX_SELECTED_IMAGE_BYTES,
+  isPdfFile,
   prepareImageForUpload,
   uploadChatImage,
   validateSelectedImage,
@@ -35,6 +36,33 @@ describe('validateSelectedImage', () => {
     expect(
       validateSelectedImage(imageFile('huge.jpg', 'image/jpeg', MAX_SELECTED_IMAGE_BYTES + 1))
     ).toContain('30 MB');
+  });
+
+  it('accepts a PDF, including an Android content-URI PDF with no useful MIME', () => {
+    expect(validateSelectedImage(imageFile('contract.pdf', 'application/pdf'))).toBeNull();
+    expect(validateSelectedImage(imageFile('contract.pdf', ''))).toBeNull();
+    expect(validateSelectedImage(imageFile('Contract.PDF', 'application/octet-stream'))).toBeNull();
+    expect(isPdfFile(imageFile('contract.pdf', ''))).toBe(true);
+    expect(isPdfFile(imageFile('photo.jpg', ''))).toBe(false);
+  });
+
+  it('rejects an 11 MB PDF with the PDF size message', () => {
+    expect(validateSelectedImage(imageFile('big.pdf', 'application/pdf', 11 * 1024 * 1024))).toBe(
+      'File too large — PDFs up to 10 MB.'
+    );
+  });
+
+  it('rejects other documents with the image-or-PDF copy', () => {
+    expect(validateSelectedImage(imageFile('notes.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'))).toBe(
+      'Unsupported file — use an image or PDF.'
+    );
+    expect(validateSelectedImage(imageFile('setup.exe', ''))).toBe('Unsupported file — use an image or PDF.');
+  });
+
+  it('keeps image rules unchanged', () => {
+    expect(validateSelectedImage(imageFile('photo.png', 'image/png'))).toBeNull();
+    expect(validateSelectedImage(imageFile('large.jpg', 'image/jpeg', 11 * 1024 * 1024))).toBeNull();
+    expect(validateSelectedImage(imageFile('huge.jpg', 'image/jpeg', MAX_SELECTED_IMAGE_BYTES + 1))).toContain('30 MB');
   });
 });
 
@@ -113,7 +141,31 @@ describe('prepareImageForUpload', () => {
   });
 });
 
+describe('prepareImageForUpload (PDF)', () => {
+  it('passes a typeless PDF through untouched, labelled application/pdf', async () => {
+    const picked = new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d])], 'scan.pdf', { type: '' });
+    const prepared = await prepareImageForUpload(picked);
+    expect(prepared.file.type).toBe('application/pdf');
+    expect(prepared.file.name).toBe('scan.pdf');
+    expect(prepared.width).toBeUndefined();
+    expect(new Uint8Array(await prepared.file.arrayBuffer())).toEqual(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]));
+  });
+});
+
 describe('uploadChatImage', () => {
+  it('returns a file attachment when the server stored a PDF', async () => {
+    const url = 'https://firebasestorage.googleapis.com/v0/b/b/o/chat%2Fall-company%2Fx.pdf?alt=media&token=t';
+    const authedFetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ url, contentType: 'application/pdf', name: 'scan.pdf', size: 5 }), {
+          status: 200,
+        })
+    );
+    await expect(
+      uploadChatImage(authedFetch, 'all-company', imageFile('scan.pdf', 'application/pdf'))
+    ).resolves.toEqual({ type: 'file', url, contentType: 'application/pdf', name: 'scan.pdf', size: 5 });
+  });
+
   it('surfaces a useful message when a proxy returns a non-JSON upload error', async () => {
     const authedFetch = vi.fn(async () => new Response('Request body too large', { status: 413 }));
 
