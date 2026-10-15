@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { decryptField, encryptField } from '@/lib/security/fieldEncryption';
 import { onboardingFrom, sendEmail } from '@/lib/email/sendEmail';
 import { inviteEmail } from '@/lib/email/templates';
@@ -35,10 +36,58 @@ export function openInviteToken(sealed: unknown): string | null {
   }
 }
 
-/** Emails the hire their link from the onboarding department. True when Postmark accepted it. */
-export async function sendInviteEmail(to: string, inviteUrl: string): Promise<boolean> {
+/** Postmark Tag on every invite email; the events webhook matches on it with Metadata.inviteId. */
+export const INVITE_EMAIL_TAG = 'onboarding-invite';
+
+export interface InviteEmailResult {
+  sent: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+/**
+ * Emails the hire their link from the onboarding department. `sent` is true
+ * when Postmark accepted it. The invite id rides along as Postmark Metadata so
+ * the delivery/bounce webhook can find the invite again.
+ */
+export async function sendInviteEmail(to: string, inviteUrl: string, inviteId: string): Promise<InviteEmailResult> {
   // Must be awaited: on serverless the instance freezes once the response
   // returns, killing any in-flight send. sendEmail never throws.
-  const result = await sendEmail({ to, from: onboardingFrom(), ...inviteEmail({ inviteUrl }) });
-  return result.ok;
+  const result = await sendEmail({
+    to,
+    from: onboardingFrom(),
+    tag: INVITE_EMAIL_TAG,
+    metadata: { inviteId },
+    ...inviteEmail({ inviteUrl }),
+  });
+  return {
+    sent: result.ok,
+    ...(result.messageId ? { messageId: result.messageId } : {}),
+    ...(result.ok ? {} : { error: (result.error || 'unknown').slice(0, 40) }),
+  };
+}
+
+/**
+ * The invite-doc patch recording one send. Every email field is rewritten, so
+ * a resend replaces what the last send (and its webhooks) left behind.
+ */
+export function inviteEmailFields(result: InviteEmailResult): Record<string, unknown> {
+  const clear = FieldValue.delete();
+  return result.sent
+    ? {
+        emailStatus: 'sent',
+        emailedAt: FieldValue.serverTimestamp(),
+        postmarkMessageId: result.messageId ?? clear,
+        emailError: clear,
+        deliveredAt: clear,
+        bouncedAt: clear,
+      }
+    : {
+        emailStatus: 'failed',
+        emailError: result.error ?? 'unknown',
+        emailedAt: clear,
+        postmarkMessageId: clear,
+        deliveredAt: clear,
+        bouncedAt: clear,
+      };
 }

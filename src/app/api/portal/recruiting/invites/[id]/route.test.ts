@@ -23,7 +23,12 @@ vi.mock('@/lib/firebase/admin', () => ({
           : {
               get: async () => ({ exists: state.invite !== null, data: () => state.invite }),
               update: async (patch: Record<string, unknown>) => {
-                state.invite = { ...state.invite, ...patch };
+                // FieldValue.delete() removes the field, as Firestore does.
+                const next: Record<string, unknown> = { ...state.invite, ...patch };
+                for (const [key, value] of Object.entries(patch)) {
+                  if ((value as { methodName?: string } | null)?.methodName === 'FieldValue.delete') delete next[key];
+                }
+                state.invite = next;
               },
             },
     }),
@@ -144,4 +149,41 @@ it('reports when the email did not go out, with the link to send by hand', async
   state.sendEmail.mockResolvedValue({ ok: false, error: 'postmark_422' });
   const json = await (await POST(request('POST'), params)).json();
   expect(json).toMatchObject({ emailSent: false, inviteUrl: 'https://portal.test/onboard/saved-token' });
+});
+
+const isServerTimestamp = (value: unknown) =>
+  (value as { methodName?: string } | null)?.methodName === 'FieldValue.serverTimestamp';
+
+it('saves the resend on the invite: sent, when, and the Postmark message id, tagged with the invite id', async () => {
+  state.sendEmail.mockResolvedValue({ ok: true, messageId: 'pm-new' });
+  await POST(request('POST'), params);
+  expect(state.invite).toMatchObject({ emailStatus: 'sent', postmarkMessageId: 'pm-new' });
+  expect(isServerTimestamp(state.invite?.emailedAt)).toBe(true);
+  expect(state.invite).not.toHaveProperty('emailError');
+  expect(state.sendEmail).toHaveBeenCalledWith(
+    expect.objectContaining({ tag: 'onboarding-invite', metadata: { inviteId: 'inv-1' } })
+  );
+});
+
+it('overwrites the last send, including a bounce, when re-sent', async () => {
+  state.invite = {
+    ...state.invite,
+    emailStatus: 'bounced',
+    postmarkMessageId: 'pm-old',
+    emailedAt: new Date('2026-10-01'),
+    deliveredAt: new Date('2026-10-01'),
+    bouncedAt: new Date('2026-10-01'),
+  };
+  state.sendEmail.mockResolvedValue({ ok: true, messageId: 'pm-new' });
+  await POST(request('POST'), params);
+  expect(state.invite).toMatchObject({ emailStatus: 'sent', postmarkMessageId: 'pm-new' });
+  expect(state.invite).not.toHaveProperty('bouncedAt');
+  expect(state.invite).not.toHaveProperty('deliveredAt');
+
+  state.sendEmail.mockResolvedValue({ ok: false, error: 'postmark_422' });
+  const json = await (await POST(request('POST'), params)).json();
+  expect(json.emailStatus).toBe('failed');
+  expect(state.invite).toMatchObject({ emailStatus: 'failed', emailError: 'postmark_422' });
+  expect(state.invite).not.toHaveProperty('postmarkMessageId');
+  expect(state.invite).not.toHaveProperty('emailedAt');
 });

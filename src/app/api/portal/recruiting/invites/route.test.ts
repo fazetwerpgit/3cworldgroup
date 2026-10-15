@@ -7,6 +7,8 @@ const state = vi.hoisted(() => ({
   applications: [] as Array<Record<string, unknown>>,
   invites: [] as Array<Record<string, unknown>>,
   onboardingAccount: null as { uid: string } | null,
+  sendEmail: vi.fn(),
+  created: null as Record<string, unknown> | null,
 }));
 
 // A Firestore stand-in for GET: users/{uid}, onboardingInvites and applications,
@@ -35,12 +37,26 @@ vi.mock('@/lib/firebase/admin', () => {
           };
         }
         if (name === 'applications') return query(() => state.applications);
-        if (name === 'onboardingInvites') return query(() => state.invites);
+        if (name === 'onboardingInvites') {
+          return {
+            ...query(() => state.invites),
+            add: async (data: Record<string, unknown>) => {
+              state.created = { ...data };
+              return {
+                id: 'inv-new',
+                update: async (patch: Record<string, unknown>) => {
+                  state.created = { ...state.created, ...patch };
+                },
+              };
+            },
+          };
+        }
         return query(() => []);
       },
     },
   };
 });
+vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: state.sendEmail, onboardingFrom: () => 'onboarding@test' }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: state.gate }));
 vi.mock('@/lib/auth/existingAccount', () => ({
   findActivePortalAccount: vi.fn(async () => null),
@@ -76,6 +92,8 @@ beforeEach(() => {
   state.applications = [];
   state.invites = [];
   state.onboardingAccount = null;
+  state.sendEmail.mockReset().mockResolvedValue({ ok: true, messageId: 'pm-1' });
+  state.created = null;
 });
 
 it('returns every application, not just the newest 50', async () => {
@@ -165,4 +183,44 @@ it('refuses a new invite for an email already partway through onboarding', async
 
   const response = await POST(request);
   expect(response.status).toBe(409);
+});
+
+function inviteRequest() {
+  return new NextRequest('http://localhost/api/portal/recruiting/invites', {
+    method: 'POST',
+    body: JSON.stringify({
+      candidateName: 'Rex',
+      candidateEmail: 'rex@example.com',
+      candidatePhone: '555-0100',
+      intendedFieldRole: 'entry_level_rep',
+    }),
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+const sentinel = (value: unknown) => (value as { methodName?: string } | null)?.methodName;
+
+it('saves on the new invite that the email went out, with Postmark\'s message id', async () => {
+  const json = await (await POST(inviteRequest())).json();
+  expect(json).toMatchObject({ emailSent: true, invite: { id: 'inv-new', emailStatus: 'sent' } });
+  expect(state.created).toMatchObject({ status: 'invited', emailStatus: 'sent', postmarkMessageId: 'pm-1' });
+  expect(sentinel(state.created?.emailedAt)).toBe('FieldValue.serverTimestamp');
+  expect(state.sendEmail).toHaveBeenCalledWith(
+    expect.objectContaining({ to: 'rex@example.com', tag: 'onboarding-invite', metadata: { inviteId: 'inv-new' } })
+  );
+});
+
+it('saves on the new invite that the email did not go out, with a short reason', async () => {
+  state.sendEmail.mockResolvedValue({ ok: false, error: 'postmark_422' });
+  const json = await (await POST(inviteRequest())).json();
+  expect(json).toMatchObject({ success: true, emailSent: false, invite: { emailStatus: 'failed' } });
+  expect(state.created).toMatchObject({ emailStatus: 'failed', emailError: 'postmark_422' });
+  expect(sentinel(state.created?.emailedAt)).toBe('FieldValue.delete');
+  expect(sentinel(state.created?.postmarkMessageId)).toBe('FieldValue.delete');
+});
+
+it('lists each invite with its email status, null on older invites', async () => {
+  state.invites = [invite(1, { emailStatus: 'bounced' }), invite(2)];
+  const json = await (await GET(getRequest())).json();
+  expect(json.invites.map((row: { emailStatus: unknown }) => row.emailStatus)).toEqual(['bounced', null]);
 });

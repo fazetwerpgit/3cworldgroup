@@ -99,6 +99,28 @@ describe('sendEmail', () => {
     expect(JSON.parse(init.body as string)).not.toHaveProperty('Attachments');
   });
 
+  it("returns Postmark's MessageID when the send is accepted", async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ MessageID: 'pm-123', ErrorCode: 0 }), { status: 200 })));
+    await expect(sendEmail(INPUT)).resolves.toEqual({ ok: true, messageId: 'pm-123' });
+  });
+
+  it('still reports ok when the accepted response has no readable MessageID', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('not json', { status: 200 })));
+    await expect(sendEmail(INPUT)).resolves.toEqual({ ok: true });
+  });
+
+  it('passes tag and metadata through as Postmark Tag and Metadata, omitting them otherwise', async () => {
+    await sendEmail({ ...INPUT, tag: 'onboarding-invite', metadata: { inviteId: 'inv-1' } });
+    await sendEmail(INPUT);
+    const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls;
+    const tagged = JSON.parse(calls[0][1].body as string);
+    expect(tagged.Tag).toBe('onboarding-invite');
+    expect(tagged.Metadata).toEqual({ inviteId: 'inv-1' });
+    const plain = JSON.parse(calls[1][1].body as string);
+    expect(plain).not.toHaveProperty('Tag');
+    expect(plain).not.toHaveProperty('Metadata');
+  });
+
   describe('onboardingFrom', () => {
     it('returns the env value when set', () => {
       vi.stubEnv('ONBOARDING_EMAIL_FROM', 'onboarding@3cworldgroup.com');

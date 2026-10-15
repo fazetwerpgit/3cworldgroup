@@ -4,7 +4,8 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
 import { isInviteExpired } from '@/lib/recruiting/inviteLookup';
-import { inviteUrlFor, openInviteToken, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
+import { inviteEmailFields, inviteUrlFor, openInviteToken, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
+import { saveInviteEmailStatus } from '@/lib/recruiting/inviteEmailStatus';
 
 // One invite's link, for the manager who sent it (or management).
 //   GET  -> { inviteUrl }: the saved link, to copy and send by hand.
@@ -113,12 +114,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
 
     const inviteUrl = inviteUrlFor(request.nextUrl.origin, token);
-    const emailSent = await sendInviteEmail(invite.data.candidateEmail, inviteUrl);
+    const email = await sendInviteEmail(invite.data.candidateEmail, inviteUrl, id);
+    const emailSent = email.sent;
+    await saveInviteEmailStatus(invite.ref, inviteEmailFields(email));
     return NextResponse.json({
       inviteUrl,
       emailSent,
       newLink: renewed,
       linkSaved: renewed ? 'tokenEncrypted' in update : true,
+      emailStatus: emailSent ? 'sent' : 'failed',
       status: invite.data.status === 'expired' ? 'invited' : invite.data.status,
       expiresAt: expiresAt.toISOString(),
     });

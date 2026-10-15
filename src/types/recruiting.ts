@@ -70,6 +70,13 @@ export interface ApplicationRecord {
   updatedAt: Date;
 }
 
+/**
+ * What happened to the invite email. 'sent' / 'failed' come from the send
+ * itself; 'delivered' / 'bounced' arrive later from Postmark's webhook.
+ * Absent on invites from before this was saved.
+ */
+export type InviteEmailStatus = 'sent' | 'failed' | 'delivered' | 'bounced';
+
 export interface OnboardingInvite {
   id: string;
   candidateName: string;
@@ -90,6 +97,14 @@ export interface OnboardingInvite {
   createdAt: Date;
   updatedAt: Date;
   submittedAt?: Date;
+  /** The latest invite email (a resend overwrites these). Absent on older invites. */
+  emailStatus?: InviteEmailStatus;
+  emailedAt?: Date;
+  postmarkMessageId?: string;
+  /** A short code ('postmark_422', 'network'), never the address or message. */
+  emailError?: string;
+  deliveredAt?: Date;
+  bouncedAt?: Date;
 }
 
 export interface CandidateOnboardingItem {

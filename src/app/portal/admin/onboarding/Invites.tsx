@@ -24,9 +24,10 @@ import { hubTabHref, ONBOARDING_HUB } from '@/components/portal/admin-d/adminHub
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './recruiting.module.css';
-import { ApplicationRecord, FieldRole, OnboardingInviteStatus, RoleDisplayNames } from '@/types';
+import { ApplicationRecord, FieldRole, InviteEmailStatus, OnboardingInviteStatus, RoleDisplayNames } from '@/types';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
 import {
+  emailProblem,
   EXPORT_COLUMNS,
   exportRow,
   matchesSearch,
@@ -57,6 +58,8 @@ export interface InviteView {
   status: OnboardingInviteStatus;
   /** The link is stored and can be copied again. False on invites made before links were saved. */
   linkSaved: boolean;
+  /** The latest invite email: sent, failed, delivered or bounced. Null on older invites. */
+  emailStatus?: InviteEmailStatus | null;
   ownerName: string;
   applicationId?: string | null;
   convertedUserId?: string | null;
@@ -456,7 +459,9 @@ export function Invites({
               ) : null}
             </span>
           </span>
-          <span className={`${r.sentence} ${needsAction(row) ? '' : u.toneMuted}`}>{recruitSentence(row)}</span>
+          <span className={`${r.sentence} ${emailProblem(row) ? u.toneAmber : needsAction(row) ? '' : u.toneMuted}`}>
+            {recruitSentence(row)}
+          </span>
           {actions ? <span className={`${u.btnRow} ${r.actions}`}>{actions}</span> : null}
         </div>
         {invite && shownLink?.id === invite.id ? (

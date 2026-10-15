@@ -10,6 +10,17 @@ export interface EmailInput {
   /** Optional Reply-To address (Postmark `ReplyTo`), e.g. the person who wrote in. CR/LF are stripped. */
   replyTo?: string;
   attachments?: { name: string; contentBase64: string; contentType: string }[];
+  /** Optional Postmark Tag, for grouping in the Postmark activity view. */
+  tag?: string;
+  /** Optional Postmark Metadata; Postmark echoes it back on delivery and bounce webhooks. */
+  metadata?: Record<string, string>;
+}
+
+export interface SendEmailResult {
+  ok: boolean;
+  error?: string;
+  /** Postmark's MessageID, when Postmark accepted the message and returned one. */
+  messageId?: string;
 }
 
 /** Sender for candidate-facing onboarding emails. Undefined when unconfigured (callers fall back). */
@@ -22,7 +33,7 @@ export function onboardingFrom(): string | undefined {
  * Free dev tier: may be limited to own-domain recipients until the account
  * is approved for production sending.
  */
-export async function sendEmail(input: EmailInput): Promise<{ ok: boolean; error?: string }> {
+export async function sendEmail(input: EmailInput): Promise<SendEmailResult> {
   const token = process.env.POSTMARK_SERVER_TOKEN;
   const from = input.from ?? process.env.EMAIL_FROM;
   if (!token || !from) {
@@ -47,6 +58,8 @@ export async function sendEmail(input: EmailInput): Promise<{ ok: boolean; error
         TextBody: input.textBody,
         MessageStream: 'outbound',
         ...(replyTo ? { ReplyTo: replyTo } : {}),
+        ...(input.tag ? { Tag: input.tag } : {}),
+        ...(input.metadata && Object.keys(input.metadata).length ? { Metadata: input.metadata } : {}),
         ...(input.attachments?.length
           ? {
               Attachments: input.attachments.map((attachment) => ({
@@ -62,9 +75,21 @@ export async function sendEmail(input: EmailInput): Promise<{ ok: boolean; error
       console.error('[email] postmark send failed', res.status, await res.text());
       return { ok: false, error: `postmark_${res.status}` };
     }
-    return { ok: true };
+    const messageId = await readMessageId(res);
+    return messageId ? { ok: true, messageId } : { ok: true };
   } catch (err) {
     console.error('[email] postmark send threw', err);
     return { ok: false, error: 'network' };
+  }
+}
+
+/** Postmark's MessageID from a 2xx send response. A body that is missing or unreadable is not a failure. */
+async function readMessageId(res: Response): Promise<string | undefined> {
+  try {
+    const body: unknown = await res.json();
+    const id = typeof body === 'object' && body !== null ? (body as { MessageID?: unknown }).MessageID : undefined;
+    return typeof id === 'string' && id ? id : undefined;
+  } catch {
+    return undefined;
   }
 }

@@ -168,6 +168,21 @@ function sourcePhrase(application: ApplicationRecord | null): string {
   return application?.source?.channel === 'direct' ? 'came in direct' : `via ${label}`;
 }
 
+// What the latest invite email did, between the date and "hasn't opened the
+// link". Older invites have no status and say nothing about the email.
+const EMAIL_PHRASE: Record<string, string> = {
+  sent: 'emailed',
+  delivered: 'delivered',
+  failed: "email didn't go out",
+  bounced: 'email bounced',
+};
+
+/** The invite email bounced or never went out: they need the link by hand (Copy link). */
+export function emailProblem(row: RecruitRow): boolean {
+  const status = row.invite?.emailStatus;
+  return row.state === 'invited' && (status === 'failed' || status === 'bounced');
+}
+
 /** Where the person is, in one plain sentence ("Invited Oct 6 · hasn't opened the link"). */
 export function recruitSentence(row: RecruitRow, now = Date.now()): string {
   const { application, invite } = row;
@@ -186,7 +201,7 @@ export function recruitSentence(row: RecruitRow, now = Date.now()): string {
     case 'invitedElsewhere':
       return sentence(applied, 'already invited');
     case 'invited':
-      return sentence(invited, "hasn't opened the link");
+      return sentence(invited, EMAIL_PHRASE[invite?.emailStatus ?? ''] ?? '', "hasn't opened the link");
     case 'started':
       return sentence(invited, 'started their paperwork');
     case 'expired':

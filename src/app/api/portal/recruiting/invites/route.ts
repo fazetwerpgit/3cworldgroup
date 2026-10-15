@@ -9,7 +9,8 @@ import {
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
-import { inviteUrlFor, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
+import { inviteEmailFields, inviteUrlFor, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
+import { saveInviteEmailStatus } from '@/lib/recruiting/inviteEmailStatus';
 import { findActivePortalAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
 import { storedSource } from '@/lib/forms/applicationSource';
 
@@ -35,6 +36,7 @@ function serializeInvite(doc: FirebaseFirestore.QueryDocumentSnapshot) {
     applicationId: data.applicationId ?? null,
     convertedUserId: data.convertedUserId ?? null,
     linkSaved: typeof data.tokenEncrypted === 'string',
+    emailStatus: data.emailStatus ?? null,
     expiresAt: data.expiresAt?.toDate?.()?.toISOString?.() ?? null,
     submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() ?? null,
     createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
@@ -193,7 +195,9 @@ export async function POST(request: NextRequest) {
     }
 
     const inviteUrl = inviteUrlFor(request.nextUrl.origin, token);
-    const emailSent = await sendInviteEmail(candidateEmail, inviteUrl);
+    const email = await sendInviteEmail(candidateEmail, inviteUrl, inviteRef.id);
+    const emailSent = email.sent;
+    await saveInviteEmailStatus(inviteRef, inviteEmailFields(email));
 
     return NextResponse.json({
       success: true,
@@ -210,6 +214,7 @@ export async function POST(request: NextRequest) {
         ownerName: requester.name,
         applicationId: applicationId || null,
         linkSaved: tokenEncrypted !== null,
+        emailStatus: emailSent ? 'sent' : 'failed',
         expiresAt: expiresAt.toISOString(),
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
