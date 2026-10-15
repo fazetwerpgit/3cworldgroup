@@ -185,6 +185,16 @@ function clampDimension(value: unknown): number | undefined {
   return Math.floor(value);
 }
 
+// A PDF's preview URL: a tokened download URL for an image object ({uuid}.png/
+// .jpg/.webp/.gif) sitting directly in THIS channel's folder of THIS bucket.
+function isChatPreviewImageUrl(url: unknown, bucketName: string, channelId: string): boolean {
+  if (typeof url !== 'string' || !url.startsWith(chatImageUrlPrefix(bucketName, channelId))) return false;
+  const objectPath = chatObjectPathFromUrl(url, bucketName, channelId);
+  if (!objectPath) return false;
+  const ext = objectPath.slice(objectPath.lastIndexOf('.') + 1);
+  return Object.values(ALLOWED_IMAGE_TYPES).includes(ext);
+}
+
 type AttachmentValidation =
   | { ok: true; attachment: ChatAttachment }
   | { ok: false; error: string };
@@ -193,7 +203,8 @@ type AttachmentValidation =
  * Validate a client-supplied attachment for a message POST. Image URLs must live
  * under this channel's storage folder; file (PDF) URLs must name a .pdf object
  * directly in that folder and carry contentType application/pdf (name is
- * sanitized, size kept only within the upload cap); gif URLs must be https on a
+ * sanitized, size kept only within the upload cap, and an optional previewUrl
+ * must be an image object in that same folder); gif URLs must be https on a
  * giphy.com host.
  * width/height are clamped (dropped if not finite/positive/≤4096). Returns a
  * sanitized attachment that is safe to persist.
@@ -234,6 +245,19 @@ export function validateMessageAttachment(
     };
     const size = clampFileSize(input.size);
     if (size !== undefined) file.size = size;
+    // Optional first-page thumbnail: an image object the upload route stored in
+    // THIS channel's folder (same origin rule as an image attachment). Present
+    // but not permitted rejects the message, never silently dropped.
+    if (input.previewUrl !== undefined && input.previewUrl !== null) {
+      if (!isChatPreviewImageUrl(input.previewUrl, bucketName, channelId)) {
+        return { ok: false, error: 'Attachment preview is not permitted for this channel' };
+      }
+      file.previewUrl = input.previewUrl as string;
+      const previewWidth = clampDimension(input.previewWidth);
+      const previewHeight = clampDimension(input.previewHeight);
+      if (previewWidth !== undefined) file.previewWidth = previewWidth;
+      if (previewHeight !== undefined) file.previewHeight = previewHeight;
+    }
     return { ok: true, attachment: file };
   }
 
@@ -295,6 +319,14 @@ export function readStoredAttachment(raw: unknown): ChatAttachment | null {
     };
     const size = clampFileSize(data.size);
     if (size !== undefined) file.size = size;
+    // The preview was origin-checked at write time; only shape it here.
+    if (typeof data.previewUrl === 'string' && data.previewUrl.startsWith('https://')) {
+      file.previewUrl = data.previewUrl;
+      const previewWidth = clampDimension(data.previewWidth);
+      const previewHeight = clampDimension(data.previewHeight);
+      if (previewWidth !== undefined) file.previewWidth = previewWidth;
+      if (previewHeight !== undefined) file.previewHeight = previewHeight;
+    }
     return file;
   }
   const attachment: ChatAttachment = { type: data.type, url: data.url };

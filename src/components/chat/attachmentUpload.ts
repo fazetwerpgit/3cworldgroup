@@ -1,5 +1,6 @@
 import { SendRequestError } from '@/lib/chat/outbox';
 import type { ChatAttachment } from '@/types';
+import { renderPdfPreview, type PdfPreview } from './pdfPreview';
 
 // Formats the picker may hand us. HEIC/HEIF are accepted at selection time and
 // converted to JPEG before upload so photos taken on an iPhone render everywhere.
@@ -150,6 +151,9 @@ export function validateSelectedImage(file: File): string | null {
   return null;
 }
 
+/** A picked file ready to upload; `preview` is a PDF's first-page thumbnail. */
+export type PreparedUpload = { file: File; width?: number; height?: number; preview?: PdfPreview };
+
 /**
  * Downscale a large still image to a JPEG (long edge ≤ 2000px, quality 0.85) so
  * big phone photos slim down before upload. HEIC/HEIF are always converted to a
@@ -159,10 +163,16 @@ export function validateSelectedImage(file: File): string | null {
  */
 export async function prepareImageForUpload(
   file: File
-): Promise<{ file: File; width?: number; height?: number }> {
+): Promise<PreparedUpload> {
   const mime = selectedImageMime(file);
-  // PDFs go up untouched, labelled application/pdf even when the picker gave no MIME.
-  if (mime === PDF_MIME) return { file: await snapshotFile(fileWithMime(file, mime), 'file') };
+  // PDFs go up untouched, labelled application/pdf even when the picker gave no
+  // MIME, with a first-page thumbnail when this device can render one. The
+  // preview is best-effort: any failure sends the PDF as a plain chip.
+  if (mime === PDF_MIME) {
+    const pdf = await snapshotFile(fileWithMime(file, mime), 'file');
+    const preview = await renderPdfPreview(pdf).catch(() => undefined);
+    return preview ? { file: pdf, preview } : { file: pdf };
+  }
   const normalizedFile = await snapshotFile(fileWithMime(file, mime));
   if (mime === 'image/gif') return { file: normalizedFile };
 
@@ -315,4 +325,16 @@ export function uploadChatImageWithProgress(
     };
     xhr.send(body);
   });
+}
+
+/**
+ * A PDF attachment carrying its uploaded first-page thumbnail (an image
+ * attachment from the same channel folder), with the thumbnail's dimensions.
+ */
+export function withPdfPreview(file: ChatAttachment, preview: ChatAttachment | undefined): ChatAttachment {
+  if (file.type !== 'file' || !preview || preview.type !== 'image' || !preview.url) return file;
+  const combined: ChatAttachment = { ...file, previewUrl: preview.url };
+  if (typeof preview.width === 'number') combined.previewWidth = preview.width;
+  if (typeof preview.height === 'number') combined.previewHeight = preview.height;
+  return combined;
 }

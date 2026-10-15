@@ -9,7 +9,7 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
 import { isPdfFile, validateSelectedImage } from '@/components/chat/attachmentUpload';
-import { FileChip, messageFileInfo } from '@/components/chat/FileChip';
+import { FileChip, PdfPreviewTile, messageFileInfo, messagePdfPreview } from '@/components/chat/FileChip';
 import { attachmentSnippet, formatFileSize } from '@/lib/chat/media';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { CompanyTape } from '@/components/chat/CompanyTape';
@@ -87,6 +87,18 @@ function DesktopAttachment({
   eager: boolean;
   onOpen: () => void;
 }) {
+  const pdfPreview = messagePdfPreview(message);
+  if (pdfPreview) {
+    return (
+      <PdfPreviewTile
+        {...pdfPreview}
+        eager={eager}
+        uploading={message.pendingState === 'sending'}
+        failed={message.pendingState === 'failed'}
+        progress={message.uploadProgress}
+      />
+    );
+  }
   const fileInfo = messageFileInfo(message);
   if (fileInfo) {
     return (

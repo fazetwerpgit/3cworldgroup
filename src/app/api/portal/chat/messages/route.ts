@@ -403,17 +403,26 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// The Storage object behind a deleted message's photo or PDF: chat/{channelId}/{name}
-// parsed from its download URL, or null for a GIF, a missing attachment, or any
-// URL outside this bucket + channel folder (never deleted).
-function deletableChatObjectPath(attachment: unknown, channelId: string): string | null {
-  if (!attachment || typeof attachment !== 'object') return null;
-  const { type, url } = attachment as { type?: unknown; url?: unknown };
-  if (type !== 'image' && type !== 'file') return null;
+// The Storage objects behind a deleted message's photo, or its PDF and the
+// PDF's first-page preview: chat/{channelId}/{name} parsed from each download
+// URL. None for a GIF or a missing attachment, and never any URL outside this
+// bucket + channel folder (those are never deleted).
+function deletableChatObjectPaths(attachment: unknown, channelId: string): string[] {
+  if (!attachment || typeof attachment !== 'object') return [];
+  const { type, url, previewUrl } = attachment as { type?: unknown; url?: unknown; previewUrl?: unknown };
+  if (type !== 'image' && type !== 'file') return [];
   const bucketName = getChatStorageBucketName();
-  if (!bucketName) return null;
-  return chatObjectPathFromUrl(url, bucketName, channelId);
+  if (!bucketName) return [];
+  const urls = type === 'file' ? [url, previewUrl] : [url];
+  const paths = urls
+    .map((candidate) => chatObjectPathFromUrl(candidate, bucketName, channelId))
+    .filter((path): path is string => !!path);
+  return [...new Set(paths)];
 }
+
+// Where another message can point at a chat object: its attachment url, or a
+// PDF's preview url.
+const CHAT_OBJECT_URL_FIELDS = ['attachment.url', 'attachment.previewUrl'] as const;
 
 // The error code of a failed Storage/Firestore call, for logs that must never
 // carry the object's download URL or token.
@@ -436,19 +445,20 @@ async function deleteChatPhotoObject(
     const bucketName = getChatStorageBucketName();
     if (!bucketName) return;
     const urlBase = chatObjectUrlBase(bucketName, objectPath);
-    const sharing = await adminDb!
-      .collection('chatChannels')
-      .doc(channelId)
-      .collection('messages')
-      .where('attachment.url', '>=', urlBase)
-      .where('attachment.url', '<', `${urlBase}\uf8ff`)
-      .get();
-    const stillUsed = sharing.docs.some((doc) => {
-      if (doc.id === messageId) return false;
-      const data = doc.data();
-      if (data.deletedAt) return false;
-      return deletableChatObjectPath(data.attachment, channelId) === objectPath;
-    });
+    const messages = adminDb!.collection('chatChannels').doc(channelId).collection('messages');
+    const sharing = await Promise.all(
+      CHAT_OBJECT_URL_FIELDS.map((field) =>
+        messages.where(field, '>=', urlBase).where(field, '<', `${urlBase}\uf8ff`).get()
+      )
+    );
+    const stillUsed = sharing.some((snapshot) =>
+      snapshot.docs.some((doc) => {
+        if (doc.id === messageId) return false;
+        const data = doc.data();
+        if (data.deletedAt) return false;
+        return deletableChatObjectPaths(data.attachment, channelId).includes(objectPath);
+      })
+    );
     if (stillUsed) {
       console.warn(`Chat photo kept: another message still shows it (channel ${channelId}, message ${messageId})`);
       return;
@@ -511,11 +521,12 @@ export async function DELETE(request: NextRequest) {
       { merge: true }
     );
 
-    // The photo goes with the message: its tokened URL would otherwise keep it
+    // The photo (or PDF and its preview) goes with the message: a tokened URL would otherwise keep it
     // reachable. Path resolved from the pre-scrub read, deleted only now that the
     // doc no longer points at it.
-    const photoPath = deletableChatObjectPath(message?.attachment, channelId);
-    if (photoPath) await deleteChatPhotoObject(channelId, messageId, photoPath);
+    for (const objectPath of deletableChatObjectPaths(message?.attachment, channelId)) {
+      await deleteChatPhotoObject(channelId, messageId, objectPath);
+    }
 
     try {
       await recomputeLastMessageAt(adminDb!.collection('chatChannels').doc(channelId), messageId, message?.createdAt);

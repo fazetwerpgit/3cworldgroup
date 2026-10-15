@@ -777,6 +777,98 @@
   border-color: rgba(255, 138, 128, 0.6);
 }
 
+/* PDF with a first-page preview (both layouts): a photo-sized tile that hugs
+   the page (portrait pages narrow, landscape up to the photo width), the page
+   on white, a "PDF" badge, and a name strip. Opens the PDF in a new tab. */
+.pdfTile {
+  width: fit-content;
+  min-width: 168px;
+  max-width: min(100%, 360px);
+  color: var(--c-text);
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pdfTile img {
+  width: auto;
+  height: auto;
+  min-width: 100%;
+  max-width: 100%;
+  max-height: 280px;
+  margin: 0 auto;
+  object-fit: contain;
+  background: #ffffff;
+}
+
+a.pdfTile:focus-visible {
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
+}
+
+span.pdfTile {
+  cursor: default;
+}
+
+.pdfBadge {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--c-lime);
+  color: #0b1424;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+}
+
+/* width 0 + min-width 100%: a long name never widens the tile past the page. */
+.pdfStrip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: 0;
+  min-width: 100%;
+  padding: 7px 10px;
+  border-top: 1px solid var(--c-line);
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+}
+
+.pdfStripName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--t-min);
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdfStripMeta {
+  flex: none;
+  color: var(--c-text-3);
+  font-size: var(--t-min);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (hover: hover) {
+  a.pdfTile:hover .pdfStripName {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+}
+
+.pdfTile .progress {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 0;
+}
+
 /* PDF chip (both layouts): icon, ellipsized name, "PDF · size". Opens in a new tab. */
 .fileChip {
   position: relative;

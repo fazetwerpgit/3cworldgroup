@@ -10,8 +10,8 @@ import type { GifResult } from '@/components/chat/GifPicker';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { MessageActionSheet } from '@/components/chat/MessageActions';
 import type { MessageActionsConfig } from '@/components/chat/MessageActions';
-import { isPdfFile, validateSelectedImage } from '@/components/chat/attachmentUpload';
-import { FileChip, messageFileInfo } from '@/components/chat/FileChip';
+import { isPdfFile, validateSelectedImage, type PreparedUpload } from '@/components/chat/attachmentUpload';
+import { FileChip, PdfPreviewTile, messageFileInfo, messagePdfPreview } from '@/components/chat/FileChip';
 import { attachmentSnippet, formatFileSize } from '@/lib/chat/media';
 import { clockTime, failedStatusLabel, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
 import { CompanyTape } from '@/components/chat/CompanyTape';
@@ -60,7 +60,12 @@ export type ThreadMessage = ChatMessageView & {
   deliveredId?: string;
   sendAttempts?: number;
   retryWindowStart?: number;
-  preparedUpload?: { file: File; width?: number; height?: number };
+  preparedUpload?: PreparedUpload;
+  // PDF echoes only: an object URL of the first-page thumbnail rendered on this
+  // device (its size rides localPreviewWidth/Height), and the thumbnail's
+  // uploaded image attachment, cached so a PDF upload retry doesn't re-upload it.
+  localPdfPreviewUrl?: string;
+  uploadedPreview?: ChatAttachment;
   uploadProgress?: number;
   // A restored photo whose file is still in the device outbox (photoPending),
   // or turned out to be gone from it (photoLost: it can only be discarded, or
@@ -178,6 +183,19 @@ function BubbleImage({
   eager: boolean;
   onOpen: () => void;
 }) {
+  const pdfPreview = messagePdfPreview(message);
+  if (pdfPreview) {
+    return (
+      <PdfPreviewTile
+        {...pdfPreview}
+        isOwn={isOwn}
+        eager={eager}
+        uploading={message.pendingState === 'sending'}
+        failed={message.pendingState === 'failed'}
+        progress={message.uploadProgress}
+      />
+    );
+  }
   const fileInfo = messageFileInfo(message);
   if (fileInfo) {
     return (

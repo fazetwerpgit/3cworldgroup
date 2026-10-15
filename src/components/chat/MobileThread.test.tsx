@@ -250,6 +250,76 @@ describe('MobileThread PDF attachments', () => {
     expect(container.querySelector('img[src="blob:local"]')).toBeNull();
   });
 
+  it('renders a PDF with a preview as a page tile linking to the PDF, not the lightbox', () => {
+    const PREVIEW_URL = 'https://firebasestorage.googleapis.com/v0/b/b/o/chat%2Fc1%2Fthumb.webp?alt=media&token=t';
+    const onOpenImage = vi.fn();
+    const pdf: ThreadMessage = {
+      ...message('pdf', 40),
+      text: '',
+      attachment: {
+        type: 'file',
+        url: PDF_URL,
+        name: 'Route map.pdf',
+        size: 1258291,
+        contentType: 'application/pdf',
+        previewUrl: PREVIEW_URL,
+        previewWidth: 618,
+        previewHeight: 800,
+      },
+      hasAttachment: true,
+    };
+    act(() => root.render(<MobileThread {...props({ messages: [...MESSAGES, pdf], onOpenImage })} />));
+    const tile = container.querySelector('[data-pdf-preview="true"]');
+    expect(tile).toBeInstanceOf(HTMLAnchorElement);
+    expect(tile?.getAttribute('href')).toBe(PDF_URL);
+    expect(tile?.getAttribute('target')).toBe('_blank');
+    expect(tile?.getAttribute('rel')).toBe('noopener noreferrer');
+    const img = tile?.querySelector('img');
+    expect(img?.getAttribute('src')).toBe(PREVIEW_URL);
+    expect(img?.getAttribute('width')).toBe('618');
+    expect(img?.getAttribute('height')).toBe('800');
+    expect(tile?.textContent).toContain('PDF');
+    expect(tile?.textContent).toContain('Route map.pdf');
+    act(() => (tile as HTMLAnchorElement).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+    expect(onOpenImage).not.toHaveBeenCalled();
+  });
+
+  it('keeps an old PDF without a preview as a chip', () => {
+    const pdf: ThreadMessage = {
+      ...message('pdf', 40),
+      text: '',
+      attachment: { type: 'file', url: PDF_URL, name: 'Old.pdf', contentType: 'application/pdf' },
+      hasAttachment: true,
+    };
+    act(() => root.render(<MobileThread {...props({ messages: [...MESSAGES, pdf] })} />));
+    expect(container.querySelector('[data-pdf-preview]')).toBeNull();
+    const chip = container.querySelector('[data-attachment-type="file"]');
+    expect(chip?.getAttribute('href')).toBe(PDF_URL);
+    expect(chip?.querySelector('img')).toBeNull();
+  });
+
+  it('shows a pending PDF echo with its local thumbnail and upload progress, inert', () => {
+    const file = new File([new Uint8Array(2048)], 'scan.pdf', { type: 'application/pdf' });
+    const echo: ThreadMessage = {
+      ...message('echo', 41),
+      text: '',
+      authorId: 'me',
+      pendingState: 'sending',
+      pendingFile: file,
+      localPreviewUrl: 'blob:pdf',
+      localPdfPreviewUrl: 'blob:thumb',
+      localPreviewWidth: 800,
+      localPreviewHeight: 566,
+      uploadProgress: 0.5,
+    };
+    act(() => root.render(<MobileThread {...props({ messages: [...MESSAGES, echo] })} />));
+    const tile = container.querySelector('[data-pdf-preview="true"]');
+    expect(tile?.tagName).toBe('SPAN');
+    expect(tile?.querySelector('img')?.getAttribute('src')).toBe('blob:thumb');
+    expect(tile?.querySelector('[style*="scaleX(0.5)"]')).not.toBeNull();
+    expect(container.querySelector('img[src="blob:pdf"]')).toBeNull();
+  });
+
   it('accepts images and PDFs in the picker, without capture', () => {
     act(() => root.render(<MobileThread {...props()} />));
     const input = container.querySelector('input[type="file"]');

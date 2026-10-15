@@ -161,16 +161,17 @@ const storageDeleteMock = vi.hoisted(() =>
 let sharingQueryError: Error | null = null;
 
 // messages.where('attachment.url', '>=', a).where('attachment.url', '<', b) — the
-// messages whose photo URL falls in a range (other messages sharing a photo).
-function attachmentUrlQuery(filters: Array<[string, string]>) {
+// messages whose photo URL (or, for attachment.previewUrl, PDF preview URL)
+// falls in a range (other messages sharing an object).
+function attachmentUrlQuery(field: 'url' | 'previewUrl', filters: Array<[string, string]>) {
   return {
-    where: (_field: string, op: string, value: string) => attachmentUrlQuery([...filters, [op, value]]),
+    where: (_field: string, op: string, value: string) => attachmentUrlQuery(field, [...filters, [op, value]]),
     get: async () => {
       if (sharingQueryError) throw sharingQueryError;
       return {
         docs: Object.entries({ ...MESSAGE_DOCS, ...createdDocs })
           .filter(([, data]) => {
-            const url = (data.attachment as { url?: unknown } | undefined)?.url;
+            const url = (data.attachment as Record<string, unknown> | undefined)?.[field];
             if (typeof url !== 'string') return false;
             return filters.every(([op, value]) => (op === '>=' ? url >= value : op === '<' ? url < value : false));
           })
@@ -182,7 +183,8 @@ function attachmentUrlQuery(filters: Array<[string, string]>) {
 
 // messages.where('replyTo.messageId', '==', id) — the replies quoting a message.
 function messagesWhere(field: string, op: string, messageId: string) {
-  if (field === 'attachment.url') return attachmentUrlQuery([[op, messageId]]);
+  if (field === 'attachment.url') return attachmentUrlQuery('url', [[op, messageId]]);
+  if (field === 'attachment.previewUrl') return attachmentUrlQuery('previewUrl', [[op, messageId]]);
   return {
     get: async () => ({
       docs: Object.entries(MESSAGE_DOCS)
@@ -1030,6 +1032,50 @@ describe('DELETE /api/portal/chat/messages (photo in Storage)', () => {
     const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'pdf-msg' }));
     expect(res.status).toBe(200);
     expect(storageDeleteMock).toHaveBeenCalledWith('chat/all-company/doc-9.pdf', { ignoreNotFound: true });
+  });
+
+  it("deletes a PDF's preview image along with the PDF", async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    storePhoto('pdf-msg', imageUrl('all-company', 'doc-7.pdf'), {
+      attachment: {
+        type: 'file',
+        url: imageUrl('all-company', 'doc-7.pdf'),
+        name: 'a.pdf',
+        contentType: 'application/pdf',
+        previewUrl: imageUrl('all-company', 'doc-7-thumb.webp'),
+        previewWidth: 618,
+        previewHeight: 800,
+      },
+    });
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'pdf-msg' }));
+    expect(res.status).toBe(200);
+    expect(storageDeleteMock.mock.calls.map(([path]) => path).sort()).toEqual([
+      'chat/all-company/doc-7-thumb.webp',
+      'chat/all-company/doc-7.pdf',
+    ]);
+  });
+
+  it("keeps a PDF preview another standing message still shows as its photo", async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const thumb = imageUrl('all-company', 'shared-thumb.webp');
+    storePhoto('pdf-msg', imageUrl('all-company', 'doc-8.pdf'), {
+      attachment: {
+        type: 'file',
+        url: imageUrl('all-company', 'doc-8.pdf'),
+        name: 'a.pdf',
+        contentType: 'application/pdf',
+        previewUrl: thumb,
+      },
+    });
+    storePhoto('photo-copy', thumb.replace('token=tok', 'token=other'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'pdf-msg' }));
+      expect(res.status).toBe(200);
+      expect(storageDeleteMock.mock.calls.map(([path]) => path)).toEqual(['chat/all-company/doc-8.pdf']);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it('never deletes an object outside this bucket and channel folder', async () => {

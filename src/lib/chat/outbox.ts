@@ -242,6 +242,11 @@ function parseAttachment(value: unknown): ChatAttachment | undefined {
   if (typeof value.width === 'number' && value.width > 0) attachment.width = value.width;
   if (typeof value.height === 'number' && value.height > 0) attachment.height = value.height;
   if (typeof value.contentType === 'string') attachment.contentType = value.contentType;
+  if (value.type === 'file' && typeof value.previewUrl === 'string' && value.previewUrl) {
+    attachment.previewUrl = value.previewUrl;
+    if (typeof value.previewWidth === 'number' && value.previewWidth > 0) attachment.previewWidth = value.previewWidth;
+    if (typeof value.previewHeight === 'number' && value.previewHeight > 0) attachment.previewHeight = value.previewHeight;
+  }
   return attachment;
 }
 

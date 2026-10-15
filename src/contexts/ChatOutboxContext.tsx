@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { prepareImageForUpload, uploadChatImageWithProgress } from '@/components/chat/attachmentUpload';
+import { prepareImageForUpload, uploadChatImageWithProgress, withPdfPreview } from '@/components/chat/attachmentUpload';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
@@ -175,28 +175,61 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
             prepared = await prepareImageForUpload(pendingFile);
             const ready = prepared;
             // Publish prepared dimensions before the (slower) upload so the pending
-            // tile reserves its box immediately and its decode causes no shift.
+            // tile reserves its box immediately and its decode causes no shift. A
+            // PDF's first-page thumbnail turns its pending chip into a preview tile.
+            const previewDims = ready.preview
+              ? { localPreviewWidth: ready.preview.width, localPreviewHeight: ready.preview.height }
+              : ready.width && ready.height
+                ? { localPreviewWidth: ready.width, localPreviewHeight: ready.height }
+                : {};
             updateEcho(echo.id, {
               preparedUpload: ready,
-              ...(ready.width && ready.height ? { localPreviewWidth: ready.width, localPreviewHeight: ready.height } : {}),
+              ...previewDims,
+              ...(ready.preview ? { localPdfPreviewUrl: URL.createObjectURL(ready.preview.file) } : {}),
             });
           }
           const idToken = await networkStep(async () => (await auth?.currentUser?.getIdToken()) ?? '');
           let shownStep = -1;
-          attachment = await uploadChatImageWithProgress(
+          // One progress bar across the preview and the PDF, weighted by bytes.
+          const preview = prepared.preview;
+          let uploadedPreview = echoesRef.current.find((p) => p.id === echo.id)?.uploadedPreview ?? echo.uploadedPreview;
+          const previewBytes = preview && !uploadedPreview ? preview.file.size : 0;
+          const pdfBytes = prepared.file.size;
+          const totalBytes = previewBytes + pdfBytes || 1;
+          const reportProgress = (loadedBytes: number) => {
+            const fraction = Math.min(1, loadedBytes / totalBytes);
+            // Every progress update re-renders the thread: step in 5% increments.
+            const step = Math.floor(fraction * 20);
+            if (step === shownStep) return;
+            shownStep = step;
+            updateEcho(echo.id, { uploadProgress: fraction });
+          };
+          if (preview && !uploadedPreview) {
+            // The thumbnail goes up first, as a normal image in the channel folder.
+            // Best-effort: if it fails, the PDF still sends (as a plain chip).
+            try {
+              uploadedPreview = await uploadChatImageWithProgress(
+                idToken,
+                echo.channelId,
+                preview.file,
+                preview.width,
+                preview.height,
+                (fraction) => reportProgress(fraction * previewBytes)
+              );
+              updateEcho(echo.id, { uploadedPreview });
+            } catch {
+              uploadedPreview = undefined;
+            }
+          }
+          const uploaded = await uploadChatImageWithProgress(
             idToken,
             echo.channelId,
             prepared.file,
             prepared.width,
             prepared.height,
-            (fraction) => {
-              // Every progress update re-renders the thread: step in 5% increments.
-              const step = Math.floor(fraction * 20);
-              if (step === shownStep) return;
-              shownStep = step;
-              updateEcho(echo.id, { uploadProgress: fraction });
-            }
+            (fraction) => reportProgress(previewBytes + fraction * pdfBytes)
           );
+          attachment = withPdfPreview(uploaded, uploadedPreview);
           updateEcho(echo.id, { uploadedAttachment: attachment, uploadProgress: 1 });
         }
         if (auth?.currentUser?.uid !== echo.authorId || uidRef.current !== owner) return;
@@ -386,7 +419,9 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
   // reconciled, or discarded) so uploading previews don't leak.
   const trackedPreviewUrls = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const live = new Set(echoes.map((echo) => echo.localPreviewUrl).filter((url): url is string => !!url));
+    const live = new Set(
+      echoes.flatMap((echo) => [echo.localPreviewUrl, echo.localPdfPreviewUrl]).filter((url): url is string => !!url)
+    );
     for (const url of trackedPreviewUrls.current) {
       if (!live.has(url)) {
         URL.revokeObjectURL(url);
@@ -426,7 +461,13 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
   const sendTextOnly = useCallback(
     (echo: ThreadMessage) => {
       if (!echo.text) return;
-      const textOnly = { photoPending: false, photoLost: false, pendingFile: undefined, localPreviewUrl: undefined };
+      const textOnly = {
+        photoPending: false,
+        photoLost: false,
+        pendingFile: undefined,
+        localPreviewUrl: undefined,
+        localPdfPreviewUrl: undefined,
+      };
       updateEcho(echo.id, textOnly);
       echoesRef.current = echoesRef.current.map((p) => (p.id === echo.id ? { ...p, ...textOnly } : p));
       retry(echo);

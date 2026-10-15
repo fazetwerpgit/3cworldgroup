@@ -24,6 +24,12 @@ export interface ChatAttachment {
   contentType?: string;
   name?: string;
   size?: number;
+  // `file` only, optional: a first-page thumbnail uploaded as an image to the
+  // same channel folder, and its pixel size. Absent on PDFs sent before
+  // previews (or when the device could not render one): those show the chip.
+  previewUrl?: string;
+  previewWidth?: number;
+  previewHeight?: number;
 }
 
 // A server-resolved quote of the message being replied to. The snippet text is

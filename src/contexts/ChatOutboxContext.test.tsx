@@ -13,6 +13,7 @@ const fake = vi.hoisted(() => ({
   canChat: true,
   photos: new Map<string, File>(),
   upload: vi.fn(),
+  prepare: vi.fn(),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -25,8 +26,9 @@ vi.mock('@/lib/firebase/config', () => ({
     },
   },
 }));
-vi.mock('@/components/chat/attachmentUpload', () => ({
-  prepareImageForUpload: async (file: File) => ({ file, width: 10, height: 20 }),
+vi.mock('@/components/chat/attachmentUpload', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/components/chat/attachmentUpload')>()),
+  prepareImageForUpload: (file: File) => fake.prepare(file),
   uploadChatImageWithProgress: fake.upload,
 }));
 vi.mock('@/lib/chat/pendingPhotos', () => ({
@@ -110,6 +112,8 @@ beforeEach(() => {
   fake.canChat = true;
   fake.photos.clear();
   fake.upload.mockReset();
+  fake.prepare.mockReset();
+  fake.prepare.mockImplementation(async (file: File) => ({ file, width: 10, height: 20 }));
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
   URL.createObjectURL = vi.fn(() => 'blob:preview');
@@ -197,6 +201,39 @@ describe('ChatOutboxProvider', () => {
     finishUpload(UPLOADED);
     await settle();
     expect(posts()).toEqual([expect.objectContaining({ clientMessageId: CID, attachment: UPLOADED })]);
+  });
+
+  it('uploads a PDF preview first, then the PDF, and sends both on one attachment', async () => {
+    const pdf = new File(['%PDF-'], 'Rate card.pdf', { type: 'application/pdf' });
+    const thumb = new File(['w'], 'Rate card-preview.webp', { type: 'image/webp' });
+    fake.prepare.mockResolvedValue({ file: pdf, preview: { file: thumb, width: 618, height: 800 } });
+    const PDF_ATTACHMENT = { type: 'file' as const, url: 'https://storage/doc.pdf', name: 'Rate card.pdf', contentType: 'application/pdf', size: 5 };
+    fake.upload
+      .mockResolvedValueOnce({ type: 'image', url: 'https://storage/thumb.webp', width: 618, height: 800 })
+      .mockResolvedValueOnce(PDF_ATTACHMENT);
+    fetchMock.mockReturnValue(respond(200, { success: true, messageId: ECHO_ID }));
+    render(true);
+    act(() => outbox.send(echo({ text: '', pendingFile: pdf, localPreviewUrl: 'blob:pdf' })));
+    await settle();
+    expect(fake.upload.mock.calls.map((call) => (call[2] as File).name)).toEqual(['Rate card-preview.webp', 'Rate card.pdf']);
+    expect(posts()).toEqual([
+      expect.objectContaining({
+        attachment: { ...PDF_ATTACHMENT, previewUrl: 'https://storage/thumb.webp', previewWidth: 618, previewHeight: 800 },
+      }),
+    ]);
+  });
+
+  it('still sends the PDF (as a plain chip) when its preview upload fails', async () => {
+    const pdf = new File(['%PDF-'], 'a.pdf', { type: 'application/pdf' });
+    const thumb = new File(['w'], 'a-preview.webp', { type: 'image/webp' });
+    fake.prepare.mockResolvedValue({ file: pdf, preview: { file: thumb, width: 618, height: 800 } });
+    const PDF_ATTACHMENT = { type: 'file' as const, url: 'https://storage/a.pdf', name: 'a.pdf', contentType: 'application/pdf' };
+    fake.upload.mockRejectedValueOnce(new Error('Photo upload failed.')).mockResolvedValueOnce(PDF_ATTACHMENT);
+    fetchMock.mockReturnValue(respond(200, { success: true, messageId: ECHO_ID }));
+    render(true);
+    act(() => outbox.send(echo({ text: '', pendingFile: pdf })));
+    await settle();
+    expect(posts()).toEqual([expect.objectContaining({ attachment: PDF_ATTACHMENT })]);
   });
 
   it('resumes a photo that was mid-upload when the app closed', async () => {
