@@ -3,6 +3,7 @@ import type { MonthNav } from './MonthNav';
 import { MonthPicker } from '@/components/portal/rep/MonthPicker';
 import styles from './leaderboard.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
+import tx from '@/components/portal/rep/rep-taste.module.css';
 
 const periods: { value: LeaderboardPeriod; label: string }[] = [
   { value: 'week', label: 'Week' },
@@ -34,13 +35,13 @@ export function LeaderboardFilters({
 }: LeaderboardFiltersProps) {
   return (
     <div className={styles.filters}>
-      {/* Points | Sales switches what the board is ranked by: the page tabs. */}
-      <div className={p.tabs} role="group" aria-label="Leaderboard metric">
+      {/* Points | Sales switches what the board is ranked by: the lime switch. */}
+      <div className={tx.seg} role="group" aria-label="Leaderboard metric">
         {metrics.map((option) => (
           <button
             key={option.value}
             type="button"
-            className={p.tab}
+            className={tx.segBtn}
             aria-pressed={metric === option.value}
             onClick={() => onMetricChange(option.value)}
           >
@@ -48,13 +49,13 @@ export function LeaderboardFilters({
           </button>
         ))}
       </div>
-      {/* Week / Month / Year / All time only filters the same board: chips. */}
+      {/* Week / Month / Year / All time only filters the same board: filled chips. */}
       <div className={p.chipRow} role="group" aria-label="Leaderboard period">
         {periods.map((option) => (
           <button
             key={option.value}
             type="button"
-            className={p.chip}
+            className={tx.chip}
             aria-pressed={period === option.value}
             onClick={() => onPeriodChange(option.value)}
           >

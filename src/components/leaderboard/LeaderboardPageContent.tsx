@@ -65,7 +65,7 @@ export function LeaderboardPageContent({
   return (
     <div className={`${styles.scope} ${styles.shell}`}>
       <header className={p.head}>
-        <h1 className={p.title}>Leaderboard</h1>
+        <h1 className={`${p.title} ${styles.pageTitle}`}>Leaderboard</h1>
         <p className={p.lede}>{periodLabel(period, metric, pastMonth)}</p>
       </header>
       <LeaderboardFilters

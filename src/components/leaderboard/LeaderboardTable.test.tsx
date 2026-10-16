@@ -65,7 +65,7 @@ describe('ranked list', () => {
     renderBoard([entry(1), entry(2), entry(3), entry(4), entry(5)]);
 
     const rows = [...container.querySelectorAll<HTMLElement>('[aria-label="Ranking"] > div')];
-    expect(rows.map((row) => row.textContent?.slice(0, 2))).toEqual(['04', '05']);
+    expect(rows.map((row) => row.querySelector('span')?.textContent)).toEqual(['4', '5']);
   });
 
   it('keeps the podium slots distinct from the rows', () => {

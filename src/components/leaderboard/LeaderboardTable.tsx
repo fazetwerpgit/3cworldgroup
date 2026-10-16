@@ -85,6 +85,19 @@ function periodSuffix(period: LeaderboardPeriod, pastMonth: MonthKey | null = nu
   return 'this week';
 }
 
+/** "You're 6th. 255 pts behind Andre N.": the standing itself in bold. */
+function SpotText({ text }: { text: string }) {
+  if (!text.startsWith("You're ")) return <>{text}</>;
+  const cut = text.indexOf('. ');
+  if (cut < 0) return <b>{text}</b>;
+  return (
+    <>
+      <b>{text.slice(0, cut + 1)}</b>
+      {text.slice(cut + 1)}
+    </>
+  );
+}
+
 export function LeaderboardTable({
   entries,
   currentUser,
@@ -138,7 +151,7 @@ export function LeaderboardTable({
       <LeaderboardStage period={period} pastMonth={pastMonth}>
         <Podium entries={podiumEntries} currentUser={effectiveCurrentUser} metric={metric} />
       </LeaderboardStage>
-      {spot ? <p className={styles.spot} data-testid="spot-line">{spot}</p> : null}
+      {spot ? <p className={styles.spot} data-testid="spot-line"><SpotText text={spot} /></p> : null}
       {entries.length === 0 ? <EmptyState pastMonth={pastMonth} /> : null}
       <LeaderboardRows entries={rowEntries} zeros={zeros} currentUser={effectiveCurrentUser} metric={metric} />
       <RecentSales sales={recent} />

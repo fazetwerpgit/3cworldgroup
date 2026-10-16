@@ -5,27 +5,20 @@ import type { LeaderboardEntry, LeaderboardMetric } from './LeaderboardTable';
 import styles from './leaderboard.module.css';
 
 /** The winner's crown. Solid gold rather than the outline icon this replaced:
- *  three points each capped with a ball, a curved base band, and a warm vertical
- *  ramp doing the shading. Drawn as fill rather than stroke, because at this
+ *  three points each capped with a ball and a curved base band, one flat gold. Drawn as fill rather than stroke, because at this
  *  size a 2px outline closes up its own gaps and turns to mush. Wide and squat
  *  like the reference: about half the avatar across, and no taller than it has
  *  to be. */
 function Crown() {
   return (
     <svg className={styles.crown} viewBox="0 0 34 22" aria-hidden="true">
-      <defs>
-        <linearGradient id="crownMetal" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="22">
-          <stop offset="0%" stopColor="#ffe066" />
-          <stop offset="100%" stopColor="#d99a1e" />
-        </linearGradient>
-      </defs>
       <path
         d="M3.46 20.8L1.67 7.3L7.6 10.9Q8.98 12 10.4 10.3L17.06 2.6L23.6 10.3Q25 12 26.4 10.9L32.33 7.3L30.54 20.8Q17 21.9 3.46 20.8Z"
-        fill="url(#crownMetal)"
+        fill="#d6a94c"
       />
-      <circle cx="17.06" cy="2" r="1.6" fill="url(#crownMetal)" />
-      <circle cx="1.67" cy="7.07" r="1.4" fill="url(#crownMetal)" />
-      <circle cx="32.33" cy="7.07" r="1.4" fill="url(#crownMetal)" />
+      <circle cx="17.06" cy="2" r="1.6" fill="#d6a94c" />
+      <circle cx="1.67" cy="7.07" r="1.4" fill="#d6a94c" />
+      <circle cx="32.33" cy="7.07" r="1.4" fill="#d6a94c" />
       {/* The band. A darker wash rather than a second shape, so the crown keeps
           one silhouette and still reads as having a rim. */}
       <path d="M2.96 17L31.04 17L30.54 20.8Q17 21.9 3.46 20.8Z" fill="#7d5310" opacity="0.3" />
@@ -71,12 +64,12 @@ function Branch() {
       <path
         d={STEM_PATH}
         fill="none"
-        stroke="url(#laurelMetal)"
+        stroke="#a37a28"
         strokeLinecap="round"
         strokeWidth="1.15"
       />
       {LEAF_PATHS.map((d) => (
-        <path key={d} d={d} fill="url(#laurelMetal)" />
+        <path key={d} d={d} fill="#a37a28" />
       ))}
     </g>
   );
@@ -85,15 +78,6 @@ function Branch() {
 function Laurel() {
   return (
     <svg className={styles.laurel} viewBox="0 0 78.52 35.66" aria-hidden="true">
-      <defs>
-        {/* Deliberately dull metal. No light stop and a short range between the
-            two, so the wreath has no highlight to catch the eye: it is texture
-            behind the numeral, and the 1 stays the one bright object here. */}
-        <linearGradient id="laurelMetal" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="35.66">
-          <stop offset="0%" stopColor="#b8892e" />
-          <stop offset="100%" stopColor="#8a6420" />
-        </linearGradient>
-      </defs>
       <Branch />
       <g transform="translate(78.52 0) scale(-1 1)">
         <Branch />
