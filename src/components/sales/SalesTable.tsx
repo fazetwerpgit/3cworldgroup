@@ -20,7 +20,7 @@ import { formatPlanMix, planMix } from '@/lib/sales/planMix';
 import { isCurrentMonth, monthLabel, salesSoldIn, type MonthKey } from '@/lib/sales/monthWindow';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
-import p from '@/components/portal/rep/rep-page.module.css';
+import tx from '@/components/portal/rep/rep-taste.module.css';
 import { CarrierStaleNote } from '@/components/portal/rep/CarrierStaleNote';
 import { SaleDetailSheet } from './SaleDetailSheet';
 import { SalesDialog } from './SalesDialog';
@@ -31,9 +31,9 @@ import { foldLeftoverOrders, matchFiberOrdersToSalesDetailed } from '@/lib/fiber
 /** Sales | Pay: switches the VIEW of the page, so it is the canonical page tabs. */
 export function SalesViewTabs({ payView, onChange }: { payView: boolean; onChange: (payView: boolean) => void }) {
   return (
-    <div className={p.tabs} role="tablist" aria-label="Sales views">
-      <button className={p.tab} role="tab" type="button" aria-selected={!payView} onClick={() => onChange(false)}>Sales</button>
-      <button className={p.tab} role="tab" type="button" aria-selected={payView} onClick={() => onChange(true)}>Pay</button>
+    <div className={tx.seg} role="tablist" aria-label="Sales views">
+      <button className={tx.segBtn} role="tab" type="button" aria-selected={!payView} onClick={() => onChange(false)}>Sales</button>
+      <button className={tx.segBtn} role="tab" type="button" aria-selected={payView} onClick={() => onChange(true)}>Pay</button>
     </div>
   );
 }
@@ -453,30 +453,40 @@ export function SalesTable({
 
   return (
     <>
-      <section className={`${s.panel} ${x.ledger}`} aria-labelledby="ledger-h">
-        <div className={`${s.panelHead} ${x.boardHead}`}>
+      <section className={x.ledger} aria-labelledby="ledger-h">
+        <div className={x.boardHead}>
           {/* NOT "What you get paid". The owner's words, via Jacob
               (2026-09-03): "if claims and final chargebacks are not accounted
               for I will have to pay that out", and "if final reports don't
               show that on the site I can be sued". The portal does not hold
               chargebacks or claims, so it must never state a rep's pay — only
               estimate it, and say so where the figure is. */}
-          <h2 id="ledger-h" className={s.kicker}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
-          <p className={x.boardMeta}>{showPay
-            ? `${datedPayCount} ${datedPayCount === 1 ? 'sale' : 'sales'}`
-            : `${listSales.length} record${listSales.length === 1 ? '' : 's'} · tap a row for detail`}</p>
+          <h2 id="ledger-h" className={x.ledgerTitle}>{showPay ? 'Est. pay' : 'Your sales'}</h2>
+          <p className={x.boardMeta}>
+            {showPay ? (
+              `${datedPayCount} ${datedPayCount === 1 ? 'sale' : 'sales'} with an install date.`
+            ) : (
+              <>
+                {`${listSales.length} record${listSales.length === 1 ? '' : 's'}.`}
+                {mixLine ? (
+                  <>
+                    {' '}
+                    <span data-testid="plan-mix">Plan mix {mixLine.split(' · ').join(', ')}.</span>
+                  </>
+                ) : null}
+                {' '}Tap a sale for detail.
+              </>
+            )}
+          </p>
         </div>
         {/* Only when the carrier's daily report is late; nothing otherwise. */}
         <CarrierStaleNote report={fiber?.data} className={x.srcNote} />
-        {!showPay && mixLine ? (
-          <p className={x.planMix} data-testid="plan-mix">Plan mix · {mixLine}</p>
-        ) : null}
 
         {fiberOrders.length > 0 && !showPay && (
-          <div className={x.chips} role="group" aria-label="Fiber status views">
+          <div className={`${tx.chips} ${x.ledgerChips}`} role="group" aria-label="Fiber status views">
             <button
               type="button"
-              className={`${p.chip} ${x.chip}`}
+              className={tx.chip}
               aria-pressed={fiberView === null}
               onClick={() => selectView(null)}
             >
@@ -493,12 +503,11 @@ export function SalesTable({
                 <button
                   key={key}
                   type="button"
-                  className={`${p.chip} ${x.chip}`}
+                  className={tx.chip}
                   aria-pressed={fiberView === key}
                   onClick={() => selectView(key)}
                 >
-                  <span className={`${x.dot} ${fiberTone(key)}`} aria-hidden="true" />
-                  {label} <b>{fiberBucketCounts[key]}</b>
+                  {label} <b className={fiberTone(key)}>{fiberBucketCounts[key]}</b>
                 </button>
               );
             })}
@@ -622,7 +631,7 @@ export function SalesTable({
               <span><b>{datedPayCount}</b> by install date{month ? ` in ${monthLabel(month)}` : ''}</span>
               {hasPlan && (
                 <span className={x.totalsPay}>
-                  Total <EstPay value={datedPayTotal} hasPlan={hasPlan} />
+                  <EstPay value={datedPayTotal} hasPlan={hasPlan} /> total
                 </span>
               )}
             </div>
@@ -630,7 +639,6 @@ export function SalesTable({
         ) : (
           <div className={x.ledgerBody}>
             <div className={`${x.lhead} ${x.sale} ${isAdmin ? x.hasAct : ''}`} aria-hidden="true">
-              <span className={x.lhStamp}>Sold</span>
               <span>Customer</span>
               <span>Status</span>
               <span className={x.num}>Points</span>
@@ -638,7 +646,7 @@ export function SalesTable({
               {isAdmin && <span />}
             </div>
             {listSales.length ? (
-              <div>
+              <div className={x.saleList}>
                 {listSales.map((sale) => {
                   const off = statusBySale[sale.id || ''] === 'cancelled';
                   const mark = saleCarrier(sale);
@@ -649,7 +657,6 @@ export function SalesTable({
                       key={sale.id}
                       {...openRow(sale)}
                     >
-                      <DateStamp value={sale.saleDate} label="Sold" />
                       <span className={x.sName}>
                         <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
                       </span>
@@ -660,7 +667,7 @@ export function SalesTable({
                       <span className={x.sMeta}>
                         {mark ? <span className={x.carrierMark}>{mark}</span> : null}
                         <span className={x.sMetaText}>
-                          {[salePlan(sale, mark), sale.customerAddress].filter(Boolean).join(' · ')}
+                          {[`Sold ${formatDate(sale.saleDate)}`, salePlan(sale, mark), sale.customerAddress].filter(Boolean).join(' · ')}
                         </span>
                       </span>
                       <span className={x.sValue}>{sale.totalPoints || 0} pts</span>
@@ -680,11 +687,11 @@ export function SalesTable({
             )}
             <div className={x.ledgerTotals}>
               <span>
-                <b>{listSales.length}</b> {listSales.length === 1 ? 'sale' : 'sales'} · <b>{totalPoints}</b> pts
+                <b>{listSales.length}</b> {listSales.length === 1 ? 'sale' : 'sales'}, <b>{totalPoints.toLocaleString('en-US')}</b> pts
               </span>
               {hasPlan && (
                 <span className={x.totalsPay}>
-                  Total <EstPay value={expectedTotal} hasPlan={hasPlan} />
+                  <EstPay value={expectedTotal} hasPlan={hasPlan} /> total
                 </span>
               )}
             </div>

@@ -14,7 +14,6 @@ function PayNumeral({ amount }: { amount: number }) {
   const shown = useCountUp(Math.round(amount), { sessionKey: '3c:countup:sales-pay' });
   return (
     <p className={x.payNum}>
-      <span className={x.payEst}>est.</span>
       <span className={x.payCur}>$</span>
       <span className={s.srOnly}>{Math.round(amount).toLocaleString('en-US')}</span>
       <span aria-hidden="true">{shown.toLocaleString('en-US')}</span>
@@ -36,8 +35,9 @@ function movedNames(sales: CardSale[]): string {
 /**
  * The raised money card on Sales: the T-Fiber est. payouts that pay in the
  * picked month (always a window, never a date), stepped one at a time with the
- * chevrons; it opens on the next one not yet over. Under it, the month's sale
- * count and the installs in the shown payout. "How pay works" sits under it and
+ * round chevrons; it opens on the next one not yet over. The line under the
+ * figure names it as an estimate and gives the month's sale count; a flat block
+ * holds the installs in the shown payout. "How pay works" closes the card and
  * opens the pay help sheet.
  */
 export function PayoutCard<T extends CardSale>({
@@ -88,46 +88,6 @@ export function PayoutCard<T extends CardSale>({
   return (
     <div className={x.payCol}>
       <section className={x.moneyCard} aria-label="Sales summary">
-        <div className={x.payHead}>
-          <p className={s.kicker}>
-            Est. payout
-            {upcoming ? (
-              <>
-                {' · '}
-                {/* The window and its tag wrap as one: "Sep 14–18 · past". */}
-                <span className={x.payWhen}>
-                  {formatPayoutWindow(upcoming.window)}
-                  {upcoming.past ? ' · past' : ''}
-                </span>
-              </>
-            ) : null}
-          </p>
-          {payouts.length > 1 ? (
-            <div className={x.payStep} role="group" aria-label={`Payouts in ${monthName}`}>
-              <button
-                type="button"
-                className={x.monthBtn}
-                onClick={() => step(-1)}
-                disabled={index <= 0}
-                aria-label="Earlier payout"
-              >
-                <ChevronLeft size={18} aria-hidden="true" />
-              </button>
-              <span className={x.payStepPos}>
-                {index + 1} of {payouts.length}
-              </span>
-              <button
-                type="button"
-                className={x.monthBtn}
-                onClick={() => step(1)}
-                disabled={index >= payouts.length - 1}
-                aria-label="Later payout"
-              >
-                <ChevronRight size={18} aria-hidden="true" />
-              </button>
-            </div>
-          ) : null}
-        </div>
         <div aria-live="polite" aria-atomic="true">
           {planLoading ? (
             <span className={`${s.skel} ${x.skelKpi}`} aria-label="Loading estimated pay" />
@@ -150,51 +110,80 @@ export function PayoutCard<T extends CardSale>({
             <p className={`${x.payNum} ${x.payDash}`}>—</p>
           )}
         </div>
-        <p className={x.payMeta}>
-          <b>{saleCount}</b> {saleCount === 1 ? 'sale' : 'sales'} in {monthName}
+        <p className={x.payLine}>
+          {/* Always a window, never a date: "window Sep 14–18 (past)". */}
+          <span data-part="pay-when">
+            <strong>Estimated T-Fiber payout</strong>
+            {upcoming ? (
+              <>
+                , window <span className={x.payWhen}>{formatPayoutWindow(upcoming.window)}</span>
+                {upcoming.past ? ' (past)' : ''}
+              </>
+            ) : null}
+            .
+          </span>{' '}
+          You sent in <b>{saleCount}</b> {saleCount === 1 ? 'sale' : 'sales'} in {monthName}.
           {planLoading || planError ? null : !hasPlan ? (
-            <> · No pay plan assigned yet</>
+            <> No pay plan assigned yet.</>
           ) : !upcoming ? (
-            <> · No T-Fiber payouts this month</>
+            <> No T-Fiber payouts this month.</>
           ) : null}
         </p>
+        {payouts.length > 1 ? (
+          <div className={x.payStep} role="group" aria-label={`Payouts in ${monthName}`}>
+            <button
+              type="button"
+              className={x.stepBtn}
+              onClick={() => step(-1)}
+              disabled={index <= 0}
+              aria-label="Earlier payout"
+            >
+              <ChevronLeft size={20} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className={x.stepBtn}
+              onClick={() => step(1)}
+              disabled={index >= payouts.length - 1}
+              aria-label="Later payout"
+            >
+              <ChevronRight size={20} aria-hidden="true" />
+            </button>
+            <span className={x.payStepPos}>
+              Payout {index + 1} of {payouts.length} this month
+            </span>
+          </div>
+        ) : null}
         {ready && upcoming ? (
           <div className={x.moneyWell}>
-            <div className={x.wellHead}>
-              <span className={s.kicker}>
-                {upcoming.count} {upcoming.count === 1 ? 'install' : 'installs'} in this payout
-              </span>
-              <span className={x.carrierMark}>T-Fiber</span>
+            <div className={x.instBar} aria-hidden="true">
+              {installed > 0 ? <i className={x.swInstalled} style={{ flexGrow: installed }} /> : null}
+              {upcoming.scheduled > 0 ? <i className={x.swScheduled} style={{ flexGrow: upcoming.scheduled }} /> : null}
             </div>
-            <ul className={x.wellLegend}>
-              {installed > 0 ? (
-                <li>
-                  <span className={`${x.sw} ${x.swInstalled}`} aria-hidden="true" />
-                  <b>{installed}</b> installed
-                </li>
-              ) : null}
-              {upcoming.scheduled > 0 ? (
-                <li>
-                  <span className={`${x.sw} ${x.swScheduled}`} aria-hidden="true" />
-                  <b>{upcoming.scheduled}</b> scheduled
-                </li>
-              ) : null}
-            </ul>
+            <p className={x.instLine} data-part="installs">
+              <span className={x.carrierMark}>T-Fiber</span>
+              {upcoming.count} {upcoming.count === 1 ? 'install' : 'installs'}
+              {installed > 0 || upcoming.scheduled > 0 ? ': ' : ''}
+              {installed > 0 ? <b className={x.st_installed}>{installed} installed</b> : null}
+              {installed > 0 && upcoming.scheduled > 0 ? ', ' : ''}
+              {upcoming.scheduled > 0 ? <b className={x.st_scheduled}>{upcoming.scheduled} scheduled</b> : null}
+            </p>
             {upcoming.movedIn.length > 0 ? (
               <p className={x.wellNote}>Moved in from an earlier payout: {movedNames(upcoming.movedIn)}</p>
             ) : null}
           </div>
         ) : null}
         {ready && undatedCount > 0 ? (
-          <p className={x.payNote}>
-            {undatedCount} T-Fiber {undatedCount === 1 ? 'sale' : 'sales'} not dated yet
+          <p className={x.undatedNote}>
+            {undatedCount} T-Fiber {undatedCount === 1 ? 'sale is' : 'sales are'} not dated yet, so{' '}
+            {undatedCount === 1 ? 'it is' : 'they are'} not in this figure.
           </p>
         ) : null}
+        <button type="button" className={x.payHelp} aria-haspopup="dialog" onClick={onHelp}>
+          <CircleHelp size={18} aria-hidden="true" />
+          How pay works
+        </button>
       </section>
-      <button type="button" className={x.payHelp} aria-haspopup="dialog" onClick={onHelp}>
-        <CircleHelp size={16} aria-hidden="true" />
-        How pay works
-      </button>
     </div>
   );
 }

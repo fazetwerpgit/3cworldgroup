@@ -121,7 +121,7 @@ afterEach(() => {
 describe('SalesTable', () => {
   it('shows the plan mix of the month, counted like the Board', () => {
     render(false);
-    expect(container.querySelector('[data-testid="plan-mix"]')?.textContent).toBe('Plan mix · 2× 1 Gig · 1× 2 Gig');
+    expect(container.querySelector('[data-testid="plan-mix"]')?.textContent).toBe('Plan mix 2× 1 Gig, 1× 2 Gig.');
     // The charged-back sale stays in the ledger, read calmly.
     expect(container.textContent).toContain('Cancelled after install · chargeback');
   });

@@ -94,34 +94,34 @@ function render(payouts: Payouts, resetKey = '2026-9', extra: { undatedCount?: n
   );
 }
 
-const kicker = () => container.querySelector('section p')!.textContent;
+const kicker = () => container.querySelector('[data-part="pay-when"]')!.textContent;
 const position = () => container.querySelector('[role="group"] span')?.textContent ?? null;
 const button = (label: string) => container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
 const amount = () => container.querySelector('[aria-live="polite"]')!.textContent;
-const well = () => container.querySelector('ul')?.textContent ?? '';
+const well = () => container.querySelector('[data-part="installs"]')?.textContent ?? '';
 const click = (label: string) => act(() => button(label)!.click());
 
 describe('PayoutCard stepping', () => {
   it('opens on the next payout of the month and steps later, earlier and stops at both ends', () => {
     render(pagePayouts(OCT_SALES));
-    expect(kicker()).toBe('Est. payout · Oct 14–18');
-    expect(position()).toBe('2 of 3');
+    expect(kicker()).toBe('Estimated T-Fiber payout, window Oct 14–18.');
+    expect(position()).toBe('Payout 2 of 3 this month');
     expect(amount()).toContain('260');
 
     click('Later payout');
-    expect(kicker()).toBe('Est. payout · Oct 28–Nov 3');
-    expect(position()).toBe('3 of 3');
+    expect(kicker()).toBe('Estimated T-Fiber payout, window Oct 28–Nov 3.');
+    expect(position()).toBe('Payout 3 of 3 this month');
     expect(amount()).toContain('130');
-    expect(container.textContent).toContain('1 install in this payout');
+    expect(container.textContent).toContain('1 install: 1 scheduled');
     expect(well()).toContain('1 scheduled');
     expect(button('Later payout')!.disabled).toBe(true);
     click('Later payout');
-    expect(position()).toBe('3 of 3');
+    expect(position()).toBe('Payout 3 of 3 this month');
 
     click('Earlier payout');
     click('Earlier payout');
-    expect(kicker()).toBe('Est. payout · Oct 7–11 · past');
-    expect(position()).toBe('1 of 3');
+    expect(kicker()).toBe('Estimated T-Fiber payout, window Oct 7–11 (past).');
+    expect(position()).toBe('Payout 1 of 3 this month');
     expect(well()).toContain('1 installed');
     expect(well()).not.toContain('scheduled');
     expect(button('Earlier payout')!.disabled).toBe(true);
@@ -129,7 +129,7 @@ describe('PayoutCard stepping', () => {
 
   it('never prints a single pay date and keeps the estimate wording', () => {
     render(pagePayouts(OCT_SALES));
-    expect(container.textContent).toContain('est.');
+    expect(container.textContent).toMatch(/Estimated/);
     expect(container.textContent).not.toMatch(/\bpaid\b/i);
     expect(kicker()).toMatch(/\d+–\d+/);
   });
@@ -141,7 +141,7 @@ describe('PayoutCard stepping', () => {
 
   it('hides the stepper when the month has one payout', () => {
     render(pagePayouts([sale({ installDate: d(2026, 10, 2) })]));
-    expect(kicker()).toBe('Est. payout · Oct 14–18');
+    expect(kicker()).toBe('Estimated T-Fiber payout, window Oct 14–18.');
     expect(button('Later payout')).toBeNull();
     expect(button('Earlier payout')).toBeNull();
     expect(position()).toBeNull();
@@ -150,36 +150,36 @@ describe('PayoutCard stepping', () => {
   it('goes back to the default payout when the month changes', () => {
     render(pagePayouts(OCT_SALES));
     click('Earlier payout');
-    expect(position()).toBe('1 of 3');
+    expect(position()).toBe('Payout 1 of 3 this month');
 
     // November: Nov 7–11 (late-Oct install) and Nov 14–18, both ahead.
     const nov = pagePayouts([...OCT_SALES, sale({ installDate: d(2026, 10, 24) }), sale({ installDate: d(2026, 11, 3) })], undefined, NOV);
     render(nov, '2026-10');
-    expect(kicker()).toBe('Est. payout · Nov 7–11');
-    expect(position()).toBe('1 of 2');
+    expect(kicker()).toBe('Estimated T-Fiber payout, window Nov 7–11.');
+    expect(position()).toBe('Payout 1 of 2 this month');
 
     render(pagePayouts(OCT_SALES), '2026-9');
-    expect(position()).toBe('2 of 3');
+    expect(position()).toBe('Payout 2 of 3 this month');
   });
 
   it('keeps the picked payout across a data refresh of the same month', () => {
     render(pagePayouts(OCT_SALES));
     click('Later payout');
     render(pagePayouts([...OCT_SALES, sale({ installDate: d(2026, 10, 9) })]));
-    expect(kicker()).toBe('Est. payout · Oct 28–Nov 3');
-    expect(position()).toBe('4 of 4');
+    expect(kicker()).toBe('Estimated T-Fiber payout, window Oct 28–Nov 3.');
+    expect(position()).toBe('Payout 4 of 4 this month');
   });
 
   it('says which sales moved in from an earlier payout, and how many are not dated yet', () => {
     const pushed = sale({ customerName: 'Carla Diaz', installDate: d(2026, 10, 9), installDatePreviousDate: d(2026, 10, 3) });
     render(pagePayouts([pushed]), '2026-9', { undatedCount: 2 });
     expect(container.textContent).toContain('Moved in from an earlier payout: Carla Diaz');
-    expect(container.textContent).toContain('2 T-Fiber sales not dated yet');
+    expect(container.textContent).toContain('2 T-Fiber sales are not dated yet, so they are not in this figure.');
   });
 
   it('says so when the month has no T-Fiber payouts', () => {
     render([]);
-    expect(kicker()).toBe('Est. payout');
+    expect(kicker()).toBe('Estimated T-Fiber payout.');
     expect(container.textContent).toContain('No T-Fiber payouts this month');
   });
 });

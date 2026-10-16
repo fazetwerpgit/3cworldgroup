@@ -48,8 +48,8 @@ function PageHead({
   onMonth?: (next: MonthKey) => void;
 }) {
   return (
-    <header className={p.head}>
-      <h1 className={p.title}>Sales</h1>
+    <header className={`${p.head} ${x.salesHead}`}>
+      <h1 className={`${p.title} ${x.salesTitle}`}>Sales</h1>
       {month && onMonth ? <MonthPicker month={month} max={max ?? currentMonth()} onChange={onMonth} /> : null}
     </header>
   );

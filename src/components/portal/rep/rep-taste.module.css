@@ -1,0 +1,127 @@
+/* ==========================================================================
+   Taste pass (Oct 2026): filled controls for the redone screens only (Sales,
+   Leaderboard). The shared rep-page .tabs / .chip stay as they are for the
+   screens not redone yet; these replace them where a screen opts in.
+   Flat tone steps: no borders, no shadows, fully round.
+   ========================================================================== */
+
+/* [Sales | Pay]-style segmented switch: one panel pill, the pick in lime. */
+.seg {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--c-panel);
+}
+
+.segBtn {
+  flex: 1 1 0;
+  min-height: 40px;
+  padding: 0 var(--s4);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 15px / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms, color 140ms;
+}
+
+.segBtn[aria-selected='true'],
+.segBtn[aria-pressed='true'] {
+  background: var(--c-lime);
+  color: var(--c-on-lime);
+}
+
+.segBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .segBtn:not([aria-selected='true']):not([aria-pressed='true']):hover {
+    color: var(--c-text);
+  }
+}
+
+/* A row of filled filter pills: the pick turns light. */
+.chips {
+  display: flex;
+  gap: var(--s2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 var(--s4);
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  font: 600 15px / 1 var(--f-ui);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms, color 140ms;
+}
+
+.chip b {
+  color: var(--c-text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip[aria-pressed='true'],
+.chip[aria-selected='true'] {
+  background: var(--c-text);
+  color: var(--c-ground);
+}
+
+.chip[aria-pressed='true'] b,
+.chip[aria-selected='true'] b {
+  color: inherit;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .chip:not([aria-pressed='true']):not([aria-selected='true']):hover {
+    background: var(--c-panel-hi);
+  }
+}
+
+@media (min-width: 1024px) {
+  .seg {
+    display: inline-flex;
+    align-self: flex-start;
+  }
+
+  .segBtn {
+    flex: none;
+    min-width: 140px;
+  }
+
+  .chips {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .segBtn,
+  .chip {
+    transition: none;
+  }
+}

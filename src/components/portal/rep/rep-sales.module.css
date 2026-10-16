@@ -13,6 +13,17 @@
   gap: var(--s4);
 }
 
+/* Taste pass: the Sales head sets the title larger, the month beside it. */
+.salesHead {
+  align-items: center;
+}
+
+.salesTitle {
+  font-size: 52px;
+  letter-spacing: 0;
+  line-height: 0.9;
+}
+
 /* ‹ September 2026 › — the month picker: two icon buttons around the month. */
 .month {
   display: inline-flex;
@@ -26,8 +37,8 @@
   min-height: var(--tap);
   padding: 0;
   border: 0;
-  border-radius: 10px;
-  background: transparent;
+  border-radius: 999px;
+  background: var(--c-panel);
   color: var(--c-text-2);
   cursor: pointer;
   transition: background 120ms, transform 120ms ease-out;
@@ -39,7 +50,7 @@
 
 .monthBtn:focus-visible {
   outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
 
 .monthBtn:disabled {
@@ -50,7 +61,7 @@
 
 @media (hover: hover) {
   .monthBtn:not(:disabled):hover {
-    background: rgba(163, 184, 214, 0.06);
+    background: var(--c-panel-hi);
   }
 }
 
@@ -58,9 +69,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 124px;
+  min-width: 108px;
   padding: 0 var(--s1);
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -600,7 +611,7 @@
 .split {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 48px;
 }
 
 .payCol {
@@ -620,23 +631,21 @@
 /* ---------- raised money card ---------- */
 .moneyCard {
   position: relative;
-  padding: 18px 20px 20px;
-  border: 1px solid var(--c-line);
-  border-radius: var(--r-card);
+  padding: 24px 20px 20px;
+  border-radius: 20px;
   background: var(--c-raised);
-  box-shadow: var(--c-lift-3);
 }
 
 .payNum {
   display: flex;
   align-items: flex-start;
-  margin: 12px 0 0;
+  margin: 0;
   color: var(--c-text);
   font-family: var(--f-num);
-  font-size: 64px;
+  font-size: 72px;
   font-weight: 600;
-  letter-spacing: -0.055em;
-  line-height: 0.92;
+  letter-spacing: -0.05em;
+  line-height: 0.9;
   font-variant-numeric: tabular-nums;
 }
 
@@ -650,9 +659,9 @@
 }
 
 .payCur {
-  margin: 5px 5px 0 0;
+  margin: 6px 4px 0 0;
   color: var(--c-text-2);
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 500;
   letter-spacing: 0;
   line-height: 1;
@@ -684,9 +693,21 @@
   font-weight: 600;
 }
 
-/* "Est. payout · Oct 14–18" with ‹ 2 of 4 › beside it: the month's payouts,
-   one at a time. The stepper keeps 44px taps; its negative margins keep the
-   kicker row as short as the kicker alone. */
+/* "Estimated T-Fiber payout, window Oct 14–18. You sent in 14 sales in October." */
+.payLine {
+  margin: 12px 0 0;
+  color: var(--c-text-2);
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.payLine strong,
+.payLine b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+/* (unused since the taste pass; kept for the design-lab harnesses) */
 .payHead {
   display: flex;
   align-items: center;
@@ -702,40 +723,105 @@
   white-space: nowrap;
 }
 
+/* ‹ › Payout 1 of 2 this month: the month's payouts, one at a time. */
 .payStep {
   display: flex;
-  flex: none;
   align-items: center;
-  margin: -15px -12px -15px 0;
+  gap: var(--s2);
+  margin-top: var(--s4);
+  color: var(--c-text-2);
+  font-size: 15px;
 }
 
 .payStepPos {
-  min-width: 2.75em;
-  color: var(--c-text-2);
-  font-size: var(--t-min);
-  font-weight: 600;
+  margin-left: 4px;
   font-variant-numeric: tabular-nums;
-  text-align: center;
-  white-space: nowrap;
 }
 
-/* Muted footnotes: sales moved into the shown payout, undated sales. */
+.stepBtn {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-panel-hi);
+  color: var(--c-text-2);
+  cursor: pointer;
+  transition: background 120ms, transform 120ms ease-out;
+}
+
+.stepBtn:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.stepBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.stepBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .stepBtn:not(:disabled):hover {
+    color: var(--c-text);
+  }
+}
+
+/* Footnotes: sales moved into the shown payout, undated sales. */
 .wellNote,
-.payNote {
-  margin: 10px 0 0;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
+.undatedNote {
+  margin: 14px 0 0;
+  color: var(--c-text-2);
+  font-size: 15px;
   line-height: 1.4;
 }
 
-/* A recessed well inside the raised card: the installs in this payout. */
+/* A flat block one step down inside the raised card: the installs in this payout. */
 .moneyWell {
-  margin-top: 18px;
-  padding: 14px 14px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  border-radius: 12px;
-  background: var(--c-well);
-  box-shadow: var(--c-sink);
+  margin-top: 20px;
+  padding: var(--s4);
+  border-radius: var(--r-card);
+  background: var(--c-panel);
+}
+
+.instBar {
+  display: flex;
+  gap: 4px;
+  height: 10px;
+}
+
+.instBar i {
+  flex: 1 1 0;
+  border-radius: 999px;
+}
+
+.instLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0 0;
+  color: var(--c-text-2);
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.instLine b {
+  font-weight: 600;
+}
+
+.instLine .carrierMark {
+  margin-right: var(--s2);
+}
+
+.moneyWell .wellNote {
+  margin-top: 10px;
 }
 
 .wellHead {
@@ -767,6 +853,19 @@
 .wellHead .carrierMark {
   height: 18px;
   font-size: 10px;
+}
+
+/* Taste pass: on the Sales money card and ledger the mark is a filled round chip. */
+.moneyWell .carrierMark,
+.ledger .carrierMark {
+  height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-panel-hi);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .wellLegend {
@@ -805,21 +904,21 @@
   background: var(--c-blue);
 }
 
-/* "How pay works": a full-width L1 text button under the money card. */
+/* "How pay works": a full-width round button closing the money card. */
 .payHelp {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--s2);
   width: 100%;
   min-height: var(--tap);
-  padding: 0 var(--s4);
-  border: 1px solid var(--c-line);
-  border-radius: 12px;
-  background: var(--c-panel);
-  box-shadow: var(--c-lift);
-  color: var(--c-text-2);
-  font: 600 var(--t-sm) / 1 var(--f-ui);
+  margin-top: var(--s4);
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font: 600 15px / 1 var(--f-ui);
   cursor: pointer;
   transition: background 120ms, transform 120ms ease-out;
 }
@@ -835,7 +934,7 @@
 
 @media (hover: hover) {
   .payHelp:hover {
-    color: var(--c-text);
+    background: var(--c-lime-wash);
   }
 }
 
@@ -845,19 +944,29 @@
   border-radius: var(--r-card);
 }
 
-/* Head: the shared .panelHead + .kicker, set like the Home panels' heads. */
+/* Head: a Bebas section title and one plain line under it. */
 .ledger .boardHead {
-  flex-wrap: wrap;
-  row-gap: 2px;
-  min-height: 0;
-  padding: 14px var(--s4) 10px;
-  border-bottom: 0;
+  padding: 0;
+}
+
+.ledgerTitle {
+  margin: 0;
+  color: var(--c-text);
+  font: 400 34px / 0.95 var(--f-display);
+  letter-spacing: 0;
 }
 
 .boardMeta {
-  margin: 0;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
+  margin: 6px 0 0;
+  color: var(--c-text-2);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+/* The filled status chips run to the phone's edge. */
+.ledgerChips {
+  margin: var(--s4) calc(var(--s4) * -1) 0 0;
+  padding-right: var(--s4);
 }
 
 /* Carrier-status filter chips sit under the head. */
@@ -869,7 +978,7 @@
 
 .srcNote {
   margin: 0;
-  padding: 0 var(--s4) 10px;
+  padding: 8px 0 0;
   color: var(--c-text-3);
   font-size: var(--t-sm);
 }
@@ -888,25 +997,29 @@
 }
 
 .fiberView {
-  border-top: 1px solid var(--c-line);
+  margin-top: var(--s4);
+  overflow: hidden;
+  border-radius: var(--r-card);
+  background: var(--c-panel);
 }
 
 .fiberView .srcNote {
-  padding-top: 10px;
+  padding: 12px var(--s4) 4px;
 }
 
 .ledger .note {
-  border-top: 1px solid var(--c-line);
+  margin-top: var(--s4);
+  border-radius: var(--r-card);
 }
 
+/* Pay view: the estimate caveat, stated once above the money. */
 .payNote {
-  margin: 12px var(--s4) 14px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--c-well);
-  box-shadow: var(--c-sink);
+  margin: var(--s4) 0 0;
+  padding: 12px 14px;
+  border-radius: var(--r-card);
+  background: var(--c-panel);
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: 15px;
   line-height: 1.45;
 }
 
@@ -915,7 +1028,7 @@
   display: none;
 }
 
-/* A sale: Bebas sold-date stamp, name + est. amount, status line, carrier + plan. */
+/* A pay row: Bebas install-date stamp, name + est. amount, status line, carrier + plan. */
 .sale,
 .pRow {
   display: grid;
@@ -933,6 +1046,87 @@
   text-align: left;
   cursor: pointer;
   transition: background 140ms, transform 120ms ease-out;
+}
+
+/* Taste pass: a sale is its own flat block, no stamp column ("Sold Oct 14"
+   leads the meta line). Name + est. pay, status + points, carrier + meta. */
+.saleList {
+  display: grid;
+  gap: var(--s2);
+  margin-top: var(--s4);
+}
+
+.sale {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name pay'
+    'status value'
+    'meta meta';
+  gap: 4px var(--s3);
+  padding: 14px var(--s4);
+  border-top: 0;
+  border-radius: 16px;
+  background: var(--c-panel);
+}
+
+.sale .sName strong {
+  font-size: 17px;
+}
+
+.sale .amt {
+  font-size: 17px;
+}
+
+.sale .status {
+  font-size: 15px;
+}
+
+/* The status is a coloured word; the dot stays on the other screens. */
+.sale .status > .dot,
+.ledger .pRow .status > .dot {
+  display: none;
+}
+
+.sale .sMeta {
+  margin-top: 4px;
+  color: var(--c-text-2);
+  font-size: 15px;
+}
+
+.sale .sValue {
+  color: var(--c-text-2);
+  font-size: 15px;
+}
+
+/* The carrier's word and the review tag: filled round pills here, no outline. */
+.ledger .sale .pill,
+.ledger .pRow .pill,
+.ledger .sale .tag,
+.ledger .pRow .tag {
+  min-height: 24px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+  font-size: 13px;
+}
+
+.ledger .sale .tag:not(.tagWarn),
+.ledger .pRow .tag:not(.tagWarn) {
+  background: var(--c-panel-hi);
+}
+
+/* Pay view rows on the rep ledger: the same flat blocks, stamps kept. */
+.ledger .pRow {
+  margin-top: var(--s2);
+  border-top: 0;
+  border-radius: 16px;
+  background: var(--c-panel);
+}
+
+.ledger .pgHead {
+  padding: 20px 0 4px;
+  border-top: 0;
 }
 
 .sale[role='button']:active,
@@ -963,6 +1157,11 @@
   .sale[role='button']:hover,
   .pRow[role='button']:hover {
     background: rgba(163, 184, 214, 0.04);
+  }
+
+  .sale[role='button']:hover,
+  .ledger .pRow[role='button']:hover {
+    background: var(--c-raised);
   }
 }
 
@@ -1189,17 +1388,18 @@
   color: var(--c-text-3);
 }
 
-/* Totals close the ledger, a hairline above them like any Home row. */
+/* Totals close the ledger: one raised block, the est. total in lime. */
 .ledgerTotals {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s2) var(--s4);
-  padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line);
+  padding: var(--s4);
+  border-radius: 16px;
+  background: var(--c-raised);
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: 15px;
 }
 
 .ledgerTotals b {
@@ -1207,8 +1407,16 @@
   font-weight: 600;
 }
 
-.ledgerTotals .amt {
-  font-size: var(--t-sm);
+.ledgerTotals .totalsPay,
+.ledgerTotals .totalsPay .amt,
+.ledgerTotals .totalsPay .amtEst {
+  color: var(--c-lime-hi);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.ledgerTotals .totalsPay .amtEst {
+  font-size: 17px;
 }
 
 /* The list body fills a tall panel: the totals ride at the foot, the end note under the rows. */
@@ -1216,6 +1424,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
+  gap: var(--s2);
 }
 
 .ledgerBody > .ledgerTotals {
@@ -1225,8 +1434,7 @@
 .listEnd {
   display: none;
   margin: 0;
-  padding: var(--s4);
-  border-top: 1px solid var(--c-line);
+  padding: var(--s4) 0 0;
   color: var(--c-text-3);
   font-size: var(--t-sm);
 }
@@ -2472,36 +2680,29 @@ a.dLine {
     font-size: 68px;
   }
 
-  .srcNote,
-  .pgHead,
-  .ledgerTotals,
-  .ledger .chips {
+  .ledgerTotals {
     padding-inline: var(--s5);
   }
 
-  .ledger .chips {
-    flex-wrap: wrap;
-    overflow: visible;
-  }
-
-  .payNote {
-    margin-inline: var(--s5);
+  .ledgerChips {
+    margin-right: 0;
+    padding-right: 0;
   }
 
   .sale {
-    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 80px 104px;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.3fr) 80px 104px;
     grid-template-areas:
-      'stamp name status value pay'
-      'stamp meta status value pay';
+      'name status value pay'
+      'meta status value pay';
     column-gap: var(--s3);
-    padding: var(--s3) var(--s5) var(--s3) var(--s4);
+    padding: 14px var(--s5);
   }
 
   .sale.hasAct {
-    grid-template-columns: 64px minmax(0, 1.5fr) minmax(0, 1.3fr) 80px 104px 96px;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.3fr) 80px 104px 96px;
     grid-template-areas:
-      'stamp name status value pay act'
-      'stamp meta status value pay act';
+      'name status value pay act'
+      'meta status value pay act';
   }
 
   .sale.hasAct .cActions {
@@ -2546,13 +2747,17 @@ a.dLine {
     display: grid;
     grid-template-areas: none;
     min-height: 36px;
+    margin-top: var(--s4);
     padding-block: 0;
+    background: transparent;
     color: var(--c-text-3);
-    font-size: var(--t-min);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
     cursor: default;
+  }
+
+  .ledger .lhead + .saleList {
+    margin-top: 0;
   }
 
   .lhStamp,
@@ -2583,7 +2788,7 @@ a.dLine {
   }
 
   .payHelp {
-    align-self: flex-start;
+    justify-self: start;
     width: auto;
   }
 }

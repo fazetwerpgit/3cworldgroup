@@ -101,18 +101,20 @@ function Harness() {
       <main className={s.scroller} id="rep-main">
         <div className={s.main}>
           <div className={x.page}>
-            <header className={p.head}>
-              <h1 className={p.title}>Sales</h1>
+            <header className={`${p.head} ${x.salesHead}`}>
+              <h1 className={`${p.title} ${x.salesTitle}`}>Sales</h1>
               <div className={x.month}>
                 <button type="button" className={x.monthBtn} aria-label="Previous month">‹</button>
                 <span className={x.monthLabel}>September 2026</span>
                 <button type="button" className={x.monthBtn} aria-label="Next month" disabled>›</button>
               </div>
             </header>
+            <SalesViewTabs payView={pay} onChange={setPay} />
             <div className={x.split}>
               <PayoutCard
                 payouts={payouts}
                 resetKey="2026-8"
+                undatedCount={2}
                 saleCount={10}
                 monthName="September"
                 hasPlan={!noPlan}
@@ -122,7 +124,6 @@ function Harness() {
                 onHelp={() => setHelp(true)}
               />
               <div className={x.ledgerCol}>
-                <SalesViewTabs payView={pay} onChange={setPay} />
                 <SalesTable
                   sales={SALES}
                   month={{ year: 2026, month: 8 }}
