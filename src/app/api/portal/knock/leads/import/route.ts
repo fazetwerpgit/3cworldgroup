@@ -14,8 +14,9 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-// Same cap as the repo's other long routes; 20,000 doors are about 45 batched writes.
-export const maxDuration = 60;
+// Address-only rows are looked up with the Census geocoder first (~11 s per 1,000 addresses, 4 at
+// a time), then 20,000 doors are about 45 batched writes: room for both (Vercel fluid compute).
+export const maxDuration = 300;
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
 
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
   try {
     const read = await readLeadImportInput(request);
     if (!read.ok) return NextResponse.json({ error: read.error, code: read.code }, { status: read.status, headers: NO_STORE });
-    planned = await planLeadsOnServer(db, read.input);
+    planned = await planLeadsOnServer(db, read.input, { by: gate.uid });
   } catch (error) {
     console.error('Lead lists: planning the import failed:', error);
     return NextResponse.json({ error: 'Checking the file failed. Try again.' }, { status: 500, headers: NO_STORE });

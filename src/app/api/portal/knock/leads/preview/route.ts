@@ -10,7 +10,8 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// Address-only rows are looked up with the Census geocoder (~11 s per 1,000 addresses, 4 at a time).
+export const maxDuration = 300;
 
 const NO_STORE = { 'Cache-Control': 'private, no-store' };
 
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
   try {
     const read = await readLeadImportInput(request);
     if (!read.ok) return NextResponse.json({ error: read.error, code: read.code }, { status: read.status, headers: NO_STORE });
-    const planned = await planLeadsOnServer(adminDb, read.input);
+    const planned = await planLeadsOnServer(adminDb, read.input, { by: gate.uid });
     if (!planned.ok) {
       return NextResponse.json({ error: planned.error, code: planned.code }, { status: planned.status, headers: NO_STORE });
     }

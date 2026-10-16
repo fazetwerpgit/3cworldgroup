@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { LeadSkipReason } from '@/lib/knock/leadImport';
-import type { LeadImportEvent, LeadPlanSummary } from '@/lib/knock/leadImportServer';
+import type { LEAD_ASSIGN_FROM_FILE, LeadImportEvent, LeadPlanSummary } from '@/lib/knock/leadImportServer';
 import { AdminFailed, AdminNotice, AdminPageHead, AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
@@ -26,14 +26,19 @@ type Done = Extract<LeadImportEvent, { type: 'done' }>;
 const SKIPPED: Record<LeadSkipReason, string> = {
   'not-door-knock-allowed': 'not allowed to knock',
   'no-coordinates': 'without a map location',
+  'not-located': "couldn't be located",
   'no-pack': 'without a pack',
   'repeated-row': 'listed twice',
 };
 
 const FORMAT: Record<LeadPlanSummary['format'], string> = {
   att: 'AT&T lead list',
-  sr: 'SalesRabbit export',
+  sr: 'SalesRabbit file',
+  generic: 'Lead list',
 };
+
+/** The "As in the file" choice (typed against the server's constant; a value import would bundle the server module). */
+const FROM_FILE: typeof LEAD_ASSIGN_FROM_FILE = 'file';
 
 const n = (count: number) => count.toLocaleString('en-US');
 const doorsWord = (count: number) => `${n(count)} ${count === 1 ? 'door' : 'doors'}`;
@@ -49,6 +54,80 @@ export function rowsSentence({ rows, rowsBreakdown: b, skipped }: Pick<LeadPlanS
   }
   for (const skip of skipped) parts.push(`${n(skip.count)} ${SKIPPED[skip.reason]}`);
   return `${n(rows)} ${rows === 1 ? 'row' : 'rows'}: ${parts.join(', ')}.`;
+}
+
+/** "Not Home (120), Go Back (8) and 3 more": names with their row counts, the first few only. */
+function counted(items: { label: string; count: number }[], max = 6): string {
+  const shown = items.slice(0, max).map((item) => `${item.label} (${n(item.count)})`);
+  return items.length > max ? `${shown.join(', ')} and ${items.length - max} more` : shown.join(', ');
+}
+
+const total = (items: { count: number }[]) => items.reduce((sum, item) => sum + item.count, 0);
+/** "1 row has" / "3 rows have". */
+const rowsHave = (count: number) => `${n(count)} ${count === 1 ? 'row has' : 'rows have'}`;
+
+/** The preview's plain-English lines under the figures (only the ones that apply). */
+export function previewLines(p: Omit<LeadPlanSummary, 'campaign' | 'packs'>): string[] {
+  const lines = [rowsSentence(p)];
+  if (p.mdus > 0) {
+    lines.push(`The new doors include ${n(p.mdus)} apartment ${p.mdus === 1 ? 'building' : 'buildings'} with ${n(p.units)} units.`);
+  }
+  if (p.geocoded > 0) {
+    lines.push(
+      `${n(p.geocoded)} ${p.geocoded === 1 ? 'row was' : 'rows were'} placed on the map from the address${
+        p.approximate > 0 ? `, ${n(p.approximate)} of them approximately located` : ''
+      }.`
+    );
+  }
+  if (p.notLocated > 0) {
+    lines.push(
+      `${n(p.notLocated)} couldn't be located. Only US addresses can be looked up; others need Latitude and Longitude columns.`
+    );
+  }
+  if (p.statuses.length > 0) {
+    lines.push(
+      `${rowsHave(total(p.statuses))} a status that comes in as the door's result: ${counted(
+        p.statuses.map((x) => ({ label: x.name, count: x.count }))
+      )}.`
+    );
+  }
+  if (p.unmatchedStatuses.length > 0) {
+    lines.push(
+      `${rowsHave(total(p.unmatchedStatuses))} a status that matches no result in this campaign, so those doors come in not knocked: ${counted(
+        p.unmatchedStatuses.map((x) => ({ label: x.name, count: x.count }))
+      )}.`
+    );
+  }
+  if (p.fromFile) {
+    if (p.fileAssignees === 0) lines.push("This file doesn't say who gets each door, so nobody gets them yet.");
+    if (p.assignees.length > 0) {
+      lines.push(`Goes to the people the file names: ${counted(p.assignees.map((x) => ({ label: x.name, count: x.count })))}.`);
+    }
+    if (p.unmatchedAssignees.length > 0) {
+      lines.push(
+        `${n(total(p.unmatchedAssignees))} ${total(p.unmatchedAssignees) === 1 ? 'row names' : 'rows name'} someone not in the portal, so nobody gets those doors yet: ${counted(
+          p.unmatchedAssignees.map((x) => ({ label: x.email, count: x.count }))
+        )}.`
+      );
+    }
+  }
+  if (p.appointments.kept > 0) lines.push(`${n(p.appointments.kept)} ${p.appointments.kept === 1 ? 'appointment' : 'appointments'} kept.`);
+  if (p.appointments.ignored > 0) {
+    lines.push(
+      `${n(p.appointments.ignored)} ${p.appointments.ignored === 1 ? 'appointment' : 'appointments'} left out: the status takes no appointment, or the date couldn't be read.`
+    );
+  }
+  const extras = [
+    p.contacts > 0 ? `${n(p.contacts)} with contact details` : '',
+    p.notes > 0 ? `${n(p.notes)} with notes` : '',
+  ].filter(Boolean);
+  if (extras.length > 0) lines.push(`${extras.join(', ')}.`);
+  if (p.addressPending > 0) {
+    lines.push(
+      `${doorsWord(p.addressPending)} have no street address yet. Each fills in the first time someone opens that door in the app.`
+    );
+  }
+  return lines;
 }
 
 /** POSTs `{ csvText, campaignId, assignTo }`, gzipped when the browser can (big files fit Vercel's body cap). */
@@ -230,7 +309,8 @@ export function LeadListUpload() {
       {done ? (
         <AdminNotice tone="ok">
           Added {doorsWord(done.written)} to {done.summary.campaign.name}
-          {done.summary.assignee ? `, given to ${done.summary.assignee.name}` : ''}.
+          {done.summary.assignee ? `, given to ${done.summary.assignee.name}` : ''}
+          {done.summary.fromFile ? ', given out as the file says' : ''}.
           {done.alreadyThere ? ` ${doorsWord(done.alreadyThere)} were already there and were left alone.` : ''}
         </AdminNotice>
       ) : null}
@@ -289,6 +369,7 @@ export function LeadListUpload() {
                   disabled={busy !== null}
                 >
                   <option value="">Nobody yet (hand them out in the app)</option>
+                  <option value={FROM_FILE}>As in the file (its Assigned to column)</option>
                   {options.people.map((person) => (
                     <option key={person.uid} value={person.uid}>
                       {person.name}
@@ -313,14 +394,14 @@ export function LeadListUpload() {
               disabled={busy !== null}
             />
             <p className={u.hint}>
-              An AT&amp;T lead list or a SalesRabbit export, up to {Math.round(options.maxBytes / 1024 / 1024)} MB and{' '}
-              {n(options.maxRows)} rows. Doors already in the campaign are left alone, so the same file can be uploaded
-              twice safely.
+              An AT&amp;T lead list, a SalesRabbit file, or any CSV with Latitude and Longitude or an Address with City or
+              ZIP, up to {Math.round(options.maxBytes / 1024 / 1024)} MB and {n(options.maxRows)} rows. Doors already in
+              the campaign are left alone, so the same file can be uploaded twice safely.
             </p>
           </div>
           <div className={u.btnRow}>
             <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={check} disabled={!canCheck}>
-              {busy === 'preview' ? 'Checking for doors already there…' : 'Check file'}
+              {busy === 'preview' ? 'Checking the file (finding addresses on the map can take a minute)…' : 'Check file'}
             </button>
           </div>
         </div>
@@ -352,20 +433,13 @@ export function LeadListUpload() {
               </div>
               <div>
                 <dt>Goes to</dt>
-                <dd>{preview.assignee ? preview.assignee.name : 'Nobody yet'}</dd>
+                <dd>{preview.fromFile ? 'As in the file' : preview.assignee ? preview.assignee.name : 'Nobody yet'}</dd>
               </div>
             </dl>
             <ul className={l.notes}>
-              <li>{rowsSentence(preview)}</li>
-              {preview.mdus > 0 ? (
-                <li>
-                  The new doors include {n(preview.mdus)} apartment {preview.mdus === 1 ? 'building' : 'buildings'} with{' '}
-                  {n(preview.units)} units.
-                </li>
-              ) : null}
-              {preview.format === 'sr' ? (
-                <li>SalesRabbit files have no street addresses. Each address fills in the first time someone opens that door in the app.</li>
-              ) : null}
+              {previewLines(preview).map((line) => (
+                <li key={line}>{line}</li>
+              ))}
             </ul>
 
             {preview.doors > 0 && live && !confirming && busy === null ? (
@@ -382,9 +456,11 @@ export function LeadListUpload() {
                 <p id="lead-confirm-q" className={l.confirmText}>
                   Add {doorsWord(preview.doors)} to {campaignName} now?
                   <span className={l.confirmSub}>
-                    {preview.assignee
-                      ? `They go to ${preview.assignee.name}.`
-                      : 'Nobody has them yet: hand them out in the app.'}{' '}
+                    {preview.fromFile
+                      ? 'They go to the people the file names.'
+                      : preview.assignee
+                        ? `They go to ${preview.assignee.name}.`
+                        : 'Nobody has them yet: hand them out in the app.'}{' '}
                     Doors already there are not changed.
                   </span>
                 </p>

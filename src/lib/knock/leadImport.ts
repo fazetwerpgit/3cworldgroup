@@ -1,17 +1,19 @@
-// COPIED VERBATIM from 3c-knock-logic src/lib/leadImport.ts at commit 8090861
+// COPIED VERBATIM from 3c-knock-logic src/lib/leadImport.ts at commit f289f43
 // (/home/fazetwerpnerd69/dev/3c-knock-logic/src/lib/leadImport.ts, LEAD_IMPORT_SPEC.md there).
 // Do not edit here: change it in the app repo and copy it again, so the phone and the portal
-// plan an import the same way. ./types.ts holds the House/HouseDoc types it imports.
+// plan an import the same way. ./types.ts holds the types it imports.
 
 /**
- * Carrier lead-file import: CSV parsing, format detection, mapping of AT&T / SalesRabbit lead rows
- * to houses (packs, MDUs), dedupe against a campaign's existing houses, and the import plan the app
- * (store `previewLeadImport` / `importLeads`) and scripts/import-leads.ts write.
+ * Lead-file import: CSV parsing, format detection, mapping of AT&T / SalesRabbit / other lead rows
+ * to houses (packs, MDUs, contacts, notes, statuses), dedupe against a campaign's existing houses,
+ * and the import plan the app (store `previewLeadImport` / `importLeads`) and
+ * scripts/import-leads.ts write. Rows with a street address but no coordinates are placed by a
+ * geocoder between `leadGeocodeRequests` and `planLeadImport` (network: geocode.ts).
  *
  * Pure and self-contained (no React Native, Firebase or other app modules; only a type import), so
  * the portal can copy this file as is. Spec: LEAD_IMPORT_SPEC.md.
  */
-import type { House, HouseDoc } from './types.ts';
+import type { Contact, Disposition, DoorNote, House, HouseDoc, NoteEdit, UnitState } from './types.ts';
 
 const EARTH_RADIUS_M = 6_371_000;
 
@@ -98,6 +100,15 @@ export function packFromPsa(psa: string): string | null {
   return codes.find((c) => /^\d+P[A-Z]$/i.test(c))?.toUpperCase() ?? codes[0]?.toUpperCase() ?? null;
 }
 
+/** A lead's status matched to a campaign result (LOGIC_REQUESTS #34): written as an imported mark. */
+export interface LeadStatus {
+  dispositionId: string;
+  /** Not Home: the visit count the file gave ("Not Home 2" = 2, plain "Not Home" = 1); else 0. */
+  notHomeCount: number;
+  /** The file's Appointment (epoch ms), kept only when the result takes an appointment. */
+  appointmentAt?: number;
+}
+
 /** A mapped lead house, independent of who it is assigned to. */
 export interface LeadHouse {
   id: string;
@@ -111,17 +122,28 @@ export interface LeadHouse {
   unitOrder: string[] | null;
   /** No street address in the source; the app reverse-geocodes it on first open. */
   addressPending?: true;
-  /** Contact first name from the source (single-family houses only). */
-  contactName?: string;
+  /** Contact from the source (single-family houses; MDU units use `unitContacts`). */
+  contact?: Contact;
+  unitContacts?: Record<string, Contact>;
+  /** The source's Notes (trimmed, at most LEAD_NOTE_MAX characters): the door's note on import. */
+  note?: string;
+  /** MDU units' Notes, by unit label. */
+  unitNoteTexts?: Record<string, string>;
+  /** Status matched to a campaign result (single-family houses; MDU units use `unitStatuses`). */
+  status?: LeadStatus;
+  unitStatuses?: Record<string, LeadStatus>;
+  /** "Assigned to (email)" from the source, lower case (an MDU: the one most of its rows name). */
+  assignEmail?: string;
 }
 export interface LeadMapResult {
   houses: LeadHouse[];
   /**
    * Rows left out at mapping. `repeated`: the same door listed again (the same apartment of a
-   * building, or the same AT&T Living Unit ID). Every row is either a house, an apartment of an
-   * MDU, or one of these.
+   * building, the same street address, or the same AT&T Living Unit ID). `notLocated`: a street
+   * address but no coordinates, and the geocoder didn't place it (or wasn't asked). Every row is
+   * either a house, an apartment of an MDU, or one of these.
    */
-  skipped: { notAllowed: number; noCoords: number; noPack: number; repeated: number };
+  skipped: { notAllowed: number; noCoords: number; noPack: number; repeated: number; notLocated: number };
 }
 
 const naturalCompare = new Intl.Collator('en', { numeric: true }).compare;
@@ -132,7 +154,7 @@ const naturalCompare = new Intl.Collator('en', { numeric: true }).compare;
  * Number collapse into one MDU house, positioned at the first unit's coordinates.
  */
 export function mapAttLeads(records: Record<string, string>[]): LeadMapResult {
-  const skipped = { notAllowed: 0, noCoords: 0, noPack: 0, repeated: 0 };
+  const skipped = { notAllowed: 0, noCoords: 0, noPack: 0, repeated: 0, notLocated: 0 };
   const singles: LeadHouse[] = [];
   const buildings = new Map<string, { base: LeadHouse; luids: string[]; units: Set<string> }>();
 
@@ -206,6 +228,244 @@ function slug(s: string): string {
     .replace(/^-|-$/g, '');
 }
 
+// ---------------------------------------------------------------------------------------------
+// SalesRabbit and other lead files: columns by alias, contacts, statuses, geocoding hand-off.
+// ---------------------------------------------------------------------------------------------
+
+/** Lead-file fields the SalesRabbit / generic mapping reads, whatever the file calls them. */
+export type LeadField =
+  | 'lat'
+  | 'lng'
+  | 'address'
+  | 'apt'
+  | 'city'
+  | 'state'
+  | 'zip'
+  | 'country'
+  | 'firstName'
+  | 'lastName'
+  | 'name'
+  | 'business'
+  | 'phone'
+  | 'email'
+  | 'notes'
+  | 'status'
+  | 'assignedEmail'
+  | 'appointment';
+
+/** Header names per field, compared as `headerKey` (case, spaces and punctuation ignored). */
+const FIELD_ALIASES: Record<LeadField, readonly string[]> = {
+  lat: ['latitude', 'lat'],
+  lng: ['longitude', 'lng', 'long', 'lon'],
+  address: ['address', 'street', 'streetaddress', 'address1', 'addressline1'],
+  apt: ['aptsuite', 'apt', 'suite', 'unit', 'unitnumber', 'apartment'],
+  city: ['city', 'town'],
+  state: ['state', 'stateregion', 'region', 'province'],
+  zip: ['zip', 'zipcode', 'postalcode', 'postcode'],
+  country: ['country'],
+  firstName: ['firstname', 'first'],
+  lastName: ['lastname', 'last'],
+  name: ['name', 'fullname', 'contactname'],
+  business: ['businessname', 'business', 'company', 'companyname'],
+  phone: ['phone', 'mobile', 'phonenumber', 'mobilephone', 'cell', 'cellphone'],
+  email: ['email', 'emailaddress'],
+  notes: ['notes', 'note'],
+  status: ['status', 'leadstatus'],
+  assignedEmail: ['assignedtoemail', 'assignedemail', 'repemail'],
+  appointment: ['appointment', 'appointmentdate', 'appointmenttime'],
+};
+
+const FIELD_OF_KEY = new Map<string, LeadField>(
+  (Object.entries(FIELD_ALIASES) as [LeadField, readonly string[]][]).flatMap(([field, keys]) => keys.map((k) => [k, field] as const)),
+);
+
+/** How headers (and statuses) are compared: lower case, letters and digits only ("Postal Code" -> "postalcode"). */
+export function headerKey(h: string): string {
+  return h.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** The header columns (as written) holding each field; a field several columns hold reads the first non-empty one. */
+export function leadColumns(header: readonly string[]): Partial<Record<LeadField, string[]>> {
+  const columns: Partial<Record<LeadField, string[]>> = {};
+  for (const h of header) {
+    const field = FIELD_OF_KEY.get(headerKey(h));
+    if (field) (columns[field] ??= []).push(h.trim());
+  }
+  return columns;
+}
+
+/** Longest imported note: the door note limit (doorNotes.ts DOOR_NOTE_MAX; the rules allow the same). */
+export const LEAD_NOTE_MAX = 1000;
+
+/** Country values that mean the US (the geocoder is US only); blank counts as US. */
+const US_COUNTRIES: Record<string, true> = { '': true, us: true, usa: true, unitedstates: true, unitedstatesofamerica: true };
+
+/** A map location from the geocoder. `exact` false: it matched a nearby or partly different address. */
+export interface LeadPoint {
+  lat: number;
+  lng: number;
+  exact: boolean;
+}
+
+/** A street address to place on the map (a row without coordinates). `key`: `geocodeKey` of it. */
+export interface LeadGeocodeRequest {
+  key: string;
+  street: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+/** Lookup key of an address: rows with the same street, city, state and ZIP share one lookup. */
+export function geocodeKey(a: { street: string; city: string; state: string; zip: string }): string {
+  return [a.street, a.city, a.state, a.zip].map((s) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()).join('|');
+}
+
+/** A row of a SalesRabbit / generic file, read through `leadColumns`. */
+interface SrRow {
+  lat: number;
+  lng: number;
+  hasCoords: boolean;
+  apt: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  country: string;
+  contact: Contact | null;
+  note: string;
+  status: string;
+  assignEmail: string;
+  appointment: string;
+}
+
+/** A person's name word typed all upper or all lower gets title case; "McDonald" stays as typed. */
+function tidyName(s: string): string {
+  return s
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => (w === w.toLowerCase() || w === w.toUpperCase() ? titleCase(w) : w))
+    .join(' ');
+}
+
+function readSrRows(records: readonly Record<string, string>[]): SrRow[] {
+  const columns = leadColumns(Object.keys(records[0] ?? {}));
+  return records.map((r) => {
+    const get = (field: LeadField) => {
+      for (const c of columns[field] ?? []) {
+        const v = (r[c] ?? '').trim();
+        if (v !== '') return v;
+      }
+      return '';
+    };
+    const lat = Number.parseFloat(get('lat'));
+    const lng = Number.parseFloat(get('lng'));
+    const name = tidyName([get('firstName'), get('lastName')].filter(Boolean).join(' ')) || tidyName(get('name'));
+    const contact: Contact = {
+      ...(name ? { name } : {}),
+      ...(get('business') ? { business: get('business') } : {}),
+      ...(get('phone') ? { phone: get('phone') } : {}),
+      ...(get('email') ? { email: get('email') } : {}),
+    };
+    return {
+      lat,
+      lng,
+      hasCoords: Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0),
+      apt: get('apt').toUpperCase(),
+      address: get('address').replace(/\s+/g, ' '),
+      city: get('city'),
+      state: get('state'),
+      zip: get('zip'),
+      country: get('country'),
+      contact: Object.keys(contact).length > 0 ? contact : null,
+      note: get('notes').slice(0, LEAD_NOTE_MAX).trim(),
+      status: get('status'),
+      assignEmail: get('assignedEmail').toLowerCase(),
+      appointment: get('appointment'),
+    };
+  });
+}
+
+/** What the geocoder needs for a row: a street plus a city or ZIP, in the US. Null when it can't be looked up. */
+function geocodeRequestOf(row: SrRow): LeadGeocodeRequest | null {
+  if (!row.address || (!row.city && !row.zip) || US_COUNTRIES[headerKey(row.country)] !== true) return null;
+  const req = { street: row.address, city: row.city, state: row.state, zip: row.zip };
+  return { key: geocodeKey(req), ...req };
+}
+
+/** Statuses that name a campaign result differently (keys as `headerKey`): the default result id, then its kind. */
+const STATUS_ALIASES: Record<string, { id: string; kind?: Disposition['kind']; sale?: true }> = {
+  nothome: { id: 'not_home', kind: 'notHome' },
+  notathome: { id: 'not_home', kind: 'notHome' },
+  noanswer: { id: 'not_home', kind: 'notHome' },
+  nh: { id: 'not_home', kind: 'notHome' },
+  goback: { id: 'go_back' },
+  callback: { id: 'go_back' },
+  comeback: { id: 'go_back' },
+  sold: { id: 'sold', sale: true },
+  sale: { id: 'sold', sale: true },
+  closed: { id: 'sold', sale: true },
+  customer: { id: 'customer', kind: 'customer' },
+  existingcustomer: { id: 'customer', kind: 'customer' },
+  currentcustomer: { id: 'customer', kind: 'customer' },
+  nosoliciting: { id: 'no_soliciting' },
+  nosolicitation: { id: 'no_soliciting' },
+  vacant: { id: 'vacant' },
+};
+
+/**
+ * Matches a lead file's Status to one of the campaign's active results: by label or id (case,
+ * spaces and punctuation ignored), else by STATUS_ALIASES ("Not Home", "Go Back", "Sold",
+ * "Customer", ...). "Not Home 2" / "NH 3+" is Not Home with that visit count. Null = unmatched.
+ */
+export function leadStatusMatcher(
+  dispositions: readonly Disposition[],
+): (status: string) => { disposition: Disposition; notHomeCount: number } | null {
+  const active = dispositions.filter((d) => d.archived !== true);
+  const byKey = new Map<string, Disposition>();
+  for (const d of active) {
+    for (const k of [headerKey(d.label), headerKey(d.id)]) if (k && !byKey.has(k)) byKey.set(k, d);
+  }
+  const find = (key: string): Disposition | undefined => {
+    const direct = byKey.get(key);
+    if (direct) return direct;
+    const alias = STATUS_ALIASES[key];
+    if (!alias) return undefined;
+    return (
+      active.find((d) => d.id === alias.id) ??
+      (alias.kind ? active.find((d) => d.kind === alias.kind) : undefined) ??
+      (alias.sale ? active.find((d) => d.sale) : undefined)
+    );
+  };
+  return (status) => {
+    const key = headerKey(status);
+    if (!key) return null;
+    const d = find(key);
+    if (d) return { disposition: d, notHomeCount: d.kind === 'notHome' ? 1 : 0 };
+    const counted = /^(.*\D)(\d+)$/.exec(key);
+    const nh = counted ? find(counted[1]) : undefined;
+    return counted && nh?.kind === 'notHome' ? { disposition: nh, notHomeCount: Math.max(1, Number(counted[2])) } : null;
+  };
+}
+
+/** Per-row tallies of a SalesRabbit / generic file (rows that became a house or apartment). */
+interface LeadRowStats {
+  geocoded: number;
+  approximate: number;
+  /** By `headerKey` of the status: the name as first written, the matched result (null = none), rows. */
+  statuses: Map<string, { name: string; dispositionId: string | null; count: number }>;
+  /** Rows per "Assigned to (email)" (lower case). */
+  assignees: Map<string, number>;
+  appointments: { kept: number; ignored: number };
+  contacts: number;
+  notes: number;
+}
+
+function emptyRowStats(): LeadRowStats {
+  return { geocoded: 0, approximate: 0, statuses: new Map(), assignees: new Map(), appointments: { kept: 0, ignored: 0 }, contacts: 0, notes: 0 };
+}
+
 /** Rows of a SalesRabbit export within this distance with Apt/Suite values share one MDU. */
 export const SR_MDU_RADIUS_M = 3;
 
@@ -213,81 +473,212 @@ export const SR_MDU_RADIUS_M = 3;
 const SR_PACK_LAT_DEG = 0.018;
 const SR_PACK_LNG_DEG = 0.022;
 
-/** Areas SR packs are named after (nearest centre wins). */
+/** Areas SR packs are named after (nearest centre within SR_AREA_RADIUS_M wins). */
 const SR_AREAS = [
   { name: 'OKC', lat: 35.4676, lng: -97.5164 },
   { name: 'Dallas', lat: 32.7767, lng: -96.797 },
 ];
+/** Packs farther than this from every SR_AREAS centre are named after their most common city. */
+const SR_AREA_RADIUS_M = 150_000;
+
+/** Options of the SalesRabbit / generic mapping. */
+export interface SrMapOptions {
+  /** The campaign's results, for the Status column (none = every status unmatched). */
+  dispositions?: readonly Disposition[];
+  /** Geocoder results by `LeadGeocodeRequest.key`; address rows without coordinates not in it are not located. */
+  geocoded?: ReadonlyMap<string, LeadPoint>;
+}
 
 /**
- * Maps SalesRabbit lead records (no address; Latitude/Longitude, optional Apt/Suite and First
- * Name) to houses with `addressPending`. Rows with Apt/Suite within SR_MDU_RADIUS_M of each other
- * become one MDU whose unitOrder is the apt values. Houses are packed by `packSrHouses`. Ids derive
- * from coordinates, so re-imports of the same file hit the same docs.
+ * Maps SalesRabbit (or other) lead records to houses. Position: the file's Latitude/Longitude,
+ * else the geocoder's point for the street address (`opts.geocoded`). Rows with a street address
+ * keep it (address + city); rows without one are `addressPending`. MDUs: rows with Apt/Suite at
+ * the same street address, or (no address) within SR_MDU_RADIUS_M of each other; unitOrder is the
+ * apt values. Contacts, notes and statuses ride along (per unit for MDUs). Houses are packed by
+ * `packSrHouses`. Ids derive from the street address, else the coordinates, so re-imports of the
+ * same file hit the same docs.
  */
-export function mapSrLeads(records: Record<string, string>[]): LeadMapResult {
-  const result = srLeadHouses(records);
-  packSrHouses(result.houses);
-  return result;
+export function mapSrLeads(records: Record<string, string>[], opts: SrMapOptions = {}): LeadMapResult {
+  const { houses, skipped } = srLeadHouses(records, opts);
+  packSrHouses(houses);
+  return { houses, skipped };
+}
+
+/** What one accepted row brings to its door. */
+interface RowData {
+  contact?: Contact;
+  note?: string;
+  status?: LeadStatus;
+  email?: string;
 }
 
 /** `mapSrLeads` without packs (packId/packName ''), so duplicates can be dropped before packing. */
-function srLeadHouses(records: Record<string, string>[]): LeadMapResult {
-  const skipped = { notAllowed: 0, noCoords: 0, noPack: 0, repeated: 0 };
-  const rows: { lat: number; lng: number; apt: string; name: string }[] = [];
-  for (const r of records) {
-    const lat = Number.parseFloat(r.Latitude ?? '');
-    const lng = Number.parseFloat(r.Longitude ?? '');
-    if (!Number.isFinite(lat) || !Number.isFinite(lng) || (lat === 0 && lng === 0)) {
-      skipped.noCoords++;
-      continue;
+function srLeadHouses(records: Record<string, string>[], opts: SrMapOptions): LeadMapResult & { stats: LeadRowStats } {
+  const skipped = { notAllowed: 0, noCoords: 0, noPack: 0, repeated: 0, notLocated: 0 };
+  const stats = emptyRowStats();
+  const dispositions = opts.dispositions ?? [];
+  const match = leadStatusMatcher(dispositions);
+  const rows: (SrRow & { name: string })[] = [];
+  for (const row of readSrRows(records)) {
+    if (!row.hasCoords) {
+      const req = geocodeRequestOf(row);
+      const point = req ? opts.geocoded?.get(req.key) : undefined;
+      if (!point) {
+        if (row.address) skipped.notLocated++;
+        else skipped.noCoords++;
+        continue;
+      }
+      row.lat = point.lat;
+      row.lng = point.lng;
+      stats.geocoded++;
+      if (!point.exact) stats.approximate++;
     }
-    rows.push({ lat, lng, apt: (r['Apt/Suite'] ?? '').trim().toUpperCase(), name: titleCase(r['First Name'] ?? '') });
+    rows.push({ ...row, name: row.contact?.name ?? '' });
   }
   // Stable order makes clustering and id collisions independent of file order.
-  rows.sort((a, b) => a.lat - b.lat || a.lng - b.lng || naturalCompare(a.apt, b.apt) || naturalCompare(a.name, b.name));
+  rows.sort(
+    (a, b) =>
+      a.lat - b.lat ||
+      a.lng - b.lng ||
+      naturalCompare(a.apt, b.apt) ||
+      naturalCompare(a.name, b.name) ||
+      naturalCompare(a.address, b.address),
+  );
 
-  const base = { packId: '', packName: '', address: '', city: '', addressPending: true as const };
+  /** A row that becomes a door or apartment: its data, tallied. */
+  const accept = (row: SrRow): RowData => {
+    const data: RowData = {};
+    if (row.contact) {
+      data.contact = row.contact;
+      stats.contacts++;
+    }
+    if (row.note) {
+      data.note = row.note;
+      stats.notes++;
+    }
+    if (row.assignEmail) {
+      data.email = row.assignEmail;
+      stats.assignees.set(row.assignEmail, (stats.assignees.get(row.assignEmail) ?? 0) + 1);
+    }
+    let takesAppointment = false;
+    if (row.status) {
+      const found = match(row.status);
+      const key = headerKey(row.status);
+      const entry = stats.statuses.get(key) ?? { name: row.status, dispositionId: found?.disposition.id ?? null, count: 0 };
+      entry.count++;
+      stats.statuses.set(key, entry);
+      if (found) {
+        data.status = { dispositionId: found.disposition.id, notHomeCount: found.notHomeCount };
+        takesAppointment = found.disposition.appointment;
+      }
+    }
+    if (row.appointment) {
+      const at = Date.parse(row.appointment);
+      if (data.status && takesAppointment && Number.isFinite(at)) {
+        data.status.appointmentAt = at;
+        stats.appointments.kept++;
+      } else stats.appointments.ignored++;
+    }
+    return data;
+  };
+
   const houses: LeadHouse[] = [];
-  // Grid cells of ~11 m so a neighbour search only checks the 3x3 block around a row.
+  const singlesByAddress = new Set<string>();
+  type Building = { lat: number; lng: number; address: string; city: string; addressKey: string; units: Map<string, RowData> };
+  const buildings: Building[] = [];
+  const buildingsByAddress = new Map<string, Building>();
+  // Address-less buildings: grid cells of ~11 m so a neighbour search only checks the 3x3 block around a row.
   const cell = (v: number) => Math.floor(v * 10_000);
-  const grid = new Map<string, { lat: number; lng: number; units: Set<string> }[]>();
-  const buildings: { lat: number; lng: number; units: Set<string> }[] = [];
+  const grid = new Map<string, Building[]>();
   for (const row of rows) {
+    const addressKey = row.address ? normalizeAddress(row.address, row.city || row.zip) : '';
+    const located = row.address ? { address: row.address, city: row.city } : { address: '', city: '', addressPending: true as const };
     if (!row.apt) {
-      houses.push({ ...base, id: '', lat: row.lat, lng: row.lng, unitOrder: null, ...(row.name ? { contactName: row.name } : {}) });
+      if (addressKey && singlesByAddress.has(addressKey)) {
+        skipped.repeated++;
+        continue;
+      }
+      if (addressKey) singlesByAddress.add(addressKey);
+      const data = accept(row);
+      houses.push({
+        id: addressKey ? `lead-${slug(addressKey)}` : '',
+        packId: '',
+        packName: '',
+        ...located,
+        lat: row.lat,
+        lng: row.lng,
+        unitOrder: null,
+        ...(data.contact ? { contact: data.contact } : {}),
+        ...(data.note ? { note: data.note } : {}),
+        ...(data.status ? { status: data.status } : {}),
+        ...(data.email ? { assignEmail: data.email } : {}),
+      });
       continue;
     }
-    let found: (typeof buildings)[number] | undefined;
-    for (let dy = -1; dy <= 1 && !found; dy++) {
-      for (let dx = -1; dx <= 1 && !found; dx++) {
-        found = grid
-          .get(`${cell(row.lat) + dy}:${cell(row.lng) + dx}`)
-          ?.find((b) => distanceMeters(b, row) <= SR_MDU_RADIUS_M);
+    let found: Building | undefined;
+    if (addressKey) found = buildingsByAddress.get(addressKey);
+    else {
+      for (let dy = -1; dy <= 1 && !found; dy++) {
+        for (let dx = -1; dx <= 1 && !found; dx++) {
+          found = grid
+            .get(`${cell(row.lat) + dy}:${cell(row.lng) + dx}`)
+            ?.find((b) => distanceMeters(b, row) <= SR_MDU_RADIUS_M);
+        }
       }
     }
     if (found) {
       if (found.units.has(row.apt)) skipped.repeated++;
-      found.units.add(row.apt);
+      else found.units.set(row.apt, accept(row));
       continue;
     }
-    const b = { lat: row.lat, lng: row.lng, units: new Set([row.apt]) };
+    const b: Building = { lat: row.lat, lng: row.lng, address: row.address, city: row.city, addressKey, units: new Map([[row.apt, accept(row)]]) };
     buildings.push(b);
-    const key = `${cell(row.lat)}:${cell(row.lng)}`;
-    grid.set(key, [...(grid.get(key) ?? []), b]);
+    if (addressKey) buildingsByAddress.set(addressKey, b);
+    else {
+      const key = `${cell(row.lat)}:${cell(row.lng)}`;
+      grid.set(key, [...(grid.get(key) ?? []), b]);
+    }
   }
   for (const b of buildings) {
-    houses.push({ ...base, id: '', lat: b.lat, lng: b.lng, unitOrder: [...b.units].sort(naturalCompare) });
+    const unitOrder = [...b.units.keys()].sort(naturalCompare);
+    const pick = <T>(f: (d: RowData) => T | undefined): Record<string, T> | undefined => {
+      const out: Record<string, T> = {};
+      for (const u of unitOrder) {
+        const v = f(b.units.get(u) as RowData);
+        if (v !== undefined) out[u] = v;
+      }
+      return Object.keys(out).length > 0 ? out : undefined;
+    };
+    const unitContacts = pick((d) => d.contact);
+    const unitNoteTexts = pick((d) => d.note);
+    const unitStatuses = pick((d) => d.status);
+    const emails = new Map<string, number>();
+    for (const d of b.units.values()) if (d.email) emails.set(d.email, (emails.get(d.email) ?? 0) + 1);
+    const assignEmail = [...emails].sort(([ea, a], [eb, bc]) => bc - a || ea.localeCompare(eb))[0]?.[0];
+    houses.push({
+      id: b.addressKey ? `lead-mdu-${slug(b.addressKey)}` : '',
+      packId: '',
+      packName: '',
+      ...(b.address ? { address: b.address, city: b.city } : { address: '', city: '', addressPending: true as const }),
+      lat: b.lat,
+      lng: b.lng,
+      unitOrder,
+      ...(unitContacts ? { unitContacts } : {}),
+      ...(unitNoteTexts ? { unitNoteTexts } : {}),
+      ...(unitStatuses ? { unitStatuses } : {}),
+      ...(assignEmail ? { assignEmail } : {}),
+    });
   }
-  const used = new Set<string>();
+  const used = new Set(houses.map((h) => h.id).filter(Boolean));
   for (const h of houses) {
+    if (h.id) continue;
     const stem = `att-sr-${h.unitOrder ? 'mdu-' : ''}${slug(`${h.lat.toFixed(6)} ${h.lng.toFixed(6)}`)}`;
     let id = stem;
     for (let n = 2; used.has(id); n++) id = `${stem}-${n}`;
     used.add(id);
     h.id = id;
   }
-  return { houses, skipped };
+  return { houses, skipped, stats };
 }
 
 /** The SR pack grid cell (~2 km) a point falls in. */
@@ -297,7 +688,8 @@ function srPackCell(p: { lat: number; lng: number }): string {
 
 /**
  * Sets packId/packName on SalesRabbit houses (in place): one pack per ~2 km grid cell, packId
- * `att-sr-<n>` numbered biggest cell first, packName 'SR <area> <k>' numbered per area. With the
+ * `att-sr-<n>` numbered biggest cell first, packName 'SR <area> <k>' numbered per area (area: the
+ * nearest SR_AREAS centre within SR_AREA_RADIUS_M, else the cell's most common city). With the
  * campaign's `existing` houses, a cell that already has an SR pack joins it (the pack holding most
  * of that cell's doors) and new packs are numbered after the highest `n` / `k` already used, so a
  * second SR file never reuses a pack id or name.
@@ -341,9 +733,10 @@ export function packSrHouses(
       } else {
         const lat = members.reduce((s, h) => s + h.lat, 0) / members.length;
         const lng = members.reduce((s, h) => s + h.lng, 0) / members.length;
-        const area = SR_AREAS.reduce((best, a) =>
+        const nearest = SR_AREAS.reduce((best, a) =>
           distanceMeters({ lat, lng }, a) < distanceMeters({ lat, lng }, best) ? a : best,
-        ).name;
+        );
+        const area = distanceMeters({ lat, lng }, nearest) <= SR_AREA_RADIUS_M ? nearest.name : (commonCity(members) ?? 'Leads');
         perArea[area] = (perArea[area] ?? 0) + 1;
         packId = `att-sr-${++lastPack}`;
         packName = `SR ${area} ${perArea[area]}`;
@@ -355,11 +748,41 @@ export function packSrHouses(
     });
 }
 
-/** A fresh house doc for a lead house (unknocked). */
+/** The city most of these houses name (ties: alphabetical); null when none has one. */
+function commonCity(houses: readonly LeadHouse[]): string | null {
+  const counts = new Map<string, number>();
+  for (const h of houses) if (h.city) counts.set(h.city, (counts.get(h.city) ?? 0) + 1);
+  return [...counts].sort(([ca, a], [cb, b]) => b - a || ca.localeCompare(cb))[0]?.[0] ?? null;
+}
+
+/**
+ * A fresh house doc for a lead house. A matched status becomes an imported mark (`last` or the
+ * unit's, `imported: true`, `knockId` '', `repId` = `by`, at `now`; Not Home with its visit count),
+ * never a knock. Notes become door notes by `by` at `now`; contacts are copied. Else unknocked.
+ */
 export function leadHouseDoc(
   h: LeadHouse,
-  opts: { campaignId: string; assignedRepId: string | null; managerId: string | null; now: number },
+  opts: { campaignId: string; assignedRepId: string | null; managerId: string | null; now: number; by: string },
 ): HouseDoc {
+  const state = (s: LeadStatus): UnitState => ({
+    last: {
+      dispositionId: s.dispositionId,
+      at: opts.now,
+      repId: opts.by,
+      knockId: '',
+      imported: true,
+      ...(s.appointmentAt !== undefined ? { appointmentAt: s.appointmentAt } : {}),
+    },
+    notHomeCount: s.notHomeCount,
+  });
+  const note = (text: string): DoorNote => ({ text, by: opts.by, at: opts.now });
+  const door = h.status ? state(h.status) : { last: null, notHomeCount: 0 };
+  const unitNotes = h.unitNoteTexts
+    ? Object.fromEntries(Object.entries(h.unitNoteTexts).map(([u, text]) => [u, note(text)]))
+    : undefined;
+  const notedUnit = h.unitOrder?.find((u) => h.unitNoteTexts?.[u]);
+  const noteEdit: NoteEdit | undefined =
+    h.note || notedUnit !== undefined ? { unit: h.note ? null : (notedUnit as string), by: opts.by, at: opts.now } : undefined;
   return {
     campaignId: opts.campaignId,
     packId: h.packId,
@@ -370,15 +793,19 @@ export function leadHouseDoc(
     lng: h.lng,
     assignedRepId: opts.assignedRepId,
     managerId: opts.assignedRepId ? opts.managerId : null,
-    last: null,
-    notHomeCount: 0,
+    last: door.last,
+    notHomeCount: door.notHomeCount,
     unitOrder: h.unitOrder,
-    units: h.unitOrder ? {} : null,
+    units: h.unitOrder ? Object.fromEntries(Object.entries(h.unitStatuses ?? {}).map(([u, s]) => [u, state(s)])) : null,
     movedBy: null,
     createdBy: null,
     updatedAt: opts.now,
     ...(h.addressPending ? { addressPending: true as const } : {}),
-    ...(h.contactName ? { contactName: h.contactName } : {}),
+    ...(h.contact ? { contact: h.contact } : {}),
+    ...(h.unitContacts ? { unitContacts: h.unitContacts } : {}),
+    ...(h.note ? { doorNote: note(h.note) } : {}),
+    ...(unitNotes ? { unitNotes } : {}),
+    ...(noteEdit ? { noteEdit } : {}),
   };
 }
 
@@ -394,23 +821,65 @@ export interface LeadFixture {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Import plan (app, portal and scripts/import-leads.ts): detect, map, drop duplicates, pack.
+// Import plan (app, portal and scripts/import-leads.ts): detect, geocode hand-off, map, drop
+// duplicates, pack, assign.
 // ---------------------------------------------------------------------------------------------
 
-/** 'att': AT&T lead list (street address, PSA pack). 'sr': SalesRabbit export (coordinates only). */
-export type LeadFormat = 'att' | 'sr';
+/**
+ * 'att': AT&T lead list (street address, PSA pack). 'sr': SalesRabbit export or SalesRabbit+
+ * import file. 'generic': any other file with coordinates or a street address + city/ZIP. 'sr' and
+ * 'generic' map the same way (`mapSrLeads`); the name only tells the preview what it saw.
+ */
+export type LeadFormat = 'att' | 'sr' | 'generic';
 
 /**
- * The format of a lead file from its header row (exact column names, as the mappers read them):
- * Latitude + Longitude, plus Door Knock Allowed + PSA for AT&T, or Apt/Suite for SalesRabbit.
- * Null when it is neither.
+ * The format of a lead file from its header row. AT&T: the exact columns Latitude, Longitude, Door
+ * Knock Allowed and PSA. Else any file with coordinate columns (Latitude/Lat + Longitude/Lng/Long)
+ * or a street address column plus City or ZIP (headers matched by `headerKey` and FIELD_ALIASES):
+ * 'sr' when it has SalesRabbit's Apt/Suite or Assigned to (email) + Status, else 'generic'.
+ * Null when it has neither coordinates nor an address.
  */
 export function detectLeadFormat(header: readonly string[]): LeadFormat | null {
-  const columns = new Set(header.map((h) => h.trim()));
-  if (!columns.has('Latitude') || !columns.has('Longitude')) return null;
-  if (columns.has('Door Knock Allowed') && columns.has('PSA')) return 'att';
-  if (columns.has('Apt/Suite')) return 'sr';
-  return null;
+  const exact = new Set(header.map((h) => h.trim()));
+  if (exact.has('Latitude') && exact.has('Longitude') && exact.has('Door Knock Allowed') && exact.has('PSA')) return 'att';
+  const c = leadColumns(header);
+  if (!(c.lat && c.lng) && !(c.address && (c.city || c.zip))) return null;
+  const keys = new Set(header.map(headerKey));
+  return keys.has('aptsuite') || (c.assignedEmail && c.status) ? 'sr' : 'generic';
+}
+
+type LeadFile =
+  | { ok: true; format: LeadFormat; rows: string[][]; records: Record<string, string>[] }
+  | { ok: false; reason: 'empty' | 'unknown-format' };
+
+function readLeadFile(text: string, format: LeadFormat | undefined): LeadFile {
+  const [header, ...rows] = parseCsv(text);
+  if (!header || rows.length === 0) return { ok: false, reason: 'empty' };
+  const detected = format ?? detectLeadFormat(header);
+  if (!detected) return { ok: false, reason: 'unknown-format' };
+  return { ok: true, format: detected, rows, records: toRecords(header, rows) };
+}
+
+export type LeadGeocodeResult =
+  | { ok: true; format: LeadFormat; requests: LeadGeocodeRequest[] }
+  | { ok: false; reason: 'empty' | 'unknown-format' };
+
+/**
+ * Step 1 of a preview: the street addresses to geocode (rows without coordinates that have a
+ * street plus city or ZIP and a US or blank country), one per distinct address. AT&T files never
+ * need any. Pass the geocoder's points (by `key`) to `planLeadImport` as `geocoded`.
+ */
+export function leadGeocodeRequests(text: string, opts: { format?: LeadFormat } = {}): LeadGeocodeResult {
+  const file = readLeadFile(text, opts.format);
+  if (!file.ok) return file;
+  if (file.format === 'att') return { ok: true, format: file.format, requests: [] };
+  const requests = new Map<string, LeadGeocodeRequest>();
+  for (const row of readSrRows(file.records)) {
+    if (row.hasCoords) continue;
+    const req = geocodeRequestOf(row);
+    if (req && !requests.has(req.key)) requests.set(req.key, req);
+  }
+  return { ok: true, format: file.format, requests: [...requests.values()] };
 }
 
 /**
@@ -461,8 +930,8 @@ export function normalizeAddress(address: string, city: string): string {
   return street ? `${street}|${words(city)}` : '';
 }
 
-export interface LeadDedupe {
-  kept: LeadHouse[];
+export interface LeadDedupe<T extends LeadHouse = LeadHouse> {
+  kept: T[];
   /** Leads that are already doors in this campaign. */
   duplicates: number;
 }
@@ -479,7 +948,7 @@ export function leadDocId(campaignId: string, leadId: string): string {
  * Drops leads that are already doors of this campaign: the same id, the same normalized address,
  * or within DUPLICATE_RADIUS_M (see there). Doors of other campaigns are ignored.
  */
-export function dedupeLeads(leads: readonly LeadHouse[], existing: readonly House[], campaignId: string): LeadDedupe {
+export function dedupeLeads<T extends LeadHouse>(leads: readonly T[], existing: readonly House[], campaignId: string): LeadDedupe<T> {
   const mine = existing.filter((h) => h.campaignId === campaignId);
   const ids = new Set(mine.map((h) => h.id));
   const addresses = new Set(mine.map((h) => normalizeAddress(h.address, h.city)).filter(Boolean));
@@ -493,7 +962,7 @@ export function dedupeLeads(leads: readonly LeadHouse[], existing: readonly Hous
     else grid.set(key, [h]);
   }
 
-  const kept: LeadHouse[] = [];
+  const kept: T[] = [];
   let duplicates = 0;
   for (const lead of leads) {
     const key = normalizeAddress(lead.address, lead.city);
@@ -513,7 +982,7 @@ export function dedupeLeads(leads: readonly LeadHouse[], existing: readonly Hous
   return { kept, duplicates };
 }
 
-export type LeadSkipReason = 'not-door-knock-allowed' | 'no-coordinates' | 'no-pack' | 'repeated-row';
+export type LeadSkipReason = 'not-door-knock-allowed' | 'no-coordinates' | 'not-located' | 'no-pack' | 'repeated-row';
 
 export interface LeadPackSummary {
   packId: string;
@@ -529,7 +998,7 @@ export interface LeadImportPlan {
   campaignId: string;
   /** Data rows in the file (blank lines ignored). */
   rows: number;
-  /** Ready-to-write docs (unknocked, `updatedAt` = plan time), in file mapping order. */
+  /** Ready-to-write docs (`updatedAt` = plan time), in file mapping order. */
   houses: House[];
   /** Packs the houses go into, by name (natural order). */
   packs: LeadPackSummary[];
@@ -543,18 +1012,57 @@ export interface LeadImportPlan {
   /**
    * Where the file's rows went, before dropping doors already in the campaign: `houseRows` became
    * one house each; `apartmentRows` became apartments of `buildings` MDUs (many rows, one door
-   * each building). rows = houseRows + apartmentRows + the row reasons in `skipped`
-   * (not-door-knock-allowed, no-coordinates, no-pack, repeated-row).
+   * each building). rows = houseRows + apartmentRows + the row reasons in `skipped`.
    */
   rowsBreakdown: { houseRows: number; apartmentRows: number; buildings: number };
+  /** Rows placed on the map by the geocoder; `approximate` of them matched a nearby or partly different address. */
+  geocoded: number;
+  approximate: number;
+  /** Rows with a street address but no map location (not US, no city/ZIP, no geocoder match, or not geocoded); also in `skipped`. */
+  notLocated: number;
+  /**
+   * The file's statuses that matched a campaign result, rows each (most first). Those doors /
+   * units get an imported mark (no knock, never counted as a visit).
+   */
+  statuses: { name: string; dispositionId: string; count: number }[];
+  /** Statuses that matched no result, rows each (most first): those doors import unknocked. */
+  unmatchedStatuses: { name: string; count: number }[];
+  /** `assignTo` 'from the file' only: emails that matched a user, rows each (most first). */
+  assignees: { email: string; repId: string; count: number }[];
+  /** `assignTo` 'from the file' only: emails that matched nobody, rows each: those doors import unassigned. */
+  unmatchedAssignees: { email: string; count: number }[];
+  /** Different "Assigned to (email)" values in the file (whatever `assignTo` is), so the screen can offer "From the file". */
+  fileAssignees: number;
+  /** Appointment cells kept on the imported mark, and ignored (no matched status that takes one, or not a date). */
+  appointments: { kept: number; ignored: number };
+  /** Rows with a contact (name, business, phone or email) and with a note. */
+  contacts: number;
+  notes: number;
+}
+
+/** A user an "Assigned to (email)" can name. */
+export interface LeadRep {
+  uid: string;
+  email: string;
+  managerId: string | null;
 }
 
 export interface LeadPlanOptions {
   campaignId: string;
   /** Houses already on the server (and queued) in `campaignId`; doors of other campaigns are ignored. */
   existing: readonly House[];
-  /** Rep the houses go to (with that rep's manager); omitted/null = unassigned. */
-  assignTo?: { repId: string; managerId: string | null } | null;
+  /** The importing user's uid: `repId` of imported marks and `by` of imported notes. */
+  by: string;
+  /** The campaign's results, for the Status column (missing = every status unmatched). */
+  dispositions?: readonly Disposition[];
+  /**
+   * Who the houses go to: one rep (with that rep's manager), or each door to the user its
+   * "Assigned to (email)" names (`fromFile`: the users to look emails up in; unknown or blank =
+   * unassigned). Omitted/null = unassigned.
+   */
+  assignTo?: { repId: string; managerId: string | null } | { fromFile: readonly LeadRep[] } | null;
+  /** Geocoder points by `LeadGeocodeRequest.key` (`leadGeocodeRequests`); missing = no address rows located. */
+  geocoded?: ReadonlyMap<string, LeadPoint>;
   /** Skips header detection. */
   format?: LeadFormat;
   now?: number;
@@ -564,29 +1072,40 @@ export type LeadPlanResult = { ok: true; plan: LeadImportPlan } | { ok: false; r
 
 /**
  * What importing this CSV into the campaign would write: detects the format, maps rows to houses
- * (AT&T: PSA packs, MDUs by building; SR: ~2 km packs continuing the campaign's SR pack numbers,
- * MDUs by 3 m apt clusters, `addressPending`), gives them campaign-scoped ids (`leadDocId`), and
- * drops leads already in the campaign. Nothing is written.
+ * (AT&T: PSA packs, MDUs by building; SR / generic: ~2 km packs continuing the campaign's SR pack
+ * numbers, MDUs by address or 3 m apt clusters, the file's address or `addressPending`, contacts,
+ * notes, statuses), gives them campaign-scoped ids (`leadDocId`), drops leads already in the
+ * campaign, and assigns them. Nothing is written.
  */
 export function planLeadImport(text: string, opts: LeadPlanOptions): LeadPlanResult {
-  const [header, ...rows] = parseCsv(text);
-  if (!header || rows.length === 0) return { ok: false, reason: 'empty' };
-  const format = opts.format ?? detectLeadFormat(header);
-  if (!format) return { ok: false, reason: 'unknown-format' };
-  const records = toRecords(header, rows);
-  const mapped = format === 'att' ? mapAttLeads(records) : srLeadHouses(records);
+  const file = readLeadFile(text, opts.format);
+  if (!file.ok) return file;
+  const { format, rows, records } = file;
+  const mapped =
+    format === 'att'
+      ? { ...mapAttLeads(records), stats: emptyRowStats() }
+      : srLeadHouses(records, { dispositions: opts.dispositions, geocoded: opts.geocoded });
   const scoped = mapped.houses.map((h) => ({ ...h, id: leadDocId(opts.campaignId, h.id) }));
   const { kept, duplicates } = dedupeLeads(scoped, opts.existing, opts.campaignId);
   const mine = opts.existing.filter((h) => h.campaignId === opts.campaignId);
-  if (format === 'sr') packSrHouses(kept, mine);
+  if (format !== 'att') packSrHouses(kept, mine);
 
-  const doc = {
-    campaignId: opts.campaignId,
-    assignedRepId: opts.assignTo?.repId ?? null,
-    managerId: opts.assignTo?.managerId ?? null,
-    now: opts.now ?? Date.now(),
+  const now = opts.now ?? Date.now();
+  const assignTo = opts.assignTo ?? null;
+  const byEmail = assignTo && 'fromFile' in assignTo ? new Map(assignTo.fromFile.map((r) => [r.email.trim().toLowerCase(), r])) : null;
+  const assignee = (h: LeadHouse): { repId: string; managerId: string | null } | null => {
+    if (!assignTo) return null;
+    if ('repId' in assignTo) return assignTo;
+    const rep = h.assignEmail ? byEmail?.get(h.assignEmail) : undefined;
+    return rep ? { repId: rep.uid, managerId: rep.managerId } : null;
   };
-  const houses: House[] = kept.map((h) => ({ id: h.id, ...leadHouseDoc(h, doc) }));
+  const houses: House[] = kept.map((h) => {
+    const a = assignee(h);
+    return {
+      id: h.id,
+      ...leadHouseDoc(h, { campaignId: opts.campaignId, assignedRepId: a?.repId ?? null, managerId: a?.managerId ?? null, now, by: opts.by }),
+    };
+  });
   const known = new Set(mine.map((h) => h.packId));
   const packs = new Map<string, LeadPackSummary>();
   for (const h of houses) {
@@ -598,6 +1117,7 @@ export function planLeadImport(text: string, opts: LeadPlanOptions): LeadPlanRes
     [
       ['not-door-knock-allowed', mapped.skipped.notAllowed],
       ['no-coordinates', mapped.skipped.noCoords],
+      ['not-located', mapped.skipped.notLocated],
       ['no-pack', mapped.skipped.noPack],
       ['repeated-row', mapped.skipped.repeated],
     ] as const
@@ -606,6 +1126,11 @@ export function planLeadImport(text: string, opts: LeadPlanOptions): LeadPlanRes
     .map(([reason, count]) => ({ reason, count }));
   const mdus = houses.filter((h) => h.unitOrder);
   const mappedMdus = mapped.houses.filter((h) => h.unitOrder);
+  const { stats } = mapped;
+  const mostFirst = <T extends { count: number }>(list: T[], name: (x: T) => string) =>
+    list.sort((a, b) => b.count - a.count || naturalCompare(name(a), name(b)));
+  const statusList = [...stats.statuses.values()];
+  const emailList = [...stats.assignees].map(([email, count]) => ({ email, count, rep: byEmail?.get(email) }));
   return {
     ok: true,
     plan: {
@@ -623,6 +1148,33 @@ export function planLeadImport(text: string, opts: LeadPlanOptions): LeadPlanRes
         apartmentRows: mappedMdus.reduce((n, h) => n + (h.unitOrder?.length ?? 0), 0),
         buildings: mappedMdus.length,
       },
+      geocoded: stats.geocoded,
+      approximate: stats.approximate,
+      notLocated: mapped.skipped.notLocated,
+      statuses: mostFirst(
+        statusList.flatMap((s) => (s.dispositionId ? [{ name: s.name, dispositionId: s.dispositionId, count: s.count }] : [])),
+        (s) => s.name,
+      ),
+      unmatchedStatuses: mostFirst(
+        statusList.flatMap((s) => (s.dispositionId ? [] : [{ name: s.name, count: s.count }])),
+        (s) => s.name,
+      ),
+      assignees: byEmail
+        ? mostFirst(
+            emailList.flatMap((e) => (e.rep ? [{ email: e.email, repId: e.rep.uid, count: e.count }] : [])),
+            (e) => e.email,
+          )
+        : [],
+      unmatchedAssignees: byEmail
+        ? mostFirst(
+            emailList.flatMap((e) => (e.rep ? [] : [{ email: e.email, count: e.count }])),
+            (e) => e.email,
+          )
+        : [],
+      fileAssignees: stats.assignees.size,
+      appointments: stats.appointments,
+      contacts: stats.contacts,
+      notes: stats.notes,
     },
   };
 }

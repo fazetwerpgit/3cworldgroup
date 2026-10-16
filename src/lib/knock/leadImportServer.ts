@@ -1,11 +1,22 @@
 import type { Firestore } from 'firebase-admin/firestore';
-import { planLeadImport, type LeadImportPlan } from './leadImport';
-import type { House, HouseDoc } from './types';
+import { geocodeAddresses } from './geocode';
+import {
+  leadGeocodeRequests,
+  parseCsv,
+  planLeadImport,
+  type LeadImportPlan,
+  type LeadPlanOptions,
+  type LeadPoint,
+  type LeadRep,
+} from './leadImport';
+import type { Disposition, House, HouseDoc } from './types';
 
 // Server side of the owner's lead-list upload (Admin settings > Lead lists): reads the request,
 // plans the import with the app's own planner (leadImport.ts, copied from 3c-knock-logic) against
 // the houses already on the server, and writes the new doors. The client never sends a plan: both
 // preview and import plan from the CSV text here, so what is written is always the server's plan.
+// Rows with only a street address are placed with the US Census geocoder (geocode.ts), from here:
+// the Census sends no CORS headers, so the browser can't call it.
 
 export const HOUSES_COLLECTION = 'houses';
 export const CAMPAIGNS_COLLECTION = 'campaigns';
@@ -30,9 +41,15 @@ export function leadImportLive(): boolean {
 export interface LeadImportInput {
   csvText: string;
   campaignId: string;
-  /** A portal user's uid the doors go to; null = nobody yet. */
+  /** A portal user's uid the doors go to, LEAD_ASSIGN_FROM_FILE, or null = nobody yet. */
   assignTo: string | null;
 }
+
+/** `assignTo` value: each door goes to the active user whose email is the row's "Assigned to (email)". */
+export const LEAD_ASSIGN_FROM_FILE = 'file';
+
+const UNKNOWN_FORMAT =
+  "This isn't a lead file the portal can read. It needs Latitude and Longitude columns, or Address with City or ZIP. Save it as CSV.";
 
 export type LeadImportFailure = { ok: false; status: number; code: string; error: string };
 
@@ -106,48 +123,103 @@ export interface ServerLeadPlan {
   ok: true;
   plan: LeadImportPlan;
   campaign: { id: string; name: string };
+  /** The one person every door goes to; null for nobody or `fromFile`. */
   assignee: { uid: string; name: string } | null;
+  /** Doors go to the people the file's "Assigned to (email)" names. */
+  fromFile: boolean;
+  /** `fromFile`: names of the users the file's emails matched, by uid. */
+  names: Record<string, string>;
 }
 
+const nameOf = (uid: string, user: FirebaseFirestore.DocumentData) => String(user.displayName || user.email || uid);
+
 /**
- * Plans the import against the campaign's doors on the server. Lead ids are campaign-scoped
- * (`leadDocId`), so other campaigns never matter. Same steps as the app's previewLeadImport.
+ * Plans the import against the campaign's doors on the server, the same three steps as the app's
+ * previewLeadImport: the addresses to locate (`leadGeocodeRequests`), the Census geocoder
+ * (`geocodeAddresses`), then `planLeadImport` with the campaign's results (Status column), `by`
+ * (the importing owner: imported marks and notes) and who the doors go to. Lead ids are
+ * campaign-scoped (`leadDocId`), so other campaigns never matter.
  */
 export async function planLeadsOnServer(
   db: Firestore,
   input: LeadImportInput,
-  now = Date.now()
+  opts: { by: string; now?: number }
 ): Promise<ServerLeadPlan | LeadImportFailure> {
+  // Counted first so an oversized file is refused before any geocoding.
+  const rows = parseCsv(input.csvText).length - 1;
+  if (rows < 1) return fail(400, 'empty', 'This file has no rows.');
+  if (rows > MAX_LEAD_ROWS) {
+    return fail(
+      413,
+      'too-many-rows',
+      `This file has ${rows.toLocaleString('en-US')} rows. The most at once is ${MAX_LEAD_ROWS.toLocaleString('en-US')}: split it into smaller files.`
+    );
+  }
+  const located = leadGeocodeRequests(input.csvText);
+  if (!located.ok) return fail(400, located.reason, located.reason === 'empty' ? 'This file has no rows.' : UNKNOWN_FORMAT);
+
   const campaignSnap = await db.collection(CAMPAIGNS_COLLECTION).doc(input.campaignId).get();
   if (!campaignSnap.exists) return fail(404, 'unknown-campaign', 'That campaign is not in 3C Doors. Pick it again.');
-  const campaignName = String(campaignSnap.data()?.name ?? input.campaignId);
+  const campaign = campaignSnap.data() ?? {};
+  const dispositions = Array.isArray(campaign.dispositions) ? (campaign.dispositions as Disposition[]) : undefined;
 
   let assignee: ServerLeadPlan['assignee'] = null;
-  let assignTo: { repId: string; managerId: string | null } | null = null;
-  if (input.assignTo) {
+  let assignTo: LeadPlanOptions['assignTo'] = null;
+  const names: Record<string, string> = {};
+  const fromFile = input.assignTo === LEAD_ASSIGN_FROM_FILE;
+  if (fromFile) {
+    const users = await db.collection('users').where('status', '==', 'active').get();
+    const reps: LeadRep[] = [];
+    for (const doc of users.docs) {
+      const user = doc.data();
+      if (typeof user.email !== 'string' || !user.email) continue;
+      reps.push({ uid: doc.id, email: user.email, managerId: typeof user.managerId === 'string' ? user.managerId : null });
+      names[doc.id] = nameOf(doc.id, user);
+    }
+    assignTo = { fromFile: reps };
+  } else if (input.assignTo) {
     const userSnap = await db.collection('users').doc(input.assignTo).get();
     const user = userSnap.data();
     if (!userSnap.exists || !user || user.status !== 'active') return fail(400, 'unknown-rep', 'Pick the rep again.');
-    assignee = { uid: input.assignTo, name: String(user.displayName || user.email || input.assignTo) };
+    assignee = { uid: input.assignTo, name: nameOf(input.assignTo, user) };
     assignTo = { repId: input.assignTo, managerId: typeof user.managerId === 'string' ? user.managerId : null };
+  }
+
+  let geocoded: Map<string, LeadPoint> | undefined;
+  if (located.requests.length > 0) {
+    const result = await geocodeAddresses(located.requests);
+    if (!result.ok) {
+      return fail(
+        503,
+        'geocoder-unavailable',
+        "Couldn't look up the addresses on the map: the US Census address service didn't answer. Try again in a few minutes."
+      );
+    }
+    geocoded = result.points;
   }
 
   const snap = await db.collection(HOUSES_COLLECTION).where('campaignId', '==', input.campaignId).get();
   const existing = snap.docs.map((doc): House => ({ id: doc.id, ...(doc.data() as HouseDoc) }));
-  const result = planLeadImport(input.csvText, { campaignId: input.campaignId, existing, assignTo, now });
-  if (!result.ok) {
-    return result.reason === 'empty'
-      ? fail(400, 'empty', 'This file has no rows.')
-      : fail(400, 'unknown-format', "This isn't an AT&T or SalesRabbit lead file.");
-  }
-  if (result.plan.rows > MAX_LEAD_ROWS) {
-    return fail(
-      413,
-      'too-many-rows',
-      `This file has ${result.plan.rows.toLocaleString('en-US')} rows. The most at once is ${MAX_LEAD_ROWS.toLocaleString('en-US')}: split it into smaller files.`
-    );
-  }
-  return { ok: true, plan: result.plan, campaign: { id: input.campaignId, name: campaignName }, assignee };
+  const result = planLeadImport(input.csvText, {
+    campaignId: input.campaignId,
+    existing,
+    by: opts.by,
+    dispositions,
+    assignTo,
+    geocoded,
+    format: located.format,
+    now: opts.now,
+  });
+  if (!result.ok) return fail(400, result.reason, result.reason === 'empty' ? 'This file has no rows.' : UNKNOWN_FORMAT);
+  const usedNames = fromFile ? Object.fromEntries(result.plan.assignees.map((a) => [a.repId, names[a.repId]])) : {};
+  return {
+    ok: true,
+    plan: result.plan,
+    campaign: { id: input.campaignId, name: String(campaign.name ?? input.campaignId) },
+    assignee,
+    fromFile,
+    names: usedNames,
+  };
 }
 
 /** What preview and import send back about a plan: counts only, never the doors themselves. */
@@ -155,6 +227,7 @@ export interface LeadPlanSummary {
   format: LeadImportPlan['format'];
   campaign: ServerLeadPlan['campaign'];
   assignee: ServerLeadPlan['assignee'];
+  fromFile: boolean;
   /** Data rows in the file. */
   rows: number;
   /** Where the rows went: houses, apartments in buildings (the rest are in `skipped`). */
@@ -166,13 +239,28 @@ export interface LeadPlanSummary {
   duplicates: number;
   mdus: number;
   units: number;
+  /** Doors without a street address yet (the app fills it in on first open). */
+  addressPending: number;
+  geocoded: number;
+  approximate: number;
+  notLocated: number;
+  statuses: LeadImportPlan['statuses'];
+  unmatchedStatuses: LeadImportPlan['unmatchedStatuses'];
+  /** `fromFile` only: who the file's emails matched (with their portal name), rows each. */
+  assignees: { email: string; uid: string; name: string; count: number }[];
+  unmatchedAssignees: LeadImportPlan['unmatchedAssignees'];
+  fileAssignees: number;
+  appointments: LeadImportPlan['appointments'];
+  contacts: number;
+  notes: number;
 }
 
-export function planSummary({ plan, campaign, assignee }: ServerLeadPlan): LeadPlanSummary {
+export function planSummary({ plan, campaign, assignee, fromFile, names }: ServerLeadPlan): LeadPlanSummary {
   return {
     format: plan.format,
     campaign,
     assignee,
+    fromFile,
     rows: plan.rows,
     rowsBreakdown: plan.rowsBreakdown,
     doors: plan.houses.length,
@@ -181,6 +269,18 @@ export function planSummary({ plan, campaign, assignee }: ServerLeadPlan): LeadP
     duplicates: plan.duplicates,
     mdus: plan.mdus,
     units: plan.units,
+    addressPending: plan.houses.filter((h) => h.addressPending).length,
+    geocoded: plan.geocoded,
+    approximate: plan.approximate,
+    notLocated: plan.notLocated,
+    statuses: plan.statuses,
+    unmatchedStatuses: plan.unmatchedStatuses,
+    assignees: plan.assignees.map((a) => ({ email: a.email, uid: a.repId, name: names[a.repId] ?? a.email, count: a.count })),
+    unmatchedAssignees: plan.unmatchedAssignees,
+    fileAssignees: plan.fileAssignees,
+    appointments: plan.appointments,
+    contacts: plan.contacts,
+    notes: plan.notes,
   };
 }
 

@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createFakeLeadDb, type FakeLeadDb } from '@/lib/knock/fakeLeadDb';
-import { ATT_CSV, bigAttCsv, leadSeed } from '@/lib/knock/leadTestCsv';
+import { ATT_CSV, SR_PLUS_CSV, SR_PLUS_POINTS, bigAttCsv, fakeCensusFetch, leadSeed } from '@/lib/knock/leadTestCsv';
 import type { LeadImportEvent } from '@/lib/knock/leadImportServer';
 
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
@@ -40,13 +40,27 @@ async function events(res: Response): Promise<LeadImportEvent[]> {
 const OWNER = { ok: true, uid: 'owner-1', name: 'Owner', isAdmin: true, isOwner: true };
 const ADMIN = { ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true, isOwner: false };
 let fake: FakeLeadDb;
+// The Census geocoder goes through the global fetch: the fake answers, nothing reaches the network.
+const fetchMock = vi.fn(fakeCensusFetch(SR_PLUS_POINTS));
 
 beforeEach(() => {
   mockGate.mockReset();
   fake = createFakeLeadDb(leadSeed());
   holder.db = fake.db;
   process.env.KNOCK_LEAD_IMPORT_LIVE = '1';
+  fetchMock.mockReset();
+  fetchMock.mockImplementation(fakeCensusFetch(SR_PLUS_POINTS));
+  vi.stubGlobal('fetch', fetchMock);
 });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/** The written house at this latitude (SR_PLUS_CSV rows each have their own). */
+function houseAt(lat: number): Record<string, unknown> | undefined {
+  return [...fake.docs('houses').values()].find((h) => h.lat === lat);
+}
 
 describe('POST /api/portal/knock/leads/import', () => {
   it('refuses every non-owner and writes nothing', async () => {
@@ -149,5 +163,48 @@ describe('POST /api/portal/knock/leads/import', () => {
       handled: 450,
     });
     expect(fake.docs('houses').size).toBe(2 + 450);
+  });
+
+  it('writes a SalesRabbit+ file: located doors, imported statuses by the owner, contacts, notes, reps from the file', async () => {
+    mockGate.mockResolvedValue(OWNER);
+    const lines = await events(await POST(req({ csvText: SR_PLUS_CSV, campaignId: 'camp-1', assignTo: 'file' })));
+    expect(lines.at(-1)).toMatchObject({ type: 'done', written: 5, alreadyThere: 0, summary: { fromFile: true, geocoded: 2 } });
+
+    // Row 1: placed by the geocoder, Not Home with 3 visits as an imported mark (no knock), rep1.
+    const ann = houseAt(35.401);
+    expect(ann).toMatchObject({
+      campaignId: 'camp-1',
+      lng: -97.501,
+      assignedRepId: 'rep-1',
+      managerId: 'mgr-1',
+      last: { dispositionId: 'not_home', repId: 'owner-1', knockId: '', imported: true },
+      notHomeCount: 3,
+      contact: { name: 'Ann Test', phone: '555-0100' },
+      doorNote: { text: 'Dog in yard', by: 'owner-1' },
+      noteEdit: { unit: null, by: 'owner-1' },
+    });
+    expect(ann).not.toHaveProperty('addressPending');
+    // Row 2: Go Back keeps its appointment.
+    expect(houseAt(35.402)).toMatchObject({
+      last: { dispositionId: 'go_back', imported: true, appointmentAt: Date.parse('2026-11-01T15:00:00Z') },
+      contact: { name: 'Bo Sample' },
+    });
+    // Row 4: email in capitals still finds rep1; Sold takes no appointment, so none is kept.
+    const sold = houseAt(35.47);
+    expect(sold).toMatchObject({ assignedRepId: 'rep-1', addressPending: true, last: { dispositionId: 'sold', imported: true } });
+    expect(sold?.last).not.toHaveProperty('appointmentAt');
+    // Row 6: unknown status and someone not in the portal: unknocked and unassigned.
+    expect(houseAt(35.472)).toMatchObject({ assignedRepId: null, managerId: null, last: null, notHomeCount: 0 });
+  });
+
+  it('writes nothing when the geocoder does not answer', async () => {
+    mockGate.mockResolvedValue(OWNER);
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError('fetch failed');
+    });
+    const res = await POST(req({ csvText: SR_PLUS_CSV, campaignId: 'camp-1' }));
+    expect(res.status).toBe(503);
+    expect((await res.json()).code).toBe('geocoder-unavailable');
+    expect(fake.commits).toEqual([]);
   });
 });

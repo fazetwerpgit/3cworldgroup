@@ -68,6 +68,55 @@ export const SR_CSV = csv([
   ['', '', '35.475000', '-97.520000'],
 ]);
 
+/**
+ * A SalesRabbit+ style file (made-up people on made-up streets) of 7 rows:
+ * 1. address only, located exactly, "Not Home 3", rep1, a contact and a note;
+ * 2. address only, located approximately, "Go Back" with an appointment, rep1, a contact;
+ * 3. address only, no geocoder match (not located), stranger;
+ * 4. coordinates only, "Sold" with an unreadable appointment, REP1 in capitals;
+ * 5. address with neither city nor ZIP (can't be looked up: not located);
+ * 6. coordinates only, "Knock" (no such result), stranger.
+ * 7. coordinates only, no status, nobody.
+ */
+export const SR_PLUS_CSV = csv([
+  ['First Name', 'Last Name', 'Phone', 'Address', 'City', 'State', 'Zip', 'Apt/Suite', 'Latitude', 'Longitude', 'Status', 'Assigned to (email)', 'Appointment', 'Notes'],
+  ['ANN', 'TEST', '555-0100', '10 Test Ln', 'Testville', 'OK', '73000', '', '', '', 'Not Home 3', 'rep1@example.test', '', 'Dog in yard'],
+  ['bo', 'sample', '', '12 Test Ln', 'Testville', 'OK', '73000', '', '', '', 'Go Back', 'rep1@example.test', '2026-11-01T15:00:00Z', ''],
+  ['', '', '', '99 Nowhere Rd', 'Testville', 'OK', '73000', '', '', '', '', 'stranger@example.test', '', ''],
+  ['', '', '', '', '', '', '', '', '35.470000', '-97.520000', 'Sold', 'REP1@EXAMPLE.TEST', 'tomorrow', ''],
+  ['', '', '', '5 Lost Way', '', '', '', '', '', '', '', '', '', ''],
+  ['', '', '', '', '', '', '', '', '35.472000', '-97.520000', 'Knock', 'stranger@example.test', '', ''],
+  ['', '', '', '', '', '', '', '', '35.474000', '-97.520000', '', '', '', ''],
+]);
+
+/** Where the fake Census geocoder finds SR_PLUS_CSV's streets (others: No_Match). */
+export const SR_PLUS_POINTS: Record<string, { lat: number; lng: number; exact: boolean }> = {
+  '10 Test Ln': { lat: 35.401, lng: -97.501, exact: true },
+  '12 Test Ln': { lat: 35.402, lng: -97.501, exact: false },
+};
+
+/**
+ * A stand-in for the Census batch endpoint (geocode.ts posts a multipart CSV of
+ * `"id","street","city","state","zip"` rows): answers each row from `points` by street, in the
+ * Census answer format. Never touches the network.
+ */
+export function fakeCensusFetch(points: Record<string, { lat: number; lng: number; exact: boolean }>) {
+  return async (_url: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const rows = [...String(init?.body ?? '').matchAll(/^"(\d+)","([^"]*)",/gm)];
+    const answer = rows.map(([, id, street]) => {
+      const p = points[street];
+      return p
+        ? `"${id}","${street}","Match","${p.exact ? 'Exact' : 'Non_Exact'}","${street.toUpperCase()}","${p.lng},${p.lat}","1","L"`
+        : `"${id}","${street}","No_Match"`;
+    });
+    return new Response(answer.join('\n'), { status: 200 });
+  };
+}
+
+function disposition(id: string, label: string, extra: Record<string, unknown> = {}) {
+  return { id, label, color: '#888888', glyph: 'check', contact: false, notes: false, appointment: false, sale: false, everyCampaign: false, kind: null, ...extra };
+}
+
 /** Firestore seed: campaigns, users and the two houses ATT_CSV runs into. */
 export function leadSeed(): Record<string, Record<string, Record<string, unknown>>> {
   const house = (campaignId: string, packId: string, packName: string, address: string, lat: number, lng: number) => ({
@@ -90,13 +139,21 @@ export function leadSeed(): Record<string, Record<string, Record<string, unknown
   });
   return {
     campaigns: {
-      'camp-1': { name: 'Test Fiber', type: 'fiber', dispositions: [] },
+      'camp-1': {
+        name: 'Test Fiber',
+        type: 'fiber',
+        dispositions: [
+          disposition('not_home', 'Not Home', { kind: 'notHome' }),
+          disposition('go_back', 'Go Back', { contact: true, appointment: true }),
+          disposition('sold', 'Sold', { contact: true, sale: true }),
+        ],
+      },
       'camp-2': { name: 'Other Fiber', type: 'fiber', dispositions: [] },
     },
     users: {
-      'owner-1': { status: 'active', displayName: 'Owner', role: 'owner' },
-      'rep-1': { status: 'active', displayName: 'Rep One', managerId: 'mgr-1' },
-      'rep-gone': { status: 'inactive', displayName: 'Former Rep' },
+      'owner-1': { status: 'active', displayName: 'Owner', role: 'owner', email: 'owner@example.test' },
+      'rep-1': { status: 'active', displayName: 'Rep One', managerId: 'mgr-1', email: 'rep1@example.test' },
+      'rep-gone': { status: 'inactive', displayName: 'Former Rep', email: 'gone@example.test' },
     },
     houses: {
       'camp-1__att-l8': house('camp-1', 'att-1111pa', '1111PA', '400 Maple Dr', 35.14, -97.14),

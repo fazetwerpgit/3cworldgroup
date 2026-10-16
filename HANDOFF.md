@@ -18,16 +18,25 @@ background (intent, stack, design system, constraints) and still applies.
 > "Signed (no stored copy)" in Review.
 
 > **3C Doors lead lists (2026-10-13, branch `knock-sale-drafts`, not deployed):** owner-only
-> tab Admin settings > Lead lists (`src/components/knock/LeadListUpload.tsx`) uploads an AT&T
-> lead list or SalesRabbit export (CSV, ≤ 10 MB / 20,000 rows; the page gzips the body to fit
+> tab Admin settings > Lead lists (`src/components/knock/LeadListUpload.tsx`) uploads a lead
+> list (AT&T, SalesRabbit / SalesRabbit+, or any CSV with Latitude/Longitude or Address + City/ZIP;
+> CSV, ≤ 10 MB / 20,000 rows; the page gzips the body to fit
 > Vercel's 4.5 MB cap) into the app's top-level `houses` collection. APIs (all owner only):
 > `GET /api/portal/knock/leads` (campaigns, active people, switch state),
 > `POST /api/portal/knock/leads/preview` and `POST /api/portal/knock/leads/import`
-> (`{ csvText, campaignId, assignTo? }`). Both plan on the server with
-> `src/lib/knock/leadImport.ts`, a verbatim copy of 3c-knock-logic `src/lib/leadImport.ts`
-> (commit `8090861`; re-copy when the app changes it, never edit it here) against the
+> (`{ csvText, campaignId, assignTo? }`; `assignTo` = a uid, `'file'` = each door to the active
+> user whose email is the row's "Assigned to (email)", or null). Both plan on the server with
+> `src/lib/knock/leadImport.ts` and `geocode.ts`, verbatim copies of 3c-knock-logic
+> `src/lib/leadImport.ts` / `geocode.ts` (commit `f289f43`; re-copy when the app changes them,
+> never edit them here; `tsconfig.json` has `allowImportingTsExtensions` for their `./x.ts`
+> imports). Steps: `leadGeocodeRequests` → `geocodeAddresses` (US Census batch geocoder, called
+> from the server because the Census sends no CORS headers; no answer = 503
+> `geocoder-unavailable`, nothing written) → `planLeadImport` with the campaign's `dispositions`
+> (a Status column becomes an imported mark: no knock, never a visit) and `by` = the owner's uid
+> (imported marks and notes), against the
 > campaign's houses only (house ids are campaign-scoped, `<campaignId>__<leadId>`, so the same
-> door can be in two campaigns and other campaigns are never read); import writes 450 per batch with
+> door can be in two campaigns and other campaigns are never read). Import geocodes again (the
+> client plan is never trusted), so both routes have `maxDuration = 300`; import writes 450 per batch with
 > `create` (same file twice adds nothing; existing doors are never overwritten) and streams
 > NDJSON progress. **Kill-switch:** import refuses (403 `not-enabled`) unless the server env
 > `KNOCK_LEAD_IMPORT_LIVE=1`; preview always runs. Set it in Vercel only once Jacob says

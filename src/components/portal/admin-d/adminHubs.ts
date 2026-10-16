@@ -135,12 +135,12 @@ export const SETTINGS_HUB = {
       roles: ['owner'],
       hint: 'The notes Ask 3C answers from, and the questions people asked it.',
     },
-    // 3C Doors: an AT&T / SalesRabbit lead file becomes doors in a campaign.
+    // 3C Doors: a lead file (AT&T, SalesRabbit or any CSV with addresses) becomes doors in a campaign.
     {
       key: 'lead-lists',
       label: 'Lead lists',
       roles: ['owner'],
-      hint: 'Upload an AT&T lead list or SalesRabbit export to add doors to a 3C Doors campaign.',
+      hint: 'Upload a lead list (AT&T, SalesRabbit, or any CSV with addresses or map locations) to add doors to a 3C Doors campaign.',
     },
   ],
 } as const satisfies HubConfig;
