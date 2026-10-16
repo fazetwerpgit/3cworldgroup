@@ -247,7 +247,15 @@ export function receiveNativeMessage(raw: unknown): void {
 export function installNativeReceiver(): void {
   if (installed || typeof window === 'undefined') return;
   installed = true;
-  const onMessage = (event: Event) => receiveNativeMessage((event as MessageEvent).data);
+  // A DOM message event is trusted only from this window itself (the shell's
+  // own postMessage / injected dispatch). Anything with another source, e.g.
+  // an embedded iframe or a window this page opened, is dropped, so it can
+  // neither spoof a reply nor push a token.
+  const onMessage = (event: Event) => {
+    const source = (event as MessageEvent).source;
+    if (source !== null && source !== undefined && source !== window) return;
+    receiveNativeMessage((event as MessageEvent).data);
+  };
   window.addEventListener('message', onMessage);
   // react-native-webview's own postMessage lands on document in some versions.
   document.addEventListener('message', onMessage as EventListener);

@@ -17,8 +17,8 @@ export function deleteConfirmMatches(typed: string): boolean {
 
 // Self-service account deletion (SPEC A3). Shown on the web and in the app.
 // Behind a typed confirmation; the server (DELETE /api/portal/auth/me)
-// disables the sign-in and anonymizes the profile, keeping sales and pay
-// records for payroll, as /privacy says.
+// disables the sign-in and anonymizes the profile. Sales and pay records,
+// with the names on them, are kept for payroll, as /privacy says.
 export default function DeleteAccountCard() {
   const { signOut } = useAuth();
   const [open, setOpen] = useState(false);
@@ -84,8 +84,9 @@ export default function DeleteAccountCard() {
           <form onSubmit={handleDelete} className={st.stack}>
             <p className={p.hint}>
               This closes your portal account for good. You will be signed out and can&apos;t sign back in. Your
-              name, contact details, ID documents and devices are removed. Sales and pay records you were part of are
-              kept, without your contact details, because payroll and carrier reconciliation need them.
+              profile details, contact info, ID documents and devices are removed, and your chat messages show as
+              &ldquo;Deleted user.&rdquo; Your name stays on the sales and pay records the company must keep for
+              payroll and carrier reconciliation.
             </p>
             <label className={p.field}>
               <span className={p.label}>Type {DELETE_CONFIRM_WORD} to confirm</span>

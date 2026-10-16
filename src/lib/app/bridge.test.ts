@@ -178,6 +178,25 @@ describe('native -> web receiver', () => {
     ]);
   });
 
+  it('drops message events from another window (an iframe), including unsolicited push tokens and replies', async () => {
+    const seen: unknown[] = [];
+    onNativeMessage((m) => seen.push(m));
+    const iframeWindow = {};
+    windowListeners.message[0]({ source: iframeWindow, data: { source: '3c-shell', type: 'pushToken', token: 'evil' } });
+
+    const pending = requestNative<'pushToken'>({ type: 'pushToken', prompt: false }, { timeoutMs: 50 });
+    const { id } = lastPosted();
+    windowListeners.message[0]({
+      source: iframeWindow,
+      data: { source: '3c-shell', type: 'reply', id, ok: true, result: { token: 'evil', permission: 'granted' } },
+    });
+    // The same message from this window itself is accepted.
+    windowListeners.message[0]({ source: window, data: { source: '3c-shell', type: 'pushToken', token: 'mine' } });
+
+    expect(seen).toEqual([{ source: '3c-shell', type: 'pushToken', token: 'mine' }]);
+    await expect(pending).rejects.toMatchObject({ code: 'timeout' });
+  });
+
   it('unsubscribes', () => {
     const seen: unknown[] = [];
     const off = onNativeMessage((m) => seen.push(m));

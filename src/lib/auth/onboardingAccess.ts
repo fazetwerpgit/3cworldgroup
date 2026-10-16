@@ -30,8 +30,6 @@ export const ONBOARDING_ALLOWED_APIS = [
   '/api/portal/calls',
   '/api/portal/notifications',
   '/api/portal/profile',
-  // Self-service account deletion from Settings (a hire can delete too).
-  '/api/portal/auth/me',
   '/api/portal/presence',
   '/api/portal/push/register',
   '/api/portal/push/health',

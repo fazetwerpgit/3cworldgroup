@@ -200,6 +200,14 @@ export async function PUT(
         { status: 400 }
       );
     }
+    // The person deleted their own account (DELETE /api/portal/auth/me): the
+    // profile is anonymized and the sign-in closed. It cannot be brought back.
+    if (doc.get('selfDeleted') === true && status !== undefined && status !== 'inactive') {
+      return NextResponse.json(
+        { error: 'This person deleted their own account, so it cannot be reactivated.' },
+        { status: 409 }
+      );
+    }
     if (phone !== undefined && (typeof phone !== 'string' || phone.length > 40)) {
       return NextResponse.json({ error: 'Invalid phone' }, { status: 400 });
     }

@@ -250,6 +250,28 @@ describe('PUT /api/portal/auth/users/[id] activation readiness gate', () => {
   });
 });
 
+describe('PUT /api/portal/auth/users/[id] self-deleted accounts', () => {
+  it('refuses to reactivate an account the person deleted themselves (409)', async () => {
+    firestore.users.set('pending-user', {
+      status: 'inactive',
+      selfDeleted: true,
+      fieldRole: 'entry_level_rep',
+      displayName: 'Deleted user',
+    });
+    const response = await PUT(request({ status: 'active' }), params());
+    expect(response.status).toBe(409);
+    expect(firestore.updates).toEqual([]);
+    expect(firestore.adminAuth.updateUser).not.toHaveBeenCalled();
+
+    expect((await PUT(request({ status: 'pending' }), params())).status).toBe(409);
+  });
+
+  it('still allows a non-status edit on it', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', selfDeleted: true, displayName: 'Deleted user' });
+    expect((await PUT(request({ status: 'inactive' }), params())).status).toBe(200);
+  });
+});
+
 describe('PUT /api/portal/auth/users/[id] role assignment', () => {
   it('kicks off onboarding and does not activate a pending l1 manager', async () => {
     firestore.users.set('pending-user', {

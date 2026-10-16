@@ -1,6 +1,7 @@
 'use client';
 
 import { auth } from '@/lib/firebase/config';
+import { NATIVE_PUSH_PLATFORM } from '@/lib/push/pushTargets';
 import { reportPushHealth } from '@/lib/push/reportPushHealth';
 import { NativeBridgeError, requestNative, type NativePushPermission } from './bridge';
 import { isNativeApp } from './isNativeApp';
@@ -9,7 +10,6 @@ import { isNativeApp } from './isNativeApp';
 // the web registers it against the signed-in user as platform 'ios-native'
 // (users/{uid}.nativePushTokens) and reports push health like the PWA does.
 
-export const NATIVE_PUSH_PLATFORM = 'ios-native' as const;
 const LAST_TOKEN_KEY = '3c-native-push-token';
 
 function readLastToken(): string | null {

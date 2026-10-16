@@ -24,6 +24,7 @@ import { PRACTICE_SESSION_KEY } from '@/lib/ask/practice';
 import { ProfileLoadRetry } from '@/components/auth/ProfileLoadRetry';
 import { unregisterPushOnDevice } from '@/lib/push/enablePushOnDevice';
 import { takePendingDisplayName } from '@/lib/app/nativeAuth';
+import { clearPendingIdToken, rememberPendingIdToken } from '@/lib/auth/pendingSession';
 import { unregisterNativePush } from '@/lib/app/nativePush';
 import { clearViewAs } from '@/lib/viewAs/storage';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
@@ -102,6 +103,16 @@ async function notifyPendingSignup(firebaseUser: FirebaseUser, teamCode?: string
     }).catch(() => {});
   } catch {
     // Best-effort: a missed alert must never fail the signup.
+  }
+}
+
+// Keeps the pending account's ID token (memory only) so the pending screen
+// can still send "Delete my request" after the sign-out. Best-effort.
+async function parkPendingIdToken(firebaseUser: FirebaseUser) {
+  try {
+    rememberPendingIdToken(await firebaseUser.getIdToken());
+  } catch {
+    rememberPendingIdToken(null);
   }
 }
 
@@ -259,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             syncAvatarFromAuth(firebaseUser);
           }
         } else if (isAwaitingRoleAssignment(userData)) {
+          await parkPendingIdToken(firebaseUser);
           if (auth) await firebaseSignOut(auth);
           setState({ user: null, loading: false, error: null, pendingApproval: true });
         } else if (userData.status === 'pending') {
@@ -293,6 +305,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               createdAt: serverTimestamp(),
             });
             await notifyPendingSignup(firebaseUser);
+            await parkPendingIdToken(firebaseUser);
             if (auth) await firebaseSignOut(auth);
             setState({ user: null, loading: false, error: null, pendingApproval: true });
           } catch (profileError) {
@@ -424,6 +437,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (verificationError) {
         console.warn('Failed to send verification email:', verificationError);
       }
+      await parkPendingIdToken(cred.user);
       await firebaseSignOut(auth);
       setState({ user: null, loading: false, error: null, pendingApproval: true });
     } catch (error) {
@@ -436,6 +450,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Let the pending screen return to the login form without a page reload.
   const clearPendingApproval = () => {
+    clearPendingIdToken();
     setState((prev) => ({ ...prev, pendingApproval: false }));
   };
 
