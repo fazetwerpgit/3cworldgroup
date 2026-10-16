@@ -15,6 +15,7 @@ import { RepBoot } from './RepBoot';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, type RepBackLink } from './RepTopBar';
 import { PushNudge } from './PushNudge';
+import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import s from './rep.module.css';
 
 export { RepBoot };
@@ -38,6 +39,8 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   // The owner viewing as a rep (read only): no presence ping or push nudge
   // while the session is on, and the in-scope screens render as the rep.
   const { viewing } = useViewAs();
+  // Inside the 3C iOS app there is nothing to install and the shell owns push.
+  const inApp = useIsNativeApp();
   usePresenceHeartbeat({ enabled: !viewing });
   const { channels } = useChatChannels();
   const { anyUnread } = useChatUnread(channels, user?.uid);
@@ -51,7 +54,7 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
         <RepTopBar chatUnread={anyUnread} navCounts={navCounts} task={task} back={back} />
         <ViewAsBanner />
         {/* Push not working on this device: a banner here, or a full-screen sheet for a required person. */}
-        {viewing ? null : <PushNudge />}
+        {viewing || inApp ? null : <PushNudge />}
         <main className={s.scroller} id="rep-main">
           <div className={s.main}>
             {viewing && isViewAsPath(pathname) ? (

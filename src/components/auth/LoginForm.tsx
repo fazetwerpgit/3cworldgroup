@@ -3,10 +3,29 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CircleCheck, Eye, EyeOff, LoaderCircle } from 'lucide-react';
-import { GoogleAuthProvider, browserLocalPersistence, setPersistence, signInWithPopup } from 'firebase/auth';
+import {
+  GoogleAuthProvider,
+  browserLocalPersistence,
+  setPersistence,
+  signInWithCredential,
+  signInWithPopup,
+} from 'firebase/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
+import { useIsNativeApp } from '@/lib/app/isNativeApp';
+import type { NativeSignInProvider } from '@/lib/app/bridge';
+import {
+  completePendingLink,
+  emailFromAuthError,
+  getNativeCredential,
+  isAccountExistsError,
+  nativeAuthErrorMessage,
+  peekPendingLink,
+  providerLabel,
+  rememberPendingDisplayName,
+  rememberPendingLink,
+} from '@/lib/app/nativeAuth';
 import { useSignupInvite } from '@/lib/onboarding/rememberedInvite';
 import s from '@/components/portal/rep/rep.module.css';
 import { AuthShell } from './AuthShell';
@@ -35,6 +54,15 @@ function GoogleIcon() {
   );
 }
 
+// Apple logo for the in-app "Continue with Apple" button (Apple HIG: monochrome).
+function AppleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M16.37 12.6c-.02-2.2 1.8-3.26 1.88-3.31-1.03-1.5-2.62-1.7-3.18-1.73-1.35-.14-2.64.8-3.33.8-.69 0-1.74-.78-2.86-.76-1.47.02-2.83.86-3.59 2.17-1.53 2.65-.39 6.58 1.1 8.73.73 1.05 1.6 2.23 2.73 2.19 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.07 2.65-2.13.84-1.22 1.18-2.4 1.2-2.46-.03-.01-2.28-.88-2.3-3.48zM14.2 6.13c.6-.73 1.01-1.75.9-2.76-.87.04-1.92.58-2.54 1.31-.56.64-1.05 1.67-.92 2.66.97.08 1.96-.49 2.56-1.21z" />
+    </svg>
+  );
+}
+
 export function AuthAlert({ message }: { message: string }) {
   return (
     <div className={a.alert} role="alert">
@@ -59,6 +87,23 @@ export function LoginForm() {
   // An invite opened on this device: still open -> back to the packet; sent ->
   // the hire already has an account and just signs in.
   const invite = useSignupInvite();
+  // Inside the iOS app the Google popup cannot run: native Google + Apple
+  // buttons replace it. On the web this stays false and nothing changes.
+  const inApp = useIsNativeApp();
+  const [nativeLoading, setNativeLoading] = useState<NativeSignInProvider | null>(null);
+  // Set when a native sign-in hit an account that uses another method: the
+  // person signs in with that method and the native one is linked to it.
+  const [linkPrompt, setLinkPrompt] = useState<string | null>(null);
+  const [linkNotice, setLinkNotice] = useState('');
+
+  // After any successful sign-in in the app, attach a held native credential.
+  const finishPendingLink = async () => {
+    if (!inApp || !peekPendingLink() || !auth?.currentUser) return;
+    const outcome = await completePendingLink(auth.currentUser);
+    setLinkPrompt(null);
+    if (outcome.status === 'linked') setLinkNotice(`${providerLabel(outcome.provider)} is now linked to your account.`);
+    else if (outcome.status === 'failed') setLinkNotice(outcome.message);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +114,7 @@ export function LoginForm() {
       // Keep reps signed in across reloads and browser restarts.
       if (auth) await setPersistence(auth, browserLocalPersistence);
       await signIn(email, password);
+      await finishPendingLink();
     } catch (err: unknown) {
       setError(friendlyAuthError(err));
     } finally {
@@ -88,6 +134,39 @@ export function LoginForm() {
       setError(friendlyAuthError(err));
     } finally {
       setGoogleLoading(false);
+    }
+  };
+
+  // In-app only: the shell runs the native sheet, the web signs in with the
+  // returned credential. AuthContext then loads the profile (or creates the
+  // pending users doc on a first sign-in) exactly as for the web popup.
+  const handleNativeSignIn = async (provider: NativeSignInProvider) => {
+    setError('');
+    setLinkNotice('');
+    setNativeLoading(provider);
+    try {
+      if (!auth) throw new Error('auth/not-configured');
+      await setPersistence(auth, browserLocalPersistence);
+      const native = await getNativeCredential(provider);
+      rememberPendingDisplayName(native.displayName);
+      try {
+        await signInWithCredential(auth, native.credential);
+      } catch (err) {
+        if (!isAccountExistsError(err)) throw err;
+        rememberPendingLink({ provider, credential: native.credential, email: emailFromAuthError(err) });
+        rememberPendingDisplayName(undefined);
+        const who = emailFromAuthError(err);
+        setLinkPrompt(
+          `${who ? `${who} already has` : 'This email already has'} a portal account. Sign in with your existing method to link ${providerLabel(provider)}.`
+        );
+        return;
+      }
+      await finishPendingLink();
+    } catch (err: unknown) {
+      rememberPendingDisplayName(undefined);
+      setError(nativeAuthErrorMessage(err, provider));
+    } finally {
+      setNativeLoading(null);
     }
   };
 
@@ -180,7 +259,9 @@ export function LoginForm() {
       ) : (
         <>
           <h1 className={a.title}>Sign in</h1>
-          <p className={a.sub}>Use your Google account or company email.</p>
+          <p className={a.sub}>
+            {inApp ? 'Use Google, Apple or your company email.' : 'Use your Google account or company email.'}
+          </p>
 
           <div className={a.stack}>
             {error || authError ? <AuthAlert message={error || authError || ''} /> : null}
@@ -191,24 +272,63 @@ export function LoginForm() {
               </div>
             ) : null}
 
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              disabled={googleLoading || loading}
-              className={`${s.btnSecondary} ${a.google}`}
-            >
-              {googleLoading ? (
-                <>
-                  {spinner}
-                  Signing in
-                </>
-              ) : (
-                <>
-                  <GoogleIcon />
-                  Continue with Google
-                </>
-              )}
-            </button>
+            {linkPrompt ? (
+              <div className={a.ok} role="status">
+                <CircleCheck size={18} aria-hidden="true" />
+                <p>{linkPrompt}</p>
+              </div>
+            ) : null}
+            {linkNotice ? (
+              <div className={a.ok} role="status">
+                <CircleCheck size={18} aria-hidden="true" />
+                <p>{linkNotice}</p>
+              </div>
+            ) : null}
+
+            {inApp ? (
+              <>
+                {(['google', 'apple'] as const).map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    onClick={() => handleNativeSignIn(provider)}
+                    disabled={nativeLoading !== null || loading}
+                    className={`${s.btnSecondary} ${a.google}`}
+                  >
+                    {nativeLoading === provider ? (
+                      <>
+                        {spinner}
+                        Signing in
+                      </>
+                    ) : (
+                      <>
+                        {provider === 'google' ? <GoogleIcon /> : <AppleIcon />}
+                        Continue with {provider === 'google' ? 'Google' : 'Apple'}
+                      </>
+                    )}
+                  </button>
+                ))}
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading}
+                className={`${s.btnSecondary} ${a.google}`}
+              >
+                {googleLoading ? (
+                  <>
+                    {spinner}
+                    Signing in
+                  </>
+                ) : (
+                  <>
+                    <GoogleIcon />
+                    Continue with Google
+                  </>
+                )}
+              </button>
+            )}
 
             <div className={a.divider}>or</div>
           </div>
@@ -267,7 +387,7 @@ export function LoginForm() {
               </div>
             </div>
 
-            <button type="submit" disabled={loading || authLoading || googleLoading} className={`${s.btnPrimary} ${a.btn}`}>
+            <button type="submit" disabled={loading || authLoading || googleLoading || nativeLoading !== null} className={`${s.btnPrimary} ${a.btn}`}>
               {loading || authLoading ? (
                 <>
                   {spinner}

@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect } from 'react';
+import { isNativeApp } from '@/lib/app/isNativeApp';
 
 // Registers the PWA service worker once, client-side. Renders nothing.
+// Skipped inside the 3C iOS app: the shell owns push there (SPEC A1).
 export default function ServiceWorkerRegistrar() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!('serviceWorker' in navigator)) return;
+    if (isNativeApp()) return;
     // Register after load so it never competes with first paint.
     const register = () => {
       // Same script the FCM token code registers (src/lib/firebase/messaging.ts):

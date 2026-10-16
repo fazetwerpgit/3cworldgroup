@@ -12,17 +12,26 @@ export async function reportPushHealth({
   supported,
   permission,
   result,
+  platform,
 }: {
   supported: boolean;
   permission: string;
   result: string;
+  /** 'ios-native' from the 3C iOS app; omitted (web) everywhere else. */
+  platform?: 'ios-native';
 }): Promise<void> {
   try {
     const idToken = await auth?.currentUser?.getIdToken();
     await fetch('/api/portal/push/health', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken ?? ''}` },
-      body: JSON.stringify({ supported, permission, result, standalone: isStandaloneApp() }),
+      body: JSON.stringify({
+        supported,
+        permission,
+        result,
+        standalone: isStandaloneApp(),
+        ...(platform ? { platform } : {}),
+      }),
     });
   } catch {
     // Diagnostics must never break the app.

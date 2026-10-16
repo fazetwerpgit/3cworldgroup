@@ -10,6 +10,7 @@ import FirestoreResumeGuard from '@/components/portal/FirestoreResumeGuard';
 import PushTokenRefresher from '@/components/portal/PushTokenRefresher';
 import PwaBottomGap from '@/components/portal/PwaBottomGap';
 import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
+import AppBridgeHost from '@/components/app/AppBridgeHost';
 import '@/styles/sweep-shell.css';
 
 // Display face for portal brand moments (login, KPI headers) — exposed as
@@ -56,9 +57,12 @@ export default function PortalLayout({
         {/* The owner's read-only "View as rep" session (see ViewAsContext). */}
         <ViewAsProvider>
         <MobileMenuProvider>
+          {/* Web push only: both skip themselves inside the 3C iOS app. */}
           <ServiceWorkerRegistrar />
           {/* Heals iOS push-subscription rotation on every open — see component. */}
           <PushTokenRefresher />
+          {/* The 3C iOS app's bridge, links and native push; inert on the web. */}
+          <AppBridgeHost />
           {/* Reconnects live data (chat, unread dot) when the app resumes. */}
           <FirestoreResumeGuard />
           {/* Drops the bottom bars onto the screen edge in iOS 26 installs. */}

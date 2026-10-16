@@ -8,6 +8,10 @@ import { ChevronDown, KeyRound, Lock } from 'lucide-react';
 import ReportBugCard from '@/components/portal/ReportBugCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
 import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
+import NativePushCard from '@/components/app/NativePushCard';
+import LinkedSignInMethods from '@/components/app/LinkedSignInMethods';
+import DeleteAccountCard from '@/components/portal/DeleteAccountCard';
+import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { getEffectiveRole, repFacingRoleLabel, SHIRT_SIZES } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -20,6 +24,7 @@ type PasswordField = 'current' | 'new' | 'confirm';
 
 export default function SettingsPage() {
   const { user, resetPassword, changePassword, refreshUser } = useAuth();
+  const inApp = useIsNativeApp();
   const [resetSent, setResetSent] = useState(false);
   const [loading, setLoading] = useState(false);
   // Each message shows next to what it is about: on a phone a notice at the
@@ -157,6 +162,9 @@ export default function SettingsPage() {
   // Accounts made with Continue with Google have no password until they set
   // one through a reset link, so there is no current password to ask for.
   const hasPassword = auth?.currentUser?.providerData.some((info) => info.providerId === 'password') ?? true;
+  const signsInWithApple =
+    auth?.currentUser?.providerData.some((info) => info.providerId === 'apple.com') === true &&
+    auth?.currentUser?.providerData.every((info) => info.providerId !== 'google.com') === true;
   const initials = (user?.displayName || email || '?')
     .split(/\s+/)
     .map((part) => part[0])
@@ -292,8 +300,15 @@ export default function SettingsPage() {
             <div className={s.panelHead}>
               <h2 id="app-title" className={s.kicker}>Notifications and app</h2>
             </div>
-            <PushNotificationsCard />
-            <InstallAppCard />
+            {/* In the 3C iOS app: native push instead of web push, nothing to install. */}
+            {inApp ? (
+              <NativePushCard />
+            ) : (
+              <>
+                <PushNotificationsCard />
+                <InstallAppCard />
+              </>
+            )}
           </section>
 
           <section className={s.panel} aria-label="Password">
@@ -319,7 +334,7 @@ export default function SettingsPage() {
             {showPasswordForm && !hasPassword ? (
               <div className={st.drawer}>
                 <p className={p.hint}>
-                  You sign in with Google, so there is no password to change. To also sign in with your email and a
+                  You sign in with {signsInWithApple ? 'Apple' : 'Google'}, so there is no password to change. To also sign in with your email and a
                   password, set one from a reset link.
                 </p>
                 {resetSent ? (
@@ -417,7 +432,11 @@ export default function SettingsPage() {
             )}
           </section>
 
+          <LinkedSignInMethods />
+
           <ReportBugCard />
+
+          <DeleteAccountCard />
         </div>
       </div>
     </div>

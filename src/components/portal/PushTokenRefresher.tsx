@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { isNativeApp } from '@/lib/app/isNativeApp';
 import { useAuth } from '@/contexts/AuthContext';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDeviceDetailed } from '@/lib/push/enablePushOnDevice';
@@ -21,7 +22,9 @@ const RESUME_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 
 export default function PushTokenRefresher() {
   const { user, loading } = useAuth();
-  const signedIn = !loading && !!user;
+  // Web push only: inside the 3C iOS app the shell's native token is synced by
+  // AppBridgeHost instead (SPEC A1/A4). isNativeApp() only gates effects here.
+  const signedIn = !loading && !!user && !isNativeApp();
   const [resumeTick, setResumeTick] = useState(0);
   const lastRunRef = useRef(0);
 

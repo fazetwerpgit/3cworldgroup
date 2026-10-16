@@ -23,6 +23,8 @@ import { ASK_CONVERSATION_KEY } from '@/lib/ask/chat';
 import { PRACTICE_SESSION_KEY } from '@/lib/ask/practice';
 import { ProfileLoadRetry } from '@/components/auth/ProfileLoadRetry';
 import { unregisterPushOnDevice } from '@/lib/push/enablePushOnDevice';
+import { takePendingDisplayName } from '@/lib/app/nativeAuth';
+import { unregisterNativePush } from '@/lib/app/nativePush';
 import { clearViewAs } from '@/lib/viewAs/storage';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 
@@ -51,6 +53,8 @@ type FetchUserDataResult =
   | { status: 'error'; error: unknown };
 
 const missingProfileMessage = 'User profile not found. Please contact an administrator.';
+const appleNoEmailMessage =
+  "Your Apple ID didn't share an email address, so we can't set up your account. Use Google or your company email instead.";
 // Same words Firebase's auth/user-disabled maps to: deactivating also disables the auth account.
 const disabledAccountMessage = 'This account has been disabled. Contact your manager.';
 const profileLoadErrorMessage =
@@ -272,9 +276,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else if (userDataResult.status === 'missing') {
         if (firebaseUser.email) {
           bootstrappingPendingProfile.current = true;
-          // A first sign-in with Google (no team code, no signup form): keep
-          // the Google name and raise the same owner alert a signup does.
-          const googleName = firebaseUser.displayName?.trim().slice(0, 100);
+          // A first sign-in with Google or Apple (no team code, no signup
+          // form): keep the provider's name and raise the same owner alert a
+          // signup does. Apple shares a name only on the first authorization
+          // (parked by the in-app sign-in) and may share a private-relay email
+          // or no name at all; both are fine here, displayName is optional.
+          const appleName = takePendingDisplayName();
+          const googleName = (firebaseUser.displayName?.trim() || appleName)?.slice(0, 100);
           try {
             // firestore.rules: exactly these keys, and the email must be this
             // account's own sign-in address.
@@ -301,10 +309,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } else {
           if (auth) await firebaseSignOut(auth);
+          // firestore.rules needs the sign-in email on the pending doc; an
+          // Apple ID that shared none cannot start an account.
+          const viaApple = firebaseUser.providerData.some((info) => info.providerId === 'apple.com');
           setState({
             user: null,
             loading: false,
-            error: missingProfileMessage,
+            error: viaApple ? appleNoEmailMessage : missingProfileMessage,
             pendingApproval: false,
           });
         }
@@ -451,7 +462,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // let the request finish in the background.
       const cap = Promise.withResolvers<void>();
       setTimeout(cap.resolve, 2500);
-      await Promise.race([unregisterPushOnDevice(), cap.promise]);
+      await Promise.race([Promise.all([unregisterPushOnDevice(), unregisterNativePush()]), cap.promise]);
       await firebaseSignOut(auth);
       setProfileLoadFailed(false);
       setState({ user: null, loading: false, error: null, pendingApproval: false });

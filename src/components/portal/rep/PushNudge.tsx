@@ -18,6 +18,7 @@ import {
 import { currentPermission, reportPushHealth } from '@/lib/push/reportPushHealth';
 import { isIosSafari } from '@/lib/pwa/addToHomeScreen';
 import { isStandaloneApp } from '@/lib/pwa/standalone';
+import { isNativeApp } from '@/lib/app/isNativeApp';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
 import x from './push-nudge.module.css';
@@ -55,8 +56,13 @@ function writeStorage(key: string, value: string) {
  */
 export function PushNudge() {
   const { user, loading } = useAuth();
+  // Never inside the 3C iOS app: no home-screen install there, and the shell
+  // asks for push itself (SPEC A1). Only effects read this, so it is hydration-safe.
   const eligible =
-    !loading && !!user && (user.status === 'active' || (user.status === 'pending' && !!user.fieldRole));
+    !loading &&
+    !!user &&
+    !isNativeApp() &&
+    (user.status === 'active' || (user.status === 'pending' && !!user.fieldRole));
   const required = user?.pushRequired === true;
 
   const [state, setState] = useState<DevicePushState | null>(null);

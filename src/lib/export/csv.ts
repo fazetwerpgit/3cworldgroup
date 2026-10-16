@@ -1,3 +1,5 @@
+import { saveBlobViaApp, shouldSaveViaApp } from '@/lib/app/saveFile';
+
 // Minimal RFC-4180 CSV serialization for exporting admin review lists. Pure and
 // unit-tested; the DOM download side is a thin isolated helper below.
 export interface CsvColumn {
@@ -22,7 +24,13 @@ export function toCsv(columns: CsvColumn[], rows: Record<string, unknown>[]): st
 
 // Browser-only: save a Blob as a file. The object URL outlives the click so
 // Safari (which starts the download asynchronously) can still read it.
+// Inside the 3C iOS app the file goes to the native share sheet instead
+// (SPEC A5); everywhere else this is the plain <a download>.
 export function downloadBlob(filename: string, blob: Blob): void {
+  if (shouldSaveViaApp()) {
+    void saveBlobViaApp(filename, blob).catch((error) => console.error('Failed to save file in the app:', error));
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
