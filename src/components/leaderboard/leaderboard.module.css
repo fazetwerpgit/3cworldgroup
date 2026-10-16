@@ -125,7 +125,7 @@
   white-space: nowrap;
 }
 
-/* The floor the blocks stand on: the podium's own ground shadow falls here. */
+/* The floor the blocks stand on. */
 .stageFloor {
   padding: 6px 14px 0;
 }
@@ -467,7 +467,7 @@
   position: absolute;
   overflow: hidden;
   width: 1px;
-  height: 1px;
+  height: 1px; /* taste-skill-ignore: screen-reader-only box, not a rule */
   clip-path: inset(50%);
   white-space: nowrap;
 }
@@ -721,10 +721,10 @@
   overflow: hidden;
   border-radius: 999px;
   /* The top step of the ladder. Opaque, because it sits over scrolling
-     content; the one shadow on the page is what lifts it off that content. */
+     content; a sticky bar is a real overlay, so it keeps its lift. */
   background: var(--c-panel-hi, #1d2c46);
   color: var(--c-text);
-  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.7); /* taste-skill-ignore: sticky overlay */
   font-size: 15px;
   font-weight: 600;
 }

@@ -604,9 +604,9 @@
 }
 
 /* ==========================================================================
-   Rep Sales, direction C · Split. Money sits in a raised L2 card with the
-   heaviest shadow on the page; the ledger under it (beside it on desktop) is
-   the flatter scoreboard language: a well header band, Bebas date stamps.
+   Rep Sales, direction C · Split, taste pass (Oct 2026). Money sits in a
+   flat raised card one tone step up; the ledger under it (beside it on
+   desktop) is a Bebas title, filled chips and one flat block per sale.
    ========================================================================== */
 .split {
   display: flex;
@@ -1001,6 +1001,14 @@
   overflow: hidden;
   border-radius: var(--r-card);
   background: var(--c-panel);
+}
+
+.fiberView .fiberRow + .fiberRow {
+  border-top: 0;
+}
+
+.fiberView .fiberRow:nth-child(even) {
+  background: var(--c-raised);
 }
 
 .fiberView .srcNote {
