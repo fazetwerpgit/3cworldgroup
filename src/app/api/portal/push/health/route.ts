@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
           permission: typeof body.permission === 'string' ? body.permission.slice(0, 20) : 'unknown',
           result: typeof body.result === 'string' ? body.result.slice(0, 240) : 'unknown',
           standalone: body.standalone === true,
+          // Which kind of device reported: the 3C iOS app or a browser / PWA.
+          // Always written, so a later web report replaces an app one.
+          platform: body.platform === 'ios-native' ? 'ios-native' : 'web',
           ua: (request.headers.get('user-agent') || '').slice(0, 200),
           at: FieldValue.serverTimestamp(),
         },

@@ -21,6 +21,7 @@ import { restampAuthor } from '@/lib/chat/restampAuthor';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
 import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
+import { hasOtherActiveOwner } from '@/lib/users/accountClosure';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
 import { getActivationReadinessForRole } from '@/lib/onboarding/activation';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
@@ -237,8 +238,7 @@ export async function PUT(
     const removesOwner =
       (role !== undefined && role !== 'owner') || fieldRole !== undefined || (status !== undefined && status !== 'active');
     if (existingRole === 'owner' && doc.get('status') === 'active' && removesOwner) {
-      const owners = await adminDb.collection('users').where('role', '==', 'owner').get();
-      if (!owners.docs.some((owner) => owner.id !== id && owner.get('status') === 'active')) {
+      if (!(await hasOtherActiveOwner(adminDb, id))) {
         return NextResponse.json(
           {
             error:
@@ -585,7 +585,8 @@ export async function DELETE(
         { status: 403 }
       );
     }
-    // Don't let a caller delete their own account out from under themselves.
+    // Don't let a caller delete their own account out from under themselves:
+    // self-service deletion is DELETE /api/portal/auth/me.
     if (gate.uid === id) {
       return NextResponse.json(
         { error: 'You cannot delete your own account' },

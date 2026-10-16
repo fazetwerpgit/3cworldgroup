@@ -100,6 +100,8 @@ export interface PushHealth {
   supported?: boolean;
   ua?: string;
   result?: string;
+  /** 'ios-native' when the 3C iOS app reported; 'web' (or absent) for a browser / PWA. */
+  platform?: string;
 }
 
 /**
@@ -109,9 +111,11 @@ export interface PushHealth {
 export function personPushState(tokenCount: number, health: PushHealth | null | undefined): PersonPushState {
   if (tokenCount > 0) return 'on';
   if (!health) return 'unknown';
-  if (isIosDevice(health.ua ?? '') && health.standalone !== true) return 'not-installed';
+  const native = health.platform === 'ios-native';
+  if (!native && isIosDevice(health.ua ?? '') && health.standalone !== true) return 'not-installed';
   if (health.permission === 'denied') return 'blocked';
-  if (health.permission === 'default') return 'never-allowed';
+  // The app reports iOS's own 'undetermined' where a browser says 'default'.
+  if (health.permission === 'default' || (native && health.permission === 'undetermined')) return 'never-allowed';
   return 'unknown';
 }
 

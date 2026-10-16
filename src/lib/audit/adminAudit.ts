@@ -3,6 +3,8 @@ import { adminDb } from '@/lib/firebase/admin';
 export type AdminAuditAction =
   | 'user.update'
   | 'user.delete'
+  // The person deleted their own account (DELETE /api/portal/auth/me).
+  | 'user.self_delete'
   | 'user.decommission'
   | 'user.reinstate'
   | 'compPlan.update'

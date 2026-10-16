@@ -2,10 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { NATIVE_PUSH_PLATFORM, nativeTokenEntry } from '@/lib/push/pushTargets';
 
-// POST   /api/portal/push/register  { token }  → add this device's FCM token to the user
-// DELETE /api/portal/push/register  { token }  → remove it (opt-out / sign-out)
-// Tokens are stored on users/{uid}.pushTokens[] and are what the server sends push to.
+// POST   /api/portal/push/register  { token, platform? }  → add this device's FCM token to the user
+// DELETE /api/portal/push/register  { token, platform? }  → remove it (opt-out / sign-out)
+// Web (browser / PWA) tokens — no platform — are stored on users/{uid}.pushTokens[].
+// The 3C iOS app sends platform: 'ios-native'; those are stored platform-tagged
+// on users/{uid}.nativePushTokens[] as { token, platform } and get an APNs
+// notification payload (see lib/push/sendPush.ts).
+
+type Platform = 'web' | typeof NATIVE_PUSH_PLATFORM;
+
+function readPlatform(body: { platform?: unknown }): Platform | null {
+  if (body.platform === undefined || body.platform === null || body.platform === 'web') return 'web';
+  if (body.platform === NATIVE_PUSH_PLATFORM) return NATIVE_PUSH_PLATFORM;
+  return null;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,10 +30,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const token = typeof body.token === 'string' ? body.token.trim() : '';
     if (!token) return NextResponse.json({ error: 'token is required' }, { status: 400 });
+    const platform = readPlatform(body);
+    if (!platform) return NextResponse.json({ error: 'Unknown platform' }, { status: 400 });
 
     await adminDb.collection('users').doc(gate.uid).set(
       {
-        pushTokens: FieldValue.arrayUnion(token),
+        ...(platform === NATIVE_PUSH_PLATFORM
+          ? { nativePushTokens: FieldValue.arrayUnion(nativeTokenEntry(token)) }
+          : { pushTokens: FieldValue.arrayUnion(token) }),
         // Stamped on every (re-)registration, including no-op same-token ones —
         // lets ops tell "device re-registered, token unchanged" apart from
         // "client never ran registration" when debugging delivery.
@@ -46,9 +62,13 @@ export async function DELETE(request: NextRequest) {
     const body = await request.json();
     const token = typeof body.token === 'string' ? body.token.trim() : '';
     if (!token) return NextResponse.json({ error: 'token is required' }, { status: 400 });
+    const platform = readPlatform(body);
+    if (!platform) return NextResponse.json({ error: 'Unknown platform' }, { status: 400 });
 
     await adminDb.collection('users').doc(gate.uid).set(
-      { pushTokens: FieldValue.arrayRemove(token) },
+      platform === NATIVE_PUSH_PLATFORM
+        ? { nativePushTokens: FieldValue.arrayRemove(nativeTokenEntry(token)) }
+        : { pushTokens: FieldValue.arrayRemove(token) },
       { merge: true }
     );
     return NextResponse.json({ success: true });

@@ -203,7 +203,8 @@ const PAGE_API_DEPENDENCIES: Record<string, string[]> = {
   '/portal/learn': ['/api/portal/training', '/api/portal/training/progress', '/api/portal/commission'],
   '/portal/training': ['/api/portal/training', '/api/portal/training/progress'],
   '/portal/calls': ['/api/portal/calls'],
-  '/portal/settings': ['/api/portal/profile'],
+  // Settings > Delete account: DELETE /api/portal/auth/me (self only, from the token).
+  '/portal/settings': ['/api/portal/profile', '/api/portal/auth/me'],
 };
 
 describe('page and api allowlists agree', () => {

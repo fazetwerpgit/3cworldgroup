@@ -129,3 +129,20 @@ describe('personPushState', () => {
     expect(PERSON_PUSH_LABEL.on).toBe('On');
   });
 });
+
+describe('personPushState for the 3C iOS app', () => {
+  it('never calls an app user "not installed"', () => {
+    expect(
+      personPushState(0, { platform: 'ios-native', permission: 'undetermined', standalone: false, ua: IPHONE })
+    ).toBe('never-allowed');
+    expect(personPushState(0, { platform: 'ios-native', permission: 'denied', standalone: false, ua: IPHONE })).toBe(
+      'blocked'
+    );
+  });
+
+  it('a web report keeps the old rules', () => {
+    expect(personPushState(0, { platform: 'web', permission: 'no-api', standalone: false, ua: IPHONE })).toBe(
+      'not-installed'
+    );
+  });
+});

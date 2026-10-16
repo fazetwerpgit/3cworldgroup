@@ -6,8 +6,8 @@ import { isValidTeamCode, signupNotifyLimiter } from '@/lib/auth/teamCode';
 import { clientIp } from '@/lib/rateLimit';
 
 // Called right after a self-signup writes its pending users doc: by
-// AuthContext.signUp with the team code in the body, and by the Google
-// first-sign-in bootstrap with no body. The uid comes from the caller's ID
+// AuthContext.signUp with the team code in the body, and by the Google (web
+// or app) / Apple (app) first-sign-in bootstrap with no body. The uid comes from the caller's ID
 // token, so only the new account itself can raise its owner alert. A pending
 // caller is expected here, so this verifies the token directly instead of
 // using the requireVerified* gates. Accounts made straight through the public
@@ -35,7 +35,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 });
   }
 
-  if (signInProvider !== 'google.com') {
+  // A first sign-in with Google, or Sign in with Apple in the 3C iOS app,
+  // creates the pending profile itself with no signup form and no team code.
+  if (signInProvider !== 'google.com' && signInProvider !== 'apple.com') {
     let code: unknown;
     try {
       code = ((await request.json()) as { code?: unknown } | null)?.code;

@@ -1,5 +1,6 @@
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { sendPushToTokens, type PushPayload } from '@/lib/push/sendPush';
+import { pushTargetsOf } from '@/lib/push/pushTargets';
 import { ANNOUNCEMENT_URL, type AnnouncementStatus, type AnnouncementView } from './schedule';
 
 // Server side of owner announcements: who receives them, the fan-out, and the
@@ -19,34 +20,43 @@ export interface FanOutResult {
   failedCount: number;
 }
 
-function tokensOf(data: FirebaseFirestore.DocumentData): string[] {
-  const raw = Array.isArray(data.pushTokens) ? data.pushTokens : [];
-  return raw.filter((token): token is string => typeof token === 'string' && token.length > 0);
+/** One user's devices: web tokens, plus the 3C iOS app's when they have it. */
+export interface Recipient {
+  uid: string;
+  tokens: string[];
+  nativeTokens?: string[];
+}
+
+function recipientOf(uid: string, data: FirebaseFirestore.DocumentData): Recipient {
+  const { web, native } = pushTargetsOf(data);
+  return native.length ? { uid, tokens: web, nativeTokens: native } : { uid, tokens: web };
+}
+
+// Web-only recipients are sent the plain token array, exactly as before the app.
+function targetsOf(r: Recipient) {
+  return r.nativeTokens?.length ? { web: r.tokens, native: r.nativeTokens } : r.tokens;
 }
 
 /** Every active user (any role) with at least one registered device. */
-export async function announcementRecipients(db: Firestore): Promise<Array<{ uid: string; tokens: string[] }>> {
+export async function announcementRecipients(db: Firestore): Promise<Recipient[]> {
   const snap = await db.collection('users').where('status', '==', 'active').get();
-  const recipients: Array<{ uid: string; tokens: string[] }> = [];
+  const recipients: Recipient[] = [];
   for (const doc of snap.docs) {
     const data = doc.data();
     // The query already filters; this guards against a doc changing shape.
     if (data.status !== 'active') continue;
-    const tokens = tokensOf(data);
-    if (tokens.length) recipients.push({ uid: doc.id, tokens });
+    const recipient = recipientOf(doc.id, data);
+    if (recipient.tokens.length || recipient.nativeTokens?.length) recipients.push(recipient);
   }
   return recipients;
 }
 
-export async function sendToRecipients(
-  recipients: Array<{ uid: string; tokens: string[] }>,
-  payload: PushPayload
-): Promise<FanOutResult> {
+export async function sendToRecipients(recipients: Recipient[], payload: PushPayload): Promise<FanOutResult> {
   let sentCount = 0;
   let failedCount = 0;
   for (let i = 0; i < recipients.length; i += SEND_CONCURRENCY) {
     const batch = recipients.slice(i, i + SEND_CONCURRENCY);
-    const results = await Promise.all(batch.map((r) => sendPushToTokens(r.uid, r.tokens, payload)));
+    const results = await Promise.all(batch.map((r) => sendPushToTokens(r.uid, targetsOf(r), payload)));
     for (const result of results) {
       if (result.delivered > 0) sentCount += 1;
       else failedCount += 1;
@@ -62,10 +72,11 @@ export async function sendTestToSelf(
   message: { title: string; body: string }
 ): Promise<{ devices: number; delivered: number }> {
   const snap = await db.collection('users').doc(uid).get();
-  const tokens = tokensOf(snap.data() ?? {});
-  if (!tokens.length) return { devices: 0, delivered: 0 };
-  const result = await sendPushToTokens(uid, tokens, { ...message, url: ANNOUNCEMENT_URL });
-  return { devices: tokens.length, delivered: result.delivered };
+  const recipient = recipientOf(uid, snap.data() ?? {});
+  const devices = recipient.tokens.length + (recipient.nativeTokens?.length ?? 0);
+  if (!devices) return { devices: 0, delivered: 0 };
+  const result = await sendPushToTokens(uid, targetsOf(recipient), { ...message, url: ANNOUNCEMENT_URL });
+  return { devices, delivered: result.delivered };
 }
 
 function toDate(value: unknown): Date | null {
@@ -123,7 +134,7 @@ export type SendOutcome =
   | { status: 'skipped' }
   | { status: 'failed'; error: string };
 
-type Recipients = Array<{ uid: string; tokens: string[] }>;
+type Recipients = Recipient[];
 
 /**
  * The one send path, shared by the cron and the owner's "Send now": claim the

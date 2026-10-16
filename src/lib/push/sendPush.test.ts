@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { sendEachForMulticast } = vi.hoisted(() => ({
+const { sendEachForMulticast, userSet, userData } = vi.hoisted(() => ({
   sendEachForMulticast: vi.fn(),
+  userSet: vi.fn(),
+  userData: { current: { pushTokens: ['tok1'] } as Record<string, unknown> },
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -11,10 +13,10 @@ vi.mock('@/lib/firebase/admin', () => ({
       if (name === 'users') {
         return {
           doc: () => ({
-            get: vi.fn().mockResolvedValue({
-              data: () => ({ pushTokens: ['tok1'] }),
-            }),
-            set: vi.fn().mockResolvedValue(undefined),
+            get: vi.fn(async () => ({
+              data: () => userData.current,
+            })),
+            set: userSet,
           }),
         };
       }
@@ -27,11 +29,27 @@ vi.mock('firebase-admin/messaging', () => ({
   getMessaging: () => ({ sendEachForMulticast }),
 }));
 
-import { sendPushToTokens, sendPushToUser } from './sendPush';
+vi.mock('firebase-admin/firestore', () => ({
+  FieldValue: { arrayRemove: (...items: unknown[]) => ({ __arrayRemove: items }) },
+}));
+
+import { pushTargetsOf, sendPushToTokens, sendPushToUser } from './sendPush';
+
+type Multicast = {
+  tokens: string[];
+  data: Record<string, string>;
+  notification?: { title: string; body: string };
+  apns?: { headers?: Record<string, string>; payload: { aps: Record<string, unknown> } };
+  webpush?: unknown;
+};
 
 beforeEach(() => {
   sendEachForMulticast.mockReset();
-  sendEachForMulticast.mockResolvedValue({ responses: [{ success: true }] });
+  userSet.mockReset();
+  userSet.mockResolvedValue(undefined);
+  userData.current = { pushTokens: ['tok1'] };
+  // One response per token, all accepted.
+  sendEachForMulticast.mockImplementation(async (m: Multicast) => ({ responses: m.tokens.map(() => ({ success: true })) }));
 });
 
 describe('sendPushToUser', () => {
@@ -108,5 +126,108 @@ describe('sendPushToTokens', () => {
 
     await sendPushToTokens('user-1', ['tok1'], { title: 'T', body: 'B' });
     expect(sendEachForMulticast.mock.calls[1][0]).not.toHaveProperty('webpush');
+  });
+});
+
+describe('native (3C iOS app) tokens', () => {
+  const payload = { title: 'New message', body: 'Hi', url: '/portal/chat' };
+
+  it('reads web and platform-tagged native tokens from a users doc', () => {
+    expect(
+      pushTargetsOf({
+        pushTokens: ['w1', '', 3],
+        nativePushTokens: [
+          { token: 'n1', platform: 'ios-native' },
+          { token: 'n2', platform: 'android' },
+          'bare-string',
+          { platform: 'ios-native' },
+        ],
+      })
+    ).toEqual({ web: ['w1'], native: ['n1'] });
+    expect(pushTargetsOf(undefined)).toEqual({ web: [], native: [] });
+  });
+
+  it('sends web tokens data-only and native tokens with notification + apns, separately', async () => {
+    const result = await sendPushToTokens('user-1', { web: ['w1', 'w2'], native: ['n1'] }, payload);
+    expect(result).toEqual({ delivered: 3, failed: 0, pruned: 0 });
+    expect(sendEachForMulticast).toHaveBeenCalledTimes(2);
+    const calls = sendEachForMulticast.mock.calls.map((c) => c[0] as Multicast);
+    const web = calls.find((m) => m.tokens.includes('w1'))!;
+    const native = calls.find((m) => m.tokens.includes('n1'))!;
+
+    // Web: byte-for-byte the message it always was.
+    expect(web).toEqual({ tokens: ['w1', 'w2'], data: { title: 'New message', body: 'Hi', url: '/portal/chat' } });
+
+    // Native: iOS shows it itself; data.url is the deep link.
+    expect(native.tokens).toEqual(['n1']);
+    expect(native.notification).toEqual({ title: 'New message', body: 'Hi' });
+    expect(native.data).toEqual({ title: 'New message', body: 'Hi', url: '/portal/chat' });
+    expect(native.apns).toEqual({ payload: { aps: { sound: 'default', badge: 1 } } });
+    expect(native).not.toHaveProperty('webpush');
+  });
+
+  it('a web-only user sends exactly one data-only multicast (unchanged behavior)', async () => {
+    await sendPushToUser('user-1', payload);
+    expect(sendEachForMulticast).toHaveBeenCalledTimes(1);
+    expect(sendEachForMulticast.mock.calls[0][0]).toEqual({
+      tokens: ['tok1'],
+      data: { title: 'New message', body: 'Hi', url: '/portal/chat' },
+    });
+  });
+
+  it('sendPushToUser reaches native tokens on the users doc', async () => {
+    userData.current = { pushTokens: [], nativePushTokens: [{ token: 'n1', platform: 'ios-native' }] };
+    await sendPushToUser('user-1', payload);
+    expect(sendEachForMulticast).toHaveBeenCalledTimes(1);
+    expect((sendEachForMulticast.mock.calls[0][0] as Multicast).apns).toBeDefined();
+  });
+
+  it('high urgency maps to APNs priority 10 for native and the Urgency header for web', async () => {
+    await sendPushToTokens('user-1', { web: ['w1'], native: ['n1'] }, payload, { urgency: 'high' });
+    const calls = sendEachForMulticast.mock.calls.map((c) => c[0] as Multicast);
+    expect(calls.find((m) => m.tokens.includes('w1'))!.webpush).toEqual({ headers: { Urgency: 'high' } });
+    expect(calls.find((m) => m.tokens.includes('n1'))!.apns!.headers).toEqual({ 'apns-priority': '10' });
+  });
+
+  it('prunes dead native tokens from nativePushTokens and dead web tokens from pushTokens', async () => {
+    sendEachForMulticast.mockImplementation(async (m: Multicast) => ({
+      responses: m.tokens.map((t) =>
+        t === 'w-dead' || t === 'n-dead'
+          ? { success: false, error: { code: 'messaging/registration-token-not-registered' } }
+          : { success: true }
+      ),
+    }));
+    const result = await sendPushToTokens('user-1', { web: ['w1', 'w-dead'], native: ['n-dead', 'n1'] }, payload);
+    expect(result).toEqual({ delivered: 2, failed: 2, pruned: 2 });
+    expect(userSet).toHaveBeenCalledWith(
+      {
+        pushTokens: { __arrayRemove: ['w-dead'] },
+        nativePushTokens: { __arrayRemove: [{ token: 'n-dead', platform: 'ios-native' }] },
+      },
+      { merge: true }
+    );
+  });
+
+  it('only touches the native list when only native tokens died', async () => {
+    sendEachForMulticast.mockImplementation(async (m: Multicast) => ({
+      responses: m.tokens.map(() => ({ success: false, error: { code: 'messaging/invalid-argument' } })),
+    }));
+    await sendPushToTokens('user-1', { web: [], native: ['n1'] }, payload);
+    expect(userSet).toHaveBeenCalledWith(
+      { nativePushTokens: { __arrayRemove: [{ token: 'n1', platform: 'ios-native' }] } },
+      { merge: true }
+    );
+  });
+
+  it('an APNs-side failure does not lose the web count', async () => {
+    sendEachForMulticast.mockImplementation(async (m: Multicast) => {
+      if (m.apns) throw new Error('apns down');
+      return { responses: m.tokens.map(() => ({ success: true })) };
+    });
+    expect(await sendPushToTokens('user-1', { web: ['w1'], native: ['n1'] }, payload)).toEqual({
+      delivered: 1,
+      failed: 1,
+      pruned: 0,
+    });
   });
 });

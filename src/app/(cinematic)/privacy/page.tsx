@@ -17,8 +17,10 @@ export const metadata: Metadata = {
  * page it replaces word for word — every clause, in its original order, with
  * its original numbering. Only the presentation changed: the kit's page head
  * instead of the old gradient hero, and one paper section set for reading.
+ * Amended 2026-10-16 for Google/Apple sign-in, push notifications and
+ * self-service account deletion (sections 2, 3, 7 and 8).
  */
-const LAST_UPDATED = "October 13, 2026";
+const LAST_UPDATED = "October 16, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -72,6 +74,13 @@ export default function PrivacyPolicyPage() {
                   contractor portal.
                 </li>
                 <li>
+                  <strong>Sign-in and device information.</strong> If you sign in with Google or Apple, the
+                  account identifier and email address that provider shares with us (Apple may share a
+                  private relay address instead of your own). If you turn on notifications in the portal
+                  or the 3C Portal iPhone app, a push token that lets us send notifications to that
+                  device.
+                </li>
+                <li>
                   <strong>Automatically collected information.</strong> IP address, browser type, device
                   type, pages visited, referring URL, and similar usage data collected through cookies
                   and standard web analytics.
@@ -86,6 +95,7 @@ export default function PrivacyPolicyPage() {
                 <li>Operate and improve our contractor portal, including sales tracking and training.</li>
                 <li>Respond to inquiries submitted through our contact form.</li>
                 <li>Communicate about opportunities, schedules, payments, and account matters.</li>
+                <li>Send portal notifications, such as messages and form activity, to devices where you turned them on.</li>
                 <li>Maintain security, prevent fraud, and comply with legal obligations.</li>
                 <li>Analyze website usage to improve content, performance, and user experience.</li>
               </ul>
@@ -140,6 +150,15 @@ export default function PrivacyPolicyPage() {
                 with legal obligations, resolve disputes, and enforce agreements. When information is
                 no longer needed, we take steps to securely delete or anonymize it.
               </p>
+              <p>
+                <strong>Deleting your portal account.</strong> You can delete your portal account at any
+                time from Settings &gt; Delete account, on the web or in the 3C Portal iPhone app. When
+                you do, we close your sign-in and remove your name, contact details, profile photo,
+                identity documents, and notification devices from your account. Sales, commission, and
+                pay records you were part of are kept, without your contact details, because we need
+                them for payroll, tax, and carrier reconciliation. Signed contractor paperwork is kept as
+                a business record.
+              </p>
             </LegalSection>
 
             <LegalSection id="privacy-8" title="8. Your Rights and Choices">
@@ -147,7 +166,10 @@ export default function PrivacyPolicyPage() {
               <ul>
                 <li>Access the personal information we hold about you.</li>
                 <li>Request correction of inaccurate information.</li>
-                <li>Request deletion of your information, subject to legal exceptions.</li>
+                <li>
+                  Request deletion of your information, subject to legal exceptions. Portal users can
+                  delete their own account in Settings (see Data Retention above).
+                </li>
                 <li>Opt out of marketing communications at any time.</li>
               </ul>
               <p>

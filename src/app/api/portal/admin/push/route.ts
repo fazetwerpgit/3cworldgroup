@@ -25,7 +25,10 @@ export async function GET(request: NextRequest) {
     const snapshot = await adminDb.collection('users').where('status', '==', 'active').get();
     const users: PushStatusRow[] = snapshot.docs.map((doc) => {
       const data = doc.data();
-      const tokens = Array.isArray(data.pushTokens) ? data.pushTokens.length : 0;
+      // Web (browser / PWA) and 3C iOS app devices both count as somewhere to send.
+      const tokens =
+        (Array.isArray(data.pushTokens) ? data.pushTokens.length : 0) +
+        (Array.isArray(data.nativePushTokens) ? data.nativePushTokens.length : 0);
       const health = (data.pushHealth ?? null) as (PushHealth & { at?: unknown }) | null;
       const checked = toDate(health?.at);
       return {

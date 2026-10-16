@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { isEligibleChatMember, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import { sendPushToTokens, type PushPayload } from '@/lib/push/sendPush';
+import { pushTargetsOf } from '@/lib/push/pushTargets';
 import { ChatAttachment, resolveRoles } from '@/types';
 import { attachmentSnippet } from '@/lib/chat/media';
 
@@ -66,10 +67,10 @@ export async function sendChatPush(
         snaps.map(async (snap) => {
           const userData = snap.exists ? snap.data() : undefined;
           if (!userData || !shouldPushChatRecipient(channelData, snap.id, userData)) return;
-          const tokens = Array.isArray(userData.pushTokens)
-            ? userData.pushTokens.filter((t: unknown): t is string => typeof t === 'string' && !!t)
-            : [];
+          const targets = pushTargetsOf(userData);
           totals.recipients += 1;
+          // Web-only users get the plain token array, exactly as before the app.
+          const tokens = targets.native.length ? targets : targets.web;
           const result = await sendPushToTokens(snap.id, tokens, payload, { urgency: 'high' });
           totals.sent += result.delivered;
           totals.failed += result.failed;

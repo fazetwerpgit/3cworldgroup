@@ -38,6 +38,7 @@ beforeEach(() => {
   verifyIdTokenMock.mockImplementation(async (token: string) => {
     if (token === 'token-new-user') return { uid: 'new-user', firebase: { sign_in_provider: 'password' } };
     if (token === 'token-google-user') return { uid: 'new-user', firebase: { sign_in_provider: 'google.com' } };
+    if (token === 'token-apple-user') return { uid: 'new-user', firebase: { sign_in_provider: 'apple.com' } };
     throw new Error('bad token');
   });
   userGetMock.mockResolvedValue(
@@ -88,6 +89,15 @@ describe('POST /api/portal/auth/signup-notify', () => {
 
     expect(response.status).toBe(403);
     expect(createAlertTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a Sign in with Apple first sign-in (3C iOS app) without a code', async () => {
+    const response = await POST(request({ token: 'token-apple-user' }));
+
+    expect(response.status).toBe(200);
+    expect(createAlertTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'pending_assignment', subjectUserId: 'new-user' })
+    );
   });
 
   it('accepts a Google first sign-in without a code', async () => {
