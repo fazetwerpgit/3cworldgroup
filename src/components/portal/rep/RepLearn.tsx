@@ -86,7 +86,7 @@ export function ProgressCard({
   return (
     <section className={`${s.panel} ${l.progress}`} aria-labelledby="uni-progress-title">
       <div className={l.progressBody}>
-        <h2 id="uni-progress-title" className={s.kicker}>
+        <h2 id="uni-progress-title" className={l.secTitle}>
           Your training
         </h2>
         {total > 0 ? (

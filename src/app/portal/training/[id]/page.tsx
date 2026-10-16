@@ -249,7 +249,7 @@ export default function TrainingDetailPage() {
             <div className={l.col}>
               {currentResource.description ? (
                 <section className={`${s.panel} ${l.about}`} aria-labelledby="about-title">
-                  <h2 id="about-title" className={s.kicker}>About this module</h2>
+                  <h2 id="about-title" className={l.secTitle}>About this module</h2>
                   <p>{currentResource.description}</p>
                 </section>
               ) : null}

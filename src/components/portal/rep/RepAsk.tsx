@@ -360,7 +360,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
       {turns.length === 0 ? (
         <section className={s.panel} aria-labelledby="ask-examples-h">
           <div className={a.examples}>
-            <h2 id="ask-examples-h" className={s.kicker}>
+            <h2 id="ask-examples-h" className={a.secTitle}>
               Try asking
             </h2>
             {EXAMPLES.map((example) => (

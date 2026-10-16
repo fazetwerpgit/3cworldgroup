@@ -1118,7 +1118,7 @@ export function RepPractice({
         {canPick ? (
           <section className={s.panel} aria-labelledby="practice-pick-h">
             <div className={pr.picker}>
-              <h2 id="practice-pick-h" className={s.kicker}>
+              <h2 id="practice-pick-h" className={pr.secTitle}>
                 Who&apos;s behind the door?
               </h2>
               <p className={p.hint}>Owners only: pick one to demo it. Reps always get a surprise.</p>
@@ -1221,7 +1221,7 @@ export function RepPractice({
               {session.feedback ? (
                 <section className={`${s.panel} ${pr.feedback}`} aria-labelledby="practice-feedback-h">
                   <div className={pr.feedbackHead}>
-                    <h2 id="practice-feedback-h" className={s.kicker}>
+                    <h2 id="practice-feedback-h" className={pr.secTitle}>
                       Feedback
                     </h2>
                     {session.feedback.score !== null ? (

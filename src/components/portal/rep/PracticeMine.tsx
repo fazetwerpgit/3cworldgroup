@@ -50,7 +50,7 @@ export function PracticeMine() {
     <>
       {mine.assignments.length ? (
         <section className={`${s.panel} ${pr.mine}`} aria-labelledby="practice-assigned-h">
-          <h2 id="practice-assigned-h" className={s.kicker}>
+          <h2 id="practice-assigned-h" className={pr.secTitle}>
             Assigned to you
           </h2>
           <ul className={pr.assignments}>
@@ -71,7 +71,7 @@ export function PracticeMine() {
         open ? (
           <section className={`${s.panel} ${pr.mine}`} aria-labelledby="practice-mine-h">
             <div className={pr.mineHead}>
-              <h2 id="practice-mine-h" className={s.kicker}>
+              <h2 id="practice-mine-h" className={pr.secTitle}>
                 My practice, last 30 days
               </h2>
               <button type="button" className={s.btnSecondary} onClick={() => setOpen(false)} aria-label="Hide my practice">

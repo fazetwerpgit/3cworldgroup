@@ -339,10 +339,9 @@ export default function CallsSchedulePage() {
               <section className={`${s.panel} ${c.next}`} aria-labelledby="next-call-title">
                 <div className={c.nextBody}>
                   <div>
-                    <p className={s.kicker}>Next call</p>
                     <h2 id="next-call-title" className={c.nextTitle}>{nextCall.title}</h2>
                     <p className={c.nextMeta}>
-                      {nextCall.day === now.day ? 'Today' : CallDayLabels[nextCall.day]} · {formatTime(nextCall.time)} CT ·{' '}
+                      Next call · {nextCall.day === now.day ? 'Today' : CallDayLabels[nextCall.day]} · {formatTime(nextCall.time)} CT ·{' '}
                       {CallAudienceLabels[nextCall.audience]}
                     </p>
                   </div>
@@ -405,7 +404,7 @@ export default function CallsSchedulePage() {
             ) : (
               <section className={s.panel} aria-labelledby="week-title">
                 <div className={s.panelHead}>
-                  <h2 id="week-title" className={s.kicker}>This week</h2>
+                  <h2 id="week-title" className={c.secTitle}>This week</h2>
                   <span className={p.rowSub}>Central Time</span>
                 </div>
                 <div className={c.week} role="tablist" aria-label="Select day">

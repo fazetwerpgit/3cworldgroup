@@ -47,7 +47,7 @@ export function PayAndLinks() {
           {RESOURCE_QUICK_LINKS.length > 0 ? (
             <section className={s.panel} aria-labelledby="tools-title">
               <div className={s.panelHead}>
-                <h2 id="tools-title" className={s.kicker}>Field tools</h2>
+                <h2 id="tools-title" className={l.secTitle}>Field tools</h2>
               </div>
               <ul className={p.rows}>
                 {RESOURCE_QUICK_LINKS.map((link) => {

@@ -127,7 +127,7 @@ export function RepPayStructure() {
   return (
     <section className={s.panel} aria-labelledby="pay-structure-title">
       <div className={s.panelHead}>
-        <h2 id="pay-structure-title" className={s.kicker}>Pay structure</h2>
+        <h2 id="pay-structure-title" className={l.secTitle}>Pay structure</h2>
         {isAdmin && data?.scope === 'all' && !editing && (
           <button className={p.headLink} type="button" onClick={() => { setDraft(data.tiers); setEditing(true); }}>
             <Edit3 size={14} aria-hidden="true" /> Edit rates
@@ -174,8 +174,7 @@ export function RepPayStructure() {
                 <p className={l.rateNote}>Your rate will show here once leadership confirms it.</p>
               ) : (
                 <>
-                  <p className={s.kicker}>Your rate</p>
-                  {ownRoleLabel !== null ? <p className={l.rateRole}>{ownRoleLabel}</p> : null}
+                  <p className={l.rateRole}>{ownRoleLabel !== null ? `Your rate as ${ownRoleLabel}` : 'Your rate'}</p>
                   <dl className={l.rateFigures}>
                     <div>
                       <dt>Base</dt>

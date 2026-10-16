@@ -149,7 +149,7 @@ export function Training() {
         ) : (
           <section className={s.panel} aria-labelledby="shorts-title">
             <div className={s.panelHead}>
-              <h2 id="shorts-title" className={s.kicker}>Short videos</h2>
+              <h2 id="shorts-title" className={l.secTitle}>Short videos</h2>
               <span className={p.rowSub}>Quick lessons for the field</span>
             </div>
             <ShortsEmpty />
