@@ -63,7 +63,7 @@ function EscalinkGuide() {
 
       <section className={s.panel} aria-labelledby="esc-which">
         <div className={s.panelHead}>
-          <h2 id="esc-which" className={s.kicker}>EscaLink or a 3C form?</h2>
+          <h2 id="esc-which" className={e.panelTitle}>EscaLink or a 3C form?</h2>
         </div>
         <ul className={e.list}>
           <li>
@@ -88,7 +88,7 @@ function EscalinkGuide() {
 
       <section className={s.panel} aria-labelledby="esc-steps">
         <div className={s.panelHead}>
-          <h2 id="esc-steps" className={s.kicker}>How it works</h2>
+          <h2 id="esc-steps" className={e.panelTitle}>How it works</h2>
         </div>
         <ol className={e.steps}>
           {STEPS.map((step, index) => (
@@ -110,7 +110,7 @@ function EscalinkGuide() {
 
       <section className={s.panel} aria-labelledby="esc-include">
         <div className={s.panelHead}>
-          <h2 id="esc-include" className={s.kicker}>What to include</h2>
+          <h2 id="esc-include" className={e.panelTitle}>What to include</h2>
         </div>
         <ul className={e.list}>
           <li>Submitter: D2D Agents and your dealer code.</li>
@@ -127,7 +127,7 @@ function EscalinkGuide() {
 
       <section className={s.panel} aria-labelledby="esc-types">
         <div className={s.panelHead}>
-          <h2 id="esc-types" className={s.kicker}>Which issue type</h2>
+          <h2 id="esc-types" className={e.panelTitle}>Which issue type</h2>
         </div>
         <dl className={e.types}>
           {ESCALINK_ISSUE_TYPES.map((type) => (
@@ -141,7 +141,7 @@ function EscalinkGuide() {
 
       <section className={s.panel} aria-labelledby="esc-rules">
         <div className={s.panelHead}>
-          <h2 id="esc-rules" className={s.kicker}>Do and don&apos;t</h2>
+          <h2 id="esc-rules" className={e.panelTitle}>Do and don&apos;t</h2>
         </div>
         <ul className={e.list}>
           <li>One ticket per customer and issue. Updates go in the same ticket, never a new one.</li>

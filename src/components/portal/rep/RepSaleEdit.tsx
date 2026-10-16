@@ -298,7 +298,7 @@ export function RepSaleEdit() {
         <div className={x.editMain}>
           <section className={s.panel} aria-labelledby="edit-customer-h">
             <div className={s.panelHead}>
-              <h2 id="edit-customer-h" className={s.kicker}>
+              <h2 id="edit-customer-h" className={x.panelTitle}>
                 Customer
               </h2>
             </div>
@@ -370,7 +370,7 @@ export function RepSaleEdit() {
 
           <section className={s.panel} aria-labelledby="edit-plan-h">
             <div className={s.panelHead}>
-              <h2 id="edit-plan-h" className={s.kicker}>
+              <h2 id="edit-plan-h" className={x.panelTitle}>
                 Plan
               </h2>
             </div>
@@ -406,7 +406,7 @@ export function RepSaleEdit() {
 
           <section className={s.panel} aria-labelledby="edit-sale-h">
             <div className={s.panelHead}>
-              <h2 id="edit-sale-h" className={s.kicker}>
+              <h2 id="edit-sale-h" className={x.panelTitle}>
                 Sale
               </h2>
             </div>
@@ -479,7 +479,7 @@ export function RepSaleEdit() {
 
           <section className={s.panel} aria-labelledby="edit-order-h">
             <div className={s.panelHead}>
-              <h2 id="edit-order-h" className={s.kicker}>
+              <h2 id="edit-order-h" className={x.panelTitle}>
                 Order number
               </h2>
             </div>
@@ -509,7 +509,7 @@ export function RepSaleEdit() {
         <aside className={x.editSide} aria-label="Summary">
           <section className={s.panel} aria-labelledby="edit-summary-h">
             <div className={s.panelHead}>
-              <h2 id="edit-summary-h" className={s.kicker}>
+              <h2 id="edit-summary-h" className={x.panelTitle}>
                 Summary
               </h2>
             </div>

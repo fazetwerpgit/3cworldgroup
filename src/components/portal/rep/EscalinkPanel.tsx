@@ -27,7 +27,7 @@ export function EscalinkPanel({ ticket, className = '' }: { ticket: string; clas
   return (
     <section className={`${s.panel} ${className}`} aria-labelledby="sale-escalink-h" data-part="escalink">
       <div className={s.panelHead}>
-        <h2 id="sale-escalink-h" className={s.kicker}>
+        <h2 id="sale-escalink-h" className={x.panelTitle}>
           T-Mobile support (EscaLink)
         </h2>
       </div>

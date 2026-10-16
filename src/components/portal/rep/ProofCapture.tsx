@@ -292,7 +292,7 @@ export function ProofCapture({
     <BorderBeam size="md" active={reading && !reducedMotion} theme="dark" strength={0.6} className={l.proofBeam}>
       <section className={l.proofCard} aria-labelledby="proof-h">
         <div className={l.proofMeta}>
-          <h2 id="proof-h" className={s.kicker}>
+          <h2 id="proof-h" className={l.proofTitle}>
             {count > 0 ? 'Proof attached' : 'Proof'}
           </h2>
           <p className={l.proofName} aria-live="polite">

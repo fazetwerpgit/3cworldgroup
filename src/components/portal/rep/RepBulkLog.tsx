@@ -339,7 +339,7 @@ export function RepBulkLog() {
   const bar = (fixed: boolean) => (
     <div className={fixed ? l.submitBar : `${l.submitInline} ${b.barInline}`}>
       <p className={b.barCount}>
-        <span className={s.kicker}>Ready</span>
+        <span className={l.estLabel}>Ready</span>
         <span className={b.barNum}>
           {bulk.toSend} of {bulk.rows.length}
         </span>

@@ -249,7 +249,7 @@ export function RepLogSale() {
       {planError ? (
         // The rates failed to load. That is not "no plan", so say so and retry.
         <button type="button" className={`${l.estPay} ${l.estRetry}`} onClick={retryPlan}>
-          <span className={s.kicker}>Est. pay</span>
+          <span className={l.estLabel}>Est. pay</span>
           <span className={l.estNone}>Couldn&apos;t load pay rates</span>
           <span className={l.estRetryLabel}>
             <RotateCw size={12} strokeWidth={2.5} aria-hidden="true" />
@@ -258,7 +258,7 @@ export function RepLogSale() {
         </button>
       ) : (
         <p className={l.estPay}>
-          <span className={s.kicker}>Est. pay</span>
+          <span className={l.estLabel}>Est. pay</span>
           {/* A 0 means the plan has no contracted rate for it yet — the Sales
               rows say "Rate pending" for that, never a confident $0. */}
           {est === 0 ? (

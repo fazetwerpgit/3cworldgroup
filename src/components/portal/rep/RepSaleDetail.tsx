@@ -375,7 +375,7 @@ export function RepSaleDetail() {
         <div className={x.side}>
           <section className={`${s.panel} ${x.oInstall}`} aria-labelledby="sale-install-h">
             <div className={s.panelHead}>
-              <h2 id="sale-install-h" className={s.kicker}>
+              <h2 id="sale-install-h" className={x.panelTitle}>
                 Install
               </h2>
             </div>
@@ -414,7 +414,7 @@ export function RepSaleDetail() {
 
           <section className={`${s.panel} ${x.oProof}`} aria-labelledby="sale-proof-h">
             <div className={s.panelHead}>
-              <h2 id="sale-proof-h" className={s.kicker}>
+              <h2 id="sale-proof-h" className={x.panelTitle}>
                 Order and proof
               </h2>
             </div>
@@ -477,7 +477,7 @@ export function RepSaleDetail() {
         <div className={x.main}>
           <section className={`${s.panel} ${x.oCustomer}`} aria-labelledby="sale-customer-h">
             <div className={s.panelHead}>
-              <h2 id="sale-customer-h" className={s.kicker}>
+              <h2 id="sale-customer-h" className={x.panelTitle}>
                 Customer
               </h2>
             </div>
@@ -510,7 +510,7 @@ export function RepSaleDetail() {
 
           <section className={`${s.panel} ${x.oPlan}`} aria-labelledby="sale-plan-h">
             <div className={s.panelHead}>
-              <h2 id="sale-plan-h" className={s.kicker}>
+              <h2 id="sale-plan-h" className={x.panelTitle}>
                 Plan
               </h2>
             </div>
@@ -541,7 +541,7 @@ export function RepSaleDetail() {
 
           <section className={`${s.panel} ${x.oNotes}`} aria-labelledby="sale-notes-h">
             <div className={s.panelHead}>
-              <h2 id="sale-notes-h" className={s.kicker}>
+              <h2 id="sale-notes-h" className={x.panelTitle}>
                 Notes
               </h2>
             </div>

@@ -165,7 +165,7 @@ export function SaleFields({
   return (
     <div className={l.groups}>
       <section className={l.group} aria-labelledby="group-order">
-        <h2 id="group-order" className={`${s.kicker} ${l.groupHead}`}>
+        <h2 id="group-order" className={l.groupHead}>
           Order
         </h2>
         <div className={l.formGrid}>
@@ -257,7 +257,7 @@ export function SaleFields({
       </section>
 
       <section className={l.group} aria-labelledby="group-customer">
-        <h2 id="group-customer" className={`${s.kicker} ${l.groupHead}`}>
+        <h2 id="group-customer" className={l.groupHead}>
           Customer and install
         </h2>
         <div className={l.formGrid}>
