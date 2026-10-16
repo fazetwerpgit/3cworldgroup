@@ -137,7 +137,7 @@ export function UnassignedOrders({ rows, onAssigned }: { rows: MergedRow[]; onAs
                 </select>
                 <button
                   type="button"
-                  className={x.actBtn}
+                  className={`${x.actBtn} ${x.actFill}`}
                   onClick={() => void assign(group)}
                   disabled={!selected[group.key] || Boolean(assigningKey)}
                 >

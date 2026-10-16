@@ -523,7 +523,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           <span className={x.bAct}>
             <button
               type="button"
-              className={x.actBtn}
+              className={`${x.actBtn} ${x.actFill}`}
               data-part="row-action"
               disabled={undoingKey === row.key}
               onClick={() => void undismiss(row)}
@@ -573,7 +573,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
             </span>
           )}
           <span className={x.bAct}>
-            <button type="button" className={x.actBtn} data-part="row-action" onClick={() => setLinkingRow(row)}>
+            <button type="button" className={`${x.actBtn} ${x.actFill}`} data-part="row-action" onClick={() => setLinkingRow(row)}>
               {row.linkBroken ? 'Re-link this order' : 'Which sale is this?'}
             </button>
           </span>
@@ -721,7 +721,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
 
           <section className={s.panel} aria-labelledby="board-h">
             <div className={`${s.panelHead} ${x.panelHead}`}>
-              <h2 id="board-h" className={s.kicker}>Company sales</h2>
+              <h2 id="board-h" className={x.bookTitle}>Company sales</h2>
               <p className={x.panelMeta}>{month ? monthLabel(month) : 'All time'}</p>
             </div>
             <div className={x.figs}>
@@ -771,7 +771,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
 
           <section className={s.panel} aria-labelledby="board-reps-h">
             <div className={`${s.panelHead} ${x.panelHead}`}>
-              <h2 id="board-reps-h" className={s.kicker}>By rep</h2>
+              <h2 id="board-reps-h" className={x.bookTitle}>By rep</h2>
               <p className={x.panelMeta}>{pricing ? '3C revenue after rep pay' : 'Points'}</p>
             </div>
 
@@ -893,7 +893,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
       ) : (
         <section className={s.panel} aria-labelledby="board-pay-h">
           <div className={`${s.panelHead} ${x.panelHead}`}>
-            <h2 id="board-pay-h" className={s.kicker}>My est. pay</h2>
+            <h2 id="board-pay-h" className={x.bookTitle}>My est. pay</h2>
             {payScaleLabel && <p className={x.panelMeta}>Pay scale · {payScaleLabel}</p>}
           </div>
           <div className={x.figs}>
@@ -1014,7 +1014,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
             <button type="button" className={s.btnSecondary} onClick={() => setCancellingId(null)}>Keep sale</button>
             <button
               type="button"
-              className={`${x.actBtn} ${x.actDanger}`}
+              className={`${x.actBtn} ${x.actFill} ${x.actDanger}`}
               disabled={loading}
               onClick={() => {
                 const id = cancellingId;
@@ -1052,7 +1052,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
             <button type="button" className={s.btnSecondary} onClick={() => setDeletingId(null)}>Cancel</button>
             <button
               type="button"
-              className={`${x.actBtn} ${x.actDanger}`}
+              className={`${x.actBtn} ${x.actFill} ${x.actDanger}`}
               disabled={loading}
               onClick={() => {
                 const id = deletingId;

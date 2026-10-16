@@ -536,9 +536,9 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
   );
 
   return (
-    <section className={s.panel} aria-label="Install status">
+    <section className={`${s.panel} ${x.statusPanel}`} aria-label="Install status">
       <div className={`${s.panelHead} ${x.panelHead}`}>
-        <h2 className={s.kicker}>Install status by rep</h2>
+        <h2 className={x.bookTitle}>Install status by rep</h2>
         {updated && <p className={x.panelMeta}>Updated {updated}</p>}
       </div>
 
@@ -628,8 +628,8 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
               {unmatchedAssignmentGroups.length > 0 && (
                 <>
                   <div className={x.divider}>
-                    <span className={s.kicker}>Not linked to an account yet</span>
-                    <button type="button" className={x.actBtn} onClick={() => void handleRematch()} disabled={rematching || Boolean(assigningKey)}>
+                    <span className={x.dividerLabel}>Not linked to an account yet</span>
+                    <button type="button" className={`${x.actBtn} ${x.actFill}`} onClick={() => void handleRematch()} disabled={rematching || Boolean(assigningKey)}>
                       {rematching ? 'Matching…' : 'Re-run matching'}
                     </button>
                   </div>
@@ -668,7 +668,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
                                   </select>
                                   <button
                                     type="button"
-                                    className={x.actBtn}
+                                    className={`${x.actBtn} ${x.actFill}`}
                                     onClick={() => void handleAssign(assignment)}
                                     disabled={!selectedUsers[assignment.key] || rematching || Boolean(assigningKey)}
                                   >
