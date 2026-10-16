@@ -1,4 +1,5 @@
-/* Owner announcements: form + history. Phone: stacked. Desktop: form beside the list. */
+/* Owner announcements: form + history. Phone: stacked. Desktop: form beside the list.
+   Flat: header bands, filled wells, no rules or outlines. */
 
 .layout {
   display: grid;
@@ -28,7 +29,7 @@
 
 .count {
   color: var(--c-text-3);
-  font: 500 var(--t-min) / 1 var(--f-ui);
+  font: 500 var(--t-sm) / 1 var(--f-ui);
   font-variant-numeric: tabular-nums;
 }
 
@@ -59,12 +60,12 @@
 .row {
   display: grid;
   gap: var(--s2);
-  padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line);
+  padding: var(--s4);
 }
 
-.row:first-child {
-  border-top: 0;
+/* Rows sit apart by space: no rules between them. */
+.row + .row {
+  padding-top: var(--s2);
 }
 
 .rowHead {
@@ -84,7 +85,7 @@
 .rowBody {
   margin: 0;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -113,7 +114,6 @@
   display: grid;
   gap: var(--s3);
   padding: var(--s3) var(--s4);
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
   background: var(--c-well);
 }

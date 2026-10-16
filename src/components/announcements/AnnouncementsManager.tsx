@@ -215,7 +215,7 @@ export function AnnouncementsManager() {
       <div className={a.layout}>
         <section className={rep.panel} aria-labelledby="announce-new">
           <div className={cx(rep.panelHead, u.band)}>
-            <h2 id="announce-new" className={rep.kicker}>
+            <h2 id="announce-new">
               New announcement
             </h2>
           </div>
@@ -334,7 +334,7 @@ export function AnnouncementsManager() {
 
         <section className={cx(rep.panel, s.listPanel)} aria-labelledby="announce-history">
           <div className={cx(rep.panelHead, u.band)}>
-            <h2 id="announce-history" className={rep.kicker}>
+            <h2 id="announce-history">
               Scheduled and sent
             </h2>
           </div>
