@@ -131,7 +131,7 @@ export default function LinkedSignInMethods() {
   return (
     <section className={s.panel} aria-labelledby="signin-methods-title">
       <div className={s.panelHead}>
-        <h2 id="signin-methods-title" className={s.kicker}>
+        <h2 id="signin-methods-title" className={st.panelTitle}>
           Linked sign-in methods
         </h2>
       </div>

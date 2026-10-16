@@ -448,7 +448,7 @@ export default function PublicOnboardingPage() {
         <aside className={o.inviteAside} aria-labelledby="onboard-progress-h">
           <section className={s.panel}>
             <div className={o.progress}>
-              <h2 id="onboard-progress-h" className={s.kicker}>
+              <h2 id="onboard-progress-h" className={o.panelTitle}>
                 Candidate
               </h2>
               <p className={o.candidate}>
@@ -696,7 +696,7 @@ export default function PublicOnboardingPage() {
                         </span>
                       )}
                       <h3 className={o.rowName}>
-                        {String(index + 1).padStart(2, '0')}. {item.label}
+                        {index + 1}. {item.label}
                       </h3>
                       <p className={o.rowDesc}>
                         {esign

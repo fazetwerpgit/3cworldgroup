@@ -129,7 +129,7 @@ export default function MemberLineOnboardingBoard({
     <>
       <section className={s.panel} aria-labelledby="onboarding-progress-h">
         <div className={o.progress}>
-          <h2 id="onboarding-progress-h" className={s.kicker}>
+          <h2 id="onboarding-progress-h" className={o.panelTitle}>
             Checklist for {memberLabel}
           </h2>
           <p className={o.score}>

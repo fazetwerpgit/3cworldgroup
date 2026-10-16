@@ -3,6 +3,15 @@
    the portaled sheet and the pre-auth ground). The page header reuses the
    forms hub classes in rep-forms.module.css. */
 
+/* Panel heading: plain sentence-case text, no eyebrow. */
+.panelTitle {
+  margin: 0;
+  color: var(--c-text);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
 /* ---------- progress ---------- */
 .progress {
   display: grid;
@@ -34,7 +43,7 @@
 .scoreLabel {
   margin-left: auto;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 600;
 }
 
@@ -43,16 +52,19 @@
 }
 
 /* ---------- checklist ---------- */
-.list {
+/* Rows are their own panel tiles 4px apart (as in Sales), no rules. */
+ul.list {
   display: grid;
+  gap: 4px;
   margin: var(--s4) 0 0;
   padding: 0;
   overflow: hidden;
+  background: transparent;
   list-style: none;
 }
 
-.list > li + li {
-  border-top: 1px solid var(--c-line);
+.list > li {
+  background: var(--c-panel);
 }
 
 .row {
@@ -64,8 +76,9 @@
   padding: var(--s4);
 }
 
-.row[data-state='rejected'] {
-  box-shadow: inset 3px 0 0 var(--c-amber);
+/* Sent back: an amber tint, not a stripe. */
+.list > li.row[data-state='rejected'] {
+  background: color-mix(in srgb, var(--c-amber) 11%, var(--c-panel));
 }
 
 .rowText {
@@ -83,7 +96,7 @@
 
 .rowDesc {
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.4;
 }
 
@@ -108,8 +121,8 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 2px;
-  color: var(--c-text-3);
-  font-size: var(--t-min);
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
   font-weight: 600;
 }
 
@@ -134,7 +147,7 @@
 }
 
 .state[data-state='submitted']::before {
-  background: linear-gradient(90deg, currentColor 50%, transparent 50%);
+  background: color-mix(in srgb, currentColor 45%, transparent);
 }
 
 .state[data-state='rejected'] {
@@ -151,10 +164,6 @@
   display: grid;
   gap: var(--s2);
   padding: var(--s4);
-}
-
-.skelRow + .skelRow {
-  border-top: 1px solid var(--c-line);
 }
 
 .empty {
@@ -187,8 +196,7 @@
 .asideItem {
   display: grid;
   gap: 4px;
-  padding-top: var(--s3);
-  border-top: 1px solid var(--c-line);
+  padding-top: var(--s2);
 }
 
 .asideItem h3 {
@@ -200,7 +208,7 @@
 .asideItem p {
   margin: 0;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.45;
 }
 
@@ -221,7 +229,6 @@
 .note {
   margin: 0;
   padding: 14px var(--s4);
-  border: 1px solid var(--c-line);
   border-radius: var(--r-panel);
   background: var(--c-ground);
   color: var(--c-text-2);
@@ -237,7 +244,6 @@
 }
 
 .noteWarn {
-  border-color: rgba(245, 185, 69, 0.45);
   background: var(--c-amber-wash);
 }
 
@@ -317,7 +323,7 @@
   gap: 2px;
   margin: 0;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.4;
   overflow-wrap: anywhere;
 }

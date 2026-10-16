@@ -400,7 +400,7 @@ export function InviteSignAll({ token, signingKey, onSessionLost }: Props) {
         <aside className={o.inviteAside} aria-labelledby="sign-progress-h">
           <section className={s.panel}>
             <div className={o.progress}>
-              <h2 id="sign-progress-h" className={s.kicker}>
+              <h2 id="sign-progress-h" className={o.panelTitle}>
                 Documents
               </h2>
               <p className={o.score}>
@@ -456,7 +456,7 @@ export function InviteSignAll({ token, signingKey, onSessionLost }: Props) {
                           {pill.text}
                         </span>
                         <h3 className={o.rowName}>
-                          {String(index + 1).padStart(2, '0')}. {doc.envelope?.name ?? doc.label}
+                          {index + 1}. {doc.envelope?.name ?? doc.label}
                         </h3>
                         <p className={o.rowDesc}>{description}</p>
                       </div>

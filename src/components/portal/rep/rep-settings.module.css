@@ -20,13 +20,21 @@
   }
 }
 
+/* Panel heading: plain sentence-case text, no eyebrow. */
+.panelTitle {
+  margin: 0;
+  color: var(--c-text);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
 /* ---------- profile ---------- */
 .who {
   display: flex;
   align-items: center;
   gap: var(--s3);
-  padding: var(--s4);
-  border-bottom: 1px solid var(--c-line);
+  padding: var(--s2) var(--s4) 0;
 }
 
 .initials {
@@ -35,12 +43,10 @@
   flex: none;
   width: 56px;
   height: 56px;
-  border: 1px solid var(--c-line-strong);
   border-radius: 50%;
   background: var(--c-panel-hi);
   font-family: var(--f-display);
   font-size: 26px;
-  letter-spacing: 0.04em;
   padding-top: 3px;
 }
 
@@ -55,7 +61,7 @@
   margin: 2px 0 0;
   overflow: hidden;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   text-overflow: ellipsis;
 }
 
@@ -93,10 +99,14 @@
   }
 }
 
-/* Read-only account facts: label left, value right, lock on the label. */
+/* Read-only account facts: label left, value right, lock on the label.
+   One tone step down from the panel instead of ruled rows. */
 .facts {
-  margin: 0;
-  border-top: 1px solid var(--c-line);
+  display: grid;
+  margin: 0 var(--s4);
+  padding: var(--s2) 0;
+  border-radius: 12px;
+  background: var(--c-ground);
 }
 
 .fact {
@@ -104,20 +114,16 @@
   grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
   align-items: center;
   gap: var(--s3);
-  min-height: 48px;
-  padding: var(--s2) var(--s4);
-}
-
-.fact + .fact {
-  border-top: 1px solid var(--c-line);
+  min-height: 44px;
+  padding: var(--s1) var(--s4);
 }
 
 .fact dt {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
   font-weight: 600;
 }
 
@@ -132,7 +138,6 @@
   display: grid;
   gap: 4px;
   padding: var(--s3) var(--s4) var(--s4);
-  border-top: 1px solid var(--c-line);
 }
 
 /* ---------- setting rows (push, install) ---------- */
@@ -145,9 +150,6 @@
   padding: var(--s3) var(--s4);
 }
 
-.setting + .setting {
-  border-top: 1px solid var(--c-line);
-}
 
 .settingText {
   display: grid;
@@ -161,7 +163,7 @@
 
 .settingSub {
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.4;
 }
 
@@ -183,13 +185,13 @@
   align-items: center;
   gap: 6px;
   color: var(--c-lime);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 650;
 }
 
 .muted {
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
   font-weight: 600;
   text-align: right;
 }
@@ -222,10 +224,10 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--c-line-strong);
   border-radius: 50%;
+  background: var(--c-panel-hi);
   color: var(--c-lime);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
@@ -286,8 +288,7 @@
 .drawer {
   display: grid;
   gap: var(--s4);
-  padding: var(--s4);
-  border-top: 1px solid var(--c-line);
+  padding: var(--s2) var(--s4) var(--s4);
 }
 
 .actions {
@@ -307,7 +308,7 @@
   border: 0;
   background: transparent;
   color: var(--c-lime);
-  font: 600 var(--t-sm) / 1 var(--f-ui);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
   cursor: pointer;
 }
 

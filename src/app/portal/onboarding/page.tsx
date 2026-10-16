@@ -397,7 +397,7 @@ function OnboardingChecklist() {
         {/* Nothing left for the rep to finish, so no how-to. */}
         {repDone ? null : (
           <aside className={`${s.panel} ${o.aside}`} aria-labelledby="onboarding-how-h">
-            <h2 id="onboarding-how-h" className={s.kicker}>
+            <h2 id="onboarding-how-h" className={o.panelTitle}>
               How to finish an item
             </h2>
             {hasUploads ? (

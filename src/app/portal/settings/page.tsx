@@ -213,7 +213,7 @@ export default function SettingsPage() {
         <div className={st.col}>
           <section className={s.panel} aria-labelledby="profile-title">
             <div className={s.panelHead}>
-              <h2 id="profile-title" className={s.kicker}>Your profile</h2>
+              <h2 id="profile-title" className={st.panelTitle}>Your profile</h2>
             </div>
             <div className={st.who}>
               <span className={st.initials} aria-hidden="true">{initials}</span>
@@ -282,7 +282,7 @@ export default function SettingsPage() {
               {facts.map(([label, value]) => (
                 <div className={st.fact} key={label}>
                   <dt>
-                    <Lock size={12} aria-hidden="true" />
+                    <Lock size={14} aria-hidden="true" />
                     {label}
                   </dt>
                   <dd>{value}</dd>
@@ -300,7 +300,7 @@ export default function SettingsPage() {
         <div className={st.col}>
           <section id="app-settings" className={s.panel} aria-labelledby="app-title">
             <div className={s.panelHead}>
-              <h2 id="app-title" className={s.kicker}>Notifications and app</h2>
+              <h2 id="app-title" className={st.panelTitle}>Notifications and app</h2>
             </div>
             {/* In the 3C iOS app: native push instead of web push, nothing to install. */}
             {inApp ? (

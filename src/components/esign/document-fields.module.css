@@ -16,20 +16,17 @@
   border: 0;
   background: none;
   color: var(--c-lime);
-  font: 600 var(--t-sm) / 1 var(--f-ui);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
   cursor: pointer;
 }
 
-/* Checkbox rows: Log Sale's extras (a 22px box, 52px row). */
+/* Checkbox rows: Log Sale's extras (a 22px box, 52px row), filled tiles
+   4px apart instead of a ruled box. */
 .checks {
   display: grid;
+  gap: 4px;
   overflow: hidden;
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
-}
-
-.checks .check + .check {
-  border-top: 1px solid var(--c-line);
 }
 
 .check {
@@ -74,14 +71,12 @@
 }
 
 .consent {
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
 }
 
 .consent:has(input:checked) {
-  border-color: rgba(141, 198, 63, 0.45);
   background: var(--c-lime-wash);
   color: var(--c-text);
 }
