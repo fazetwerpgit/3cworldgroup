@@ -7,6 +7,7 @@ import type { FiberPlan, Sale, SaleProduct, SaleType } from '@/types';
 import { addPlanToProducts, isExtraPlanId } from '@/lib/sales/planSelection';
 import { MAX_PROOF_SCREENSHOTS, proofPathFields, saleProofPaths } from '@/lib/sales/proofPaths';
 import { randomHex } from '@/lib/randomHex';
+import { nativeHaptic } from '@/lib/app/bridge';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
 import {
   buildSalePayload,
@@ -471,12 +472,15 @@ export function useSaleFormState({ persist = true, initial }: { persist?: boolea
     } else if (result?.duplicate) {
       setDuplicateOf(result.sale);
     } else if (result) {
+      // 3C iOS app only (a no-op on the web): a tap the rep feels on success.
+      nativeHaptic('success');
       submittedRef.current = true;
       if (draftKey) writeSaleDraft(draftKey, null);
       // Confirmed: whatever is entered next is a new sale with a new key.
       setProofUploadId(newClientSaleId());
       setKeyUsed(false);
     }
+    if (!result) nativeHaptic('error');
     return result;
   };
 

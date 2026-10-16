@@ -293,7 +293,7 @@ export function LoginForm() {
                     type="button"
                     onClick={() => handleNativeSignIn(provider)}
                     disabled={nativeLoading !== null || loading}
-                    className={`${s.btnSecondary} ${a.google}`}
+                    className={`${s.btnSecondary} ${a.google}${provider === 'apple' ? ` ${a.apple}` : ''}`}
                   >
                     {nativeLoading === provider ? (
                       <>

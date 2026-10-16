@@ -9,6 +9,8 @@ import ReportBugCard from '@/components/portal/ReportBugCard';
 import InstallAppCard from '@/components/portal/InstallAppCard';
 import PushNotificationsCard from '@/components/portal/PushNotificationsCard';
 import NativePushCard from '@/components/app/NativePushCard';
+import FaceIdLockCard from '@/components/app/FaceIdLockCard';
+import AppOnly from '@/components/app/AppOnly';
 import LinkedSignInMethods from '@/components/app/LinkedSignInMethods';
 import DeleteAccountCard from '@/components/portal/DeleteAccountCard';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
@@ -302,7 +304,10 @@ export default function SettingsPage() {
             </div>
             {/* In the 3C iOS app: native push instead of web push, nothing to install. */}
             {inApp ? (
-              <NativePushCard />
+              <>
+                <NativePushCard />
+                <FaceIdLockCard />
+              </>
             ) : (
               <>
                 <PushNotificationsCard />
@@ -432,11 +437,16 @@ export default function SettingsPage() {
             )}
           </section>
 
-          <LinkedSignInMethods />
+          {/* App-only: on the web Settings is exactly what it was. */}
+          <AppOnly>
+            <LinkedSignInMethods />
+          </AppOnly>
 
           <ReportBugCard />
 
-          <DeleteAccountCard />
+          <AppOnly>
+            <DeleteAccountCard />
+          </AppOnly>
         </div>
       </div>
     </div>

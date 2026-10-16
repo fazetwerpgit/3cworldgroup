@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ChevronDown, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { nativeHaptic } from '@/lib/app/bridge';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import st from '@/components/portal/rep/rep-settings.module.css';
@@ -15,7 +16,8 @@ export function deleteConfirmMatches(typed: string): boolean {
   return typed.trim().toUpperCase() === DELETE_CONFIRM_WORD;
 }
 
-// Self-service account deletion (SPEC A3). Shown on the web and in the app.
+// Self-service account deletion (SPEC A3). Settings shows it in the 3C iOS
+// app only (Jacob 2026-10-16); on the web, deletion is by request.
 // Behind a typed confirmation; the server (DELETE /api/portal/auth/me)
 // disables the sign-in and anonymizes the profile. Sales and pay records,
 // with the names on them, are kept for payroll, as /privacy says.
@@ -52,6 +54,7 @@ export default function DeleteAccountCard() {
         setWorking(false);
         return;
       }
+      nativeHaptic('success');
       // The sign-in is closed server-side; drop the local session too.
       try {
         await signOut();

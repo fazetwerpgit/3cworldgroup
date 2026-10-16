@@ -76,6 +76,10 @@ The web stores the token on the user with
 `style`: `light` | `medium` | `heavy` | `selection` | `success` | `warning` | `error`
 (maps to `expo-haptics` impact / selection / notification).
 
+The portal sends `success` when a sale is submitted or an edit is saved, and
+when an account deletion finishes; it sends `error` when a sale submit or edit
+save fails. Outside the app the call does nothing.
+
 ### `share` (request)
 ```json
 { "type": "share", "id": "w2", "url": "https://...", "text": "...", "title": "..." }
@@ -111,8 +115,16 @@ web handler.
 ```
 Without `enabled`, read the setting. With it, change the Face ID lock-on-resume
 setting. Result: `{ "enabled": boolean, "available": boolean }`, where
-`available` is false when no biometrics are enrolled. (The portal does not send
-this yet. It is reserved for a Settings toggle.)
+`available` is false when no biometrics are enrolled.
+
+The portal's Settings toggle "Require Face ID to open the app" (app only, off by
+default) reads the setting on mount and sends `enabled` when the rep flips it.
+The shell owns the setting: it stores it on the device (for example in
+SecureStore), applies it on the next resume, and replies with the stored value.
+If turning it on needs a Face ID check and the rep cancels, reply with code
+`canceled` and leave the setting unchanged. The web mirrors the reply in
+`localStorage['3c-face-id-lock']` (`on`/`off`) only to draw the toggle before
+the shell answers; that copy is never the source of truth.
 
 ### `nativeSignIn` (request, SPEC A2)
 ```json

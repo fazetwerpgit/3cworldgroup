@@ -17,6 +17,7 @@ import { ProofCapture, useProofUploads } from './ProofCapture';
 import { RepPlanPicker } from './RepPlanPicker';
 import { useSoftKeyboardOpen } from './RepForm';
 import { useHideRepTabBar } from './RepShell';
+import { nativeHaptic } from '@/lib/app/bridge';
 import { formatPrice, num } from './saleFormat';
 import s from './rep.module.css';
 import x from './rep-sale.module.css';
@@ -227,6 +228,8 @@ export function RepSaleEdit() {
     };
 
     const success = await updateSale(saleId, updates);
+    // 3C iOS app only (a no-op on the web).
+    nativeHaptic(success ? 'success' : 'error');
     if (success) {
       router.push(`/portal/sales/${saleId}`);
     }

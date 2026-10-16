@@ -152,9 +152,9 @@ export default function PrivacyPolicyPage() {
               </p>
               <p>
                 <strong>Deleting your portal account.</strong> You can delete your portal account at any
-                time from Settings &gt; Delete account, on the web or in the 3C Portal iPhone app. If
-                your sign-up is still waiting for approval, you can delete the request from that screen.
-                When you do, we close your sign-in and remove your personal profile details (contact
+                time in the 3C Portal iPhone app under Settings &gt; Delete account, or by asking us
+                (see Contact Us below). If your sign-up is still waiting for approval, you can delete
+                the request from that screen. When your account is deleted, we close your sign-in and remove your personal profile details (contact
                 information, address, profile photo), your identity documents, and your notification
                 devices. Chat messages you sent show as &ldquo;Deleted user.&rdquo; Your name stays on
                 the sales, commission, and pay records we must keep for payroll, tax, and carrier
@@ -169,7 +169,8 @@ export default function PrivacyPolicyPage() {
                 <li>Request correction of inaccurate information.</li>
                 <li>
                   Request deletion of your information, subject to legal exceptions. Portal users can
-                  delete their own account in Settings (see Data Retention above).
+                  delete their account in the 3C Portal iPhone app under Settings, or by asking us
+                  (see Data Retention above).
                 </li>
                 <li>Opt out of marketing communications at any time.</li>
               </ul>
