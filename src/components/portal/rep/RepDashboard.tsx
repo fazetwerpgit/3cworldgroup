@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, TrendingDown, TrendingUp, Video } from 'lucide-react';
+import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAsReadOnly } from '@/contexts/ViewAsContext';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
@@ -116,10 +116,10 @@ function Failed({ what, onRetry, className = '' }: { what: string; onRetry: () =
   );
 }
 
-function PanelHead({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
+function SectionHead({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
   return (
-    <div className={`${s.panelHead} ${d.head}`}>
-      <h2 id={id} className={s.kicker}>
+    <div className={d.sectionHead}>
+      <h2 id={id} className={d.sectionTitle}>
         {title}
       </h2>
       {children}
@@ -129,7 +129,7 @@ function PanelHead({ id, title, children }: { id: string; title: string; childre
 
 function SkeletonPanel({ label, rows = 2, className = '' }: { label: string; rows?: number; className?: string }) {
   return (
-    <section className={`${s.panel} ${d.card} ${className}`} aria-busy="true" aria-label={label}>
+    <section className={`${d.surface} ${d.card} ${className}`} aria-busy="true" aria-label={label}>
       <div className={d.skelBody}>
         <span className={`${s.skel} ${d.skelLine}`} />
         {Array.from({ length: rows }, (_, i) => (
@@ -140,7 +140,7 @@ function SkeletonPanel({ label, rows = 2, className = '' }: { label: string; row
   );
 }
 
-/** Carrier wordmark: text in a quiet outlined chip until real monochrome logo files exist. */
+/** Carrier wordmark: text in a quiet filled chip until real monochrome logo files exist. */
 export function CarrierMark({ name }: { name: string }) {
   return name ? <span className={d.carrier}>{name}</span> : null;
 }
@@ -148,9 +148,9 @@ export function CarrierMark({ name }: { name: string }) {
 // ---------------------------------------------------------------- money
 
 const BUCKETS = [
-  { key: 'installed', seg: d.seg_installed, label: 'installed' },
-  { key: 'scheduled', seg: d.seg_scheduled, label: 'scheduled' },
-  { key: 'attention', seg: d.seg_needs, label: 'needs a date' },
+  { key: 'installed', seg: d.seg_installed, tone: d.st_installed, label: 'installed' },
+  { key: 'scheduled', seg: d.seg_scheduled, tone: d.st_scheduled, label: 'scheduled' },
+  { key: 'attention', seg: d.seg_needs, tone: d.st_needsdate, label: 'need a date' },
 ] as const;
 
 /** One segment per sale up to 10; above that each bucket is one proportional segment. */
@@ -193,61 +193,47 @@ export function chargebackNote(lines: PaySummary['chargebacks']): string {
   return `Includes est. ${amount} in chargebacks · ${lines.length} customers cancelled within 120 days of install`;
 }
 
-function MoneyCard({ pay, hasPlan, tucked }: { pay: PaySummary; hasPlan: boolean; tucked: boolean }) {
+function MoneyCard({ pay, hasPlan }: { pay: PaySummary; hasPlan: boolean }) {
   const delta = pay.deltaPct;
   const amount = hasPlan && pay.estThisMonth !== null ? pay.estThisMonth : null;
 
   return (
-    <section className={`${d.money} ${tucked ? d.moneyTucked : ''}`} aria-labelledby="money-h">
-      <div className={d.moneyMain}>
-        <h2 id="money-h" className={s.kicker}>
-          Est. pay this month
-        </h2>
-        <p className={d.payNum}>{amount !== null ? <PayAmount amount={amount} /> : '—'}</p>
-        {!hasPlan ? (
-          <p className={d.moneyNote}>No pay plan assigned yet</p>
-        ) : delta !== null ? (
-          <p className={d.delta}>
-            <b className={delta < 0 ? d.deltaDown : ''}>
-              {delta < 0 ? (
-                <TrendingDown size={16} strokeWidth={2.25} aria-hidden="true" />
-              ) : (
-                <TrendingUp size={16} strokeWidth={2.25} aria-hidden="true" />
-              )}
-              {delta > 0 ? '+' : ''}
-              {delta}%
-            </b>
-            vs last month
-          </p>
+    <section className={d.money} aria-labelledby="money-h">
+      <p className={d.payNum}>{amount !== null ? <PayAmount amount={amount} /> : '—'}</p>
+      {/* The label sits under the figure as a sentence, with the change against last month. */}
+      <h2 id="money-h" className={d.payLine}>
+        <strong>Estimated pay this month</strong>
+        {hasPlan && delta !== null ? (
+          <>
+            , <b className={delta < 0 ? d.deltaDown : d.deltaUp}>{delta < 0 ? 'down' : 'up'} {Math.abs(delta)}%</b> on last
+            month
+          </>
         ) : null}
-        {/* Money on sales with nothing on the calendar yet: it has no month. */}
-        {hasPlan && pay.estNoDate ? <p className={d.moneyNote}>est. {money(pay.estNoDate)} has no install date yet</p> : null}
-        {/* Est. chargebacks landing this month, already netted into the figure above. */}
-        {hasPlan && pay.chargebacks.length ? <p className={d.moneyNote}>{chargebackNote(pay.chargebacks)}</p> : null}
-        {/* Missed installs: their date is stale, so their money waits on a new one. */}
-        {hasPlan && pay.estMissed ? (
-          <p className={d.moneyNote}>est. {money(pay.estMissed)} needs a new install date</p>
-        ) : null}
-      </div>
+      </h2>
+      {!hasPlan ? <p className={d.moneyNote}>No pay plan assigned yet</p> : null}
+      {/* Money on sales with nothing on the calendar yet: it has no month. */}
+      {hasPlan && pay.estNoDate ? <p className={d.moneyNote}>est. {money(pay.estNoDate)} has no install date yet</p> : null}
+      {/* Est. chargebacks landing this month, already netted into the figure above. */}
+      {hasPlan && pay.chargebacks.length ? <p className={d.moneyNote}>{chargebackNote(pay.chargebacks)}</p> : null}
+      {/* Missed installs: their date is stale, so their money waits on a new one. */}
+      {hasPlan && pay.estMissed ? <p className={d.moneyNote}>est. {money(pay.estMissed)} needs a new install date</p> : null}
 
-      <div className={d.well}>
-        <div className={d.wellHead}>
-          <span className={s.kicker}>This month</span>
-          <span>
-            {pay.monthCount} {pay.monthCount === 1 ? 'sale' : 'sales'}
-          </span>
-        </div>
+      <div className={d.month}>
         {pay.monthCount > 0 ? (
           <>
             <MonthStack counts={pay.counts} total={pay.monthCount} />
-            <ul className={d.legend}>
-              {BUCKETS.filter((bucket) => pay.counts[bucket.key] > 0).map((bucket) => (
-                <li key={bucket.key}>
-                  <span className={`${d.swatch} ${bucket.seg}`} aria-hidden="true" />
-                  <b>{pay.counts[bucket.key]}</b> {bucket.label}
-                </li>
-              ))}
-            </ul>
+            <div className={d.monthLine}>
+              <span>
+                {pay.monthCount} {pay.monthCount === 1 ? 'sale' : 'sales'} this month:
+              </span>{' '}
+              <ul className={d.legend}>
+                {BUCKETS.filter((bucket) => pay.counts[bucket.key] > 0).map((bucket) => (
+                  <li key={bucket.key} className={bucket.tone}>
+                    {pay.counts[bucket.key]} {bucket.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </>
         ) : (
           <p className={d.periodEmpty}>Nothing logged this month yet.</p>
@@ -261,21 +247,20 @@ function MoneyCard({ pay, hasPlan, tucked }: { pay: PaySummary; hasPlan: boolean
 function PayoutCard({ payout }: { payout: NonNullable<PaySummary['payout']> }) {
   return (
     <div className={d.payout}>
-      <span className={d.payoutLab}>
-        <span className={s.kicker}>Next window</span>
-        <CarrierMark name="T-Fiber" />
-      </span>
-      <span className={d.payoutWhen}>Est. payout {formatPayoutWindow(payout.window)}</span>
-      <span className={d.payoutMeta}>
-        {payout.count} {payout.count === 1 ? 'sale' : 'sales'}
-        {payout.scheduled > 0 ? ` · ${payout.scheduled} scheduled` : ''}
-      </span>
+      <span className={d.payoutWhen}>Next payout, est. {formatPayoutWindow(payout.window)}</span>
       {payout.amount !== null ? (
         <span className={d.payoutAmt}>
           <small className={d.est}>est.</small>
           {money(payout.amount)}
         </span>
       ) : null}
+      <span className={d.payoutMeta}>
+        <CarrierMark name="T-Fiber" />
+        <span>
+          {payout.count} {payout.count === 1 ? 'sale' : 'sales'}
+          {payout.scheduled > 0 ? `, ${payout.scheduled} still scheduled` : ''}
+        </span>
+      </span>
     </div>
   );
 }
@@ -292,12 +277,11 @@ export function PayHelpButton({ onClick, className = '' }: { onClick: () => void
 function MoneySkeleton() {
   return (
     <section className={d.money} aria-busy="true" aria-label="Loading your pay">
-      <div className={d.moneyMain}>
-        <p className={s.kicker}>Est. pay this month</p>
-        <span className={`${s.skel} ${d.skelScore}`} />
-        <span className={`${s.skel} ${d.skelLine}`} />
-      </div>
-      <div className={d.well}>
+      <span className={`${s.skel} ${d.skelScore}`} />
+      <p className={d.payLine}>
+        <strong>Estimated pay this month</strong>
+      </p>
+      <div className={d.month}>
         <span className={`${s.skel} ${d.skelBar}`} />
       </div>
     </section>
@@ -340,8 +324,8 @@ function ChallengeSegs({ target, done }: { target: number; done: number }) {
   if (target > 10) {
     const pct = Math.min(Math.round((done / target) * 100), 100);
     return (
-      <div className={`${s.track} ${d.chTrack}`} aria-hidden="true">
-        <span className={`${s.fill} ${d.grow}`} style={{ width: `${pct}%` }} />
+      <div className={d.chTrack} aria-hidden="true">
+        <span className={d.grow} style={{ width: `${pct}%` }} />
       </div>
     );
   }
@@ -378,45 +362,38 @@ function WeekStrip({
   const gapPct = rank && ahead && ahead.points > 0 ? Math.min(Math.round((rank.points / ahead.points) * 100), 100) : null;
 
   return (
-    <section className={`${s.panel} ${d.card} ${d.week}`} style={rise(2)} aria-labelledby="week-h">
-      <PanelHead id="week-h" title="This week">
+    <section className={`${d.card} ${d.week}`} style={rise(2)} aria-labelledby="week-h">
+      <SectionHead id="week-h" title="This week">
         <span className={d.clock}>
-          <Timer size={16} aria-hidden="true" />
+          <Timer size={17} aria-hidden="true" />
           {timeLeft}
         </span>
-      </PanelHead>
+      </SectionHead>
 
       <div className={`${d.halves} ${showRank && showChallenge ? '' : d.halvesSolo}`}>
         {showRank ? (
-          <div className={d.half}>
-            <p className={s.kicker}>Rank</p>
+          <div className={`${d.surface} ${d.half}`}>
             {standing.status === 'loading' ? (
               <span className={`${s.skel} ${d.skelBig}`} aria-label="Loading rank" />
             ) : standing.status === 'error' ? (
               <Failed what="rank" onRetry={onRetryStanding} className={d.cellFailed} />
             ) : rank ? (
               <>
-                <div className={d.rankRow}>
-                  <p className={d.big} aria-label={`${rank.rank}${ordinalSuffix(rank.rank)} of ${rank.of}`}>
-                    {rank.rank}
-                    <sup>{ordinalSuffix(rank.rank)}</sup>
-                  </p>
-                  {rank.movement ? (
-                    <p className={`${d.delta} ${d.rankMove}`}>
-                      <b className={rank.movement < 0 ? d.deltaDown : ''}>
-                        {rank.movement < 0 ? (
-                          <TrendingDown size={16} strokeWidth={2.25} aria-hidden="true" />
-                        ) : (
-                          <TrendingUp size={16} strokeWidth={2.25} aria-hidden="true" />
-                        )}
-                        {rank.movement > 0 ? 'Up' : 'Down'} {Math.abs(rank.movement)}
-                      </b>
-                      today
-                    </p>
-                  ) : null}
-                </div>
+                <p className={d.big} aria-label={`${rank.rank}${ordinalSuffix(rank.rank)} of ${rank.of}`}>
+                  {rank.rank}
+                  <sup>{ordinalSuffix(rank.rank)}</sup>
+                </p>
                 <p className={d.cap}>
-                  of {rank.of} · <b>{rank.points.toLocaleString('en-US')} pts</b>
+                  Of {rank.of}
+                  {rank.movement ? (
+                    <>
+                      ,{' '}
+                      <b className={rank.movement < 0 ? d.capDown : d.win}>
+                        {rank.movement > 0 ? 'up' : 'down'} {Math.abs(rank.movement)} today
+                      </b>
+                    </>
+                  ) : null}
+                  . <b>{rank.points.toLocaleString('en-US')} pts</b>
                 </p>
               </>
             ) : null}
@@ -424,8 +401,7 @@ function WeekStrip({
         ) : null}
 
         {showChallenge ? (
-          <div className={d.half}>
-            <p className={s.kicker}>Challenge</p>
+          <div className={`${d.surface} ${d.half}`}>
             {challenge.status === 'loading' ? (
               <span className={`${s.skel} ${d.skelBig}`} aria-label="Loading weekly challenge" />
             ) : challenge.status === 'error' ? (
@@ -440,11 +416,11 @@ function WeekStrip({
                 <p className={d.cap}>
                   {toGo > 0 ? (
                     <>
-                      <b className={d.win}>{toGo} more</b> by Saturday
+                      Challenge. <b className={d.win}>{toGo} more</b> by Saturday.
                     </>
                   ) : (
                     <>
-                      <b className={d.win}>Done.</b> Challenge closed.
+                      Challenge <b className={d.win}>done.</b>
                     </>
                   )}
                 </p>
@@ -455,17 +431,17 @@ function WeekStrip({
       </div>
 
       {rank ? (
-        <Link href="/portal/leaderboard" className={d.chase}>
-          {gapPct !== null ? (
-            <span className={`${s.track} ${d.chaseTrack}`} aria-hidden="true">
-              <span className={`${s.fill} ${d.grow}`} style={{ width: `${gapPct}%` }} />
-            </span>
-          ) : null}
+        <Link href="/portal/leaderboard" className={`${d.surface} ${d.chase}`}>
           <span className={d.chaseText}>{standLine(rank)}</span>
           <span className={d.chaseLink}>
             <span className={d.chaseWord}>Leaderboard</span>
-            <ChevronRight size={16} aria-hidden="true" />
+            <ChevronRight size={20} aria-hidden="true" />
           </span>
+          {gapPct !== null ? (
+            <span className={d.chaseTrack} aria-hidden="true">
+              <span className={d.grow} style={{ width: `${gapPct}%` }} />
+            </span>
+          ) : null}
         </Link>
       ) : null}
     </section>
@@ -496,96 +472,95 @@ function TodayPanel({
   onSetDate?: (row: NeedsDateRow) => void;
 }) {
   return (
-    <section className={`${s.panel} ${d.card} ${d.today}`} style={rise(3)} aria-labelledby="today-h">
-      <PanelHead id="today-h" title="Today" />
-      {items.map((item) => {
-        if (item.kind === 'date') {
-          const { row } = item;
-          const verb = row.missed ? 'Reschedule' : 'Add date';
-          const stampSub = row.missed
-            ? row.missedDayLabel
-            : row.soldDate
-              ? `Sold ${shortDate(row.soldDate)}`
-              : null;
-          const body = (
-            <>
-              <span className={`${d.stamp} ${row.missed ? d.stampMissed : d.stampNeeds}`}>
-                <span className={d.stampLabel}>{row.overdue ? 'Overdue' : row.missed ? 'Missed' : 'Needs date'}</span>
-                {stampSub ? <span className={d.stampSub}>{stampSub}</span> : null}
-              </span>
+    <section className={`${d.card} ${d.today}`} style={rise(3)} aria-labelledby="today-h">
+      <SectionHead id="today-h" title="Today" />
+      <div className={d.list}>
+        {items.map((item) => {
+          if (item.kind === 'date') {
+            const { row } = item;
+            const verb = row.missed ? 'Reschedule' : 'Add date';
+            const when = row.missed
+              ? row.missedDayLabel
+              : row.soldDate
+                ? `Sold ${shortDate(row.soldDate)}`
+                : null;
+            const body = (
               <span className={d.tText}>
+                <span className={`${d.tWhat} ${row.missed ? d.st_missed : d.st_needsdate}`}>
+                  {row.overdue ? 'Install overdue' : row.missed ? 'Missed install' : 'Needs an install date'}
+                </span>
                 <span className={d.tTitle}>{row.customer}</span>
-                <span className={d.tSub}>{row.plan}</span>
+                <span className={d.tSub}>{[when, row.plan].filter(Boolean).join(' · ')}</span>
                 {row.missedReason ? <span className={d.tNote}>{row.missedReason}</span> : null}
               </span>
-            </>
-          );
-          // Read only (the owner viewing as the rep): the row, not the action.
-          if (!onSetDate) {
+            );
+            // Read only (the owner viewing as the rep): the row, not the action.
+            if (!onSetDate) {
+              return (
+                <div key={`date-${row.id}`} className={`${d.surface} ${d.tRow}`} data-part="date-row">
+                  {body}
+                </div>
+              );
+            }
             return (
-              <div key={`date-${row.id}`} className={d.tRow} data-part="date-row">
+              <button
+                key={`date-${row.id}`}
+                type="button"
+                className={`${d.surface} ${d.tRow} ${d.tRowBtn}`}
+                onClick={() => onSetDate(row)}
+              >
                 {body}
-              </div>
+                <span className={d.tAct}>{verb}</span>
+              </button>
             );
           }
+          const external = item.kind === 'call' && !!item.call.meetLink;
+          const href = item.kind === 'call' ? item.call.meetLink || '/portal/calls' : item.href;
           return (
-            <button
-              key={`date-${row.id}`}
-              type="button"
-              className={`${d.tRow} ${d.tRowBtn}`}
-              onClick={() => onSetDate(row)}
+            <Link
+              key={item.kind === 'call' ? `call-${item.call.id}` : item.key}
+              href={href}
+              className={`${d.surface} ${d.tRow}`}
+              {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             >
-              {body}
-              <span className={d.tAct}>{verb}</span>
-            </button>
+              {item.kind === 'call' ? (
+                <>
+                  <span className={d.tText}>
+                    <span className={d.tWhat}>{formatCallTime(item.call.time)}</span>
+                    <span className={d.tTitle}>{item.call.title}</span>
+                    <span className={d.tSub}>{item.call.meetLink ? 'Video call' : 'Call'}</span>
+                  </span>
+                  <span className={d.tAct}>
+                    {item.call.meetLink ? (
+                      <>
+                        <Video size={18} aria-hidden="true" />
+                        Join
+                      </>
+                    ) : (
+                      'Open'
+                    )}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className={d.tText}>
+                    <span className={d.tTitle}>{item.title}</span>
+                    <span className={d.tSub}>{item.sub}</span>
+                  </span>
+                  <span className={d.tAct}>Open</span>
+                </>
+              )}
+            </Link>
           );
-        }
-        const external = item.kind === 'call' && !!item.call.meetLink;
-        const href = item.kind === 'call' ? item.call.meetLink || '/portal/calls' : item.href;
-        return (
-          <Link
-            key={item.kind === 'call' ? `call-${item.call.id}` : item.key}
-            href={href}
-            className={item.kind === 'call' ? d.tRow : `${d.tRow} ${d.tRowPlain}`}
-            {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
-          >
-            {item.kind === 'call' ? (
-              <>
-                <span className={d.stamp}>{formatCallTime(item.call.time)}</span>
-                <span className={d.tText}>
-                  <span className={d.tTitle}>{item.call.title}</span>
-                  <span className={d.tSub}>{item.call.meetLink ? 'Video call' : 'Call'}</span>
-                </span>
-                <span className={d.tAct}>
-                  {item.call.meetLink ? (
-                    <>
-                      <Video size={16} aria-hidden="true" />
-                      Join
-                    </>
-                  ) : (
-                    'Open'
-                  )}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className={d.tText}>
-                  <span className={d.tTitle}>{item.title}</span>
-                  <span className={d.tSub}>{item.sub}</span>
-                </span>
-                <span className={d.tAct}>Open</span>
-              </>
-            )}
-          </Link>
-        );
-      })}
+        })}
+      </div>
       {extraDates > 0 ? (
-        <Link href="/portal/sales" className={d.todayMore}>
+        <Link href="/portal/sales" className={d.quietLink}>
           {extraDates} more {extraDates === 1 ? 'sale needs' : 'sales need'} a date
-          <ChevronRight size={16} aria-hidden="true" />
+          <ChevronRight size={18} aria-hidden="true" />
         </Link>
       ) : null}
-      {callsFailed ? <Failed what="today's calls" onRetry={onRetryCalls} /> : null}
+      {callsFailed ? <Failed what="today's calls" onRetry={onRetryCalls} className={d.sectionFailed} /> : null}
     </section>
   );
 }
@@ -594,25 +569,25 @@ function TodayPanel({
 
 function RecentSales({ rows, report }: { rows: RecentSaleRow[]; report?: CarrierReportStamp | null }) {
   return (
-    <section className={`${s.panel} ${d.card} ${d.sales}`} style={rise(4)} aria-labelledby="sales-h">
-      <PanelHead id="sales-h" title="Recent sales">
-        <Link href="/portal/sales" className={d.headLink}>
+    <section className={`${d.card} ${d.sales}`} style={rise(4)} aria-labelledby="sales-h">
+      <SectionHead id="sales-h" title="Recent sales">
+        <Link href="/portal/sales" className={d.quietLink}>
           See all
-          <ChevronRight size={16} aria-hidden="true" />
+          <ChevronRight size={18} aria-hidden="true" />
         </Link>
-      </PanelHead>
+      </SectionHead>
       {/* Only when the carrier's daily report is late; nothing otherwise. */}
       <CarrierStaleNote report={report} className={d.staleNote} />
       <ul className={d.saleList}>
         {rows.map((row) => (
           <li key={row.id}>
-            <Link href={`/portal/sales/${row.id}`} className={`${d.sale} ${row.status === 'cancelled' ? d.saleOff : ''}`}>
+            <Link
+              href={`/portal/sales/${row.id}`}
+              className={`${d.surface} ${d.sale} ${row.status === 'cancelled' ? d.saleOff : ''}`}
+            >
               <span className={d.saleName}>{row.customer}</span>
               <span className={d.saleAmt}>{payCell(row)}</span>
-              <span className={`${d.status} ${STATUS_CLASS[row.status]}`}>
-                <span className={d.dot} aria-hidden="true" />
-                {statusLine(row)}
-              </span>
+              <span className={`${d.status} ${STATUS_CLASS[row.status]}`}>{statusLine(row)}</span>
               <span className={d.saleWhen}>{payoutLine(row)}</span>
               <span className={d.saleMeta}>
                 <CarrierMark name={row.carrier} />
@@ -664,10 +639,10 @@ export interface RepHomeViewProps {
 }
 
 /**
- * Home in direction C ("Split"): the premium money block on top (raised card,
- * the payout window tucked under it), the competitive week strip below it,
- * then Today and recent sales. Desktop: money + week in the main column,
- * Today and recent sales in the side column.
+ * Home after the taste pass: the money block on top (one raised surface with
+ * the payout window inside it), the week below it, then Today and recent
+ * sales. Flat tone steps, Bebas section headings, no kickers or rules.
+ * Desktop: money + week in the main column, Today and recent sales beside.
  */
 export function RepHomeView(p: RepHomeViewProps) {
   const payout = p.pay?.payout ?? null;
@@ -691,10 +666,10 @@ export function RepHomeView(p: RepHomeViewProps) {
               <MoneySkeleton />
             ) : p.payStatus === 'error' ? (
               <section className={d.money} aria-label="Est. pay this month">
-                <div className={d.moneyMain}>
-                  <p className={s.kicker}>Est. pay this month</p>
-                  <Failed what="your pay" onRetry={() => p.onRetry('pay')} className={d.cellFailed} />
-                </div>
+                <p className={d.payLine}>
+                  <strong>Estimated pay this month</strong>
+                </p>
+                <Failed what="your pay" onRetry={() => p.onRetry('pay')} className={d.cellFailed} />
               </section>
             ) : p.zeroSales ? (
               <section className={`${d.money} ${d.welcome}`} aria-labelledby="welcome-h">
@@ -710,7 +685,7 @@ export function RepHomeView(p: RepHomeViewProps) {
               </section>
             ) : p.pay ? (
               <>
-                <MoneyCard pay={p.pay} hasPlan={p.hasPlan} tucked={!!payout} />
+                <MoneyCard pay={p.pay} hasPlan={p.hasPlan} />
                 {payout ? <PayoutCard payout={payout} /> : null}
                 <PayHelpButton onClick={p.onHelp} />
               </>

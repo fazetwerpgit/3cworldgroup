@@ -1,14 +1,22 @@
 /* ==========================================================================
-   Rep Home, direction C ("Split"). Tokens come from .root / .layer in
-   rep.module.css. Depth is the surface ladder only: the money card sits on
-   the raised step with the deepest neutral shadow, the payout window tucks
-   under it one step down, the week strip and lists are flat L1 panels, and
-   the month bar / table sit in recessed wells. No glows, no accent shadows.
+   Rep Home after the taste pass. Tokens come from .root / .layer in
+   rep.module.css, but nothing here uses the shared .panel / .kicker / lift
+   shadows: Home's surfaces are flat tone steps (ground -> panel -> raised ->
+   panel-hi), sections open with a Bebas heading, and there are no rules,
+   outlines or resting shadows. Buttons are fully round.
    ========================================================================== */
 
 .grid {
   display: grid;
-  gap: var(--s4);
+  gap: 56px;
+}
+
+/* Banners, queues and notices sit close; only the sections get the big step. */
+.banners,
+.queues,
+.carrierNote,
+.scanSlot {
+  margin-bottom: -40px;
 }
 
 /* Phone: one column in answer order (pay, this week, today, sales). */
@@ -23,12 +31,13 @@
 }
 
 .carrierNote {
-  margin: 0;
+  margin-top: 0;
 }
 
-/* ---------- motion: cards rise in, bars fill ---------- */
+/* ---------- motion: blocks rise in, bars fill ---------- */
 .moneyBlock,
-.card {
+.card,
+.askEntry {
   animation: rise 480ms var(--ease) both;
   animation-delay: calc(var(--i, 0) * 60ms);
 }
@@ -36,150 +45,154 @@
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(12px);
   }
 }
 
-/* ---------- L1 panels on this page ---------- */
+/* ---------- surfaces and section heads ---------- */
+.surface {
+  border-radius: 16px;
+  background: var(--c-panel);
+}
+
 .card {
-  overflow: hidden;
-  border-radius: var(--r-card);
+  min-width: 0;
 }
 
-.head {
-  min-height: 0;
-  padding: 14px var(--s4) 10px;
-  border-bottom: 0;
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: 14px;
 }
 
-/* Recent sales: the one quiet line when the carrier's daily report is late.
-   Set like the Sales ledger's .srcNote, right under the head. */
-.staleNote {
+.sectionTitle {
   margin: 0;
-  padding: 0 var(--s4) 10px;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
+  color: var(--c-text);
+  font-family: var(--f-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 0.95;
 }
 
-.headLink {
+.list {
+  display: grid;
+  gap: var(--s2);
+}
+
+/* Recent sales: the one quiet line when the carrier's daily report is late. */
+.staleNote {
+  margin: 0 0 10px;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+}
+
+.quietLink {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   min-height: var(--tap);
-  margin: -12px calc(var(--s2) * -1) -12px 0;
   padding: 0 var(--s2);
+  margin-right: calc(var(--s2) * -1);
+  border-radius: 999px;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 600;
   text-decoration: none;
 }
 
-/* ---------- money card (L2) ---------- */
+.list + .quietLink {
+  margin: var(--s1) 0 0 calc(var(--s2) * -1);
+}
+
+.sectionFailed {
+  margin-top: var(--s2);
+  border-radius: 16px;
+  background: var(--c-panel);
+}
+
+/* ---------- money: one raised surface ---------- */
+.moneyBlock {
+  padding: 24px 20px 20px;
+  border-radius: 20px;
+  background: var(--c-raised);
+}
+
+.moneyBlock:empty {
+  display: none;
+}
+
 .money {
   position: relative;
-  z-index: 2;
-  padding: 18px 20px 20px;
-  border: 1px solid var(--c-line);
-  border-radius: 16px;
-  background: var(--c-raised);
-  box-shadow: var(--c-lift-3);
 }
 
 .payNum {
   display: flex;
   align-items: flex-start;
-  margin: var(--s3) 0 0;
+  margin: 0;
   font-family: var(--f-num);
-  font-size: 68px;
+  font-size: 72px;
   font-weight: 600;
-  line-height: 0.92;
-  letter-spacing: -0.055em;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
   font-variant-numeric: tabular-nums;
 }
 
 .cur {
-  margin: 5px 5px 0 0;
+  margin: 6px 4px 0 0;
   color: var(--c-text-2);
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 500;
   line-height: 1;
   letter-spacing: 0;
 }
 
-.delta {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-  margin: 14px 0 0;
-  color: var(--c-text-3);
-  font-size: 14px;
+.payLine {
+  margin: 12px 0 0;
+  color: var(--c-text-2);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.45;
 }
 
-.delta b {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--c-lime);
+.payLine strong {
+  color: var(--c-text);
   font-weight: 600;
 }
 
-.delta b.deltaDown {
-  color: var(--c-text-2);
+.payLine b {
+  font-weight: 600;
 }
 
-/* Rank movement sits beside the big rank when there is room (desktop), and
-   drops under it on a phone's half-width cell. Same look as the pay change. */
-.rankRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  column-gap: var(--s4);
+.deltaUp {
+  color: var(--c-lime-hi);
 }
 
-.delta.rankMove {
-  flex-shrink: 0;
-  margin: 6px 0 4px;
-  white-space: nowrap;
+.deltaDown {
+  color: var(--c-text);
 }
 
 .moneyNote {
-  margin: var(--s1) 0 0;
+  margin: 6px 0 0;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
+  line-height: 1.45;
 }
 
-.delta + .moneyNote {
-  margin-top: 6px;
-}
-
-/* Recessed well inside a raised card. */
-.well {
-  margin-top: 18px;
-  padding: 14px 14px 12px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  border-radius: 12px;
-  background: var(--c-well);
-  box-shadow: var(--c-sink);
-}
-
-.wellHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 10px;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
+.month {
+  margin-top: 20px;
 }
 
 .stack {
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
 
 .stack > span {
   flex: 1;
-  height: 8px;
-  border-radius: 2px;
+  height: 10px;
+  border-radius: 999px;
   background: var(--c-track);
   transform-origin: left;
   animation: grow 420ms var(--ease) both;
@@ -197,97 +210,89 @@
   }
 }
 
-.stack > .seg_installed,
-.swatch.seg_installed {
+.stack > .seg_installed {
   background: var(--c-lime);
 }
 
-.stack > .seg_scheduled,
-.swatch.seg_scheduled {
+.stack > .seg_scheduled {
   background: var(--c-blue);
 }
 
-.stack > .seg_needs,
-.swatch.seg_needs {
+.stack > .seg_needs {
   background: var(--c-amber);
 }
 
+.monthLine {
+  margin-top: 10px;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
 .legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
-  margin: 10px 0 0;
+  display: inline;
+  margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
 }
 
 .legend li {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.legend b {
-  color: var(--c-text);
+  display: inline;
   font-weight: 600;
 }
 
-.swatch {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
+.legend li + li::before {
+  content: ', ';
+  color: var(--c-text-2);
+  font-weight: 400;
+}
+
+.legend li:last-child::after {
+  content: '.';
+  color: var(--c-text-2);
+  font-weight: 400;
 }
 
 .periodEmpty {
   margin: 0;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
 }
 
-/* ---------- payout window: tucked under the money card, one step down ---------- */
+/* ---------- next payout window: one step down, inside the raised surface ---------- */
 .payout {
-  position: relative;
-  z-index: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 3px var(--s3);
-  margin: -18px var(--s2) 0;
-  padding: 32px var(--s4) var(--s4);
-  border: 1px solid var(--c-line);
-  border-top: 0;
-  border-radius: 0 0 14px 14px;
+  align-items: baseline;
+  gap: 6px var(--s3);
+  margin-top: 20px;
+  padding: var(--s4);
+  border-radius: 14px;
   background: var(--c-panel);
-  box-shadow: var(--c-lift-2);
-}
-
-.payoutLab {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
 }
 
 .payoutWhen {
-  font-size: var(--t-body);
+  font-size: 17px;
   font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.payoutMeta {
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
+  line-height: 1.3;
 }
 
 .payoutAmt {
-  grid-row: 1 / span 3;
-  grid-column: 2;
   font-family: var(--f-num);
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.02em;
+  text-align: right;
   white-space: nowrap;
+}
+
+.payoutMeta {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
 }
 
 /* ---------- carrier wordmark (text until real monochrome logo files exist) ---------- */
@@ -295,27 +300,25 @@
   display: inline-flex;
   flex: none;
   align-items: center;
-  height: 20px;
-  padding: 0 6px;
-  border: 1px solid var(--c-line-strong);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.03);
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--c-panel-hi);
   color: var(--c-text-2);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0;
+  font-size: 13px;
+  font-weight: 600;
   line-height: 1;
   white-space: nowrap;
 }
 
 /* Every dollar figure carries a small "est.". */
 .est {
-  margin-right: 3px;
+  margin-right: 4px;
   color: var(--c-text-3);
   font-family: var(--f-ui);
-  font-size: 0.72em;
+  font-size: 0.62em;
   font-weight: 500;
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
 }
 
 /* ---------- How pay works ---------- */
@@ -323,21 +326,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--s2);
   width: 100%;
   min-height: var(--tap);
-  margin-top: 10px;
-  padding: 0 var(--s4);
-  border: 1px solid var(--c-line);
-  border-radius: 12px;
-  background: var(--c-panel);
-  box-shadow: var(--c-lift);
-  color: var(--c-text-2);
-  font: 600 var(--t-sm) / 1.2 var(--f-ui);
+  margin-top: 14px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1.2 var(--f-ui);
   cursor: pointer;
   transition:
     background 120ms,
-    color 120ms,
     transform 120ms ease-out;
 }
 
@@ -349,19 +350,69 @@
   transform: scale(0.97);
 }
 
+/* ---------- Ask 3C entry (one row) ---------- */
+.askRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: var(--s4);
+  color: var(--c-text);
+  text-decoration: none;
+  transition: transform 120ms ease-out;
+}
+
+.askTile {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border-radius: 999px;
+  background: var(--c-lime-wash);
+  color: var(--c-lime-hi);
+}
+
+.askText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.askTitle {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.askSub {
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+.askChev {
+  color: var(--c-text-3);
+}
+
 /* ---------- this week: rank | challenge ---------- */
 .clock {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 500;
+  white-space: nowrap;
+}
+
+.clock svg {
+  color: var(--c-text-3);
 }
 
 .halves {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
 }
 
 .halvesSolo {
@@ -370,27 +421,23 @@
 
 .half {
   min-width: 0;
-  padding: 14px var(--s4) var(--s4);
-}
-
-.half + .half {
-  border-left: 1px solid var(--c-line);
+  padding: var(--s4);
 }
 
 .big {
   display: flex;
   align-items: flex-start;
-  margin: var(--s2) 0 0;
+  margin: 0;
   font-family: var(--f-display);
-  font-size: 76px;
+  font-size: 84px;
   font-weight: 400;
-  line-height: 0.8;
+  line-height: 0.85;
 }
 
 .big sup {
-  margin: 4px 0 0 3px;
+  margin: 6px 0 0 2px;
   color: var(--c-text-2);
-  font-size: 26px;
+  font-size: 32px;
   line-height: 1;
   vertical-align: baseline;
 }
@@ -400,13 +447,14 @@
   margin-left: 2px;
   color: var(--c-text-3);
   font-size: 34px;
-  line-height: 0.8;
+  line-height: 0.85;
 }
 
 .cap {
   margin: 10px 0 0;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
+  line-height: 1.4;
 }
 
 .cap b {
@@ -418,27 +466,45 @@
   color: var(--c-lime-hi);
 }
 
+.cap b.capDown {
+  color: var(--c-text);
+}
+
 .chSegs {
   margin-top: var(--s3);
 }
 
-.chSegs > span {
+.chTrack,
+.chaseTrack {
+  position: relative;
   height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--c-track);
 }
 
 .chTrack {
   margin-top: var(--s3);
 }
 
+.chTrack > span,
+.chaseTrack > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--c-lime);
+}
+
 .chase {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  min-height: var(--tap);
-  padding: var(--s3) var(--s3) var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line);
+  gap: 10px var(--s3);
+  margin-top: var(--s2);
+  padding: var(--s4);
   color: var(--c-text-2);
-  font-size: 14px;
+  font-size: 17px;
+  line-height: 1.4;
   text-decoration: none;
   transition:
     background 140ms,
@@ -446,12 +512,10 @@
 }
 
 .chaseTrack {
-  flex: 0 0 64px;
-  height: 4px;
+  grid-column: 1 / -1;
 }
 
 .chaseText {
-  flex: 1;
   min-width: 0;
 }
 
@@ -466,7 +530,7 @@
   align-items: center;
   gap: 2px;
   color: var(--c-text-3);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 600;
 }
 
@@ -475,22 +539,18 @@
 }
 
 .cellFailed {
-  margin-top: var(--s3);
   padding: 0;
 }
 
 /* ---------- today ---------- */
 .tRow {
   display: grid;
-  grid-template-columns: 80px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--s3);
   width: 100%;
-  min-height: 60px;
-  padding: 10px var(--s4);
+  padding: var(--s4);
   border: 0;
-  border-top: 1px solid var(--c-line);
-  background: none;
   color: var(--c-text);
   font: inherit;
   text-align: left;
@@ -501,43 +561,8 @@
     transform 120ms ease-out;
 }
 
-/* The left tag says what is true of this row: a call's time, or how it is late. */
-.stamp {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  color: var(--c-text-2);
-  font-family: var(--f-display);
-  font-size: 20px;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.stampLabel {
-  font-size: 18px;
-}
-
-.stampSub {
-  color: var(--c-text-3);
-  font-family: var(--f-ui);
-  font-size: var(--t-min);
-  font-weight: 600;
-  letter-spacing: 0;
-  line-height: 1.2;
-}
-
-.stampMissed {
-  color: var(--c-red);
-}
-
-.stampNeeds {
-  color: var(--c-amber);
-}
-
-/* A row with no tag (an onboarding task) gives its column back to the text. */
-.tRowPlain {
-  grid-template-columns: minmax(0, 1fr) auto;
+div.tRow {
+  cursor: default;
 }
 
 .tText {
@@ -547,9 +572,17 @@
   min-width: 0;
 }
 
+/* What is true of this row: a call's time, or how the install is late. */
+.tWhat {
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
 .tTitle {
   overflow: hidden;
-  font-size: var(--t-ui);
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.3;
   text-overflow: ellipsis;
@@ -557,53 +590,37 @@
 }
 
 .tSub {
-  overflow: hidden;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.4;
 }
 
 /* The carrier's reason is the point of the line: wrap it, never cut it off. */
 .tNote {
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
-  line-height: 1.3;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.4;
 }
 
 .tAct {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 var(--s3);
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
+  justify-content: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--c-panel-hi);
   color: var(--c-text);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 600;
   white-space: nowrap;
 }
 
-.todayMore {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: var(--tap);
-  padding: 0 var(--s3) 0 var(--s4);
-  border-top: 1px solid var(--c-line);
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.today > [role='alert'] {
-  border-top: 1px solid var(--c-line);
-}
-
 /* ---------- recent sales ---------- */
 .saleList {
+  display: grid;
+  gap: var(--s2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -613,8 +630,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px var(--s3);
-  padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line);
+  padding: var(--s4);
   color: var(--c-text);
   text-decoration: none;
   transition:
@@ -624,7 +640,7 @@
 
 .saleName {
   overflow: hidden;
-  font-size: var(--t-body);
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
@@ -633,7 +649,7 @@
 
 .saleAmt {
   font-family: var(--f-num);
-  font-size: var(--t-ui);
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.4;
   text-align: right;
@@ -642,8 +658,8 @@
 
 .saleWhen {
   align-self: center;
-  color: var(--c-text-3);
-  font-size: var(--t-min);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
   text-align: right;
   white-space: nowrap;
 }
@@ -654,8 +670,9 @@
   align-items: center;
   gap: var(--s2);
   min-width: 0;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
+  margin-top: 4px;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
 }
 
 .saleMetaText {
@@ -670,26 +687,15 @@
 }
 
 /* One status language on every surface: lime installed, blue scheduled,
-   amber needs a date, red missed, grey cancelled. */
+   amber needs a date, red missed, grey cancelled. Said as a coloured word. */
 .status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   min-width: 0;
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 500;
 }
 
-.dot {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
 .st_installed {
-  color: var(--c-lime);
+  color: var(--c-lime-hi);
 }
 
 .st_scheduled {
@@ -710,28 +716,33 @@
 
 /* ---------- press / hover / focus ---------- */
 .sale:active,
-.tRow:active,
-.chase:active {
+.tRow:not(div):active,
+.chase:active,
+.askRow:active {
   transform: scale(0.97);
 }
 
 @media (hover: hover) {
   .sale:hover,
-  .tRow:hover,
+  .tRow:not(div):hover,
   .chase:hover,
-  .payHelp:hover {
+  .askEntry:hover {
     background: var(--c-panel-hi);
   }
 
-  .headLink:hover,
-  .payHelp:hover {
+  .payHelp:hover,
+  .tRow:not(div):hover .tAct {
+    background: #26385a;
+  }
+
+  .quietLink:hover {
     color: var(--c-text);
   }
 }
 
-:is(.sale, .tRow, .chase, .headLink, .payHelp, .todayMore):focus-visible {
+:is(.sale, .tRow, .chase, .quietLink, .payHelp, .askRow):focus-visible {
   outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
 
 /* ---------- zero sales: one clear action ---------- */
@@ -739,44 +750,40 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--s3);
-  padding: var(--s5) 20px;
+  gap: var(--s4);
 }
 
 .welcomeTitle {
   margin: 0;
   font-family: var(--f-display);
-  font-size: var(--t-d2);
+  font-size: 34px;
   font-weight: 400;
-  line-height: 1;
-  letter-spacing: 0.01em;
+  line-height: 0.95;
 }
 
 /* ---------- skeletons ---------- */
 .skelScore {
   display: block;
   width: 62%;
-  height: 58px;
-  margin: var(--s3) 0 var(--s2);
+  height: 64px;
 }
 
 .skelBig {
   display: block;
   width: 56%;
-  height: 60px;
-  margin-top: var(--s2);
+  height: 72px;
 }
 
 .skelLine {
   display: block;
   width: 48%;
-  height: 12px;
+  height: 14px;
 }
 
 .skelBar {
   display: block;
   width: 100%;
-  height: 12px;
+  height: 10px;
 }
 
 .skelBody {
@@ -787,7 +794,7 @@
 }
 
 .skelRow {
-  height: 40px;
+  height: 44px;
 }
 
 /* ---------- desktop ---------- */
@@ -795,19 +802,25 @@
   .grid {
     grid-template-columns: repeat(12, minmax(0, 1fr));
     align-items: start;
-    gap: var(--s5);
+    gap: var(--s6);
   }
 
   .banners,
   .queues {
     grid-column: 1 / -1;
+    margin-bottom: 0;
+  }
+
+  .carrierNote,
+  .scanSlot {
+    margin-bottom: 0;
   }
 
   .colMain,
   .colSide {
     display: flex;
     flex-direction: column;
-    gap: var(--s5);
+    gap: 48px;
     min-width: 0;
   }
 
@@ -819,8 +832,8 @@
     grid-column: 8 / span 5;
   }
 
-  .money {
-    padding: var(--s5) 28px 28px;
+  .moneyBlock {
+    padding: 32px 28px 28px;
   }
 
   .payNum {
@@ -832,29 +845,21 @@
     font-size: 36px;
   }
 
-  .payout {
-    margin-inline: var(--s4);
-    padding: 34px var(--s5) 18px;
-  }
-
   .payoutWhen {
     font-size: 18px;
   }
 
   .payoutAmt {
-    font-size: 22px;
+    font-size: 26px;
   }
 
-  /* A quiet text button under the stack, not a full-width bar. */
+  /* A quiet round button under the stack, not a full-width bar. */
   .payHelp {
     width: auto;
-    margin: var(--s3) 0 0 var(--s4);
-    padding: 0 var(--s4);
-    border-radius: var(--r-control);
   }
 
   .half {
-    padding: 18px var(--s5) var(--s5);
+    padding: 20px var(--s5);
   }
 
   .big {
@@ -862,23 +867,11 @@
   }
 
   .big sup {
-    font-size: 34px;
+    font-size: 36px;
   }
 
   .big span {
     font-size: 46px;
-  }
-
-  .cap {
-    font-size: 14px;
-  }
-
-  .chase {
-    padding-left: var(--s5);
-  }
-
-  .chaseTrack {
-    flex-basis: 120px;
   }
 
   .chaseWord {
@@ -886,16 +879,23 @@
   }
 }
 
-/* Wide desktop: the month well sits beside the figure instead of under it. */
+/* Wide desktop: the month bar sits beside the figure instead of under it. */
 @media (min-width: 1280px) {
   .money:not(.welcome) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
     align-items: end;
-    gap: var(--s5);
+    column-gap: var(--s5);
   }
 
-  .well {
+  .money:not(.welcome) > :not(.payNum, .month) {
+    grid-column: 1;
+  }
+
+  .money:not(.welcome) > .month {
+    grid-column: 2;
+    grid-row: 1 / span 6;
+    align-self: end;
     margin-top: 0;
   }
 }
@@ -1019,15 +1019,10 @@
   right: var(--s1);
 }
 
-/* ---------- Ask 3C entry (one row) ---------- */
-.askEntry {
-  overflow: hidden;
-  border-radius: var(--r-card);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .moneyBlock,
   .card,
+  .askEntry,
   .stack > span,
   .grow {
     animation: none;
