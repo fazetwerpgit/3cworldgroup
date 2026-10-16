@@ -131,10 +131,9 @@
 }
 
 /* ---------- podium ----------
-   Three charcoal boxes that touch on one baseline. Each is drawn as a lit lid
-   seen slightly from above (a trapezoid, back edge inset) over a darker front
-   face, with a highlight along the seam between them. The centre box is nearest
-   the eye, so its lid is the deepest. Dark in both themes: it is the one solid
+   Three charcoal boxes that touch on one baseline. Each has a flat lighter lid
+   band over a darker front face; only the outer top corners round, so the
+   boxes meet square. The centre box's lid is the deepest. Dark in both themes: it is the one solid
    object here. */
 
 .podium {
@@ -165,7 +164,6 @@
   --pod-base: #1d2c46;
   --pod-top: #26385a;
   --pod-lid: 8px;
-  --pod-inset: 7%;
   --pod-h: 72px;
   --pod-radius: 6px 0 0 0;
 }
@@ -175,7 +173,6 @@
   --pod-base: #22355a;
   --pod-top: #2c426c;
   --pod-lid: 14px;
-  --pod-inset: 6%;
   --pod-h: 100px;
   --pod-radius: 6px 6px 0 0;
 }
@@ -258,8 +255,11 @@
   animation: podiumRise 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* The lid. Its back edge is inset on both sides, which is what makes the box
-   read as a box rather than a card with a stripe. */
+/* The lid: a flat lighter band across the block's full width. It used to be a
+   trapezoid (back edge inset), but on a phone the inset left the block's dark
+   corners showing as tabs beside the lid, and the winner's lime seam sat under
+   the lid instead of on the block's top edge. Flat, it follows the block's own
+   corners, which the block clips to its radius. */
 .blockTop {
   position: absolute;
   z-index: 1;
@@ -268,12 +268,6 @@
   left: 0;
   height: var(--pod-lid);
   background: var(--pod-top);
-  clip-path: polygon(
-    var(--pod-inset) 0,
-    calc(100% - var(--pod-inset)) 0,
-    100% 100%,
-    0 100%
-  );
 }
 
 .blockFace {
@@ -287,8 +281,8 @@
   background: var(--pod-base);
 }
 
-/* The winner's seam: a lime top edge on the face, under the lid. */
-.podiumSlot[data-rank='1'] .blockFace {
+/* The winner's lime top edge: on the lid, so the block's radius rounds it. */
+.podiumSlot[data-rank='1'] .blockTop {
   border-top: 2px solid var(--c-lime);
 }
 

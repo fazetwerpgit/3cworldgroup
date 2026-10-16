@@ -147,11 +147,13 @@
   letter-spacing: 0;
 }
 
-/* Board and install-status panels clip their row hovers to the corners. */
+/* Board and install-status panels clip their row hovers to the corners.
+   clip, not hidden: hidden makes each panel a scroll box that a focused or
+   scrolled-into-view child can shift sideways. */
 .board > section,
 .mgmt > section,
 .ledgerCol > section {
-  overflow: hidden;
+  overflow: clip;
   border-radius: var(--r-card);
 }
 
@@ -955,8 +957,19 @@
 
 /* ---------- the ledger: flatter strip language ---------- */
 .ledger {
-  overflow: hidden;
+  /* clip, not hidden: hidden makes the ledger a scroll box, and the chip row
+     below bleeds 16px past it, so a tapped or focused chip scrolled the whole
+     section sideways (title cut on the left, a gap on the right). */
+  overflow: clip;
   border-radius: var(--r-card);
+}
+
+/* On a phone the ledger has no fill to round off, and the chip row is meant to
+   run to the screen edge, so nothing is clipped. */
+@media (max-width: 1023px) {
+  .ledgerCol > .ledger {
+    overflow: visible;
+  }
 }
 
 /* Head: a Bebas section title and one plain line under it. */

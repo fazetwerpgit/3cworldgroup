@@ -4,6 +4,7 @@ import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SalesTable, SalesViewTabs } from '@/components/sales/SalesTable';
+import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
 import { PayoutCard } from '@/app/portal/sales/PayoutCard';
 import { PayHelpSheet } from '@/components/portal/rep/PayHelpSheet';
 import { payoutsInMonth } from '@/lib/pay/payoutWindow';
@@ -23,11 +24,15 @@ const PLANS: Record<string, [string, string, number, number]> = {
   att: ['att', 'AT&T Fiber 1 Gig', 80, 90],
   fr: ['frontier', 'Frontier 1 Gig', 80, 80],
   xf: ['xfinity', 'Xfinity 1 Gig', 80, 60],
+  tf3: ['tfiber', 'T-Fiber 300', 50, 60],
+  tf5: ['tfiber', 'T-Fiber 500', 65, 80],
+  tf8: ['tfiber', 'T-Fiber 8 Gig', 150, 160],
 };
-const rates = { tfiber: { tf1: 280, tf2: 310 }, att: { att: 225 }, frontier: { fr: 150 }, xfinity: { xf: 125 } };
+const rates = { tfiber: { 'tfiber-1gig': 280, 'tfiber-2gig': 310, 'tfiber-300': 200, 'tfiber-500': 240 }, att: { 'att-1gig': 225, 'att-5gig': 400 }, frontier: { 'frontier-500': 150 }, xfinity: { 'xfinity-2gig': 125 } };
 
 function sale(id: string, name: string, plan: string, addr: string, sold: number, install: Date | null, extra: Partial<Sale> = {}): Sale {
   const [company, productName, price, points] = PLANS[plan];
+  const productId = ({ tf1: 'tfiber-1gig', tf2: 'tfiber-2gig', tf3: 'tfiber-300', tf5: 'tfiber-500', tf8: 'att-5gig', att: 'att-1gig', fr: 'frontier-500', xf: 'xfinity-2gig' } as Record<string, string>)[plan] ?? plan;
   return {
     id,
     salesRepId: 'rep1',
@@ -36,10 +41,10 @@ function sale(id: string, name: string, plan: string, addr: string, sold: number
     customerPhone: '(555) 014-2290',
     customerAddress: addr,
     saleType: 'fiber' as Sale['saleType'],
-    products: [{ productId: plan, productName, company, quantity: 1, unitPrice: price, totalPrice: price, points }],
+    products: [{ productId, productName, company, quantity: 1, unitPrice: price, totalPrice: price, points }],
     totalValue: price,
     totalPoints: points,
-    commission: (rates as Record<string, Record<string, number>>)[company][plan],
+    commission: (rates as Record<string, Record<string, number>>)[company][productId] ?? 0,
     orderNumberOrBtn: `Order ${id.toUpperCase()}`,
     status: 'approved' as Sale['status'],
     saleDate: d(sold),
@@ -61,6 +66,14 @@ const SALES: Sale[] = [
   sale('s9', 'Haskins', 'tf1', '509 Fern Dr', 8, d(22), { status: 'pending' as Sale['status'] }),
   sale('s10', 'Moreau', 'att', '1260 Vale St', 4, d(11)),
   sale('s11', 'Ferreira', 'tf1', '12 Cedar Ct', 28, d(5), { saleDate: d(28, 7) }),
+];
+// ?long=1: worst-case rep (many plan tiers, long names and addresses, 50 records).
+const LONG_PLANS = ['tf1', 'tf1', 'tf2', 'tf3', 'tf5', 'tf8', 'att', 'fr', 'xf'];
+const LONG_SALES: Sale[] = [
+  ...SALES,
+  ...Array.from({ length: 40 }, (_, i) =>
+    sale(`L${i}`, i % 3 === 0 ? 'Bartholomew-Vanderslice Kensington-Okonkwo' : `Customer${i}`, LONG_PLANS[i % LONG_PLANS.length], `${1000 + i} Extraordinarily Long Boulevard Northwest Apt 12B`, 1 + (i % 22), i % 4 ? d(2 + (i % 27)) : null)
+  ),
 ];
 
 function order(id: string, addr: string, status: FiberOrderStatus, est: string | null): FiberOrder {
@@ -87,14 +100,15 @@ function Harness() {
   const noPlan = q.get('plan') === '0';
   const [pay, setPay] = useState(q.get('view') === 'pay');
   const [help, setHelp] = useState(false);
+  const harnessSales = q.get('long') === '1' ? LONG_SALES : SALES;
   const fiber = useMemo(
-    () => ({ data: { scope: 'own' as const, lastReportAt: '2026-09-23T12:00:00Z', orders: ORDERS }, loading: false, error: null }),
-    []
+    () => ({ data: { scope: (q.get('scope') === 'all' ? 'all' : 'own') as 'own', lastReportAt: '2026-09-23T12:00:00Z', orders: ORDERS }, loading: false, error: null }),
+    [q]
   );
-  const bySale = useMemo(() => matchFiberOrdersToSales(SALES, ORDERS), []);
+  const bySale = useMemo(() => matchFiberOrdersToSales(harnessSales, ORDERS), [harnessSales]);
   const payouts = useMemo(
-    () => payoutsInMonth(datedSales(SALES, bySale), noPlan ? null : rates, { year: 2026, month: 8 }, new Date(2026, 8, 23, 12)),
-    [bySale, noPlan]
+    () => payoutsInMonth(datedSales(harnessSales, bySale), noPlan ? null : rates, { year: 2026, month: 8 }, new Date(2026, 8, 23, 12)),
+    [harnessSales, bySale, noPlan]
   );
   return (
     <div className={s.root} data-shell="rep">
@@ -124,8 +138,9 @@ function Harness() {
                 onHelp={() => setHelp(true)}
               />
               <div className={x.ledgerCol}>
+                {q.get('scope') === 'all' ? <InstallStatusSection fiber={fiber as never} /> : null}
                 <SalesTable
-                  sales={SALES}
+                  sales={harnessSales}
                   month={{ year: 2026, month: 8 }}
                   payView={pay}
                   payPlan={{ rates: noPlan ? null : rates, payDelayDays: 14, hasPlan: !noPlan }}
