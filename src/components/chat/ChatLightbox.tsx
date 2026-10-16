@@ -87,7 +87,7 @@ export function ChatLightbox({
           src={image.url}
           alt={image.alt ?? (image.author ? `Shared by ${image.author}` : 'Shared image')}
           onClick={(event) => event.stopPropagation()}
-          className="chat-line-lightbox-image max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+          className="chat-line-lightbox-image max-h-full max-w-full rounded-lg object-contain"
         />
       </div>
       {(image.author || image.time) && (

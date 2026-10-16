@@ -1002,7 +1002,7 @@ export default function TeamChatPage() {
       <div className={c.desk}>
         <aside className={`${s.panel} ${c.rail}`} aria-label="Channels">
           <div className={c.panelHead}>
-            <h1 className={s.kicker}>Team chat</h1>
+            <h1 className={c.railTitle}>Team chat</h1>
           </div>
           <div className={c.railList}>
             <ChannelRows
