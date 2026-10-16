@@ -369,7 +369,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
           {/* The money sits in a well at the top: est. pay, then points (and, for the owner, 3C revenue). */}
           <div className={x.dMoney}>
             <div>
-              <span className={s.kicker}>Est. pay</span>
+              <span className={x.dMoneyLabel}>Est. pay</span>
               <span className={x.dMoneyNum}>
                 {shownPay === null ? '—' : shownPay === 0 ? <span className={x.amtQuiet}>Rate pending</span> : <><span className={x.amtEst}>est.</span>{formatMoney(shownPay)}</>}
               </span>

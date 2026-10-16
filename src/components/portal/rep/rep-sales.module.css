@@ -2,7 +2,7 @@
    Sales page — direction D. Page-scoped styles for /portal/sales: the KPI
    strip, the rep's ledger + pay list, the company board (admin / owner),
    Install status by rep and the sale detail sheet. Tokens and primitives
-   (.panel, .kicker, buttons, .sheet, .skel) live in rep.module.css; this file
+   (.panel, buttons, .sheet, .skel) live in rep.module.css; this file
    only reads the custom properties it defines on .root / .layer.
    ========================================================================== */
 
@@ -82,7 +82,6 @@
   align-items: center;
   gap: var(--s3);
   padding: var(--s1) var(--s1) var(--s1) var(--s4);
-  border: 1px solid rgba(141, 198, 63, 0.45);
   border-radius: var(--r-panel);
   background: var(--c-lime-wash);
 }
@@ -426,13 +425,12 @@
 
 /* "Couldn't load pay rates · Retry" above the pay list. */
 .planFailed {
-  border-bottom: 1px solid var(--c-line);
+  padding-bottom: var(--s1);
 }
 
 .note {
   margin: 0;
   padding: var(--s3) var(--s4);
-  border-bottom: 1px solid var(--c-line);
   color: var(--c-text-2);
   font-size: var(--t-sm);
   line-height: 1.45;
@@ -463,8 +461,8 @@
   padding: var(--s3) var(--s4) 14px;
 }
 
-.fiberRow + .fiberRow {
-  border-top: 1px solid var(--c-line);
+.fiberRow:nth-child(even) {
+  background: var(--c-raised);
 }
 
 .fiberWho {
@@ -1066,7 +1064,6 @@
   gap: 3px var(--s3);
   width: 100%;
   padding: var(--s3) var(--s4) var(--s3) 14px;
-  border-top: 1px solid var(--c-line);
   color: var(--c-text);
   text-align: left;
   cursor: pointer;
@@ -1313,7 +1310,6 @@
 /* ---------- pay view ---------- */
 .pgHead {
   padding: 12px var(--s4) 10px;
-  border-top: 1px solid var(--c-line);
 }
 
 .pgTitle {
@@ -2017,17 +2013,13 @@
 .input:focus,
 .select:focus {
   border-color: var(--c-lime);
-  outline: none;
-  box-shadow: 0 0 0 3px var(--c-lime-wash);
+  outline: 3px solid var(--c-lime-wash);
+  outline-offset: 0;
 }
 
 .select {
   padding-right: 36px;
   background: var(--c-ground) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23a3b8d6' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 14px center / 12px 8px;
-}
-
-.logged {
-  border-top: 1px solid var(--c-line);
 }
 
 /* Inside an open install-status group the rep's own list sits apart by space. */
@@ -2203,7 +2195,6 @@
   padding: 0 8px;
   border-radius: 6px;
   background: var(--c-panel-hi);
-  box-shadow: var(--c-edge);
   color: var(--c-text);
   font-size: var(--t-min);
   font-weight: 600;
@@ -2243,10 +2234,17 @@
   gap: var(--s3);
   margin-top: 14px;
   padding: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 12px;
   background: var(--c-well);
-  box-shadow: var(--c-sink);
+}
+
+/* "Est. pay" over the number: sentence case, plain text weight. */
+.dMoneyLabel {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .dMoneyNum {
@@ -2288,7 +2286,6 @@
   flex-direction: column;
   margin-top: var(--s4);
   padding-top: 14px;
-  border-top: 1px solid var(--c-line);
 }
 
 .dHeading {
@@ -2344,7 +2341,7 @@
 }
 
 .dPlan + .dPlan {
-  border-top: 1px solid var(--c-line);
+  margin-top: 2px;
 }
 
 .dPlan strong {
@@ -2410,7 +2407,6 @@
 .dBody .dActions {
   margin-top: var(--s4);
   padding: var(--s4) 0 0;
-  border-top: 1px solid var(--c-line);
   border-bottom: 0;
 }
 
@@ -2538,7 +2534,6 @@ a.dLine {
   flex-wrap: wrap;
   gap: var(--s2);
   padding: var(--s4);
-  border-bottom: 1px solid var(--c-line);
 }
 
 .dActions:empty {
@@ -2698,7 +2693,7 @@ a.dLine {
   }
 
   .detail[data-closing] {
-    animation: slideOut 180ms ease-in both;
+    animation: slideOut 180ms var(--ease-sheet) both;
   }
 }
 

@@ -27,16 +27,3 @@
   font-size: var(--t-ui);
   line-height: 1.45;
 }
-
-/* A wrapping Seg (audience, category) below desktop: two picks a row that
-   really fit beside the 4px gap, in a softly rounded well rather than a pill
-   (a pill around two rows reads as a lozenge). Desktop keeps one pill row. */
-@media (max-width: 1023px) {
-  .segWrap.segWrap {
-    border-radius: 24px;
-  }
-
-  .segWrap.segWrap > button {
-    flex: 1 1 calc(50% - 2px);
-  }
-}

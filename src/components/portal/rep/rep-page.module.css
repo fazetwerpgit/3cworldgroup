@@ -344,7 +344,7 @@ button.row:focus-visible {
 
 .label {
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 600;
 }
 
@@ -384,7 +384,7 @@ button.row:focus-visible {
 .hint {
   margin: 0;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.45;
 }
 

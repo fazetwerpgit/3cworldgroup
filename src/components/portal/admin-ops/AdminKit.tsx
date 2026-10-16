@@ -95,7 +95,7 @@ export function Seg<T extends string>({
   scroll?: boolean;
 }) {
   return (
-    <div className={cx(s.seg, wrap && s.segWrap, wrap && k.segWrap, scroll && s.segScroll)} role="group" aria-label={label}>
+    <div className={cx(s.seg, wrap && s.segWrap, scroll && s.segScroll)} role="group" aria-label={label}>
       {options.map((opt) => (
         <button
           key={opt.value}

@@ -923,7 +923,6 @@ div.tRow {
 .help h3 {
   margin: 0 0 var(--s1);
   padding-top: 14px;
-  border-top: 1px solid var(--c-line);
   color: var(--c-text);
   font-size: var(--t-ui);
   font-weight: 600;
@@ -938,7 +937,6 @@ div.tRow {
   border-spacing: 0;
   border-radius: 12px;
   background: var(--c-well);
-  box-shadow: var(--c-sink);
   font-size: 14px;
   font-variant-numeric: tabular-nums;
 }

@@ -17,6 +17,16 @@
   --cols: 64px minmax(0, 1fr) 104px 96px 24px;
 }
 
+/* Queue rows sit apart by tone, not hairlines (the head li is first, so
+   every other queue is an odd child after it). */
+.cols.cols > li + li {
+  border-top: 0;
+}
+
+.cols > li:nth-child(odd):not(:first-child) {
+  background: var(--c-raised);
+}
+
 /* Phone row: count | text | chevron. (.cols lifts these over admin-ui's .row / .cell.) */
 .cols .queue {
   grid-template-columns: 48px minmax(0, 1fr) auto;
