@@ -25,15 +25,14 @@
   min-height: 80px;
   min-width: 0;
   padding: var(--s3) 0 var(--s2);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-control);
-  background: transparent;
+  background: var(--c-well);
   color: var(--c-text-2);
   font-family: var(--f-ui);
   cursor: pointer;
   transition:
     background-color 140ms ease,
-    border-color 140ms ease,
     color 140ms ease,
     transform 120ms ease-out;
 }
@@ -53,23 +52,21 @@
 
 .preset span {
   max-width: 100%;
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.15;
   text-align: center;
 }
 
-/* The chosen target lifts a step (L3); lime stays for progress on the board. */
+/* The chosen target turns solid ink (the filled-chip pick); lime stays for progress on the board. */
 .preset[aria-pressed='true'] {
-  border-color: var(--c-text-2);
-  background: var(--c-panel-hi);
-  color: var(--c-text);
-  box-shadow: var(--c-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
+  background: var(--c-text);
+  color: var(--c-ground);
 }
 
 .preset[aria-pressed='true'] strong {
-  color: var(--c-text);
+  color: var(--c-ground);
 }
 
 .preset:focus-visible {
@@ -85,7 +82,7 @@
 
 @media (hover: hover) {
   .preset:hover:not([aria-pressed='true']) {
-    border-color: var(--c-text-3);
+    background: var(--c-panel-hi);
     color: var(--c-text);
   }
 }
@@ -99,8 +96,14 @@
   display: grid;
   gap: 6px;
   padding: var(--s3) var(--s4);
-  border: 1px dashed var(--c-line-strong);
   border-radius: var(--r-control);
+  background: var(--c-well);
+}
+
+.previewLabel {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
 }
 
 .preview strong {

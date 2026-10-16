@@ -5,6 +5,8 @@ import { auth } from '@/lib/firebase/config';
 import rep from '@/components/portal/rep/rep.module.css';
 import { Banner, LoadFailed, SkeletonRows, cx } from '@/components/portal/admin-ops/AdminKit';
 import s from '@/components/portal/admin-ops/admin-ops.module.css';
+import k from '@/components/portal/admin-ops/admin-kit.module.css';
+import u from '@/components/portal/admin-d/admin-ui.module.css';
 
 interface FormAlert {
   key: string;
@@ -71,12 +73,10 @@ export default function FormAlertsCard() {
 
   return (
     <section className={cx(rep.panel, s.listPanel)} aria-labelledby="form-alerts-title">
-      <div className={rep.panelHead}>
-        <h2 id="form-alerts-title" className={rep.kicker}>
-          Submission alerts
-        </h2>
+      <div className={cx(rep.panelHead, u.band)}>
+        <h2 id="form-alerts-title">Submission alerts</h2>
       </div>
-      <p className={s.emptyBody} style={{ padding: '12px 16px 4px' }}>
+      <p className={k.lede}>
         When on, admins and operations get a notification when this form is submitted.
       </p>
       {loading ? (

@@ -6,6 +6,7 @@ import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import { AdminPageHead, StatusDot as AdminStatusDot } from '@/components/portal/admin-d/AdminUi';
 import rep from '@/components/portal/rep/rep.module.css';
 import s from './admin-ops.module.css';
+import k from './admin-kit.module.css';
 
 /** Direction D building blocks shared by the admin ops pages (queues, channels, templates, options). */
 
@@ -94,7 +95,7 @@ export function Seg<T extends string>({
   scroll?: boolean;
 }) {
   return (
-    <div className={cx(s.seg, wrap && s.segWrap, scroll && s.segScroll)} role="group" aria-label={label}>
+    <div className={cx(s.seg, wrap && s.segWrap, wrap && k.segWrap, scroll && s.segScroll)} role="group" aria-label={label}>
       {options.map((opt) => (
         <button
           key={opt.value}
@@ -220,14 +221,15 @@ export function StatusDot({ tone, children }: { tone: 'new' | 'done' | 'muted'; 
 
 /** Bottom sheet on phones, centred dialog on desktop; portaled to <body> (iOS fixed-in-scroller bug). */
 export function AdminSheet({
-  kicker,
+  subtitle,
   title,
   labelId,
   onClose,
   children,
   footer,
 }: {
-  kicker?: string;
+  /** A quiet line under the title: what the sheet is about ("Bug report"). */
+  subtitle?: string;
   title: string;
   labelId: string;
   onClose: () => void;
@@ -265,10 +267,10 @@ export function AdminSheet({
           <div className={rep.sheetHandle} aria-hidden="true" />
           <div className={rep.sheetHead}>
             <div className={s.sheetTitleWrap}>
-              {kicker ? <span className={cx(rep.kicker, s.sheetKicker)}>{kicker}</span> : null}
               <h2 id={labelId} className={s.sheetTitle}>
                 {title}
               </h2>
+              {subtitle ? <p className={k.sheetSub}>{subtitle}</p> : null}
             </div>
             <button ref={closeRef} type="button" className={rep.iconBtn} aria-label="Close" onClick={onClose}>
               <X size={20} aria-hidden="true" />

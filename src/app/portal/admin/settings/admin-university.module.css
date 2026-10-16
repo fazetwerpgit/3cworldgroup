@@ -93,7 +93,6 @@
   justify-content: space-between;
   gap: var(--s2);
   padding: var(--s2) var(--s4) var(--s3);
-  border-top: 1px solid var(--c-line);
 }
 
 .publish {
@@ -133,5 +132,16 @@
 @media (min-width: 1600px) {
   .grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* The carrier pick sits inside a panel: unpicked chips take the well tone so they read as buttons. */
+.chipWrap > button:not([aria-pressed='true']) {
+  background: var(--c-well);
+}
+
+@media (hover: hover) {
+  .chipWrap > button:not([aria-pressed='true']):hover {
+    background: var(--c-panel-hi);
   }
 }

@@ -269,7 +269,6 @@ export function EmailTemplates() {
           return (
             <article key={template.id} className={cx(rep.panel, s.tCard)}>
               <div className={s.tBody}>
-                <p className={rep.kicker}>{EmailTemplateCategoryLabels[template.category]}</p>
                 <h2 className={s.tName}>{template.name}</h2>
                 <p className={s.tSubject}>
                   <span className={s.tSubjectLabel}>Subject </span>
@@ -279,6 +278,7 @@ export function EmailTemplates() {
                   <WithTokens text={template.body} />
                 </p>
                 <p className={s.tMeta}>
+                  <span>{EmailTemplateCategoryLabels[template.category]}</span>
                   <span>{relativeUpdated(template.updatedAt)}</span>
                   <span>
                     {tokens} token{tokens === 1 ? '' : 's'}
@@ -382,7 +382,7 @@ export function EmailTemplates() {
             style={{ scrollMarginTop: 96 }}
           >
             <div className={`${rep.panelHead} ${u.band}`}>
-              <h2 id="template-editor-title" className={rep.kicker}>
+              <h2 id="template-editor-title">
                 {form.id ? `Edit · ${form.name || 'template'}` : 'New template'}
               </h2>
             </div>

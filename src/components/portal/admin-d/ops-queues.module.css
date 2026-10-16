@@ -91,10 +91,6 @@
   padding: var(--s4);
 }
 
-.skelRow + .skelRow {
-  border-top: 1px solid var(--c-line);
-}
-
 @media (min-width: 1024px) {
   .cols .queue {
     grid-template-columns: var(--cols);

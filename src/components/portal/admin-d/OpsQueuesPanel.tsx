@@ -79,7 +79,7 @@ export function OpsQueuesPanel({
   return (
     <section className={`${s.panel} ${className}`} aria-labelledby="ops-queues-heading">
       <div className={`${s.panelHead} ${u.band}`}>
-        <h2 id="ops-queues-heading" className={s.kicker}>
+        <h2 id="ops-queues-heading">
           {title}
         </h2>
         <span className={h.headRight}>

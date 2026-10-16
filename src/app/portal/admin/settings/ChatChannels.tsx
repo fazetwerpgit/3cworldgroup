@@ -373,7 +373,7 @@ export function ChatChannels() {
         {creating ? (
           <section className={rep.panel} aria-labelledby="new-channel-title">
             <div className={`${rep.panelHead} ${u.band}`}>
-              <h2 id="new-channel-title" className={rep.kicker}>
+              <h2 id="new-channel-title">
                 New channel
               </h2>
             </div>

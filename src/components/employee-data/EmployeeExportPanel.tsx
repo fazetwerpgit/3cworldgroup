@@ -47,7 +47,7 @@ export function EmployeeExportPanel() {
   return (
     <section className={s.panel} aria-labelledby="export-heading">
       <div className={`${s.panelHead} ${u.band}`}>
-        <h2 id="export-heading" className={s.kicker}>
+        <h2 id="export-heading">
           Export
         </h2>
       </div>

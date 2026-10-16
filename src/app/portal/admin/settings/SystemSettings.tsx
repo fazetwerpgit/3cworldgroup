@@ -15,11 +15,11 @@ const WEEKLY_CHALLENGE_PRESETS = [
   { value: 15, descriptor: 'Beast mode' },
 ];
 
-/** Panel title row: kicker on the left, a status or tag on the right. */
+/** Panel title row: the title on the left, a status or tag on the right. */
 function PanelHead({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
   return (
     <div className={`${s.panelHead} ${u.band}`}>
-      <h2 id={id} className={s.kicker}>
+      <h2 id={id}>
         {title}
       </h2>
       {children}
@@ -174,7 +174,7 @@ function WeeklyChallengeCard() {
           </div>
 
           <div className={st.preview}>
-            <span className={s.kicker}>Reps will see</span>
+            <span className={st.previewLabel}>Reps will see</span>
             <strong>
               Close {target ?? '—'} {target === 1 ? 'sale' : 'sales'} by Saturday
             </strong>

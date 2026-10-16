@@ -42,7 +42,6 @@
   display: grid;
   gap: var(--s3);
   padding: var(--s3) var(--s4);
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
   background: var(--c-well);
 }

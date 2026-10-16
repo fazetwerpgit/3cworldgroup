@@ -270,7 +270,7 @@ function AdminUniversity() {
       {showAdd ? (
         <section className={s.panel} aria-labelledby="uni-add-heading">
           <div className={`${s.panelHead} ${u.band}`}>
-            <h2 id="uni-add-heading" className={s.kicker}>
+            <h2 id="uni-add-heading">
               Add content
             </h2>
           </div>
@@ -443,7 +443,7 @@ function AdminUniversity() {
               <li key={item.id} className={`${s.panel} ${un.card}`}>
                 <div className={un.cardBody}>
                   <div className={un.cardTop}>
-                    <span className={s.kicker}>{CATEGORY_LABEL[item.category] || item.category}</span>
+                    <span className={u.tag}>{CATEGORY_LABEL[item.category] || item.category}</span>
                     <span className={un.cardTags}>
                       {item.isRequired ? <span className={`${u.tag} ${u.tagAmber}`}>Required</span> : null}
                       <StatusDot tone={item.isPublished ? 'lime' : 'muted'}>

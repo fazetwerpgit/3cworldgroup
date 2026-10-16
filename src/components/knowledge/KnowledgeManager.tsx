@@ -249,7 +249,7 @@ export function KnowledgeManager() {
           {editor ? (
             <section className={s.panel} aria-labelledby="note-editor-h">
               <div className={`${s.panelHead} ${u.band}`}>
-                <h2 id="note-editor-h" className={s.kicker}>
+                <h2 id="note-editor-h">
                   {editor.id ? 'Edit note' : 'New note'}
                 </h2>
                 <span className={u.panelMeta}>{editor.body.length.toLocaleString('en-US')} characters</span>
@@ -340,7 +340,7 @@ export function KnowledgeManager() {
 
           <section className={s.panel} aria-labelledby="notes-h">
             <div className={`${s.panelHead} ${u.band}`}>
-              <h2 id="notes-h" className={s.kicker}>
+              <h2 id="notes-h">
                 Notes
               </h2>
               <span className={u.panelMeta}>In the order Ask 3C reads them</span>
@@ -412,7 +412,7 @@ function Questions({ onAddToKnowledge }: { onAddToKnowledge: (row: AskLogView) =
   return (
     <section className={s.panel} aria-labelledby="questions-h">
       <div className={`${s.panelHead} ${u.band}`}>
-        <h2 id="questions-h" className={s.kicker}>
+        <h2 id="questions-h">
           {filter === 'down' ? 'Thumbs down' : 'Latest 100'}
         </h2>
         <div className={u.chips} role="group" aria-label="Show">
@@ -513,7 +513,7 @@ function PracticeSessions() {
   return (
     <section className={s.panel} aria-labelledby="practice-h">
       <div className={`${s.panelHead} ${u.band}`}>
-        <h2 id="practice-h" className={s.kicker}>
+        <h2 id="practice-h">
           Latest 100
         </h2>
         {reps.length > 1 ? (
@@ -550,7 +550,7 @@ function PracticeSessions() {
           {shown.map((row) => {
             const expanded = open === row.id;
             return (
-              <li key={row.id} className={k.session}>
+              <li key={row.id}>
                 {/* One line per session; tap it for the homeowner, the feedback and the transcript. */}
                 <button
                   type="button"
@@ -665,7 +665,7 @@ function PracticeAssignments() {
   return (
     <section className={s.panel} aria-labelledby="assign-h">
       <div className={`${s.panelHead} ${u.band}`}>
-        <h2 id="assign-h" className={s.kicker}>
+        <h2 id="assign-h">
           Assignments
         </h2>
         <span className={u.panelMeta}>Reps see these on Practice</span>

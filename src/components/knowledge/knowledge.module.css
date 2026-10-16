@@ -35,8 +35,10 @@
 
 /* ---------- questions ---------- */
 .questions {
+  display: grid;
+  gap: var(--s1);
   margin: 0;
-  padding: 0;
+  padding: var(--s1) 0;
   list-style: none;
 }
 
@@ -44,10 +46,6 @@
   display: grid;
   gap: var(--s2);
   padding: var(--s4);
-}
-
-.question + .question {
-  border-top: 1px solid var(--c-line);
 }
 
 .qMeta {
@@ -75,8 +73,6 @@
 /* A follow-up's earlier question, quiet, above the question itself. */
 .prevText {
   margin: 0;
-  padding-left: var(--s3);
-  border-left: 2px solid var(--c-line-strong);
   color: var(--c-text-2);
   font-size: var(--t-sm);
   line-height: 1.4;
@@ -139,10 +135,6 @@
 }
 
 /* One line per practice session; tap to open it. */
-.session + .session {
-  border-top: 1px solid var(--c-line);
-}
-
 .sessionRow {
   display: flex;
   flex-wrap: wrap;
@@ -218,6 +210,6 @@
   display: grid;
   gap: var(--s1);
   padding: var(--s3);
-  border-left: 2px solid var(--c-amber);
-  background: var(--c-well);
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--c-amber) 10%, var(--c-well));
 }

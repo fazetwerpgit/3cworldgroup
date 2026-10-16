@@ -18,6 +18,7 @@ import {
   cx,
 } from './AdminKit';
 import s from './admin-ops.module.css';
+import k from './admin-kit.module.css';
 
 /**
  * The one review queue behind every admin form inbox (bug reports, expedite
@@ -132,7 +133,7 @@ export function AdminQueue({
   onRetry: () => void;
   /** Rejects when the server refuses; the sheet says so. */
   onMarkHandled: (id: string) => Promise<void>;
-  /** Singular noun for the sheet kicker ("Bug report"). */
+  /** Singular noun for the line under the sheet title ("Bug report"). */
   itemNoun: string;
   searchPlaceholder?: string;
   filterLabel?: string;
@@ -402,7 +403,7 @@ function QueueSheet({
 
   return (
     <AdminSheet
-      kicker={itemNoun}
+      subtitle={itemNoun}
       title={row.detailTitle ?? row.subject}
       labelId={labelId}
       onClose={onClose}
@@ -453,7 +454,7 @@ function QueueSheet({
 
         {row.evidenceKind === 'files' && (row.evidenceItems?.length ?? 0) > 0 ? (
           <div className={s.section}>
-            <p className={rep.kicker}>Attachments</p>
+            <h3 className={k.sectionTitle}>Attachments</h3>
             <div className={s.evList}>
               {row.evidenceItems!.map((item) => (
                 <button key={item.label} type="button" className={s.btn} onClick={item.onClick}>
@@ -468,7 +469,7 @@ function QueueSheet({
 
         {row.evidenceKind === 'signature' && row.signatureUrl ? (
           <div className={s.section}>
-            <p className={rep.kicker}>Signature</p>
+            <h3 className={k.sectionTitle}>Signature</h3>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={row.signatureUrl} alt="Captured signature" className={s.signature} />
           </div>
@@ -476,7 +477,7 @@ function QueueSheet({
 
         {row.notes ? (
           <div className={s.section}>
-            <p className={rep.kicker}>Notes</p>
+            <h3 className={k.sectionTitle}>Notes</h3>
             <p className={s.notes}>{row.notes}</p>
           </div>
         ) : null}

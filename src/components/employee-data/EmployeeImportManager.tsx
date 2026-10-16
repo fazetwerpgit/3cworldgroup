@@ -132,7 +132,7 @@ export function EmployeeImportManager() {
 
       <section className={s.panel} aria-labelledby="import-file-heading">
         <div className={`${s.panelHead} ${u.band}`}>
-          <h2 id="import-file-heading" className={s.kicker}>
+          <h2 id="import-file-heading">
             Import
           </h2>
           {preview ? <span className={u.panelMeta}>{toUpdate} to update</span> : null}
@@ -216,7 +216,7 @@ export function EmployeeImportManager() {
         <>
           <section className={s.panel} aria-labelledby="import-people-heading">
             <div className={`${s.panelHead} ${u.band}`}>
-              <h2 id="import-people-heading" className={s.kicker}>
+              <h2 id="import-people-heading">
                 {result ? 'Imported' : 'Preview'}
               </h2>
               <span className={e.summary}>
@@ -268,7 +268,7 @@ export function EmployeeImportManager() {
           {shown.skipped.length ? (
             <section className={s.panel} aria-labelledby="import-skipped-heading">
               <div className={`${s.panelHead} ${u.band}`}>
-                <h2 id="import-skipped-heading" className={s.kicker}>
+                <h2 id="import-skipped-heading">
                   Skipped
                 </h2>
                 <span className={u.panelMeta}>{shown.skipped.length}</span>

@@ -144,7 +144,7 @@ export function FormOptions() {
               return (
                 <section key={key} className={cx(rep.panel, s.oCard)} aria-labelledby={`${inputId}-title`}>
                   <div className={`${rep.panelHead} ${u.band}`}>
-                    <h2 id={`${inputId}-title`} className={rep.kicker}>
+                    <h2 id={`${inputId}-title`}>
                       {FORM_OPTION_LABELS[key]}
                     </h2>
                     <span className={s.panelCount}>
