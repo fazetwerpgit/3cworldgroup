@@ -70,14 +70,13 @@ dl.summaryFacts {
   display: grid;
   gap: var(--s2);
   padding: var(--s3);
-  border: 1px solid rgba(255, 138, 128, 0.35);
   border-radius: var(--r-control);
-  background: rgba(255, 138, 128, 0.07);
+  background: rgba(255, 138, 128, 0.12);
 }
 
 .revealConfirm p {
   margin: 0;
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 500;
   line-height: 1.45;
 }

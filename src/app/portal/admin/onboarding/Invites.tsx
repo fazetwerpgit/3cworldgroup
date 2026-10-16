@@ -553,7 +553,7 @@ export function Invites({
         <div className={r.formWrap}>
           <section className={`${s.panel} ${r.formPanel}`} id="invite-form" aria-labelledby="recruiting-form-heading">
             <div className={`${s.panelHead} ${u.band}`}>
-              <h2 id="recruiting-form-heading" className={s.kicker}>Send an invite</h2>
+              <h2 id="recruiting-form-heading" className={u.sectionTitle}>Send an invite</h2>
               <button type="button" className={`${s.btnSecondary} ${u.sm} ${u.quiet}`} onClick={closeForm}>
                 {latestInviteUrl ? 'Close' : 'Cancel'}
               </button>

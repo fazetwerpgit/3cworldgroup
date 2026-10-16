@@ -61,12 +61,12 @@
   flex: 0 1 auto;
   min-width: 0;
   max-width: 55%;
-  padding: 3px 7px;
+  padding: 4px 8px;
   overflow: hidden;
-  border: 1px solid var(--c-line-strong);
-  border-radius: var(--r-control);
+  border-radius: 4px;
+  background: rgba(163, 184, 214, 0.12);
   color: var(--c-text-2);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 600;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -74,14 +74,14 @@
 }
 
 .chipMuted {
-  border-style: dashed;
+  background: transparent;
   color: var(--c-text-3);
 }
 
 .statusWord {
   position: absolute;
   width: 1px;
-  height: 1px;
+  height: 1px; /* taste-skill-ignore: visually hidden text, not a rule */
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
@@ -200,9 +200,9 @@
   min-width: var(--tap);
   min-height: var(--tap);
   padding: 0 10px;
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-control);
-  background: transparent;
+  background: var(--c-panel-hi);
   color: var(--c-text);
   font: inherit;
   font-size: var(--t-sm);
@@ -223,7 +223,8 @@
 
 @media (hover: hover) {
   .viewAsBtn:hover {
-    border-color: var(--c-amber);
+    background: var(--c-amber-wash);
+    color: var(--c-amber);
   }
 }
 
@@ -244,7 +245,7 @@
   .viewAsWord {
     position: absolute;
     width: 1px;
-    height: 1px;
+    height: 1px; /* taste-skill-ignore: visually hidden text, not a rule */
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;

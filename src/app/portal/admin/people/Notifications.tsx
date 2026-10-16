@@ -118,7 +118,7 @@ export function Notifications() {
 
         <section className={s.panel} aria-labelledby="push-status-heading">
           <div className={`${s.panelHead} ${u.band}`}>
-            <h2 id="push-status-heading" className={s.kicker}>
+            <h2 id="push-status-heading" className={u.sectionTitle}>
               Active people
             </h2>
             {rows ? <span className={u.panelMeta}>{rows.length}</span> : null}

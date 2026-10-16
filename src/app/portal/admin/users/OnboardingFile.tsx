@@ -204,7 +204,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
   return (
     <section id="onboarding-file" className={`${s.panel} ${f.section}`} aria-labelledby="onboarding-file-heading">
       <div className={`${s.panelHead} ${u.band} ${f.head}`}>
-        <h2 id="onboarding-file-heading" className={s.kicker}>
+        <h2 id="onboarding-file-heading" className={u.sectionTitle}>
           Onboarding file
         </h2>
         <span className={u.tag}>

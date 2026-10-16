@@ -271,7 +271,7 @@ export function Everyone() {
         {pendingUsers.length > 0 ? (
           <section className={`${s.panel} ${p.pending}`} aria-labelledby="users-pending-heading">
             <div className={`${s.panelHead} ${u.band}`}>
-              <h2 id="users-pending-heading" className={s.kicker}>
+              <h2 id="users-pending-heading" className={u.sectionTitle}>
                 Pending approval
               </h2>
               <span className={u.panelMeta}>{pendingUsers.length} waiting</span>
@@ -316,7 +316,7 @@ export function Everyone() {
 
         <section className={s.panel} aria-labelledby="users-all-heading">
           <div className={`${s.panelHead} ${u.band}`}>
-            <h2 id="users-all-heading" className={s.kicker}>
+            <h2 id="users-all-heading" className={u.sectionTitle}>
               All members
             </h2>
             {loaded && !failed ? (

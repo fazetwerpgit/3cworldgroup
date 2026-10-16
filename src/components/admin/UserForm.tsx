@@ -312,7 +312,7 @@ export function UserForm({ user }: UserFormProps) {
 
       <section className={s.panel} aria-labelledby="person-details-heading">
         <div className={`${s.panelHead} ${u.band}`}>
-          <h2 id="person-details-heading" className={s.kicker}>
+          <h2 id="person-details-heading" className={u.sectionTitle}>
             Account details
           </h2>
           <span className={u.panelMeta}>Email is locked</span>
@@ -402,7 +402,7 @@ export function UserForm({ user }: UserFormProps) {
 
       <section className={s.panel} aria-labelledby="person-role-heading">
         <div className={`${s.panelHead} ${u.band}`}>
-          <h2 id="person-role-heading" className={s.kicker}>
+          <h2 id="person-role-heading" className={u.sectionTitle}>
             Role and status
           </h2>
         </div>
@@ -539,7 +539,7 @@ export function UserForm({ user }: UserFormProps) {
 
       <section className={`${s.panel} ${f.actions}`} aria-labelledby="person-actions-heading">
         <div className={`${s.panelHead} ${u.band}`}>
-          <h2 id="person-actions-heading" className={s.kicker}>
+          <h2 id="person-actions-heading" className={u.sectionTitle}>
             Account actions
           </h2>
         </div>

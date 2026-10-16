@@ -1,8 +1,9 @@
 /* User Management (direction D). Shared pieces are admin-ui.module.css. */
 
 /* ---------- pending approval ---------- */
+/* Waiting on a decision: the panel takes a faint amber tone (no outline). */
 .pending {
-  border-color: rgba(245, 185, 69, 0.34);
+  background: color-mix(in srgb, var(--c-panel), var(--c-amber) 6%);
 }
 
 /* Phone: person on one line, the decision underneath. Desktop: side by side. */
@@ -38,7 +39,7 @@
   gap: 2px;
   min-height: var(--tap);
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 600;
   text-decoration: none;
 }
@@ -54,7 +55,6 @@
   display: grid;
   gap: var(--s3);
   padding: var(--s4);
-  border-bottom: 1px solid var(--c-line);
 }
 
 .filters .status {

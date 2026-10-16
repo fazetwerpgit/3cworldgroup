@@ -278,7 +278,7 @@ export default function EditUserPage() {
             {pipelineRep ? (
               <section className={s.panel} aria-labelledby="person-where-heading">
                 <div className={`${s.panelHead} ${u.band}`}>
-                  <h2 id="person-where-heading" className={s.kicker}>
+                  <h2 id="person-where-heading" className={u.sectionTitle}>
                     Where they are
                   </h2>
                 </div>
@@ -353,7 +353,7 @@ export default function EditUserPage() {
                   {showSalesPanel ? (
                     <section className={s.panel} aria-labelledby="person-sales-heading">
                       <div className={`${u.panelBody} ${d.salesBody}`}>
-                        <h2 id="person-sales-heading" className={s.kicker}>
+                        <h2 id="person-sales-heading" className={u.sectionTitle}>
                           Approved sales
                         </h2>
                         <p className={u.hint}>Sales entered in the portal and approved for this person.</p>
@@ -366,7 +366,7 @@ export default function EditUserPage() {
                   {showAsideVault ? (
                     <section className={`${s.panel} ${d.vault}`} aria-labelledby="person-vault-heading">
                       <div className={`${s.panelHead} ${u.band}`}>
-                        <h2 id="person-vault-heading" className={s.kicker}>
+                        <h2 id="person-vault-heading" className={u.sectionTitle}>
                           Sensitive information
                         </h2>
                         <span className={u.tag}>
