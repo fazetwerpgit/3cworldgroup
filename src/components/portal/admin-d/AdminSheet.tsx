@@ -25,7 +25,7 @@ export function AdminSheet({
   children?: ReactNode;
   /** Pinned action row under the scrolling body. */
   footer?: ReactNode;
-  /** 'danger' draws a red rule under the title for destructive confirmations. */
+  /** 'danger' tints the title band red for destructive confirmations. */
   tone?: 'danger';
 }) {
   const titleId = useId();

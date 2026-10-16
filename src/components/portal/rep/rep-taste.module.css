@@ -1,8 +1,11 @@
 /* ==========================================================================
-   Taste pass (Oct 2026): filled controls for the redone screens only (Sales,
-   Leaderboard). The shared rep-page .tabs / .chip stay as they are for the
-   screens not redone yet; these replace them where a screen opts in.
-   Flat tone steps: no borders, no shadows, fully round.
+   Taste pass (Oct 2026): filled controls, first built for Sales and the
+   Leaderboard. The same look now lives in the shared rep-page.module.css
+   (.tabs / .tab = .seg / .segBtn, .chip = .chip), so new work should use
+   rep-page. This file stays, unchanged, for the screens that import it
+   (SalesTable, LeaderboardFilters, LegacyLeaderboardPage); its layout rules
+   differ slightly (no justify-self, no bleed row), so it is kept rather than
+   composed. Flat tone steps: no borders, no shadows, fully round.
    ========================================================================== */
 
 /* [Sales | Pay]-style segmented switch: one panel pill, the pick in lime. */

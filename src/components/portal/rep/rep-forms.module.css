@@ -88,7 +88,7 @@
   .header .title {
     position: absolute;
     width: 1px;
-    height: 1px;
+    height: 1px; /* taste-skill-ignore: visually hidden h1 */
     overflow: hidden;
     clip: rect(0 0 0 0);
     white-space: nowrap;
@@ -112,8 +112,6 @@
   align-items: baseline;
   gap: var(--s3);
   margin: 0;
-  padding-bottom: var(--s3);
-  border-bottom: 1px solid var(--c-line);
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -162,7 +160,7 @@
 
 .req {
   color: var(--c-text-3);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 500;
 }
 
@@ -180,36 +178,32 @@
      text fields without it. */
   -webkit-appearance: none;
   appearance: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+  transition: border-color 160ms ease;
 }
 
 .input::placeholder {
   color: var(--c-text-3);
 }
 
+/* Focus: the field's own line turns lime and doubles (no glow). */
 .input:focus {
   border-color: var(--c-lime);
-  outline: none;
-  box-shadow: 0 0 0 3px var(--c-lime-wash);
+  outline: 1px solid var(--c-lime);
+  outline-offset: 0;
 }
 
 /* iOS Safari paints autofilled fields (name, phone, address) pale yellow with
-   dark text, which cannot be overridden with background-color. An inset
-   shadow repaints the ground and the fill colour keeps the text light. */
+   dark text, which cannot be overridden with background-color. An inset box
+   fill repaints the ground and the fill colour keeps the text light. */
 .input:-webkit-autofill,
 .input:-webkit-autofill:hover {
   -webkit-text-fill-color: var(--c-text);
   caret-color: var(--c-text);
-  box-shadow: inset 0 0 0 100px var(--c-ground);
+  box-shadow: inset 0 0 0 100px var(--c-ground); /* taste-skill-ignore: repaints iOS autofill, not a shadow */
 }
 
 .input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--c-text);
-  box-shadow:
-    inset 0 0 0 100px var(--c-ground),
-    0 0 0 3px var(--c-lime-wash);
 }
 
 .input[type='date'] {
@@ -262,10 +256,10 @@
 .empty {
   margin: 0;
   padding: var(--s3) var(--s4);
-  border: 1px dashed var(--c-line-strong);
   border-radius: var(--r-control);
+  background: var(--c-panel);
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.4;
 }
 
@@ -278,18 +272,23 @@
 }
 
 .fieldInvalid .input,
+.fieldInvalid .fileRow {
+  border-color: var(--c-red);
+}
+
+/* Filled choice groups have no line of their own: an error rings them. */
 .fieldInvalid .chips,
 .fieldInvalid .pair,
 .fieldInvalid .rows,
 .fieldInvalid .drop,
-.fieldInvalid .fileRow,
 .fieldInvalid .empty {
-  border-color: var(--c-red);
+  outline: 2px solid var(--c-red);
+  outline-offset: 2px;
 }
 
 .fieldInvalid .input:focus {
   border-color: var(--c-red);
-  box-shadow: 0 0 0 3px rgba(255, 138, 128, 0.18);
+  outline-color: var(--c-red);
 }
 
 .fieldError {
@@ -308,38 +307,30 @@
   margin-top: 2px;
 }
 
-/* ---------- choices: chips (short), segmented pair, rows (long) ---------- */
+/* ---------- choices: chips (short), segmented pair, rows (long) ----------
+   Taste pass: filled tiles, no outlines. The pick turns solid lime. */
 .chips,
 .pair {
   display: grid;
-  gap: 1px;
+  gap: var(--s2);
   margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
-  background: var(--c-line-strong);
 }
 
 .chips {
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: var(--s2);
-  overflow: visible;
-  border: 0;
-  background: transparent;
 }
 
-/* Chips in a grid are separate tiles, so a short last row leaves no filled gap. */
 .chips .chip {
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
-}
-
-.chips .chip:has(input:checked) {
-  border-color: var(--c-lime);
 }
 
 .pair {
   grid-template-columns: 1fr 1fr;
+}
+
+.pair .chip {
+  border-radius: var(--r-control);
 }
 
 .chip {
@@ -370,22 +361,20 @@
 }
 
 .chip:has(input:checked) {
-  background: var(--c-lime-wash);
-  color: var(--c-lime-hi);
-  box-shadow: inset 0 -2px 0 var(--c-lime);
+  background: var(--c-lime);
+  color: var(--c-on-lime);
 }
 
 .chip:has(input:focus-visible),
 .row:has(input:focus-visible) {
   outline: 2px solid var(--c-lime-hi);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
 
 .rows {
   display: grid;
+  gap: 2px;
   margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
 }
 
@@ -397,15 +386,12 @@
   gap: var(--s3);
   min-height: 52px;
   padding: var(--s3) var(--s4);
-  background: var(--c-ground);
+  border-radius: var(--r-control);
+  background: var(--c-panel);
   color: var(--c-text);
   font-size: var(--t-ui);
   line-height: 1.35;
   cursor: pointer;
-}
-
-.row + .row {
-  border-top: 1px solid var(--c-line);
 }
 
 .row:has(input:checked) {
@@ -433,12 +419,13 @@
 }
 
 @media (hover: hover) {
-  .chip:hover {
+  .chip:not(:has(input:checked)):hover {
+    background: var(--c-panel-hi);
     color: var(--c-text);
   }
 
-  .row:hover {
-    background: var(--c-panel);
+  .row:not(:has(input:checked)):hover {
+    background: var(--c-panel-hi);
   }
 }
 
@@ -451,9 +438,8 @@
   gap: var(--s3);
   min-height: 72px;
   padding: var(--s3) var(--s4);
-  border: 1px dashed var(--c-line-strong);
   border-radius: var(--r-control);
-  background: var(--c-ground);
+  background: var(--c-panel);
   cursor: pointer;
 }
 
@@ -489,7 +475,7 @@
 
 @media (hover: hover) {
   .drop:hover {
-    border-color: var(--c-text-2);
+    background: var(--c-panel-hi);
   }
 }
 
@@ -513,7 +499,6 @@
 }
 
 .fileThumb {
-  border: 1px solid var(--c-line);
   object-fit: cover;
   object-position: top;
 }
@@ -575,11 +560,11 @@
   min-width: var(--tap);
   min-height: var(--tap);
   padding: 0 var(--s3);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-control);
-  background: transparent;
+  background: var(--c-panel-hi);
   color: var(--c-text);
-  font: 600 var(--t-sm) / 1 var(--f-ui);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
   cursor: pointer;
 }
 
@@ -606,9 +591,8 @@
   align-items: flex-start;
   gap: var(--s3);
   padding: 14px var(--s4);
-  border: 1px solid rgba(255, 138, 128, 0.5);
   border-radius: var(--r-panel);
-  background: rgba(255, 138, 128, 0.1);
+  background: rgba(255, 138, 128, 0.12);
   color: var(--c-red);
   scroll-margin: 96px;
 }
@@ -657,16 +641,13 @@
   left: 0;
   z-index: 40;
   padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--c-line-strong);
   background: var(--c-bar);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   transform: translateZ(0);
 }
 
 .submitInline {
   display: none;
   padding-top: var(--s4);
-  border-top: 1px solid var(--c-line);
 }
 
 .submitInline[data-keyboard='open'] {
@@ -709,10 +690,11 @@
   font-size: var(--t-sm);
 }
 
-/* Firestore ids are mixed case: a case-preserving mono face keeps them readable. */
+/* Firestore ids are mixed case: the text face, tabular, slightly open. */
 .sentRefId {
   color: var(--c-text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
   overflow-wrap: anywhere;
 }
 
@@ -763,10 +745,6 @@
   list-style: none;
 }
 
-.hubList li + li {
-  border-top: 1px solid var(--c-line);
-}
-
 .hubRow {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -783,9 +761,8 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--c-line);
   border-radius: var(--r-control);
-  background: var(--c-ground);
+  background: var(--c-panel-hi);
   color: var(--c-lime);
 }
 
@@ -803,18 +780,18 @@
 
 .hubDesc {
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.4;
 }
 
 .hubTag {
   align-self: flex-start;
   margin-top: 2px;
-  padding: 3px 8px;
-  border: 1px solid var(--c-line-strong);
+  padding: 4px 10px;
   border-radius: 999px;
+  background: var(--c-panel-hi);
   color: var(--c-text-2);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 600;
 }
 

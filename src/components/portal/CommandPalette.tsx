@@ -321,8 +321,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
-      <div className="portal-enter relative mx-auto mt-[15vh] w-[calc(100%-2rem)] max-w-lg overflow-hidden rounded-lg border border-white/10 bg-[#0A1F44]/90 text-white shadow-2xl backdrop-blur-md">
-        <div className="flex items-center gap-3 border-b border-white/10 px-4">
+      {/* A real dialog: opaque raised navy, one drop of depth (no glass, no outline). */}
+      <div className="portal-enter relative mx-auto mt-[15vh] w-[calc(100%-2rem)] max-w-lg overflow-hidden rounded-lg bg-[#172540] text-white shadow-2xl"> {/* taste-skill-ignore */}
+        <div className="flex items-center gap-3 bg-[#131f33] px-4">
           <Search className="h-4 w-4 shrink-0 text-white/40" aria-hidden="true" />
           <input
             ref={inputRef}
@@ -339,20 +340,20 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             style={{ color: '#ffffff', caretColor: '#8dc63f' }}
             aria-label="Search"
           />
-          <kbd className="shrink-0 rounded border border-white/15 px-1.5 py-0.5 text-[10px] font-medium text-white/40">
+          <kbd className="shrink-0 rounded bg-white/10 px-1.5 py-0.5 text-xs font-medium text-white/60">
             esc
           </kbd>
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto py-2">
           {flat.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-white/40">
+            <p className="px-4 py-6 text-center text-sm text-white/60">
               Nothing matches — try a customer name or page.
             </p>
           ) : (
             sections.map((section) => (
               <div key={section.heading} className="mb-1 last:mb-0">
-                <p className="px-4 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+                <p className="px-4 pb-1 pt-2 text-[13px] font-semibold text-white/55">
                   {section.heading}
                 </p>
                 <ul>

@@ -254,13 +254,11 @@ body {
   border-radius: var(--radius);
 }
 
-/* Command-center table headers: small uppercase muted, financial-grade scan */
+/* Table headers: muted sentence case at a readable size (taste pass). */
 .portal-scope [data-slot="table-head"] {
   color: var(--muted-foreground);
-  font-size: 0.6875rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 /* Skeletons are neutral, never lime-tinted */
@@ -279,10 +277,8 @@ body {
 
 .portal-label {
   color: var(--muted-foreground);
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 
 .portal-num {
@@ -323,9 +319,10 @@ body {
 .portal-scope input:focus-visible,
 .portal-scope select:focus-visible,
 .portal-scope textarea:focus-visible {
+  /* The field's own line turns lime and doubles (no glow). */
   border-color: #8dc63f;
-  box-shadow: 0 0 0 3px rgba(141, 198, 63, 0.3);
-  outline: none;
+  outline: 1px solid #8dc63f;
+  outline-offset: 0;
 }
 
 /* Typed text follows the theme. The ui Input/Textarea primitives set no text

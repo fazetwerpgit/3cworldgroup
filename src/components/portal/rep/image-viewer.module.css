@@ -22,7 +22,6 @@
   padding: env(safe-area-inset-top) max(var(--gutter), env(safe-area-inset-right)) 0
     max(var(--gutter), env(safe-area-inset-left));
   min-height: calc(var(--topbar-h) + env(safe-area-inset-top));
-  border-bottom: 1px solid var(--c-line);
   background: var(--c-bar);
 }
 
@@ -46,7 +45,7 @@
   min-width: var(--tap);
   min-height: var(--tap);
   padding: 0 var(--s4) 0 var(--s3);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-control);
   background: var(--c-panel-hi);
   color: var(--c-text);
@@ -68,7 +67,7 @@
 
 @media (hover: hover) {
   .close:hover {
-    border-color: var(--c-text-3);
+    background: #26375a;
   }
 }
 

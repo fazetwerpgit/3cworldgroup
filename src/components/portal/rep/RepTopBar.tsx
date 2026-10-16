@@ -378,7 +378,7 @@ export function RepTopBar({
           <button type="button" className={s.dropClear} aria-label="Close notifications" tabIndex={-1} onClick={close} />
           <div ref={dropRef} className={s.drop} role="dialog" aria-labelledby="rep-notes-title">
             <div className={s.noteHead}>
-              <h2 id="rep-notes-title" className={s.kicker}>
+              <h2 id="rep-notes-title" className={s.sheetTitle}>
                 Notifications
               </h2>
               {unreadCount > 0 ? (

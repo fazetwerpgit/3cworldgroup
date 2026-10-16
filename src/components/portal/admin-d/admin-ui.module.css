@@ -60,7 +60,7 @@
   font-family: var(--f-display);
   font-size: 40px;
   font-weight: 400;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   line-height: 0.95;
   padding-top: 4px;
   overflow-wrap: anywhere;
@@ -122,19 +122,18 @@
 }
 
 .danger:is(a, button) {
-  border-color: rgba(255, 138, 128, 0.42);
+  background: rgba(255, 138, 128, 0.12);
   color: var(--c-red);
 }
 
 @media (hover: hover) {
   .danger:is(a, button):hover {
-    border-color: var(--c-red);
-    background: rgba(255, 138, 128, 0.08);
+    background: rgba(255, 138, 128, 0.2);
   }
 }
 
 .quiet:is(a, button) {
-  border-color: transparent;
+  background: transparent;
   color: var(--c-text-2);
 }
 
@@ -199,10 +198,9 @@
 
 .band.band > :is(h2, h3) {
   color: var(--c-text-2);
-  font: 400 20px / 1 var(--f-display);
-  letter-spacing: 0.08em;
+  font: 400 22px / 1 var(--f-display);
+  letter-spacing: 0.01em;
   padding-top: 3px;
-  text-transform: uppercase;
 }
 
 .band.band > :is(h2, h3)::before {
@@ -324,11 +322,11 @@
   gap: var(--s2);
   min-height: var(--tap);
   padding: 0 16px;
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: 999px;
-  background: transparent;
+  background: var(--c-panel);
   color: var(--c-text-2);
-  font: 600 14px / 1 var(--f-ui);
+  font: 600 15px / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -344,14 +342,13 @@
 
 /* The selected filter inverts to white; lime is kept for what needs action. */
 .chip[aria-pressed='true'] {
-  border-color: var(--c-text);
   background: var(--c-text);
   color: var(--c-ground);
 }
 
 @media (hover: hover) {
   .chip:hover:not([aria-pressed='true']) {
-    border-color: var(--c-text-3);
+    background: var(--c-panel-hi);
     color: var(--c-text);
   }
 }
@@ -365,16 +362,14 @@
   color: inherit;
 }
 
-/* One segmented control (status, carrier …): options set in a recessed well,
-   the selected one lifted a step (L3) with the top-edge highlight. */
+/* One segmented control (status, carrier …): a filled panel pill, the pick in
+   solid lime (rep-page .tabs). */
 .segmented {
   display: flex;
   gap: 4px;
   padding: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  border-radius: 10px;
-  background: var(--c-well);
-  box-shadow: var(--c-sink);
+  border-radius: 999px;
+  background: var(--c-panel);
 }
 
 .segmented > button {
@@ -382,10 +377,10 @@
   min-height: 40px;
   padding: 0 var(--s3);
   border: 0;
-  border-radius: 7px;
+  border-radius: 999px;
   background: transparent;
-  color: var(--c-text-3);
-  font: 600 var(--t-sm) / 1 var(--f-ui);
+  color: var(--c-text-2);
+  font: 600 15px / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -399,9 +394,8 @@
 }
 
 .segmented > button[aria-pressed='true'] {
-  background: var(--c-panel-hi);
-  color: var(--c-text);
-  box-shadow: var(--c-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
+  background: var(--c-lime);
+  color: var(--c-on-lime);
 }
 
 @media (hover: hover) {
@@ -460,7 +454,6 @@
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
   background: var(--c-well);
-  box-shadow: var(--c-sink);
   color: var(--c-text);
   font: 400 var(--t-body) / 1.2 var(--f-ui);
   font-variant-numeric: tabular-nums;
@@ -490,7 +483,6 @@
 .input:read-only:not(select) {
   border-color: var(--c-line);
   background: transparent;
-  box-shadow: none;
   color: var(--c-text-2);
 }
 
@@ -543,10 +535,9 @@
 .fileInput::file-selector-button {
   margin-right: var(--s3);
   padding: 8px 12px;
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-control);
   background: var(--c-panel-hi);
-  box-shadow: var(--c-edge);
   color: var(--c-text);
   font: 600 var(--t-sm) / 1 var(--f-ui);
   cursor: pointer;
@@ -606,7 +597,6 @@
   content: '';
   width: 44px;
   height: 26px;
-  border: 1px solid var(--c-line-strong);
   border-radius: 13px;
   background: var(--c-track);
   transition: background-color 160ms ease;
@@ -650,10 +640,8 @@
   gap: var(--s3);
   margin: 0;
   padding: var(--s3) var(--s4);
-  border: 1px solid var(--c-line);
   border-radius: var(--r-panel);
   background: var(--c-panel);
-  box-shadow: var(--c-lift);
   color: var(--c-text);
   font-size: var(--t-ui);
   line-height: 1.4;
@@ -670,8 +658,9 @@
   overflow-wrap: anywhere;
 }
 
+/* Tone: a tinted fill, no stripe. */
 .noticeError {
-  box-shadow: inset 3px 0 0 var(--c-red), var(--c-lift);
+  background: rgba(255, 138, 128, 0.12);
 }
 
 .noticeError > svg {
@@ -679,7 +668,7 @@
 }
 
 .noticeOk {
-  box-shadow: inset 3px 0 0 var(--c-lime), var(--c-lift);
+  background: var(--c-lime-wash);
 }
 
 .noticeOk > svg {
@@ -687,7 +676,7 @@
 }
 
 .noticeWarn {
-  box-shadow: inset 3px 0 0 var(--c-amber), var(--c-lift);
+  background: var(--c-amber-wash);
 }
 
 .noticeWarn > svg {
@@ -726,7 +715,7 @@
   max-width: 44ch;
   margin: 0;
   color: var(--c-text-2);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   line-height: 1.45;
 }
 
@@ -737,10 +726,6 @@
 .skelRow {
   display: grid;
   padding: var(--s4);
-}
-
-.skelRow + .skelRow {
-  border-top: 1px solid var(--c-line);
 }
 
 .skelLines {
@@ -781,9 +766,10 @@
     transform 120ms ease-out;
 }
 
+/* A real data table (desktop) / list: it keeps its row lines. */
 .rows > li + li,
 .rows > .row + .row {
-  border-top: 1px solid var(--c-line);
+  border-top: 1px solid var(--c-line); /* taste-skill-ignore: data table rows */
 }
 
 :is(a, button).row {
@@ -807,12 +793,13 @@
   outline-offset: -2px;
 }
 
+/* Needs action: a tinted fill, no stripe. */
 .rowHot {
-  box-shadow: inset 3px 0 0 var(--c-lime);
+  background: rgba(141, 198, 63, 0.07);
 }
 
 .rowWarn {
-  box-shadow: inset 3px 0 0 var(--c-amber);
+  background: rgba(245, 185, 69, 0.07);
 }
 
 .cellMain {
@@ -881,12 +868,10 @@
     gap: var(--s4);
     min-height: 40px;
     padding: 0 var(--s5);
-    border-bottom: 1px solid var(--c-line);
+    border-bottom: 1px solid var(--c-line); /* taste-skill-ignore: data table head */
     color: var(--c-text-3);
-    font-size: var(--t-min);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .row {
@@ -1003,7 +988,7 @@
   color: var(--c-text-3);
 }
 
-/* Small outlined tag: IBO, Admin only, Sensitive, file counts. */
+/* Small filled tag: IBO, Admin only, Sensitive, file counts. */
 .tag {
   display: inline-flex;
   flex: none;
@@ -1011,42 +996,39 @@
   gap: 5px;
   min-height: 24px;
   padding: 0 8px;
-  border: 1px solid var(--c-line-strong);
   border-radius: 4px;
+  background: rgba(163, 184, 214, 0.12);
   color: var(--c-text-2);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
 }
 
 .tagLime {
-  border-color: rgba(141, 198, 63, 0.45);
+  background: var(--c-lime-wash);
   color: var(--c-lime);
 }
 
 .tagAmber {
-  border-color: rgba(245, 185, 69, 0.45);
+  background: var(--c-amber-wash);
   color: var(--c-amber);
 }
 
 .tagRed {
-  border-color: rgba(255, 138, 128, 0.45);
+  background: rgba(255, 138, 128, 0.12);
   color: var(--c-red);
 }
 
 /* ---------- facts (label / value grid) ---------- */
-/* A recessed well, like the est. pay well on the sale sheet. */
+/* Flat tiles one tone below the panel, split by space (no grid lines). */
 .facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1px;
+  gap: 4px;
   margin: 0;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 10px;
-  background: var(--c-line);
-  box-shadow: var(--c-sink);
 }
 
 .facts > div {
@@ -1059,10 +1041,8 @@
 
 .facts dt {
   color: var(--c-text-3);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .facts dd {
@@ -1080,8 +1060,7 @@
   justify-content: space-between;
   gap: var(--s2) var(--s3);
   padding: var(--s3) var(--s4);
-  border-top: 1px solid rgba(255, 138, 128, 0.3);
-  background: rgba(255, 138, 128, 0.07);
+  background: rgba(255, 138, 128, 0.1);
   font-size: var(--t-sm);
   font-weight: 500;
 }
@@ -1095,7 +1074,7 @@
 }
 
 .sheetHeadDanger {
-  box-shadow: inset 0 -2px 0 rgba(255, 138, 128, 0.55);
+  background: rgba(255, 138, 128, 0.1);
 }
 
 .sheetLead {
@@ -1116,7 +1095,6 @@
   display: flex;
   gap: var(--s2);
   padding: var(--s3) var(--s4) var(--s4);
-  border-top: 1px solid var(--c-line);
 }
 
 .sheetFoot > * {
@@ -1141,8 +1119,9 @@
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+  /* Edge fades: a scroll mask, not a fill. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%); /* taste-skill-ignore */
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%); /* taste-skill-ignore */
 }
 
 .tabsScroll::-webkit-scrollbar {
@@ -1176,6 +1155,11 @@
   color: var(--c-amber);
 }
 
+/* On the solid lime pick the count takes the label's ink. */
+.tabsWrap .tabItem[aria-pressed='true'] .tabCount {
+  color: inherit;
+}
+
 /* Desktop: the strip spans the full content width (never sized to its content, which
    shrink-wraps a wrapping flex row to one tab per line). Tabs sit side by side, each at
    least 140px and growing to share the row; only when they outgrow the row (Admin
@@ -1192,6 +1176,8 @@
     flex-wrap: wrap;
     width: 100%;
     overflow: hidden;
+    /* Wrapped onto two rows a full pill would read as a lozenge. */
+    border-radius: 24px;
   }
   .tabsWrap .tabItem {
     flex: 1 0 auto;

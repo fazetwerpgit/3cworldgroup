@@ -24,11 +24,11 @@
   gap: var(--s2);
   min-height: var(--tap);
   padding: 0 var(--s4);
-  border: 1px solid var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-control);
-  background: transparent;
+  background: var(--c-panel-hi);
   color: var(--c-text);
-  font: 600 14px / 1 var(--f-ui);
+  font: 600 15px / 1 var(--f-ui);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
@@ -39,19 +39,18 @@
 }
 
 .btnLime {
-  border-color: var(--c-lime);
   background: var(--c-lime);
   color: var(--c-on-lime);
   font-weight: 700;
 }
 
 .btnGhost {
-  border-color: transparent;
+  background: transparent;
   color: var(--c-text-2);
 }
 
 .btnDanger {
-  border-color: rgba(255, 138, 128, 0.45);
+  background: rgba(255, 138, 128, 0.12);
   color: var(--c-red);
 }
 
@@ -73,11 +72,9 @@
 
 @media (hover: hover) {
   .btn:hover:not(:disabled) {
-    border-color: var(--c-text-2);
-    background: rgba(163, 184, 214, 0.06);
+    background: #26375a;
   }
   .btnLime:hover:not(:disabled) {
-    border-color: var(--c-lime-hi);
     background: var(--c-lime-hi);
   }
   .btnGhost:hover:not(:disabled) {
@@ -85,7 +82,7 @@
     background: rgba(163, 184, 214, 0.06);
   }
   .btnDanger:hover:not(:disabled) {
-    background: rgba(255, 138, 128, 0.08);
+    background: rgba(255, 138, 128, 0.2);
   }
 }
 
@@ -128,7 +125,6 @@
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
   background: var(--c-well);
-  box-shadow: var(--c-sink);
   color: var(--c-text);
   font: 400 var(--t-body) / 1 var(--f-ui);
   font-variant-numeric: tabular-nums;
@@ -202,10 +198,8 @@
   margin: 0;
   padding: 4px;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.25);
-  border-radius: 10px;
-  background: var(--c-well);
-  box-shadow: var(--c-sink);
+  border-radius: 999px;
+  background: var(--c-panel);
 }
 
 .segBtn {
@@ -218,10 +212,10 @@
   min-height: 40px;
   padding: 0 var(--s3);
   border: 0;
-  border-radius: 7px;
+  border-radius: 999px;
   background: transparent;
-  color: var(--c-text-3);
-  font: 600 var(--t-sm) / 1 var(--f-ui);
+  color: var(--c-text-2);
+  font: 600 15px / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -234,10 +228,10 @@
   transform: scale(0.97);
 }
 
+/* The pick: solid lime (rep-page .tabs). */
 .segBtn[aria-pressed='true'] {
-  background: var(--c-panel-hi);
-  color: var(--c-text);
-  box-shadow: var(--c-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
+  background: var(--c-lime);
+  color: var(--c-on-lime);
 }
 
 /* Hover lifts the label one step only: full white is the selected tab's, so a
@@ -254,7 +248,7 @@
 }
 
 .segBtn[aria-pressed='true'] .segCount {
-  color: var(--c-text-2);
+  color: inherit;
 }
 
 /* Filter chips that may outgrow a phone: one row that scrolls sideways. */
@@ -305,7 +299,7 @@
 .iconOnlyPhone .btnText {
   position: absolute;
   width: 1px;
-  height: 1px;
+  height: 1px; /* taste-skill-ignore: visually hidden utility */
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
@@ -378,11 +372,10 @@
   align-items: flex-start;
   gap: var(--s2);
   padding: var(--s3) var(--s4);
-  border: 1px solid var(--c-line);
   border-radius: var(--r-panel);
   background: var(--c-panel);
   color: var(--c-text);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 500;
   line-height: 1.4;
 }
@@ -392,8 +385,9 @@
   margin-top: 1px;
 }
 
+/* Tone: a tinted fill, no stripe. */
 .bannerOk {
-  box-shadow: inset 3px 0 0 var(--c-lime), var(--c-lift);
+  background: var(--c-lime-wash);
 }
 
 .bannerOk svg {
@@ -401,7 +395,7 @@
 }
 
 .bannerErr {
-  box-shadow: inset 3px 0 0 var(--c-red), var(--c-lift);
+  background: rgba(255, 138, 128, 0.12);
 }
 
 .bannerErr svg {
@@ -455,9 +449,6 @@
   padding: var(--s4);
 }
 
-.skelRow + .skelRow {
-  border-top: 1px solid var(--c-line);
-}
 
 /* ---------- queue ---------- */
 .qHead {
@@ -471,7 +462,7 @@
 }
 
 .qList > li + li {
-  border-top: 1px solid var(--c-line);
+  border-top: 1px solid var(--c-line); /* taste-skill-ignore: data table rows */
 }
 
 /* First time a queue shows this session, rows rise in a short stagger. */
@@ -615,7 +606,7 @@
   justify-self: end;
   gap: 6px;
   color: var(--c-text-2);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -662,12 +653,10 @@
   .qHead {
     min-height: 40px;
     padding: 0 var(--s5);
-    border-bottom: 1px solid var(--c-line);
+    border-bottom: 1px solid var(--c-line); /* taste-skill-ignore: data table head */
     color: var(--c-text-3);
-    font-size: var(--t-min);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .qRow {
@@ -742,10 +731,8 @@
 .fields dt {
   margin: 0 0 4px;
   color: var(--c-text-3);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .fields dd {
@@ -793,10 +780,8 @@
 .notes {
   margin: 0;
   padding: var(--s3) 14px;
-  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 10px;
   background: var(--c-well);
-  box-shadow: var(--c-sink);
   color: var(--c-text-2);
   font-size: var(--t-ui);
   line-height: 1.5;
@@ -807,7 +792,6 @@
   display: grid;
   gap: var(--s2);
   padding: var(--s3) var(--s4) var(--s4);
-  border-top: 1px solid var(--c-line);
 }
 
 .doneLine {
@@ -943,12 +927,10 @@
   .cHead {
     min-height: 40px;
     padding: 0 var(--s5);
-    border-bottom: 1px solid var(--c-line);
+    border-bottom: 1px solid var(--c-line); /* taste-skill-ignore: data table head */
     color: var(--c-text-3);
-    font-size: var(--t-min);
+    font-size: var(--t-sm);
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .cRow {
@@ -1022,7 +1004,7 @@
 .hint {
   margin: 0;
   color: var(--c-text-3);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
 }
 
 .editorActions {
@@ -1067,9 +1049,8 @@
   align-items: center;
   gap: var(--s2) var(--s3);
   padding: var(--s3);
-  border: 1px solid rgba(255, 138, 128, 0.35);
   border-radius: var(--r-control);
-  background: rgba(255, 138, 128, 0.07);
+  background: rgba(255, 138, 128, 0.1);
 }
 
 .confirmText {
@@ -1156,7 +1137,7 @@
   flex-wrap: wrap;
   gap: 4px var(--s3);
   color: var(--c-text-3);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 500;
 }
 
@@ -1164,7 +1145,6 @@
   display: flex;
   gap: var(--s2);
   padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line);
 }
 
 .tFoot > * {
@@ -1189,7 +1169,6 @@
   padding: 1px 5px;
   border-radius: 4px;
   background: var(--c-panel-hi);
-  box-shadow: var(--c-edge);
   color: var(--c-text);
   font-weight: 600;
 }
@@ -1205,9 +1184,9 @@
   align-items: center;
   min-height: var(--tap);
   padding: 0 var(--s3);
-  border: 1px dashed var(--c-line-strong);
+  border: 0;
   border-radius: var(--r-control);
-  background: transparent;
+  background: var(--c-panel-hi);
   color: var(--c-text-2);
   font: 600 var(--t-sm) / 1 var(--f-ui);
   cursor: pointer;
@@ -1223,7 +1202,7 @@
 
 @media (hover: hover) {
   .tokenBtn:hover {
-    border-color: var(--c-text-3);
+    background: #26375a;
     color: var(--c-text);
   }
 }
@@ -1244,16 +1223,12 @@
   display: grid;
   gap: var(--s3);
   padding: var(--s4);
-  border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 10px;
   background: var(--c-well);
-  box-shadow: var(--c-sink);
 }
 
 .previewSubject {
   margin: 0;
-  padding-bottom: var(--s3);
-  border-bottom: 1px solid var(--c-line);
   font-size: var(--t-ui);
   font-weight: 650;
   line-height: 1.4;
@@ -1314,11 +1289,10 @@
   align-items: center;
   min-height: var(--tap);
   padding-left: var(--s3);
-  border: 1px solid var(--c-line-strong);
   border-radius: var(--r-control);
-  background: rgba(163, 184, 214, 0.05);
+  background: var(--c-panel-hi);
   color: var(--c-text);
-  font-size: var(--t-sm);
+  font-size: var(--t-ui);
   font-weight: 500;
 }
 
@@ -1355,7 +1329,6 @@
   justify-content: space-between;
   gap: var(--s3);
   padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line);
 }
 
 .saved {
@@ -1412,9 +1385,6 @@
   padding: var(--s2) var(--s4);
 }
 
-.switchRow + .switchRow {
-  border-top: 1px solid var(--c-line);
-}
 
 .switchLabel {
   font-size: var(--t-ui);
@@ -1438,7 +1408,6 @@
   left: 0;
   width: 52px;
   height: 30px;
-  border: 1px solid var(--c-line-strong);
   border-radius: 15px;
   background: var(--c-track);
   transform: translateY(-50%);
