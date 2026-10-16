@@ -18,7 +18,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
 import { auth } from '@/lib/firebase/config';
 import { weekTimeLeft } from '@/lib/dashboard/repSummary';
-import { PageTitle } from '@/components/portal/PageTitle';
+import p from '@/components/portal/rep/rep-page.module.css';
+import tx from '@/components/portal/rep/rep-taste.module.css';
+import d from './leaderboard-desk.module.css';
 import type { LeaderboardEntry } from '../LeaderboardTable';
 import type { MonthNav } from '../MonthNav';
 import { MonthPicker } from '@/components/portal/rep/MonthPicker';
@@ -56,28 +58,28 @@ function LegacyLeaderboardFilters({
   monthNav?: MonthNav | null;
 }) {
   return (
-    <div className="portal-leaderboard-filters border-b border-[#0A1F44]/20 pb-4 dark:border-white/15">
-      <div className="portal-leaderboard-filter-row" aria-label="Leaderboard period">
+    <div className={d.filters}>
+      <div className={tx.chips} role="group" aria-label="Leaderboard period">
           {periodOptions.map((option) => (
             <button
               key={option.value}
               type="button"
               aria-pressed={period === option.value}
               onClick={() => setPeriod(option.value)}
-              className="cursor-pointer transition-colors duration-150"
+              className={tx.chip}
             >
               {option.label}
             </button>
           ))}
       </div>
-      <div className="portal-leaderboard-filter-row" aria-label="Leaderboard metric">
+      <div className={tx.seg} role="group" aria-label="Leaderboard metric">
           {metricOptions.map((option) => (
             <button
               key={option.value}
               type="button"
               aria-pressed={metric === option.value}
               onClick={() => setMetric(option.value)}
-              className="cursor-pointer transition-colors duration-150"
+              className={tx.segBtn}
             >
               {option.label}
             </button>
@@ -87,8 +89,8 @@ function LegacyLeaderboardFilters({
       {period === 'month' && monthNav ? (
         <MonthPicker month={monthNav.month} min={monthNav.min} max={monthNav.max} onChange={monthNav.onChange} />
       ) : null}
-      <span className="portal-live-label">Live</span>
-      </div>
+      <span className={d.live}>Live</span>
+    </div>
   );
 }
 
@@ -116,18 +118,20 @@ function WeeklyChallenge({
 
   if (target === null) {
     return (
-      <div className="relative grid gap-3 border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] py-4 text-white dark:border-[#e7edf4] dark:bg-[var(--c-raised)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)] sm:grid-cols-[minmax(180px,1fr)_1.7fr] sm:items-center sm:gap-5">
-        <h2 className="portal-display text-[18px] font-black text-[#8dc63f] dark:text-[#d9a520]">Weekly challenge</h2>
-        {failed ? (
-          <span className="flex items-center gap-3 text-[14px] text-white/85" role="alert">
-            Couldn&apos;t load
-            <button type="button" className="min-h-[44px] font-black underline underline-offset-4" onClick={onRetry}>
-              Retry
-            </button>
-          </span>
-        ) : (
-          <span className="portal-display text-[12px] font-black text-white/85">Loading</span>
-        )}
+      <div className={d.card}>
+        <h2 className={d.cardTitle}>Weekly challenge</h2>
+        <div className={d.challengeBody}>
+          {failed ? (
+            <span className={d.retryRow} role="alert">
+              Couldn&apos;t load
+              <button type="button" className={d.retry} onClick={onRetry}>
+                Retry
+              </button>
+            </span>
+          ) : (
+            <span className={d.challengeMeta}>Loading</span>
+          )}
+        </div>
       </div>
     );
   }
@@ -135,22 +139,22 @@ function WeeklyChallenge({
   const complete = sales !== null && sales >= target;
 
   return (
-    <div className="relative grid gap-3 border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] py-4 text-white dark:border-[#e7edf4] dark:bg-[var(--c-raised)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)] sm:grid-cols-[minmax(180px,1fr)_1.7fr] sm:items-center sm:gap-5">
-      <div>
-        <h2 className="portal-display text-[18px] font-black text-[#8dc63f] dark:text-[#d9a520]">Weekly challenge</h2>
-        <span className="portal-display mt-2 block text-[12px] font-black whitespace-nowrap text-white/85">
-          {loading || sales === null ? `0 of ${target}, loading` : `${Math.min(sales, target)} of ${target}, ${weekTimeLeft(now)}`}
-        </span>
-        <span className="mt-2 block h-[3px] w-full bg-white/15" aria-hidden="true">
+    <div className={d.card}>
+      <h2 className={d.cardTitle}>Weekly challenge</h2>
+      <div className={d.challengeBody}>
+        <strong className={d.challengeLine}>
+          {complete ? `Challenge complete. ${target} of ${target}` : `Close ${target} sales by Saturday`}
+        </strong>
+        <span className={d.track} aria-hidden="true">
           <span
-            className="block h-full bg-[#8dc63f] dark:bg-[#d9a520]"
+            className={d.fill}
             style={{ width: `${loading || sales === null ? 0 : Math.min(sales / target, 1) * 100}%` }}
           />
         </span>
+        <span className={d.challengeMeta}>
+          {loading || sales === null ? `0 of ${target}, loading` : `${Math.min(sales, target)} of ${target}, ${weekTimeLeft(now)}`}
+        </span>
       </div>
-      <strong className="portal-display text-[15px] font-black sm:text-[18px]">
-        {complete ? `Challenge complete. ${target} of ${target}` : `Close ${target} sales by Saturday`}
-      </strong>
     </div>
   );
 }
@@ -159,15 +163,15 @@ function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardE
   const unit = metric === 'totalPoints' ? 'pts' : 'sales';
 
   return (
-    <aside className="min-h-[178px] w-full min-w-0 border-[5px] border-[#0A1F44] bg-[#0A1F44] px-[19px] pb-[17px] pt-5 text-white dark:border-[#e7edf4] dark:bg-[var(--c-raised)] dark:shadow-[0_18px_38px_rgba(0,0,0,0.22)]">
-      <h2 className="portal-display text-[18px] font-black text-[#8dc63f] dark:text-[#d9a520]">Your standing</h2>
-      <div className="mt-[15px] flex w-fit items-baseline gap-[0.08em] portal-display text-[clamp(64px,8vw,100px)] font-black leading-[0.75] tracking-[-0.02em]">
-        <small className="text-[0.4em] tracking-normal">#</small>
+    <aside className={d.card}>
+      <h2 className={d.cardTitle}>Your standing</h2>
+      <div className={d.standingRank}>
+        <small>#</small>
         {userRank?.rank ?? '—'}
       </div>
-      <div className="mt-[17px] flex items-end justify-between gap-2.5 border-t border-white/35 pt-2.5">
-        <strong className="truncate text-[14px]">{userName}</strong>
-        <span className="portal-display shrink-0 text-[12px] whitespace-nowrap">{formatNumber(userRank?.totalPoints ?? 0)} pts, {userRank?.totalSales ?? 0} sales</span>
+      <div className={d.standingFoot}>
+        <strong>{userName}</strong>
+        <span>{formatNumber(userRank?.totalPoints ?? 0)} pts, {userRank?.totalSales ?? 0} sales</span>
       </div>
       <span className="sr-only">Metric: {unit}</span>
     </aside>
@@ -176,34 +180,28 @@ function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardE
 
 function BoardSkeleton() {
   return (
-    <div className="space-y-[45px]">
+    <div className={d.skel}>
       <section>
-        <div className="mb-0 flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]">
-          <Skeleton className="h-7 w-44 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
-          <Skeleton className="h-3 w-36 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
+        <div className={d.secHead}>
+          <Skeleton className={`h-8 w-44 ${d.skelBar}`} />
+          <Skeleton className={`h-4 w-36 ${d.skelBar}`} />
         </div>
-        <div className="grid gap-0 bg-[#0A1F44] sm:grid-cols-3 dark:bg-[#0d2449]">
+        <div className={d.skelPod}>
           {[0, 1, 2].map((index) => (
-            <div key={index} className={`min-h-[256px] border-white/20 p-6 ${index === 1 ? 'sm:-mt-5 sm:min-h-[306px] border border-[#d9a520]/50' : 'border-r'}`}>
-              <Skeleton className="h-24 w-24 rounded-none bg-white/10" />
-              <Skeleton className="mt-7 h-11 w-40 rounded-none bg-white/10" />
-              <Skeleton className="mt-8 ml-auto h-8 w-24 rounded-none bg-white/10" />
-            </div>
+            <div key={index} className={d.skelBlock} style={{ minHeight: index === 1 ? 306 : 256 }} />
           ))}
         </div>
       </section>
-      <div className="grid grid-cols-2 border-y border-[#0A1F44] dark:border-[#e7edf4] sm:grid-cols-4">
-        {[0, 1, 2, 3].map((index) => <div key={index} className="min-h-[109px] border-r border-[#0A1F44] p-4 last:border-0 dark:border-[#e7edf4] sm:p-[17px]"><Skeleton className="h-3 w-20 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="mt-5 h-6 w-28 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="mt-2 h-3 w-24 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /></div>)}
+      <div className={d.pulse}>
+        {[0, 1, 2, 3].map((index) => <div key={index} className={d.skelBlock} style={{ minHeight: 112 }} />)}
       </div>
       <section>
-        <div className="mb-0 flex items-end justify-between border-b-[5px] border-[#0A1F44] pb-2.5 dark:border-[#e7edf4]"><Skeleton className="h-7 w-40 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="h-3 w-36 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /></div>
-        <div className="border-b border-[#0A1F44] dark:border-[#e7edf4]">{[0, 1, 2, 3, 4].map((index) => <div key={index} className="grid min-h-[77px] grid-cols-[70px_minmax(0,1fr)_110px_100px] items-center gap-4 border-b border-[#0A1F44]/20 px-3 last:border-0 dark:border-white/15"><Skeleton className="h-6 w-10 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><div className="flex items-center gap-3"><Skeleton className="size-9 rounded-full bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="h-4 w-32 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /></div><Skeleton className="h-5 w-16 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" /><Skeleton className="h-5 w-20 rounded-full bg-[#0A1F44]/10 dark:bg-white/10" /></div>)}</div>
+        <div className={d.secHead}><Skeleton className={`h-8 w-40 ${d.skelBar}`} /><Skeleton className={`h-4 w-36 ${d.skelBar}`} /></div>
+        <div className={d.skelBlock} style={{ minHeight: 5 * 76 }} />
       </section>
-      <Skeleton className="h-3 w-72 rounded-none bg-[#0A1F44]/10 dark:bg-white/10" />
     </div>
   );
 }
-
 
 interface LegacyLeaderboardPageProps {
   active: boolean;
@@ -295,10 +293,13 @@ export function LegacyLeaderboardPage({
   return (
     <>
       {/* No side padding: the D shell's gutter already lines the board up with its top bar. */}
-      <div className="relative z-10 mx-auto w-full max-w-[1500px] pb-8">
-        <PageTitle title="Leaderboard" meta={`${entries.length} ranked`} />
+      <div className={`relative z-10 mx-auto w-full max-w-[1500px] pb-8 ${d.scope}`}>
+        <header className={p.head}>
+          <h1 className={`${p.title} ${d.pageTitle}`}>Leaderboard</h1>
+          <p className={p.lede}>{entries.length} ranked</p>
+        </header>
         <LegacyLeaderboardFilters period={period} metric={metric} setPeriod={onPeriodChange} setMetric={onMetricChange} monthNav={monthNav} />
-        <div className="portal-leaderboard-summary-grid">
+        <div className={d.summary}>
           <WeeklyChallenge
             sales={weeklySales}
             loading={weeklyLoading}
@@ -309,9 +310,9 @@ export function LegacyLeaderboardPage({
           <ArenaStanding userRank={userRank} userName={userName} metric={metric} />
         </div>
 
-        {error && <div className="my-5 flex items-start gap-3 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300"><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
+        {error && <div className={d.error}><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
 
-        <div className="pt-4">
+        <div className={d.board}>
           {loading ? <BoardSkeleton /> : <LegacyLeaderboardTable entries={entries} currentUser={currentUser} metric={metric} period={period} pastMonth={pastMonth} unranked={unranked} recent={recent} viewerId={viewerId} />}
         </div>
       </div>
