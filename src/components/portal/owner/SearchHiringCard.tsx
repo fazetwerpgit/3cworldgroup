@@ -17,6 +17,7 @@ import {
 } from '@/lib/search/searchCardFormat';
 import type { JobPageStatus, SearchStatsResponse, SearchStatsView } from '@/lib/search/searchStatsTypes';
 import s from '../rep/rep.module.css';
+import u from '../admin-d/admin-ui.module.css';
 import c from './search-card.module.css';
 
 // The owner's "Hiring from search" card: where this week's applications came
@@ -229,10 +230,8 @@ export function SearchHiringCard({ className = '' }: { className?: string }) {
   const { state, retry } = useSearchStats();
   return (
     <section className={`${s.panel} ${c.card} ${className}`} aria-labelledby="search-hiring-h" aria-busy={state.status === 'loading' || undefined}>
-      <div className={s.panelHead}>
-        <h2 id="search-hiring-h" className={s.kicker}>
-          Hiring from search
-        </h2>
+      <div className={`${s.panelHead} ${u.band}`}>
+        <h2 id="search-hiring-h">Hiring from search</h2>
       </div>
       {state.status === 'loading' ? (
         <div className={c.skel}>

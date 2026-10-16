@@ -21,6 +21,7 @@ import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import { SearchHiringCard } from './SearchHiringCard';
 import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
 import s from '../rep/rep.module.css';
+import u from '../admin-d/admin-ui.module.css';
 import o from './owner-dashboard.module.css';
 
 // The owner's home screen (direction D): the company, not a personal pay card.
@@ -66,10 +67,8 @@ function Failed({ what, onRetry, className = '' }: { what: string; onRetry: () =
 
 function PanelHead({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
   return (
-    <div className={s.panelHead}>
-      <h2 id={id} className={s.kicker}>
-        {title}
-      </h2>
+    <div className={`${s.panelHead} ${u.band}`}>
+      <h2 id={id}>{title}</h2>
       {children}
     </div>
   );
@@ -152,7 +151,7 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
         Company money
       </h2>
       <div className={o.cellMargin}>
-        <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+        <p className={o.boardLabel}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
         <p className={o.score}>
           <MarginScore margin={month.current.margin} />
         </p>
@@ -165,7 +164,7 @@ function MoneyBoard({ data }: { data: MoneySummary }) {
       </div>
 
       <div className={o.cellInstalls}>
-        <p className={`${s.kicker} ${o.boardLabel}`}>This week</p>
+        <p className={o.boardLabel}>This week</p>
         <p className={`${o.score} ${o.scoreLime}`}>{count(week.current.installs)}</p>
         <p className={o.heroSub}>
           <Delta current={week.current.installs} prior={week.prior.installs} label={`vs ${weekPrior}`} />
@@ -216,12 +215,12 @@ function MoneySkeleton() {
   return (
     <section className={`${s.panel} ${o.board}`} aria-busy="true" aria-label="Loading company money">
       <div className={o.cellMargin}>
-        <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+        <p className={o.boardLabel}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
         <span className={`${s.skel} ${o.skelScore}`} />
         <span className={`${s.skel} ${o.skelLine}`} />
       </div>
       <div className={o.cellInstalls}>
-        <p className={`${s.kicker} ${o.boardLabel}`}>This week</p>
+        <p className={o.boardLabel}>This week</p>
         <span className={`${s.skel} ${o.skelScore}`} />
       </div>
       <div className={`${o.tableWrap} ${o.skelTable}`}>
@@ -368,7 +367,7 @@ export function OwnerDashboard() {
         ) : data.money.status === 'error' ? (
           <section className={`${s.panel} ${o.board} ${o.boardFailed}`} aria-label="Company money">
             <div className={o.cellMargin}>
-              <p className={`${s.kicker} ${o.boardLabel}`}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
+              <p className={o.boardLabel}>Est. margin · {MONTH_SHORT.format(new Date())}</p>
               <Failed what="company money" onRetry={() => retry('money')} className={o.cellFailed} />
             </div>
           </section>

@@ -1,16 +1,10 @@
 /* ==========================================================================
-   Owner dashboard (direction D). Same tokens, panel, score type and blooms as
-   the rep dashboard (rep.module.css / rep-dashboard.module.css); only the
-   content differs: company money as the score panel, then needs attention,
-   then recruiting.
+   Owner dashboard (direction D). Same tokens, flat panel and score type as the
+   rep dashboard (rep.module.css / rep-dashboard.module.css); only the content
+   differs: company money as the score panel, then needs attention, then
+   recruiting. Taste pass: panels sit apart by space and tone, not rules; the
+   money table is a real data table and keeps its row lines.
    ========================================================================== */
-
-.grid {
-  /* Pinned to the D values (40421300): the rep base moved to C, the owner view
-     stays as it is live. */
-  --c-lift: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --c-panel-hi: #1a2840;
-}
 
 .grid {
   display: grid;
@@ -40,10 +34,6 @@
   grid-template-areas: 'margin';
 }
 
-.boardFailed .cellMargin {
-  border-right: 0;
-}
-
 .cellMargin,
 .cellInstalls {
   position: relative;
@@ -53,16 +43,19 @@
 
 .cellMargin {
   grid-area: margin;
-  border-right: 1px solid var(--c-line);
 }
 
 .cellInstalls {
   grid-area: installs;
 }
 
-/* Labels over the blooms sit one tone up so they hold 4.5:1. */
+/* What the big figure is, in plain words over it. */
 .boardLabel {
+  margin: 0;
   color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.3;
 }
 
 .score {
@@ -71,7 +64,6 @@
   font-size: var(--t-score);
   font-weight: 400;
   line-height: 0.82;
-  letter-spacing: 0.005em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -120,7 +112,7 @@
   position: relative;
   z-index: 1;
   grid-area: table;
-  border-top: 1px solid var(--c-line);
+  border-top: 1px solid var(--c-line); /* taste-skill-ignore: real data table */
 }
 
 .table {
@@ -140,10 +132,8 @@
   padding-top: var(--s3);
   padding-bottom: var(--s2);
   color: var(--c-text-2);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .table thead th:first-child {
@@ -159,7 +149,7 @@
 }
 
 .table tbody tr {
-  border-top: 1px solid var(--c-line);
+  border-top: 1px solid var(--c-line); /* taste-skill-ignore: real data table */
 }
 
 .table td,
@@ -202,10 +192,9 @@
   z-index: 1;
   grid-area: foot;
   margin: 0;
-  padding: var(--s3) var(--s4);
-  border-top: 1px solid var(--c-line);
+  padding: var(--s2) var(--s4) var(--s4);
   color: var(--c-text-3);
-  font-size: var(--t-min);
+  font-size: var(--t-sm);
   line-height: 1.45;
 }
 
@@ -245,10 +234,6 @@
   padding: var(--s3) var(--s4);
 }
 
-.marketRow + .marketRow {
-  border-top: 1px solid var(--c-line);
-}
-
 .marketName {
   min-width: 0;
   overflow: hidden;
@@ -284,23 +269,13 @@
   padding: var(--s4);
 }
 
-/* 2 x 2 on the phone: rule between columns and between rows. */
-.stat:nth-child(even) {
-  border-left: 1px solid var(--c-line);
-}
-
-.stat:nth-child(n + 3) {
-  border-top: 1px solid var(--c-line);
-}
-
+/* 2 x 2 on the phone, spaced apart: no rules between the tiles. */
 .statLabel {
   margin: 0;
-  color: var(--c-text-3);
-  font-size: var(--t-sm);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
   font-weight: 600;
-  letter-spacing: 0.06em;
   line-height: 1.2;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -376,7 +351,7 @@
     grid-row: 4;
   }
 
-  /* Full width: the markets sit side by side, ruled like the recruiting tiles. */
+  /* Full width: the markets sit side by side, spaced like the recruiting tiles. */
   .marketList {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -384,11 +359,6 @@
 
   .marketRow {
     padding: var(--s4) var(--s6);
-  }
-
-  .marketRow + .marketRow {
-    border-top: 0;
-    border-left: 1px solid var(--c-line);
   }
 
   .marketCount {
@@ -445,7 +415,7 @@
   }
 
   .foot {
-    padding: var(--s3) var(--s6);
+    padding: var(--s3) var(--s6) var(--s4);
     font-size: var(--t-sm);
   }
 
