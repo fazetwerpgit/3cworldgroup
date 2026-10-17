@@ -364,6 +364,9 @@ export function SignupForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 className={a.input}
                 autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 minLength={6}
                 aria-describedby="signup-strength"
                 required
@@ -406,6 +409,9 @@ export function SignupForm() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={a.input}
               autoComplete="new-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               minLength={6}
               required
             />

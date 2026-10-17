@@ -374,6 +374,9 @@ export function LoginForm() {
                   className={a.input}
                   placeholder="Enter your password"
                   autoComplete="current-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   required
                 />
                 <button

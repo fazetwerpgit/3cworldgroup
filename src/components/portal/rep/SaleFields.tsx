@@ -228,6 +228,8 @@ export function SaleFields({
               type="text"
               autoComplete="off"
               autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </Field>
 
@@ -280,6 +282,7 @@ export function SaleFields({
               {...input('customerAddress', { error: 'customerAddress' })}
               type="text"
               autoComplete="off"
+              autoCapitalize="words"
               placeholder="Street, city, state, ZIP"
             />
           </Field>
@@ -308,7 +311,7 @@ export function SaleFields({
         </summary>
         <div className={l.moreGrid}>
           <Field id="customerEmail" label="Email">
-            <input {...input('customerEmail')} type="email" inputMode="email" autoComplete="off" />
+            <input {...input('customerEmail')} type="email" inputMode="email" autoComplete="off" autoCorrect="off" spellCheck={false} />
           </Field>
           <Field id="saleType" label="Sale type">
             <span className={l.selectWrap}>
