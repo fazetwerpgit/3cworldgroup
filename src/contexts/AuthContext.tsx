@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, useRef, ReactNode } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -29,6 +29,10 @@ import { unregisterNativePush } from '@/lib/app/nativePush';
 import { clearViewAs } from '@/lib/viewAs/storage';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 import { setDataCacheOwner } from '@/lib/cache/dataCache';
+import { clearSessionProfile, readSessionProfile, writeSessionProfile } from '@/lib/auth/sessionProfile';
+
+// Layout effects warn on the server; the provider only runs them in the browser.
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
@@ -178,6 +182,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     profileLoadFailedRef.current = profileLoadFailed;
   }, [profileLoadFailed]);
+  // True once the user on screen came from a real read of users/{uid} for the
+  // confirmed session (not the device's remembered copy).
+  const profileVerified = useRef(false);
+
+  // Cold open: paint the portal with the profile this device remembered from
+  // the last session (see sessionProfile.ts) instead of a splash, while Firebase
+  // Auth restores and checks the session and the profile is read again below.
+  // Pages start their own reads at once; getIdToken() waits for the session.
+  // The confirmed answer replaces this guess: another account or none clears it.
+  useIsoLayoutEffect(() => {
+    if (!isFirebaseConfigured() || !auth || !db || auth.currentUser) return;
+    const remembered = readSessionProfile();
+    if (!remembered) return;
+    // The cache belongs to this account from the start, so the first page's
+    // reads are kept (a later setDataCacheOwner with the same uid is a no-op).
+    setDataCacheOwner(remembered.uid);
+    setState((prev) =>
+      prev.loading && !prev.user ? { user: remembered, loading: false, error: null, pendingApproval: false } : prev
+    );
+  }, []);
+
+  // Keep the remembered copy in step with the confirmed profile; drop it when
+  // the session ends or resolves to anything but this account. A profile read
+  // that failed on weak signal (the retry screen) keeps it: the session stands.
+  useEffect(() => {
+    if (state.loading || profileLoadFailed) return;
+    if (state.user) {
+      if (profileVerified.current) writeSessionProfile(state.user);
+    } else {
+      clearSessionProfile();
+    }
+  }, [state.user, state.loading, profileLoadFailed]);
 
   const fetchUserData = async (firebaseUser: FirebaseUser): Promise<FetchUserDataResult> => {
     if (!db) return { status: 'error', error: new Error('Firestore is not configured') };
@@ -260,6 +296,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userDataResult = await fetchUserDataWithRetry(firebaseUser, generation);
       if (!userDataResult) return; // superseded by a newer auth event
       if (userDataResult.status !== 'error') setProfileLoadFailed(false);
+      profileVerified.current = userDataResult.status === 'found';
       if (userDataResult.status === 'found') {
         const userData = userDataResult.user;
         if (userData.status === 'active') {
@@ -356,6 +393,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await resolveProfile(firebaseUser);
       } else {
         resolveGeneration.current += 1;
+        profileVerified.current = false;
+        clearSessionProfile();
         stopWatchingProfile();
         setProfileLoadFailed(false);
         // Preserve pendingApproval so the pending screen survives the sign-out.
@@ -470,6 +509,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearViewAs();
       // Cached screens (an owner's include financials) never outlive the sign-in.
       setDataCacheOwner(null);
+      // Nor does the remembered profile: the next open starts at the sign-in.
+      profileVerified.current = false;
+      clearSessionProfile();
       // Same for the Ask 3C conversation and practice: the next rep must not see or send them.
       try {
         window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);
@@ -524,6 +566,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentUser) {
       const userDataResult = await fetchUserData(currentUser);
       if (userDataResult.status === 'found') {
+        profileVerified.current = true;
         setState((prev) => ({ ...prev, user: userDataResult.user }));
       }
     }
