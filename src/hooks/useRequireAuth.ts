@@ -37,24 +37,27 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
     redirectIfFound,
   } = options;
 
+  // Every hop here is a redirect, not a step: replace, so Back never lands on
+  // a page that only bounces again (a protected page after sign-out, the
+  // login after sign-in).
   useEffect(() => {
     if (loading) return;
 
     // If user is logged in and we should redirect them away (e.g., from login page)
     if (user && redirectIfFound) {
-      router.push(redirectIfFound);
+      router.replace(redirectIfFound);
       return;
     }
 
     // If no user and we need one, redirect to login
     if (!user) {
-      router.push(redirectTo);
+      router.replace(redirectTo);
       return;
     }
 
     // Check role requirements
     if (!satisfiesRoles(user, requiredRoles)) {
-      router.push('/portal/dashboard');
+      router.replace('/portal/dashboard');
       return;
     }
 
@@ -62,7 +65,7 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
     if (requiredPermissions && requiredPermissions.length > 0) {
       const hasAllPermissions = requiredPermissions.every((p) => hasPermission(p));
       if (!hasAllPermissions) {
-        router.push('/portal/dashboard');
+        router.replace('/portal/dashboard');
         return;
       }
     }

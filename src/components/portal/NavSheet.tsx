@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeftToLine, LogOut, Settings, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSheetDismiss } from '@/hooks/useSheetDismiss';
+import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import {
   portalNavGroups,
@@ -156,12 +157,16 @@ export function NavSheetActions({
   onSignOut: () => void;
   classes?: NavSheetClasses;
 }) {
+  const inApp = useIsNativeApp();
   return (
     <div className={classes.actions}>
-      <Link href="/" onClick={onClose} className={classes.action}>
-        <ArrowLeftToLine aria-hidden="true" />
-        Back to main site
-      </Link>
+      {/* The app has no marketing site behind it. */}
+      {inApp ? null : (
+        <Link href="/" onClick={onClose} className={classes.action}>
+          <ArrowLeftToLine aria-hidden="true" />
+          Back to main site
+        </Link>
+      )}
       <Link href="/portal/settings" onClick={onClose} className={classes.action}>
         <Settings aria-hidden="true" />
         Settings

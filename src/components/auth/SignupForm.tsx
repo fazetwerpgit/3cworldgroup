@@ -231,7 +231,7 @@ export function SignupForm() {
       await signUp(email.trim(), password, displayName.trim(), teamCode);
       // AuthContext set pendingApproval; go to /portal, which renders the
       // real PendingApproval component (this page only knows how to show the form).
-      router.push("/portal");
+      router.replace("/portal");
     } catch (err) {
       const code =
         err && typeof err === "object" && "code" in err
