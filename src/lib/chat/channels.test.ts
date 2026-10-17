@@ -80,6 +80,7 @@ import {
   isEligibleChatMember,
   reconcileChatMembershipForUser,
   syncChatChannels,
+  userCanAccessChannelDoc,
 } from './channels';
 import { canAccessChatChannel, MANAGEMENT_FIELD_ROLES } from '@/types';
 import type { ChatChannel } from '@/types';
@@ -264,5 +265,20 @@ describe('canAccessChatChannel', () => {
       expect(canAccessChatChannel(channel, undefined, fieldRole)).toBe(false);
     }
     expect(canAccessChatChannel(channel, undefined, undefined)).toBe(false);
+  });
+});
+
+describe('userCanAccessChannelDoc — demo accounts', () => {
+  const custom = { id: 'leads', name: 'Leads', audience: 'managers', order: 5, active: true, extraMemberIds: ['demo', 'r1'] };
+  const general = { id: 'general', name: 'General', audience: 'all', order: 0, active: true };
+
+  it('denies a demo account even when its raw uid sits in extraMemberIds', () => {
+    expect(userCanAccessChannelDoc(custom, { uid: 'demo', demoAccount: true })).toBe(false);
+    expect(userCanAccessChannelDoc(general, { uid: 'demo', fieldRole: 'entry_level_rep', demoAccount: true })).toBe(false);
+  });
+
+  it('still lets a real manual extra and a real audience member in', () => {
+    expect(userCanAccessChannelDoc(custom, { uid: 'r1', demoAccount: false })).toBe(true);
+    expect(userCanAccessChannelDoc(general, { uid: 'r2', fieldRole: 'entry_level_rep', demoAccount: false })).toBe(true);
   });
 });

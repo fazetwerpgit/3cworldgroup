@@ -14,6 +14,8 @@ export interface ChatUser {
   fieldRole?: FieldRole;
   effectiveRole?: PlatformRole | FieldRole;
   canModerate: boolean;
+  /** users/{uid}.demoAccount === true: denied every channel, extras included. */
+  demoAccount: boolean;
 }
 
 type ChatUserResult =
@@ -40,7 +42,8 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
 
   // A demo account keeps a working chat screen with no channels: with no role it
   // reaches no audience, so it can neither read nor post where others would see it.
-  const { role, fieldRole } = isDemoAccount(data) ? {} : resolveRoles(data.role, data.fieldRole);
+  const demoAccount = isDemoAccount(data);
+  const { role, fieldRole } = demoAccount ? {} : resolveRoles(data.role, data.fieldRole);
 
   return {
     ok: true,
@@ -51,6 +54,7 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
       fieldRole,
       effectiveRole: getEffectiveRole({ role, fieldRole }),
       canModerate: isManagementRole(role),
+      demoAccount,
     },
   };
 }

@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { isEligibleChatMember, userCanAccessChannelDoc } from '@/lib/chat/channels';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 import { sendPushToTokens, type PushPayload } from '@/lib/push/sendPush';
 import { pushTargetsOf } from '@/lib/push/pushTargets';
 import { ChatAttachment, resolveRoles } from '@/types';
@@ -36,7 +37,7 @@ export function shouldPushChatRecipient(
 ): boolean {
   if (!isEligibleChatMember(userData)) return false;
   const { role, fieldRole } = resolveRoles(userData.role, userData.fieldRole);
-  return userCanAccessChannelDoc(channelData, { uid, role, fieldRole });
+  return userCanAccessChannelDoc(channelData, { uid, role, fieldRole, demoAccount: isDemoAccount(userData) });
 }
 
 export interface ChatPushTotals {

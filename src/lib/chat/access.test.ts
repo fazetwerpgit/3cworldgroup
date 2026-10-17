@@ -49,6 +49,7 @@ describe('getVerifiedChatUser', () => {
       expect(res.user.role).toBeUndefined();
       expect(res.user.fieldRole).toBeUndefined();
       expect(res.user.canModerate).toBe(false);
+      expect(res.user.demoAccount).toBe(true);
     }
   });
 
@@ -57,6 +58,7 @@ describe('getVerifiedChatUser', () => {
     userDoc('u2', { status: 'active', fieldRole: 'entry_level_rep', demoAccount: false });
     const res = await getVerifiedChatUser(req());
     expect(res.ok && res.user.fieldRole).toBe('entry_level_rep');
+    expect(res.ok && res.user.demoAccount).toBe(false);
   });
 
   it('rejects when the token is invalid', async () => {
