@@ -245,7 +245,9 @@ Firebase Auth out and close the native chat screen if it is open. No reply.
 Show the native chat screen, on `channelId` when given, else the channel list,
 and reply `{ ok: true }` once it is showing. Reply `ok: false` if it cannot
 open (for example the native sign-in is gone). **Answer within 1.5 s**: on a
-failed reply or no reply in time, the web opens its own chat page instead.
+failed reply or no reply in time, the web opens its own chat page instead, and
+keeps chat on the web page for the next 45 s (no `openNativeChat` at all), so a
+broken native screen does not cost every navigation another 1.5 s wait.
 
 Sent only when the shell advertised `nativeChat` (see `capabilities` below) and
 answered the current web user's `nativeAuth` with ok. It replaces every way into

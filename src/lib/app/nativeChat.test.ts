@@ -7,6 +7,7 @@ import { __resetBridgeForTests, installNativeReceiver, parseNativeMessage, recei
 import {
   CHAT_FALLBACK_PATH,
   CHAT_HOLD_MAX_MS,
+  NATIVE_CHAT_REFUSAL_MS,
   __resetNativeChatForTests,
   beginChatVisit,
   chatVisitDecision,
@@ -14,6 +15,7 @@ import {
   handleChatDeepLink,
   installCapabilityListener,
   nativeChatPending,
+  nativeChatRefused,
   openNativeChat,
   openNativeChatForHref,
   readCapabilities,
@@ -381,5 +383,44 @@ describe('chat visit (decided once, holding capped)', () => {
     beginChatVisit();
     expect(chatVisitDecision()).toBeNull();
     expect(nativeChatPending()).toBe(true);
+  });
+});
+
+describe('refusal after a failed open', () => {
+  beforeEach(ready);
+
+  it('a timed-out openNativeChatForHref keeps chat on the web for a while, then retries', async () => {
+    vi.useFakeTimers();
+    const navigate = vi.fn();
+    expect(openNativeChatForHref('/portal/chat', navigate)).toBe(true);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(navigate).toHaveBeenCalledWith('/portal/chat');
+    expect(nativeChatRefused()).toBe(true);
+    expect(supportsNativeChat()).toBe(false);
+    // The fallback lands on /portal/chat: the visit goes straight to the web chat.
+    beginChatVisit();
+    expect(nativeChatPending()).toBe(false);
+    expect(chatVisitDecision()).toBe('web');
+    // Later navigations are not intercepted (no second 1.5 s wait).
+    expect(openNativeChatForHref('/portal/chat', navigate)).toBe(false);
+    expect(posted).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(NATIVE_CHAT_REFUSAL_MS);
+    expect(nativeChatRefused()).toBe(false);
+    expect(supportsNativeChat()).toBe(true);
+    expect(openNativeChatForHref('/portal/chat', navigate)).toBe(true);
+    expect(posted).toHaveLength(2);
+  });
+
+  it('a refused reply sets it too; an ok open does not', async () => {
+    const okOpen = openNativeChat();
+    reply(true);
+    await okOpen;
+    expect(nativeChatRefused()).toBe(false);
+    const failed = openNativeChat();
+    reply(false);
+    await failed;
+    expect(nativeChatRefused()).toBe(true);
+    expect(await handleChatDeepLink('/portal/chat', '', { back: vi.fn(), replace: vi.fn() }, 1)).toBe(false);
+    expect(posted).toHaveLength(2);
   });
 });

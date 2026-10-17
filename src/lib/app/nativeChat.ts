@@ -26,6 +26,8 @@ export const CHAT_PATH = '/portal/chat';
 export const CHAT_FALLBACK_PATH = '/portal/dashboard';
 /** Longest the holding screen waits for the native sign-in on one chat visit. */
 export const CHAT_HOLD_MAX_MS = 3000;
+/** After a failed or unanswered openNativeChat, chat stays on the web this long. */
+export const NATIVE_CHAT_REFUSAL_MS = 45_000;
 
 /** idle: no auth event yet. pending: a custom token is on its way to the shell. */
 export type NativeAuthStatus = 'idle' | 'pending' | 'ok' | 'failed' | 'signedOut';
@@ -34,6 +36,8 @@ let shellCaps: AppCapabilities = {};
 let nativeAuthUid: string | null = null;
 let nativeAuthStatus: NativeAuthStatus = 'idle';
 let opening = false;
+// Set when an openNativeChat fails or times out; cleared by its timer.
+let refusalTimer: ReturnType<typeof setTimeout> | null = null;
 const subscribers = new Set<() => void>();
 
 /** One stay on /portal/chat. decision: null while undecided, then fixed for the visit. */
@@ -110,7 +114,7 @@ function currentWebUid(): string | null {
  * on the web and the PWA.
  */
 export function supportsNativeChat(): boolean {
-  if (!nativeChatAdvertised() || nativeAuthUid === null) return false;
+  if (refusalTimer !== null || !nativeChatAdvertised() || nativeAuthUid === null) return false;
   return nativeAuthUid === currentWebUid();
 }
 
@@ -122,7 +126,7 @@ export function supportsNativeChat(): boolean {
  * CHAT_HOLD_MAX_MS plus one open. Never true on the web.
  */
 export function nativeChatPending(): boolean {
-  if (!nativeChatAdvertised()) return false;
+  if (refusalTimer !== null || !nativeChatAdvertised()) return false;
   if (chatVisit?.decision === 'web') return false;
   if (opening || nativeAuthUnderWay()) return true;
   return chatVisit !== null && chatVisit.decision === null && supportsNativeChat();
@@ -213,10 +217,25 @@ export function chatTargetFromHref(href: string, base: string): { channelId: str
   return { channelId: channelId ? channelId : null };
 }
 
+/** Chat stays on the web for NATIVE_CHAT_REFUSAL_MS (no retry on every navigation). */
+function refuseNativeChat(): void {
+  if (refusalTimer) clearTimeout(refusalTimer);
+  refusalTimer = setTimeout(() => {
+    refusalTimer = null;
+    notify();
+  }, NATIVE_CHAT_REFUSAL_MS);
+}
+
+/** True while a recent failed open keeps chat on the web. */
+export function nativeChatRefused(): boolean {
+  return refusalTimer !== null;
+}
+
 /**
  * Asks the shell to show native chat. Resolves true only on an ok reply; false
  * when native chat is not supported, the shell refused, or it did not answer
- * within 1.5 s.
+ * within 1.5 s. A refusal or timeout keeps chat on the web for
+ * NATIVE_CHAT_REFUSAL_MS, so the next navigation does not try (and wait) again.
  */
 export async function openNativeChat(channelId?: string | null): Promise<boolean> {
   if (!supportsNativeChat()) return false;
@@ -226,6 +245,7 @@ export async function openNativeChat(channelId?: string | null): Promise<boolean
     await requestNative<'openNativeChat'>(channelId ? { type: 'openNativeChat', channelId } : { type: 'openNativeChat' });
     return true;
   } catch {
+    refuseNativeChat();
     return false;
   } finally {
     opening = false;
@@ -306,6 +326,8 @@ export function __resetNativeChatForTests(): void {
   listening = false;
   if (chatVisit?.timer) clearTimeout(chatVisit.timer);
   chatVisit = null;
+  if (refusalTimer) clearTimeout(refusalTimer);
+  refusalTimer = null;
   subscribers.clear();
   chatNavigate = hardNavigate;
 }
