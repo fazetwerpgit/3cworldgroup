@@ -6,7 +6,10 @@ vi.mock('@/lib/firebase/config', () => ({ auth: fakeAuth }));
 import { __resetBridgeForTests, installNativeReceiver, parseNativeMessage, receiveNativeMessage } from './bridge';
 import {
   CHAT_FALLBACK_PATH,
+  CHAT_HOLD_MAX_MS,
   __resetNativeChatForTests,
+  beginChatVisit,
+  chatVisitDecision,
   chatTargetFromHref,
   handleChatDeepLink,
   installCapabilityListener,
@@ -288,5 +291,95 @@ describe('handleChatDeepLink', () => {
     setNativeAuth('signedOut');
     expect(await handleChatDeepLink('/portal/chat', '', r, 1)).toBe(false);
     expect(posted).toEqual([]);
+  });
+});
+
+describe('chat visit (decided once, holding capped)', () => {
+  const router = () => ({ back: vi.fn(), replace: vi.fn() });
+
+  function waitingForAuth() {
+    stub({ caps: { nativeChat: true } });
+    fakeAuth.currentUser = { uid: 'u1' };
+  }
+
+  it('holds at most CHAT_HOLD_MAX_MS for the native sign-in, then shows the web chat', async () => {
+    vi.useFakeTimers();
+    waitingForAuth();
+    beginChatVisit();
+    expect(nativeChatPending()).toBe(true);
+    await vi.advanceTimersByTimeAsync(CHAT_HOLD_MAX_MS - 1);
+    expect(nativeChatPending()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(nativeChatPending()).toBe(false);
+    expect(chatVisitDecision()).toBe('web');
+  });
+
+  it('a late native sign-in after the web chat showed does not open native chat', async () => {
+    vi.useFakeTimers();
+    waitingForAuth();
+    beginChatVisit();
+    await vi.advanceTimersByTimeAsync(CHAT_HOLD_MAX_MS);
+    setNativeAuth('ok', 'u1');
+    expect(supportsNativeChat()).toBe(true);
+    expect(nativeChatPending()).toBe(false);
+    expect(await handleChatDeepLink('/portal/chat', '?channel=c1', router(), 1)).toBe(false);
+    expect(posted).toEqual([]);
+  });
+
+  it('a failed sign-in settles the visit on the web at once; a later ok does not yank', async () => {
+    waitingForAuth();
+    beginChatVisit();
+    setNativeAuth('failed');
+    expect(chatVisitDecision()).toBe('web');
+    expect(nativeChatPending()).toBe(false);
+    setNativeAuth('ok', 'u1');
+    expect(await handleChatDeepLink('/portal/chat', '', router(), 1)).toBe(false);
+    expect(posted).toEqual([]);
+  });
+
+  it('a sign-in that confirms within the cap opens native chat; the hold covers the gap', async () => {
+    vi.useFakeTimers();
+    waitingForAuth();
+    beginChatVisit();
+    await vi.advanceTimersByTimeAsync(2500);
+    setNativeAuth('ok', 'u1');
+    // Usable but not opened yet: keep holding so the web chat does not flash.
+    expect(nativeChatPending()).toBe(true);
+    const r = router();
+    const done = handleChatDeepLink('/portal/chat', '?channel=c1', r, 1);
+    expect(chatVisitDecision()).toBe('native');
+    expect(posted[0]).toMatchObject({ type: 'openNativeChat', channelId: 'c1' });
+    // The cap passing (t=3000) does not cut into an open already under way.
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(nativeChatPending()).toBe(true);
+    expect(chatVisitDecision()).toBe('native');
+    reply(true);
+    expect(await done).toBe(true);
+    expect(r.replace).toHaveBeenCalledWith(CHAT_FALLBACK_PATH);
+  });
+
+  it('opens at most once per visit; a failed open settles on the web', async () => {
+    ready();
+    beginChatVisit();
+    const first = handleChatDeepLink('/portal/chat', '', router(), 1);
+    expect(await handleChatDeepLink('/portal/chat', '', router(), 1)).toBe(false);
+    reply(false);
+    expect(await first).toBe(false);
+    expect(chatVisitDecision()).toBe('web');
+    expect(nativeChatPending()).toBe(false);
+    expect(posted).toHaveLength(1);
+  });
+
+  it('a new visit decides afresh', () => {
+    waitingForAuth();
+    const end = beginChatVisit();
+    setNativeAuth('failed');
+    expect(chatVisitDecision()).toBe('web');
+    end();
+    expect(chatVisitDecision()).toBeUndefined();
+    setNativeAuth('pending');
+    beginChatVisit();
+    expect(chatVisitDecision()).toBeNull();
+    expect(nativeChatPending()).toBe(true);
   });
 });

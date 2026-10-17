@@ -15,6 +15,7 @@ import NativeBadgeSync from './NativeBadgeSync';
 import { startNativeAuthSync } from '@/lib/app/nativeAuthSync';
 import {
   CHAT_PATH,
+  beginChatVisit,
   handleChatDeepLink,
   installCapabilityListener,
   setChatNavigate,
@@ -76,6 +77,7 @@ export default function AppBridgeHost() {
   const router = useRouter();
   const nativeChat = useSupportsNativeChat();
   const nativeChatPending = useNativeChatPending();
+  const chatOpen = onChatPath(pathname);
 
   useEffect(() => {
     if (!isNativeApp()) return;
@@ -109,9 +111,18 @@ export default function AppBridgeHost() {
     setChatNavigate((href) => router.push(href));
   }, [router]);
 
+  // One chat visit per stay on /portal/chat: native or web is decided once
+  // (the holding screen waits at most 3 s). Declared before the deep-link
+  // effect so the visit exists when it runs. App only.
+  useEffect(() => {
+    if (!chatOpen || !isNativeApp()) return;
+    return beginChatVisit();
+  }, [chatOpen]);
+
   // /portal/chat?channel=<id> reached directly (push tap, cold deep link):
   // open native chat on that channel; after the shell's ok, step back (or to
-  // the dashboard). nativeChat is always false on the web, so this never runs there.
+  // the dashboard). Skipped once this visit has shown the web chat.
+  // nativeChat is always false on the web, so this never runs there.
   useEffect(() => {
     if (!nativeChat || !onChatPath(pathname)) return;
     void handleChatDeepLink(pathname, window.location.search, router, window.history.length);
@@ -173,7 +184,7 @@ export default function AppBridgeHost() {
     <>
       <AppNotice />
       {inApp && signedIn ? <NativeBadgeSync /> : null}
-      {nativeChatPending && onChatPath(pathname) ? <NativeChatHolding /> : null}
+      {nativeChatPending && chatOpen ? <NativeChatHolding /> : null}
     </>
   );
 }

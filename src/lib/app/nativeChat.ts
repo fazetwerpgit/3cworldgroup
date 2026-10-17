@@ -15,9 +15,17 @@ import { hasNativeBridge, onNativeMessage, parseCapabilities, requestNative, typ
 // shell refuses or does not answer within 1.5 s, the web chat page opens as
 // before. Outside the app none of this runs: every check starts with
 // isNativeApp() and the bridge.
+//
+// A visit to /portal/chat (beginChatVisit, from AppBridgeHost) decides native
+// or web once: the "Opening chat…" holding screen waits at most
+// CHAT_HOLD_MAX_MS for the native sign-in, and once the web chat has shown for
+// that visit a late native sign-in does not pull the person into native chat
+// (nor does anything bring the web chat back over a native open under way).
 
 export const CHAT_PATH = '/portal/chat';
 export const CHAT_FALLBACK_PATH = '/portal/dashboard';
+/** Longest the holding screen waits for the native sign-in on one chat visit. */
+export const CHAT_HOLD_MAX_MS = 3000;
 
 /** idle: no auth event yet. pending: a custom token is on its way to the shell. */
 export type NativeAuthStatus = 'idle' | 'pending' | 'ok' | 'failed' | 'signedOut';
@@ -28,7 +36,35 @@ let nativeAuthStatus: NativeAuthStatus = 'idle';
 let opening = false;
 const subscribers = new Set<() => void>();
 
+/** One stay on /portal/chat. decision: null while undecided, then fixed for the visit. */
+interface ChatVisit {
+  decision: 'native' | 'web' | null;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+let chatVisit: ChatVisit | null = null;
+
+function decideVisit(visit: ChatVisit, decision: 'native' | 'web'): void {
+  visit.decision = decision;
+  if (visit.timer) clearTimeout(visit.timer);
+  visit.timer = null;
+}
+
+/** True while the shell's native sign-in for the web user is still on its way. */
+function nativeAuthUnderWay(): boolean {
+  return nativeChatAdvertised() && (nativeAuthStatus === 'idle' || nativeAuthStatus === 'pending');
+}
+
+// An undecided visit becomes 'web' as soon as nothing native is coming: no
+// open in flight, native chat not usable, and no native sign-in under way.
+function settleVisit(): void {
+  const visit = chatVisit;
+  if (!visit || visit.decision !== null) return;
+  if (opening || supportsNativeChat() || nativeAuthUnderWay()) return;
+  decideVisit(visit, 'web');
+}
+
 function notify() {
+  settleVisit();
   for (const fn of subscribers) fn();
 }
 
@@ -81,11 +117,49 @@ export function supportsNativeChat(): boolean {
 /**
  * True while /portal/chat should show a holding state instead of the web chat:
  * nativeChat is advertised and the native sign-in or the open is still under
- * way. Never true on the web.
+ * way (or native chat is usable and the visit is about to open it). False once
+ * the visit has settled on the web chat, so the hold lasts at most
+ * CHAT_HOLD_MAX_MS plus one open. Never true on the web.
  */
 export function nativeChatPending(): boolean {
   if (!nativeChatAdvertised()) return false;
-  return opening || nativeAuthStatus === 'idle' || nativeAuthStatus === 'pending';
+  if (chatVisit?.decision === 'web') return false;
+  if (opening || nativeAuthUnderWay()) return true;
+  return chatVisit !== null && chatVisit.decision === null && supportsNativeChat();
+}
+
+/**
+ * Starts a visit to /portal/chat (AppBridgeHost, on entering the page; app
+ * only). Native or web is decided once per visit: the web chat if nothing
+ * native is coming, or if the native sign-in has not confirmed within
+ * CHAT_HOLD_MAX_MS. Returns the function that ends the visit (on leaving).
+ */
+export function beginChatVisit(): () => void {
+  endChatVisit();
+  const visit: ChatVisit = { decision: null, timer: null };
+  chatVisit = visit;
+  visit.timer = setTimeout(() => {
+    visit.timer = null;
+    if (chatVisit !== visit || visit.decision !== null) return;
+    decideVisit(visit, 'web');
+    notify();
+  }, CHAT_HOLD_MAX_MS);
+  notify();
+  return () => {
+    if (chatVisit === visit) endChatVisit();
+  };
+}
+
+function endChatVisit(): void {
+  if (!chatVisit) return;
+  if (chatVisit.timer) clearTimeout(chatVisit.timer);
+  chatVisit = null;
+  notify();
+}
+
+/** The current chat visit's decision: undefined with no visit, null while undecided. */
+export function chatVisitDecision(): 'native' | 'web' | null | undefined {
+  return chatVisit ? chatVisit.decision : undefined;
 }
 
 let listening = false;
@@ -204,9 +278,20 @@ export async function handleChatDeepLink(
   historyLength: number
 ): Promise<boolean> {
   if (!supportsNativeChat() || pathname?.replace(/\/+$/, '') !== CHAT_PATH) return false;
+  // Decided once per visit: the web chat already showed (do not pull the
+  // person out mid-typing), or an open already ran for this visit.
+  const visit = chatVisit;
+  if (visit && visit.decision !== null) return false;
+  if (visit) decideVisit(visit, 'native');
   const channelId = new URLSearchParams(search).get('channel');
   const ok = await openNativeChat(channelId);
-  if (!ok) return false;
+  if (!ok) {
+    if (visit && chatVisit === visit) {
+      decideVisit(visit, 'web');
+      notify();
+    }
+    return false;
+  }
   if (historyLength > 1) router.back();
   else router.replace(CHAT_FALLBACK_PATH);
   return true;
@@ -219,6 +304,8 @@ export function __resetNativeChatForTests(): void {
   nativeAuthStatus = 'idle';
   opening = false;
   listening = false;
+  if (chatVisit?.timer) clearTimeout(chatVisit.timer);
+  chatVisit = null;
   subscribers.clear();
   chatNavigate = hardNavigate;
 }
