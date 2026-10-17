@@ -13,6 +13,8 @@ import {
   getNativeCredential,
   linkedMethodRows,
   nativeAuthErrorMessage,
+  isNativeSignInCanceled,
+  isNativeSignInPending,
   passwordCredential,
   type SignInMethodId,
 } from '@/lib/app/nativeAuth';
@@ -64,6 +66,7 @@ export default function LinkedSignInMethods() {
       setPasswordOpen(true);
       return;
     }
+    if (inApp && isNativeSignInPending()) return;
     setBusy(id);
     setMessage(null);
     const provider = id === APPLE_PROVIDER_ID ? 'apple' : 'google';
@@ -77,7 +80,7 @@ export default function LinkedSignInMethods() {
       await refresh(user);
       setMessage({ ok: true, text: `${provider === 'apple' ? 'Apple' : 'Google'} is linked.` });
     } catch (err) {
-      setMessage({ ok: false, text: nativeAuthErrorMessage(err, provider) });
+      if (!isNativeSignInCanceled(err)) setMessage({ ok: false, text: nativeAuthErrorMessage(err, provider) });
     } finally {
       setBusy(null);
     }

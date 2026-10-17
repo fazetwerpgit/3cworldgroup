@@ -74,8 +74,34 @@ export interface NativeCredential {
   displayName?: string;
 }
 
-/** Runs the shell's native sign-in sheet and returns a Firebase credential. */
+let nativeSignInPending = false;
+
+/** A native sign-in sheet is open (or being asked for). A second tap should do nothing. */
+export function isNativeSignInPending(): boolean {
+  return nativeSignInPending;
+}
+
+/** The person (or a second, dropped tap) cancelled: show nothing. */
+export function isNativeSignInCanceled(err: unknown): boolean {
+  return err instanceof NativeBridgeError && err.code === 'canceled';
+}
+
+/**
+ * Runs the shell's native sign-in sheet and returns a Firebase credential.
+ * One at a time: a call while one is pending is dropped with `canceled`
+ * (callers check isNativeSignInPending() first and ignore `canceled`).
+ */
 export async function getNativeCredential(provider: NativeSignInProvider): Promise<NativeCredential> {
+  if (nativeSignInPending) throw new NativeBridgeError('canceled', 'A sign-in is already open.');
+  nativeSignInPending = true;
+  try {
+    return await runNativeSignIn(provider);
+  } finally {
+    nativeSignInPending = false;
+  }
+}
+
+async function runNativeSignIn(provider: NativeSignInProvider): Promise<NativeCredential> {
   if (provider === 'apple') {
     const rawNonce = generateRawNonce();
     const nonce = await sha256Hex(rawNonce);
