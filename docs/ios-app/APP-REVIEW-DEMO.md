@@ -9,7 +9,7 @@ in production, done by an owner/admin. Do it before submitting a build.
   It is left out of every roster, leaderboard, recipient list and owner count
   (`src/lib/users/demoAccount.ts`), and the sales it logs are stamped and
   hidden from everyone else.
-- One chat channel, the **demo sandbox** (`chatChannels/{id}.demoSandbox: true`,
+- One chat channel, the **demo sandbox**, named "Demo Team" (`chatChannels/{id}.demoSandbox: true`,
   `src/lib/chat/channels.ts`), so the reviewer can send, report and block
   (App Store guideline 1.2) without reaching a real person:
   - A demo account can read and post ONLY in a sandbox channel. Every other
@@ -19,7 +19,8 @@ in production, done by an owner/admin. Do it before submitting a build.
     `extraMemberIds` are ignored there; the admin "add member" and "change
     audience" actions refuse a sandbox.
   - Reps, managers and operations never see the channel. Admins/owners do,
-    so they can moderate it, and they get its pushes.
+    so they can moderate it, and they get its pushes. It shows in their
+    channel list as "Demo Team".
   - Its messages appear nowhere else: leaderboard callouts and the owner
     book read only `all-company`, the company tape reads sales, and Ask reads
     no chat.
@@ -42,7 +43,7 @@ in production, done by an owner/admin. Do it before submitting a build.
    ```json
    {
      "id": "app-review",
-     "name": "Team Chat",
+     "name": "Demo Team",
      "description": "Say hi to the team.",
      "audience": "all",
      "order": 1,
@@ -54,6 +55,11 @@ in production, done by an owner/admin. Do it before submitting a build.
 
    `audience` must be a valid value for the channel to parse, but it is not
    used for a sandbox. `memberIds` is filled by step 5.
+
+   Note for admins and owners: "Demo Team" is the App Review demo channel.
+   Only the demo accounts and admins/owners are in it, and no real rep reads
+   it. Do not use it for team messages. Leave it alone except to moderate a
+   report, and archive it as below when review is done.
 
 4. **Seed a few messages** from the second demo user under
    `chatChannels/app-review/messages/{autoId}`, one doc each:
