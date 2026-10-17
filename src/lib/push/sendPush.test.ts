@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { sendEachForMulticast, userSet, userData } = vi.hoisted(() => ({
+const { sendEachForMulticast, userSet, userData, unreadChatBadge } = vi.hoisted(() => ({
+  unreadChatBadge: vi.fn(),
   sendEachForMulticast: vi.fn(),
   userSet: vi.fn(),
   userData: { current: { pushTokens: ['tok1'] } as Record<string, unknown> },
@@ -33,6 +34,8 @@ vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { arrayRemove: (...items: unknown[]) => ({ __arrayRemove: items }) },
 }));
 
+vi.mock('./unreadBadge', () => ({ unreadChatBadge }));
+
 import { pushTargetsOf, sendPushToTokens, sendPushToUser } from './sendPush';
 
 type Multicast = {
@@ -48,6 +51,8 @@ beforeEach(() => {
   userSet.mockReset();
   userSet.mockResolvedValue(undefined);
   userData.current = { pushTokens: ['tok1'] };
+  unreadChatBadge.mockReset();
+  unreadChatBadge.mockResolvedValue(null);
   // One response per token, all accepted.
   sendEachForMulticast.mockImplementation(async (m: Multicast) => ({ responses: m.tokens.map(() => ({ success: true })) }));
 });
@@ -164,6 +169,24 @@ describe('native (3C iOS app) tokens', () => {
     expect(native.data).toEqual({ title: 'New message', body: 'Hi', url: '/portal/chat' });
     expect(native.apns).toEqual({ payload: { aps: { sound: 'default', badge: 1 } } });
     expect(native).not.toHaveProperty('webpush');
+  });
+
+  it('native badge is the recipient unread chat count when it can be read', async () => {
+    unreadChatBadge.mockResolvedValue(4);
+    await sendPushToTokens('user-1', { web: [], native: ['n1'] }, payload);
+    expect(unreadChatBadge).toHaveBeenCalledWith(expect.anything(), 'user-1');
+    expect((sendEachForMulticast.mock.calls[0][0] as Multicast).apns!.payload.aps.badge).toBe(4);
+  });
+
+  it('a zero unread count sends badge 0 (clears the icon)', async () => {
+    unreadChatBadge.mockResolvedValue(0);
+    await sendPushToTokens('user-1', { web: [], native: ['n1'] }, payload);
+    expect((sendEachForMulticast.mock.calls[0][0] as Multicast).apns!.payload.aps.badge).toBe(0);
+  });
+
+  it('web-only recipients never pay for the unread count', async () => {
+    await sendPushToTokens('user-1', { web: ['w1'], native: [] }, payload);
+    expect(unreadChatBadge).not.toHaveBeenCalled();
   });
 
   it('a web-only user sends exactly one data-only multicast (unchanged behavior)', async () => {

@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { PendingApproval } from '@/components/auth/PendingApproval';
 import { RepBoot } from '@/components/portal/rep/RepBoot';
+import { useAppReady } from '@/lib/app/shellExtras';
 
 export default function PortalLoginPage() {
   const { user, loading, pendingApproval } = useAuth();
@@ -15,6 +16,8 @@ export default function PortalLoginPage() {
   // and wipe the typed email when the password turns out wrong.
   const [authChecked, setAuthChecked] = useState(false);
   if (!loading && !authChecked) setAuthChecked(true);
+  // App splash: the login form (or pending-approval screen) is the first real screen.
+  useAppReady(authChecked && !user);
 
   useEffect(() => {
     // If user is already logged in, redirect to dashboard

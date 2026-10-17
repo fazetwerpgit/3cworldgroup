@@ -2,6 +2,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { FieldValue } from 'firebase-admin/firestore';
 import { app, adminDb } from '@/lib/firebase/admin';
 import { nativeTokenEntry, pushTargetsOf, type PushTargets } from './pushTargets';
+import { unreadChatBadge } from './unreadBadge';
 
 export interface PushPayload {
   title: string;
@@ -76,6 +77,10 @@ export async function sendPushToTokens(
         console.error('Failed to send push to user', uid, err);
         return null;
       });
+    // The app icon badge: the recipient's real unread chat count (two small
+    // capped reads, native recipients only). If it can't be read, the old
+    // constant 1 still marks something new.
+    const badge = targets.native.length ? ((await unreadChatBadge(db, uid)) ?? 1) : 1;
     const [webRes, nativeRes] = await Promise.all([
       targets.web.length
         ? settle(messaging.sendEachForMulticast({
@@ -92,7 +97,7 @@ export async function sendPushToTokens(
             data,
             apns: {
               ...(options.urgency === 'high' ? { headers: { 'apns-priority': '10' } } : {}),
-              payload: { aps: { sound: 'default', badge: 1 } },
+              payload: { aps: { sound: 'default', badge } },
             },
           }))
         : null,

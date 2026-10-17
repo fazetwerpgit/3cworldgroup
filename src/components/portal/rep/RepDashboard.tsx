@@ -25,6 +25,7 @@ import {
   type Standing,
 } from '@/lib/dashboard/repSummary';
 import { formatPayoutWindow } from '@/lib/pay/payoutWindow';
+import { buildWidgetData, useAppReady, useNativeWidgetData, useUidHash } from '@/lib/app/shellExtras';
 import { AWAITING_CARRIER_LABEL, isInstallToday } from '@/lib/sales/installBucket';
 import { CarrierNotice } from './CarrierNotice';
 import { CarrierStaleNote } from './CarrierStaleNote';
@@ -803,6 +804,30 @@ export function RepDashboard() {
         ? 'error'
         : 'ready';
   const canLog = hasPermission('sales:write');
+
+  // 3C iOS app only (both no-ops on the web): drop the splash once the money
+  // block has its numbers, and feed the home-screen widget the same Est. pay
+  // and rank shown here. Never while the owner views as this rep.
+  useAppReady(payStatus !== 'loading');
+  const widgetRank = standing.status === 'ready' && standing.data ? standing.data.rank : null;
+  const widgetRankOf = standing.status === 'ready' && standing.data ? standing.data.of : null;
+  const widgetSettled = payStatus === 'ready' && pay !== null && standing.status !== 'loading';
+  const uidHash = useUidHash(readOnly ? null : user?.uid);
+  const widget = useMemo(
+    () =>
+      !readOnly && widgetSettled && pay && uidHash
+        ? buildWidgetData({
+            uidHash,
+            estThisMonth: pay.estThisMonth,
+            hasPlan: rates !== null,
+            monthCount: pay.monthCount,
+            standing: widgetRank !== null && widgetRankOf !== null ? { rank: widgetRank, of: widgetRankOf } : null,
+            now,
+          })
+        : null,
+    [readOnly, widgetSettled, pay, uidHash, rates, widgetRank, widgetRankOf, now]
+  );
+  useNativeWidgetData(widget);
 
   const onRetry = (key: RepSectionKey | 'pay') => {
     const keys: RepSectionKey[] =

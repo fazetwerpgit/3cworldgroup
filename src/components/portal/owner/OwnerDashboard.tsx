@@ -23,6 +23,7 @@ import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
 import s from '../rep/rep.module.css';
 import u from '../admin-d/admin-ui.module.css';
 import o from './owner-dashboard.module.css';
+import { useAppReady } from '@/lib/app/shellExtras';
 
 // The owner's home screen (direction D): the company, not a personal pay card.
 // Money first (estimated from installs × the comp plan), then this month's
@@ -353,6 +354,8 @@ function SkeletonPanel({ label, title, rows, className }: { label: string; title
 export function OwnerDashboard() {
   const data = useOwnerDashboard();
   const { retry } = data;
+  // 3C iOS app: drop the splash once the money board has settled (no-op on the web).
+  useAppReady(data.money.status !== 'loading');
 
   return (
     <>
