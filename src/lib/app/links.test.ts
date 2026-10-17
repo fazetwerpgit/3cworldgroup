@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyLink } from './links';
+import { classifyLink, inAppRoute } from './links';
 
 const HERE = 'https://www.3cworldgroup.com/portal/dashboard';
 
@@ -32,5 +32,21 @@ describe('classifyLink', () => {
     expect(classifyLink('javascript:void(0)', HERE)).toEqual({ kind: 'ignore' });
     expect(classifyLink('', HERE)).toEqual({ kind: 'ignore' });
     expect(classifyLink(null, HERE)).toEqual({ kind: 'ignore' });
+  });
+});
+
+describe('inAppRoute', () => {
+  it('returns the router path for a portal page on this origin', () => {
+    expect(inAppRoute('https://www.3cworldgroup.com/portal/chat?channel=all-company', HERE)).toBe('/portal/chat?channel=all-company');
+    expect(inAppRoute('/portal/announcements#latest', HERE)).toBe('/portal/announcements#latest');
+    expect(inAppRoute('/portal', HERE)).toBe('/portal');
+  });
+
+  it('refuses other origins, non-portal pages and junk', () => {
+    expect(inAppRoute('https://evil.example/portal/chat', HERE)).toBeNull();
+    expect(inAppRoute('http://www.3cworldgroup.com/portal/chat', HERE)).toBeNull();
+    expect(inAppRoute('/privacy', HERE)).toBeNull();
+    expect(inAppRoute('/portalx', HERE)).toBeNull();
+    expect(inAppRoute('javascript:alert(1)', HERE)).toBeNull();
   });
 });

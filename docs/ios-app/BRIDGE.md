@@ -149,6 +149,19 @@ The web then calls `signInWithCredential` with
 reply `code: "canceled"`. If Sign in with Apple is not available or set up,
 reply `code: "not_configured"`.
 
+### `chatContext` (event)
+```json
+{ "type": "chatContext", "channelId": "general" }
+{ "type": "chatContext", "channelId": null }
+```
+Sent by the team chat page whenever the conversation on screen changes:
+the open channel id, or `null` when no thread is showing (the phone channel
+list, or leaving chat). The shell keeps the latest value and uses it to drop
+the foreground banner for a push about that channel (see "Foreground pushes"
+below). It is a hint, not a lock: a shell that never hears `null` (for
+example the page crashed) should also forget it when the WebView navigates
+away from `/portal/chat`.
+
 ## native -> web events
 
 ### `pushToken`
@@ -157,6 +170,54 @@ reply `code: "not_configured"`.
 ```
 Send this whenever FCM issues or rotates the token (`onTokenRefresh`). If the
 person is signed in, the web registers it.
+
+### `keyboard`
+```json
+{ "source": "3c-shell", "type": "keyboard", "height": 336, "duration": 250, "easing": "keyboard" }
+```
+Sent from React Native's `keyboardWillShow`, `keyboardWillChangeFrame` and
+`keyboardWillHide` (hide sends `height: 0`). `height` is how much of the
+WebView the keyboard covers, in CSS px (window height minus
+`endCoordinates.screenY`, never negative). `duration` is the iOS animation
+length in ms (the web clamps it to 0..1000). `easing` is RN's
+`event.easing`: `keyboard`, `easeIn`, `easeOut`, `easeInEaseOut` or
+`linear`; anything else is read as `keyboard`.
+
+In the app, the chat thread uses this instead of `visualViewport` timing: one
+transition on the composer inset (`--kb`) with the keyboard's own duration
+and curve, then a single snap to the newest message. With the event absent
+(older shell, browser, PWA) the page keeps its visualViewport path.
+
+### `navigate`
+```json
+{ "source": "3c-shell", "type": "navigate", "url": "https://www.3cworldgroup.com/portal/chat?channel=general" }
+```
+Open a portal URL without reloading the page (a push tap while the app is
+running). The web client-side routes same-origin `/portal` URLs
+(`router.push`), so the team chat page opens the channel in place. A
+same-host URL outside `/portal` is loaded with `location.assign`; any other
+host is ignored.
+
+Pages that handle it say so: `window.__3C_BRIDGE__.features` includes
+`"navigate"` once the portal's bridge host has mounted. The shell must check
+before sending and fall back to `location.assign(url)` otherwise (the login
+page, an error page, or a portal build from before this event):
+
+```js
+var b = window.__3C_BRIDGE__;
+if (b && b.features && b.features.indexOf('navigate') !== -1) b.receive(msg);
+else window.location.assign(msg.url);
+```
+
+## Foreground pushes
+
+A push that arrives while the app is open does not show the system banner
+(`firebase.json` `messaging_ios_foreground_presentation_options` is
+`["badge", "list"]`: it goes to Notification Center and bumps the badge).
+The shell shows its own in-app banner from `messaging().onMessage` instead,
+unless the push's `data.url` is `/portal/chat?channel=<id>` and `<id>` is
+the channel from the latest `chatContext`. Tapping the banner sends
+`navigate`. Changing the presentation options needs a native rebuild.
 
 ## Push payload the shell receives (A4)
 

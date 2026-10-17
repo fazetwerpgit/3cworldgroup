@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { CheckCheck, Copy, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, X } from 'lucide-react';
+import { Ban, CheckCheck, Copy, Flag, MoreHorizontal, Pencil, Pin, PinOff, Reply, SmilePlus, Trash2, UserCheck, X } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import { REPORT_REASONS, REPORT_REASON_LABELS, type ReportReason } from '@/lib/chat/moderationShared';
 import s from '@/components/portal/rep/rep.module.css';
 import c from './chat.module.css';
 
@@ -34,6 +35,12 @@ export interface MessageActionsConfig {
   // Opens the "Read by" list for this message. Absent (no row) when the parent
   // can't show it, e.g. a message that hasn't reached the server yet.
   onReadBy?: () => void;
+  // Moderation, on someone else's delivered message only (the parent decides):
+  // report it with a reason, or block / unblock its author. Each is absent
+  // (no row) when it doesn't apply. Report and Block confirm in the sheet first.
+  onReport?: (reason: ReportReason) => void;
+  onBlock?: () => void;
+  onUnblock?: () => void;
 }
 
 interface ActionItem {
@@ -66,6 +73,14 @@ function buildActions(config: MessageActionsConfig): ActionItem[] {
   if (config.canEdit) {
     items.push({ key: 'edit', label: 'Edit', icon: Pencil, onSelect: config.onEdit });
   }
+  if (config.onReport) {
+    items.push({ key: 'report', label: 'Report', icon: Flag, onSelect: () => {} });
+  }
+  if (config.onUnblock) {
+    items.push({ key: 'unblock', label: 'Unblock', icon: UserCheck, onSelect: config.onUnblock });
+  } else if (config.onBlock) {
+    items.push({ key: 'block', label: 'Block', icon: Ban, onSelect: () => {} });
+  }
   if (config.canDelete) {
     items.push({ key: 'delete', label: 'Delete', icon: Trash2, onSelect: config.onDelete, destructive: true });
   }
@@ -80,36 +95,46 @@ function buildActions(config: MessageActionsConfig): ActionItem[] {
  */
 export function MessageActions({
   config,
+  authorName,
   triggerClassName = '',
 }: {
   config: MessageActionsConfig;
+  authorName?: string;
   triggerClassName?: string;
 }) {
+  // Report and Block need a reason or a confirmation: they open the sheet at that step.
+  const [step, setStep] = useState<ConfirmStep | null>(null);
   const items = buildActions(config);
   if (items.length === 0) return null;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button type="button" aria-label="Message actions" className={`${c.iconBtn} ${triggerClassName}`.trim()}>
-          <MoreHorizontal size={18} aria-hidden="true" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className={c.menu}>
-        {items.map((item) => (
-          <DropdownMenuItem
-            key={item.key}
-            variant={item.destructive ? 'destructive' : 'default'}
-            onSelect={item.onSelect}
-            className={`${c.menuItem} ${item.destructive ? c.menuDanger : ''}`}
-          >
-            <item.icon aria-hidden="true" />
-            {item.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      {step ? <ActionSheetBody config={config} authorName={authorName} initialStep={step} onClose={() => setStep(null)} /> : null}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="Message actions" className={`${c.iconBtn} ${triggerClassName}`.trim()}>
+            <MoreHorizontal size={18} aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className={c.menu}>
+          {items.map((item) => (
+            <DropdownMenuItem
+              key={item.key}
+              variant={item.destructive ? 'destructive' : 'default'}
+              onSelect={item.key === 'report' || item.key === 'block' ? () => setStep(item.key as ConfirmStep) : item.onSelect}
+              className={`${c.menuItem} ${item.destructive ? c.menuDanger : ''}`}
+            >
+              <item.icon aria-hidden="true" />
+              {item.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
+
+/** Sheet steps that ask before an action runs. */
+type ConfirmStep = 'delete' | 'report' | 'block';
 
 // A tap that lands this soon after the sheet opens came from the long-press
 // that opened it (its release), not from a choice, so it's ignored.
@@ -140,13 +165,15 @@ export function MessageActionSheet({
 function ActionSheetBody({
   config,
   authorName,
+  initialStep = null,
   onClose,
 }: {
   config: MessageActionsConfig;
   authorName?: string;
+  initialStep?: ConfirmStep | null;
   onClose: () => void;
 }) {
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [step, setStep] = useState<ConfirmStep | null>(initialStep);
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {
@@ -178,7 +205,60 @@ function ActionSheetBody({
       >
         <section className={s.sheet} role="dialog" aria-modal="true" aria-label="Message actions">
           <div className={s.sheetHandle} aria-hidden="true" />
-          {confirmingDelete ? (
+          {step === 'report' ? (
+            <>
+              <p className={c.sheetConfirm}>
+                Report this message?
+                <span>An admin reviews every report. {authorName ?? 'The author'} isn&apos;t told who sent it.</span>
+              </p>
+              <div className={c.sheetList}>
+                {REPORT_REASONS.map((reason) => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={choose(() => {
+                      onClose();
+                      config.onReport?.(reason);
+                    })}
+                    className={c.sheetItem}
+                  >
+                    {REPORT_REASON_LABELS[reason]}
+                  </button>
+                ))}
+                <button type="button" onClick={choose(initialStep ? onClose : () => setStep(null))} className={c.sheetItem}>
+                  <X size={20} aria-hidden="true" />
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : step === 'block' ? (
+            <>
+              <p className={c.sheetConfirm}>
+                Block {authorName ?? 'this person'}?
+                <span>
+                  Their messages are hidden for you and you won&apos;t get chat notifications from them. They stay in
+                  your channels and aren&apos;t told. Unblock any time from one of their messages.
+                </span>
+              </p>
+              <div className={c.sheetList}>
+                <button
+                  type="button"
+                  onClick={choose(() => {
+                    onClose();
+                    config.onBlock?.();
+                  })}
+                  className={`${c.sheetItem} ${c.sheetDanger}`}
+                >
+                  <Ban size={20} aria-hidden="true" />
+                  Block
+                </button>
+                <button type="button" onClick={choose(initialStep ? onClose : () => setStep(null))} className={c.sheetItem}>
+                  <X size={20} aria-hidden="true" />
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : step === 'delete' ? (
             <>
               <p className={c.sheetConfirm}>Delete this message? This can&apos;t be undone.</p>
               <div className={c.sheetList}>
@@ -193,7 +273,7 @@ function ActionSheetBody({
                   <Trash2 size={20} aria-hidden="true" />
                   Delete message
                 </button>
-                <button type="button" onClick={choose(() => setConfirmingDelete(false))} className={c.sheetItem}>
+                <button type="button" onClick={choose(() => setStep(null))} className={c.sheetItem}>
                   <X size={20} aria-hidden="true" />
                   Keep it
                 </button>
@@ -221,8 +301,8 @@ function ActionSheetBody({
                     key={item.key}
                     type="button"
                     onClick={choose(() => {
-                      if (item.key === 'delete') {
-                        setConfirmingDelete(true);
+                      if (item.key === 'delete' || item.key === 'report' || item.key === 'block') {
+                        setStep(item.key);
                         return;
                       }
                       onClose();

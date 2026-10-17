@@ -77,6 +77,13 @@ service cloud.firestore {
         request.resource.data.lastReadAt == request.time;
     }
 
+    // Per-user chat blocks (App Store guideline 1.2). Server-only: the chat API
+    // reads and writes them with the Admin SDK, so no client access at all.
+    // Explicit for clarity; the default deny below already covers it.
+    match /users/{userId}/chatBlocks/{blockedId} {
+      allow read, write: if false;
+    }
+
     // Per-user "I've been paid for this sale" marks (client-written). Private to
     // the rep: their own reconciliation against a paycheck, never a payroll
     // record, so nobody — manager, admin or owner — can read another user's.
@@ -216,6 +223,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /askUsage/{usageId} {
+      allow read, write: if false;
+    }
+
+    // Chat message reports (App Store guideline 1.2). Server-only: filed by
+    // POST /api/portal/chat/messages/report, worked in the admin queue through
+    // /api/portal/admin/chat-reports. Explicit; the default deny covers it too.
+    match /chatReports/{reportId} {
       allow read, write: if false;
     }
 

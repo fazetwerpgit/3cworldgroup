@@ -47,9 +47,13 @@ export async function markChannelRead(uid: string, channelId: string): Promise<v
   });
 }
 
+const NO_READS: Record<string, Date | null> = {};
+
 export interface ChatUnreadResult {
   unreadByChannel: Record<string, boolean>;
   anyUnread: boolean;
+  /** The settled read receipts (empty until they load): what unread counts count from. */
+  lastReadByChannel: Record<string, Date | null>;
 }
 
 /**
@@ -118,5 +122,10 @@ export function useChatUnread(
     [unreadByChannel]
   );
 
-  return { unreadByChannel, anyUnread };
+  const lastReadByChannel = useMemo(
+    () => (uid && canSubscribe && reads.uid === uid ? reads.byChannel : NO_READS),
+    [reads, uid, canSubscribe]
+  );
+
+  return { unreadByChannel, anyUnread, lastReadByChannel };
 }

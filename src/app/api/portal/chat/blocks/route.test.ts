@@ -47,7 +47,7 @@ import { getVerifiedChatUser } from '@/lib/chat/access';
 
 const verified = vi.mocked(getVerifiedChatUser);
 
-function call(handler: typeof POST, method: string, body?: unknown) {
+function call(handler: (request: NextRequest) => Promise<Response>, method: string, body?: unknown) {
   return handler(
     new NextRequest('http://localhost/api/portal/chat/blocks', {
       method,

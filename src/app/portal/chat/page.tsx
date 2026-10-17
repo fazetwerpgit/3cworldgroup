@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import type { CSSProperties } from 'react';
 import { AlertCircle, ArrowDown, Check, Clock, FileText, ImagePlus, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
+import { ChatTermsSheet } from '@/components/chat/ChatTermsSheet';
 import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { GifPicker } from '@/components/chat/GifPicker';
@@ -28,6 +29,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useChatOutbox } from '@/contexts/ChatOutboxContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
+import { useChatUnreadCounts } from '@/hooks/chat/useChatUnreadCounts';
+import { useChatSafety } from '@/hooks/chat/useChatSafety';
+import { useIsNativeApp } from '@/lib/app/isNativeApp';
+import { reportChatContext } from '@/lib/app/bridge';
+import { APP_NAVIGATE_EVENT } from '@/lib/app/links';
+import type { ReportReason } from '@/lib/chat/moderationShared';
 import { useMarkChannelRead } from '@/hooks/chat/useMarkChannelRead';
 import { useConnectionNotice } from '@/hooks/chat/useConnectionNotice';
 import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
@@ -375,7 +382,8 @@ export default function TeamChatPage() {
 
   // Unread badges: compare each channel's streamed lastMessageAt against this
   // user's own read receipts. All-read until reads settle (see the hook).
-  const { unreadByChannel } = useChatUnread(channels, user?.uid);
+  const { unreadByChannel, lastReadByChannel } = useChatUnread(channels, user?.uid);
+  const unreadCounts = useChatUnreadCounts(channels, unreadByChannel, lastReadByChannel);
 
   // The channel currently visible to this reader (empty when none is open): the
   // active channel on desktop, or the active channel only while the mobile thread
@@ -468,6 +476,57 @@ export default function TeamChatPage() {
       headers: { ...(init?.headers || {}), Authorization: `Bearer ${token ?? ''}` },
     });
   }, []);
+
+  // Report / block / chat agreement (App Store guideline 1.2). Report and block
+  // are on every surface; the one-time agreement gates chat in the app only.
+  const inApp = useIsNativeApp();
+  const safety = useChatSafety(user?.uid, authedFetch);
+  const [notice, setNotice] = useState('');
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  const reportMessage = useCallback(
+    async (message: ThreadMessage, reason: ReportReason) => {
+      if (!activeChannelId) return;
+      setError('');
+      try {
+        await safety.report({ channelId: activeChannelId, messageId: message.id, reason });
+        setNotice('Thanks. An admin will review it.');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not send the report. Try again.');
+      }
+    },
+    [activeChannelId, safety]
+  );
+
+  const blockAuthor = useCallback(
+    async (message: ThreadMessage) => {
+      setError('');
+      try {
+        const name = await safety.block(message.authorId);
+        setNotice(`${name || message.authorName} is blocked.`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not block. Try again.');
+      }
+    },
+    [safety]
+  );
+
+  const unblockAuthor = useCallback(
+    async (message: ThreadMessage) => {
+      setError('');
+      try {
+        await safety.unblock(message.authorId);
+        setNotice(`${message.authorName} is unblocked.`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not unblock. Try again.');
+      }
+    },
+    [safety]
+  );
 
   // Company sales tape (All Company channel only): fetched on mount, not per
   // channel switch — the numbers don't depend on which channel is active, only
@@ -604,6 +663,32 @@ export default function TeamChatPage() {
     setActiveChannelId(linkedChannel);
     setMobileView('thread');
   }, []);
+
+  // In the app a push tap arrives as a soft navigation (AppBridgeHost
+  // router.push()es and announces the route) instead of a reload, so this page
+  // stays mounted: open the linked channel the same way the mount effect does.
+  useEffect(() => {
+    const onAppNavigate = (event: Event) => {
+      const route = (event as CustomEvent<string>).detail;
+      if (typeof route !== 'string') return;
+      const url = new URL(route, window.location.origin);
+      if (url.pathname !== '/portal/chat') return;
+      const linkedChannel = url.searchParams.get('channel');
+      if (!linkedChannel) return;
+      setActiveChannelId(linkedChannel);
+      setMobileView('thread');
+    };
+    window.addEventListener(APP_NAVIGATE_EVENT, onAppNavigate);
+    return () => window.removeEventListener(APP_NAVIGATE_EVENT, onAppNavigate);
+  }, []);
+
+  // Tell the app shell which channel is on screen, so it can skip the
+  // foreground banner for a push about the conversation being read. A no-op
+  // outside the app.
+  useEffect(() => {
+    reportChatContext(viewingChannelId || null);
+  }, [viewingChannelId]);
+  useEffect(() => () => reportChatContext(null), []);
 
   // Keep ?channel= naming the thread actually on screen (none while the phone
   // channel list shows). The service worker reads it to silence a push only
@@ -997,6 +1082,12 @@ export default function TeamChatPage() {
           {shownError}
         </p>
       )}
+      {!shownError && notice ? (
+        <p className={`${c.alert} ${c.alertNotice} ${s.deskOnly}`} role="status">
+          <Check size={16} aria-hidden="true" />
+          {notice}
+        </p>
+      ) : null}
 
       {/* Desktop: channel rail + conversation, sized to the viewport. */}
       <div className={c.desk}>
@@ -1011,6 +1102,9 @@ export default function TeamChatPage() {
               error={channelsError}
               onRetry={retryChannels}
               unreadByChannel={unreadByChannel}
+              unreadCounts={unreadCounts}
+              currentUserId={user?.uid}
+              blockedUids={safety.blockedUids}
               activeChannelId={activeChannelId}
               onSelect={setActiveChannelId}
             />
@@ -1184,6 +1278,7 @@ export default function TeamChatPage() {
                         {!isPending && (
                           <div className={c.rowActions}>
                             <MessageActions
+                              authorName={message.authorName}
                               config={{
                                 hasText: !!message.text,
                                 canEdit,
@@ -1196,6 +1291,14 @@ export default function TeamChatPage() {
                                 onDelete: () => deleteMessage(message.id),
                                 onTogglePin: () => void togglePin(message),
                                 onReadBy: () => openReadBy(message),
+                                ...(message.authorId !== user?.uid
+                                  ? {
+                                      onReport: (reason: ReportReason) => void reportMessage(message, reason),
+                                      ...(safety.blockedUids.has(message.authorId)
+                                        ? { onUnblock: () => void unblockAuthor(message) }
+                                        : { onBlock: () => void blockAuthor(message) }),
+                                    }
+                                  : {}),
                               }}
                             />
                           </div>
@@ -1376,6 +1479,11 @@ export default function TeamChatPage() {
             onSaveEdit={saveEdit}
             onReadBy={openReadBy}
             onFollowingChange={setMobileFollowing}
+            notice={notice}
+            blockedUids={safety.blockedUids}
+            onReport={reportMessage}
+            onBlock={blockAuthor}
+            onUnblock={unblockAuthor}
           />
         ) : (
           <>
@@ -1391,6 +1499,9 @@ export default function TeamChatPage() {
               error={channelsError}
               onRetry={retryChannels}
               unreadByChannel={unreadByChannel}
+              unreadCounts={unreadCounts}
+              currentUserId={user?.uid}
+              blockedUids={safety.blockedUids}
               onOpenChannel={openChannelOnPhone}
             />
           </>
@@ -1399,6 +1510,7 @@ export default function TeamChatPage() {
       <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
       <ReadBySheet target={readByTarget} authedFetch={authedFetch} onClose={closeReadBy} />
       <ChatLightbox image={lightbox} onClose={closeLightbox} />
+      {inApp && safety.termsAccepted === false ? <ChatTermsSheet onAccept={safety.acceptTerms} /> : null}
     </div>
   );
 }
