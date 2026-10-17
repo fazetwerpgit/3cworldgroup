@@ -28,7 +28,7 @@ function satisfiesRoles(
 }
 
 export function useRequireAuth(options: UseRequireAuthOptions = {}) {
-  const { user, loading, hasPermission } = useAuth();
+  const { user, loading, hasPermission, profileVerified } = useAuth();
   const router = useRouter();
   const {
     requiredRoles,
@@ -55,6 +55,11 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
       return;
     }
 
+    // Role and permission redirects wait for the real profile read: the copy
+    // this device remembered may be out of date (a role just changed), and
+    // bouncing on it would send the rep to the wrong page.
+    if (!profileVerified) return;
+
     // Check role requirements
     if (!satisfiesRoles(user, requiredRoles)) {
       router.replace('/portal/dashboard');
@@ -72,6 +77,7 @@ export function useRequireAuth(options: UseRequireAuthOptions = {}) {
   }, [
     user,
     loading,
+    profileVerified,
     router,
     requiredRoles,
     requiredPermissions,

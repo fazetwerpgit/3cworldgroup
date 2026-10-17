@@ -9,20 +9,47 @@ import type { User } from '@/types';
 // it. It never grants access: every API route verifies the ID token itself.
 
 const KEY = '3c.portal.sessionProfile.v1';
-const DATE_FIELDS = ['hireDate', 'createdAt', 'updatedAt', 'lastActiveAt'] as const;
+
+// Only what the shell and role gates need to paint. Personal details (address,
+// phone, city/state/zip, shirt size, hire date) never touch device storage;
+// they arrive with the real profile read a moment later.
+const PERSISTED_FIELDS = [
+  'uid',
+  'email',
+  'displayName',
+  'role',
+  'fieldRole',
+  'isIBO',
+  'status',
+  'avatarUrl',
+  'pushRequired',
+  'territoryId',
+  'reportsToId',
+] as const;
 
 type Stored = { v: 1; user: Record<string, unknown> };
+
+function pick(source: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of PERSISTED_FIELDS) {
+    if (source[field] !== undefined && source[field] !== null) out[field] = source[field];
+  }
+  return out;
+}
 
 export function readSessionProfile(): User | null {
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Stored;
-    const user = parsed?.v === 1 ? parsed.user : null;
-    if (!user || typeof user.uid !== 'string' || !user.uid || user.status !== 'active') return null;
-    for (const field of DATE_FIELDS) {
-      const value = user[field];
-      user[field] = typeof value === 'string' ? new Date(value) : undefined;
+    const stored = parsed?.v === 1 ? parsed.user : null;
+    if (!stored || typeof stored !== 'object') return null;
+    if (typeof stored.uid !== 'string' || !stored.uid || stored.status !== 'active') return null;
+    // An entry written before the allowlist holds the full profile: strip it
+    // and rewrite the trimmed copy so the extra fields leave storage too.
+    const user = pick(stored);
+    if (Object.keys(stored).some((key) => !(key in user))) {
+      window.localStorage.setItem(KEY, JSON.stringify({ v: 1, user } satisfies Stored));
     }
     return user as unknown as User;
   } catch {
@@ -36,7 +63,7 @@ export function writeSessionProfile(user: User): void {
     return;
   }
   try {
-    const stored: Stored = { v: 1, user: JSON.parse(JSON.stringify(user)) as Record<string, unknown> };
+    const stored: Stored = { v: 1, user: pick(user as unknown as Record<string, unknown>) };
     window.localStorage.setItem(KEY, JSON.stringify(stored));
   } catch {
     // Storage blocked or full: the next open just waits for the profile read.

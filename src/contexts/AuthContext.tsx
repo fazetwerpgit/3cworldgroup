@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState, useRef, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useRef, ReactNode } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -30,6 +30,7 @@ import { clearViewAs } from '@/lib/viewAs/storage';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 import { setDataCacheOwner } from '@/lib/cache/dataCache';
 import { clearSessionProfile, readSessionProfile, writeSessionProfile } from '@/lib/auth/sessionProfile';
+import { preloadOwnerDashboard } from '@/components/portal/owner/preloadOwnerDashboard';
 
 export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
@@ -46,6 +47,10 @@ export interface AuthContextType extends AuthState {
   // a retry screen instead of signing the rep out.
   profileLoadFailed: boolean;
   retryProfileLoad: () => Promise<void>;
+  // True once the user on screen came from a real read of users/{uid} for the
+  // confirmed session. False while the portal paints from the profile this
+  // device remembered (sessionProfile.ts): role-based redirects wait for it.
+  profileVerified: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -67,6 +72,10 @@ const profileLoadErrorMessage =
 // read failure must never sign the rep out: on a weak cell signal Firestore
 // reports "client is offline"/unavailable, which says nothing about the account.
 const PROFILE_RETRY_DELAYS_MS = [1000, 3000];
+// When the remembered profile is already on screen and the read still fails,
+// the rep keeps working and the read is retried quietly on this backoff (the
+// last wait repeats), as well as on 'online' and by the live profile listener.
+const QUIET_PROFILE_RETRY_DELAYS_MS = [5000, 15000, 30000, 60000];
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // Best-effort, fire-and-forget: copies a Google SSO photoURL onto the caller's
@@ -180,8 +189,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profileLoadFailedRef.current = profileLoadFailed;
   }, [profileLoadFailed]);
   // True once the user on screen came from a real read of users/{uid} for the
-  // confirmed session (not the device's remembered copy).
-  const profileVerified = useRef(false);
+  // confirmed session (not the device's remembered copy). The ref is what the
+  // auth listener reads; the state is what consumers (useRequireAuth) see.
+  const profileVerifiedRef = useRef(false);
+  const [profileVerified, setProfileVerifiedState] = useState(false);
+  const markProfileVerified = useCallback((verified: boolean) => {
+    profileVerifiedRef.current = verified;
+    setProfileVerifiedState(verified);
+  }, []);
+  // The user currently on screen, for the auth listener (its closure is stale).
+  const shownUser = useRef<User | null>(null);
+  useEffect(() => {
+    shownUser.current = state.user;
+  }, [state.user]);
+  // Quiet retry of the profile read while the remembered profile stays up.
+  const quietRetry = useRef<{ timer: ReturnType<typeof setTimeout> | null; attempt: number } | null>(null);
+  const cancelQuietRetry = useCallback(() => {
+    if (quietRetry.current?.timer) clearTimeout(quietRetry.current.timer);
+    quietRetry.current = null;
+  }, []);
+
+  // Owners land on the company view: fetch its chunk as soon as a profile
+  // (the remembered one at mount, then the real one) says owner.
+  useEffect(() => {
+    if (isOwner(readSessionProfile()?.role)) preloadOwnerDashboard();
+  }, []);
+  useEffect(() => {
+    if (isOwner(state.user?.role)) preloadOwnerDashboard();
+  }, [state.user?.role]);
 
   // Keep the remembered copy in step with the confirmed profile; drop it when
   // the session ends or resolves to anything but this account. A profile read
@@ -189,11 +224,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state.loading || profileLoadFailed) return;
     if (state.user) {
-      if (profileVerified.current) writeSessionProfile(state.user);
+      if (profileVerified) writeSessionProfile(state.user);
     } else {
       clearSessionProfile();
     }
-  }, [state.user, state.loading, profileLoadFailed]);
+  }, [state.user, state.loading, profileLoadFailed, profileVerified]);
 
   const fetchUserData = async (firebaseUser: FirebaseUser): Promise<FetchUserDataResult> => {
     if (!db) return { status: 'error', error: new Error('Firestore is not configured') };
@@ -254,12 +289,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (snap.metadata.fromCache || !snap.exists()) return;
           const next = toUser(uid, snap.data());
           if (next.status === 'active' || (next.status === 'pending' && !isAwaitingRoleAssignment(next))) {
+            // A server snapshot is a real read: it verifies a remembered
+            // profile kept up through a failed read and ends the quiet retry.
+            if (shownUser.current?.uid === uid) {
+              cancelQuietRetry();
+              markProfileVerified(true);
+            }
             setState((prev) =>
               prev.user?.uid === uid && !sameUser(prev.user, next) ? { ...prev, user: next } : prev
             );
             return;
           }
           stopWatchingProfile();
+          cancelQuietRetry();
           resolveGeneration.current += 1;
           void (async () => {
             if (auth) await firebaseSignOut(auth);
@@ -270,13 +312,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
     };
 
+    const scheduleQuietRetry = (firebaseUser: FirebaseUser) => {
+      const attempt = quietRetry.current ? quietRetry.current.attempt + 1 : 0;
+      if (quietRetry.current?.timer) clearTimeout(quietRetry.current.timer);
+      const delay = QUIET_PROFILE_RETRY_DELAYS_MS[Math.min(attempt, QUIET_PROFILE_RETRY_DELAYS_MS.length - 1)];
+      const generation = resolveGeneration.current;
+      const timer = setTimeout(() => {
+        if (quietRetry.current) quietRetry.current.timer = null;
+        if (generation !== resolveGeneration.current) return;
+        if (auth?.currentUser?.uid !== firebaseUser.uid) return;
+        void resolveProfileRef.current?.(firebaseUser);
+      }, delay);
+      quietRetry.current = { timer, attempt };
+    };
+
     const resolveProfile = async (firebaseUser: FirebaseUser) => {
       const generation = ++resolveGeneration.current;
       stopWatchingProfile();
+      if (quietRetry.current?.timer) {
+        clearTimeout(quietRetry.current.timer);
+        quietRetry.current.timer = null;
+      }
       const userDataResult = await fetchUserDataWithRetry(firebaseUser, generation);
       if (!userDataResult) return; // superseded by a newer auth event
+      if (userDataResult.status === 'error' && shownUser.current?.uid === firebaseUser.uid) {
+        // The remembered (or an earlier) profile for this same account is on
+        // screen and the read only failed (weak signal): keep the rep working.
+        // No retry screen, no sign-out; retry quietly on a backoff, on
+        // 'online', and through the live listener's first server snapshot.
+        console.warn('User profile read failed; keeping the profile on screen:', userDataResult.error);
+        watchProfile(firebaseUser.uid);
+        scheduleQuietRetry(firebaseUser);
+        return;
+      }
+      cancelQuietRetry();
       if (userDataResult.status !== 'error') setProfileLoadFailed(false);
-      profileVerified.current = userDataResult.status === 'found';
+      markProfileVerified(userDataResult.status === 'found');
       if (userDataResult.status === 'found') {
         const userData = userDataResult.user;
         if (userData.status === 'active') {
@@ -384,7 +455,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await resolveProfile(firebaseUser);
       } else {
         resolveGeneration.current += 1;
-        profileVerified.current = false;
+        markProfileVerified(false);
+        cancelQuietRetry();
         clearSessionProfile();
         stopWatchingProfile();
         setProfileLoadFailed(false);
@@ -396,7 +468,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Coming back into signal is the most likely moment a retry succeeds.
     const handleOnline = () => {
       const currentUser = auth?.currentUser;
-      if (currentUser && resolveProfileRef.current && profileLoadFailedRef.current) {
+      if (currentUser && resolveProfileRef.current && (profileLoadFailedRef.current || quietRetry.current)) {
         void resolveProfileRef.current(currentUser);
       }
     };
@@ -405,9 +477,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       unsubscribe();
       stopWatchingProfile();
+      cancelQuietRetry();
       window.removeEventListener('online', handleOnline);
     };
-  }, []);
+  }, [cancelQuietRetry, markProfileVerified]);
 
   const retryProfileLoad = async () => {
     const currentUser = auth?.currentUser;
@@ -501,7 +574,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Cached screens (an owner's include financials) never outlive the sign-in.
       setDataCacheOwner(null);
       // Nor does the remembered profile: the next open starts at the sign-in.
-      profileVerified.current = false;
+      markProfileVerified(false);
+      cancelQuietRetry();
       clearSessionProfile();
       // Same for the Ask 3C conversation and practice: the next rep must not see or send them.
       try {
@@ -557,7 +631,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentUser) {
       const userDataResult = await fetchUserData(currentUser);
       if (userDataResult.status === 'found') {
-        profileVerified.current = true;
+        markProfileVerified(true);
         setState((prev) => ({ ...prev, user: userDataResult.user }));
       }
     }
@@ -595,6 +669,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearPendingApproval,
         profileLoadFailed,
         retryProfileLoad,
+        profileVerified,
       }}
     >
       {profileLoadFailed ? (
