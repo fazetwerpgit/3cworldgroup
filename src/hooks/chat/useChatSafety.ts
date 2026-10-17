@@ -11,6 +11,8 @@ export interface ChatSafety {
   /** null until known (loading, or the call failed); then whether the chat agreement was accepted. */
   termsAccepted: boolean | null;
   acceptTerms: () => Promise<void>;
+  /** The send route refused a message until the agreement is accepted: treat it as not accepted. */
+  requireTerms: () => void;
   block: (uid: string) => Promise<string>;
   unblock: (uid: string) => Promise<void>;
   report: (input: { channelId: string; messageId: string; reason: ReportReason }) => Promise<void>;
@@ -68,6 +70,15 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
     setLoaded((prev) => (prev ? { ...prev, termsAccepted: true } : prev));
   }, [authedFetch]);
 
+  const requireTerms = useCallback(() => {
+    if (!uid) return;
+    setLoaded((prev) =>
+      prev && prev.uid === uid
+        ? { ...prev, termsAccepted: false }
+        : { uid, blocked: prev?.uid === uid ? prev.blocked : new Set<string>(), termsAccepted: false }
+    );
+  }, [uid]);
+
   const block = useCallback(
     async (target: string) => {
       const res = await authedFetch('/api/portal/chat/blocks', {
@@ -116,7 +127,7 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
   const blockedUids = current?.blocked ?? NO_BLOCKS;
   const termsAccepted = current?.termsAccepted ?? null;
   return useMemo(
-    () => ({ blockedUids, termsAccepted, acceptTerms, block, unblock, report }),
-    [blockedUids, termsAccepted, acceptTerms, block, unblock, report]
+    () => ({ blockedUids, termsAccepted, acceptTerms, requireTerms, block, unblock, report }),
+    [blockedUids, termsAccepted, acceptTerms, requireTerms, block, unblock, report]
   );
 }

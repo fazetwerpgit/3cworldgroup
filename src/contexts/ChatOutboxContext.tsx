@@ -6,6 +6,7 @@ import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import {
+  CHAT_TERMS_CODE,
   SendRequestError,
   autoRetryExpired,
   classifySendError,
@@ -62,6 +63,11 @@ interface ChatOutboxValue {
   reconcile: (deliveredIds: ReadonlySet<string>, channelId: string, windowFloorMs: number | null) => void;
   // Send errors as they happen ('' when a send starts); the Chat page shows them.
   subscribeErrors: (listener: (message: string) => void) => () => void;
+  // A send refused until the chat rules are accepted (app only); the Chat page
+  // shows the rules sheet instead of an error. Without a listener it is a plain error.
+  subscribeTermsRequired: (listener: () => void) => () => void;
+  // Sends again every message parked by subscribeTermsRequired (after accepting).
+  retryTermsBlocked: () => void;
 }
 
 const ChatOutboxContext = createContext<ChatOutboxValue | null>(null);
@@ -89,6 +95,17 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
   const retryTimersRef = useRef<Map<string, number>>(new Map());
   const uidRef = useRef(uid);
   const errorListenersRef = useRef<Set<(message: string) => void>>(new Set());
+
+  // Chat page listeners for "the chat rules must be accepted first" (app only),
+  // and the echoes parked by it until they are.
+  const termsListenersRef = useRef<Set<() => void>>(new Set());
+  const termsBlockedRef = useRef<Set<string>>(new Set());
+  const subscribeTermsRequired = useCallback((listener: () => void) => {
+    termsListenersRef.current.add(listener);
+    return () => {
+      termsListenersRef.current.delete(listener);
+    };
+  }, []);
 
   const emitError = useCallback((message: string) => {
     for (const listener of errorListenersRef.current) listener(message);
@@ -257,7 +274,11 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
         }
         const json = await response.json().catch(() => ({}));
         if (!response.ok) {
-          throw new SendRequestError(json.error || 'Failed to send message', { kind: 'http', status: response.status });
+          throw new SendRequestError(
+            json.error || 'Failed to send message',
+            { kind: 'http', status: response.status },
+            typeof json.code === 'string' ? json.code : undefined
+          );
         }
         if (json.duplicate === true) {
           // Stored by an earlier attempt whose response was lost: the message is
@@ -271,6 +292,15 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
           sendAttempts: 0,
         });
       } catch (err) {
+        // The app's send route wants the chat rules agreed first: park the
+        // message as "Not sent", ask the Chat page to show the rules sheet, and
+        // send it again once they are accepted (retryTermsBlocked).
+        if (err instanceof SendRequestError && err.code === CHAT_TERMS_CODE && termsListenersRef.current.size > 0) {
+          termsBlockedRef.current.add(echo.id);
+          updateEcho(echo.id, { pendingState: 'failed', sendAttempts: 0, uploadProgress: undefined });
+          for (const listener of termsListenersRef.current) listener();
+          return;
+        }
         const failure = classifySendError(err);
         const windowStart = echo.retryWindowStart ?? echo.createdAt?.getTime() ?? Date.now();
         const decision = failure
@@ -496,9 +526,27 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
     []
   );
 
+  const retryTermsBlocked = useCallback(() => {
+    const ids = termsBlockedRef.current;
+    termsBlockedRef.current = new Set();
+    for (const echo of echoesRef.current) {
+      if (ids.has(echo.id) && echo.pendingState === 'failed') retry(echo);
+    }
+  }, [retry]);
+
   const value = useMemo(
-    () => ({ echoes, send, retry, sendTextOnly, discard, reconcile, subscribeErrors }),
-    [echoes, send, retry, sendTextOnly, discard, reconcile, subscribeErrors]
+    () => ({
+      echoes,
+      send,
+      retry,
+      sendTextOnly,
+      discard,
+      reconcile,
+      subscribeErrors,
+      subscribeTermsRequired,
+      retryTermsBlocked,
+    }),
+    [echoes, send, retry, sendTextOnly, discard, reconcile, subscribeErrors, subscribeTermsRequired, retryTermsBlocked]
   );
   return <ChatOutboxContext.Provider value={value}>{children}</ChatOutboxContext.Provider>;
 }

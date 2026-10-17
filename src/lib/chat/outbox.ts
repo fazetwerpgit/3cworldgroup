@@ -45,10 +45,15 @@ export type SendFailure = { kind: 'network' } | { kind: 'http'; status: number }
 // A send/upload request that failed in a classifiable way. Anything else thrown
 // on the send path (a photo the phone can't read, a HEIC it can't convert) is
 // permanent and goes straight to "Not sent".
+/** The send route's code for "agree to the team chat rules first" (403, app only). */
+export const CHAT_TERMS_CODE = 'chat_terms';
+
 export class SendRequestError extends Error {
   constructor(
     message: string,
-    readonly failure: SendFailure
+    readonly failure: SendFailure,
+    /** The route's machine-readable `code`, when it sent one (e.g. CHAT_TERMS_CODE). */
+    readonly code?: string
   ) {
     super(message);
     this.name = 'SendRequestError';

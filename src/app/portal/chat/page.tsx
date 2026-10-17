@@ -810,6 +810,17 @@ export default function TeamChatPage() {
   // Send errors come from the outbox (it sends even while this page is closed).
   const subscribeSendErrors = outbox.subscribeErrors;
   useEffect(() => subscribeSendErrors(setError), [subscribeSendErrors]);
+  // In the app, a send refused until the chat rules are accepted opens the
+  // rules sheet (not an error); accepting sends the parked messages again.
+  const subscribeTermsRequired = outbox.subscribeTermsRequired;
+  const requireTerms = safety.requireTerms;
+  useEffect(() => (inApp ? subscribeTermsRequired(requireTerms) : undefined), [inApp, subscribeTermsRequired, requireTerms]);
+  const retryTermsBlocked = outbox.retryTermsBlocked;
+  const acceptTerms = safety.acceptTerms;
+  const acceptTermsAndResend = useCallback(async () => {
+    await acceptTerms();
+    retryTermsBlocked();
+  }, [acceptTerms, retryTermsBlocked]);
 
   // A locally-built reply quote for an optimistic echo (author + snippet), mirroring
   // the server's rule: text sliced to 140, or Photo/GIF for an attachment-only source.
@@ -1522,7 +1533,7 @@ export default function TeamChatPage() {
       <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} />
       <ReadBySheet target={readByTarget} authedFetch={authedFetch} onClose={closeReadBy} />
       <ChatLightbox image={lightbox} onClose={closeLightbox} />
-      {inApp && safety.termsAccepted === false ? <ChatTermsSheet onAccept={safety.acceptTerms} /> : null}
+      {inApp && safety.termsAccepted === false ? <ChatTermsSheet onAccept={acceptTermsAndResend} /> : null}
     </div>
   );
 }
