@@ -39,6 +39,29 @@ export function shouldPushChatRecipient(
   return userCanAccessChannelDoc(channelData, { uid, role, fieldRole });
 }
 
+// Of these recipients, the ones who blocked the author (users/{uid}/chatBlocks/
+// {authorId} exists). One getAll per batch. A failed lookup is logged and
+// treated as no blocks, so a Firestore hiccup never silences a whole channel.
+export async function recipientsWhoBlocked(
+  db: FirebaseFirestore.Firestore,
+  uids: string[],
+  authorId: string
+): Promise<Set<string>> {
+  const blocked = new Set<string>();
+  if (uids.length === 0) return blocked;
+  try {
+    const snaps = await db.getAll(
+      ...uids.map((uid) => db.collection('users').doc(uid).collection('chatBlocks').doc(authorId))
+    );
+    snaps.forEach((snap, index) => {
+      if (snap.exists) blocked.add(uids[index]);
+    });
+  } catch (err) {
+    console.error('[chat] block lookup failed', err);
+  }
+  return blocked;
+}
+
 export interface ChatPushTotals {
   recipients: number;
   sent: number;
@@ -46,9 +69,10 @@ export interface ChatPushTotals {
   pruned: number;
 }
 
-// Pushes a chat message to every qualifying member except the author, batch by
-// batch. Best-effort: a failed batch is logged and the rest still go out.
-// Sent with high urgency so iOS delivers it now rather than deferring it.
+// Pushes a chat message to every qualifying member except the author (and
+// anyone who blocked them), batch by batch. Best-effort: a failed batch is
+// logged and the rest still go out. Sent with high urgency so iOS delivers it
+// now rather than deferring it.
 export async function sendChatPush(
   channelData: FirebaseFirestore.DocumentData,
   authorId: string,
@@ -63,10 +87,16 @@ export async function sendChatPush(
     const batch = recipients.slice(i, i + CHAT_PUSH_BATCH_SIZE);
     try {
       const snaps = await db.getAll(...batch.map((uid) => db.collection('users').doc(uid)));
+      const eligible = snaps.filter((snap) => {
+        const userData = snap.exists ? snap.data() : undefined;
+        return !!userData && shouldPushChatRecipient(channelData, snap.id, userData);
+      });
+      // Someone who blocked the author gets no push for their messages.
+      const blocked = await recipientsWhoBlocked(db, eligible.map((snap) => snap.id), authorId);
       await Promise.all(
-        snaps.map(async (snap) => {
-          const userData = snap.exists ? snap.data() : undefined;
-          if (!userData || !shouldPushChatRecipient(channelData, snap.id, userData)) return;
+        eligible.map(async (snap) => {
+          if (blocked.has(snap.id)) return;
+          const userData = snap.data() ?? {};
           const targets = pushTargetsOf(userData);
           totals.recipients += 1;
           // Web-only users get the plain token array, exactly as before the app.

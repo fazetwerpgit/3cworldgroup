@@ -5,6 +5,7 @@ import { ChatAttachment, ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { buildChatPushBody, pushChatMessageOnce } from '@/lib/push/chatPush';
 import { chatMessageDocId, isValidClientMessageId } from '@/lib/chat/outbox';
+import { buildLastMessage } from '@/lib/chat/lastMessage';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   attachmentSnippet,
@@ -135,13 +136,15 @@ function senderReceiptRef(uid: string, channelId: string) {
 async function bumpLastMessageAt(
   channelRef: FirebaseFirestore.DocumentReference,
   createdAt: unknown,
-  senderId: string
+  senderId: string,
+  messageId: string,
+  stored: FirebaseFirestore.DocumentData
 ): Promise<void> {
   if (!(createdAt instanceof Timestamp)) return;
   await adminDb!.runTransaction(async (tx) => {
     const current = (await tx.get(channelRef)).data()?.lastMessageAt;
     if (current instanceof Timestamp && current.toMillis() >= createdAt.toMillis()) return;
-    tx.set(channelRef, { lastMessageAt: createdAt }, { merge: true });
+    tx.set(channelRef, { lastMessageAt: createdAt, lastMessage: buildLastMessage(messageId, stored) }, { merge: true });
     tx.set(senderReceiptRef(senderId, channelRef.id), { lastReadAt: FieldValue.serverTimestamp() }, { merge: true });
   });
 }
@@ -154,6 +157,8 @@ const DUPLICATE_PUSH_MAX_AGE_MS = 5 * 60 * 1000;
 // newest message still standing (or is cleared when the channel has none left),
 // so a dot raised only by the deleted message goes away. Left alone when a newer
 // message exists, or when the window holds no standing message but older ones may.
+// The list preview (lastMessage) follows the same message, and is cleared
+// whenever it would otherwise keep showing the deleted text.
 // Runs in a transaction so a send landing meanwhile is never undercut.
 const RECOMPUTE_WINDOW = 25;
 async function recomputeLastMessageAt(
@@ -164,21 +169,48 @@ async function recomputeLastMessageAt(
   if (!(deletedCreatedAt instanceof Timestamp)) return;
   const deletedMs = deletedCreatedAt.toMillis();
   await adminDb!.runTransaction(async (tx) => {
-    const current = (await tx.get(channelRef)).data()?.lastMessageAt;
+    const channel = (await tx.get(channelRef)).data();
+    const current = channel?.lastMessageAt;
+    const previewShowsDeleted = channel?.lastMessage?.messageId === deletedId;
     // Bumped by a later send (pre-atomic bumps trail their message by a moment).
-    if (current instanceof Timestamp && current.toMillis() > deletedMs + 5000) return;
+    if (current instanceof Timestamp && current.toMillis() > deletedMs + 5000) {
+      if (previewShowsDeleted) tx.set(channelRef, { lastMessage: FieldValue.delete() }, { merge: true });
+      return;
+    }
     const recent = await tx.get(
       channelRef.collection('messages').orderBy('createdAt', 'desc').limit(RECOMPUTE_WINDOW)
     );
     const newest = recent.docs.find((doc) => doc.id !== deletedId && !doc.data().deletedAt);
     const newestAt = newest?.data().createdAt;
-    if (newestAt instanceof Timestamp && newestAt.toMillis() > deletedMs) return;
-    if (!newest && recent.docs.length >= RECOMPUTE_WINDOW) return;
+    const preview = previewShowsDeleted
+      ? { lastMessage: newest ? buildLastMessage(newest.id, newest.data()) : FieldValue.delete() }
+      : {};
+    if (
+      (newestAt instanceof Timestamp && newestAt.toMillis() > deletedMs) ||
+      (!newest && recent.docs.length >= RECOMPUTE_WINDOW)
+    ) {
+      if (previewShowsDeleted) tx.set(channelRef, preview, { merge: true });
+      return;
+    }
     tx.set(
       channelRef,
-      { lastMessageAt: newestAt instanceof Timestamp ? newestAt : FieldValue.delete() },
+      { lastMessageAt: newestAt instanceof Timestamp ? newestAt : FieldValue.delete(), ...preview },
       { merge: true }
     );
+  });
+}
+
+// An edit of the message the channel list previews rewrites the preview too.
+async function refreshLastMessagePreview(
+  channelRef: FirebaseFirestore.DocumentReference,
+  messageId: string,
+  message: FirebaseFirestore.DocumentData,
+  text: string
+): Promise<void> {
+  await adminDb!.runTransaction(async (tx) => {
+    const preview = (await tx.get(channelRef)).data()?.lastMessage;
+    if (preview?.messageId !== messageId) return;
+    tx.set(channelRef, { lastMessage: buildLastMessage(messageId, { ...message, text }) }, { merge: true });
   });
 }
 
@@ -288,11 +320,16 @@ export async function POST(request: NextRequest) {
     };
 
     // The message, the channel's lastMessageAt bump (what unread badges compare
-    // users/{uid}/chatReads receipts against) and the sender's own receipt commit
-    // together, so all carry the same commit timestamp and none lands alone.
+    // users/{uid}/chatReads receipts against) with its list preview, and the
+    // sender's own receipt commit together, so all carry the same commit
+    // timestamp and none lands alone.
     const write = adminDb!.batch();
     write.create(messageRef, messageDoc);
-    write.set(channelRef, { lastMessageAt: FieldValue.serverTimestamp() }, { merge: true });
+    write.set(
+      channelRef,
+      { lastMessageAt: FieldValue.serverTimestamp(), lastMessage: buildLastMessage(messageRef.id, messageDoc) },
+      { merge: true }
+    );
     write.set(senderReceiptRef(user.uid, channelId), { lastReadAt: FieldValue.serverTimestamp() }, { merge: true });
     try {
       await write.commit();
@@ -305,7 +342,7 @@ export async function POST(request: NextRequest) {
       const storedData = stored.data();
       if (storedData && !storedData.deletedAt) {
         try {
-          await bumpLastMessageAt(channelRef, storedData.createdAt, user.uid);
+          await bumpLastMessageAt(channelRef, storedData.createdAt, user.uid, messageRef.id, storedData);
         } catch (bumpError) {
           console.error('Error bumping channel lastMessageAt:', bumpError);
         }
@@ -395,6 +432,17 @@ export async function PATCH(request: NextRequest) {
       { text: text.slice(0, 1000), editedAt: FieldValue.serverTimestamp() },
       { merge: true }
     );
+
+    try {
+      await refreshLastMessagePreview(
+        adminDb!.collection('chatChannels').doc(channelId),
+        messageId,
+        message,
+        text.slice(0, 1000)
+      );
+    } catch (previewError) {
+      console.error('Error refreshing channel lastMessage:', previewError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
