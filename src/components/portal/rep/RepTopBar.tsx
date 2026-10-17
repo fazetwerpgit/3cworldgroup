@@ -5,6 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Bell, BellOff, Bug, ChevronDown, ChevronLeft, LogOut, Menu, MessageCircleQuestion, Plus, Settings, X } from 'lucide-react';
+import { isNativeApp } from '@/lib/app/isNativeApp';
+import { nativePushNotAskedYet } from '@/lib/app/nativePush';
 import { askOpenTo } from '@/lib/ask/flag';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -128,10 +130,31 @@ export function RepTopBar({
   }
 
   useEffect(() => {
-    const update = () => setPushOff(pushNotAskedYet());
+    // In the app the web Notification API says nothing about the phone's
+    // alerts: ask the shell (read-only) and point at the native push row.
+    const inApp = isNativeApp();
+    let latest = 0;
+    const update = () => {
+      if (!inApp) {
+        setPushOff(pushNotAskedYet());
+        return;
+      }
+      const run = ++latest;
+      void nativePushNotAskedYet().then((off) => {
+        if (run === latest) setPushOff(off);
+      });
+    };
     update();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') update();
+    };
     window.addEventListener('focus', update);
-    return () => window.removeEventListener('focus', update);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      latest += 1;
+      window.removeEventListener('focus', update);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, []);
 
   useEffect(() => {
