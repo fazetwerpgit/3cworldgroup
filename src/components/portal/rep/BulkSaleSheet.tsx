@@ -174,7 +174,10 @@ export function BulkSaleSheet({
     return () => window.cancelAnimationFrame(frame);
   }, [keyboard.inset, formRef]);
   const keyboardStyle =
-    keyboard.inset > 0 ? { bottom: keyboard.inset, maxHeight: Math.max(240, keyboard.viewportHeight - 8) } : undefined;
+    keyboard.inset > 0
+      ? // Over the keyboard there is no home indicator to clear: drop the safe-area padding.
+        { bottom: keyboard.inset, maxHeight: Math.max(240, keyboard.viewportHeight - 8), paddingBottom: 0 }
+      : undefined;
 
   // A field the rep looked at or changed no longer needs "Check this".
   const clearFlag = (target: ScanTarget) =>
