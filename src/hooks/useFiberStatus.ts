@@ -3,10 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useCacheSubject } from '@/lib/cache/useCacheSubject';
-import { dataCacheGeneration, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
+import {
+  awaitPendingDataCacheRead,
+  dataCacheGeneration,
+  readDataCacheEntry,
+  writeDataCache,
+} from '@/lib/cache/dataCache';
 import type { FiberStatusResponse } from '@/types';
 
-const FIBER_CACHE_KEY = 'fiber-status';
+/** Cache key of the carrier report (the dashboard and the tab prefetch fill it too). */
+export const FIBER_CACHE_KEY = 'fiber-status';
 
 export function useFiberStatus() {
   const uid = useCacheSubject();
@@ -31,6 +37,16 @@ export function useFiberStatus() {
     else if (!initial) setRefreshing(true);
 
     try {
+      // The tab prefetch is already reading the report: use its answer.
+      const prefetched = fresh ? undefined : await awaitPendingDataCacheRead<FiberStatusResponse>(uid, FIBER_CACHE_KEY);
+      if (prefetched) {
+        if (activeRef.current) {
+          setData(prefetched.value);
+          setError(null);
+          setStaleAt(null);
+        }
+        return;
+      }
       const token = await getIdToken();
       // `fresh` bypasses the server's fiberOrders cache. It is only for the
       // refetch that follows a write: invalidation clears the serverless

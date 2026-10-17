@@ -9,7 +9,10 @@ import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import type { DashboardCall, LeaderboardRow } from '@/lib/dashboard/repSummary';
-import type { CompPlanCompanyRates, CompPlanResponse, FiberOrder, Sale } from '@/types';
+import type { CompPlanCompanyRates, CompPlanResponse, FiberOrder, FiberStatusResponse, Sale } from '@/types';
+import { salesListCacheKey } from '@/hooks/useSales';
+import { FIBER_CACHE_KEY } from '@/hooks/useFiberStatus';
+import { COMP_PLAN_CACHE_KEY, compPlanState } from '@/hooks/useCompPlan';
 
 // The D dashboard's data, one independent section per source. Every section
 // loads in parallel (Promise.allSettled) and renders as it lands, so a slow or
@@ -94,10 +97,16 @@ async function getJson<T>(url: string, token: string | null, signal: AbortSignal
  * without the report the book still stands (as the Sales page does), flagged
  * `carrierFailed` so the page can say the estimates may be off.
  */
-export async function fetchRepBook(uid: string, token: string | null, signal: AbortSignal): Promise<RepBook> {
+export async function fetchRepBook(
+  uid: string,
+  token: string | null,
+  signal: AbortSignal,
+  /** Handed the raw answers (the same requests the Sales tab makes), to seed its cache. */
+  onRaw?: (sales: { sales: Sale[]; truncated?: boolean }, fiber: FiberStatusResponse | null) => void
+): Promise<RepBook> {
   const own = encodeURIComponent(uid);
   const [salesResult, fiberResult] = await Promise.allSettled([
-    getJson<{ sales: Sale[] }>(`/api/portal/sales?salesRepId=${own}&limit=500`, token, signal),
+    getJson<{ sales: Sale[]; truncated?: boolean }>(`/api/portal/sales?salesRepId=${own}&limit=500`, token, signal),
     getJson<{
       scope?: 'own' | 'all';
       orders?: FiberOrder[];
@@ -106,6 +115,9 @@ export async function fetchRepBook(uid: string, token: string | null, signal: Ab
     }>('/api/portal/sales/status', token, signal),
   ]);
   if (salesResult.status === 'rejected') throw salesResult.reason;
+  if (onRaw && !signal.aborted) {
+    onRaw(salesResult.value, fiberResult.status === 'fulfilled' ? (fiberResult.value as FiberStatusResponse) : null);
+  }
   const logged = salesResult.value.sales ?? [];
   const carrierFailed = fiberResult.status === 'rejected';
   if (carrierFailed && !signal.aborted) console.error('Carrier report failed:', fiberResult.reason);
@@ -204,11 +216,20 @@ export function useRepDashboard() {
     const loaders: Partial<Loaders> = {
       // The carrier report sharpens install dates and drops carrier
       // cancellations; see fetchRepBook for what happens without it.
-      book: (token, signal) => fetchRepBook(uid, token, signal),
+      // The dashboard reads exactly what the Sales tab reads for a rep's own
+      // book (the list and the carrier report): seed that tab's cache with it,
+      // so opening Sales next paints at once without asking again.
+      book: (token, signal) =>
+        fetchRepBook(uid, token, signal, (sales, fiber) => {
+          writeDataCache(uid, salesListCacheKey({ limit: 500, salesRepId: uid }), { sales: sales.sales ?? [], truncated: sales.truncated === true }, gen);
+          if (fiber) writeDataCache(uid, FIBER_CACHE_KEY, fiber, gen);
+        }),
       plan: async (token, signal) => {
         // Pending accounts are refused by the route; they have no plan yet.
         if (!active) return { rates: null };
         const data = await getJson<CompPlanResponse>('/api/portal/comp-plan', token, signal);
+        // Same answer the Sales tab's pay view reads: seed it.
+        if (!signal.aborted) writeDataCache(uid, COMP_PLAN_CACHE_KEY, compPlanState(uid, data), gen);
         const rates =
           data.scope === 'all'
             ? ((data.ownRates as CompPlanCompanyRates | null) ?? null)
@@ -256,7 +277,7 @@ export function useRepDashboard() {
       },
     };
     return loaders;
-  }, [active, uid]);
+  }, [active, uid, gen]);
 
   const run = useCallback(
     /** Resolves true when every requested section loaded. */

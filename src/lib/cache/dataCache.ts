@@ -25,6 +25,9 @@ export type DataCacheEntry<T> = { value: T; at: number };
 let owner: string | null = null;
 let generation = 0;
 const entries = new Map<string, DataCacheEntry<unknown>>();
+// Reads under way (a tab prefetch), so a screen opening mid-read waits for it
+// instead of sending the same request again.
+const inflight = new Map<string, Promise<unknown>>();
 
 const SEP = '\u0000';
 
@@ -37,6 +40,7 @@ export function setDataCacheOwner(uid: string | null | undefined): void {
   const next = uid || null;
   if (next === owner) return;
   entries.clear();
+  inflight.clear();
   owner = next;
   generation += 1;
 }
@@ -49,6 +53,7 @@ export function dataCacheGeneration(): number {
 /** Empties the cache (and invalidates fetches in flight). */
 export function clearDataCache(): void {
   entries.clear();
+  inflight.clear();
   generation += 1;
 }
 
@@ -97,6 +102,46 @@ export function writeDataCache<T>(
     if (oldest === undefined) break;
     entries.delete(oldest);
   }
+}
+
+/**
+ * Registers a read under way for this subject and key (see inflight above).
+ * Returns the same promise. A no-op with no signed-in account.
+ */
+export function trackDataCacheRead<T>(subject: string | null | undefined, key: string, read: Promise<T>): Promise<T> {
+  if (!owner || !subject) return read;
+  const id = fullKey(subject, key);
+  inflight.set(id, read);
+  const done = () => {
+    if (inflight.get(id) === read) inflight.delete(id);
+  };
+  read.then(done, done);
+  return read;
+}
+
+/** True while a tracked read for this subject and key is under way. */
+export function isDataCacheReadPending(subject: string | null | undefined, key: string): boolean {
+  return !!owner && !!subject && inflight.has(fullKey(subject, key));
+}
+
+/** How recent a prefetched entry must be for a screen to use it instead of reading again. */
+export const PREFETCH_FRESH_MS = 30_000;
+
+/**
+ * A screen about to read: if a tracked read for the same data is under way,
+ * waits for it and returns its entry when it landed fresh (within
+ * PREFETCH_FRESH_MS); otherwise undefined and the screen reads as usual.
+ */
+export async function awaitPendingDataCacheRead<T>(
+  subject: string | null | undefined,
+  key: string
+): Promise<DataCacheEntry<T> | undefined> {
+  if (!owner || !subject) return undefined;
+  const pending = inflight.get(fullKey(subject, key));
+  if (!pending) return undefined;
+  await pending.catch(() => undefined);
+  const entry = readDataCacheEntry<T>(subject, key);
+  return entry && Date.now() - entry.at <= PREFETCH_FRESH_MS ? entry : undefined;
 }
 
 /** Drops this subject's entries whose key starts with `prefix` (after a write that changes them). */

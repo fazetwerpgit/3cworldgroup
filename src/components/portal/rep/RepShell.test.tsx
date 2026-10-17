@@ -75,6 +75,8 @@ vi.mock('./RepTopBar', () => ({
     return <header data-topbar data-task={task ?? ''} />;
   },
 }));
+// Tab data prefetch has its own tests (tabPrefetch.test.ts).
+vi.mock('./useTabPrefetch', () => ({ useTabPrefetch: () => undefined }));
 vi.mock('./RepTabBar', () => ({
   RepTabBar: () => {
     useEffect(() => {

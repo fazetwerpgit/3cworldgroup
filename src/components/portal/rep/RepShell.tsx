@@ -29,6 +29,7 @@ import { RepTopBar, type RepBackLink } from './RepTopBar';
 import { PushNudge } from './PushNudge';
 import { PullToRefresh } from './PullToRefresh';
 import { isRepShellPath } from './repShellRoutes';
+import { useTabPrefetch } from './useTabPrefetch';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import s from './rep.module.css';
 
@@ -91,6 +92,8 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   // Inside the 3C iOS app there is nothing to install and the shell owns push.
   const inApp = useIsNativeApp();
   usePresenceHeartbeat({ enabled: !viewing });
+  // Tab switches paint from cache: the other tabs' data loads once this page has had its turn.
+  useTabPrefetch(pathname);
   // One live channel list and read-receipt listener per session, shared with
   // the chat page (useSharedChatChannels) instead of a second pair there.
   const { channels, loading: channelsLoading, error: channelsError, retry: retryChannels } = useChatChannels();

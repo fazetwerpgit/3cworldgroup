@@ -32,6 +32,7 @@ vi.mock('@/contexts/AuthContext', () => ({
 vi.mock('@/lib/firebase/config', () => ({ auth: null }));
 
 vi.mock('@/hooks/useLeaderboard', () => ({
+  FIRST_LEADERBOARD_BOARD: { period: 'week', metric: 'totalPoints', limit: 100, scope: 'approved', team: true },
   useLeaderboard: () => ({
     get leaderboard() {
       return testState.leaderboard;

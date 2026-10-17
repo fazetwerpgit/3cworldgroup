@@ -7,6 +7,7 @@ import { useViewAs } from '@/contexts/ViewAsContext';
 import { useNavAccess } from '@/components/portal/NavSheet';
 import { isOwner } from '@/types';
 import { BodyLayer } from './BodyLayer';
+import { usePrefetchTabOnTouch } from './useTabPrefetch';
 import { activeRepHref, repTabsFor, viewAsTabs } from './repNav';
 import s from './rep.module.css';
 import t from './rep-tabbar.module.css';
@@ -33,6 +34,8 @@ export function RepTabBar({
   const { viewing } = useViewAs();
   const tabs = (viewing ? viewAsTabs() : repTabsFor(isOwner(user?.role ?? undefined))).filter(canAccess);
   const waiting = Object.values(navCounts).reduce((sum, n) => sum + n, 0);
+  // A finger on a tab starts its data read before the tap lands.
+  const prefetchTab = usePrefetchTabOnTouch();
 
   return (
     <BodyLayer>
@@ -45,7 +48,13 @@ export function RepTabBar({
             const count = tab.waiting ? waiting : 0;
             return (
               <li key={tab.href}>
-                <Link href={tab.href} className={s.tab} aria-current={current ? 'page' : undefined}>
+                <Link
+                  href={tab.href}
+                  className={s.tab}
+                  aria-current={current ? 'page' : undefined}
+                  onTouchStart={current ? undefined : () => prefetchTab(tab.href)}
+                  onPointerDown={current ? undefined : () => prefetchTab(tab.href)}
+                >
                   {tab.log ? (
                     <span className={s.tabLog}>
                       <Icon size={20} strokeWidth={2.5} aria-hidden="true" />

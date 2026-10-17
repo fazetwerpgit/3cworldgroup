@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useLeaderboard } from '@/hooks/useLeaderboard';
+import { FIRST_LEADERBOARD_BOARD, useLeaderboard } from '@/hooks/useLeaderboard';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { LeaderboardPageContent } from './LeaderboardPageContent';
 import { LegacyLeaderboardPage } from './legacy/LegacyLeaderboardPage';
@@ -19,7 +19,7 @@ import split from './routeSplit.module.css';
  *  master. The period, the metric and the fetch live here so that both sides
  *  read the same board and only one request goes out, whichever is on screen.
  *  The filter controls in each page write back through the callbacks. */
-const FIRST_BOARD = { period: 'week', metric: 'totalPoints', limit: 100, scope: 'approved', team: true } as const;
+const FIRST_BOARD = FIRST_LEADERBOARD_BOARD;
 
 export function LeaderboardRoute() {
   const { user } = useAuth();

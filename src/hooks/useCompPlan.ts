@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useAuth } from '@/contexts/AuthContext';
-import { dataCacheGeneration, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
+import { awaitPendingDataCacheRead, dataCacheGeneration, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
 import { PAY_DELAY_DAYS } from '@/types';
 import type { CompPlanCompanyRates, CompPlanRates, CompPlanResponse, CompPlanRole } from '@/types';
 import type { OwnerPricing } from '@/lib/owner/revenue';
@@ -26,9 +26,10 @@ export interface CompPlanResult {
   retry: () => void;
 }
 
-type PlanState = Omit<CompPlanResult, 'loading' | 'retry'> & { uid: string | null };
+export type PlanState = Omit<CompPlanResult, 'loading' | 'retry'> & { uid: string | null };
 
-const COMP_PLAN_CACHE_KEY = 'comp-plan';
+/** Cache key of the plan (the dashboard and the tab prefetch fill it too). */
+export const COMP_PLAN_CACHE_KEY = 'comp-plan';
 
 const EMPTY: PlanState = {
   uid: null,
@@ -39,6 +40,34 @@ const EMPTY: PlanState = {
   error: false,
   ownerPricing: null,
 };
+
+/** The cached plan state for a successful /api/portal/comp-plan answer. */
+export function compPlanState(uid: string, data: CompPlanResponse): PlanState {
+  // `scope: 'all'` hands back the role-keyed table, which is nobody's
+  // personal rate card — a platform caller's own slice arrives as
+  // `ownRates` instead. Reading `rates` there would hand the pay view a
+  // table keyed by role where it expects one keyed by company.
+  const rates =
+    data.scope === 'all'
+      ? (data.ownRates as CompPlanCompanyRates | null) ?? null
+      : (data.rates as CompPlanCompanyRates | null) ?? null;
+  return {
+    uid,
+    rates,
+    compRole: data.compRole ?? null,
+    payDelayDays: data.payDelayDays ?? PAY_DELAY_DAYS,
+    hasPlan: !!rates,
+    error: false,
+    ownerPricing:
+      data.scope === 'all' && data.margin
+        ? {
+            margin: data.margin,
+            rates: (data.rates as Partial<CompPlanRates> | null) ?? {},
+            repCompRoles: data.repCompRoles ?? {},
+          }
+        : null,
+  };
+}
 
 /**
  * The signed-in user's own slice of the comp plan, fetched once per login.
@@ -76,6 +105,12 @@ export function useCompPlan(): CompPlanResult {
 
     (async () => {
       try {
+        // The tab prefetch is already reading the plan: use its answer.
+        const prefetched = await awaitPendingDataCacheRead<PlanState>(uid, COMP_PLAN_CACHE_KEY);
+        if (prefetched) {
+          if (!cancelled) setPlan(prefetched.value);
+          return;
+        }
         const token = await getIdToken();
         const response = await fetch('/api/portal/comp-plan', {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -88,30 +123,7 @@ export function useCompPlan(): CompPlanResult {
           return;
         }
 
-        // `scope: 'all'` hands back the role-keyed table, which is nobody's
-        // personal rate card — a platform caller's own slice arrives as
-        // `ownRates` instead. Reading `rates` there would hand the pay view a
-        // table keyed by role where it expects one keyed by company.
-        const rates =
-          data.scope === 'all'
-            ? (data.ownRates as CompPlanCompanyRates | null) ?? null
-            : (data.rates as CompPlanCompanyRates | null) ?? null;
-        const next: PlanState = {
-          uid,
-          rates,
-          compRole: data.compRole ?? null,
-          payDelayDays: data.payDelayDays ?? PAY_DELAY_DAYS,
-          hasPlan: !!rates,
-          error: false,
-          ownerPricing:
-            data.scope === 'all' && data.margin
-              ? {
-                  margin: data.margin,
-                  rates: (data.rates as Partial<CompPlanRates> | null) ?? {},
-                  repCompRoles: data.repCompRoles ?? {},
-                }
-              : null,
-        };
+        const next = compPlanState(uid, data);
         writeDataCache(uid, COMP_PLAN_CACHE_KEY, next, gen);
         setPlan(next);
       } catch (error) {

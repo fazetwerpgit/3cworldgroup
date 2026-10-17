@@ -3,7 +3,13 @@
 import { useState, useCallback, useRef } from 'react';
 import { auth } from '@/lib/firebase/config';
 import { useCacheSubject } from '@/lib/cache/useCacheSubject';
-import { dataCacheGeneration, readDataCache, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
+import {
+  awaitPendingDataCacheRead,
+  dataCacheGeneration,
+  readDataCache,
+  readDataCacheEntry,
+  writeDataCache,
+} from '@/lib/cache/dataCache';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 
 interface LeaderboardEntry {
@@ -49,7 +55,7 @@ export function leaderboardQuery({
   return params.toString();
 }
 
-type CachedBoard = {
+export type CachedBoard = {
   leaderboard: LeaderboardEntry[];
   currentUser: LeaderboardEntry | null;
   unranked: UnrankedRep[];
@@ -59,6 +65,37 @@ type CachedBoard = {
 };
 
 const boardCacheKey = (query: string) => `leaderboard?${query}`;
+/** The cache key of this board (the tab prefetch fills it too). */
+export const leaderboardCacheKey = (request: LeaderboardRequest) => boardCacheKey(leaderboardQuery(request));
+
+/**
+ * The board the Leaderboard page opens on (week, points, with the team): the
+ * page seeds and fetches it first, and the tab prefetch warms it.
+ */
+export const FIRST_LEADERBOARD_BOARD = {
+  period: 'week',
+  metric: 'totalPoints',
+  limit: 100,
+  scope: 'approved',
+  team: true,
+} as const satisfies LeaderboardRequest;
+
+/** The cached board for a successful /api/portal/leaderboard answer. */
+export function boardFromResponse(data: {
+  leaderboard?: LeaderboardEntry[];
+  currentUser?: LeaderboardEntry | null;
+  unranked?: unknown;
+  recent?: unknown;
+  firstMonth?: unknown;
+}): CachedBoard {
+  return {
+    leaderboard: data.leaderboard ?? [],
+    currentUser: data.currentUser ?? null,
+    unranked: Array.isArray(data.unranked) ? (data.unranked as UnrankedRep[]) : [],
+    recent: Array.isArray(data.recent) ? (data.recent as RecentSale[]) : [],
+    firstMonth: 'firstMonth' in data ? (typeof data.firstMonth === 'string' ? data.firstMonth : null) : undefined,
+  };
+}
 
 /**
  * `seed` names the board the caller fetches first: its last copy (if any)
@@ -127,6 +164,22 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
     }
     const quiet = options.quiet || !!cached;
     try {
+      // The tab prefetch is already reading this board: use its answer.
+      const prefetched = cached ? undefined : await awaitPendingDataCacheRead<CachedBoard>(uid, key);
+      if (prefetched) {
+        if (request !== latest.current) return;
+        const board = prefetched.value;
+        setLeaderboard(board.leaderboard);
+        setCurrentUser(board.currentUser);
+        setUnranked(board.unranked);
+        setRecent(board.recent);
+        if (board.firstMonth !== undefined) setFirstMonth(board.firstMonth);
+        shownAt.current = prefetched.at;
+        setStaleAt(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
       const token = await auth?.currentUser?.getIdToken();
       const response = await fetch(`/api/portal/leaderboard?${query}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -136,13 +189,7 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch leaderboard');
       }
-      writeDataCache<CachedBoard>(uid, key, {
-        leaderboard: data.leaderboard,
-        currentUser: data.currentUser ?? null,
-        unranked: Array.isArray(data.unranked) ? data.unranked : [],
-        recent: Array.isArray(data.recent) ? data.recent : [],
-        firstMonth: 'firstMonth' in data ? (typeof data.firstMonth === 'string' ? data.firstMonth : null) : undefined,
-      }, gen);
+      writeDataCache<CachedBoard>(uid, key, boardFromResponse(data), gen);
       if (request !== latest.current) return;
 
       setLeaderboard(data.leaderboard);

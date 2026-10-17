@@ -3,7 +3,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useCacheSubject } from '@/lib/cache/useCacheSubject';
-import { dataCacheGeneration, invalidateAfterSaleWrite, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
+import {
+  awaitPendingDataCacheRead,
+  dataCacheGeneration,
+  invalidateAfterSaleWrite,
+  readDataCacheEntry,
+  writeDataCache,
+} from '@/lib/cache/dataCache';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
 
@@ -70,8 +76,10 @@ export function salesQuery(filters?: SalesFilters): string {
   return params.toString();
 }
 
-type CachedSales = { sales: Sale[]; truncated: boolean };
+export type CachedSales = { sales: Sale[]; truncated: boolean };
 const listCacheKey = (query: string) => `sales?${query}`;
+/** The cache key of the list for these filters (the tab prefetch fills it too). */
+export const salesListCacheKey = (filters?: SalesFilters) => listCacheKey(salesQuery(filters));
 
 /**
  * Sales list and writes. `seed` (the filters the caller is about to fetch)
@@ -134,6 +142,16 @@ export function useSales(seed?: SalesFilters | null) {
     const subject = uidRef.current;
     try {
       const query = salesQuery(filters);
+
+      // The tab prefetch is already reading this list: use its answer.
+      const prefetched = await awaitPendingDataCacheRead<CachedSales>(subject, listCacheKey(query));
+      if (prefetched && gen === dataCacheGeneration()) {
+        listKey.current = { key: listCacheKey(query), subject, gen, at: prefetched.at };
+        setSales(prefetched.value.sales);
+        setTruncated(prefetched.value.truncated === true);
+        setError(null);
+        return;
+      }
 
       // The list endpoint requires a verified login (sales carry customer PII).
       const token = await getIdToken();
