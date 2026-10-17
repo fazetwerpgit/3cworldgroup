@@ -160,10 +160,17 @@ export function useRepDashboard() {
     ...cached,
   }));
   const [state, setState] = useState<RepDashboardState>(initialState);
-  // When a section on screen last came from the server. Starts at the cached
-  // entry's time and moves only when a fetch succeeds, so writing the sections
-  // back (or a local install-date edit) never makes the entry look fresher.
-  const fetchedAt = useRef<number | null>(cachedEntry?.at ?? null);
+  // When each section on screen last came from the server. A cached section
+  // starts at the entry's time; each moves only when its own fetch succeeds,
+  // so writing the sections back (or a local install-date edit) never makes
+  // the entry look fresher.
+  const sectionFetchedAt = useRef(
+    new Map<RepSectionKey, number>(
+      cached && cachedEntry
+        ? (Object.keys(cached) as RepSectionKey[]).map((key) => [key, cachedEntry.at] as [RepSectionKey, number])
+        : []
+    )
+  );
 
   // Keep the cache in step with every section that is on screen. The seeded
   // state is what the cache already holds: writing it back would only restamp it.
@@ -173,8 +180,14 @@ export function useRepDashboard() {
     for (const key of Object.keys(state) as RepSectionKey[]) {
       if (state[key].status === 'ready') (ready as Record<string, unknown>)[key] = state[key];
     }
-    if (Object.keys(ready).length) {
-      writeDataCache(uid, DASHBOARD_CACHE_KEY, ready, gen, fetchedAt.current ?? Date.now());
+    const keys = Object.keys(ready) as RepSectionKey[];
+    if (keys.length) {
+      // The entry is as old as its oldest section: a section kept from an older
+      // copy after its refresh failed holds the time back, so the next visit
+      // still shows its "as of" note.
+      const now = Date.now();
+      const at = Math.min(...keys.map((key) => sectionFetchedAt.current.get(key) ?? now));
+      writeDataCache(uid, DASHBOARD_CACHE_KEY, ready, gen, at);
     }
   }, [state, initialState, uid, gen]);
   const stateRef = useRef(state);
@@ -264,7 +277,7 @@ export function useRepDashboard() {
           try {
             const data = await all[key]!(token, controller.signal);
             if (controller.signal.aborted) return;
-            fetchedAt.current = Date.now();
+            sectionFetchedAt.current.set(key, Date.now());
             staleKeys.current.delete(key);
             setState((current) => ({ ...current, [key]: { status: 'ready', data } }));
           } catch (error) {

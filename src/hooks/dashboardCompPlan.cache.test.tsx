@@ -25,12 +25,12 @@ function json(body: unknown, ok = true) {
   return { ok, status: ok ? 200 : 500, json: async () => body };
 }
 
-/** Every dashboard endpoint answers; `down` makes all of them fail. */
-function respondDashboard(down = false) {
+/** Every dashboard endpoint answers; `down` makes all of them fail, `downPrefix` only the matching ones. */
+function respondDashboard(down = false, downPrefix?: string) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
-      if (down) return json({ error: 'down' }, false);
+      if (down || (downPrefix && url.startsWith(downPrefix))) return json({ error: 'down' }, false);
       if (url.startsWith('/api/portal/sales/status')) return json({ scope: 'own', orders: [] });
       if (url.startsWith('/api/portal/sales')) return json({ sales: [{ id: 's1', status: 'approved' }] });
       if (url.startsWith('/api/portal/comp-plan')) return json({ scope: 'own', rates: { att: { p1: 100 } } });
@@ -121,6 +121,33 @@ describe('useRepDashboard cache', () => {
     await unmount();
     expect(readDataCacheEntry('rep-1', 'dashboard')!.at).toBeGreaterThan(fetchedAt);
   });
+  it('a section kept from an older copy holds the cache time back, so the next visit still says "as of"', async () => {
+    const fetchedAt = Date.now() - 5 * 60 * 1000;
+    writeDataCache(
+      'rep-1',
+      'dashboard',
+      { calls: { status: 'ready', data: [] }, paperwork: { status: 'ready', data: 0 } },
+      undefined,
+      fetchedAt
+    );
+
+    // Everything reloads except the calls, which stay on last time's copy.
+    respondDashboard(false, '/api/portal/calls');
+    renders = [];
+    await mount(<Harness />);
+    expect(renders.at(-1)!.book.status).toBe('ready');
+    expect(renders.at(-1)!.staleAt).toBe(fetchedAt);
+    await unmount();
+    expect(readDataCacheEntry('rep-1', 'dashboard')!.at).toBe(fetchedAt);
+
+    respondDashboard(true);
+    renders = [];
+    await mount(<Harness />);
+    expect(renders.at(-1)!.calls.status).toBe('ready');
+    expect(renders.at(-1)!.staleAt).toBe(fetchedAt);
+    await unmount();
+  });
+
   it('a successful Retry clears the "as of" note once the kept sections reload', async () => {
     writeDataCache('rep-1', 'dashboard', { calls: { status: 'ready', data: [] } });
     respondDashboard(true);
