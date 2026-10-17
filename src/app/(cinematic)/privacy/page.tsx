@@ -302,8 +302,8 @@ export default function PrivacyPolicyPage() {
 
             <LegalSection id="privacy-9" title="9. Data Retention and Account Deletion">
               <p>
-                We keep your personal information while you work with 3C World Group and for 3 years
-                after that. At the end of that period, we delete it or anonymize it. Your pay and sales
+                We keep your personal information while you work with 3C World Group. We aim to delete
+                or anonymize it within 3 years after you stop working with 3C. Your pay and sales
                 records are kept for the same period for payroll and tax reasons.
               </p>
               <p>
