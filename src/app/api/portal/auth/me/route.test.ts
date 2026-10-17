@@ -61,6 +61,7 @@ const fake = vi.hoisted(() => {
     reconcile: vi.fn(async () => []),
     restampAuthor: vi.fn(async () => undefined),
     scrubDeletedChatAuthor: vi.fn(async () => undefined),
+    anonymizeAskHistory: vi.fn(async () => 0),
     audit: vi.fn(async () => undefined),
   };
 });
@@ -72,6 +73,7 @@ vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: fake.resolveAlert
 vi.mock('@/lib/chat/channels', () => ({ reconcileChatMembershipForUser: fake.reconcile }));
 vi.mock('@/lib/chat/restampAuthor', () => ({ restampAuthor: fake.restampAuthor, scrubDeletedChatAuthor: fake.scrubDeletedChatAuthor }));
 vi.mock('@/lib/audit/adminAudit', () => ({ writeAdminAudit: fake.audit }));
+vi.mock('@/lib/ask/anonymizeHistory', () => ({ anonymizeAskHistory: fake.anonymizeAskHistory }));
 
 import { DELETE } from './route';
 import { PERSONAL_PROFILE_FIELDS } from '@/lib/users/accountClosure';
@@ -192,6 +194,7 @@ describe('DELETE /api/portal/auth/me', () => {
 
     expect(fake.restampAuthor).toHaveBeenCalledWith('rep1', { authorName: 'Deleted user' });
     expect(fake.scrubDeletedChatAuthor).toHaveBeenCalledWith('rep1', 'Deleted user');
+    expect(fake.anonymizeAskHistory).toHaveBeenCalledWith(fake.adminDb, 'rep1', 'Deleted user');
     expect(fake.reconcile).toHaveBeenCalledWith('rep1');
     expect(fake.resolveAlertTasks).toHaveBeenCalledWith('rep1');
     expect(fake.audit).toHaveBeenCalledWith(
@@ -266,6 +269,7 @@ describe('DELETE /api/portal/auth/me', () => {
     fake.reconcile.mockRejectedValueOnce(new Error('x'));
     fake.resolveAlertTasks.mockRejectedValueOnce(new Error('x'));
     fake.scrubDeletedChatAuthor.mockRejectedValueOnce(new Error('x'));
+    fake.anonymizeAskHistory.mockRejectedValueOnce(new Error('x'));
     expect((await DELETE(request())).status).toBe(200);
   });
 

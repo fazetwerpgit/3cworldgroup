@@ -21,7 +21,10 @@ export const metadata: Metadata = {
  * identity and tax data, e-signature records, AI features (sale scan, Ask 3C,
  * Practice), microphone and speech, photos and chat, Face ID, named service
  * providers, and retention. Each statement was checked against the portal
- * code on master; open questions are marked TODO(Jacob).
+ * code on master; open questions were resolved with the owner.
+ * Amended 2026-10-17 with the owner's answers: DeepSeek named, Gemini on a
+ * paid plan, no carrier sharing, a stated retention period, anonymized
+ * Ask/Practice history after self-deletion, and a minimum age of 18.
  */
 const LAST_UPDATED = "October 17, 2026";
 
@@ -166,13 +169,10 @@ export default function PrivacyPolicyPage() {
                   <strong>Ask 3C.</strong> Ask 3C answers questions about the portal and selling. Your
                   question, the earlier messages in that conversation, any photo you attach, and some
                   portal information about you (your first name, city and state, dealer codes, and a
-                  summary of your recent sales) are sent to a third-party AI provider{/* TODO(Jacob): name */} to write the answer. Email addresses and phone numbers you type are removed before your
-                  question is sent or saved. We keep a record of each question and answer so we can
-                  improve Ask 3C. Photos you attach are not saved.
-                  {/* TODO(Jacob): name the Ask 3C provider. The code defaults to DeepSeek
-                      (api.deepseek.com, src/lib/ask/provider.ts) unless ASK_BASE_URL points elsewhere
-                      in Vercel. If prod uses DeepSeek, add it here and in section 6, and decide
-                      whether a provider that processes data in China is acceptable before launch. */}
+                  summary of your recent sales) are sent to DeepSeek, an AI provider, to generate the
+                  answer. Email addresses and phone numbers you type are removed before your question is
+                  sent or saved. We keep a record of each question and answer so we can improve Ask 3C.
+                  Photos you attach are not saved.
                 </li>
                 <li>
                   <strong>Voice sales practice.</strong> Practice lets you rehearse a door conversation
@@ -180,15 +180,16 @@ export default function PrivacyPolicyPage() {
                   Google&apos;s Gemini service to turn your speech into text, and the homeowner&apos;s
                   replies are spoken using Google&apos;s Gemini text-to-speech. Otherwise, your speech is
                   turned into text by your phone or browser&apos;s built-in speech recognition (on
-                  iPhone, provided by Apple). The text of your practice conversation is sent to a third-party
-                  AI provider{/* TODO(Jacob): name */} to write the homeowner&apos;s replies and your coaching feedback, and we keep a
+                  iPhone, provided by Apple). The transcript of your practice conversation is sent to
+                  DeepSeek to generate the homeowner&apos;s replies and your coaching feedback, and we keep a
                   record of each finished practice session and its feedback. We do not save recordings
                   of your voice.
                 </li>
               </ul>
-              {/* TODO(Jacob): confirm the Gemini API key is on a paid (billed) Google Cloud project.
-                  Only paid-tier Gemini API data is excluded from Google's model training; if it is,
-                  we can add: "Google does not use this data to train its models." */}
+              <p>
+                We use Google&apos;s Gemini service on a paid Google plan, and Google does not use the
+                data we send it to train its models.
+              </p>
             </LegalSection>
 
             <LegalSection id="privacy-5" title="5. Team Chat">
@@ -250,9 +251,8 @@ export default function PrivacyPolicyPage() {
                     <li>Postmark, which sends our email.</li>
                     <li>Google Gemini, for sale screenshot auto-fill and for speech in hands-free voice practice.</li>
                     <li>
-                      A third-party AI provider, which writes Ask 3C answers and the practice
-                      homeowner&apos;s replies and coaching feedback.
-                      {/* TODO(Jacob): name the Ask/Practice provider here (see the TODO in section 4). */}
+                      DeepSeek, which generates Ask 3C answers and the practice homeowner&apos;s
+                      replies and coaching feedback.
                     </li>
                     <li>Google reCAPTCHA, which helps block automated sign-ups.</li>
                     <li>Google Workspace, where we keep a copy of contractor applications.</li>
@@ -265,13 +265,6 @@ export default function PrivacyPolicyPage() {
                   portal information they need to do their jobs, such as your sales records and onboarding
                   status. Your name and sales results may appear on team leaderboards that other portal
                   users can see.
-                </li>
-                <li>
-                  <strong>Carriers.</strong> Sales information needed to confirm and reconcile the orders
-                  you sell with the carriers we sell for.
-                  {/* TODO(Jacob): confirm what, if anything, 3C sends to carriers about a rep (name, rep
-                      ID, order details). The portal code receives carrier reports; I found no code that
-                      sends rep data to carriers. Delete this bullet if nothing is shared. */}
                 </li>
                 <li>
                   <strong>Legal compliance.</strong> When required by law, subpoena, or other legal
@@ -309,12 +302,9 @@ export default function PrivacyPolicyPage() {
 
             <LegalSection id="privacy-9" title="9. Data Retention and Account Deletion">
               <p>
-                We retain personal information for as long as needed to provide our services, comply
-                with legal obligations, resolve disputes, and enforce agreements. When information is
-                no longer needed, we take steps to securely delete or anonymize it.
-                {/* TODO(Jacob): no automatic retention periods exist in the code. If you want stated
-                    periods (for example, "applications we do not act on are deleted after N months",
-                    or how long Ask 3C and Practice records are kept), give them and we will add them. */}
+                We keep your personal information while you work with 3C World Group and for 3 years
+                after that. At the end of that period, we delete it or anonymize it. Your pay and sales
+                records are kept for the same period for payroll and tax reasons.
               </p>
               <p>
                 <strong>Deleting your portal account.</strong> You can delete your portal account at any
@@ -324,8 +314,8 @@ export default function PrivacyPolicyPage() {
                 remove your personal profile details (contact information, address, profile photo),
                 your Social Security and driver&apos;s license numbers and license photos, and your
                 notification devices. Your profile, the chat messages you sent, the chat list preview of
-                your last message, other people&apos;s block lists, and chat reports you filed or that
-                name you show as &ldquo;Deleted user.&rdquo;
+                your last message, your Ask 3C and practice history, other people&apos;s block lists, and
+                chat reports you filed or that name you show as &ldquo;Deleted user.&rdquo;
               </p>
               <p>
                 Some records are kept after deletion because we need them for business and legal
@@ -334,11 +324,9 @@ export default function PrivacyPolicyPage() {
                 signed contractor paperwork, such as tax and direct-deposit forms and contractor
                 agreements; a log of who viewed your identity information; and, in chat reports, the
                 copy of a reported message (its text, and any attached photo or file), kept as
-                moderation evidence with the names replaced. Records of your Ask 3C questions and practice
-                sessions are also kept.
-                {/* TODO(Jacob): the self-delete route does not remove askLog or practiceLog rows, or the
-                    message text itself (only the author name is replaced). Confirm that is intended, or
-                    we add those to the deletion. */}
+                moderation evidence with the names replaced. The chat messages you sent and your Ask 3C
+                questions and practice sessions are also kept, anonymized: the author shows as
+                &ldquo;Deleted user.&rdquo; These records are kept for the retention period above.
               </p>
             </LegalSection>
 
@@ -370,11 +358,9 @@ export default function PrivacyPolicyPage() {
 
             <LegalSection id="privacy-11" title="11. Children's Privacy">
               <p>
-                Our website and services are not directed to children under 16, and we do not knowingly
-                collect personal information from children. If you believe a child has provided us with
-                personal information, please contact us so we can delete it.
-                {/* TODO(Jacob): contractors are presumably 18+. If so, consider "not directed to anyone
-                    under 18" to match the App Store age rating you choose. */}
+                Our website and services are not directed to anyone under 18, and we do not knowingly
+                collect personal information from anyone under 18. If you believe someone under 18 has
+                provided us with personal information, please contact us so we can delete it.
               </p>
             </LegalSection>
 
@@ -399,8 +385,6 @@ export default function PrivacyPolicyPage() {
                 If you have questions about this Privacy Policy or how we handle your information,
                 please reach out:
               </p>
-              {/* TODO(Jacob): confirm privacy@3cworldgroup.com is a real, monitored inbox before
-                  submission; Apple reviewers and users will use it for deletion requests. */}
               <ul>
                 <li>
                   <strong>Email:</strong>{" "}

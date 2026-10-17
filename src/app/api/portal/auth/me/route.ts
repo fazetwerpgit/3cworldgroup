@@ -12,6 +12,7 @@ import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { restampAuthor, scrubDeletedChatAuthor } from '@/lib/chat/restampAuthor';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
+import { anonymizeAskHistory } from '@/lib/ask/anonymizeHistory';
 
 const FEDERATED_PROVIDERS = ['google.com', 'apple.com'];
 
@@ -151,6 +152,11 @@ export async function DELETE(request: NextRequest) {
       await scrubDeletedChatAuthor(uid, DELETED_USER_NAME);
     } catch (error) {
       console.error('[auth/me] failed to scrub chat blocks/reports name', uid, error);
+    }
+    try {
+      await anonymizeAskHistory(adminDb, uid, DELETED_USER_NAME);
+    } catch (error) {
+      console.error('[auth/me] failed to anonymize Ask/Practice history', uid, error);
     }
     try {
       await reconcileChatMembershipForUser(uid);
