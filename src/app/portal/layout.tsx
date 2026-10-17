@@ -11,6 +11,7 @@ import PushTokenRefresher from '@/components/portal/PushTokenRefresher';
 import PwaBottomGap from '@/components/portal/PwaBottomGap';
 import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
 import AppBridgeHost from '@/components/app/AppBridgeHost';
+import { RepShellHost } from '@/components/portal/rep/RepShell';
 import '@/styles/sweep-shell.css';
 
 // Display face for portal brand moments (login, KPI headers) — exposed as
@@ -72,7 +73,11 @@ export default function PortalLayout({
           <div className={`portal-scope contents ${archivo.variable}`}>
             {/* Queued chat messages keep sending on every portal page. */}
             <ChatOutboxProvider>
-              <OnboardingGate>{children}</OnboardingGate>
+              <OnboardingGate>
+                {/* One rep shell for every rep page: its bars, live chat
+                    listeners and presence survive a tab switch. */}
+                <RepShellHost>{children}</RepShellHost>
+              </OnboardingGate>
             </ChatOutboxProvider>
           </div>
         </MobileMenuProvider>

@@ -1,6 +1,17 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { usePathname } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { CommandPalette } from '@/components/portal/CommandPalette';
@@ -15,10 +26,14 @@ import { RepBoot } from './RepBoot';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, type RepBackLink } from './RepTopBar';
 import { PushNudge } from './PushNudge';
+import { isRepShellPath } from './repShellRoutes';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import s from './rep.module.css';
 
 export { RepBoot };
+
+// Layout effects warn on the server; these components only run them in the browser.
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /** Lets a page swap the phone tab bar for its own bottom bar (Log Sale's submit bar). */
 const TabBarHiddenContext = createContext<((hidden: boolean) => void) | null>(null);
@@ -31,6 +46,32 @@ export function useHideRepTabBar(hidden: boolean) {
     setHidden(hidden);
     return () => setHidden(false);
   }, [hidden, setHidden]);
+}
+
+/** What one page asks of the shared chrome: its task title and back link. */
+export type RepShellConfig = { task?: string; back?: RepBackLink };
+
+type Registration = RepShellConfig & { depth: number; order: number };
+
+type RepShellRegistry = {
+  register: (id: string, registration: Registration) => void;
+  unregister: (id: string) => void;
+};
+
+/** Present inside RepShellHost's shell: a page's <RepShell> registers with it instead of mounting chrome. */
+const RegistryContext = createContext<RepShellRegistry | null>(null);
+/** How many <RepShell>s wrap this point (a layout's and its page's): the deepest one names the page. */
+const DepthContext = createContext(0);
+
+/** The registration that names the page: the deepest, then the latest. */
+export function pickRepShellConfig(registrations: Iterable<Registration>): RepShellConfig {
+  let best: Registration | null = null;
+  for (const entry of registrations) {
+    if (!best || entry.depth > best.depth || (entry.depth === best.depth && entry.order > best.order)) {
+      best = entry;
+    }
+  }
+  return best ? { task: best.task, back: best.back } : {};
 }
 
 function RepChrome({ children, task, back }: { children: ReactNode; task?: string; back?: RepBackLink }) {
@@ -47,6 +88,8 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   const navCounts = useAdminNavCounts();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [tabBarHidden, setTabBarHidden] = useState(false);
+  const mainRef = useRef<HTMLElement>(null);
+  useMainScrollMemory(mainRef, pathname);
 
   return (
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
@@ -55,7 +98,7 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
         <ViewAsBanner />
         {/* Push not working on this device: a banner here, or a full-screen sheet for a required person. */}
         {viewing || inApp ? null : <PushNudge />}
-        <main className={s.scroller} id="rep-main">
+        <main className={s.scroller} id="rep-main" ref={mainRef}>
           <div className={s.main}>
             {viewing && isViewAsPath(pathname) ? (
               <ViewAsScope loading={<ViewAsLoading />}>{children}</ViewAsScope>
@@ -72,6 +115,81 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   );
 }
 
+/** How long a restored position keeps waiting for the page's content to grow tall enough. */
+const RESTORE_WINDOW_MS = 1500;
+
+/**
+ * On phones <main> is the scroller and now outlives each page, so it keeps a
+ * scroll position per path: a new page opens at the top (as a fresh shell
+ * did), and Back / Forward returns to where that page was left. Desktop
+ * scrolls the window, which the browser and router already handle; there
+ * <main> does not scroll and these writes do nothing.
+ */
+export function useMainScrollMemory(mainRef: React.RefObject<HTMLElement | null>, pathname: string) {
+  const positions = useRef(new Map<string, number>());
+  const current = useRef(pathname);
+  const popped = useRef(false);
+  const cancelRestore = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const onPop = () => {
+      popped.current = true;
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      positions.current.set(current.current, el.scrollTop);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [mainRef]);
+
+  useEffect(() => () => cancelRestore.current?.(), []);
+
+  useIsoLayoutEffect(() => {
+    if (current.current === pathname) return;
+    current.current = pathname;
+    cancelRestore.current?.();
+    cancelRestore.current = null;
+    const el = mainRef.current;
+    const target = popped.current ? (positions.current.get(pathname) ?? 0) : 0;
+    popped.current = false;
+    positions.current.set(pathname, target);
+    if (!el) return;
+    el.scrollTop = target;
+    if (target <= 0 || typeof requestAnimationFrame === 'undefined') return;
+    // The page may still be loading: keep trying until it is tall enough, the
+    // window closes, or the person scrolls themselves.
+    const started = Date.now();
+    let frame = 0;
+    const stop = () => {
+      cancelAnimationFrame(frame);
+      el.removeEventListener('touchstart', stop);
+      el.removeEventListener('wheel', stop);
+      el.removeEventListener('pointerdown', stop);
+      if (cancelRestore.current === stop) cancelRestore.current = null;
+    };
+    const tick = () => {
+      if (Math.abs(el.scrollTop - target) <= 1 || Date.now() - started > RESTORE_WINDOW_MS) {
+        stop();
+        return;
+      }
+      el.scrollTop = target;
+      frame = requestAnimationFrame(tick);
+    };
+    el.addEventListener('touchstart', stop, { passive: true });
+    el.addEventListener('wheel', stop, { passive: true });
+    el.addEventListener('pointerdown', stop);
+    cancelRestore.current = stop;
+    frame = requestAnimationFrame(tick);
+  }, [pathname, mainRef]);
+}
+
 /** Until the server confirms the rep: never the owner's own screen and its reads. */
 function ViewAsLoading() {
   return (
@@ -81,10 +199,108 @@ function ViewAsLoading() {
   );
 }
 
+function sameBack(a?: RepBackLink, b?: RepBackLink): boolean {
+  return a === b || (!!a && !!b && a.href === b.href && a.label === b.label);
+}
+
+/** The one shell: chrome built from whatever the current page registered. */
+function HostedChrome({ children }: { children: ReactNode }) {
+  const [registrations, setRegistrations] = useState<ReadonlyMap<string, Registration>>(() => new Map());
+  const register = useCallback((id: string, next: Registration) => {
+    setRegistrations((prev) => {
+      const had = prev.get(id);
+      if (had && had.depth === next.depth && had.task === next.task && sameBack(had.back, next.back)) return prev;
+      const map = new Map(prev);
+      // Keep the first registration's order so a changed title does not reorder.
+      map.set(id, had ? { ...next, order: had.order } : next);
+      return map;
+    });
+  }, []);
+  const unregister = useCallback((id: string) => {
+    setRegistrations((prev) => {
+      if (!prev.has(id)) return prev;
+      const map = new Map(prev);
+      map.delete(id);
+      return map;
+    });
+  }, []);
+  const registry = useMemo(() => ({ register, unregister }), [register, unregister]);
+  const { task, back } = pickRepShellConfig(registrations.values());
+
+  return (
+    <RegistryContext.Provider value={registry}>
+      <RepChrome task={task} back={back}>
+        {children}
+      </RepChrome>
+    </RegistryContext.Provider>
+  );
+}
+
+/**
+ * Mounted once in the portal layout. On every rep-shell path (see
+ * repShellRoutes) it renders the Direction D chrome and keeps it mounted
+ * across navigation: bars, chat listeners, presence and the <main> scroller
+ * live for the session instead of being rebuilt on each tab switch. Pages
+ * still render <RepShell task back permissions>, which hands those props to
+ * this shell. Every other portal path renders bare.
+ */
+export function RepShellHost({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  if (!isRepShellPath(pathname)) return <>{children}</>;
+  return (
+    <ProtectedRoute fallback={<RepBoot />}>
+      <HostedChrome>{children}</HostedChrome>
+    </ProtectedRoute>
+  );
+}
+
+let registrationOrder = 0;
+
+/** A page's slot in the shared shell: registers its chrome props and applies its permission gate. */
+function RepShellSlot({
+  registry,
+  children,
+  permissions,
+  task,
+  back,
+}: {
+  registry: RepShellRegistry;
+  children: ReactNode;
+  permissions?: string[];
+  task?: string;
+  back?: RepBackLink;
+}) {
+  const id = useId();
+  const depth = useContext(DepthContext) + 1;
+  const [order] = useState(() => ++registrationOrder);
+  const backHref = back?.href;
+  const backLabel = back?.label;
+
+  useIsoLayoutEffect(() => {
+    registry.register(id, {
+      depth,
+      order,
+      task,
+      back: backHref !== undefined && backLabel !== undefined ? { href: backHref, label: backLabel } : undefined,
+    });
+  }, [registry, id, depth, order, task, backHref, backLabel]);
+
+  useIsoLayoutEffect(() => () => registry.unregister(id), [registry, id]);
+
+  return (
+    <DepthContext.Provider value={depth}>
+      <ProtectedRoute permissions={permissions} fallback={<RepBoot />}>
+        {children}
+      </ProtectedRoute>
+    </DepthContext.Provider>
+  );
+}
+
 /**
  * Direction D chrome for a rep-facing page: top bar, phone tab bar, no sidebar
- * rail. Mounted per page layout (dashboard first), so every page not yet ported
- * keeps the old PortalHeader + PortalSidebar.
+ * rail. Inside RepShellHost (every rep path in the portal) this only registers
+ * the page's task title, back link and permission gate with the one shared
+ * shell. Rendered anywhere else it mounts the whole shell itself.
  */
 export function RepShell({
   children,
@@ -99,6 +315,14 @@ export function RepShell({
   /** The task page's parent for that back link. Defaults to the dashboard. */
   back?: RepBackLink;
 }) {
+  const registry = useContext(RegistryContext);
+  if (registry) {
+    return (
+      <RepShellSlot registry={registry} permissions={permissions} task={task} back={back}>
+        {children}
+      </RepShellSlot>
+    );
+  }
   return (
     <ProtectedRoute permissions={permissions} fallback={<RepBoot />}>
       <RepChrome task={task} back={back}>
