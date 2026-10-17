@@ -233,6 +233,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Evidence copies to retry (lib/chat/evidence, /api/cron/chat-evidence).
+    // Server-only; explicit, the default deny covers it too.
+    match /chatEvidencePending/{pendingId} {
+      allow read, write: if false;
+    }
+
     match /chatChannels/{channelId} {
       allow read: if (isApproved() || isOnboardingMember()) && request.auth.uid in resource.data.memberIds;
       allow write: if false;
