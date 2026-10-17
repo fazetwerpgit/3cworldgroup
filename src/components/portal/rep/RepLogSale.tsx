@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -16,7 +17,6 @@ import {
   RotateCw,
   WifiOff,
 } from 'lucide-react';
-import { ThinkingOrb } from 'thinking-orbs';
 import { getPlanById } from '@/types';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useSaleFormState } from '@/hooks/useSaleFormState';
@@ -36,6 +36,15 @@ import { DEFAULT_PROVIDER, SaleFields } from './SaleFields';
 import { useSaleScan, type ScanFill, type ScanTarget } from './useSaleScan';
 import s from './rep.module.css';
 import l from './rep-logsale.module.css';
+
+// The orb only shows while a screenshot is being read, so it loads in its own
+// chunk; RepLogSale warms that chunk on mount, long before a scan can start.
+// The placeholder holds the orb's 20px box so a cold load never shifts the line.
+const loadThinkingOrb = () => import('thinking-orbs').then((m) => m.ThinkingOrb);
+const ThinkingOrb = dynamic(loadThinkingOrb, {
+  ssr: false,
+  loading: () => <span aria-hidden="true" style={{ display: 'inline-block', width: 20, height: 20, flex: 'none' }} />,
+});
 
 // Log a sale, direction D. Two steps: attach the carrier's confirmation
 // screenshot(s) as proof, then check the sale details. The first screenshot is
@@ -91,6 +100,10 @@ export function SubmitLabel({ logged, children }: { logged: boolean; children: R
 
 export function RepLogSale() {
   const router = useRouter();
+  // Warm the orb's chunk now so it is ready before the first scan.
+  useEffect(() => {
+    void loadThinkingOrb().catch(() => undefined);
+  }, []);
   const { formRef, errorRef, ...form } = useSaleFormState();
   const { rates, hasPlan, error: planError, retry: retryPlan } = useCompPlan();
   const [step, setStep] = useState<'entry' | 'details'>('entry');
