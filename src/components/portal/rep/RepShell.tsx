@@ -14,7 +14,7 @@ import {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import { CommandPalette } from '@/components/portal/CommandPalette';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
@@ -33,6 +33,12 @@ import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import s from './rep.module.css';
 
 export { RepBoot };
+
+// Ctrl/Cmd+K search is a desktop extra: its own chunk, fetched after the shell
+// has painted instead of with every portal page's first load.
+const CommandPalette = dynamic(() => import('@/components/portal/CommandPalette').then((m) => m.CommandPalette), {
+  ssr: false,
+});
 
 // Layout effects warn on the server; these components only run them in the browser.
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;

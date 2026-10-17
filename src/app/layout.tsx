@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { SITE_URL } from "./_cinematic/nav";
 import "@fontsource/bebas-neue/latin-400.css";
 import "./globals.css";
@@ -88,7 +87,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <TooltipProvider>{children}</TooltipProvider>
+        {/* No TooltipProvider: nothing renders a Tooltip, and the provider alone
+            put Radix Tooltip and floating-ui in every page's first load.
+            Wrap the subtree that needs one when a tooltip is added. */}
+        {children}
       </body>
     </html>
   );

@@ -324,7 +324,7 @@ export function storageUploadFailure(error: unknown): SendRequestError {
 async function firebasePutFile(path: string, file: File, onProgress: (fraction: number) => void): Promise<void> {
   const [{ ref, uploadBytesResumable }, { storage }] = await Promise.all([
     import('firebase/storage'),
-    import('@/lib/firebase/config'),
+    import('@/lib/firebase/storage'),
   ]);
   if (!storage) throw new Error('Storage is not configured');
   const bucket = storage;

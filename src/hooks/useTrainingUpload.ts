@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { ref, uploadBytesResumable } from 'firebase/storage';
-import { storage } from '@/lib/firebase/config';
+import { storage } from '@/lib/firebase/storage';
 import { isAllowedTrainingUpload, sanitizeFileName } from '@/lib/training/fileKind';
 
 export interface UploadedFile {

@@ -1,6 +1,6 @@
 'use client';
 
-import { getMessaging, getToken, isSupported, type Messaging } from 'firebase/messaging';
+import type { Messaging } from 'firebase/messaging';
 import { app } from './config';
 import { shouldResetPushSubscription } from '@/lib/push/tokenRecovery';
 
@@ -11,10 +11,22 @@ const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
 let messaging: Messaging | null = null;
 
+// The messaging SDK (and the installations SDK under it) loads on first use,
+// not with the portal shell: the layout's push components only need it after
+// sign-in, and inside the 3C iOS app (native push) never.
+let sdk: Promise<typeof import('firebase/messaging')> | null = null;
+function loadMessagingSdk() {
+  sdk ??= import('firebase/messaging');
+  return sdk;
+}
+async function isSupported(): Promise<boolean> {
+  return (await loadMessagingSdk()).isSupported();
+}
+
 async function getMessagingInstance(): Promise<Messaging | null> {
   if (!app || !VAPID_KEY) return null;
   if (!(await isSupported().catch(() => false))) return null;
-  if (!messaging) messaging = getMessaging(app);
+  if (!messaging) messaging = (await loadMessagingSdk()).getMessaging(app);
   return messaging;
 }
 
@@ -62,7 +74,7 @@ export async function requestPushTokenDetailed(): Promise<{ token: string | null
 
   const msg = (error: unknown) => (error instanceof Error ? `${error.name}: ${error.message}` : String(error));
   try {
-    const token = await getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    const token = await (await loadMessagingSdk()).getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
     return { token, detail: 'ok' };
   } catch (firstError) {
     // Weak signal fails getToken too; resetting then could leave no
@@ -73,7 +85,7 @@ export async function requestPushTokenDetailed(): Promise<{ token: string | null
     try {
       const stale = await swReg.pushManager.getSubscription();
       if (stale) await stale.unsubscribe();
-      const token = await getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+      const token = await (await loadMessagingSdk()).getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
       return { token, detail: stale ? 'ok-after-resubscribe' : 'ok-on-retry' };
     } catch (secondError) {
       return { token: null, detail: `token-failed [${msg(firstError)}] retry [${msg(secondError)}]`.slice(0, 200) };

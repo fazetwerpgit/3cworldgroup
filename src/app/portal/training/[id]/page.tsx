@@ -19,7 +19,7 @@ import { useTraining } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
 import { postToNative } from '@/lib/app/bridge';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
-import { storage } from '@/lib/firebase/config';
+import { storage } from '@/lib/firebase/storage';
 import { TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 import { LoadFailed } from '@/components/portal/rep/RepLearn';
 import { TrainingPdf } from '@/components/portal/rep/TrainingPdf';

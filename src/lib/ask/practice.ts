@@ -19,7 +19,7 @@ export const MAX_PRACTICE_TURNS = 40;
 export const MAX_REP_CHARS = 1000;
 export const MAX_CUSTOMER_CHARS = 2000;
 /** The rep page keeps the practice in sessionStorage under this key (never Ask's), tagged with the uid. */
-export const PRACTICE_SESSION_KEY = 'ask3c-practice';
+export { PRACTICE_SESSION_KEY } from './practiceSessionKey';
 /** The homeowner ends the conversation with this marker; the route strips it. */
 export const END_MARKER = '[END]';
 /** The line the route puts in the homeowner's mouth when their patience runs out and they didn't close the door themselves. */

@@ -17,6 +17,12 @@ vi.mock('@/components/portal/admin-d/opsQueues', () => ({
   useOpsQueues: () => ({ cards: state.queues, loading: false, refreshedAt: null, refresh: vi.fn() }),
 }));
 
+// The dashboard page loads the owner view with next/dynamic (its own chunk);
+// static markup cannot wait for that, so hand the page the component directly.
+vi.mock('next/dynamic', async () => {
+  const owner = await import('./OwnerDashboard');
+  return { default: () => owner.OwnerDashboard };
+});
 import { OwnerDashboard } from './OwnerDashboard';
 import DashboardPage from '@/app/portal/dashboard/page';
 

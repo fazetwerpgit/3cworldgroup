@@ -20,7 +20,7 @@ import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { isAwaitingRoleAssignment } from '@/lib/auth/pendingApproval';
 import { clearSignature } from '@/components/esign/signatureStore';
 import { ASK_CONVERSATION_KEY } from '@/lib/ask/chat';
-import { PRACTICE_SESSION_KEY } from '@/lib/ask/practice';
+import { PRACTICE_SESSION_KEY } from '@/lib/ask/practiceSessionKey';
 import { ProfileLoadRetry } from '@/components/auth/ProfileLoadRetry';
 import { unregisterPushOnDevice } from '@/lib/push/enablePushOnDevice';
 import { takePendingDisplayName } from '@/lib/app/nativeAuth';

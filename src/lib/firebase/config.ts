@@ -1,7 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -19,7 +18,6 @@ const hasValidConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
 
 // Only initialize Firebase if we have a valid config
 // This allows the app to build without Firebase credentials
@@ -31,10 +29,11 @@ if (hasValidConfig) {
   }
   auth = getAuth(app);
   db = getFirestore(app);
-  storage = getStorage(app);
 }
 
-export { app, auth, db, storage };
+// Storage lives in ./storage so the Storage SDK loads only on the pages that
+// upload or download files, not with every portal page.
+export { app, auth, db };
 
 // Helper to check if Firebase is properly configured
 export function isFirebaseConfigured(): boolean {
