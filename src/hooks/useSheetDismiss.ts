@@ -79,6 +79,22 @@ function scrolledWithin(target: Element | null, sheet: HTMLElement): boolean {
   return false;
 }
 
+/** True when `target` sits in a horizontal scroller inside `sheet` (a chip row, a wide table).
+ *  A touch there belongs to that scroller: the sheet never takes it for a drag. */
+function inHorizontalScroller(target: Element | null, sheet: HTMLElement): boolean {
+  for (let node = target; node && node !== sheet; node = node.parentElement) {
+    if (!(node instanceof HTMLElement) || node.scrollWidth <= node.clientWidth) continue;
+    const overflowX = window.getComputedStyle(node).overflowX;
+    if (overflowX === 'auto' || overflowX === 'scroll') return true;
+  }
+  return false;
+}
+
+/** Clearly a downward drag: far enough to mean it, and well over twice as vertical as sideways. */
+function clearlyDown(dx: number, dy: number): boolean {
+  return dy >= 3 && dy > 2 * Math.abs(dx);
+}
+
 const SNAP_MS = 240;
 const DECIDE_PX = 6;
 
@@ -196,6 +212,9 @@ export function useSheetDismiss<S extends HTMLElement = HTMLElement, B extends H
       if (window.matchMedia?.('(min-width: 1024px)').matches) return;
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest('input[type="range"], [data-sheet-nodrag]')) return;
+      // A sideways scroller keeps its touches: no drag, and never a preventDefault
+      // (it would stop the row from scrolling).
+      if (inHorizontalScroller(target, sheet)) return;
       const touch = event.touches[0];
       atTop = !scrolledWithin(target, sheet);
       // A body mid-scroll can only scroll: leave the touch to the browser, and
@@ -213,12 +232,13 @@ export function useSheetDismiss<S extends HTMLElement = HTMLElement, B extends H
       const dx = touch.clientX - start.x;
       const dy = touch.clientY - start.y;
       if (!decided) {
-        // Mostly downward from the top: hold the body's bounce off from the
-        // very first move, or iOS commits to it before the drag is decided.
-        if (atTop && dy > 0 && dy >= Math.abs(dx) && event.cancelable) event.preventDefault();
+        // Clearly downward from the top: hold the body's bounce off from the
+        // first such move, or iOS commits to it before the drag is decided. A
+        // diagonal or sideways start is left alone so it can still scroll.
+        if (atTop && clearlyDown(dx, dy) && event.cancelable) event.preventDefault();
         if (Math.abs(dx) < DECIDE_PX && Math.abs(dy) < DECIDE_PX) return;
         decided = true;
-        claimed = dy > 0 && Math.abs(dy) > Math.abs(dx) && atTop;
+        claimed = atTop && clearlyDown(dx, dy);
         if (!claimed) {
           // An upward or sideways move: the browser scrolls it.
           start = null;

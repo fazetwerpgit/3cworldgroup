@@ -84,6 +84,9 @@ describe('useSheetDismiss', () => {
       <div ref={backdropRef} id="backdrop" data-closing={closing || undefined}>
         <section ref={sheetRef} id="sheet" data-closing={closing || undefined}>
           <div id="body">content</div>
+          <div id="row" style={{ overflowX: 'auto' }}>
+            <span id="chip">chip</span>
+          </div>
         </section>
       </div>
     );
@@ -91,13 +94,13 @@ describe('useSheetDismiss', () => {
 
   const sheetEl = () => document.getElementById('sheet') as HTMLElement;
 
-  function touch(type: string, y: number, t: number) {
+  function touch(type: string, y: number, t: number, x = 100, targetId = 'body') {
     const event = new Event(type, { bubbles: true, cancelable: true });
-    const point = { clientX: 100, clientY: y };
+    const point = { clientX: x, clientY: y };
     Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [point] });
     Object.defineProperty(event, 'changedTouches', { value: [point] });
     Object.defineProperty(event, 'timeStamp', { value: t });
-    document.getElementById('body')!.dispatchEvent(event);
+    document.getElementById(targetId)!.dispatchEvent(event);
     return event;
   }
 
@@ -229,5 +232,53 @@ describe('useSheetDismiss', () => {
       touch('touchstart', 100, 30);
     });
     expect(add.mock.calls.filter(([type]) => type === 'touchmove')).toHaveLength(1);
+  });
+
+  it('leaves a diagonal start alone so it can still scroll', async () => {
+    await act(async () => {
+      touch('touchstart', 100, 0, 100);
+    });
+    // 2px down, 2px across: not clearly vertical yet.
+    const first = await act(async () => touch('touchmove', 102, 10, 102));
+    expect(first.defaultPrevented).toBe(false);
+    // 5px down, 4px across: more down than across, but not twice as much.
+    const second = await act(async () => touch('touchmove', 105, 20, 104));
+    expect(second.defaultPrevented).toBe(false);
+    // Decided (past 6px) as a diagonal: never claimed, nothing moves.
+    const third = await act(async () => touch('touchmove', 120, 30, 110));
+    expect(third.defaultPrevented).toBe(false);
+    expect(sheetEl().style.transform).toBe('');
+  });
+
+  it('does not hold the bounce off for a 1-2px downward wobble', async () => {
+    await act(async () => {
+      touch('touchstart', 100, 0);
+    });
+    const first = await act(async () => touch('touchmove', 102, 10));
+    expect(first.defaultPrevented).toBe(false);
+  });
+
+  it('never takes a touch that starts in a horizontal scroller', async () => {
+    const row = document.getElementById('row')!;
+    Object.defineProperty(row, 'scrollWidth', { configurable: true, value: 800 });
+    Object.defineProperty(row, 'clientWidth', { configurable: true, value: 300 });
+    await act(async () => {
+      touch('touchstart', 100, 0, 100, 'chip');
+    });
+    const first = await act(async () => touch('touchmove', 104, 10, 100, 'chip'));
+    expect(first.defaultPrevented).toBe(false);
+    const drag = await act(async () => touch('touchmove', 300, 50, 100, 'chip'));
+    expect(drag.defaultPrevented).toBe(false);
+    expect(sheetEl().style.transform).toBe('');
+  });
+
+  it('still drags from a row that does not overflow', async () => {
+    await act(async () => {
+      touch('touchstart', 100, 0, 100, 'chip');
+      touch('touchmove', 140, 50, 100, 'chip');
+    });
+    const move = await act(async () => touch('touchmove', 200, 100, 100, 'chip'));
+    expect(move.defaultPrevented).toBe(true);
+    expect(sheetEl().style.transform).toBe('translate3d(0, 100px, 0)');
   });
 });
