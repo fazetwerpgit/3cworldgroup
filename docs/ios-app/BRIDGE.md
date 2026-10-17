@@ -471,9 +471,11 @@ the channel from the latest `chatContext`. Tapping the banner sends
 Native tokens get an FCM message with `notification: { title, body }`,
 `data: { title, body, url }` and `apns.payload.aps: { sound: "default", badge: <n> }`.
 `badge` is the recipient's unread chat channel count (`src/lib/push/unreadBadge.ts`:
-their member channels' `lastMessageAt` against `users/{uid}/chatReads`, two
-reads capped at 100 docs each, native recipients only). If that read fails it
-falls back to `1`.
+their member channels' `lastMessageAt`, at most 100 channels in document-id
+order, against `users/{uid}/chatReads` for exactly those channels; native
+recipients only). Every push carries it, not only chat pushes, so an alert or
+announcement push can lower or clear a stale badge; that is intended. If the
+read fails it falls back to `1`.
 `apns-priority: 10` is added for urgent (chat) pushes. When a notification is
 tapped, send `navigate` with `data.url` when the page advertises it (see
 `navigate`), else load `data.url` in the WebView. It is a portal path such as

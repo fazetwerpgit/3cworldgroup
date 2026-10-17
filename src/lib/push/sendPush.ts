@@ -77,9 +77,11 @@ export async function sendPushToTokens(
         console.error('Failed to send push to user', uid, err);
         return null;
       });
-    // The app icon badge: the recipient's real unread chat count (two small
-    // capped reads, native recipients only). If it can't be read, the old
-    // constant 1 still marks something new.
+    // The app icon badge: the recipient's real unread chat count (one capped
+    // channel query plus a getAll of those channels' receipts, native
+    // recipients only). Computed for EVERY push, chat or not, so a non-chat
+    // push also corrects (or clears) a stale badge. If it can't be read, the
+    // old constant 1 still marks something new.
     const badge = targets.native.length ? ((await unreadChatBadge(db, uid)) ?? 1) : 1;
     const [webRes, nativeRes] = await Promise.all([
       targets.web.length
