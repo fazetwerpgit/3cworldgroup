@@ -101,7 +101,8 @@ export function useOwnerDashboard(enabled = true) {
     [run]
   );
 
-  const refresh = useCallback(() => void run(SECTIONS, { quiet: true }), [run]);
+  // Returns the run, so pull to refresh can wait for it.
+  const refresh = useCallback(() => run(SECTIONS, { quiet: true }), [run]);
   useRefreshOnResume(refresh, { enabled });
 
   return { ...state, retry };

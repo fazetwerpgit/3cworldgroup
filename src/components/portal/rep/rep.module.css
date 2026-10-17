@@ -193,6 +193,7 @@
   }
 
   .scroller {
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -231,6 +232,58 @@
 @media (min-width: 1024px) {
   .main {
     padding-top: var(--s6);
+  }
+}
+
+/* ---------- pull to refresh (app only, PullToRefresh) ----------
+   Sits at the top of the scroller, under the content; the content slides
+   down off it as the pull grows. Position, scale and fade are set inline per
+   frame (transform and opacity only). */
+.ptr {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  border-radius: 50%;
+  background: var(--c-raised);
+  color: var(--c-text-3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, -18px, 0) scale(0.6);
+}
+
+.ptr[data-state='armed'],
+.ptr[data-state='refreshing'] {
+  color: var(--c-lime);
+}
+
+.ptrArc {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  /* Three quarters of the ring (r 9: 56.5 around). */
+  stroke-dasharray: 42.4 56.5;
+}
+
+.ptr[data-state='refreshing'] .ptrArc {
+  animation: ptrSpin 760ms linear infinite;
+}
+
+@keyframes ptrSpin {
+  from {
+    transform: rotate(270deg);
+  }
+
+  to {
+    transform: rotate(630deg);
   }
 }
 
@@ -283,6 +336,7 @@
    Scale only, no colour flash. */
 .retry,
 .iconBtn,
+.back,
 .textBtn,
 .tab,
 .navItem {
@@ -291,6 +345,7 @@
 
 .retry:active,
 .iconBtn:active,
+.back:active,
 .textBtn:not(:disabled):active,
 .tab:active,
 .navItem:active {
@@ -764,8 +819,24 @@
   inset: 0 0 calc(0px - var(--pwa-bottom-gap, 0px));
   z-index: 60;
   border: 0;
-  background: rgba(1, 4, 10, 0.72);
+  background: transparent;
   animation: fadeIn 280ms ease-out both;
+}
+
+/* The dim is its own layer so a sheet being dragged down (useSheetDismiss)
+   can lift it by opacity alone; --sheet-dim follows the drag, and the dim
+   eases back when the sheet springs back. */
+.backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(1, 4, 10, 0.72);
+  opacity: var(--sheet-dim, 1);
+  transition: opacity 240ms var(--ease-sheet);
+}
+
+.backdrop[data-dragging]::before {
+  transition: none;
 }
 
 /* A confirm (SalesDialog) nests its .sheet INSIDE this backdrop, so the whole
@@ -795,7 +866,8 @@
   animation: sheetUp 280ms var(--ease-sheet) both;
 }
 
-/* Closing (SaleDetailSheet): quicker than the open, and no longer tappable. */
+/* Closing (useSheetDismiss, SaleDetailSheet): quicker than the open, and no
+   longer tappable. A sheet let go mid-drag slides on from where it was. */
 .backdrop[data-closing],
 .sheet[data-closing] {
   pointer-events: none;
@@ -1090,6 +1162,15 @@
   .note:hover {
     background: var(--c-panel-hi);
   }
+}
+
+/* Press: rows step up a tone. */
+.note:active {
+  background: var(--c-panel-hi);
+}
+
+.notePush:active {
+  opacity: 0.72;
 }
 
 .notePush {

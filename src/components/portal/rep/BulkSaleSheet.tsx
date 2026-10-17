@@ -15,6 +15,8 @@ import {
   type BulkSaleFields,
 } from '@/lib/sales/bulk/batch';
 import type { ScanTarget } from '@/lib/sales/scan/fills';
+import { useKeyboardInset } from '@/hooks/useKeyboardInset';
+import { useSheetDismiss } from '@/hooks/useSheetDismiss';
 import { BodyLayer } from './BodyLayer';
 import { useAttachmentViewer } from './ImageViewer';
 import { signedProofUrl } from './ProofCapture';
@@ -147,21 +149,32 @@ export function BulkSaleSheet({
 
   // The list behind keeps re-rendering while other screenshots are read: the
   // focus and the Escape handler are set up once, not on every new onClose.
-  const onCloseRef = useRef(onClose);
-  useEffect(() => {
-    onCloseRef.current = onClose;
-  });
+  // (close is stable: the hook reads the latest onClose itself.)
+  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onClose);
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onCloseRef.current();
+        close();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  }, [close]);
+
+  // The keyboard covers the bottom of the screen: the sheet rides above it,
+  // no taller than what is left, and the field being typed in stays in view.
+  const keyboard = useKeyboardInset();
+  useEffect(() => {
+    if (keyboard.inset <= 0) return;
+    const field = document.activeElement;
+    if (!(field instanceof HTMLElement) || !formRef.current?.contains(field)) return;
+    const frame = window.requestAnimationFrame(() => field.scrollIntoView({ block: 'nearest' }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [keyboard.inset, formRef]);
+  const keyboardStyle =
+    keyboard.inset > 0 ? { bottom: keyboard.inset, maxHeight: Math.max(240, keyboard.viewportHeight - 8) } : undefined;
 
   // A field the rep looked at or changed no longer needs "Check this".
   const clearFlag = (target: ScanTarget) =>
@@ -200,18 +213,28 @@ export function BulkSaleSheet({
   return (
     <BodyLayer>
       <div
+        ref={backdropRef}
         className={s.backdrop}
+        data-closing={closing || undefined}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget) onClose();
+          if (event.target === event.currentTarget) close();
         }}
       >
-        <section className={`${s.sheet} ${b.editSheet}`} role="dialog" aria-modal="true" aria-labelledby="bulk-edit-title">
+        <section
+          ref={sheetRef}
+          className={`${s.sheet} ${b.editSheet}`}
+          data-closing={closing || undefined}
+          style={keyboardStyle}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bulk-edit-title"
+        >
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={s.sheetHead}>
             <h2 id="bulk-edit-title" className={s.sheetTitle}>
               {label}
             </h2>
-            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={onClose}>
+            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={close}>
               <X size={20} aria-hidden="true" />
             </button>
           </div>
@@ -330,7 +353,7 @@ export function BulkSaleSheet({
               />
             </div>
             <div className={b.editActions}>
-              <button type="button" className={s.btnSecondary} onClick={onClose}>
+              <button type="button" className={s.btnSecondary} onClick={close}>
                 Cancel
               </button>
               <button type="submit" className={s.btnPrimary}>

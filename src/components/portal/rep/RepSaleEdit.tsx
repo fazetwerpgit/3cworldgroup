@@ -313,7 +313,8 @@ export function RepSaleEdit() {
                   className={x.input}
                   type="text"
                   name="customerAddress"
-                  autoComplete="street-address"
+                  autoComplete="off"
+                  autoCapitalize="words"
                   value={formData.customerAddress}
                   onChange={handleChange}
                   required
@@ -330,6 +331,7 @@ export function RepSaleEdit() {
                   type="text"
                   name="customerName"
                   autoComplete="off"
+                  autoCapitalize="words"
                   value={formData.customerName}
                   onChange={handleChange}
                   placeholder="John Smith"
@@ -344,6 +346,7 @@ export function RepSaleEdit() {
                   className={x.input}
                   type="tel"
                   name="customerPhone"
+                  inputMode="tel"
                   autoComplete="off"
                   value={formData.customerPhone}
                   onChange={handleChange}
@@ -359,7 +362,10 @@ export function RepSaleEdit() {
                   className={x.input}
                   type="email"
                   name="customerEmail"
+                  inputMode="email"
                   autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={formData.customerEmail}
                   onChange={handleChange}
                   placeholder="customer@email.com"
@@ -494,6 +500,9 @@ export function RepSaleEdit() {
                   type="text"
                   name="orderNumberOrBtn"
                   autoComplete="off"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={formData.orderNumberOrBtn}
                   onChange={handleChange}
                   placeholder="Order # or billing phone number"

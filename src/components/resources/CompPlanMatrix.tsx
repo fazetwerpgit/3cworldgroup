@@ -18,6 +18,7 @@ import {
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import c from './comp-plan.module.css';
+import { invalidateAfterCompPlanWrite } from '@/lib/cache/dataCache';
 
 // IBO is hidden from the UI but kept in data: its rates never get a column,
 // yet ride through `draft` untouched, so a save writes them back as loaded.
@@ -126,6 +127,7 @@ export function CompPlanMatrix() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to save');
+      invalidateAfterCompPlanWrite();
       setEditing(false);
       setSuccess('Comp plan updated');
       window.setTimeout(() => setSuccess(''), 3000);

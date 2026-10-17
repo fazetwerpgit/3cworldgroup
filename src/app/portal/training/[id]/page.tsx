@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useTraining } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { storage } from '@/lib/firebase/config';
 import { TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 import { LoadFailed } from '@/components/portal/rep/RepLearn';
@@ -29,6 +30,8 @@ import l from '@/components/portal/rep/rep-learn.module.css';
 export default function TrainingDetailPage() {
   const params = useParams();
   const { user } = useAuth();
+  // In the app a link opens over the portal (the shell's browser sheet), not in a tab.
+  const inApp = useIsNativeApp();
   const { currentResource, progress, error, missing, fetchResource, fetchProgress, markComplete } = useTraining();
   const [marking, setMarking] = useState(false);
   const [markFailed, setMarkFailed] = useState(false);
@@ -172,7 +175,16 @@ export default function TrainingDetailPage() {
                     ) : !fileUrl ? (
                       <div className={l.mediaLoading}>Loading…</div>
                     ) : currentResource.type === 'video' ? (
-                      <video controls playsInline preload="metadata" src={fileUrl} className={l.video} />
+                      <video
+                        controls
+                        playsInline
+                        preload="metadata"
+                        // No thumbnail: the media fragment makes iOS paint the first
+                        // frame instead of a black box.
+                        src={currentResource.thumbnailUrl ? fileUrl : `${fileUrl}#t=0.001`}
+                        poster={currentResource.thumbnailUrl || undefined}
+                        className={l.video}
+                      />
                     ) : currentResource.mimeType === 'application/pdf' ? (
                       <TrainingPdf src={fileUrl} title={currentResource.title} />
                     ) : (
@@ -180,7 +192,7 @@ export default function TrainingDetailPage() {
                       <img src={fileUrl} alt={currentResource.title} className={l.image} />
                     )}
                   </div>
-                  {fileUrl && (
+                  {fileUrl && !inApp && (
                     <a href={fileUrl} target="_blank" rel="noopener noreferrer" className={l.openLink}>
                       Open in a new tab <ExternalLink size={14} aria-hidden="true" />
                     </a>
@@ -209,7 +221,7 @@ export default function TrainingDetailPage() {
                     </span>
                     <div>
                       <strong>View or download the document</strong>
-                      <span>Opens in a new tab</span>
+                      {!inApp && <span>Opens in a new tab</span>}
                     </div>
                   </div>
                   <a className={`${s.btnPrimary} ${s.btnBlock}`} href={currentResource.url} target="_blank" rel="noopener noreferrer">
@@ -228,7 +240,7 @@ export default function TrainingDetailPage() {
                     </span>
                     <div>
                       <strong>This module lives on another site</strong>
-                      <span>Opens in a new tab</span>
+                      {!inApp && <span>Opens in a new tab</span>}
                     </div>
                   </div>
                   <a className={`${s.btnPrimary} ${s.btnBlock}`} href={currentResource.url} target="_blank" rel="noopener noreferrer">

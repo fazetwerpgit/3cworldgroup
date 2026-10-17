@@ -1117,3 +1117,46 @@
     display: grid;
   }
 }
+
+/* ---------- press ---------- */
+/* Buttons give a little under the thumb; text links dim. */
+.back,
+.iconBtn,
+.retryLink,
+.danger,
+.confirmDelete {
+  transition: transform 120ms ease-out;
+}
+
+.proofBtn,
+.planPick {
+  transition:
+    background 140ms,
+    transform 120ms ease-out;
+}
+
+.provider {
+  transition:
+    background 140ms,
+    color 140ms,
+    transform 120ms ease-out;
+}
+
+.back:active,
+.iconBtn:active,
+.retryLink:active,
+.provider:active,
+.danger:not(:disabled):active,
+.confirmDelete:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.proofBtn:not(:disabled):active,
+.planPick:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.link:active,
+.escGuide:active {
+  opacity: 0.72;
+}

@@ -563,3 +563,39 @@
     min-width: 120px;
   }
 }
+
+/* 32px text buttons sit tight in the card; the hit area reaches 44px. */
+.combine,
+.statusAction {
+  position: relative;
+}
+
+.combine::after,
+.statusAction::after {
+  content: '';
+  position: absolute;
+  inset: -6px 0;
+}
+
+/* ---------- press ---------- */
+/* Text buttons and the card row dim; the box and the remove icon give a little. */
+.combine:active,
+.statusAction:not(:disabled):active,
+.shotAction:active,
+.viewShot:active,
+.card:not([data-skipped]) .cardOpen:not(:disabled):active {
+  opacity: 0.72;
+}
+
+.box,
+.remove {
+  transition: transform 120ms ease-out;
+}
+
+.check:not(:has(input:disabled)):active .box {
+  transform: scale(0.88);
+}
+
+.remove:not(:disabled):active {
+  transform: scale(0.97);
+}

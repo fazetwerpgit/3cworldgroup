@@ -1,0 +1,91 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  __resetKeyboardForTests,
+  keyboardInsetFrom,
+  overlapBelowVisible,
+  useKeyboardInset,
+} from './useKeyboardInset';
+
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+describe('keyboardInsetFrom', () => {
+  it('is 0 with the keyboard down', () => {
+    expect(keyboardInsetFrom({ innerHeight: 844, height: 844, offsetTop: 0, scale: 1 })).toBe(0);
+  });
+
+  it('ignores a small shrink (the URL bar settling)', () => {
+    expect(keyboardInsetFrom({ innerHeight: 844, height: 790, offsetTop: 0, scale: 1 })).toBe(0);
+  });
+
+  it('measures the keyboard', () => {
+    expect(keyboardInsetFrom({ innerHeight: 844, height: 508, offsetTop: 0, scale: 1 })).toBe(336);
+  });
+
+  it('subtracts what Safari panned the page by', () => {
+    expect(keyboardInsetFrom({ innerHeight: 844, height: 508, offsetTop: 200, scale: 1 })).toBe(136);
+  });
+
+  it('reads a pinch zoom as no keyboard', () => {
+    expect(keyboardInsetFrom({ innerHeight: 844, height: 400, offsetTop: 0, scale: 2 })).toBe(0);
+  });
+});
+
+describe('overlapBelowVisible', () => {
+  it('is 0 when the box clears the keyboard', () => {
+    expect(overlapBelowVisible(400, { offsetTop: 0, height: 508 })).toBe(0);
+  });
+
+  it('is how far the box must rise, with the margin', () => {
+    expect(overlapBelowVisible(600, { offsetTop: 0, height: 508 }, 12)).toBe(104);
+  });
+
+  it('counts a panned visual viewport', () => {
+    expect(overlapBelowVisible(600, { offsetTop: 100, height: 508 }, 12)).toBe(4);
+  });
+});
+
+describe('useKeyboardInset', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  const vv = Object.assign(new EventTarget(), { height: 844, offsetTop: 0, scale: 1 });
+
+  function Probe() {
+    const { inset, viewportHeight } = useKeyboardInset();
+    return <output id="kb">{`${inset}/${viewportHeight}`}</output>;
+  }
+  const shown = () => document.getElementById('kb')?.textContent;
+
+  beforeEach(async () => {
+    __resetKeyboardForTests();
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: vv });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    vv.height = 844;
+    vv.offsetTop = 0;
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root.render(<Probe />));
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('follows the visual viewport as the keyboard opens and closes', async () => {
+    expect(shown()).toBe('0/0');
+    await act(async () => {
+      vv.height = 500;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(shown()).toBe('344/500');
+    await act(async () => {
+      vv.height = 844;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(shown()).toBe('0/0');
+  });
+});

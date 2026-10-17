@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { dataCacheGeneration, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -75,6 +76,9 @@ export type RepSectionKey = Exclude<keyof RepDashboardState, never>;
 
 const LOADING = { status: 'loading' } as const;
 
+/** Cache key for the dashboard's sections (a sale write drops it: see useSales). */
+const DASHBOARD_CACHE_KEY = 'dashboard';
+
 async function getJson<T>(url: string, token: string | null, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -135,6 +139,17 @@ export function useRepDashboard() {
   const uid = user?.uid ?? null;
   const active = user?.status === 'active';
 
+  // Revisit: the sections loaded last time show at once (from the in-memory,
+  // per-account cache) and refresh quietly underneath.
+  const [cachedEntry] = useState(() => readDataCacheEntry<Partial<RepDashboardState>>(uid, DASHBOARD_CACHE_KEY));
+  const cached = cachedEntry?.value;
+  // Writes from this mount never land in another account's cache.
+  const [gen] = useState(dataCacheGeneration);
+  // When the numbers on screen were last loaded in full, and — after a
+  // background refresh failed with them still showing — that time, for the
+  // quiet "Couldn't refresh · as of" note.
+  const lastGoodAt = useRef<number | null>(cachedEntry?.at ?? null);
+  const [staleAt, setStaleAt] = useState<number | null>(null);
   const [state, setState] = useState<RepDashboardState>(() => ({
     book: LOADING,
     plan: LOADING,
@@ -142,7 +157,21 @@ export function useRepDashboard() {
     challenge: LOADING,
     calls: LOADING,
     paperwork: LOADING,
+    ...cached,
   }));
+
+  // Keep the cache in step with every section that is on screen.
+  useEffect(() => {
+    const ready: Partial<RepDashboardState> = {};
+    for (const key of Object.keys(state) as RepSectionKey[]) {
+      if (state[key].status === 'ready') (ready as Record<string, unknown>)[key] = state[key];
+    }
+    if (Object.keys(ready).length) writeDataCache(uid, DASHBOARD_CACHE_KEY, ready, gen);
+  }, [state, uid, gen]);
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
   const controllers = useRef(new Map<RepSectionKey, AbortController>());
 
   const loaders = useCallback((): Partial<Loaders> => {
@@ -211,6 +240,8 @@ export function useRepDashboard() {
       if (!wanted.length) return;
 
       const token = await getIdToken().catch(() => null);
+      let keptStale = false;
+      let failed = false;
 
       await Promise.allSettled(
         wanted.map(async (key) => {
@@ -226,6 +257,8 @@ export function useRepDashboard() {
             // network failure must surface as "Couldn't load", never spin forever.
             if (controller.signal.aborted) return;
             console.error(`Dashboard section "${key}" failed:`, error);
+            failed = true;
+            if (quiet && stateRef.current[key]?.status === 'ready') keptStale = true;
             // A quiet refresh keeps what is on screen rather than trading it for
             // an error; a section with nothing loaded yet still gets its error.
             setState((current) =>
@@ -233,14 +266,25 @@ export function useRepDashboard() {
             );
           }
         })
-      );
+      ).then(() => {
+        if (keptStale) {
+          setStaleAt(lastGoodAt.current ?? Date.now());
+        } else if (!failed && !keys) {
+          lastGoodAt.current = Date.now();
+          setStaleAt(null);
+        }
+      });
     },
     [loaders]
   );
 
+  const showedCached = useRef(!!cached);
   useEffect(() => {
     const running = controllers.current;
-    void run();
+    // From cache: a quiet refresh keeps each section on screen if its reload fails.
+    const quiet = showedCached.current;
+    showedCached.current = false;
+    void run(undefined, { quiet });
     return () => {
       for (const controller of running.values()) controller.abort();
       running.clear();
@@ -269,8 +313,9 @@ export function useRepDashboard() {
   );
 
   /** Reopened after a while: reload every section without leaving the screen. */
-  const refresh = useCallback(() => void run(undefined, { quiet: true }), [run]);
+  // Returns the run, so pull to refresh can wait for it.
+  const refresh = useCallback(() => run(undefined, { quiet: true }), [run]);
   useRefreshOnResume(refresh, { enabled: !!uid });
 
-  return { ...state, retry, installDateSaved };
+  return { ...state, staleAt, retry, installDateSaved };
 }

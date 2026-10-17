@@ -17,9 +17,10 @@ export default function PortalLoginPage() {
   if (!loading && !authChecked) setAuthChecked(true);
 
   useEffect(() => {
-    // If user is already logged in, redirect to dashboard
+    // Signed in: on to the dashboard. Replace, so Back from the dashboard
+    // leaves the portal instead of returning to the sign-in screen.
     if (!loading && user) {
-      router.push('/portal/dashboard');
+      router.replace('/portal/dashboard');
     }
   }, [user, loading, router]);
 
@@ -27,9 +28,9 @@ export default function PortalLoginPage() {
   // there is no flash between this and the login or the dashboard.
   if (loading && !authChecked) return <RepBoot />;
 
-  // If user is logged in, show nothing (will redirect)
+  // Signed in: the boot mark holds the screen until the dashboard paints.
   if (user) {
-    return null;
+    return <RepBoot />;
   }
 
   if (pendingApproval) {

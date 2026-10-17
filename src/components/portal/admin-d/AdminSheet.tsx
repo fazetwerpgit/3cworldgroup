@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import { useSheetDismiss } from '@/hooks/useSheetDismiss';
 import s from '@/components/portal/rep/rep.module.css';
 import u from './admin-ui.module.css';
 
@@ -30,9 +31,11 @@ export function AdminSheet({
 }) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement | null>(null);
-  const onCloseRef = useRef(onClose);
+  // Close, Escape, the backdrop and a drag down slide it out first.
+  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onClose);
+  const closeLatest = useRef(close);
   useEffect(() => {
-    onCloseRef.current = onClose;
+    closeLatest.current = close;
   });
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function AdminSheet({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onCloseRef.current();
+        closeLatest.current();
       }
     };
     document.addEventListener('keydown', onKey);
@@ -54,18 +57,27 @@ export function AdminSheet({
   return (
     <BodyLayer>
       <div
+        ref={backdropRef}
         className={s.backdrop}
+        data-closing={closing || undefined}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget) onClose();
+          if (event.target === event.currentTarget) close();
         }}
       >
-        <section className={`${s.sheet} ${u.sheet}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <section
+          ref={sheetRef}
+          className={`${s.sheet} ${u.sheet}`}
+          data-closing={closing || undefined}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+        >
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={`${s.sheetHead} ${tone === 'danger' ? u.sheetHeadDanger : ''}`}>
             <h2 id={titleId} className={s.sheetTitle}>
               {title}
             </h2>
-            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={onClose}>
+            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={close}>
               <X size={20} aria-hidden="true" />
             </button>
           </div>

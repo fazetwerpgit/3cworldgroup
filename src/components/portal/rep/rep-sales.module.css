@@ -2329,8 +2329,16 @@
 }
 
 .dKvEnd .dChange {
+  position: relative;
   min-height: 36px;
   padding: 0 var(--s3);
+}
+
+/* 36px to sit in the row; the hit area reaches 44px. */
+.dKvEnd .dChange::after {
+  content: '';
+  position: absolute;
+  inset: -5px 0;
 }
 
 .dSub {
@@ -2909,4 +2917,37 @@ a.dLine {
 .dCarrier .pill {
   border-color: color-mix(in srgb, currentColor 45%, transparent);
   border-radius: 999px;
+}
+
+/* ---------- press ---------- */
+/* Buttons give a little under the thumb; links dim; list rows step up a tone. */
+.actBtn,
+.quietBtn,
+.loggedClose,
+.proofBtn {
+  transition: transform 120ms ease-out;
+}
+
+.actBtn:not(:disabled):active,
+.quietBtn:not(:disabled):active,
+.loggedClose:active {
+  transform: scale(0.97);
+}
+
+.proofBtn:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+.dPhone:active,
+.fiberPhone:active,
+.fiberDetails:active {
+  opacity: 0.72;
+}
+
+.subRow:active {
+  background: var(--c-panel-hi);
+}
+
+.fiberRowOpen:active {
+  background: var(--c-raised);
 }

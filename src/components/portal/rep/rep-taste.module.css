@@ -18,6 +18,7 @@
 }
 
 .segBtn {
+  position: relative;
   flex: 1 1 0;
   min-height: 40px;
   padding: 0 var(--s4);
@@ -28,7 +29,14 @@
   font: 600 15px / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms, color 140ms;
+  transition: background 140ms, color 140ms, transform 120ms ease-out;
+}
+
+/* 40px pill; the hit area takes the track's padding to reach 48px. */
+.segBtn::after {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
 }
 
 .segBtn[aria-selected='true'],
@@ -74,7 +82,7 @@
   font: 600 15px / 1 var(--f-ui);
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms, color 140ms;
+  transition: background 140ms, color 140ms, transform 120ms ease-out;
 }
 
 .chip b {
@@ -103,6 +111,12 @@
   .chip:not([aria-pressed='true']):not([aria-selected='true']):hover {
     background: var(--c-panel-hi);
   }
+}
+
+/* Press: give a little under the thumb. */
+.segBtn:active,
+.chip:active {
+  transform: scale(0.97);
 }
 
 @media (min-width: 1024px) {

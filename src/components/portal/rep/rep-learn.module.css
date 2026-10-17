@@ -255,6 +255,10 @@
   text-decoration: none;
 }
 
+.openLink:active {
+  opacity: 0.72;
+}
+
 .docCard {
   display: grid;
   gap: var(--s4);

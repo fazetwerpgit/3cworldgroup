@@ -231,7 +231,7 @@ export function SignupForm() {
       await signUp(email.trim(), password, displayName.trim(), teamCode);
       // AuthContext set pendingApproval; go to /portal, which renders the
       // real PendingApproval component (this page only knows how to show the form).
-      router.push("/portal");
+      router.replace("/portal");
     } catch (err) {
       const code =
         err && typeof err === "object" && "code" in err
@@ -364,6 +364,9 @@ export function SignupForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 className={a.input}
                 autoComplete="new-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 minLength={6}
                 aria-describedby="signup-strength"
                 required
@@ -406,6 +409,9 @@ export function SignupForm() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className={a.input}
               autoComplete="new-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               minLength={6}
               required
             />

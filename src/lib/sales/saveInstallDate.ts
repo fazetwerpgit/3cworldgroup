@@ -1,4 +1,5 @@
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { invalidateAfterSaleWrite } from '@/lib/cache/dataCache';
 
 // Client side of PATCH /api/portal/sales/[id]/install-date: the one edit a rep
 // makes to their own sale. Every failure comes back as a line the rep can act
@@ -31,7 +32,11 @@ export async function saveInstallDate(
       signal: controller.signal,
     });
     const data = (await response.json().catch(() => null)) as { installDate?: string; error?: string } | null;
-    if (response.ok && data?.installDate) return { ok: true, installDate: data.installDate };
+    if (response.ok && data?.installDate) {
+      // Pay windows, buckets and the boards all read install dates.
+      invalidateAfterSaleWrite();
+      return { ok: true, installDate: data.installDate };
+    }
     // The route's 400/409 lines are written for the rep ("Install date is
     // before the sale date"); anything else is ours to explain.
     if ((response.status === 400 || response.status === 409) && data?.error) return { ok: false, error: data.error };

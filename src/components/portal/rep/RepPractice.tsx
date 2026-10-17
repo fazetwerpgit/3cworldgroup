@@ -39,6 +39,8 @@ import { askForMic, canHandsFree } from './handsFreeMic';
 import { useHandsFree } from './useHandsFree';
 import { useSoftKeyboardOpen } from './RepForm';
 import { useHideRepTabBar } from './RepShell';
+import { useKeepAboveKeyboard } from '@/hooks/useKeyboardInset';
+import { isComposerSend } from './composerKeys';
 
 // Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
 // answers until the door closes, they sign up, or the rep ends it, then a
@@ -321,6 +323,9 @@ export function RepPractice({
   // Typing a line: the tab bar steps aside for the keyboard, as it does on forms.
   const keyboardOpen = useSoftKeyboardOpen();
   useHideRepTabBar(active && keyboardOpen);
+  // The keyboard covers the bottom of the page: keep the composer above it.
+  const composerRef = useRef<HTMLFormElement>(null);
+  const { inset: keyboardInset } = useKeepAboveKeyboard(composerRef, active);
   const handsFree = talk && canHandsFreeHere && handsFreeOn;
   const hands = useHandsFree<PreparedCut>({
     onLine: (text, ms) => {
@@ -1270,7 +1275,7 @@ export function RepPractice({
           ) : null}
         </div>
       ) : (
-        <form className={`${s.panel} ${a.composer}`} onSubmit={onSubmit}>
+        <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={onSubmit}>
           {failed ? (
             <div className={a.failed} role="alert">
               <p>{failed.message}</p>
@@ -1345,7 +1350,9 @@ export function RepPractice({
                   setDraft(event.target.value);
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) sendLine(draft);
+                  if (!isComposerSend(event.nativeEvent)) return;
+                  event.preventDefault();
+                  if (!listening) sendLine(draft);
                 }}
               />
               {draft.length > COUNTER_FROM ? (
@@ -1405,6 +1412,7 @@ export function RepPractice({
           </div>
         </form>
       )}
+      {keyboardInset > 0 ? <div aria-hidden="true" style={{ height: keyboardInset }} /> : null}
       <div ref={bottomRef} className={pr.anchor} aria-hidden="true" />
     </>
   );

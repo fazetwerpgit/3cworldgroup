@@ -89,6 +89,7 @@
 }
 
 .tab {
+  position: relative;
   flex: 1 1 0;
   min-height: 40px;
   padding: 0 var(--s4);
@@ -101,7 +102,15 @@
   cursor: pointer;
   transition:
     background-color 140ms,
-    color 140ms;
+    color 140ms,
+    transform 120ms ease-out;
+}
+
+/* 40px pill; the hit area takes the track's padding to reach 48px. */
+.tab::after {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
 }
 
 .tab[aria-selected='true'],
@@ -174,7 +183,8 @@
   cursor: pointer;
   transition:
     background-color 140ms,
-    color 140ms;
+    color 140ms,
+    transform 120ms ease-out;
 }
 
 .chip b {
@@ -239,6 +249,11 @@ button.row {
   text-align: left;
   cursor: pointer;
   transition: background-color 160ms ease;
+}
+
+a.row:active,
+button.row:active {
+  background: var(--c-panel-hi);
 }
 
 @media (hover: hover) {
@@ -516,4 +531,17 @@ button.row:focus-visible {
   color: var(--c-text-3);
   font-size: var(--t-sm);
   line-height: 1.45;
+}
+
+/* ---------- press ---------- */
+.back,
+.headLink {
+  transition: transform 120ms ease-out;
+}
+
+.back:active,
+.headLink:active,
+.tab:active,
+.chip:active {
+  transform: scale(0.97);
 }

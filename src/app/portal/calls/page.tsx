@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, CalendarClock, Check, ChevronDown, Plus, RotateCw, ShieldCheck, Users, Video, X } from 'lucide-react';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import { useSheetDismiss } from '@/hooks/useSheetDismiss';
+import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
+import { friendlyError } from '@/lib/forms/friendlyError';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import c from '@/components/portal/rep/rep-calls.module.css';
@@ -220,6 +223,8 @@ export default function CallsSchedulePage() {
   useEffect(() => {
     fetchCalls();
   }, [fetchCalls]);
+  // Pull to refresh (app): the schedule in place.
+  useRevalidateOnPull(fetchCalls, !!user);
 
   // The clock is not an animation, so it ticks under reduce-motion too.
   useEffect(() => {
@@ -243,7 +248,7 @@ export default function CallsSchedulePage() {
       setForm(EMPTY_FORM);
       await fetchCalls();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add call');
+      setError(friendlyError(err instanceof Error ? err.message : 'Failed to add call', 'save').message);
     } finally {
       setSaving(false);
     }
@@ -263,7 +268,7 @@ export default function CallsSchedulePage() {
       if (!response.ok) throw new Error(json.error || 'Failed to remove call');
       await fetchCalls();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove call');
+      setError(friendlyError(err instanceof Error ? err.message : 'Failed to remove call', 'remove it').message);
     } finally {
       setDeletingId(null);
     }
@@ -592,32 +597,42 @@ function CallsSkeleton() {
 /** Manager-only add form: bottom sheet on phone, centred dialog on desktop, portaled to <body>. */
 function AddCallSheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onClose);
 
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        close();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [close]);
 
   return (
     <BodyLayer>
       <div
+        ref={backdropRef}
         className={s.backdrop}
+        data-closing={closing || undefined}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget) onClose();
+          if (event.target === event.currentTarget) close();
         }}
       >
-        <section className={s.sheet} role="dialog" aria-modal="true" aria-labelledby="add-call-title">
+        <section
+          ref={sheetRef}
+          className={s.sheet}
+          data-closing={closing || undefined}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-call-title"
+        >
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={s.sheetHead}>
             <h2 id="add-call-title" className={s.sheetTitle}>{title}</h2>
-            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={onClose}>
+            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={close}>
               <X size={20} aria-hidden="true" />
             </button>
           </div>

@@ -166,7 +166,7 @@ function ExpediteOrderForm() {
           <input {...text('zip', 'zip')} inputMode="numeric" autoComplete="off" placeholder="12345" />
         </Field>
         <Field id="order-number" label="Order number" required error={check.errors.orderNumber}>
-          <input {...text('orderNumber', 'order-number')} autoComplete="off" autoCapitalize="characters" />
+          <input {...text('orderNumber', 'order-number')} autoComplete="off" autoCapitalize="characters" autoCorrect="off" spellCheck={false} />
         </Field>
         <Field id="expedite-dates" label="Dates you want" required error={check.errors.expediteDates} wide>
           <textarea

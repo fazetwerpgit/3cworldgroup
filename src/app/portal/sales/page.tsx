@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Plus, RotateCw, X } from 'lucide-react';
@@ -33,6 +33,7 @@ import {
   type MonthKey,
 } from '@/lib/sales/monthWindow';
 import { PayoutCard } from './PayoutCard';
+import { cacheTimeLabel } from '@/lib/cache/dataCache';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -109,13 +110,41 @@ function LoggedBanner({ name, onDismiss }: { name: string | null; onDismiss: () 
 function SalesContent() {
   const { user, hasPermission, isRole } = useAuth();
   const params = useSearchParams();
-  const { sales: loggedSales, truncated, loading, error, fetchSales, deleteSale, setSaleCancelled } = useSales();
-  const fiber = useFiberStatus();
 
   // Admins and owners read the whole company book; everyone else reads their own.
   // This replaced sales:approve, which used to carry the visibility switch as a
   // side effect of the approval permission.
   const canViewAll = hasPermission('sales:read:all');
+  const salesFilters = useMemo(() => {
+    if (!user) return null;
+    // Both books are fetched WHOLE and sliced by month in the browser.
+    //
+    // A rep's pay list is keyed on the INSTALL date, so a month-bounded fetch on
+    // saleDate would drop a sale sold in August that installs in September —
+    // money they are actually owed.
+    //
+    // Management's book is merged against the carrier report, which arrives
+    // all-time. A month-bounded fetch made the two feeds asymmetric: a sale
+    // whose saleDate sat outside the picked month left its carrier order with
+    // nothing to join to, and the order rendered red as "never logged" — the
+    // board accusing somebody of not logging a sale they had logged. The month
+    // is applied to the merged book instead, where both sides see it.
+    return canViewAll ? { limit: 500 } : { limit: 500, salesRepId: user.uid };
+  }, [canViewAll, user]);
+  // A revisit shows the last copy of the book at once and refreshes it in the
+  // background. Not straight after Log Sale: the new sale must be in the list
+  // the banner names, so that lands on a fresh read as before.
+  const {
+    sales: loggedSales,
+    truncated,
+    loading,
+    error,
+    fetchSales,
+    deleteSale,
+    setSaleCancelled,
+    seeded,
+  } = useSales(params.get('logged') ? null : salesFilters);
+  const fiber = useFiberStatus();
   const canLog = hasPermission('sales:write');
   // The status API answers scope 'all' to admins and owners. Until it answers —
   // or when the first load fails — the role stands in, so Install status shows
@@ -146,7 +175,7 @@ function SalesContent() {
   }, []);
   // useSales starts idle (loading false, no sales). Until the first fetch
   // settles the page shows skeletons, never a zero it has not measured.
-  const [fetched, setFetched] = useState(false);
+  const [fetched, setFetched] = useState(seeded);
   const [helpOpen, setHelpOpen] = useState(false);
   const closeHelp = useCallback(() => setHelpOpen(false), []);
   const {
@@ -164,39 +193,27 @@ function SalesContent() {
     [compRole, hasPlan, payDelayDays, planError, rates, retryPlan]
   );
 
-  const salesFilters = useMemo(() => {
-    if (!user) return null;
-    // Both books are fetched WHOLE and sliced by month in the browser.
-    //
-    // A rep's pay list is keyed on the INSTALL date, so a month-bounded fetch on
-    // saleDate would drop a sale sold in August that installs in September —
-    // money they are actually owed.
-    //
-    // Management's book is merged against the carrier report, which arrives
-    // all-time. A month-bounded fetch made the two feeds asymmetric: a sale
-    // whose saleDate sat outside the picked month left its carrier order with
-    // nothing to join to, and the order rendered red as "never logged" — the
-    // board accusing somebody of not logging a sale they had logged. The month
-    // is applied to the merged book instead, where both sides see it.
-    return canViewAll ? { limit: 500 } : { limit: 500, salesRepId: user.uid };
-  }, [canViewAll, user]);
-
   const refreshSales = useCallback(() => {
     if (!salesFilters) return;
     void fetchSales(salesFilters).finally(() => setFetched(true));
   }, [fetchSales, salesFilters]);
 
+  const showedCached = useRef(seeded);
   useEffect(() => {
+    if (showedCached.current && salesFilters) {
+      showedCached.current = false;
+      void fetchSales(salesFilters, { background: true });
+      return;
+    }
     refreshSales();
-  }, [refreshSales]);
+  }, [fetchSales, refreshSales, salesFilters]);
 
   // Reopened after a while: reload the book and the carrier report in place,
   // keeping the list on screen (and on a failure, keeping it as it was).
   const { refetch: refetchFiber } = fiber;
   const refreshQuietly = useCallback(() => {
     if (!salesFilters) return;
-    void fetchSales(salesFilters, { quiet: true });
-    void refetchFiber().catch(() => undefined);
+    return Promise.all([fetchSales(salesFilters, { quiet: true }), refetchFiber().catch(() => undefined)]);
   }, [fetchSales, refetchFiber, salesFilters]);
   useRefreshOnResume(refreshQuietly, { enabled: !!salesFilters });
 
@@ -250,6 +267,11 @@ function SalesContent() {
   const staleNote = error ? (
     <p className={x.alert} role="alert">
       Couldn&apos;t refresh just now. What you see may be out of date.
+    </p>
+  ) : fiber.staleAt !== null ? (
+    // The carrier report shown is a cached copy whose refresh failed.
+    <p className={x.alert} role="status">
+      Couldn&apos;t refresh the carrier report · as of {cacheTimeLabel(fiber.staleAt)}
     </p>
   ) : null;
 

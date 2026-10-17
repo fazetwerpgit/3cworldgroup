@@ -28,6 +28,7 @@ import { clearPendingIdToken, rememberPendingIdToken } from '@/lib/auth/pendingS
 import { unregisterNativePush } from '@/lib/app/nativePush';
 import { clearViewAs } from '@/lib/viewAs/storage';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
+import { setDataCacheOwner } from '@/lib/cache/dataCache';
 
 export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
@@ -348,6 +349,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resolveProfileRef.current = resolveProfile;
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Cached screens belong to one account: another account, or none, empties them.
+      setDataCacheOwner(firebaseUser?.uid ?? null);
       if (signingUp.current || bootstrappingPendingProfile.current) return; // explicit auth flows own state
       if (firebaseUser) {
         await resolveProfile(firebaseUser);
@@ -465,6 +468,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearSignature();
       // The owner's "View as rep" session ends with the sign-in it belongs to.
       clearViewAs();
+      // Cached screens (an owner's include financials) never outlive the sign-in.
+      setDataCacheOwner(null);
       // Same for the Ask 3C conversation and practice: the next rep must not see or send them.
       try {
         window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);

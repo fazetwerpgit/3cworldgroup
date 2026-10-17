@@ -384,7 +384,14 @@
   text-align: center;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 140ms, color 140ms;
+  transition: background 140ms, color 140ms, transform 120ms ease-out;
+}
+
+/* 42px segment; the hit area takes the track's padding to reach 44px+. */
+.chip::after {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
 }
 
 .chip input {
@@ -718,7 +725,7 @@ span.thumbView {
   line-height: 1.2;
   text-align: center;
   cursor: pointer;
-  transition: color 140ms;
+  transition: color 140ms, transform 120ms ease-out;
 }
 
 .thumbAdd svg {
@@ -1335,4 +1342,29 @@ span.thumbView {
 /* "Log several from screenshots" is a link styled as the manual row. */
 a.manual {
   text-decoration: none;
+}
+
+/* ---------- press ---------- */
+/* Tiles and filled buttons give a little; text buttons and rows dim. */
+button.thumbView,
+.thumbRetry,
+.thumbRemove {
+  transition: transform 120ms ease-out;
+}
+
+.chip:active,
+.thumbAdd:active,
+button.thumbView:active,
+.thumbRetry:active,
+.thumbRemove:active {
+  transform: scale(0.97);
+}
+
+.draftStartOver:active,
+.dupeNew:active,
+.scanSkip:active,
+.estRetry:active,
+.extra:active,
+.moreSummary:active {
+  opacity: 0.72;
 }

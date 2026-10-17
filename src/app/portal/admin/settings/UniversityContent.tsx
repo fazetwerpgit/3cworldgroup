@@ -18,6 +18,7 @@ import {
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import un from './admin-university.module.css';
+import { invalidateAllSubjects } from '@/lib/cache/dataCache';
 
 const CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
   TRAINING_CATEGORIES.map((category) => [category.value, category.label])
@@ -130,6 +131,7 @@ function AdminUniversity() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to save');
+      invalidateAllSubjects(['training']);
       setMsg('Content added.');
       setTitle('');
       setDescription('');
@@ -155,6 +157,8 @@ function AdminUniversity() {
         const data = await res.json().catch(() => ({}));
         throw new Error(typeof data.error === 'string' ? data.error : failMsg);
       }
+      // Reps' cached module lists must not show the old set.
+      invalidateAllSubjects(['training']);
       return true;
     } catch (error) {
       setErr(error instanceof Error && error.message ? error.message : failMsg);

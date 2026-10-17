@@ -1,9 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, CircleHelp, Clock3, Edit3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import {
+  cacheTimeLabel,
+  dataCacheGeneration,
+  invalidateAfterCompPlanWrite,
+  readDataCache,
+  readDataCacheEntry,
+  writeDataCache,
+} from '@/lib/cache/dataCache';
+import { friendlyError } from '@/lib/forms/friendlyError';
+import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
 import { ratesArePending, CommissionConfig, FieldRole, IBO_FIELD_ROLES, RoleDisplayNames, repFacingRoleLabel } from '@/types';
 import { LoadFailed } from './RepLearn';
 import { PayHelpSheet } from './PayHelpSheet';
@@ -42,13 +52,22 @@ const TIER_NOTES: Record<FieldRole, string> = {
  * only their own tier; platform users (admin/operations) get every tier and
  * admins can edit rates. The owner-only comp plan (with margin) sits below.
  */
+const PAY_STRUCTURE_CACHE_KEY = 'commission';
+
 export function RepPayStructure() {
   const { user, isRole } = useAuth();
-  const [data, setData] = useState<PayStructureResponse | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Revisit: last time's tiers show at once and refresh in the background.
+  const [cached] = useState(() => readDataCache<PayStructureResponse>(user?.uid, PAY_STRUCTURE_CACHE_KEY));
+  const [data, setData] = useState<PayStructureResponse | null>(() => cached ?? null);
+  const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState('');
+  const [staleAt, setStaleAt] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<CommissionConfig[]>([]);
+  const editingRef = useRef(editing);
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
+  const [draft, setDraft] = useState<CommissionConfig[]>(() => cached?.tiers ?? []);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
@@ -58,7 +77,9 @@ export function RepPayStructure() {
 
   const fetchStructure = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    const shown = readDataCacheEntry<PayStructureResponse>(user.uid, PAY_STRUCTURE_CACHE_KEY);
+    const gen = dataCacheGeneration();
+    if (!shown) setLoading(true);
     try {
       // Tiers are scoped to the caller's own role, resolved from this token.
       const token = await getIdToken();
@@ -67,15 +88,23 @@ export function RepPayStructure() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load pay structure');
+      writeDataCache(user.uid, PAY_STRUCTURE_CACHE_KEY, json, gen);
+      setStaleAt(null);
       setData(json);
-      setDraft(json.tiers);
+      // A background refresh never clobbers rates being edited.
+      if (!editingRef.current) setDraft(json.tiers);
       setError('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load pay structure');
+    } catch {
+      // Cached tiers still showing: one quiet "as of" line, not an error box.
+      // With nothing on screen the page shows its Retry; never the raw error.
+      if (shown) setStaleAt(shown.at);
+      else setError("Couldn't refresh just now. What you see may be out of date.");
     } finally {
       setLoading(false);
     }
   }, [user]);
+  // Pull to refresh (app): the tiers in place, never over rates being edited.
+  useRevalidateOnPull(fetchStructure, !!user);
 
   useEffect(() => {
     void fetchStructure();
@@ -103,12 +132,13 @@ export function RepPayStructure() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to save');
+      invalidateAfterCompPlanWrite();
       setEditing(false);
       setSuccess('Pay structure updated');
       window.setTimeout(() => setSuccess(''), 3000);
       await fetchStructure();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      setError(friendlyError(err instanceof Error ? err.message : 'Failed to save', 'save').message);
     } finally {
       setSaving(false);
     }
@@ -145,6 +175,11 @@ export function RepPayStructure() {
         <LoadFailed what="pay structure" onRetry={() => void fetchStructure()} />
       ) : (
         <>
+          {staleAt !== null ? (
+            <p className={p.hint} role="status">
+              Couldn&apos;t refresh · as of {cacheTimeLabel(staleAt)}
+            </p>
+          ) : null}
           {(error || success || (ratesPending && data.scope === 'all')) && (
             <div className={l.payNotices}>
               {error && (

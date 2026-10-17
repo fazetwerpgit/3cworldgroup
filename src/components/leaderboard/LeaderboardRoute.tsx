@@ -19,9 +19,13 @@ import split from './routeSplit.module.css';
  *  master. The period, the metric and the fetch live here so that both sides
  *  read the same board and only one request goes out, whichever is on screen.
  *  The filter controls in each page write back through the callbacks. */
+const FIRST_BOARD = { period: 'week', metric: 'totalPoints', limit: 100, scope: 'approved', team: true } as const;
+
 export function LeaderboardRoute() {
   const { user } = useAuth();
-  const { leaderboard, currentUser, unranked, recent, firstMonth, loading, error, fetchLeaderboard } = useLeaderboard();
+  // Seeded with the board fetched first below (week, points, team), so a revisit paints it at once.
+  const { leaderboard, currentUser, unranked, recent, firstMonth, loading, error, fetchLeaderboard } =
+    useLeaderboard(FIRST_BOARD);
   const [period, setPeriod] = useState<LeaderboardPeriod>('week');
   const [metric, setMetric] = useState<LeaderboardMetric>('totalPoints');
   // The month board's month: null is this month (on the office clock, as the
@@ -39,9 +43,13 @@ export function LeaderboardRoute() {
   // Reopened after a while: the same board, reloaded in place. A load already
   // under way (a filter tap) is left to land on its own.
   const refreshQuietly = useCallback(() => {
-    if (user && !loading) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true, ...(monthParam ? { month: monthParam } : {}) });
+    if (!user || loading) return;
+    return fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true, ...(monthParam ? { month: monthParam } : {}) });
   }, [user, loading, period, metric, monthParam, fetchLeaderboard]);
   useRefreshOnResume(refreshQuietly, { enabled: !!user });
+  const retry = useCallback(() => {
+    if (user) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, ...(monthParam ? { month: monthParam } : {}) });
+  }, [user, period, metric, monthParam, fetchLeaderboard]);
 
   const busy = loading || !user;
 
@@ -70,6 +78,7 @@ export function LeaderboardRoute() {
           recent={recent}
           loading={busy}
           error={error}
+          onRetry={retry}
           period={period}
           metric={metric}
           onPeriodChange={setPeriod}

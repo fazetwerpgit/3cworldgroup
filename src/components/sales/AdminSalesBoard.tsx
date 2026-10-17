@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { FIBER_COMPANIES, RoleDisplayNames, isOwner } from '@/types';
+import { nativeHaptic } from '@/lib/app/bridge';
 import type { CompPlanCompanyRates, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
 import { saleNetRevenue, type OwnerPricing } from '@/lib/owner/revenue';
 import { useAuth } from '@/contexts/AuthContext';
@@ -34,6 +35,7 @@ import { LinkOrderDialog, UnassignedOrders } from './UnloggedOrders';
 import { SalesDialog } from './SalesDialog';
 import { ChargebackRow, PayGroupHead } from './SalesTable';
 import { Collapse } from '@/components/portal/Collapse';
+import { invalidateAfterSaleWrite } from '@/lib/cache/dataCache';
 
 // The company book, for admins and owners. One row per CUSTOMER — the sales the
 // reps logged and the carrier's morning report merged into a single list, so the
@@ -424,6 +426,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || 'Failed to undo');
+      invalidateAfterSaleWrite();
       await refetchFiber();
     } catch (err) {
       setUndoError(err instanceof Error ? err.message : 'Failed to undo');
@@ -1058,6 +1061,8 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                 const id = deletingId;
                 setDeletingId(null);
                 setSelectedId(null);
+                // A destructive confirm: the warning tick, in the app only.
+                nativeHaptic('warning');
                 if (id) void onDelete?.(id);
               }}
             >

@@ -26,8 +26,7 @@ import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatOutbox } from '@/contexts/ChatOutboxContext';
-import { useChatChannels } from '@/hooks/chat/useChatChannels';
-import { useChatUnread } from '@/hooks/chat/useChatUnread';
+import { useSharedChatChannels, useSharedChatUnread } from '@/hooks/chat/sharedChat';
 import { useMarkChannelRead } from '@/hooks/chat/useMarkChannelRead';
 import { useConnectionNotice } from '@/hooks/chat/useConnectionNotice';
 import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
@@ -234,7 +233,7 @@ export default function TeamChatPage() {
   const [mobileFollowing, setMobileFollowing] = useState(true);
   const followingLatest = isLgUp ? desktopPinned : mobileView === 'thread' ? mobileFollowing : true;
 
-  const { channels, loading: loadingChannels, error: channelsError, retry: retryChannels } = useChatChannels();
+  const { channels, loading: loadingChannels, error: channelsError, retry: retryChannels } = useSharedChatChannels();
   const {
     messages,
     loading: loadingMessages,
@@ -375,7 +374,7 @@ export default function TeamChatPage() {
 
   // Unread badges: compare each channel's streamed lastMessageAt against this
   // user's own read receipts. All-read until reads settle (see the hook).
-  const { unreadByChannel } = useChatUnread(channels, user?.uid);
+  const { unreadByChannel } = useSharedChatUnread(channels, user?.uid);
 
   // The channel currently visible to this reader (empty when none is open): the
   // active channel on desktop, or the active channel only while the mobile thread

@@ -13,15 +13,19 @@ import {
   Mail,
   Pencil,
   Phone,
+  RotateCw,
   Trash2,
   TriangleAlert,
   X,
 } from 'lucide-react';
 import { InstallStatusLine } from '@/components/sales/InstallStatusLine';
+import { nativeHaptic } from '@/lib/app/bridge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useSales } from '@/hooks/useSales';
+import { useSheetDismiss } from '@/hooks/useSheetDismiss';
+import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
 import { CHARGEBACK_STATUS_LABEL, isOverdue, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -104,6 +108,30 @@ function NotFound({ message }: { message: string }) {
   );
 }
 
+/** The sale route's own answers for a sale that isn't there or isn't the caller's. */
+function isNotFoundError(message: string): boolean {
+  return /not found|forbidden/i.test(message);
+}
+
+function LoadFailedSale({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className={x.page}>
+      <section className={`${s.panel} ${x.empty}`}>
+        <TriangleAlert size={28} aria-hidden="true" color="var(--c-amber)" />
+        <h1>Couldn&apos;t load this sale</h1>
+        <p>Check your connection and try again.</p>
+        <button type="button" className={s.btnPrimary} onClick={onRetry}>
+          <RotateCw size={18} aria-hidden="true" />
+          Try again
+        </button>
+        <Link href="/portal/sales" className={s.btnSecondary}>
+          Back to sales
+        </Link>
+      </section>
+    </div>
+  );
+}
+
 function DeleteSheet({
   name,
   deleting,
@@ -122,33 +150,46 @@ function DeleteSheet({
   useEffect(() => {
     busyRef.current = deleting;
   });
+  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onCancel, { drag: !deleting });
+  const cancel = () => {
+    if (!busyRef.current) close();
+  };
   useEffect(() => {
     cancelRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !busyRef.current) {
         event.preventDefault();
-        onCancel();
+        close();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  }, [close]);
 
   return (
     <BodyLayer>
       <div
+        ref={backdropRef}
         className={s.backdrop}
+        data-closing={closing || undefined}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !busyRef.current) onCancel();
+          if (event.target === event.currentTarget) cancel();
         }}
       >
-        <section className={s.sheet} role="alertdialog" aria-modal="true" aria-labelledby="delete-sale-title">
+        <section
+          ref={sheetRef}
+          className={s.sheet}
+          data-closing={closing || undefined}
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-sale-title"
+        >
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={s.sheetHead}>
             <h2 id="delete-sale-title" className={s.sheetTitle}>
               Delete this sale?
             </h2>
-            <button type="button" className={s.iconBtn} aria-label="Close" disabled={deleting} onClick={onCancel}>
+            <button type="button" className={s.iconBtn} aria-label="Close" disabled={deleting} onClick={cancel}>
               <X size={20} aria-hidden="true" />
             </button>
           </div>
@@ -166,7 +207,7 @@ function DeleteSheet({
                 <Trash2 size={18} aria-hidden="true" />
                 {deleting ? 'Deleting…' : 'Delete sale'}
               </button>
-              <button ref={cancelRef} type="button" className={`${s.btnSecondary} ${s.btnBlock}`} disabled={deleting} onClick={onCancel}>
+              <button ref={cancelRef} type="button" className={`${s.btnSecondary} ${s.btnBlock}`} disabled={deleting} onClick={cancel}>
                 Keep it
               </button>
             </div>
@@ -204,6 +245,7 @@ export function RepSaleDetail() {
   const isAdmin = isRole('admin');
   const saleId = params.id as string;
 
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!saleId) return;
     let cancelled = false;
@@ -215,7 +257,25 @@ export function RepSaleDetail() {
     return () => {
       cancelled = true;
     };
-  }, [saleId, fetchSale]);
+  }, [saleId, fetchSale, attempt]);
+  const retryLoad = () => {
+    setLoaded(false);
+    setAttempt((n) => n + 1);
+  };
+
+  // Pull to refresh (app): the sale and its carrier status in place. A failed
+  // reload keeps the sale on screen.
+  const { refetch: refetchFiber } = fiber;
+  useRevalidateOnPull(
+    () =>
+      Promise.all([
+        fetchSale(saleId).then((data) => {
+          if (data) setSale({ ...data, id: data.id ?? saleId });
+        }),
+        refetchFiber().catch(() => undefined),
+      ]),
+    !!saleId && loaded
+  );
 
   // The same pipeline the Sales list runs: the carrier's order for this
   // address, its activation date over the typed install date, then the
@@ -232,6 +292,8 @@ export function RepSaleDetail() {
   }, [sale, orders, now, reportAsOf]);
 
   const handleDelete = async () => {
+    // A destructive confirm: the warning tick, in the app only.
+    nativeHaptic('warning');
     setDeleting(true);
     setDeleteFailed(false);
     const success = await deleteSale(saleId);
@@ -260,7 +322,9 @@ export function RepSaleDetail() {
 
   if (!loaded) return <SaleSkeleton />;
   if (!sale || !view) {
-    return <NotFound message={error || "This sale doesn't exist, or it isn't yours to see."} />;
+    // A missing or someone else's sale says so; a network or server failure can be retried.
+    if (error && !isNotFoundError(error)) return <LoadFailedSale onRetry={retryLoad} />;
+    return <NotFound message="This sale doesn't exist, or it isn't yours to see." />;
   }
 
   const { order, status } = view;

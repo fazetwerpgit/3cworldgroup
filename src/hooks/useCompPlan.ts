@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useAuth } from '@/contexts/AuthContext';
+import { dataCacheGeneration, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
 import { PAY_DELAY_DAYS } from '@/types';
 import type { CompPlanCompanyRates, CompPlanRates, CompPlanResponse, CompPlanRole } from '@/types';
 import type { OwnerPricing } from '@/lib/owner/revenue';
@@ -26,6 +27,8 @@ export interface CompPlanResult {
 }
 
 type PlanState = Omit<CompPlanResult, 'loading' | 'retry'> & { uid: string | null };
+
+const COMP_PLAN_CACHE_KEY = 'comp-plan';
 
 const EMPTY: PlanState = {
   uid: null,
@@ -51,7 +54,8 @@ export function useCompPlan(): CompPlanResult {
   const status = user?.status;
   // Tagged with the uid it was fetched for, so a user switch can never briefly
   // show the previous rep's rates.
-  const [plan, setPlan] = useState<PlanState>(EMPTY);
+  // Revisit: the plan read last time shows at once and refreshes underneath.
+  const [plan, setPlan] = useState<PlanState>(() => readDataCache<PlanState>(uid, COMP_PLAN_CACHE_KEY) ?? EMPTY);
   const [loading, setLoading] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
@@ -64,7 +68,11 @@ export function useCompPlan(): CompPlanResult {
     }
 
     let cancelled = false;
-    setLoading(true);
+    // A cached plan stays on screen while it refreshes. A failed refresh flags
+    // the error as before (never a stale plan passing as current).
+    const cached = readDataCache<PlanState>(uid, COMP_PLAN_CACHE_KEY);
+    const gen = dataCacheGeneration();
+    if (!cached) setLoading(true);
 
     (async () => {
       try {
@@ -88,7 +96,7 @@ export function useCompPlan(): CompPlanResult {
           data.scope === 'all'
             ? (data.ownRates as CompPlanCompanyRates | null) ?? null
             : (data.rates as CompPlanCompanyRates | null) ?? null;
-        setPlan({
+        const next: PlanState = {
           uid,
           rates,
           compRole: data.compRole ?? null,
@@ -103,7 +111,9 @@ export function useCompPlan(): CompPlanResult {
                   repCompRoles: data.repCompRoles ?? {},
                 }
               : null,
-        });
+        };
+        writeDataCache(uid, COMP_PLAN_CACHE_KEY, next, gen);
+        setPlan(next);
       } catch (error) {
         // Expected pay is supporting information: a failed fetch never breaks
         // the page, but it is flagged so it cannot pass for "no plan".

@@ -23,6 +23,7 @@ import { AdminEmpty, AdminFailed, AdminNotice, AdminSkeletonRows } from '@/compo
 import { hubTabHref, ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
+import { shareLinkViaApp, shouldShareViaApp } from '@/lib/app/shareLink';
 import r from './recruiting.module.css';
 import { ApplicationRecord, FieldRole, InviteEmailStatus, OnboardingInviteStatus, RoleDisplayNames } from '@/types';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
@@ -247,6 +248,19 @@ export function Invites({
       if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Could not load the link');
       return json.inviteUrl as string;
     })();
+    if (shouldShareViaApp()) {
+      // In the app the share sheet replaces the clipboard (Copy is one of its actions).
+      try {
+        const link = await url;
+        setShownLink({ id: invite.id, url: link });
+        await shareLinkViaApp(link, `Invite for ${invite.candidateName}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not load the link');
+      } finally {
+        setLinkBusy(null);
+      }
+      return;
+    }
     try {
       await copyPendingText(url);
       setShownLink({ id: invite.id, url: await url });
@@ -294,6 +308,10 @@ export function Invites({
 
   const copyLatestInvite = async () => {
     if (!latestInviteUrl) return;
+    if (shouldShareViaApp()) {
+      await shareLinkViaApp(latestInviteUrl, 'Onboarding invite').catch(() => undefined);
+      return;
+    }
     await navigator.clipboard.writeText(latestInviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

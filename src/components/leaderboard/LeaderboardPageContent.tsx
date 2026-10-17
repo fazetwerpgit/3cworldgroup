@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, RotateCw } from 'lucide-react';
 import { LeaderboardFilters } from './LeaderboardFilters';
 import { LeaderboardSkeleton } from './LeaderboardSkeleton';
 import {
@@ -16,6 +16,7 @@ import type { MonthNav } from './MonthNav';
 import type { MonthKey } from '@/lib/sales/monthWindow';
 import styles from './leaderboard.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
+import s from '@/components/portal/rep/rep.module.css';
 
 interface LeaderboardPageContentProps {
   entries: LeaderboardEntry[];
@@ -26,6 +27,8 @@ interface LeaderboardPageContentProps {
   recent?: RecentSale[];
   loading: boolean;
   error: string | null;
+  /** Loads the board again after a failed load. */
+  onRetry?: () => void;
   period: LeaderboardPeriod;
   metric: LeaderboardMetric;
   onPeriodChange: (period: LeaderboardPeriod) => void;
@@ -52,6 +55,7 @@ export function LeaderboardPageContent({
   recent,
   loading,
   error,
+  onRetry,
   period,
   metric,
   onPeriodChange,
@@ -75,15 +79,21 @@ export function LeaderboardPageContent({
         onMetricChange={onMetricChange}
         monthNav={monthNav}
       />
-      {error ? (
+      {/* A failed load: plain words and a retry, never the raw request error. */}
+      {error && !loading ? (
         <div className={styles.error} role="alert">
           <AlertCircle size={17} aria-hidden="true" />
-          {error}
+          <span>{entries.length > 0 ? "Couldn't refresh the board" : "Couldn't load the board"}</span>
+          {onRetry ? (
+            <button type="button" className={`${s.retry} ${styles.errorRetry}`} onClick={onRetry}>
+              <RotateCw size={14} aria-hidden="true" /> Retry
+            </button>
+          ) : null}
         </div>
       ) : null}
       {loading ? (
         <LeaderboardSkeleton />
-      ) : (
+      ) : error && entries.length === 0 ? null : (
         <LeaderboardTable
           entries={entries}
           currentUser={currentUser}

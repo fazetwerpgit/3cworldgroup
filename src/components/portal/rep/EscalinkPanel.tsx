@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { Check, Copy, ExternalLink } from 'lucide-react';
+import { nativeHaptic } from '@/lib/app/bridge';
 import { ESCALINK_URL } from '@/lib/escalink';
 import s from './rep.module.css';
 import x from './rep-sale.module.css';
@@ -18,6 +19,7 @@ export function EscalinkPanel({ ticket, className = '' }: { ticket: string; clas
   const copyTicket = async () => {
     try {
       await navigator.clipboard.writeText(ticket);
+      nativeHaptic('success');
       setCopy('copied');
     } catch {
       setCopy('failed');

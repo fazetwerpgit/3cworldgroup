@@ -13,6 +13,7 @@ import {
 import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { downloadBlob } from '@/lib/export/csv';
+import { shouldSaveViaApp } from '@/lib/app/saveFile';
 import type { OnboardingFileItem, OnboardingFileSummary } from '@/lib/onboarding/onboardingFile';
 import { isAppleMobile, onboardingFileItemStatus, opensInViewer } from '@/lib/onboarding/onboardingFileStatus';
 import { OnboardingCategoryLabels } from '@/types';
@@ -32,6 +33,9 @@ async function authHeaders(): Promise<Record<string, string>> {
 const FILENAME = /filename="([^"]+)"/;
 
 function canShareFile(file: File): boolean {
+  // In the app, downloadBlob hands the zip to the shell's share sheet right
+  // away (no extra "Save file" tap needed).
+  if (shouldSaveViaApp()) return false;
   try {
     return (
       typeof navigator !== 'undefined' &&

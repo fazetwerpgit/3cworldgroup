@@ -37,6 +37,7 @@ import { ScanIntroCard } from './ScanIntroCard';
 import { LOG_SALE_HREF } from './repNav';
 import s from './rep.module.css';
 import d from './rep-dashboard.module.css';
+import { cacheTimeLabel } from '@/lib/cache/dataCache';
 
 // ---------------------------------------------------------------- format
 
@@ -829,7 +830,19 @@ export function RepDashboard() {
         todayLoading={data.calls.status === 'loading' || data.book.status === 'loading'}
         extraDates={Math.max(dates.length - MAX_DATE_ROWS, 0)}
         callsFailed={data.calls.status === 'error'}
-        banners={canLog ? <CalloutNudge now={now} /> : null}
+        banners={
+          data.staleAt !== null || canLog ? (
+            <>
+              {/* A background refresh failed: the numbers shown are the last good ones. */}
+              {data.staleAt !== null ? (
+                <p className={d.staleNote} role="status">
+                  Couldn&apos;t refresh · as of {cacheTimeLabel(data.staleAt)}
+                </p>
+              ) : null}
+              {canLog ? <CalloutNudge now={now} /> : null}
+            </>
+          ) : null
+        }
         scanIntro={canLog ? <ScanIntroCard now={now} /> : null}
         askEntry={readOnly ? null : <AskEntryCard />}
         queues={showQueues ? <OpsQueuesPanel title="Needs attention" /> : null}

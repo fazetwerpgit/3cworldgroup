@@ -83,6 +83,21 @@ export async function syncNativePush({ prompt }: { prompt: boolean }): Promise<N
   return outcome;
 }
 
+/**
+ * Read-only: whether the app has never been asked for notifications on this
+ * phone (no token, permission undetermined). Registers nothing and reports
+ * nothing, so it is safe to call on every focus.
+ */
+export async function nativePushNotAskedYet(): Promise<boolean> {
+  if (!isNativeApp()) return false;
+  try {
+    const reply = await requestNative<'pushToken'>({ type: 'pushToken', prompt: false });
+    return !reply.token && reply.permission === 'undetermined';
+  } catch {
+    return false;
+  }
+}
+
 /** Sign-out: take this phone's token off the account. Best-effort. */
 export async function unregisterNativePush(): Promise<void> {
   if (!isNativeApp()) return;
