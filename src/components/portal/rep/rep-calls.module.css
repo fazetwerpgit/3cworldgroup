@@ -452,3 +452,19 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ---------- press ---------- */
+.day,
+.preset,
+.remove {
+  transition: transform 120ms ease-out;
+}
+
+.day:active,
+.remove:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.preset:active {
+  transform: scale(0.98);
+}

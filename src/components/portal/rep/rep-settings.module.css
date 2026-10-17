@@ -285,6 +285,11 @@
   outline-offset: -2px;
 }
 
+/* Press: the row steps up a tone. */
+.toggle:active {
+  background: var(--c-panel-hi);
+}
+
 .drawer {
   display: grid;
   gap: var(--s4);
@@ -314,6 +319,10 @@
 
 .linkBtn:disabled {
   opacity: 0.6;
+}
+
+.linkBtn:not(:disabled):active {
+  opacity: 0.72;
 }
 
 .areas {

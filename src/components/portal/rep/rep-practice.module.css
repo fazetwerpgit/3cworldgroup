@@ -473,6 +473,9 @@
   font-size: var(--t-ui);
   cursor: pointer;
 }
+.recent summary:active {
+  opacity: 0.72;
+}
 .recent summary span:last-child {
   color: var(--c-text-2);
   white-space: nowrap;

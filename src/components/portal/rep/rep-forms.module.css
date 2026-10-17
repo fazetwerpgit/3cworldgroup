@@ -926,3 +926,23 @@
   right: var(--s2);
   color: var(--c-text);
 }
+
+/* ---------- press ---------- */
+/* Buttons and chips give a little; rows step up a tone. */
+.backLink,
+.fileBtn,
+.chip {
+  transition: transform 120ms ease-out;
+}
+
+.backLink:active,
+.fileBtn:not(:disabled):active,
+.chip:active {
+  transform: scale(0.97);
+}
+
+.hubRow:active,
+.drop:active,
+.row:not(:has(input:checked)):active {
+  background: var(--c-panel-hi);
+}

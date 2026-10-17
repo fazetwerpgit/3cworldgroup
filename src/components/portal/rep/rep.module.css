@@ -336,6 +336,7 @@
    Scale only, no colour flash. */
 .retry,
 .iconBtn,
+.back,
 .textBtn,
 .tab,
 .navItem {
@@ -344,6 +345,7 @@
 
 .retry:active,
 .iconBtn:active,
+.back:active,
 .textBtn:not(:disabled):active,
 .tab:active,
 .navItem:active {
@@ -1160,6 +1162,15 @@
   .note:hover {
     background: var(--c-panel-hi);
   }
+}
+
+/* Press: rows step up a tone. */
+.note:active {
+  background: var(--c-panel-hi);
+}
+
+.notePush:active {
+  opacity: 0.72;
 }
 
 .notePush {

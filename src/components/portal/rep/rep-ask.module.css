@@ -184,6 +184,19 @@
   outline-offset: 2px;
 }
 
+/* Press: the thumbs give a little; inline links dim. */
+.thumb {
+  transition: transform 120ms ease-out;
+}
+
+.thumb:active {
+  transform: scale(0.97);
+}
+
+.link:active {
+  opacity: 0.72;
+}
+
 .rateError {
   margin: var(--s1) 0 0;
   color: var(--c-red);

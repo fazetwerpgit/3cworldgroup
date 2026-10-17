@@ -722,6 +722,14 @@ div.tRow {
   transform: scale(0.97);
 }
 
+.quietLink {
+  transition: transform 120ms ease-out;
+}
+
+.quietLink:active {
+  transform: scale(0.97);
+}
+
 @media (hover: hover) {
   .sale:hover,
   .tRow:not(div):hover,
