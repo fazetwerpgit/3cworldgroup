@@ -14,7 +14,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 function respond(body: unknown, ok = true) {
-  return vi.fn(async (_url: string, _init?: RequestInit) => ({ ok, json: async () => body }) as Response);
+  return vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () => ({ ok, json: async () => body }) as Response);
 }
 
 async function flush() {
