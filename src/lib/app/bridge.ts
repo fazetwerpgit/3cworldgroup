@@ -78,7 +78,13 @@ export interface OpenExternalMessage {
 }
 
 export type BridgeRequest = PushTokenRequest | ShareRequest | SaveFileRequest | BiometricLockRequest | NativeSignInRequest;
-export type BridgeEvent = HapticMessage | OpenExternalMessage;
+/** Status bar text colour: 'light' (white) over a dark page, 'dark' (black) over a light page. */
+export type StatusBarStyle = 'light' | 'dark';
+export interface StatusBarMessage {
+  type: 'statusBar';
+  style: StatusBarStyle;
+}
+export type BridgeEvent = HapticMessage | OpenExternalMessage | StatusBarMessage;
 export type WebToNativeMessage = BridgeRequest | BridgeEvent;
 
 // ---- native -> web -------------------------------------------------------

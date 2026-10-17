@@ -48,8 +48,8 @@ The web stops waiting after a timeout (60 s for `pushToken` and
 `biometricLock`, 5 min for `nativeSignIn`, 10 min for `share` and `saveFile`).
 A late reply is ignored.
 
-Messages without an `id` (`haptic`, `openExternal`) are fire-and-forget: no
-reply.
+Messages without an `id` (`haptic`, `openExternal`, `statusBar`) are
+fire-and-forget: no reply.
 
 ## web -> native messages
 
@@ -148,6 +148,20 @@ The web then calls `signInWithCredential` with
 `OAuthProvider('apple.com').credential({ idToken, rawNonce })`. On cancel,
 reply `code: "canceled"`. If Sign in with Apple is not available or set up,
 reply `code: "not_configured"`.
+
+### `statusBar` (event)
+```json
+{ "type": "statusBar", "style": "light" }
+```
+`style`: `light` (white status bar text, for a dark page) | `dark` (black text,
+for a light page). Any other value is dropped.
+
+The web (`src/lib/app/statusBar.ts`, from `AppBridgeHost`) sends it on mount and
+whenever the page theme changes: the `dark` class on `<body>` (ThemeContext)
+means `light`; without it the old light chrome (white `.portal-shell-header`)
+shows, so `dark`. It sends only on a change. The shell defaults to `light`
+before the first message, and its own screens (lock, privacy cover, offline)
+always use `light`. Older shells ignore it.
 
 ## native -> web events
 
