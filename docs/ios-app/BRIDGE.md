@@ -221,7 +221,8 @@ different uid, or with none, counts as a failure.
 
 The web gets the token from `POST /api/portal/auth/custom-token` (Bearer ID
 token, checked for revocation; active accounts only; the uid comes from the
-token, never the body). It sends it only while the shell advertises
+token, never the body; the web aborts the fetch after 8 s and counts that as a
+failure). It sends it only while the shell advertises
 `nativeChat` (and the bridge is present): at once for the first auth event after
 a page load, then on each ID-token refresh (`onIdTokenChanged`) debounced 1.5 s,
 at most once every 5 minutes for the same uid. If the web user changes after a

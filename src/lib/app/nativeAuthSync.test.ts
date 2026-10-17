@@ -5,8 +5,10 @@ vi.mock('@/lib/firebase/config', () => ({ auth: null }));
 import type { NativeAuthStatus } from './nativeChat';
 import {
   NATIVE_AUTH_DEBOUNCE_MS,
+  CUSTOM_TOKEN_TIMEOUT_MS,
   NATIVE_AUTH_MIN_INTERVAL_MS,
   createNativeAuthSync,
+  fetchCustomToken as fetchCustomTokenImpl,
   startNativeAuthSync,
   type SyncUser,
 } from './nativeAuthSync';
@@ -209,5 +211,50 @@ describe('startNativeAuthSync', () => {
     vi.stubGlobal('window', { navigator: { userAgent: 'Mozilla/5.0 Safari/604.1' } });
     expect(typeof startNativeAuthSync()).toBe('function');
     vi.unstubAllGlobals();
+  });
+});
+
+describe('fetchCustomToken', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('passes an abort signal and returns the token', async () => {
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+      return new Response(JSON.stringify({ token: 'tok' }), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(fetchCustomTokenImpl('id')).resolves.toBe('tok');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up (null) when the timeout signal aborts the request', async () => {
+    const controller = new AbortController();
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    try {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: string, init: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              init.signal?.addEventListener('abort', () => reject(new DOMException('timed out', 'TimeoutError')));
+            })
+        )
+      );
+      const result = fetchCustomTokenImpl('id');
+      expect(timeout).toHaveBeenCalledWith(CUSTOM_TOKEN_TIMEOUT_MS);
+      controller.abort();
+      await expect(result).resolves.toBeNull();
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
+  it('is null on a non-ok response or a network error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 403 })));
+    await expect(fetchCustomTokenImpl('id')).resolves.toBeNull();
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('network'))));
+    await expect(fetchCustomTokenImpl('id')).resolves.toBeNull();
   });
 });

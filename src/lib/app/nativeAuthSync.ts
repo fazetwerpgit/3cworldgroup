@@ -167,15 +167,26 @@ export function createNativeAuthSync(deps: NativeAuthSyncDeps): () => void {
   };
 }
 
-async function fetchCustomToken(idToken: string): Promise<string | null> {
-  const res = await fetch('/api/portal/auth/custom-token', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${idToken}` },
-    cache: 'no-store',
-  });
-  if (!res.ok) return null;
-  const body = (await res.json().catch(() => null)) as { token?: unknown } | null;
-  return typeof body?.token === 'string' && body.token ? body.token : null;
+export const CUSTOM_TOKEN_TIMEOUT_MS = 8000;
+
+/**
+ * POST /api/portal/auth/custom-token. Null on any failure, including no answer
+ * (headers and body) within CUSTOM_TOKEN_TIMEOUT_MS: the request is aborted.
+ */
+export async function fetchCustomToken(idToken: string): Promise<string | null> {
+  try {
+    const res = await fetch('/api/portal/auth/custom-token', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(CUSTOM_TOKEN_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json().catch(() => null)) as { token?: unknown } | null;
+    return typeof body?.token === 'string' && body.token ? body.token : null;
+  } catch {
+    return null;
+  }
 }
 
 async function sendNativeAuth(customToken: string): Promise<string | null> {
