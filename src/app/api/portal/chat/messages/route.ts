@@ -3,6 +3,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { ChatAttachment, ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
+import { CHAT_TERMS_REFUSAL, needsChatTerms } from '@/lib/chat/terms';
 import { buildChatPushBody, pushChatMessageOnce } from '@/lib/push/chatPush';
 import { chatMessageDocId, isValidClientMessageId } from '@/lib/chat/outbox';
 import { buildLastMessage } from '@/lib/chat/lastMessage';
@@ -222,10 +223,6 @@ async function refreshLastMessagePreview(
 }
 
 /** The 3C iOS app's WebView (user agent marker, docs/ios-app/BRIDGE.md). */
-function isAppRequest(request: NextRequest): boolean {
-  return /\b3CPortalApp\//.test(request.headers.get('user-agent') ?? '');
-}
-
 // POST — send a message as the VERIFIED caller. Author identity is stamped server-side.
 // Admin SDK create() on an existing doc rejects with gRPC ALREADY_EXISTS (6).
 function isAlreadyExists(error: unknown): boolean {
@@ -241,8 +238,8 @@ export async function POST(request: NextRequest) {
 
     // The app shows the one-time chat agreement before chat opens; a send from
     // the app without it on file is refused (the user doc is already read).
-    if (user.chatTermsAccepted === false && isAppRequest(request)) {
-      return NextResponse.json({ error: 'Agree to the team chat rules first.', code: 'chat_terms' }, { status: 403 });
+    if (needsChatTerms(user, request)) {
+      return NextResponse.json(CHAT_TERMS_REFUSAL, { status: 403 });
     }
 
     const body = await request.json();

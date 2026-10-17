@@ -57,11 +57,11 @@ const REP = {
   },
 };
 
-function form(fields: { channelId?: string; file?: File | null }) {
+function form(fields: { channelId?: string; file?: File | null }, headers?: Record<string, string>) {
   const fd = new FormData();
   if (fields.channelId !== undefined) fd.set('channelId', fields.channelId);
   if (fields.file) fd.set('file', fields.file);
-  return new NextRequest('http://localhost/api/portal/chat/media', { method: 'POST', body: fd });
+  return new NextRequest('http://localhost/api/portal/chat/media', { method: 'POST', body: fd, headers });
 }
 
 function pdfFile(bytes: number, name = 'Pay stub.pdf', body: string = '%PDF-1.7\n') {
@@ -140,6 +140,20 @@ describe('POST /api/portal/chat/media', () => {
     );
     expect(res.status).toBe(400);
     expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses an app upload until the chat agreement is on file, so nothing is stored', async () => {
+    const appUA = { 'user-agent': 'Mozilla/5.0 (iPhone) 3CPortal 3CPortalApp/1.0.0' };
+    mockGate.mockResolvedValue({ ok: true, user: { ...REP.user, chatTermsAccepted: false } });
+    const blocked = await POST(form({ channelId: 'all-company', file: pngFile(10) }, appUA));
+    expect(blocked.status).toBe(403);
+    expect((await blocked.json()).code).toBe('chat_terms');
+    expect(saveMock).not.toHaveBeenCalled();
+
+    // The web is never gated, and an app caller who agreed uploads normally.
+    expect((await POST(form({ channelId: 'all-company', file: pngFile(10) }))).status).toBe(200);
+    mockGate.mockResolvedValue({ ok: true, user: { ...REP.user, chatTermsAccepted: true } });
+    expect((await POST(form({ channelId: 'all-company', file: pngFile(10) }, appUA))).status).toBe(200);
   });
 
   it('uploads and returns a tokened URL under the channel folder', async () => {

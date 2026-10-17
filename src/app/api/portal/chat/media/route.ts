@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { getVerifiedChatUser } from '@/lib/chat/access';
+import { CHAT_TERMS_REFUSAL, needsChatTerms } from '@/lib/chat/terms';
 import { toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   MAX_UPLOAD_BYTES,
@@ -22,6 +23,12 @@ export async function POST(request: NextRequest) {
     const result = await getVerifiedChatUser(request);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
     const user = result.user;
+
+    // Same gate as a send: an app caller without the chat agreement on file
+    // may not upload, so no attachment is stored for a message it can't post.
+    if (needsChatTerms(user, request)) {
+      return NextResponse.json(CHAT_TERMS_REFUSAL, { status: 403 });
+    }
 
     const form = await request.formData();
     const channelIdRaw = form.get('channelId');

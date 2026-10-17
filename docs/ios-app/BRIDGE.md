@@ -254,6 +254,28 @@ ok reply it steps back in history, or replaces its page with
 `/portal/dashboard` on a cold load, so that page stays behind the native
 screen. If the open fails the web chat shows. Without the capability, chat stays
 the web page exactly as before.
+### Native chat: the same API, terms gate and user agent
+
+The native chat screen is a client of the same portal chat API as the web,
+with the same Bearer ID token (from its own Firebase Auth session) and no
+native-only routes or rules:
+
+- send, edit, delete: `/api/portal/chat/messages`
+- photo / PDF upload: `POST /api/portal/chat/media`
+- report: `POST /api/portal/chat/messages/report`
+- block list, block, unblock: `GET` / `POST` / `DELETE /api/portal/chat/blocks`
+- the chat agreement: `/api/portal/chat/terms`
+
+Every request it makes sends the user agent `3CPortal 3CPortalApp/<version>`.
+The server treats any user agent carrying `3CPortalApp/` as an app caller
+(`src/lib/chat/terms.ts`): until `users/{uid}.chatTermsAcceptedAt` is set, a
+send AND an upload from an app caller are refused with `403
+{ code: "chat_terms" }` (the upload is refused before any bytes are stored, so
+no orphaned attachment is left behind). Show the agreement, accept it through
+the terms route, then retry. Report and block go to the back office exactly as
+they do from the web. A demo (App Review) account sees only the demo sandbox
+channel (`docs/ios-app/APP-REVIEW-DEMO.md`).
+
 ### `chatContext` (event)
 ```json
 { "type": "chatContext", "channelId": "general" }
