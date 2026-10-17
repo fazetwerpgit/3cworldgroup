@@ -2396,3 +2396,40 @@ button.person {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* "Blocked people" disclosure under the support line on the info sheet. */
+.blockedWrap {
+  padding: var(--s2) 0 0;
+}
+
+.blockedToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  margin: 0 var(--s4);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 var(--t-sm) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+.blockedToggle svg {
+  transition: transform 160ms ease;
+}
+
+.blockedChevronOpen {
+  transform: rotate(180deg);
+}
+
+.blockedList {
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.blockedList .actionError {
+  padding: 0 var(--s4);
+}

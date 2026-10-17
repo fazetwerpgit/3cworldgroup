@@ -9,6 +9,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import { getInitials } from '@/lib/chat/authorColor';
 import { attachmentSnippet } from '@/lib/chat/media';
 import { ChatAttachment, ChatChannel } from '@/types';
+import { BlockedPeople } from './BlockedPeople';
 import { CHAT_SUPPORT_EMAIL } from './ChatTermsSheet';
 import c from './chat.module.css';
 
@@ -61,6 +62,9 @@ interface ChannelInfoSheetProps {
   // True while that viewer is open over the sheet: Escape then closes only the
   // lightbox, never the sheet underneath it.
   lightboxOpen: boolean;
+  // Unblocks someone through the chat page's safety hook so its blocked set
+  // refreshes. Omitted (design lab), the "Blocked people" list is hidden.
+  onUnblock?: (uid: string) => Promise<void>;
 }
 
 /** Short "Jul 1, 3:04 PM" caption for a media tile's lightbox. */
@@ -108,6 +112,7 @@ export function ChannelInfoSheet({
   authedFetch,
   onOpenImage,
   lightboxOpen,
+  onUnblock,
 }: ChannelInfoSheetProps) {
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [loading, setLoading] = useState(false);
@@ -550,6 +555,8 @@ export function ChannelInfoSheet({
             Problem with someone in chat? Press and hold their message to report or block, or email{' '}
             <a href={`mailto:${CHAT_SUPPORT_EMAIL}`}>{CHAT_SUPPORT_EMAIL}</a>.
           </p>
+
+          {onUnblock && <BlockedPeople authedFetch={authedFetch} onUnblock={onUnblock} />}
 
           {isAdmin && (
             <div className={c.infoFoot}>
