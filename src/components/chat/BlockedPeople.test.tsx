@@ -93,7 +93,7 @@ describe('BlockedPeople', () => {
 
   it('keeps the row and shows the error when unblocking fails', async () => {
     const onUnblock = vi.fn(async () => {
-      throw new Error('Could not unblock. Try again.');
+      throw new Error("Couldn't unblock. Try again.");
     });
     const fetcher = respond({ blocked: [{ uid: 'u1', name: 'Pat Doe' }] });
     act(() => root.render(<BlockedPeople authedFetch={fetcher} onUnblock={onUnblock} />));
@@ -103,6 +103,6 @@ describe('BlockedPeople', () => {
     });
     await flush();
     expect(container.textContent).toContain('Pat Doe');
-    expect(container.querySelector('[role="alert"]')?.textContent).toBe('Could not unblock. Try again.');
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe("Couldn't unblock. Try again.");
   });
 });

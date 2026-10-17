@@ -89,7 +89,7 @@ function carrierName(company: string) {
   return carrierMark(company) || FIBER_COMPANIES.find((item) => item.value === company)?.label || company;
 }
 
-const INSTALL_DATE_ERROR = 'Could not save the install date. Try again.';
+const INSTALL_DATE_ERROR = "Couldn't save the install date. Try again.";
 
 function formatMoney(value: number) {
   return `$${Math.round(value).toLocaleString('en-US')}`;
@@ -306,13 +306,13 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
         { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
       );
       const data = await response.json();
-      if (!response.ok || !data.url) throw new Error('Could not load the screenshot. Try again.');
+      if (!response.ok || !data.url) throw new Error("Couldn't load the screenshot. Try again.");
       setProofImage({
         url: data.url,
         alt: proofPaths.length > 1 ? `Sale proof screenshot ${index + 1}` : 'Sale proof screenshot',
       });
     } catch {
-      setProofError('Could not load the screenshot. Try again.');
+      setProofError("Couldn't load the screenshot. Try again.");
     } finally {
       setProofLoading(null);
     }

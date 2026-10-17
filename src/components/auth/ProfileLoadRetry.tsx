@@ -44,10 +44,10 @@ export function ProfileLoadRetry({
           {retrying ? (
             <>
               <LoaderCircle size={18} className={a.spin} aria-hidden="true" />
-              Retrying
+              Trying again
             </>
           ) : (
-            'Retry'
+            'Try again'
           )}
         </button>
         <button

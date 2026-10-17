@@ -76,7 +76,7 @@ export async function syncNativePush({ prompt }: { prompt: boolean }): Promise<N
     outcome =
       code === 'denied'
         ? { state: 'off', permission: 'denied' }
-        : { state: 'error', message: 'Could not turn on notifications. Try again.' };
+        : { state: 'error', message: "Couldn't turn on notifications. Try again." };
     result = `failed / ${code}`;
   }
   await reportPushHealth({ supported: true, permission, result, platform: NATIVE_PUSH_PLATFORM });

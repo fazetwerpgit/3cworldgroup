@@ -40,7 +40,7 @@ export function BlockedPeople({ authedFetch, onUnblock }: BlockedPeopleProps) {
     try {
       const response = await authedFetch('/api/portal/chat/blocks');
       const json = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(json.error || 'Failed to load blocked people');
+      if (!response.ok) throw new Error(json.error || "Couldn't load blocked people");
       const list: unknown = json.blocked;
       setPeople(
         Array.isArray(list)
@@ -51,7 +51,7 @@ export function BlockedPeople({ authedFetch, onUnblock }: BlockedPeopleProps) {
           : []
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load blocked people');
+      setError(err instanceof Error ? err.message : "Couldn't load blocked people");
     } finally {
       setLoading(false);
     }
@@ -71,7 +71,7 @@ export function BlockedPeople({ authedFetch, onUnblock }: BlockedPeopleProps) {
       await onUnblock(person.uid);
       setPeople((prev) => prev.filter((entry) => entry.uid !== person.uid));
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Could not unblock. Try again.');
+      setActionError(err instanceof Error ? err.message : "Couldn't unblock. Try again.");
     } finally {
       setMutatingUid(null);
     }

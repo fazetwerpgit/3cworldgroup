@@ -150,7 +150,7 @@ export function LoadFailed({ what, onRetry }: { what?: string; onRetry: () => vo
       <span aria-hidden="true">·</span>
       <button type="button" className={rep.retry} onClick={onRetry}>
         <RotateCw size={14} aria-hidden="true" />
-        Retry
+        Try again
       </button>
     </div>
   );

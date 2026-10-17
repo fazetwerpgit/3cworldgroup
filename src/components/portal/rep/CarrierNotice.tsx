@@ -24,7 +24,7 @@ export function CarrierNotice({
       <p className={n.text}>Carrier report didn&apos;t load, estimates may be off</p>
       <button type="button" className={s.retry} onClick={onRetry} disabled={retrying}>
         <RotateCw size={14} aria-hidden="true" />
-        {retrying ? 'Retrying…' : 'Retry'}
+        {retrying ? 'Trying again…' : 'Try again'}
       </button>
     </div>
   );

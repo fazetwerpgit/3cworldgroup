@@ -48,10 +48,10 @@ describe('AdminQueue', () => {
     expect(html).not.toContain(' open</span>');
   });
 
-  it("says Couldn't load with a Retry instead of an empty queue or zero", () => {
+  it("says Couldn't load with a Try again instead of an empty queue or zero", () => {
     const html = render({ error: 'boom' });
     expect(html).toContain('Couldn&#x27;t load');
-    expect(html).toContain('Retry');
+    expect(html).toContain('Try again');
     expect(html).not.toContain('Nothing to review');
     expect(html).not.toContain(' open</span>');
   });

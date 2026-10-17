@@ -66,7 +66,7 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
 
   const acceptTerms = useCallback(async () => {
     const res = await authedFetch('/api/portal/chat/terms', { method: 'POST' });
-    if (!res.ok) throw await errorFrom(res, 'Could not save. Try again.');
+    if (!res.ok) throw await errorFrom(res, "Couldn't save. Try again.");
     setLoaded((prev) => (prev ? { ...prev, termsAccepted: true } : prev));
   }, [authedFetch]);
 
@@ -86,7 +86,7 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: target }),
       });
-      if (!res.ok) throw await errorFrom(res, 'Could not block. Try again.');
+      if (!res.ok) throw await errorFrom(res, "Couldn't block. Try again.");
       const body = await res.json().catch(() => ({}));
       setLoaded((prev) => (prev ? { ...prev, blocked: new Set(prev.blocked).add(target) } : prev));
       return typeof body.name === 'string' ? body.name : '';
@@ -101,7 +101,7 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: target }),
       });
-      if (!res.ok) throw await errorFrom(res, 'Could not unblock. Try again.');
+      if (!res.ok) throw await errorFrom(res, "Couldn't unblock. Try again.");
       setLoaded((prev) => {
         if (!prev) return prev;
         const blocked = new Set(prev.blocked);
@@ -119,7 +119,7 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       });
-      if (!res.ok) throw await errorFrom(res, 'Could not send the report. Try again.');
+      if (!res.ok) throw await errorFrom(res, "Couldn't send the report. Try again.");
     },
     [authedFetch]
   );

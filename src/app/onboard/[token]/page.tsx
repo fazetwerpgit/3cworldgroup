@@ -151,7 +151,7 @@ export default function PublicOnboardingPage() {
         if (!response.ok) {
           // Unknown or expired: nothing for Sign in / Sign up to send them back to.
           if (response.status === 404 || response.status === 410) forgetInvite(token);
-          throw new Error(json.error || 'Could not load onboarding link');
+          throw new Error(json.error || "Couldn't load onboarding link");
         }
         setData(json);
         // Open or already sent, Sign in / Sign up on this device point back
@@ -173,7 +173,7 @@ export default function PublicOnboardingPage() {
           password: '',
         });
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not load onboarding link');
+        setError(err instanceof Error ? err.message : "Couldn't load onboarding link");
       } finally {
         setLoading(false);
       }
@@ -296,7 +296,7 @@ export default function PublicOnboardingPage() {
           input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
           return;
         }
-        throw new Error(json.error || 'Failed to submit onboarding');
+        throw new Error(json.error || "Couldn't submit onboarding");
       }
       if (typeof json.signingKey === 'string' && json.signingKey) {
         writeSigningKey(token, json.signingKey);
@@ -307,7 +307,7 @@ export default function PublicOnboardingPage() {
     } catch (err) {
       // Dropped on a back/forward-cache restore: the pageshow handler took over.
       if (send.signal.aborted) return;
-      setError(err instanceof Error ? err.message : 'Failed to submit onboarding');
+      setError(err instanceof Error ? err.message : "Couldn't submit onboarding");
     } finally {
       if (sendRef.current === send) {
         sendRef.current = null;

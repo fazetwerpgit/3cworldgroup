@@ -206,7 +206,7 @@ describe('SaleDetailSheet install date', () => {
 
     expect(api.updateSale).toHaveBeenCalledWith('sale1', { installDate: '2026-09-20' });
     expect(own.save).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain('Could not save the install date. Try again.');
+    expect(document.body.textContent).toContain("Couldn't save the install date. Try again.");
   });
   it("moves a missed install only past the carrier's missed day", async () => {
     render(SALE, false, breakage('2026-09-22'));
