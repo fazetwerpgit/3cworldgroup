@@ -11,7 +11,8 @@ import { isNativeApp } from './isNativeApp';
 //
 // Requests that expect an answer carry an `id`; the shell answers each with
 // exactly one { type: 'reply', id, ok, ... }. Fire-and-forget messages
-// (haptic, openExternal, statusBar, nativeSignOut, chatContext) carry no id and get no reply.
+// (haptic, openExternal, statusBar, nativeSignOut, chatContext, ready, badge,
+// widgetData) carry no id and get no reply.
 
 export const BRIDGE_VERSION = 1;
 export const NATIVE_SOURCE = '3c-shell';
@@ -82,6 +83,39 @@ export interface ChatContextMessage {
   channelId: string | null;
 }
 
+// Shell extras (fire-and-forget; the shell-side contract is the app repo's
+// docs/NATIVE-EXTRAS.md). Senders live in ./shellExtras.
+/** First meaningful paint: the shell may drop its splash. Sent once per page load. */
+export interface ReadyMessage {
+  type: 'ready';
+}
+/** App icon badge: total unread chat channels. 0 clears it. */
+export interface BadgeMessage {
+  type: 'badge';
+  count: number;
+}
+/** The home-screen widget's numbers. Pay is an estimate only: never a pay date. */
+export interface WidgetData {
+  /** First 16 hex chars of SHA-256(uid); the shell clears the widget and badge when it changes. */
+  uidHash: string;
+  /** Expected pay MTD in whole dollars (negative when chargebacks net it below zero); null when not on a comp plan. */
+  estPayMtd: number | null;
+  /** Month the estimate covers, e.g. "October". */
+  periodLabel: string;
+  /** This week's leaderboard position (1 = top); null when not ranked. */
+  rank: number | null;
+  rankOf: number | null;
+  /** Sales this month, counted as the dashboard counts them. */
+  salesMtd: number | null;
+  /** ISO 8601. */
+  updatedAt: string;
+}
+export interface WidgetDataMessage {
+  type: 'widgetData';
+  /** null clears the widget (signed out). */
+  data: WidgetData | null;
+}
+
 /** Status bar text colour: 'light' (white) over a dark page, 'dark' (black) over a light page. */
 export type StatusBarStyle = 'light' | 'dark';
 export interface StatusBarMessage {
@@ -120,7 +154,10 @@ export type BridgeEvent =
   | OpenExternalMessage
   | StatusBarMessage
   | NativeSignOutMessage
-  | ChatContextMessage;
+  | ChatContextMessage
+  | ReadyMessage
+  | BadgeMessage
+  | WidgetDataMessage;
 export type WebToNativeMessage = BridgeRequest | BridgeEvent;
 
 // ---- native -> web -------------------------------------------------------

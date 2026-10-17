@@ -3,13 +3,15 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { isNativeApp } from '@/lib/app/isNativeApp';
+import { isNativeApp, useIsNativeApp } from '@/lib/app/isNativeApp';
 import { advertiseBridgeFeature, installNativeReceiver, onNativeMessage } from '@/lib/app/bridge';
 import { APP_NAVIGATE_EVENT, inAppRoute, installAppLinkHandling } from '@/lib/app/links';
 import { registerNativePushToken, syncNativePush } from '@/lib/app/nativePush';
 import { installStatusBarSync } from '@/lib/app/statusBar';
 import { installResumeMotionReset } from '@/lib/app/appVisibility';
+import { clearNativeExtras, signalAppReady } from '@/lib/app/shellExtras';
 import AppNotice from './AppNotice';
+import NativeBadgeSync from './NativeBadgeSync';
 import { startNativeAuthSync } from '@/lib/app/nativeAuthSync';
 import {
   CHAT_PATH,
@@ -20,6 +22,9 @@ import {
   useSupportsNativeChat,
 } from '@/lib/app/nativeChat';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+
+/** Routes whose page sends `ready` itself, once its real content renders. */
+export const SELF_READY_PATHS = ['/portal', '/portal/dashboard'];
 
 const onChatPath = (pathname: string | null) => pathname?.replace(/\/+$/, '') === CHAT_PATH;
 
@@ -66,6 +71,7 @@ export default function AppBridgeHost() {
   const { user, loading } = useAuth();
   const signedIn = !loading && !!user;
   const syncedFor = useRef<string | null>(null);
+  const inApp = useIsNativeApp();
   const pathname = usePathname();
   const router = useRouter();
   const nativeChat = useSupportsNativeChat();
@@ -149,10 +155,24 @@ export default function AppBridgeHost() {
     });
   }, [signedIn, user]);
 
-  // The shell's download toasts (BRIDGE.md notice); nothing on the web.
+  // Signed out (or the session ended): clear the icon badge and the widget.
+  useEffect(() => {
+    if (isNativeApp() && !loading && !user) clearNativeExtras();
+  }, [loading, user]);
+
+  // Splash: the login page and the dashboard send `ready` once their content
+  // is up. Any other first page (a notification tap, a quick action) sends it
+  // once auth has resolved and the page itself is rendering.
+  useEffect(() => {
+    if (!loading && !SELF_READY_PATHS.includes(pathname ?? '')) signalAppReady();
+  }, [loading, pathname]);
+
+  // The shell's download toasts (BRIDGE.md notice) and the icon badge sync;
+  // nothing on the web.
   return (
     <>
       <AppNotice />
+      {inApp && signedIn ? <NativeBadgeSync /> : null}
       {nativeChatPending && onChatPath(pathname) ? <NativeChatHolding /> : null}
     </>
   );

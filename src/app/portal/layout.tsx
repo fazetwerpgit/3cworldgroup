@@ -45,6 +45,9 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "3C Console",
   },
+  // Tells the 3C iOS app this page posts `ready` (shellExtras.signalAppReady),
+  // so its splash waits for the first real screen. Inert in a browser.
+  other: { "3c-app-ready": "v1" },
 };
 
 export default function PortalLayout({

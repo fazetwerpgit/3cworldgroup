@@ -49,7 +49,8 @@ The web stops waiting after a timeout (60 s for `pushToken` and
 15 s for `nativeAuth`, 1.5 s for `openNativeChat`).
 A late reply is ignored.
 
-Messages without an `id` (`haptic`, `openExternal`, `statusBar`, `nativeSignOut`) are
+Messages without an `id` (`haptic`, `openExternal`, `statusBar`,
+`nativeSignOut`, `chatContext`, `ready`, `badge`, `widgetData`) are
 fire-and-forget: no reply.
 
 ## web -> native messages
@@ -266,6 +267,59 @@ below). It is a hint, not a lock: a shell that never hears `null` (for
 example the page crashed) should also forget it when the WebView navigates
 away from `/portal/chat`.
 
+### Shell extras: `ready`, `badge`, `widgetData` (events)
+
+Added on top of v1 for the shell's `native-extras` work (shell contract:
+`docs/NATIVE-EXTRAS.md` in the app repo). No `id`, no reply; a shell that does
+not know them drops them. Senders: `src/lib/app/shellExtras.ts`. Nothing is
+sent outside the app.
+
+#### `ready`
+```json
+{ "type": "ready" }
+```
+The first real screen is painted, so the shell can drop its splash. Sent once
+per page load, two animation frames after the screen commits. The portal
+layout also serves `<meta name="3c-app-ready" content="v1">`, which the shell's
+load-end probe reads to know this page will send `ready` (it waits at most 3 s).
+
+Who sends it: the login page once the auth check settles signed out (login
+form or pending approval), the rep dashboard once the money block leaves its
+skeleton (data or error), the owner dashboard once the money board settles,
+and `AppBridgeHost` for any other first route (notification tap, quick action)
+once auth resolves.
+
+#### `badge`
+```json
+{ "type": "badge", "count": 3 }
+```
+The icon badge: the number of unread chat channels (the same comparison as the
+tab bar's unread dot, `useChatUnread`). Sent by `NativeBadgeSync` (mounted by
+`AppBridgeHost` for a signed-in person in the app) whenever the count changes.
+`0` is sent when signed out.
+
+#### `widgetData`
+```json
+{ "type": "widgetData", "data": { "uidHash": "ba7816bf8f01cfea", "estPayMtd": 1235, "periodLabel": "October", "rank": 3, "rankOf": 28, "salesMtd": 9, "updatedAt": "2026-10-17T15:00:00.000Z" } }
+{ "type": "widgetData", "data": null }
+```
+The home-screen widget's numbers, from the rep dashboard's own data:
+
+- `uidHash`: first 16 hex chars of SHA-256 of the uid (Web Crypto). The shell
+  clears the widget and badge when it changes.
+- `estPayMtd`: the dashboard's "Estimated pay this month" (`summarizePay`
+  `estThisMonth`), whole dollars, negative when chargebacks net it below zero;
+  `null` when the person has no comp plan (shown as "Not on a plan").
+- `periodLabel`: the month name in America/Chicago.
+- `rank` / `rankOf`: this week's leaderboard standing as the dashboard shows
+  it; `null` when unranked or the standing failed to load.
+- `salesMtd`: the dashboard's "N sales this month".
+- There is never a pay date (estimates only).
+
+Sent when the numbers change (`updatedAt` aside), and again after 30 min with
+the same numbers. Never sent while the owner is viewing as a rep. `null` is
+sent when signed out. Owners (company dashboard) send nothing.
+
 ## native -> web events
 
 ### `capabilities`
@@ -389,7 +443,11 @@ the channel from the latest `chatContext`. Tapping the banner sends
 ## Push payload the shell receives (A4)
 
 Native tokens get an FCM message with `notification: { title, body }`,
-`data: { title, body, url }` and `apns.payload.aps: { sound: "default", badge: 1 }`.
+`data: { title, body, url }` and `apns.payload.aps: { sound: "default", badge: <n> }`.
+`badge` is the recipient's unread chat channel count (`src/lib/push/unreadBadge.ts`:
+their member channels' `lastMessageAt` against `users/{uid}/chatReads`, two
+reads capped at 100 docs each, native recipients only). If that read fails it
+falls back to `1`.
 `apns-priority: 10` is added for urgent (chat) pushes. When a notification is
 tapped, send `navigate` with `data.url` when the page advertises it (see
 `navigate`), else load `data.url` in the WebView. It is a portal path such as
