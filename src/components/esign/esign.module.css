@@ -140,7 +140,9 @@
 .canvas {
   display: block;
   width: 100%;
-  height: 160px;
+  /* Phones: room for a full-width signature stroke (160px felt like a slot).
+     svh, so the keyboard opening never resizes (and repaints) the pad. */
+  height: clamp(200px, 30svh, 260px);
   border-radius: var(--r-control);
   background: #f2f5f9;
   touch-action: none;
@@ -244,5 +246,9 @@
   .method {
     flex: none;
     min-width: 140px;
+  }
+
+  .canvas {
+    height: 180px;
   }
 }
