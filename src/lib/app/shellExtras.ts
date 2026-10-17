@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { isNativeApp } from './isNativeApp';
-import { postToNative, type WidgetData } from './bridge';
+import { postToNative, type OwnerWidgetData, type RepWidgetData, type WidgetData } from './bridge';
+import type { Section } from '@/hooks/useRepDashboard';
+import type { MoneySummary } from '@/lib/owner/companySummary';
+import type { MarketsSummary } from '@/lib/owner/markets';
 
 // The web side of the shell extras (the app repo's docs/NATIVE-EXTRAS.md):
 // splash `ready`, the icon `badge` and the home-screen `widgetData`. All three
@@ -106,7 +109,7 @@ const periodFormat = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone:
  * widget shows as "Not on a plan". A month netted below zero by chargebacks
  * sends the real (negative) estimate, as the dashboard shows it.
  */
-export function buildWidgetData(input: WidgetInput): WidgetData {
+export function buildWidgetData(input: WidgetInput): RepWidgetData {
   const pay = input.hasPlan && input.estThisMonth !== null ? Math.round(input.estThisMonth) : null;
   const ranked = input.standing && input.standing.rank >= 1 && input.standing.of >= input.standing.rank;
   return {
@@ -116,6 +119,33 @@ export function buildWidgetData(input: WidgetInput): WidgetData {
     rank: ranked ? input.standing!.rank : null,
     rankOf: ranked ? input.standing!.of : null,
     salesMtd: Math.max(0, Math.floor(input.monthCount)),
+    updatedAt: input.now.toISOString(),
+  };
+}
+
+export interface OwnerWidgetInput {
+  uidHash: string;
+  /** OwnerDashboard's money section: installs this month come from it. null: failed. */
+  money: MoneySummary | null;
+  /** OwnerDashboard's markets section: company sales and the top rep. null: failed. */
+  markets: MarketsSummary | null;
+  now: Date;
+}
+
+/**
+ * The owners' widget payload, from the company numbers OwnerDashboard already
+ * loaded (no extra queries). Counts and a short name only: no money amounts.
+ */
+export function buildOwnerWidgetData(input: OwnerWidgetInput): OwnerWidgetData {
+  const top = input.markets?.topRep ?? null;
+  return {
+    kind: 'owner',
+    uidHash: input.uidHash,
+    periodLabel: periodFormat.format(input.now),
+    companySalesMtd: input.markets ? input.markets.total : null,
+    companyInstallsMtd: input.money ? input.money.month.current.installs : null,
+    topRepName: top ? top.name : null,
+    topRepSalesMtd: top ? top.sales : null,
     updatedAt: input.now.toISOString(),
   };
 }
@@ -139,6 +169,37 @@ export function useNativeWidgetData(data: WidgetData | null): void {
   useEffect(() => {
     if (data) sendNativeWidgetData(data);
   }, [data]);
+}
+
+/**
+ * OwnerDashboard's widget feed: the company numbers once both sections have
+ * settled (a failed one sends null), offered again every WIDGET_REFRESH_MS so
+ * a dashboard left open keeps the widget inside its 48h window. A no-op on
+ * the web. OwnerDashboard renders for the owner role only.
+ */
+export function useOwnerWidgetData(
+  uid: string | null | undefined,
+  sections: { money: Section<MoneySummary>; markets: Section<MarketsSummary> }
+): void {
+  const uidHash = useUidHash(uid);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!uidHash) return;
+    const timer = setInterval(() => setTick((n) => n + 1), WIDGET_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [uidHash]);
+  const { money, markets } = sections;
+  useEffect(() => {
+    if (!uidHash || money.status === 'loading' || markets.status === 'loading') return;
+    sendNativeWidgetData(
+      buildOwnerWidgetData({
+        uidHash,
+        money: money.status === 'ready' ? money.data : null,
+        markets: markets.status === 'ready' ? markets.data : null,
+        now: new Date(),
+      })
+    );
+  }, [uidHash, money, markets, tick]);
 }
 
 // ---- sign-out -------------------------------------------------------------

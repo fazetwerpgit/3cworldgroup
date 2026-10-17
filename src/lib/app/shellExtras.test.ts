@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MoneySummary } from '@/lib/owner/companySummary';
+import type { MarketsSummary } from '@/lib/owner/markets';
 import {
   WIDGET_REFRESH_MS,
   __resetShellExtrasForTests,
+  buildOwnerWidgetData,
   buildWidgetData,
   clearNativeExtras,
   countUnread,
@@ -152,5 +155,42 @@ describe('sendNativeWidgetData', () => {
     sendNativeWidgetData(base);
     clearNativeExtras();
     expect(posted).toEqual([]);
+  });
+});
+
+describe('buildOwnerWidgetData', () => {
+  const at = new Date('2026-10-17T15:00:00.000Z');
+  const money = { month: { current: { installs: 31 } } } as unknown as MoneySummary;
+  const markets: MarketsSummary = { markets: [], total: 46, placedByRep: 0, topRep: { name: 'Wil T.', sales: 9 } };
+
+  it('sends the company numbers the owner dashboard loaded, with no money amounts', () => {
+    const data = buildOwnerWidgetData({ uidHash: 'abc123abc123abc1', money, markets, now: at });
+    expect(data).toEqual({
+      kind: 'owner',
+      uidHash: 'abc123abc123abc1',
+      periodLabel: 'October',
+      companySalesMtd: 46,
+      companyInstallsMtd: 31,
+      topRepName: 'Wil T.',
+      topRepSalesMtd: 9,
+      updatedAt: '2026-10-17T15:00:00.000Z',
+    });
+    sendNativeWidgetData(data);
+    expect(posted).toEqual([{ type: 'widgetData', data }]);
+  });
+
+  it('a failed section, or no top rep yet, sends null for those figures', () => {
+    expect(buildOwnerWidgetData({ uidHash: 'abc123abc123abc1', money: null, markets: null, now: at })).toMatchObject({
+      companySalesMtd: null,
+      companyInstallsMtd: null,
+      topRepName: null,
+      topRepSalesMtd: null,
+    });
+    const cached = { markets: [], total: 3, placedByRep: 0 }; // cached before topRep existed
+    expect(buildOwnerWidgetData({ uidHash: 'abc123abc123abc1', money, markets: cached, now: at })).toMatchObject({
+      companySalesMtd: 3,
+      topRepName: null,
+      topRepSalesMtd: null,
+    });
   });
 });

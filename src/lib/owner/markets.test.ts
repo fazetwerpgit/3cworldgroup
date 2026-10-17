@@ -90,6 +90,21 @@ describe('countsForMonth (the leaderboard rule)', () => {
 });
 
 describe('summarizeMarkets', () => {
+  it('names the month top rep by counted sales, first name + last initial', () => {
+    const sales = [
+      sale({ salesRepId: 'wil', salesRepName: 'Wil Teasdale' }),
+      sale({ salesRepId: 'wil', salesRepName: 'Wil Teasdale' }),
+      sale({ salesRepId: 'wil', salesRepName: 'Wil Teasdale', status: 'pending' }),
+      sale({ salesRepId: 'ana', salesRepName: 'Ana Ruiz' }),
+      sale({ salesRepId: 'ana', salesRepName: 'Ana Ruiz', saleDate: new Date('2026-09-20T15:00:00Z') }),
+      sale({ salesRepId: 'zed', salesRepName: 'Zed Young' }),
+      sale({ salesRepId: 'zed', salesRepName: 'Zed Young' }),
+    ];
+    // Wil and Zed tie on 2: the alphabetical name wins.
+    expect(summarizeMarkets(sales, OCT).topRep).toEqual({ name: 'Wil T.', sales: 2 });
+    expect(summarizeMarkets([sale({ salesRepName: '' })], OCT).topRep).toBeNull();
+  });
+
   it('counts the month by state, biggest first, with full names', () => {
     const sales = [
       sale({}),
@@ -108,6 +123,7 @@ describe('summarizeMarkets', () => {
       ],
       total: 5,
       placedByRep: 0,
+      topRep: null,
     });
   });
 
@@ -140,7 +156,7 @@ describe('summarizeMarkets', () => {
   });
 
   it('is empty for a month with no approved sales', () => {
-    expect(summarizeMarkets([sale({ status: 'pending' })], OCT)).toEqual({ markets: [], total: 0, placedByRep: 0 });
+    expect(summarizeMarkets([sale({ status: 'pending' })], OCT)).toEqual({ markets: [], total: 0, placedByRep: 0, topRep: null });
   });
 });
 

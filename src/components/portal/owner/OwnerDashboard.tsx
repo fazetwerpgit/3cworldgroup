@@ -23,7 +23,8 @@ import type { QueueCard } from '@/components/portal/admin-d/opsQueues';
 import s from '../rep/rep.module.css';
 import u from '../admin-d/admin-ui.module.css';
 import o from './owner-dashboard.module.css';
-import { useAppReady } from '@/lib/app/shellExtras';
+import { useAppReady, useOwnerWidgetData } from '@/lib/app/shellExtras';
+import { useAuth } from '@/contexts/AuthContext';
 
 // The owner's home screen (direction D): the company, not a personal pay card.
 // Money first (estimated from installs × the comp plan), then this month's
@@ -356,6 +357,11 @@ export function OwnerDashboard() {
   const { retry } = data;
   // 3C iOS app: drop the splash once the money board has settled (no-op on the web).
   useAppReady(data.money.status !== 'loading');
+  // 3C iOS app: the home-screen widget gets the company numbers loaded here
+  // (sales and installs this month, top rep). Without it an owner's widget
+  // never leaves "Open the app".
+  const { user } = useAuth();
+  useOwnerWidgetData(user?.uid, data);
 
   return (
     <>

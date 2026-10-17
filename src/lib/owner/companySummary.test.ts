@@ -427,8 +427,9 @@ describe('buildOwnerSummary', () => {
       ],
       total: 3,
       placedByRep: 1,
+      topRep: { name: 'repA', sales: 2 },
     });
-    expect(JSON.stringify(summary)).not.toMatch(/Oak Street|Pine Avenue|repA/);
+    expect(JSON.stringify(summary)).not.toMatch(/Oak Street|Pine Avenue/);
   });
 
   it('counts Needs attention overdue installs against the report stamp the book carries', async () => {
