@@ -60,6 +60,7 @@ const fake = vi.hoisted(() => {
     resolveAlertTasks: vi.fn(async () => undefined),
     reconcile: vi.fn(async () => []),
     restampAuthor: vi.fn(async () => undefined),
+    scrubDeletedChatAuthor: vi.fn(async () => undefined),
     audit: vi.fn(async () => undefined),
   };
 });
@@ -69,7 +70,7 @@ vi.mock('firebase-admin/firestore', () => ({ FieldValue: { delete: () => '__DELE
 vi.mock('@/lib/users/purgeSensitiveUserData', () => ({ purgeSensitiveUserData: fake.purge }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: fake.resolveAlertTasks }));
 vi.mock('@/lib/chat/channels', () => ({ reconcileChatMembershipForUser: fake.reconcile }));
-vi.mock('@/lib/chat/restampAuthor', () => ({ restampAuthor: fake.restampAuthor }));
+vi.mock('@/lib/chat/restampAuthor', () => ({ restampAuthor: fake.restampAuthor, scrubDeletedChatAuthor: fake.scrubDeletedChatAuthor }));
 vi.mock('@/lib/audit/adminAudit', () => ({ writeAdminAudit: fake.audit }));
 
 import { DELETE } from './route';
@@ -190,6 +191,7 @@ describe('DELETE /api/portal/auth/me', () => {
     }
 
     expect(fake.restampAuthor).toHaveBeenCalledWith('rep1', { authorName: 'Deleted user' });
+    expect(fake.scrubDeletedChatAuthor).toHaveBeenCalledWith('rep1', 'Deleted user');
     expect(fake.reconcile).toHaveBeenCalledWith('rep1');
     expect(fake.resolveAlertTasks).toHaveBeenCalledWith('rep1');
     expect(fake.audit).toHaveBeenCalledWith(
@@ -263,6 +265,7 @@ describe('DELETE /api/portal/auth/me', () => {
     fake.restampAuthor.mockRejectedValueOnce(new Error('x'));
     fake.reconcile.mockRejectedValueOnce(new Error('x'));
     fake.resolveAlertTasks.mockRejectedValueOnce(new Error('x'));
+    fake.scrubDeletedChatAuthor.mockRejectedValueOnce(new Error('x'));
     expect((await DELETE(request())).status).toBe(200);
   });
 

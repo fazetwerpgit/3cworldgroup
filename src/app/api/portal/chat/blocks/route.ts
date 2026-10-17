@@ -79,7 +79,9 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await blockRef.create({ blockedAt: FieldValue.serverTimestamp(), name });
+      // blockedUid repeats the doc id so a self-delete can find every block of
+      // this person with one collection-group query (scrubDeletedChatAuthor).
+      await blockRef.create({ blockedAt: FieldValue.serverTimestamp(), name, blockedUid: target });
     } catch (createError) {
       if (!isAlreadyExists(createError)) throw createError;
       return NextResponse.json({ success: true, duplicate: true });

@@ -10,7 +10,7 @@ import {
 } from '@/lib/users/accountClosure';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
-import { restampAuthor } from '@/lib/chat/restampAuthor';
+import { restampAuthor, scrubDeletedChatAuthor } from '@/lib/chat/restampAuthor';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
 
 const FEDERATED_PROVIDERS = ['google.com', 'apple.com'];
@@ -146,6 +146,11 @@ export async function DELETE(request: NextRequest) {
       await restampAuthor(uid, { authorName: DELETED_USER_NAME });
     } catch (error) {
       console.error('[auth/me] failed to re-stamp chat author name', uid, error);
+    }
+    try {
+      await scrubDeletedChatAuthor(uid, DELETED_USER_NAME);
+    } catch (error) {
+      console.error('[auth/me] failed to scrub chat blocks/reports name', uid, error);
     }
     try {
       await reconcileChatMembershipForUser(uid);

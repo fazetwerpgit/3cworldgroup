@@ -98,7 +98,7 @@ describe('/api/portal/chat/blocks', () => {
     // No name or email in the answer: the caller has the name from the message.
     expect(await res.json()).toEqual({ success: true });
     await Promise.all(afterTasks);
-    expect(store.get('users/me/chatBlocks/other')).toMatchObject({ name: 'Other Person' });
+    expect(store.get('users/me/chatBlocks/other')).toMatchObject({ name: 'Other Person', blockedUid: 'other' });
     expect(notifyMock).toHaveBeenCalledTimes(1);
     // The blocked person is never on the alert, and alerts throttle per blocker.
     expect(notifyMock).toHaveBeenCalledWith(expect.objectContaining({ actorId: 'me', excludeUids: ['other'] }));
