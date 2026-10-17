@@ -8,14 +8,29 @@ service firebase.storage {
     function isPlatformManagement() {
       return request.auth != null && caller().get('role', null) in ['owner', 'admin', 'operations'];
     }
+    // Every FieldRoles value in src/types/auth.ts (media.test.ts checks the two agree).
+    function fieldRoleValues() {
+      return ['entry_rep', 'entry_level_rep', 'l1_manager', 'l2_manager',
+        'ibo_level_1', 'ibo_level_2', 'ibo_level_3', 'ibo_level_4',
+        'general_manager', 'gm_in_training', 'office_manager',
+        'ae_tier_1', 'ae_tier_2', 'regional_manager', 'director', 'internal_rep'];
+    }
+    // resolveRoles (src/types/auth.ts): a valid `fieldRole`, or a legacy field
+    // role stored in `role`. Platform and field roles never overlap, so a role
+    // that is a field role value is never also a platform role.
+    function hasFieldRole(data) {
+      return data.get('fieldRole', null) in fieldRoleValues()
+        || data.get('role', null) in fieldRoleValues();
+    }
     // Mirrors the API status gate: an active account, or a hired rep still in
     // onboarding (pending WITH a field role; /portal/training and chat are on
     // the onboarding allowlist). A role-less pending self-signup or an inactive
     // account gets nothing.
     function canReadTraining() {
+      let data = caller();
       return request.auth != null
-        && (caller().get('status', null) == 'active'
-          || (caller().get('status', null) == 'pending' && caller().get('fieldRole', null) != null));
+        && (data.get('status', null) == 'active'
+          || (data.get('status', null) == 'pending' && hasFieldRole(data)));
     }
 
     // University training content: platform management uploads; staff fetch a

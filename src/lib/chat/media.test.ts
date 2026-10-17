@@ -10,6 +10,7 @@ import {
   sanitizeAttachmentFileName,
   validateMessageAttachment,
 } from './media';
+import { FieldRoles, PlatformRoles, resolveRoles } from '@/types/auth';
 
 const BUCKET = 'demo-bucket.appspot.com';
 
@@ -164,5 +165,23 @@ describe('storage.rules agree with the chat upload limits', () => {
     for (const type of ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif']) {
       expect(block).toContain(`request.resource.contentType == '${type}'`);
     }
+  });
+
+  it('gates on resolveRoles: a valid fieldRole, or a legacy field role stored in role', () => {
+    expect(block).toContain('allow create: if canReadTraining()');
+    const fn = (name: string) => {
+      const start = rules.indexOf(`function ${name}(`);
+      expect(start, name).toBeGreaterThan(-1);
+      return rules.slice(start, rules.indexOf('\n    }', start));
+    };
+    expect(fn('canReadTraining')).toContain("data.get('status', null) == 'pending' && hasFieldRole(data)");
+    expect(fn('hasFieldRole')).toContain("data.get('fieldRole', null) in fieldRoleValues()");
+    expect(fn('hasFieldRole')).toContain("data.get('role', null) in fieldRoleValues()");
+    // The rules' list is exactly the FieldRoles union, and shares nothing with
+    // the platform roles (so a field role in `role` never shadows one).
+    const listed = [...fn('fieldRoleValues').matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]).sort();
+    expect(listed).toEqual([...Object.values(FieldRoles)].sort());
+    for (const role of Object.values(PlatformRoles)) expect(listed).not.toContain(role);
+    expect(resolveRoles('entry_rep', undefined)).toEqual({ role: undefined, fieldRole: 'entry_rep' });
   });
 });
