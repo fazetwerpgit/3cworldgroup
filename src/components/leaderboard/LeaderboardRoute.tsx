@@ -24,7 +24,7 @@ const FIRST_BOARD = { period: 'week', metric: 'totalPoints', limit: 100, scope: 
 export function LeaderboardRoute() {
   const { user } = useAuth();
   // Seeded with the board fetched first below (week, points, team), so a revisit paints it at once.
-  const { leaderboard, currentUser, unranked, recent, firstMonth, loading, error, fetchLeaderboard } =
+  const { leaderboard, currentUser, unranked, recent, firstMonth, loading, error, staleAt, fetchLeaderboard } =
     useLeaderboard(FIRST_BOARD);
   const [period, setPeriod] = useState<LeaderboardPeriod>('week');
   const [metric, setMetric] = useState<LeaderboardMetric>('totalPoints');
@@ -47,9 +47,12 @@ export function LeaderboardRoute() {
     return fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true, ...(monthParam ? { month: monthParam } : {}) });
   }, [user, loading, period, metric, monthParam, fetchLeaderboard]);
   useRefreshOnResume(refreshQuietly, { enabled: !!user });
+  // Retry keeps a board that is showing (quiet: no skeleton); only an empty
+  // screen goes back to its loading state.
+  const hasBoard = leaderboard.length > 0;
   const retry = useCallback(() => {
-    if (user) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, ...(monthParam ? { month: monthParam } : {}) });
-  }, [user, period, metric, monthParam, fetchLeaderboard]);
+    if (user) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: hasBoard, ...(monthParam ? { month: monthParam } : {}) });
+  }, [user, period, metric, monthParam, hasBoard, fetchLeaderboard]);
 
   const busy = loading || !user;
 
@@ -78,6 +81,7 @@ export function LeaderboardRoute() {
           recent={recent}
           loading={busy}
           error={error}
+          staleAt={staleAt}
           onRetry={retry}
           period={period}
           metric={metric}

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { auth } from '@/lib/firebase/config';
 import { useCacheSubject } from '@/lib/cache/useCacheSubject';
-import { dataCacheGeneration, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
+import { dataCacheGeneration, readDataCache, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 
 interface LeaderboardEntry {
@@ -84,6 +84,10 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
   // Only the newest request may land: a slow answer for the old period (or a
   // resume refresh overtaken by a filter tap) must not replace the new board.
   const latest = useRef(0);
+  // When the board on screen was loaded, and (after a quiet refresh failed
+  // with it still showing) that time, for the "Couldn't refresh · as of" note.
+  const shownAt = useRef<number | null>(null);
+  const [staleAt, setStaleAt] = useState<number | null>(null);
 
   /**
    * `quiet` reloads the board in place (the app was reopened): no loading
@@ -103,8 +107,11 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
     const query = leaderboardQuery({ period, metric, limit, scope, team: options.team, month: options.month });
     const key = boardCacheKey(query);
     // Seen before: show that board now and refresh it in place (like `quiet`).
-    const cached = readDataCache<CachedBoard>(uid, key);
+    const entry = readDataCacheEntry<CachedBoard>(uid, key);
+    const cached = entry?.value;
     if (cached) {
+      shownAt.current = entry.at;
+      setStaleAt(null);
       setLeaderboard(cached.leaderboard);
       setCurrentUser(cached.currentUser);
       setUnranked(cached.unranked);
@@ -113,6 +120,8 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
       setLoading(false);
       setError(null);
     } else if (!options.quiet) {
+      shownAt.current = null;
+      setStaleAt(null);
       setLoading(true);
       setError(null);
     }
@@ -141,12 +150,18 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
       setUnranked(Array.isArray(data.unranked) ? data.unranked : []);
       setRecent(Array.isArray(data.recent) ? data.recent : []);
       if ('firstMonth' in data) setFirstMonth(typeof data.firstMonth === 'string' ? data.firstMonth : null);
+      shownAt.current = Date.now();
+      setStaleAt(null);
       setError(null);
     } catch (err) {
       if (request !== latest.current) return;
       const message = err instanceof Error ? err.message : 'Failed to fetch leaderboard';
-      if (quiet) console.error('Quiet leaderboard refresh failed:', message);
-      else setError(message);
+      if (quiet) {
+        console.error('Quiet leaderboard refresh failed:', message);
+        if (shownAt.current !== null) setStaleAt(shownAt.current);
+      } else {
+        setError(message);
+      }
     } finally {
       if (request === latest.current) setLoading(false);
     }
@@ -166,6 +181,7 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
     firstMonth,
     loading,
     error,
+    staleAt,
     fetchLeaderboard,
     getUserRank,
   };
