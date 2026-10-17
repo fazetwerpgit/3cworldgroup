@@ -53,7 +53,10 @@ function toReport(id: string, data: FirebaseFirestore.DocumentData) {
     reason: text(data.reason) ?? 'other',
     details: text(data.details),
     messageText: typeof data.messageText === 'string' ? data.messageText : '',
-    attachmentUrl: text(data.attachmentUrl),
+    // Once the message is removed its chat upload is gone; the copy saved to
+    // the moderation folder (evidenceUrl) is what the queue shows from then on.
+    attachmentUrl: text(data.evidenceUrl) ?? text(data.attachmentUrl),
+    evidencePath: text(data.evidencePath),
     attachmentType: text(data.attachmentType),
     authorId: text(data.authorId) ?? '',
     authorName: text(data.authorName),

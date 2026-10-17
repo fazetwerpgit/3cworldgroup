@@ -111,6 +111,19 @@ describe('GET /api/portal/admin/chat-reports', () => {
     expect(json.reports[0].status).toBe('dismissed');
   });
 
+  it('shows the saved evidence copy in place of the deleted chat upload', async () => {
+    fake.reports.set('m2_rep-a', {
+      ...fake.reports.get('m2_rep-a'),
+      attachmentUrl: 'https://firebasestorage.googleapis.com/v0/b/b/o/chat%2Fnew-reps%2Fx.png?alt=media&token=old',
+      attachmentType: 'image',
+      evidencePath: 'moderation/chat-reports/new-reps/m2/x.png',
+      evidenceUrl: 'https://firebasestorage.googleapis.com/v0/b/b/o/moderation%2Fx.png?alt=media&token=new',
+    });
+    const json = await (await GET(req('GET', { query: '?status=resolved' }))).json();
+    expect(json.reports[0].attachmentUrl).toContain('token=new');
+    expect(json.reports[0].evidencePath).toBe('moderation/chat-reports/new-reps/m2/x.png');
+  });
+
   it('rejects an unknown status filter', async () => {
     const res = await GET(req('GET', { query: '?status=everything' }));
     expect(res.status).toBe(400);

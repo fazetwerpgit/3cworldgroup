@@ -159,6 +159,16 @@ const storageDeleteMock = vi.hoisted(() =>
 );
 // When set, the "does another message still show this photo" query rejects.
 let sharingQueryError: Error | null = null;
+// Evidence copies of a reported upload: file(src).copy(file(dest)), then
+// file(dest).setMetadata(...) to give the copy its own token.
+const storageCopyMock = vi.hoisted(() => vi.fn<(from: string, to: string) => Promise<unknown>>(async () => [{}]));
+const storageSetMetadataMock = vi.hoisted(() =>
+  vi.fn<(objectPath: string, metadata: Record<string, unknown>) => Promise<unknown>>(async () => [{}])
+);
+// chatReports docs by id; where('messageId', '==', id) reads them. When set,
+// that query rejects.
+const CHAT_REPORTS = vi.hoisted((): Record<string, Record<string, unknown>> => ({}));
+let reportsQueryError: Error | null = null;
 
 // messages.where('attachment.url', '>=', a).where('attachment.url', '<', b) — the
 // messages whose photo URL (or, for attachment.previewUrl, PDF preview URL)
@@ -242,12 +252,28 @@ const CHANNEL_DOCS: Record<string, Record<string, unknown>> = {
 vi.mock('@/lib/firebase/admin', () => ({
   getOnboardingBucket: () => ({
     file: (objectPath: string) => ({
+      name: objectPath,
       delete: (options?: { ignoreNotFound?: boolean }) => storageDeleteMock(objectPath, options),
+      copy: (dest: { name: string }) => storageCopyMock(objectPath, dest.name),
+      setMetadata: (metadata: Record<string, unknown>) => storageSetMetadataMock(objectPath, metadata),
     }),
   }),
   adminDb: {
     collection: (name: string) =>
-      name === 'users'
+      name === 'chatReports'
+        ? {
+            where: (_field: string, _op: string, messageId: string) => ({
+              get: async () => {
+                if (reportsQueryError) throw reportsQueryError;
+                return {
+                  docs: Object.entries(CHAT_REPORTS)
+                    .filter(([, data]) => data.messageId === messageId)
+                    .map(([id, data]) => ({ id, ref: { id }, data: () => data })),
+                };
+              },
+            }),
+          }
+        : name === 'users'
         ? {
             doc: (uid: string) => ({
               __user: uid,
@@ -395,6 +421,12 @@ beforeEach(() => {
   storageDeleteMock.mockReset();
   storageDeleteMock.mockResolvedValue([{}]);
   sharingQueryError = null;
+  storageCopyMock.mockReset();
+  storageCopyMock.mockResolvedValue([{}]);
+  storageSetMetadataMock.mockReset();
+  storageSetMetadataMock.mockResolvedValue([{}]);
+  for (const id of Object.keys(CHAT_REPORTS)) delete CHAT_REPORTS[id];
+  reportsQueryError = null;
   sendPushMock.mockClear();
   afterTasks.length = 0;
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
@@ -1196,6 +1228,149 @@ describe('DELETE /api/portal/chat/messages (photo in Storage)', () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+});
+
+describe('DELETE /api/portal/chat/messages (reported upload kept as evidence)', () => {
+  function deleteReq(body: unknown) {
+    return new NextRequest('http://localhost/api/portal/chat/messages', {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    });
+  }
+
+  function storeReportedPhoto(id: string, name: string, attachment?: Record<string, unknown>) {
+    createdDocs[id] = {
+      authorId: 'someone-else',
+      authorName: 'Someone',
+      text: '',
+      attachment: attachment ?? { type: 'image', url: imageUrl('all-company', name), contentType: 'image/png' },
+      hasAttachment: true,
+      deletedAt: null,
+      createdAt: Timestamp.fromMillis(500_000),
+    };
+  }
+
+  function report(id: string, messageId: string, channelId = 'all-company') {
+    CHAT_REPORTS[id] = { messageId, channelId, status: 'open' };
+  }
+
+  it('copies the photo to the moderation folder, records it on every report, then deletes the original', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    storeReportedPhoto('bad-photo', 'bad.png');
+    report('bad-photo_r1', 'bad-photo');
+    report('bad-photo_r2', 'bad-photo');
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'bad-photo' }));
+    expect(res.status).toBe(200);
+
+    const evidencePath = 'moderation/chat-reports/all-company/bad-photo/bad.png';
+    expect(storageCopyMock).toHaveBeenCalledWith('chat/all-company/bad.png', evidencePath);
+    // The copy gets a fresh token, never the chat URL's.
+    const [metaPath, meta] = storageSetMetadataMock.mock.calls[0];
+    expect(metaPath).toBe(evidencePath);
+    const token = (meta.metadata as Record<string, string>).firebaseStorageDownloadTokens;
+    expect(token).toBeTruthy();
+    expect(token).not.toBe('tok');
+
+    const updates = batchUpdates.filter((u) => u.id.startsWith('bad-photo_'));
+    expect(updates.map((u) => u.id).sort()).toEqual(['bad-photo_r1', 'bad-photo_r2']);
+    for (const { data } of updates) {
+      expect(data.evidencePath).toBe(evidencePath);
+      expect(data.evidenceUrl).toBe(
+        `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(evidencePath)}?alt=media&token=${token}`
+      );
+    }
+    expect(storageDeleteMock).toHaveBeenCalledWith('chat/all-company/bad.png', { ignoreNotFound: true });
+    expect(storageCopyMock.mock.invocationCallOrder[0]).toBeLessThan(storageDeleteMock.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps the PDF itself as evidence and still deletes its preview and the PDF', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    storeReportedPhoto('bad-pdf', '', {
+      type: 'file',
+      url: imageUrl('all-company', 'doc.pdf'),
+      name: 'a.pdf',
+      contentType: 'application/pdf',
+      previewUrl: imageUrl('all-company', 'doc-thumb.webp'),
+    });
+    report('bad-pdf_r1', 'bad-pdf');
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'bad-pdf' }));
+    expect(res.status).toBe(200);
+    expect(storageCopyMock.mock.calls).toEqual([
+      ['chat/all-company/doc.pdf', 'moderation/chat-reports/all-company/bad-pdf/doc.pdf'],
+    ]);
+    expect(storageDeleteMock.mock.calls.map(([path]) => path).sort()).toEqual([
+      'chat/all-company/doc-thumb.webp',
+      'chat/all-company/doc.pdf',
+    ]);
+  });
+
+  it('skips the Storage delete when the copy fails, so the evidence is never lost', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    storageCopyMock.mockRejectedValue(Object.assign(new Error('copy failed'), { code: 503 }));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      storeReportedPhoto('bad-photo', 'bad.png');
+      report('bad-photo_r1', 'bad-photo');
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'bad-photo' }));
+      expect(res.status).toBe(200);
+      expect(msgSetMock).toHaveBeenCalledTimes(1);
+      expect(storageDeleteMock).not.toHaveBeenCalled();
+      expect(batchUpdates.filter((u) => u.id === 'bad-photo_r1')).toEqual([]);
+      expect(errorSpy.mock.calls.flat().map(String).join(' ')).not.toMatch(/https?:|token=/);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('removes the copy and keeps the original when the new token cannot be set', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    storageSetMetadataMock.mockRejectedValue(Object.assign(new Error('nope'), { code: 503 }));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      storeReportedPhoto('bad-photo', 'bad.png');
+      report('bad-photo_r1', 'bad-photo');
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'bad-photo' }));
+      expect(res.status).toBe(200);
+      expect(storageDeleteMock.mock.calls).toEqual([
+        ['moderation/chat-reports/all-company/bad-photo/bad.png', { ignoreNotFound: true }],
+      ]);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('keeps the upload when the report lookup fails', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    reportsQueryError = Object.assign(new Error('unavailable'), { code: 14 });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      storeReportedPhoto('bad-photo', 'bad.png');
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'bad-photo' }));
+      expect(res.status).toBe(200);
+      expect(storageDeleteMock).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('leaves an unreported upload (or a report from another channel) on the old path: no copy, plain delete', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    storeReportedPhoto('plain-photo', 'plain.png');
+    report('plain-photo_r1', 'plain-photo', 'managers-extra');
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'plain-photo' }));
+    expect(res.status).toBe(200);
+    expect(storageCopyMock).not.toHaveBeenCalled();
+    expect(storageDeleteMock).toHaveBeenCalledWith('chat/all-company/plain.png', { ignoreNotFound: true });
+  });
+
+  it('makes no copy for a reported text-only message', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    report('others-msg_r1', 'others-msg');
+    const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'others-msg' }));
+    expect(res.status).toBe(200);
+    expect(storageCopyMock).not.toHaveBeenCalled();
+    expect(storageDeleteMock).not.toHaveBeenCalled();
   });
 });
 

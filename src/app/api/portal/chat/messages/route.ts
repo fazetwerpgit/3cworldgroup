@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
@@ -11,6 +12,7 @@ import { checkChatText } from '@/lib/chat/contentFilter';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   attachmentSnippet,
+  buildTokenedDownloadUrl,
   chatObjectPathFromUrl,
   chatObjectUrlBase,
   getChatStorageBucketName,
@@ -539,6 +541,69 @@ async function deleteChatPhotoObject(
   }
 }
 
+// Where a reported message's upload is kept once the message is deleted.
+// Admin SDK only: storage.rules deny every client read and write outside
+// training/, and the copy gets its own download token, so the chat URL's
+// token never opens it.
+function chatEvidencePath(channelId: string, messageId: string, objectPath: string): string {
+  const name = objectPath.slice(objectPath.lastIndexOf('/') + 1);
+  return `moderation/chat-reports/${channelId}/${messageId}/${name}`;
+}
+
+// Before a reported message's upload is deleted, copies it to the moderation
+// folder and points every report on the message at the copy (evidencePath +
+// evidenceUrl), so removing the message never destroys what was reported.
+// Answers whether the chat objects may now be deleted: true when the message
+// has no reports or no upload of ours, or the evidence is saved; false when
+// any step failed, and the original then stays in place (its tokened URL is
+// still on the report). Never throws.
+async function preserveReportedEvidence(
+  channelId: string,
+  messageId: string,
+  attachment: unknown
+): Promise<boolean> {
+  try {
+    const reports = (await adminDb!.collection('chatReports').where('messageId', '==', messageId).get()).docs.filter(
+      (doc) => doc.data().channelId === channelId
+    );
+    if (reports.length === 0) return true;
+    const bucketName = getChatStorageBucketName();
+    const url = attachment && typeof attachment === 'object' ? (attachment as { url?: unknown }).url : undefined;
+    const objectPath = bucketName ? chatObjectPathFromUrl(url, bucketName, channelId) : null;
+    if (!bucketName || !objectPath || !deletableChatObjectPaths(attachment, channelId).includes(objectPath)) return true;
+
+    const evidencePath = chatEvidencePath(channelId, messageId, objectPath);
+    const bucket = getOnboardingBucket();
+    const evidence = bucket.file(evidencePath);
+    await bucket.file(objectPath).copy(evidence);
+    // The copy carries the chat object's download token; replace it so only
+    // the URL recorded on the report opens the evidence.
+    const token = randomUUID();
+    try {
+      await evidence.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+    } catch (tokenError) {
+      await evidence.delete({ ignoreNotFound: true }).catch(() => undefined);
+      throw tokenError;
+    }
+
+    const batch = adminDb!.batch();
+    for (const doc of reports) {
+      batch.update(doc.ref, {
+        evidencePath,
+        evidenceUrl: buildTokenedDownloadUrl(bucketName, evidencePath, token),
+        evidenceSavedAt: FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+    return true;
+  } catch (error) {
+    console.error(
+      `Chat evidence not saved; upload kept (channel ${channelId}, message ${messageId}): code ${errorCode(error)}`
+    );
+    return false;
+  }
+}
+
 // DELETE — author (self) or a moderator (admin/operations) can soft-delete.
 export async function DELETE(request: NextRequest) {
   try {
@@ -604,8 +669,13 @@ export async function DELETE(request: NextRequest) {
     // The photo (or PDF and its preview) goes with the message: a tokened URL would otherwise keep it
     // reachable. Path resolved from the pre-scrub read, deleted only now that the
     // doc no longer points at it.
-    for (const objectPath of deletableChatObjectPaths(message?.attachment, channelId)) {
-      await deleteChatPhotoObject(channelId, messageId, objectPath);
+    // A reported upload is copied to the moderation folder first; if that
+    // fails the objects stay rather than lose the evidence.
+    const objectPaths = deletableChatObjectPaths(message?.attachment, channelId);
+    if (objectPaths.length > 0 && (await preserveReportedEvidence(channelId, messageId, message?.attachment))) {
+      for (const objectPath of objectPaths) {
+        await deleteChatPhotoObject(channelId, messageId, objectPath);
+      }
     }
 
     try {
