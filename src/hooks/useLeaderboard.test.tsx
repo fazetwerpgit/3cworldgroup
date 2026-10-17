@@ -2,7 +2,7 @@
 //
 // The board shows the newest request's answer, and a quiet (resume) refresh
 // never shows the skeleton or trades the board for an error.
-import { act } from 'react';
+import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useLeaderboard } from './useLeaderboard';
@@ -39,9 +39,13 @@ let pending: Array<{ url: string; resolve: (response: FakeResponse) => void }> =
 
 function Probe() {
   const hook = useLeaderboard();
-  fetchers.push(hook.fetchLeaderboard);
-  lastStaleAt = hook.staleAt;
-  renders.push({ rep: hook.leaderboard[0]?.salesRepId ?? null, loading: hook.loading, error: hook.error });
+  // Recorded after each commit (an effect with no deps), not during render:
+  // writing module variables in render is a side effect the hooks rules forbid.
+  useEffect(() => {
+    fetchers.push(hook.fetchLeaderboard);
+    lastStaleAt = hook.staleAt;
+    renders.push({ rep: hook.leaderboard[0]?.salesRepId ?? null, loading: hook.loading, error: hook.error });
+  });
   return null;
 }
 

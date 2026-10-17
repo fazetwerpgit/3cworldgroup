@@ -211,9 +211,11 @@ export function NavSheet({
    */
   animated?: boolean;
 }) {
-  const sheet = useSheetDismiss<HTMLElement>(onClose, { drag: animated });
-  const dismiss = animated ? sheet.close : onClose;
-  const closing = animated && sheet.closing ? true : undefined;
+  // Destructured so the React Compiler sees backdropRef/sheetRef as refs passed
+  // to `ref`, not as reads of a plain object's properties during render.
+  const { backdropRef, sheetRef, close, closing: sheetClosing } = useSheetDismiss<HTMLElement>(onClose, { drag: animated });
+  const dismiss = animated ? close : onClose;
+  const closing = animated && sheetClosing ? true : undefined;
   const content = (
     <>
       <NavGroupsList
@@ -230,7 +232,7 @@ export function NavSheet({
 
   return (
     <div
-      ref={sheet.backdropRef}
+      ref={backdropRef}
       className={classes.backdrop}
       data-closing={closing}
       onMouseDown={(event) => {
@@ -238,7 +240,7 @@ export function NavSheet({
       }}
     >
       <section
-        ref={sheet.sheetRef}
+        ref={sheetRef}
         id={id}
         data-closing={closing}
         className={classes.sheet}

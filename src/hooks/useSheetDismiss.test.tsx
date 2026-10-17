@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { releaseVelocity, sheetDimFor, shouldDismissSheet, useSheetDismiss } from './useSheetDismiss';
@@ -75,10 +75,14 @@ describe('useSheetDismiss', () => {
 
   function Sheet() {
     const sheet = useSheetDismiss<HTMLElement>(onClose);
-    api = sheet;
+    const { backdropRef, sheetRef, closing } = sheet;
+    // Exposed after commit, not during render (no side effects in render).
+    useEffect(() => {
+      api = sheet;
+    });
     return (
-      <div ref={sheet.backdropRef} id="backdrop" data-closing={sheet.closing || undefined}>
-        <section ref={sheet.sheetRef} id="sheet" data-closing={sheet.closing || undefined}>
+      <div ref={backdropRef} id="backdrop" data-closing={closing || undefined}>
+        <section ref={sheetRef} id="sheet" data-closing={closing || undefined}>
           <div id="body">content</div>
         </section>
       </div>
