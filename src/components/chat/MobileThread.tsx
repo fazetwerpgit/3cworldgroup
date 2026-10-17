@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, RefObject, TouchEvent } from 'react';
-import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, FileText, ImagePlus, Info, Lock, Pin, RotateCw, Send, X } from 'lucide-react';
+import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, FileText, ImagePlus, Info, Lock, Pin, Reply, RotateCw, Send, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { GifPicker } from '@/components/chat/GifPicker';
@@ -25,6 +25,11 @@ import type { ChatMessageView } from '@/hooks/chat/useMessages';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
 import { countNewArrivals, newestDeliveredId } from '@/lib/chat/unseen';
 import { setScrollTopInstant, useStickToBottom } from '@/hooks/chat/useStickToBottom';
+import { isNativeApp, useIsNativeApp } from '@/lib/app/isNativeApp';
+import { nativeHaptic, onNativeMessage, type KeyboardEasing } from '@/lib/app/bridge';
+import type { ReportReason } from '@/lib/chat/moderationShared';
+import { authorIndex, isBlockedQuote, shouldCollapseBlocked } from '@/lib/chat/blocked';
+import { BlockedMessageButton, MessageQuote } from '@/components/chat/BlockedContent';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 import c from './chat.module.css';
 
@@ -165,6 +170,14 @@ interface MobileThreadProps {
   // Reports whether the reader is following the latest messages (the pinned
   // observer), so useMessages slides its window instead of widening it.
   onFollowingChange?: (following: boolean) => void;
+  // A short confirmation under the thread (a report sent, someone blocked).
+  notice?: string;
+  // Moderation: authors this reader blocked (their messages collapse to a
+  // "blocked" row they can tap open), and the report / block / unblock calls.
+  blockedUids?: ReadonlySet<string>;
+  onReport?: (message: ThreadMessage, reason: ReportReason) => void;
+  onBlock?: (message: ThreadMessage) => void;
+  onUnblock?: (message: ThreadMessage) => void;
 }
 
 /**
@@ -300,6 +313,32 @@ function fitGifPicker(thread: HTMLElement) {
   thread.style.setProperty('--gif-max', `${max}px`);
 }
 
+// The shell's keyboard curves as CSS timing functions. 'keyboard' is iOS's own
+// keyboard spring, which has no public curve; this cubic is the usual match.
+const KEYBOARD_EASING_CSS: Record<KeyboardEasing, string> = {
+  keyboard: 'cubic-bezier(0.38, 0.7, 0.125, 1)',
+  easeIn: 'ease-in',
+  easeOut: 'ease-out',
+  easeInEaseOut: 'ease-in-out',
+  linear: 'linear',
+};
+
+// Swipe-to-reply (app only): how far a row must travel to reply, how far it
+// can travel at all (rubber-banded past the threshold), and the strip along
+// the left edge left to WebKit's back swipe.
+const SWIPE_REPLY_PX = 56;
+const SWIPE_MAX_PX = 88;
+const SWIPE_EDGE_PX = 24;
+// Movement before a touch counts as a swipe or a scroll.
+const SWIPE_SLOP_PX = 8;
+
+/** Row offset for a finger that moved `dx` px: 1:1 up to the threshold, then resisting. */
+export function swipeOffset(dx: number): number {
+  if (dx <= 0) return 0;
+  if (dx <= SWIPE_REPLY_PX) return dx;
+  return Math.min(SWIPE_MAX_PX, SWIPE_REPLY_PX + (dx - SWIPE_REPLY_PX) * 0.35);
+}
+
 /**
  * Phone conversation screen: a back/title row under the D top bar, bubbles that
  * fill the height, and the composer on the bottom edge. The composer replaces
@@ -360,7 +399,15 @@ export function MobileThread({
   onSaveEdit,
   onReadBy,
   onFollowingChange,
+  notice,
+  blockedUids,
+  onReport,
+  onBlock,
+  onUnblock,
 }: MobileThreadProps) {
+  // Inside the iOS app: faster long-press with a haptic, swipe-to-reply, and
+  // the keyboard driven by the shell's own keyboard events (see below).
+  const inApp = useIsNativeApp();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   // Bottom positioning scoped to the scroller (never scrollIntoView) plus
   // stick-to-bottom across late layout changes — see useStickToBottom.
@@ -371,8 +418,9 @@ export function MobileThread({
     followingChangeRef.current = onFollowingChange;
   }, [onFollowingChange]);
   // Long-press → bottom action sheet. A single shared timer/target avoids per-row
-  // hooks: touchstart on a bubble arms a 500ms timer; move/scroll/end cancel it;
-  // firing opens the sheet for that message.
+  // hooks: touchstart on a bubble arms a timer (500ms in the browser; 350ms with
+  // a light haptic in the app, closer to iOS's own context menus); move/scroll/
+  // end cancel it; firing opens the sheet for that message.
   const [actionSheet, setActionSheet] = useState<ThreadMessage | null>(null);
   const [reactionPickerMessageId, setReactionPickerMessageId] = useState<string | null>(null);
   const longPressTimer = useRef<number | undefined>(undefined);
@@ -389,11 +437,15 @@ export function MobileThread({
   const startLongPress = (message: ThreadMessage) => {
     clearLongPress();
     longPressFired.current = false;
-    longPressTimer.current = window.setTimeout(() => {
-      longPressTimer.current = undefined;
-      longPressFired.current = true;
-      setActionSheet(message);
-    }, 500);
+    longPressTimer.current = window.setTimeout(
+      () => {
+        longPressTimer.current = undefined;
+        longPressFired.current = true;
+        nativeHaptic('light');
+        setActionSheet(message);
+      },
+      isNativeApp() ? 350 : 500
+    );
   };
   const endLongPress = (event: TouchEvent) => {
     clearLongPress();
@@ -401,6 +453,87 @@ export function MobileThread({
     longPressFired.current = false;
     if (event.cancelable) event.preventDefault();
   };
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // Reply always lands in the composer. The focus runs inside the tap or swipe
+  // that chose Reply, so iOS raises the keyboard (it ignores a focus from a
+  // later effect).
+  const replyAndFocus = (message: ThreadMessage) => {
+    onReply(message);
+    textareaRef.current?.focus({ preventScroll: true });
+  };
+
+  // Swipe right on a message to reply (app only). One gesture at a time, kept
+  // in a ref so the drag never re-renders the thread: the row follows the
+  // finger through a transform (--swipe-x), a light haptic marks the threshold,
+  // and release springs it back, replying if it got that far. A touch that
+  // starts out vertical belongs to the scroller (touch-action: pan-y keeps the
+  // browser from also panning sideways), and one that starts at the screen's
+  // left edge belongs to WebKit's back swipe.
+  const swipeRef = useRef<{
+    message: ThreadMessage;
+    row: HTMLElement;
+    x: number;
+    y: number;
+    mode: 'pending' | 'swipe' | 'scroll';
+    armed: boolean;
+  } | null>(null);
+  const startSwipe = (event: TouchEvent, message: ThreadMessage) => {
+    swipeRef.current = null;
+    if (!inApp || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    if (touch.clientX < SWIPE_EDGE_PX) return;
+    const row = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-swipe-row]');
+    if (!row) return;
+    swipeRef.current = { message, row, x: touch.clientX, y: touch.clientY, mode: 'pending', armed: false };
+  };
+  const moveSwipe = (event: TouchEvent) => {
+    const swipe = swipeRef.current;
+    if (!swipe || swipe.mode === 'scroll' || event.touches.length !== 1) return;
+    const dx = event.touches[0].clientX - swipe.x;
+    const dy = event.touches[0].clientY - swipe.y;
+    if (swipe.mode === 'pending') {
+      if (Math.abs(dy) > SWIPE_SLOP_PX && Math.abs(dy) >= Math.abs(dx)) {
+        swipe.mode = 'scroll';
+        return;
+      }
+      if (dx <= SWIPE_SLOP_PX || dx < Math.abs(dy) * 1.5) return;
+      swipe.mode = 'swipe';
+      delete swipe.row.dataset.settling;
+      swipe.row.dataset.swiping = 'true';
+    }
+    const offset = swipeOffset(dx);
+    swipe.row.style.setProperty('--swipe-x', `${offset}px`);
+    swipe.row.style.setProperty('--swipe-p', String(Math.min(1, offset / SWIPE_REPLY_PX)));
+    const armed = offset >= SWIPE_REPLY_PX;
+    if (armed !== swipe.armed) {
+      swipe.armed = armed;
+      if (armed) nativeHaptic('light');
+    }
+  };
+  const endSwipe = (commit: boolean) => {
+    const swipe = swipeRef.current;
+    swipeRef.current = null;
+    if (!swipe || swipe.mode !== 'swipe') return;
+    const { row } = swipe;
+    // data-settling keeps the transform (and its spring-back transition) on
+    // only until the row is home, so resting rows carry no transform at all.
+    row.dataset.settling = 'true';
+    delete row.dataset.swiping;
+    row.style.setProperty('--swipe-x', '0px');
+    row.style.setProperty('--swipe-p', '0');
+    const settled = () => {
+      if (row.dataset.swiping) return;
+      delete row.dataset.settling;
+    };
+    row.addEventListener('transitionend', settled, { once: true });
+    window.setTimeout(settled, 400);
+    if (commit && swipe.armed) replyAndFocus(swipe.message);
+  };
+
+  // Collapsed messages from blocked authors the reader tapped open (this visit only).
+  const [revealedBlocked, setRevealedBlocked] = useState<ReadonlySet<string>>(() => new Set());
+  const authorById = useMemo(() => authorIndex(messages), [messages]);
   // Composer media state (mobile owns its own, mirroring the desktop composer).
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [attachFile, setAttachFile] = useState<File | null>(null);
@@ -518,12 +651,17 @@ export function MobileThread({
   // If they were at the bottom when they tapped the composer, keep them there
   // through the resize (its timing varies by device, hence the timer ladder).
   const keyboardTimersRef = useRef<number[]>([]);
+  // True once the shell has sent a keyboard event: from then on the app's
+  // events own --kb and the bottom snap. Until then (an older shell, or the
+  // browser) the visual-viewport path and the timer ladder stay in charge.
+  const appKeyboardRef = useRef(false);
   const clearKeyboardTimers = () => {
     keyboardTimersRef.current.forEach((timer) => window.clearTimeout(timer));
     keyboardTimersRef.current = [];
   };
   const handleComposerFocus = () => {
-    if (!pinnedRef.current) return;
+    // The app's keyboard events drive this instead (see the shell effect below).
+    if (appKeyboardRef.current || !pinnedRef.current) return;
     clearKeyboardTimers();
     const el = scrollRef.current;
     // A touch on the thread while the ladder is live is the reader taking
@@ -690,6 +828,10 @@ export function MobileThread({
     if (!el) return;
     const vv = window.visualViewport;
     const update = () => {
+      if (appKeyboardRef.current) {
+        fitGifPicker(el);
+        return;
+      }
       const inset = vv
         ? keyboardInset({ innerHeight: window.innerHeight, height: vv.height, offsetTop: vv.offsetTop, scale: vv.scale })
         : 0;
@@ -728,6 +870,40 @@ export function MobileThread({
       window.removeEventListener('pageshow', onResume);
     };
   }, []);
+
+  // In the app the shell reports each keyboard move as it starts (BRIDGE.md
+  // `keyboard`: covered height, duration, easing), so the thread's bottom
+  // padding rides up with the keys on the same curve instead of jumping after
+  // WebKit's viewport resize. A reader at the latest message gets one snap to
+  // the bottom; stick-to-bottom's ResizeObserver then follows the scroller as
+  // it shrinks. Safari's pan-to-reveal is checked once, after the move, rather
+  // than fought on every viewport event.
+  useEffect(() => {
+    const el = threadRef.current;
+    if (!el || !isNativeApp()) return;
+    let settle = 0;
+    const stop = onNativeMessage((message) => {
+      if (message.type !== 'keyboard') return;
+      appKeyboardRef.current = true;
+      const opening = message.height > 0;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      el.style.transition =
+        reduce || !message.duration ? 'none' : `padding-bottom ${message.duration}ms ${KEYBOARD_EASING_CSS[message.easing]}`;
+      el.style.setProperty('--kb', `${message.height}px`);
+      setKeyboardOpen(opening);
+      if (opening && (pinnedRef.current || stickRef.current)) snapToBottom();
+      window.clearTimeout(settle);
+      settle = window.setTimeout(() => {
+        fitGifPicker(el);
+        const vv = window.visualViewport;
+        if (vv && vv.offsetTop > 0) window.scrollTo(0, 0);
+      }, message.duration + 32);
+    });
+    return () => {
+      window.clearTimeout(settle);
+      stop();
+    };
+  }, [snapToBottom, stickRef]);
 
   // Size the GIF picker to the room above the composer as soon as it opens
   // (the keyboard its search box raises re-fits it through update above).
@@ -833,6 +1009,19 @@ export function MobileThread({
               // Tighten spacing inside a group; keep breathing room between groups.
               const spacing = showDaySeparator || index === 0 ? '' : isFirstOfGroup ? c.gapGroup : c.gapTight;
 
+              // A blocked author's message stays in the flow (scroll anchoring,
+              // day separators) as one quiet row the reader can open.
+              if (shouldCollapseBlocked(message, currentUserId, blockedUids, revealedBlocked)) {
+                return (
+                  <div key={message.id}>
+                    {showDaySeparator && message.createdAt && <div className={c.threadDay}>{dayLabel(message.createdAt)}</div>}
+                    <div data-mid={message.id} className={`${c.bubbleWrap} ${spacing}`}>
+                      <BlockedMessageButton onShow={() => setRevealedBlocked((prev) => new Set(prev).add(message.id))} />
+                    </div>
+                  </div>
+                );
+              }
+
               return (
                 <div key={message.id} className={liveIds?.has(message.id) ? (isOwn ? c.liveOwn : c.liveIn) : undefined}>
                   {showDaySeparator && message.createdAt && <div className={c.threadDay}>{dayLabel(message.createdAt)}</div>}
@@ -841,7 +1030,11 @@ export function MobileThread({
                       day separator, which disappears when a prepend gives this
                       message a same-day predecessor — anchoring the wrapper would
                       then hold its top steady while the visible message shifts. */}
-                  <div data-mid={message.id} className={`${c.bubbleWrap} ${isOwn ? c.bubbleWrapOwn : ''} ${spacing}`}>
+                  <div
+                    data-mid={message.id}
+                    data-swipe-row={inApp && !isPending ? '' : undefined}
+                    className={`${c.bubbleWrap} ${isOwn ? c.bubbleWrapOwn : ''} ${spacing}`}
+                  >
                     {/* Own-message headers are hidden by design, except the
                         developer identity — it shows on the author's own phone too. */}
                     {(!isOwn || isDev) && isFirstOfGroup && (
@@ -862,6 +1055,11 @@ export function MobileThread({
                       </div>
                     )}
                     <div className={c.bubbleRow}>
+                      {inApp && !isPending && (
+                        <span className={c.swipeCue} aria-hidden="true">
+                          <Reply size={16} />
+                        </span>
+                      )}
                       {/* Avatar gutter (others only): chip on first-of-group,
                           empty spacer otherwise so grouped bubbles stay aligned. */}
                       {!isOwn && (
@@ -878,10 +1076,23 @@ export function MobileThread({
                       )}
                       <div
                         className={c.bubbleCol}
-                        onTouchStart={() => !isPending && startLongPress(message)}
-                        onTouchMove={clearLongPress}
-                        onTouchEnd={endLongPress}
-                        onTouchCancel={clearLongPress}
+                        onTouchStart={(event) => {
+                          if (isPending) return;
+                          startLongPress(message);
+                          startSwipe(event, message);
+                        }}
+                        onTouchMove={(event) => {
+                          clearLongPress();
+                          moveSwipe(event);
+                        }}
+                        onTouchEnd={(event) => {
+                          endLongPress(event);
+                          endSwipe(true);
+                        }}
+                        onTouchCancel={() => {
+                          clearLongPress();
+                          endSwipe(false);
+                        }}
                         onContextMenu={(event) => {
                           // Long-press on mobile also fires the browser context menu —
                           // suppress it so our action sheet is the only affordance.
@@ -889,10 +1100,7 @@ export function MobileThread({
                         }}
                       >
                         {message.replyTo && (
-                          <div className={c.quote}>
-                            <strong>{message.replyTo.authorName}</strong>
-                            <span>{message.replyTo.text}</span>
-                          </div>
+                          <MessageQuote replyTo={message.replyTo} blocked={isBlockedQuote(message.replyTo, blockedUids, authorById)} />
                         )}
                         {(message.attachment || message.localPreviewUrl || message.photoPending) && (
                           <BubbleImage
@@ -919,8 +1127,10 @@ export function MobileThread({
                         )}
                       </div>
                     </div>
-                    {/* Pending echoes swap the timestamp/reactions for a status
-                        caption; failed sends offer retry/discard inline. */}
+                    {/* A sending echo already wears its timestamp, with a small
+                        clock that fades in only if the send is slow; confirming
+                        just drops the clock (it sits on the inner side, so the
+                        time never moves). Failed sends offer retry/discard. */}
                     {isPending ? (
                       isFailed ? (
                         <div className={c.failed}>
@@ -949,10 +1159,14 @@ export function MobileThread({
                           </button>
                         </div>
                       ) : (
-                        <span className={c.status}>
-                          <Clock size={12} aria-hidden="true" />
-                          {pendingStatusLabel(message)}
-                        </span>
+                        isLastOfGroup && (
+                          <span className={c.stamp}>
+                            <span className={c.stampPending} role="status" aria-label={pendingStatusLabel(message)}>
+                              <Clock size={11} aria-hidden="true" />
+                            </span>
+                            {clockTime(message.createdAt)}
+                          </span>
+                        )
                       )
                     ) : (
                       <>
@@ -999,6 +1213,12 @@ export function MobileThread({
         <p className={c.threadError} role="alert">
           <AlertCircle size={16} aria-hidden="true" />
           {error}
+        </p>
+      )}
+      {notice && !error && (
+        <p className={c.threadNotice} role="status">
+          <Check size={16} aria-hidden="true" />
+          {notice}
         </p>
       )}
 
@@ -1091,6 +1311,7 @@ export function MobileThread({
             </div>
           )}
           <textarea
+            ref={textareaRef}
             value={draft}
             onChange={(event) => onDraftChange(event.target.value.slice(0, 1000))}
             onFocus={handleComposerFocus}
@@ -1140,7 +1361,7 @@ export function MobileThread({
                 canDelete: canModerate || actionSheet.authorId === currentUserId,
                 canPin,
                 isPinned: !!actionSheet.isPinned,
-                onReply: () => onReply(actionSheet),
+                onReply: () => replyAndFocus(actionSheet),
                 onCopy: () => onCopy(actionSheet.text),
                 onEdit: () => onEdit(actionSheet),
                 onDelete: () => onDelete(actionSheet.id),
@@ -1148,6 +1369,15 @@ export function MobileThread({
                 onAddReaction: () => setReactionPickerMessageId(actionSheet.id),
                 // Nobody can have read a message that hasn't reached the server yet.
                 onReadBy: onReadBy && !actionSheet.pendingState ? () => onReadBy(actionSheet) : undefined,
+                // Someone else's delivered message: report it, or block / unblock its author.
+                ...(actionSheet.authorId !== currentUserId && !actionSheet.pendingState
+                  ? {
+                      onReport: onReport ? (reason: ReportReason) => onReport(actionSheet, reason) : undefined,
+                      ...(blockedUids?.has(actionSheet.authorId)
+                        ? { onUnblock: onUnblock ? () => onUnblock(actionSheet) : undefined }
+                        : { onBlock: onBlock ? () => onBlock(actionSheet) : undefined }),
+                    }
+                  : {}),
               } satisfies MessageActionsConfig)
             : null
         }

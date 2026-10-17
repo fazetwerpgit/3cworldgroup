@@ -3,11 +3,14 @@ import {
   BRIDGE_VERSION,
   NativeBridgeError,
   __resetBridgeForTests,
+  advertiseBridgeFeature,
+  installNativeReceiver,
   nativeHaptic,
   onNativeMessage,
   parseNativeMessage,
   postToNative,
   receiveNativeMessage,
+  reportChatContext,
   requestNative,
 } from './bridge';
 
@@ -203,5 +206,50 @@ describe('native -> web receiver', () => {
     off();
     receiveNativeMessage({ source: '3c-shell', type: 'pushToken', token: 't' });
     expect(seen).toEqual([]);
+  });
+});
+
+describe('keyboard, navigate and chatContext', () => {
+  it('parses a keyboard move, clamping junk', () => {
+    expect(parseNativeMessage({ source: '3c-shell', type: 'keyboard', height: 336.4, duration: 250, easing: 'keyboard' })).toEqual({
+      source: '3c-shell',
+      type: 'keyboard',
+      height: 336,
+      duration: 250,
+      easing: 'keyboard',
+    });
+    expect(parseNativeMessage({ source: '3c-shell', type: 'keyboard', height: -5, duration: 99_999, easing: 'bounce' })).toEqual({
+      source: '3c-shell',
+      type: 'keyboard',
+      height: 0,
+      duration: 1000,
+      easing: 'keyboard',
+    });
+    expect(parseNativeMessage({ source: '3c-shell', type: 'keyboard', height: 'tall' })).toBeNull();
+  });
+
+  it('parses navigate only with a url', () => {
+    expect(parseNativeMessage({ source: '3c-shell', type: 'navigate', url: '/portal/chat?channel=x' })).toEqual({
+      source: '3c-shell',
+      type: 'navigate',
+      url: '/portal/chat?channel=x',
+    });
+    expect(parseNativeMessage({ source: '3c-shell', type: 'navigate' })).toBeNull();
+  });
+
+  it('advertises a feature until released', () => {
+    installNativeReceiver();
+    const release = advertiseBridgeFeature('navigate');
+    const bridge = (window as unknown as { __3C_BRIDGE__: { features: string[] } }).__3C_BRIDGE__;
+    expect(bridge.features).toEqual(['navigate']);
+    release();
+    expect(bridge.features).toEqual([]);
+  });
+
+  it('reports the open chat channel to the shell', () => {
+    reportChatContext('all-company');
+    expect(lastPosted()).toEqual({ type: 'chatContext', channelId: 'all-company' });
+    reportChatContext(null);
+    expect(lastPosted()).toEqual({ type: 'chatContext', channelId: null });
   });
 });

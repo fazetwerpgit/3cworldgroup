@@ -59,7 +59,7 @@ describe('shared chat listeners', () => {
   it('inside the rep shell: uses the shared list and opens no listener of its own', () => {
     const shared: SharedChat = {
       channels: { channels: [{ id: 'shared' }] as never, loading: false, error: '', retry: () => {} },
-      unread: { unreadByChannel: { shared: false }, anyUnread: false },
+      unread: { unreadByChannel: { shared: false }, anyUnread: false, lastReadByChannel: {} },
     };
     render(
       <SharedChatProvider value={shared}>

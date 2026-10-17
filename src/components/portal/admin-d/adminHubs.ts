@@ -1,4 +1,5 @@
 import type { UserRole } from '@/types';
+import { CHAT_REPORTS_PATH } from '@/lib/chat/moderationShared';
 
 // The admin hubs: pages that host several of the old admin pages as tabs.
 // One definition per hub feeds the nav (an item shows when any tab is open to
@@ -100,6 +101,14 @@ export const REQUESTS_HUB = {
   href: '/portal/admin/requests',
   param: 'type',
   tabs: REQUEST_TABS,
+} as const satisfies HubConfig;
+
+// Chat reports is one page, not a hub; this single-tab config gives it the same
+// nav gate and a nav badge through the shared queue loader (opsQueues).
+export const CHAT_REPORTS_HUB = {
+  href: CHAT_REPORTS_PATH,
+  param: 'tab',
+  tabs: [{ key: 'open', label: 'Open', roles: PLATFORM_ROLES }],
 } as const satisfies HubConfig;
 
 export const SETTINGS_HUB = {

@@ -89,13 +89,13 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   // One live channel list and read-receipt listener per session, shared with
   // the chat page (useSharedChatChannels) instead of a second pair there.
   const { channels, loading: channelsLoading, error: channelsError, retry: retryChannels } = useChatChannels();
-  const { unreadByChannel, anyUnread } = useChatUnread(channels, user?.uid);
+  const { unreadByChannel, anyUnread, lastReadByChannel } = useChatUnread(channels, user?.uid);
   const sharedChat = useMemo(
     () => ({
       channels: { channels, loading: channelsLoading, error: channelsError, retry: retryChannels },
-      unread: { unreadByChannel, anyUnread },
+      unread: { unreadByChannel, anyUnread, lastReadByChannel },
     }),
-    [anyUnread, channels, channelsError, channelsLoading, retryChannels, unreadByChannel]
+    [anyUnread, channels, channelsError, channelsLoading, lastReadByChannel, retryChannels, unreadByChannel]
   );
   const navCounts = useAdminNavCounts();
   const [paletteOpen, setPaletteOpen] = useState(false);

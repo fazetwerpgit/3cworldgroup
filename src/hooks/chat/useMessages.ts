@@ -103,6 +103,7 @@ function toReplyTo(value: unknown): ChatReplySnippet | undefined {
   if (!messageId) return undefined;
   return {
     messageId,
+    ...(typeof raw.authorId === 'string' && raw.authorId ? { authorId: raw.authorId } : {}),
     authorName: typeof raw.authorName === 'string' && raw.authorName ? raw.authorName : '3C User',
     text: typeof raw.text === 'string' ? raw.text : '',
   };

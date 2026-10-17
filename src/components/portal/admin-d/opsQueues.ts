@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import {
+  CHAT_REPORTS_HUB,
   ONBOARDING_HUB,
   REQUEST_TABS,
   REQUESTS_HUB,
@@ -152,6 +153,17 @@ const SOURCES: QueueSource[] = [
     // Same definition as the owner's Needs-attention count: status == 'new'.
     load: async () => figuresFrom((await fetchOpenRequests(tab.form)).map((row) => row.createdAt)),
   })),
+  {
+    key: 'chat-reports',
+    label: 'Chat reports',
+    hub: CHAT_REPORTS_HUB,
+    tab: 'open',
+    load: async (get) => {
+      const json = await get('/api/portal/admin/chat-reports?status=open');
+      const reports: { createdAt?: string | null }[] = Array.isArray(json.reports) ? json.reports : [];
+      return figuresFrom(reports.map((report) => report.createdAt));
+    },
+  },
 ];
 
 // ---------------------------------------------------------------- cache

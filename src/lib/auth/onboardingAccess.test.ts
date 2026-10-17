@@ -199,7 +199,7 @@ describe('isOnboardingUser', () => {
 // add its API dependencies here — this test will fail until you do.
 const PAGE_API_DEPENDENCIES: Record<string, string[]> = {
   '/portal/onboarding': ['/api/portal/onboarding', '/api/portal/onboarding/submit', '/api/portal/onboarding/upload'],
-  '/portal/chat': ['/api/portal/chat/channels', '/api/portal/chat/gifs', '/api/portal/chat/media', '/api/portal/chat/messages', '/api/portal/chat/messages/pin', '/api/portal/chat/reactions'],
+  '/portal/chat': ['/api/portal/chat/channels', '/api/portal/chat/gifs', '/api/portal/chat/media', '/api/portal/chat/messages', '/api/portal/chat/messages/pin', '/api/portal/chat/messages/report', '/api/portal/chat/reactions', '/api/portal/chat/blocks', '/api/portal/chat/terms'],
   '/portal/learn': ['/api/portal/training', '/api/portal/training/progress', '/api/portal/commission'],
   '/portal/training': ['/api/portal/training', '/api/portal/training/progress'],
   '/portal/calls': ['/api/portal/calls'],

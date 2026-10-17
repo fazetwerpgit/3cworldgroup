@@ -4,7 +4,14 @@ const fake = vi.hoisted(() => {
   const users = new Map<string, Record<string, unknown>>();
   const getAllSizes: number[] = [];
   const adminDb = {
-    collection: vi.fn(() => ({ doc: (id: string) => ({ __id: id }) })),
+    // users/{uid} and users/{uid}/chatBlocks/{blocked}: both resolve against the
+    // users map by path, so a test blocks by setting 'uid/chatBlocks/author'.
+    collection: vi.fn(() => ({
+      doc: (id: string) => ({
+        __id: id,
+        collection: () => ({ doc: (blocked: string) => ({ __id: `${id}/chatBlocks/${blocked}` }) }),
+      }),
+    })),
     runTransaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
         get: (ref: { get: () => Promise<unknown> }) => ref.get(),
@@ -95,6 +102,34 @@ describe('sendChatPush', () => {
     expect(pushedTo()).toEqual(['extra-rep', 'mgr']);
     expect(fake.sendPushToTokens).toHaveBeenCalledWith('mgr', ['t-mgr'], payload, { urgency: 'high' });
     expect(totals).toEqual({ recipients: 2, sent: 2, failed: 0, pruned: 0 });
+  });
+
+  it('skips members who blocked the author', async () => {
+    fake.users.set('mgr', { status: 'active', fieldRole: 'l1_manager', pushTokens: ['t-mgr'] });
+    fake.users.set('mgr-2', { status: 'active', fieldRole: 'l1_manager', pushTokens: ['t-mgr-2'] });
+    fake.users.set('mgr-2/chatBlocks/boss', { blockedAt: 1 });
+
+    const totals = await sendChatPush({ ...managers, memberIds: ['boss', 'mgr', 'mgr-2'] }, 'boss', payload);
+
+    expect(pushedTo()).toEqual(['mgr']);
+    expect(totals.recipients).toBe(1);
+  });
+
+  it('still pushes when the block lookup fails', async () => {
+    fake.users.set('mgr', { status: 'active', fieldRole: 'l1_manager', pushTokens: ['t-mgr'] });
+    fake.adminDb.getAll
+      .mockImplementationOnce(async (...refs: Array<{ __id: string }>) =>
+        refs.map((r) => ({ id: r.__id, exists: fake.users.has(r.__id), data: () => fake.users.get(r.__id) }))
+      )
+      .mockImplementationOnce(async () => {
+        throw new Error('unavailable');
+      });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await sendChatPush({ ...managers, memberIds: ['boss', 'mgr'] }, 'boss', payload);
+
+    expect(pushedTo()).toEqual(['mgr']);
+    error.mockRestore();
   });
 
   it('reaches every member of a big channel, batch by batch', async () => {

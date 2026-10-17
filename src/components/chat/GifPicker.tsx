@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import s from '@/components/portal/rep/rep.module.css';
+import { isNativeApp } from '@/lib/app/isNativeApp';
 import c from './chat.module.css';
 
 // One GIPHY result mapped by the /api/portal/chat/gifs proxy.
@@ -39,7 +40,7 @@ export function GifPicker({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Outside-click + Esc to dismiss; focus the search box on open.
+  // Outside-click + Esc to dismiss; focus the search box on open (browser only).
   useEffect(() => {
     const onDown = (event: MouseEvent) => {
       if (panelRef.current && !panelRef.current.contains(event.target as Node)) onClose();
@@ -49,7 +50,9 @@ export function GifPicker({
     };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
-    inputRef.current?.focus();
+    // In the app the WebView may focus from code, so this would throw the
+    // keyboard up over the grid the moment it opens: there, tap to search.
+    if (!isNativeApp()) inputRef.current?.focus();
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);

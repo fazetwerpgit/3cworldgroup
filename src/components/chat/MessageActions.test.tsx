@@ -106,4 +106,47 @@ describe('MessageActionSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(config.onDelete).not.toHaveBeenCalled();
   });
+
+  it('reports with a reason after one more step', () => {
+    const onReport = vi.fn();
+    config = { ...config, canEdit: false, canDelete: false, onReport, onBlock: vi.fn() };
+    render();
+    act(() => vi.advanceTimersByTime(SHEET_TAP_GUARD_MS));
+    act(() => button('Report').click());
+    expect(onReport).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('Report this message?');
+    expect(document.body.textContent).toContain("Cole Hart isn't told who sent it.");
+
+    act(() => button('Harassment or bullying').click());
+    expect(onReport).toHaveBeenCalledWith('harassment');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('says what blocking does before it blocks', () => {
+    const onBlock = vi.fn();
+    config = { ...config, canEdit: false, canDelete: false, onReport: vi.fn(), onBlock };
+    render();
+    act(() => vi.advanceTimersByTime(SHEET_TAP_GUARD_MS));
+    act(() => button('Block').click());
+    expect(onBlock).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('Block Cole Hart?');
+    expect(document.body.textContent).toContain('They stay in your channels');
+
+    act(() => button('Cancel').click());
+    expect(onBlock).not.toHaveBeenCalled();
+    act(() => button('Block').click());
+    const confirm = Array.from(document.body.querySelectorAll('button')).filter((b) => b.textContent?.trim() === 'Block');
+    act(() => confirm[confirm.length - 1].click());
+    expect(onBlock).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers Unblock instead of Block for someone already blocked', () => {
+    const onUnblock = vi.fn();
+    config = { ...config, onReport: vi.fn(), onUnblock };
+    render();
+    act(() => vi.advanceTimersByTime(SHEET_TAP_GUARD_MS));
+    expect(Array.from(document.body.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Block')).toBe(false);
+    act(() => button('Unblock').click());
+    expect(onUnblock).toHaveBeenCalledTimes(1);
+  });
 });

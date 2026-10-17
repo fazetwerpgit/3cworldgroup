@@ -249,6 +249,28 @@
   background: var(--c-lime);
 }
 
+/* Unread count, in the dot's place once it is known (the dot stays as the fallback). */
+.unreadCount {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--c-lime);
+  color: var(--c-on-lime);
+  font: 700 12px / 20px var(--f-ui);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* "Dana: see you at 5": the sender is quieter than what they said. */
+.channelDesc .previewWho {
+  color: var(--c-text-3);
+}
+
+.channelUnread .channelDesc .previewWho {
+  color: var(--c-text-2);
+}
+
 .channelUnread .channelName {
   color: var(--c-text);
   font-weight: 700;
@@ -1548,6 +1570,16 @@ a.fileChip:focus-visible {
   margin: 0 var(--gutter) var(--s2);
 }
 
+.threadNotice {
+  composes: threadError;
+  background: var(--c-lime-wash);
+  color: var(--c-text);
+}
+
+.threadNotice svg {
+  color: var(--c-lime);
+}
+
 .threadComposer {
   composes: composer;
   padding: var(--s2) var(--s3) calc(var(--s2) + env(safe-area-inset-bottom));
@@ -1606,10 +1638,74 @@ a.fileChip:focus-visible {
 }
 
 .bubbleRow {
+  position: relative;
   display: flex;
   align-items: flex-end;
   gap: var(--s2);
   max-width: 86%;
+}
+
+/* Swipe-to-reply (app only): the row follows the finger while data-swiping is
+   set and springs home under data-settling; a resting row has no transform.
+   pan-y leaves vertical scrolling to the browser and sideways moves to us. */
+[data-swipe-row] .bubbleCol {
+  touch-action: pan-y;
+}
+
+.bubbleWrap[data-swiping] .bubbleRow,
+.bubbleWrap[data-settling] .bubbleRow {
+  transform: translate3d(var(--swipe-x, 0px), 0, 0);
+}
+
+.bubbleWrap[data-settling] .bubbleRow {
+  transition: transform 320ms var(--ease);
+}
+
+.swipeCue {
+  position: absolute;
+  top: 50%;
+  left: -34px;
+  display: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--c-panel-hi);
+  color: var(--c-text-2);
+}
+
+.bubbleWrap[data-swiping] .swipeCue,
+.bubbleWrap[data-settling] .swipeCue {
+  display: grid;
+  opacity: var(--swipe-p, 0);
+  transform: translate3d(0, -50%, 0) scale(calc(0.6 + 0.4 * var(--swipe-p, 0)));
+}
+
+.bubbleWrap[data-settling] .swipeCue {
+  transition:
+    opacity 200ms var(--ease),
+    transform 320ms var(--ease);
+}
+
+/* A blocked author's message, collapsed to one quiet line. */
+.blockedRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: var(--tap);
+  margin-left: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--c-text-3);
+  font: italic 400 var(--t-ui) / 1.3 var(--f-ui);
+  cursor: pointer;
+}
+
+.blockedRow span {
+  color: var(--c-text-2);
+  font-style: normal;
+  font-weight: 600;
 }
 
 .bubbleWrapOwn .bubbleRow {
@@ -1695,6 +1791,23 @@ a.fileChip:focus-visible {
 
 .stamp svg {
   color: var(--c-lime);
+}
+
+/* A sending echo's clock: only a slow send ever shows it. */
+.stampPending {
+  display: inline-flex;
+  opacity: 0;
+  animation: stampPendingIn 200ms var(--ease) 600ms forwards;
+}
+
+.stamp .stampPending svg {
+  color: var(--c-text-3);
+}
+
+@keyframes stampPendingIn {
+  to {
+    opacity: 1;
+  }
 }
 
 .bubbleReactions {
@@ -2015,6 +2128,14 @@ button.person {
   line-height: 1.4;
 }
 
+.sheetConfirm span {
+  display: block;
+  margin-top: 4px;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 400;
+}
+
 .sheetList {
   padding: var(--s1) 0 var(--s2);
 }
@@ -2148,6 +2269,16 @@ button.person {
   .channels[data-reveal] > li {
     animation: none;
   }
+
+  /* Still only on a slow send, without the fade. */
+  .stampPending {
+    animation-duration: 1ms;
+  }
+
+  .bubbleWrap[data-settling] .bubbleRow,
+  .bubbleWrap[data-settling] .swipeCue {
+    transition: none;
+  }
 }
 
 /* Channel listener failed after channels loaded: a quiet row above the stale list. */
@@ -2183,4 +2314,85 @@ button.person {
   color: var(--c-text);
   font: 600 var(--t-ui) / 1 var(--f-ui);
   cursor: pointer;
+}
+
+/* One-time chat agreement (ChatTermsSheet). */
+.terms {
+  display: grid;
+  gap: var(--s3);
+  padding: 0 var(--s4) calc(var(--s4) + env(safe-area-inset-bottom));
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.5;
+}
+
+.terms p,
+.terms ul {
+  margin: 0;
+}
+
+.terms > p:first-child {
+  color: var(--c-text);
+}
+
+.terms ul {
+  display: grid;
+  gap: var(--s2);
+  padding-left: 1.1em;
+}
+
+.termsHelp a {
+  color: var(--c-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.termsError {
+  color: var(--c-red);
+}
+
+.termsActions {
+  display: grid;
+  gap: var(--s2);
+  margin-top: var(--s2);
+}
+
+.alertNotice {
+  background: var(--c-lime-wash);
+  color: var(--c-text);
+}
+
+.alertNotice svg {
+  color: var(--c-lime);
+}
+
+/* Blocked authors in the desktop thread: one quiet row in the avatar column's place. */
+.deskBlockedRow {
+  padding: 2px var(--s4);
+}
+
+.deskBlockedRow .blockedRow {
+  /* Lines up with message text: past the 36px avatar column and its gap. */
+  margin-left: calc(36px + var(--s3));
+}
+
+/* A quote of a blocked author: no name, no words. */
+.quoteBlocked span {
+  color: var(--c-text-3);
+  font-style: italic;
+}
+
+/* Channel info: the chat support contact (guideline 1.2). */
+.infoSupport {
+  margin: 0;
+  padding: var(--s3) var(--s4) 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.infoSupport a {
+  color: var(--c-text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

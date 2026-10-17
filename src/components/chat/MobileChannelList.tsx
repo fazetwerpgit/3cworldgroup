@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import { Lock, RotateCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { useFirstReveal } from '@/hooks/useFirstReveal';
 import type { ChatChannelDoc } from '@/hooks/chat/useChatChannels';
+import { formatUnreadCount } from '@/hooks/chat/useChatUnreadCounts';
 import s from '@/components/portal/rep/rep.module.css';
 import c from './chat.module.css';
 
@@ -20,12 +21,34 @@ export function formatChannelTime(date: Date | null | undefined): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+/**
+ * The row's second line: "You: ..." / "Ana: ..." over the latest message, or the
+ * channel description when there's no preview yet (or its author is blocked).
+ */
+export function channelPreview(
+  channel: ChatChannelDoc,
+  currentUserId?: string | null,
+  blockedUids?: ReadonlySet<string>
+): { who: string | null; text: string } | null {
+  const last = channel.lastMessage;
+  if (last && last.text && !blockedUids?.has(last.authorId)) {
+    const firstName = last.authorName.trim().split(/\s+/)[0] ?? '';
+    const who = currentUserId && last.authorId === currentUserId ? 'You' : firstName || null;
+    return { who, text: last.text };
+  }
+  return channel.description ? { who: null, text: channel.description } : null;
+}
+
 interface ChannelRowsProps {
   channels: ChatChannelDoc[];
   loading: boolean;
   /** The channel listener failed: say so, never show an empty list as if it were real. */
   error?: string;
   unreadByChannel?: Record<string, boolean>;
+  /** Known unread counts (channels without one keep the plain dot). */
+  unreadCounts?: Record<string, number>;
+  currentUserId?: string | null;
+  blockedUids?: ReadonlySet<string>;
   /** Desktop rail only: the open channel gets the current-row treatment. */
   activeChannelId?: string;
   onSelect: (channelId: string) => void;
@@ -39,6 +62,9 @@ export function ChannelRows({
   loading,
   error,
   unreadByChannel,
+  unreadCounts,
+  currentUserId,
+  blockedUids,
   activeChannelId,
   onSelect,
   onRetry = () => window.location.reload(),
@@ -88,6 +114,8 @@ export function ChannelRows({
       <ul className={c.channels} data-reveal={reveal || undefined}>
         {channels.map((channel, index) => {
           const unread = !!unreadByChannel?.[channel.id];
+          const count = unread ? unreadCounts?.[channel.id] : undefined;
+          const preview = channelPreview(channel, currentUserId, blockedUids);
           return (
             <li key={channel.id} style={{ '--i': index } as CSSProperties}>
               <button
@@ -101,11 +129,23 @@ export function ChannelRows({
                     {channel.name}
                     {channel.audience === 'managers' ? <Lock size={12} role="img" aria-label="Private" /> : null}
                   </span>
-                  {channel.description ? <span className={c.channelDesc}>{channel.description}</span> : null}
+                  {preview ? (
+                    <span className={c.channelDesc}>
+                      {preview.who ? <span className={c.previewWho}>{preview.who}: </span> : null}
+                      {preview.text}
+                    </span>
+                  ) : null}
                 </span>
                 <span className={c.channelMeta}>
                   {formatChannelTime(channel.lastMessageAt)}
-                  {unread ? (
+                  {unread && count ? (
+                    <span className={c.unreadCount}>
+                      <span aria-hidden="true">{formatUnreadCount(count)}</span>
+                      <span className={s.srOnly}>
+                        {formatUnreadCount(count)} unread {count === 1 ? 'message' : 'messages'}
+                      </span>
+                    </span>
+                  ) : unread ? (
                     <>
                       <i className={c.unreadDot} aria-hidden="true" />
                       <span className={s.srOnly}>Unread messages</span>
@@ -127,6 +167,9 @@ export function MobileChannelList({
   loading,
   error,
   unreadByChannel,
+  unreadCounts,
+  currentUserId,
+  blockedUids,
   onOpenChannel,
   onRetry,
 }: {
@@ -134,6 +177,9 @@ export function MobileChannelList({
   loading: boolean;
   error?: string;
   unreadByChannel?: Record<string, boolean>;
+  unreadCounts?: Record<string, number>;
+  currentUserId?: string | null;
+  blockedUids?: ReadonlySet<string>;
   onOpenChannel: (channelId: string) => void;
   onRetry?: () => void;
 }) {
@@ -152,6 +198,9 @@ export function MobileChannelList({
           loading={loading}
           error={error}
           unreadByChannel={unreadByChannel}
+          unreadCounts={unreadCounts}
+          currentUserId={currentUserId}
+          blockedUids={blockedUids}
           onSelect={onOpenChannel}
           onRetry={onRetry}
         />

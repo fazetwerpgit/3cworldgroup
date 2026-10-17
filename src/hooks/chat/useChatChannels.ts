@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firest
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
+import { readLastMessage, type ChatLastMessage } from '@/lib/chat/lastMessage';
 import { ChatChannel, FieldRole } from '@/types';
 
 // Who the Firestore chat rules let read channels and receipts: active users and
@@ -19,9 +20,11 @@ export function canSubscribeToChat(
 // lastMessageAt is server-stamped on the channel doc when a message is sent (via
 // the messages POST route). Unread badges compare it against the caller's own
 // read receipt. Absent on channels that have never received a message.
+// lastMessage is the list's preview line, stamped beside it by the same routes.
 export type ChatChannelDoc = ChatChannel & {
   memberIds?: string[];
   lastMessageAt?: Date | null;
+  lastMessage?: ChatLastMessage | null;
 };
 
 function toDate(value: unknown): Date | null {
@@ -73,6 +76,7 @@ export function useChatChannels({ enabled = true }: { enabled?: boolean } = {}) 
               active: data.active !== false,
               memberIds: Array.isArray(data.memberIds) ? data.memberIds : [],
               lastMessageAt: toDate(data.lastMessageAt),
+              lastMessage: readLastMessage(data.lastMessage),
             } as ChatChannelDoc;
           })
           .sort((a, b) => a.order - b.order);

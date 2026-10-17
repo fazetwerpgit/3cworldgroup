@@ -114,3 +114,25 @@ export function installAppLinkHandling(): () => void {
     installed = false;
   };
 }
+
+/**
+ * The router path for a shell `navigate` URL: path, query and hash when it is a
+ * portal page on this page's own origin, else null (the caller loads it the
+ * old way, or drops it).
+ */
+export function inAppRoute(rawUrl: string, currentHref: string): string | null {
+  let url: URL;
+  let current: URL;
+  try {
+    current = new URL(currentHref);
+    url = new URL(rawUrl, current);
+  } catch {
+    return null;
+  }
+  if (url.origin !== current.origin) return null;
+  if (url.pathname !== '/portal' && !url.pathname.startsWith('/portal/')) return null;
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** Window event the app's navigate handler fires after a soft navigation; detail is the route. */
+export const APP_NAVIGATE_EVENT = '3c:app-navigate';

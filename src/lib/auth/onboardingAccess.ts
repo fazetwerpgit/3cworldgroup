@@ -38,7 +38,11 @@ export const ONBOARDING_ALLOWED_APIS = [
   '/api/portal/chat/media',
   '/api/portal/chat/messages',
   '/api/portal/chat/messages/pin',
+  '/api/portal/chat/messages/report',
   '/api/portal/chat/reactions',
+  // Guideline 1.2 safety: anyone who can read chat can block, report and accept the agreement.
+  '/api/portal/chat/blocks',
+  '/api/portal/chat/terms',
 ] as const satisfies readonly string[];
 
 // Listed prefixes that must NOT match, even though a listed prefix covers them.

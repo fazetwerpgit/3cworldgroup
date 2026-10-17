@@ -11,7 +11,7 @@ import { isNativeApp } from './isNativeApp';
 //
 // Requests that expect an answer carry an `id`; the shell answers each with
 // exactly one { type: 'reply', id, ok, ... }. Fire-and-forget messages
-// (haptic, openExternal, nativeSignOut) carry no id and get no reply.
+// (haptic, openExternal, statusBar, nativeSignOut, chatContext) carry no id and get no reply.
 
 export const BRIDGE_VERSION = 1;
 export const NATIVE_SOURCE = '3c-shell';
@@ -76,6 +76,11 @@ export interface OpenExternalMessage {
   /** Absolute URL: https (Safari / in-app browser), tel:, mailto:, sms:, maps: ... */
   url: string;
 }
+/** The chat channel open on screen (null when none is). The shell keeps that channel's pushes out of the foreground banner. */
+export interface ChatContextMessage {
+  type: 'chatContext';
+  channelId: string | null;
+}
 
 /** Status bar text colour: 'light' (white) over a dark page, 'dark' (black) over a light page. */
 export type StatusBarStyle = 'light' | 'dark';
@@ -110,7 +115,12 @@ export type BridgeRequest =
   | NativeSignInRequest
   | NativeAuthRequest
   | OpenNativeChatRequest;
-export type BridgeEvent = HapticMessage | OpenExternalMessage | StatusBarMessage | NativeSignOutMessage;
+export type BridgeEvent =
+  | HapticMessage
+  | OpenExternalMessage
+  | StatusBarMessage
+  | NativeSignOutMessage
+  | ChatContextMessage;
 export type WebToNativeMessage = BridgeRequest | BridgeEvent;
 
 // ---- native -> web -------------------------------------------------------
@@ -207,6 +217,25 @@ export interface CapabilitiesEvent {
   type: 'capabilities';
   capabilities: AppCapabilities;
 }
+/**
+ * Unsolicited: the iOS keyboard is about to move. `height` is how much of the
+ * WebView the keys will cover once the move ends (0 when hiding); `duration`
+ * (ms) and `easing` are the system animation's, so the page can move with it.
+ */
+export interface NativeKeyboardEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'keyboard';
+  height: number;
+  duration: number;
+  easing: KeyboardEasing;
+}
+export type KeyboardEasing = 'keyboard' | 'easeIn' | 'easeOut' | 'easeInEaseOut' | 'linear';
+/** Unsolicited: open this portal URL (a tapped notification) without reloading the page. */
+export interface NativeNavigateEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'navigate';
+  url: string;
+}
 export type NativeToWebMessage =
   | ReplySuccess
   | ReplyFailure
@@ -214,9 +243,17 @@ export type NativeToWebMessage =
   | VisibleEvent
   | ResumedEvent
   | NoticeEvent
-  | CapabilitiesEvent;
+  | CapabilitiesEvent
+  | NativeKeyboardEvent
+  | NativeNavigateEvent;
+
+/** Native -> web event types this page handles; the shell reads the list to decide whether to send one or fall back. */
+export type BridgeFeature = 'navigate';
 
 const ERROR_CODES: readonly NativeErrorCode[] = ['canceled', 'denied', 'not_configured', 'unsupported', 'failed'];
+const KEYBOARD_EASINGS: readonly KeyboardEasing[] = ['keyboard', 'easeIn', 'easeOut', 'easeInEaseOut', 'linear'];
+/** Longest keyboard animation the page will follow; anything longer is clamped. */
+const MAX_KEYBOARD_DURATION_MS = 1000;
 
 export class NativeBridgeError extends Error {
   readonly code: NativeErrorCode | 'timeout' | 'no_bridge';
@@ -230,7 +267,7 @@ export class NativeBridgeError extends Error {
 declare global {
   interface Window {
     ReactNativeWebView?: { postMessage: (message: string) => void };
-    __3C_BRIDGE__?: { version: number; receive: (message: unknown) => void };
+    __3C_BRIDGE__?: { version: number; receive: (message: unknown) => void; features: BridgeFeature[] };
     /** Set by shells that send `visible`: the latest value (false before the first). */
     __3C_VISIBLE__?: boolean;
     /** Optional: the shell may inject its capabilities before content loads. */
@@ -300,6 +337,21 @@ export function parseNativeMessage(raw: unknown): NativeToWebMessage | null {
     if (!caps) return null;
     return { source: NATIVE_SOURCE, type: 'capabilities', capabilities: caps };
   }
+  if (m.type === 'keyboard') {
+    if (typeof m.height !== 'number' || !Number.isFinite(m.height)) return null;
+    const duration = typeof m.duration === 'number' && Number.isFinite(m.duration) ? m.duration : 0;
+    return {
+      source: NATIVE_SOURCE,
+      type: 'keyboard',
+      height: Math.max(0, Math.round(m.height)),
+      duration: Math.min(MAX_KEYBOARD_DURATION_MS, Math.max(0, Math.round(duration))),
+      easing: KEYBOARD_EASINGS.includes(m.easing as KeyboardEasing) ? (m.easing as KeyboardEasing) : 'keyboard',
+    };
+  }
+  if (m.type === 'navigate') {
+    if (typeof m.url !== 'string' || !m.url) return null;
+    return { source: NATIVE_SOURCE, type: 'navigate', url: m.url };
+  }
   return null;
 }
 
@@ -368,7 +420,23 @@ export function installNativeReceiver(): void {
   window.addEventListener('message', onMessage);
   // react-native-webview's own postMessage lands on document in some versions.
   document.addEventListener('message', onMessage as EventListener);
-  window.__3C_BRIDGE__ = { version: BRIDGE_VERSION, receive: receiveNativeMessage };
+  window.__3C_BRIDGE__ = { version: BRIDGE_VERSION, receive: receiveNativeMessage, features: [] };
+}
+
+/**
+ * Announces that this page handles a native -> web event type until the
+ * returned function runs. The shell checks window.__3C_BRIDGE__.features before
+ * sending `navigate` (and falls back to a full load without it).
+ */
+export function advertiseBridgeFeature(feature: BridgeFeature): () => void {
+  installNativeReceiver();
+  const bridge = typeof window !== 'undefined' ? window.__3C_BRIDGE__ : undefined;
+  if (!bridge) return () => {};
+  bridge.features.push(feature);
+  return () => {
+    const index = bridge.features.indexOf(feature);
+    if (index >= 0) bridge.features.splice(index, 1);
+  };
 }
 
 /** Subscribes to every validated native -> web message. Returns the unsubscribe. */
@@ -431,6 +499,11 @@ export function requestNative<T extends BridgeRequestType>(
 /** Fire-and-forget haptic tap; silently nothing on the web. */
 export function nativeHaptic(style: HapticStyle): void {
   postToNative({ type: 'haptic', style });
+}
+
+/** Tells the shell which chat channel is on screen (null: none); silently nothing on the web. */
+export function reportChatContext(channelId: string | null): void {
+  postToNative({ type: 'chatContext', channelId });
 }
 
 /** Test-only: forget pending requests and listeners. */

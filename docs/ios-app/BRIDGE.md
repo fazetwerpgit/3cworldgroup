@@ -253,6 +253,18 @@ ok reply it steps back in history, or replaces its page with
 `/portal/dashboard` on a cold load, so that page stays behind the native
 screen. If the open fails the web chat shows. Without the capability, chat stays
 the web page exactly as before.
+### `chatContext` (event)
+```json
+{ "type": "chatContext", "channelId": "general" }
+{ "type": "chatContext", "channelId": null }
+```
+Sent by the team chat page whenever the conversation on screen changes:
+the open channel id, or `null` when no thread is showing (the phone channel
+list, or leaving chat). The shell keeps the latest value and uses it to drop
+the foreground banner for a push about that channel (see "Foreground pushes"
+below). It is a hint, not a lock: a shell that never hears `null` (for
+example the page crashed) should also forget it when the WebView navigates
+away from `/portal/chat`.
 
 ## native -> web events
 
@@ -321,11 +333,64 @@ A short status toast, used for downloads (see `saveFile`). `kind` is `progress`,
 The app came back after 30+ minutes in the background. Always sent before the
 `visible: true` that follows it. The web clears its `3c:reveal:*` and `3c:countup:*`
 sessionStorage keys so reveals replay, as in a relaunched PWA.
+### `keyboard`
+```json
+{ "source": "3c-shell", "type": "keyboard", "height": 336, "duration": 250, "easing": "keyboard" }
+```
+Sent from React Native's `keyboardWillShow`, `keyboardWillChangeFrame` and
+`keyboardWillHide` (hide sends `height: 0`). `height` is how much of the
+WebView the keyboard covers, in CSS px (window height minus
+`endCoordinates.screenY`, never negative). `duration` is the iOS animation
+length in ms (the web clamps it to 0..1000). `easing` is RN's
+`event.easing`: `keyboard`, `easeIn`, `easeOut`, `easeInEaseOut` or
+`linear`; anything else is read as `keyboard`.
+
+In the app, the chat thread uses this instead of `visualViewport` timing: one
+transition on the composer inset (`--kb`) with the keyboard's own duration
+and curve, then a single snap to the newest message. With the event absent
+(older shell, browser, PWA) the page keeps its visualViewport path.
+
+### `navigate`
+```json
+{ "source": "3c-shell", "type": "navigate", "url": "https://www.3cworldgroup.com/portal/chat?channel=general" }
+```
+Open a portal URL without reloading the page (a push tap while the app is
+running). The web client-side routes same-origin `/portal` URLs
+(`router.push`), so the team chat page opens the channel in place. A
+same-host URL outside `/portal` is loaded with `location.assign`; any other
+host is ignored.
+
+Pages that handle it say so: `window.__3C_BRIDGE__.features` includes
+`"navigate"` once the portal's bridge host has mounted. The shell must check
+before sending and fall back to `location.assign(url)` otherwise (the login
+page, an error page, or a portal build from before this event):
+
+```js
+var b = window.__3C_BRIDGE__;
+if (b && b.features && b.features.indexOf('navigate') !== -1) b.receive(msg);
+else window.location.assign(msg.url);
+```
+
+With native chat on (`capabilities.nativeChat` and an ok `nativeAuth`), a
+`navigate` to `/portal/chat?channel=<id>` still goes through the web: the page
+routes there and hands it to the native screen with `openNativeChat`, the same
+as a push-tap deep link.
+
+## Foreground pushes
+
+A push that arrives while the app is open does not show the system banner
+(`firebase.json` `messaging_ios_foreground_presentation_options` is
+`["badge", "list"]`: it goes to Notification Center and bumps the badge).
+The shell shows its own in-app banner from `messaging().onMessage` instead,
+unless the push's `data.url` is `/portal/chat?channel=<id>` and `<id>` is
+the channel from the latest `chatContext`. Tapping the banner sends
+`navigate`. Changing the presentation options needs a native rebuild.
 
 ## Push payload the shell receives (A4)
 
 Native tokens get an FCM message with `notification: { title, body }`,
 `data: { title, body, url }` and `apns.payload.aps: { sound: "default", badge: 1 }`.
 `apns-priority: 10` is added for urgent (chat) pushes. When a notification is
-tapped, load `data.url` in the WebView. It is a portal path such as
+tapped, send `navigate` with `data.url` when the page advertises it (see
+`navigate`), else load `data.url` in the WebView. It is a portal path such as
 `/portal/chat`; resolve it against `https://www.3cworldgroup.com`.

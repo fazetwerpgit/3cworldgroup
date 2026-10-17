@@ -38,6 +38,8 @@ export interface ChatAttachment {
 // attachment-only.
 export interface ChatReplySnippet {
   messageId: string;
+  /** The quoted author (stamped since block support; older quotes lack it). */
+  authorId?: string;
   authorName: string;
   text: string;
 }

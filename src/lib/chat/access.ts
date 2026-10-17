@@ -16,6 +16,8 @@ export interface ChatUser {
   canModerate: boolean;
   /** users/{uid}.demoAccount === true: denied every channel, extras included. */
   demoAccount: boolean;
+  /** Whether they accepted the one-time chat agreement (users/{uid}.chatTermsAcceptedAt). */
+  chatTermsAccepted?: boolean;
 }
 
 type ChatUserResult =
@@ -55,6 +57,7 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
       effectiveRole: getEffectiveRole({ role, fieldRole }),
       canModerate: isManagementRole(role),
       demoAccount,
+      chatTermsAccepted: !!data.chatTermsAcceptedAt,
     },
   };
 }
