@@ -8,6 +8,7 @@ import { FiberRows, sortFiberOrders } from './InstallStatusSection';
 import { SalesDialog } from './SalesDialog';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import { invalidateAfterSaleWrite } from '@/lib/cache/dataCache';
 
 // The two admin-only actions the merged board needs and the shell does not
 // already own: assigning a whole dealer's unmatched orders to a portal user
@@ -97,6 +98,7 @@ export function UnassignedOrders({ rows, onAssigned }: { rows: MergedRow[]; onAs
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || 'Failed to assign install statuses');
+      invalidateAfterSaleWrite();
       await onAssigned();
     } catch (err) {
       setErrors((current) => ({
@@ -199,6 +201,7 @@ export function LinkOrderDialog({
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || 'Failed to link this order');
+      invalidateAfterSaleWrite();
       await onLinked();
       onClose();
     } catch (err) {

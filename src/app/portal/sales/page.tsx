@@ -33,6 +33,7 @@ import {
   type MonthKey,
 } from '@/lib/sales/monthWindow';
 import { PayoutCard } from './PayoutCard';
+import { cacheTimeLabel } from '@/lib/cache/dataCache';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -267,6 +268,11 @@ function SalesContent() {
   const staleNote = error ? (
     <p className={x.alert} role="alert">
       Couldn&apos;t refresh just now. What you see may be out of date.
+    </p>
+  ) : fiber.staleAt !== null ? (
+    // The carrier report shown is a cached copy whose refresh failed.
+    <p className={x.alert} role="status">
+      Couldn&apos;t refresh the carrier report · as of {cacheTimeLabel(fiber.staleAt)}
     </p>
   ) : null;
 

@@ -13,6 +13,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import { Collapse } from '@/components/portal/Collapse';
+import { invalidateAfterSaleWrite } from '@/lib/cache/dataCache';
 
 type FiberFilter = 'all' | 'pending' | 'active' | 'cancelled' | 'attention';
 export type FiberBucket = Exclude<FiberFilter, 'all'>;
@@ -460,6 +461,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
     });
     const responseData = await response.json() as { error?: string };
     if (!response.ok) throw new Error(responseData.error || 'Failed to update install status assignments');
+    invalidateAfterSaleWrite();
   }, []);
 
   const handleRematch = useCallback(async () => {

@@ -34,6 +34,7 @@ import { LinkOrderDialog, UnassignedOrders } from './UnloggedOrders';
 import { SalesDialog } from './SalesDialog';
 import { ChargebackRow, PayGroupHead } from './SalesTable';
 import { Collapse } from '@/components/portal/Collapse';
+import { invalidateAfterSaleWrite } from '@/lib/cache/dataCache';
 
 // The company book, for admins and owners. One row per CUSTOMER — the sales the
 // reps logged and the carrier's morning report merged into a single list, so the
@@ -424,6 +425,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
       });
       const data = await response.json() as { error?: string };
       if (!response.ok) throw new Error(data.error || 'Failed to undo');
+      invalidateAfterSaleWrite();
       await refetchFiber();
     } catch (err) {
       setUndoError(err instanceof Error ? err.message : 'Failed to undo');

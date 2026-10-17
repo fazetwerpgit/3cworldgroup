@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { dataCacheGeneration } from '@/lib/cache/dataCache';
 import { readCachedTrainingList, trainingProgress, useTraining, writeCachedTrainingList } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
@@ -60,6 +61,7 @@ export function Training() {
     if (!user) return;
     let active = true;
     const loadCount = async () => {
+      const gen = dataCacheGeneration();
       try {
         const token = await getIdToken();
         const response = await fetch('/api/portal/training', {
@@ -67,7 +69,7 @@ export function Training() {
         });
         if (!response.ok) return;
         const data = await response.json() as { resources?: TrainingResource[] };
-        writeCachedTrainingList(user.uid, data.resources ?? []);
+        writeCachedTrainingList(user.uid, data.resources ?? [], gen);
         if (active) setAllResources(data.resources ?? []);
       } catch {
         // The filtered list still renders when the count request is unavailable.

@@ -4,7 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, CircleHelp, Clock3, Edit3 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { readDataCache, writeDataCache } from '@/lib/cache/dataCache';
+import {
+  cacheTimeLabel,
+  dataCacheGeneration,
+  invalidateAfterCompPlanWrite,
+  readDataCache,
+  readDataCacheEntry,
+  writeDataCache,
+} from '@/lib/cache/dataCache';
 import { ratesArePending, CommissionConfig, FieldRole, IBO_FIELD_ROLES, RoleDisplayNames, repFacingRoleLabel } from '@/types';
 import { LoadFailed } from './RepLearn';
 import { PayHelpSheet } from './PayHelpSheet';
@@ -52,6 +59,7 @@ export function RepPayStructure() {
   const [data, setData] = useState<PayStructureResponse | null>(() => cached ?? null);
   const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState('');
+  const [staleAt, setStaleAt] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
   const editingRef = useRef(editing);
   useEffect(() => {
@@ -67,7 +75,8 @@ export function RepPayStructure() {
 
   const fetchStructure = useCallback(async () => {
     if (!user) return;
-    const shown = readDataCache<PayStructureResponse>(user.uid, PAY_STRUCTURE_CACHE_KEY);
+    const shown = readDataCacheEntry<PayStructureResponse>(user.uid, PAY_STRUCTURE_CACHE_KEY);
+    const gen = dataCacheGeneration();
     if (!shown) setLoading(true);
     try {
       // Tiers are scoped to the caller's own role, resolved from this token.
@@ -77,13 +86,16 @@ export function RepPayStructure() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load pay structure');
-      writeDataCache(user.uid, PAY_STRUCTURE_CACHE_KEY, json);
+      writeDataCache(user.uid, PAY_STRUCTURE_CACHE_KEY, json, gen);
+      setStaleAt(null);
       setData(json);
       // A background refresh never clobbers rates being edited.
       if (!editingRef.current) setDraft(json.tiers);
       setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load pay structure');
+      // Cached tiers still showing: one quiet "as of" line, not an error box.
+      if (shown) setStaleAt(shown.at);
+      else setError(err instanceof Error ? err.message : 'Failed to load pay structure');
     } finally {
       setLoading(false);
     }
@@ -115,6 +127,7 @@ export function RepPayStructure() {
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to save');
+      invalidateAfterCompPlanWrite();
       setEditing(false);
       setSuccess('Pay structure updated');
       window.setTimeout(() => setSuccess(''), 3000);
@@ -157,6 +170,11 @@ export function RepPayStructure() {
         <LoadFailed what="pay structure" onRetry={() => void fetchStructure()} />
       ) : (
         <>
+          {staleAt !== null ? (
+            <p className={p.hint} role="status">
+              Couldn&apos;t refresh · as of {cacheTimeLabel(staleAt)}
+            </p>
+          ) : null}
           {(error || success || (ratesPending && data.scope === 'all')) && (
             <div className={l.payNotices}>
               {error && (

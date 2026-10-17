@@ -11,7 +11,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: auth.user }) 
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'token') }));
 
 import { useSales } from './useSales';
-import { setDataCacheOwner } from '@/lib/cache/dataCache';
+import { readDataCache, setDataCacheOwner, writeDataCache } from '@/lib/cache/dataCache';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -108,6 +108,63 @@ describe('useSales cache', () => {
     await mount();
     expect(renders[0].seeded).toBe(false);
     expect(renders.every((hook) => hook.sales.length === 0)).toBe(true);
+    await unmount();
+  });
+
+  it('a sale write drops the cached lists, dashboard, boards and carrier report', async () => {
+    respond([{ id: 'a' }]);
+    await mount();
+    writeDataCache('rep-1', 'dashboard', { units: 3 });
+    writeDataCache('rep-1', 'leaderboard?period=month', { board: 1 });
+    writeDataCache('rep-1', 'fiber-status', { orders: 1 });
+    writeDataCache('rep-1', 'comp-plan', { rates: 1 });
+    writeDataCache('rep-2', 'sales?limit=500&salesRepId=rep-2', { sales: [] });
+
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ sale: { id: 'b' } }) })));
+    await act(async () => {
+      await renders.at(-1)!.createSale({} as Parameters<Hook['createSale']>[0]);
+    });
+    await unmount();
+
+    expect(readDataCache('rep-1', 'dashboard')).toBeUndefined();
+    expect(readDataCache('rep-1', 'leaderboard?period=month')).toBeUndefined();
+    expect(readDataCache('rep-1', 'fiber-status')).toBeUndefined();
+    // A manager's write changes the rep's views too.
+    expect(readDataCache('rep-2', 'sales?limit=500&salesRepId=rep-2')).toBeUndefined();
+    // Unrelated reads stay.
+    expect(readDataCache('rep-1', 'comp-plan')).toEqual({ rates: 1 });
+
+    // The list itself is a miss: the next visit shows the skeleton and a fresh read.
+    respond([{ id: 'a' }, { id: 'b' }]);
+    await mount();
+    expect(renders[0].seeded).toBe(false);
+    await unmount();
+  });
+
+  it('a fetch that lands after an account switch is not cached', async () => {
+    let release: (value: unknown) => void = () => {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          })
+      )
+    );
+    await mount();
+    // Another account signs in on this phone while the first read is in flight.
+    setDataCacheOwner('owner-1');
+    await act(async () => {
+      release({ ok: true, json: async () => ({ sales: [{ id: 'rep-1-private' }], truncated: false }) });
+    });
+    await unmount();
+
+    // The owner opening "View as rep-1" must not see the late answer as a cached copy.
+    respond([]);
+    await mount();
+    expect(renders[0].seeded).toBe(false);
+    expect(renders[0].sales).toEqual([]);
     await unmount();
   });
 });

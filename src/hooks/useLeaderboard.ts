@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { auth } from '@/lib/firebase/config';
 import { useCacheSubject } from '@/lib/cache/useCacheSubject';
-import { readDataCache, writeDataCache } from '@/lib/cache/dataCache';
+import { dataCacheGeneration, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 
 interface LeaderboardEntry {
@@ -99,6 +99,7 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
     options: { team?: boolean; quiet?: boolean; month?: string | null } = {}
   ) => {
     const request = ++latest.current;
+    const gen = dataCacheGeneration();
     const query = leaderboardQuery({ period, metric, limit, scope, team: options.team, month: options.month });
     const key = boardCacheKey(query);
     // Seen before: show that board now and refresh it in place (like `quiet`).
@@ -132,7 +133,7 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
         unranked: Array.isArray(data.unranked) ? data.unranked : [],
         recent: Array.isArray(data.recent) ? data.recent : [],
         firstMonth: 'firstMonth' in data ? (typeof data.firstMonth === 'string' ? data.firstMonth : null) : undefined,
-      });
+      }, gen);
       if (request !== latest.current) return;
 
       setLeaderboard(data.leaderboard);

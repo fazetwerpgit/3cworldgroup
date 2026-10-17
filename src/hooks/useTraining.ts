@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { TrainingResource, TrainingCategory, ResourceType } from '@/types';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useCacheSubject } from '@/lib/cache/useCacheSubject';
-import { readDataCache, writeDataCache } from '@/lib/cache/dataCache';
+import { dataCacheGeneration, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
 
 // training/progress verifies the caller from the ID token and allows self or
 // management. userId stays as the TARGET row being read/written.
@@ -60,8 +60,8 @@ export function readCachedTrainingList(uid: string | null | undefined): Training
 }
 
 /** Stores the whole published list for the next visit. */
-export function writeCachedTrainingList(uid: string | null | undefined, list: TrainingResource[]): void {
-  writeDataCache(uid, listKey(''), list);
+export function writeCachedTrainingList(uid: string | null | undefined, list: TrainingResource[], gen?: number): void {
+  writeDataCache(uid, listKey(''), list, gen);
 }
 
 export function useTraining() {
@@ -76,9 +76,12 @@ export function useTraining() {
   );
   // Whose progress is on screen, so a local update keeps that copy current.
   const progressOwner = useRef<string | null>(null);
+  // The generation this screen mounted under: after an account switch its
+  // progress copy is not written into the new account's cache.
+  const [mountGen] = useState(dataCacheGeneration);
   useEffect(() => {
-    if (progressOwner.current) writeDataCache(uid, progressKey(progressOwner.current), progress);
-  }, [progress, uid]);
+    if (progressOwner.current) writeDataCache(uid, progressKey(progressOwner.current), progress, mountGen);
+  }, [progress, uid, mountGen]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The module asked for is deleted or unpublished (a 404): retrying can't bring it back.
@@ -86,6 +89,7 @@ export function useTraining() {
 
   const fetchResources = useCallback(async (filters?: TrainingFilters) => {
     const query = trainingQuery(filters);
+    const gen = dataCacheGeneration();
     // Seen before: show it now and refresh in the background (no skeleton, and
     // a failed refresh keeps the list rather than an error).
     const cached = readDataCache<TrainingResource[]>(uid, listKey(query));
@@ -103,7 +107,7 @@ export function useTraining() {
         throw new Error(data.error || 'Failed to fetch training resources');
       }
 
-      writeDataCache(uid, listKey(query), data.resources);
+      writeDataCache(uid, listKey(query), data.resources, gen);
       setResources(data.resources);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch training resources';

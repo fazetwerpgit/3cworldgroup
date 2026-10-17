@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { readDataCache, writeDataCache } from '@/lib/cache/dataCache';
+import { dataCacheGeneration, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -141,7 +141,15 @@ export function useRepDashboard() {
 
   // Revisit: the sections loaded last time show at once (from the in-memory,
   // per-account cache) and refresh quietly underneath.
-  const [cached] = useState(() => readDataCache<Partial<RepDashboardState>>(uid, DASHBOARD_CACHE_KEY));
+  const [cachedEntry] = useState(() => readDataCacheEntry<Partial<RepDashboardState>>(uid, DASHBOARD_CACHE_KEY));
+  const cached = cachedEntry?.value;
+  // Writes from this mount never land in another account's cache.
+  const [gen] = useState(dataCacheGeneration);
+  // When the numbers on screen were last loaded in full, and — after a
+  // background refresh failed with them still showing — that time, for the
+  // quiet "Couldn't refresh · as of" note.
+  const lastGoodAt = useRef<number | null>(cachedEntry?.at ?? null);
+  const [staleAt, setStaleAt] = useState<number | null>(null);
   const [state, setState] = useState<RepDashboardState>(() => ({
     book: LOADING,
     plan: LOADING,
@@ -158,8 +166,12 @@ export function useRepDashboard() {
     for (const key of Object.keys(state) as RepSectionKey[]) {
       if (state[key].status === 'ready') (ready as Record<string, unknown>)[key] = state[key];
     }
-    if (Object.keys(ready).length) writeDataCache(uid, DASHBOARD_CACHE_KEY, ready);
-  }, [state, uid]);
+    if (Object.keys(ready).length) writeDataCache(uid, DASHBOARD_CACHE_KEY, ready, gen);
+  }, [state, uid, gen]);
+  const stateRef = useRef(state);
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
   const controllers = useRef(new Map<RepSectionKey, AbortController>());
 
   const loaders = useCallback((): Partial<Loaders> => {
@@ -228,6 +240,8 @@ export function useRepDashboard() {
       if (!wanted.length) return;
 
       const token = await getIdToken().catch(() => null);
+      let keptStale = false;
+      let failed = false;
 
       await Promise.allSettled(
         wanted.map(async (key) => {
@@ -243,6 +257,8 @@ export function useRepDashboard() {
             // network failure must surface as "Couldn't load", never spin forever.
             if (controller.signal.aborted) return;
             console.error(`Dashboard section "${key}" failed:`, error);
+            failed = true;
+            if (quiet && stateRef.current[key]?.status === 'ready') keptStale = true;
             // A quiet refresh keeps what is on screen rather than trading it for
             // an error; a section with nothing loaded yet still gets its error.
             setState((current) =>
@@ -250,7 +266,14 @@ export function useRepDashboard() {
             );
           }
         })
-      );
+      ).then(() => {
+        if (keptStale) {
+          setStaleAt(lastGoodAt.current ?? Date.now());
+        } else if (!failed && !keys) {
+          lastGoodAt.current = Date.now();
+          setStaleAt(null);
+        }
+      });
     },
     [loaders]
   );
@@ -293,5 +316,5 @@ export function useRepDashboard() {
   const refresh = useCallback(() => void run(undefined, { quiet: true }), [run]);
   useRefreshOnResume(refresh, { enabled: !!uid });
 
-  return { ...state, retry, installDateSaved };
+  return { ...state, staleAt, retry, installDateSaved };
 }
