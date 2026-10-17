@@ -81,8 +81,7 @@ export default function PrivacyPolicyPage() {
                   Security Number, driver&apos;s license number, a photo of your driver&apos;s license,
                   your background-check authorization, tax form details (such as your legal or business
                   name and tax classification), and the bank name, routing number, and account number you
-                  enter on the direct-deposit form. Bank details are used only to pay you; they are
-                  never shown in the app or shared outside payroll. Your Social Security Number and driver&apos;s license
+                  enter on the direct-deposit form. Bank details are used only to pay you. Your Social Security Number and driver&apos;s license
                   number are stored encrypted, only a small number of authorized staff can view them,
                   and each time they are viewed it is logged.
                 </li>
