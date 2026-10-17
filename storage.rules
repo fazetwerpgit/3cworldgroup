@@ -9,8 +9,8 @@ service firebase.storage {
       return request.auth != null && caller().get('role', null) in ['owner', 'admin', 'operations'];
     }
     // Mirrors the API status gate: an active account, or a hired rep still in
-    // onboarding (pending WITH a field role; /portal/training is on the
-    // onboarding allowlist). A role-less pending self-signup or an inactive
+    // onboarding (pending WITH a field role; /portal/training and chat are on
+    // the onboarding allowlist). A role-less pending self-signup or an inactive
     // account gets nothing.
     function canReadTraining() {
       return request.auth != null
@@ -28,7 +28,28 @@ service firebase.storage {
         && request.resource.size < 1024 * 1024 * 1024
         && request.resource.contentType.matches('application/pdf|image/.*|video/.*');
     }
-    // Everything else (onboarding/forms) is Admin-SDK-only.
+    // Team chat files too big for a request body (Vercel caps it near 4.5 MB):
+    // the client writes chat-pending/{uid}/{id}.{ext} itself, then POSTs only the
+    // path to /api/portal/chat/media, which re-checks the object (owner, size,
+    // type, PDF header, channel membership, chat terms, file-name filter) and
+    // moves it to chat/{channelId}/ with a download token. Only the owner may
+    // create, once (no overwrite), up to 10 MB, with a content type that matches
+    // the extension. Nobody reads, lists or deletes here from a client; the
+    // route removes the pending object. Same account gate as training.
+    match /chat-pending/{uid}/{name} {
+      allow create: if canReadTraining()
+        && request.auth.uid == uid
+        && request.resource.size > 0
+        && request.resource.size <= 10 * 1024 * 1024
+        && name.matches('[A-Za-z0-9-]{8,64}[.](pdf|png|jpg|webp|gif)')
+        && ((name.matches('.*[.]pdf') && request.resource.contentType == 'application/pdf')
+          || (name.matches('.*[.]png') && request.resource.contentType == 'image/png')
+          || (name.matches('.*[.]jpg') && request.resource.contentType == 'image/jpeg')
+          || (name.matches('.*[.]webp') && request.resource.contentType == 'image/webp')
+          || (name.matches('.*[.]gif') && request.resource.contentType == 'image/gif'));
+      allow read, update, delete: if false;
+    }
+    // Everything else (onboarding/forms, chat/) is Admin-SDK-only.
     match /{allPaths=**} {
       allow read, write: if false;
     }

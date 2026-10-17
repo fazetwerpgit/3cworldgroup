@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  DIRECT_UPLOAD_THRESHOLD,
   MAX_SELECTED_IMAGE_BYTES,
   isPdfFile,
   prepareImageForUpload,
+  storageUploadFailure,
+  uploadChatFileDirect,
   uploadChatImage,
+  uploadChatImageWithProgress,
   validateSelectedImage,
+  type DirectUploadDeps,
 } from './attachmentUpload';
+import { SendRequestError } from '@/lib/chat/outbox';
 
 function imageFile(name: string, type: string, size = 16): File {
   return new File([new Uint8Array(size)], name, { type });
@@ -172,5 +178,113 @@ describe('uploadChatImage', () => {
     await expect(
       uploadChatImage(authedFetch, 'all-company', imageFile('photo.jpg', 'image/jpeg'))
     ).rejects.toThrow('Photo upload failed. Please try again.');
+  });
+});
+
+describe('uploadChatFileDirect (straight to Storage, then attach by path)', () => {
+  const URL_PDF = 'https://firebasestorage.googleapis.com/v0/b/b/o/chat%2Fall-company%2Fx.pdf?alt=media&token=t';
+
+  function deps(response: Response | Error = new Response(
+    JSON.stringify({ url: URL_PDF, contentType: 'application/pdf', name: 'Contract.pdf', size: 9 }),
+    { status: 200 }
+  )) {
+    const puts: Array<{ path: string; file: File }> = [];
+    const d = {
+      uid: vi.fn(async () => 'rep1'),
+      putFile: vi.fn(async (path: string, file: File, onProgress: (f: number) => void) => {
+        puts.push({ path, file });
+        onProgress(0.5);
+        onProgress(1);
+      }),
+      fetch: vi.fn(async () => {
+        if (response instanceof Error) throw response;
+        return response;
+      }),
+    } satisfies DirectUploadDeps;
+    return { d, puts };
+  }
+
+  it("writes to the caller's pending folder, then sends only the path and name", async () => {
+    const { d, puts } = deps();
+    const progress: number[] = [];
+    const file = imageFile('Contract.pdf', 'application/pdf', 9);
+    const attachment = await uploadChatFileDirect(d, 'id-tok', 'all-company', file, undefined, undefined, (f) => progress.push(f));
+
+    expect(attachment).toEqual({ type: 'file', url: URL_PDF, contentType: 'application/pdf', name: 'Contract.pdf', size: 9 });
+    expect(puts[0].path).toMatch(/^chat-pending\/rep1\/[0-9a-f-]{8,64}\.pdf$/);
+    expect(puts[0].file).toBe(file);
+    const [url, init] = d.fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/portal/chat/media');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer id-tok');
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+    expect(JSON.parse(init.body as string)).toEqual({ channelId: 'all-company', pendingPath: puts[0].path, name: 'Contract.pdf' });
+    expect(progress).toEqual([0.475, 0.95, 1]);
+  });
+
+  it('sends no name for an image, and keeps its dimensions', async () => {
+    const { d, puts } = deps(new Response(JSON.stringify({ url: 'u', contentType: 'image/gif' }), { status: 200 }));
+    const attachment = await uploadChatFileDirect(d, 't', 'c', imageFile('a.gif', 'image/gif'), 300, 200, () => {});
+    expect(puts[0].path).toMatch(/\.gif$/);
+    expect(JSON.parse((d.fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).not.toHaveProperty('name');
+    expect(attachment).toEqual({ type: 'image', url: 'u', contentType: 'image/gif', width: 300, height: 200 });
+  });
+
+  it('refuses an unsupported type and a signed-out caller before uploading', async () => {
+    const { d } = deps();
+    await expect(uploadChatFileDirect(d, 't', 'c', imageFile('a.docx', 'application/msword'), undefined, undefined, () => {})).rejects.toThrow('Unsupported');
+    d.uid.mockResolvedValueOnce(null as unknown as string);
+    await expect(uploadChatFileDirect(d, 't', 'c', imageFile('a.pdf', 'application/pdf'), undefined, undefined, () => {})).rejects.toBeInstanceOf(SendRequestError);
+    expect(d.putFile).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the route refusal with its status, and a lost attach call as retryable', async () => {
+    const refused = deps(new Response(JSON.stringify({ error: 'That file is not a valid PDF.' }), { status: 400 }));
+    const error = await uploadChatFileDirect(refused.d, 't', 'c', imageFile('a.pdf', 'application/pdf'), undefined, undefined, () => {}).catch((e) => e);
+    expect(error).toBeInstanceOf(SendRequestError);
+    expect(error.message).toBe('That file is not a valid PDF.');
+    expect(error.failure).toEqual({ kind: 'http', status: 400 });
+
+    const offline = deps(new TypeError('Failed to fetch'));
+    const lost = await uploadChatFileDirect(offline.d, 't', 'c', imageFile('a.pdf', 'application/pdf'), undefined, undefined, () => {}).catch((e) => e);
+    expect(lost.failure).toEqual({ kind: 'network' });
+  });
+
+  it('maps a rules refusal to a permanent error and anything else to a retry', () => {
+    expect(storageUploadFailure({ code: 'storage/unauthorized' }).failure).toEqual({ kind: 'http', status: 403 });
+    expect(storageUploadFailure({ code: 'storage/canceled' }).failure).toEqual({ kind: 'network' });
+    expect(storageUploadFailure(new Error('x')).failure).toEqual({ kind: 'network' });
+  });
+
+  it('uploadChatImageWithProgress sends a file over the threshold straight to Storage', async () => {
+    const { d, puts } = deps();
+    const big = imageFile('Big.pdf', 'application/pdf', DIRECT_UPLOAD_THRESHOLD + 1);
+    await uploadChatImageWithProgress('t', 'all-company', big, undefined, undefined, () => {}, d);
+    expect(puts).toHaveLength(1);
+    expect(DIRECT_UPLOAD_THRESHOLD).toBeLessThan(4.5 * 1024 * 1024);
+  });
+
+  it('uploadChatImageWithProgress keeps a small file on the multipart path', async () => {
+    const { d } = deps();
+    const sent: FormData[] = [];
+    class FakeXhr {
+      status = 200;
+      responseText = JSON.stringify({ url: 'u', contentType: 'image/png' });
+      upload = { onprogress: null };
+      timeout = 0;
+      onload: (() => void) | null = null;
+      onerror = null;
+      ontimeout = null;
+      onabort = null;
+      open() {}
+      setRequestHeader() {}
+      send(body: FormData) {
+        sent.push(body);
+        this.onload?.();
+      }
+    }
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    await uploadChatImageWithProgress('t', 'c', imageFile('a.png', 'image/png', 1024), 10, 10, () => {}, d);
+    expect(sent).toHaveLength(1);
+    expect(d.putFile).not.toHaveBeenCalled();
   });
 });

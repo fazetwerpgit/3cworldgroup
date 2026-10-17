@@ -270,10 +270,31 @@ with the same Bearer ID token (from its own Firebase Auth session) and no
 native-only routes or rules:
 
 - send, edit, delete: `/api/portal/chat/messages`
-- photo / PDF upload: `POST /api/portal/chat/media`
+- photo / PDF upload: `POST /api/portal/chat/media` (two forms, below)
 - report: `POST /api/portal/chat/messages/report`
 - block list, block, unblock: `GET` / `POST` / `DELETE /api/portal/chat/blocks`
 - the chat agreement: `/api/portal/chat/terms`
+
+**Uploads.** Vercel refuses request bodies over about 4.5 MB, so a multipart
+upload only works for small files. The web switches at 4 MB
+(`DIRECT_UPLOAD_THRESHOLD`, `src/components/chat/attachmentUpload.ts`); the
+native screen should do the same:
+
+- up to 4 MB: multipart `channelId` + `file`, as before.
+- over 4 MB (PDFs and GIFs up to 10 MB): upload the bytes with
+  `@react-native-firebase/storage` to
+  `chat-pending/{uid}/{id}.{ext}`, where `uid` is the native Firebase user (the
+  custom-token sign-in), `id` is 8 to 64 of `[A-Za-z0-9-]` (a UUID), and `ext`
+  is `pdf`, `png`, `jpg`, `webp` or `gif`. Set `contentType` to the matching
+  type (`application/pdf`, `image/png`, `image/jpeg`, `image/webp`,
+  `image/gif`). storage.rules refuse any other path, type, an empty file, a
+  file over 10 MB, and any overwrite. Then `POST /api/portal/chat/media` with
+  JSON `{ "channelId": "...", "pendingPath": "chat-pending/...", "name":
+  "Original name.pdf" }` (`name` only for a PDF). The response is the same as
+  the multipart form: `{ url, contentType, name?, size? }`. The route checks
+  the caller owns the path, the channel, the chat agreement, size, type and
+  the PDF header, filters the name, and moves the file; a refused upload is
+  deleted. A 404 means the pending object is gone: upload again under a new id.
 
 Every request it makes sends the user agent `3CPortal 3CPortalApp/<version>`.
 The server treats any user agent carrying `3CPortalApp/` as an app caller

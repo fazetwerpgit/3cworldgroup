@@ -100,6 +100,32 @@ export function getChatStorageBucketName(): string | null {
   return process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || null;
 }
 
+// Direct-to-Storage uploads (files too big for a Vercel request body, which is
+// capped near 4.5 MB). The client writes chat-pending/{uid}/{id}.{ext} itself;
+// storage.rules lets only that uid create it (once, never overwrite or read),
+// at most MAX_UPLOAD_BYTES, with a content type that matches the extension.
+// POST /api/portal/chat/media then validates it and moves it into chat/.
+export const CHAT_PENDING_PREFIX = 'chat-pending';
+const CHAT_PENDING_NAME = /^([A-Za-z0-9-]{8,64})\.(pdf|png|jpg|webp|gif)$/;
+
+/** The pending path a client uploads to: chat-pending/{uid}/{id}.{ext}. */
+export function chatPendingPath(uid: string, id: string, ext: string): string {
+  return `${CHAT_PENDING_PREFIX}/${uid}/${id}.${ext}`;
+}
+
+/**
+ * The extension of a pending upload path, only when the path is exactly
+ * chat-pending/{uid}/{id}.{ext} for THIS uid (no other user's folder, no nesting
+ * or traversal). Null otherwise.
+ */
+export function parseChatPendingPath(path: unknown, uid: string): { ext: string } | null {
+  if (typeof path !== 'string' || !uid || uid.includes('/')) return null;
+  const parts = path.split('/');
+  if (parts.length !== 3 || parts[0] !== CHAT_PENDING_PREFIX || parts[1] !== uid) return null;
+  const match = CHAT_PENDING_NAME.exec(parts[2]);
+  return match ? { ext: match[2] } : null;
+}
+
 /** Storage object path for a chat image: chat/{channelId}/{uuid}.{ext}. */
 export function chatObjectPath(channelId: string, uuid: string, ext: string): string {
   return `chat/${channelId}/${uuid}.${ext}`;

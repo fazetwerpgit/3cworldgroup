@@ -4,7 +4,29 @@ import { NextRequest } from 'next/server';
 const BUCKET = 'test-bucket.appspot.com';
 
 const saveMock = vi.fn(async (_buffer: Buffer, _opts: unknown) => undefined);
-const fileMock = vi.fn((_path: string) => ({ save: saveMock }));
+
+// Objects a client wrote straight to Storage (the chat-pending folder).
+type StoredObject = { contentType: string; size: number | string; head: Buffer };
+const pendingObjects = new Map<string, StoredObject>();
+const copyMock = vi.fn<(dest: { path: string }, opts: unknown) => Promise<void>>(async () => undefined);
+const deleteMock = vi.fn<(path: string) => Promise<void>>(async () => undefined);
+const fileMock = vi.fn((path: string) => ({
+  path,
+  save: saveMock,
+  exists: async () => [pendingObjects.has(path)],
+  getMetadata: async () => {
+    const obj = pendingObjects.get(path);
+    return [{ contentType: obj?.contentType, size: String(obj?.size) }];
+  },
+  download: async (opts: { start: number; end: number }) => [
+    (pendingObjects.get(path)?.head ?? Buffer.alloc(0)).subarray(opts.start, opts.end + 1),
+  ],
+  copy: (dest: { path: string }, opts: unknown) => copyMock(dest, opts),
+  delete: async () => {
+    pendingObjects.delete(path);
+    await deleteMock(path);
+  },
+}));
 
 const firestore = vi.hoisted(() => {
   type DocData = Record<string, unknown>;
@@ -79,6 +101,9 @@ beforeEach(() => {
   mockGate.mockReset();
   saveMock.mockClear();
   fileMock.mockClear();
+  copyMock.mockClear();
+  deleteMock.mockClear();
+  pendingObjects.clear();
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
   firestore.channels.set('all-company', {
     id: 'all-company',
@@ -216,5 +241,150 @@ describe('POST /api/portal/chat/media', () => {
     expect(res.status).toBe(400);
     expect((await res.json()).error).toBe('File too large — PDFs up to 10 MB.');
     expect(saveMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/portal/chat/media (direct upload, JSON)', () => {
+  const PENDING_PDF = 'chat-pending/rep-1/0f8fad5b-d9cb-469f-a165-70867728950e.pdf';
+  const PENDING_PNG = 'chat-pending/rep-1/7c9e6679-7425-40de-944b-e07fc1f90ae7.png';
+
+  function attach(body: Record<string, unknown>, headers?: Record<string, string>) {
+    return new NextRequest('http://localhost/api/portal/chat/media', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json', ...headers },
+    });
+  }
+
+  function putPdf(path = PENDING_PDF, size = 9 * 1024 * 1024, head = '%PDF-1.7') {
+    pendingObjects.set(path, { contentType: 'application/pdf', size, head: Buffer.from(head) });
+  }
+
+  it('moves a 9 MB PDF from the pending folder into the channel, with a fresh token', async () => {
+    mockGate.mockResolvedValue(REP);
+    putPdf();
+    const res = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF, name: 'Big contract.pdf' }));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toMatchObject({ contentType: 'application/pdf', name: 'Big contract.pdf', size: 9 * 1024 * 1024 });
+    expect(json.url.startsWith(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent('chat/all-company/')}`)).toBe(true);
+    const [dest, opts] = copyMock.mock.calls[0] as [
+      { path: string },
+      { contentType: string; contentDisposition: string; metadata: { firebaseStorageDownloadTokens: string } },
+    ];
+    expect(dest.path).toMatch(/^chat\/all-company\/[0-9a-f-]+\.pdf$/);
+    expect(opts.contentType).toBe('application/pdf');
+    expect(opts.contentDisposition).toContain(encodeURIComponent('Big contract.pdf'));
+    expect(json.url).toContain(`token=${opts.metadata.firebaseStorageDownloadTokens}`);
+    // The pending original is removed once moved.
+    expect(deleteMock).toHaveBeenCalledWith(PENDING_PDF);
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it('moves an image and returns no name or size', async () => {
+    mockGate.mockResolvedValue(REP);
+    pendingObjects.set(PENDING_PNG, { contentType: 'image/png', size: 6 * 1024 * 1024, head: Buffer.alloc(8) });
+    const res = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PNG }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ url: expect.any(String), contentType: 'image/png' });
+  });
+
+  it("refuses another user's pending path, a nested path, and a traversal", async () => {
+    mockGate.mockResolvedValue(REP);
+    for (const pendingPath of [
+      'chat-pending/rep-2/0f8fad5b-d9cb-469f-a165-70867728950e.pdf',
+      'chat-pending/rep-1/x/0f8fad5b-d9cb-469f-a165-70867728950e.pdf',
+      'chat-pending/rep-1/../rep-2/0f8fad5b.pdf',
+      'chat/all-company/0f8fad5b-d9cb-469f-a165-70867728950e.pdf',
+      'chat-pending/rep-1/0f8fad5b-d9cb-469f-a165-70867728950e.exe',
+      42,
+    ]) {
+      putPdf(String(pendingPath));
+      const res = await POST(attach({ channelId: 'all-company', pendingPath }));
+      expect(res.status, String(pendingPath)).toBe(400);
+    }
+    expect(copyMock).not.toHaveBeenCalled();
+    expect(deleteMock).not.toHaveBeenCalled();
+  });
+
+  it('checks the channel and the chat agreement before touching storage', async () => {
+    putPdf();
+    mockGate.mockResolvedValue(REP);
+    expect((await POST(attach({ channelId: 'managers', pendingPath: PENDING_PDF }))).status).toBe(403);
+    expect((await POST(attach({ channelId: 'nope', pendingPath: PENDING_PDF }))).status).toBe(404);
+    expect((await POST(attach({ pendingPath: PENDING_PDF }))).status).toBe(400);
+
+    const appUA = { 'user-agent': 'Mozilla/5.0 (iPhone) 3CPortal 3CPortalApp/1.0.0' };
+    mockGate.mockResolvedValue({ ok: true, user: { ...REP.user, chatTermsAccepted: false } });
+    const blocked = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }, appUA));
+    expect(blocked.status).toBe(403);
+    expect((await blocked.json()).code).toBe('chat_terms');
+
+    mockGate.mockResolvedValue({ ok: false, error: 'Unauthorized', status: 401 });
+    expect((await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }))).status).toBe(401);
+    expect(fileMock).not.toHaveBeenCalled();
+    expect(copyMock).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 when the pending object is missing', async () => {
+    mockGate.mockResolvedValue(REP);
+    const res = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }));
+    expect(res.status).toBe(404);
+    expect(copyMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses and removes an object over 10 MB', async () => {
+    mockGate.mockResolvedValue(REP);
+    putPdf(PENDING_PDF, 10 * 1024 * 1024 + 1);
+    const res = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toBe('File too large — PDFs up to 10 MB.');
+    expect(deleteMock).toHaveBeenCalledWith(PENDING_PDF);
+    expect(copyMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts exactly 10 MB', async () => {
+    mockGate.mockResolvedValue(REP);
+    putPdf(PENDING_PDF, 10 * 1024 * 1024);
+    expect((await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }))).status).toBe(200);
+  });
+
+  it('refuses and removes an object whose stored type does not match its extension', async () => {
+    mockGate.mockResolvedValue(REP);
+    pendingObjects.set(PENDING_PDF, { contentType: 'image/png', size: 100, head: Buffer.from('%PDF-') });
+    expect((await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }))).status).toBe(400);
+    pendingObjects.set(PENDING_PNG, { contentType: 'text/html', size: 100, head: Buffer.alloc(4) });
+    expect((await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PNG }))).status).toBe(400);
+    expect(deleteMock).toHaveBeenCalledTimes(2);
+    expect(copyMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses and removes a fake PDF and an empty object', async () => {
+    mockGate.mockResolvedValue(REP);
+    putPdf(PENDING_PDF, 2048, 'MZ\u0000\u0000');
+    const fake = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }));
+    expect(fake.status).toBe(400);
+    expect((await fake.json()).error).toMatch(/not a valid PDF/);
+
+    putPdf(PENDING_PDF, 0);
+    expect((await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }))).status).toBe(400);
+    expect(deleteMock).toHaveBeenCalledTimes(2);
+    expect(copyMock).not.toHaveBeenCalled();
+  });
+
+  it('runs the file name through the sanitizer and chat content filter', async () => {
+    mockGate.mockResolvedValue(REP);
+    putPdf();
+    const res = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF, name: '../../etc/passwd.pdf' }));
+    expect((await res.json()).name).toBe('passwd.pdf');
+
+    putPdf();
+    const missing = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF }));
+    expect((await missing.json()).name).toBe('document.pdf');
+
+    putPdf();
+    const filtered = await POST(attach({ channelId: 'all-company', pendingPath: PENDING_PDF, name: 'fuck-this.pdf' }));
+    expect((await filtered.json()).name).toBe('document.pdf');
   });
 });

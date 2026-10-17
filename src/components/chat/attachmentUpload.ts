@@ -1,4 +1,5 @@
 import { SendRequestError } from '@/lib/chat/outbox';
+import { chatPendingPath, uploadExtForMime } from '@/lib/chat/media';
 import type { ChatAttachment } from '@/types';
 import { renderPdfPreview, type PdfPreview } from './pdfPreview';
 
@@ -287,12 +288,81 @@ function toUploadedAttachment(
 // policy take over instead.
 const UPLOAD_TIMEOUT_MS = 120_000;
 
+// Above this, a file goes straight to Firebase Storage instead of through the
+// API body: Vercel refuses request bodies over about 4.5 MB, and a multipart
+// body adds a little on top of the file itself.
+export const DIRECT_UPLOAD_THRESHOLD = 4 * 1024 * 1024;
+
+/** The seams the direct upload needs, so tests can drive it without Firebase. */
+export interface DirectUploadDeps {
+  /** The signed-in Firebase uid (it names the pending folder storage.rules allows). */
+  uid: () => Promise<string | null>;
+  /** Stores `file` at `path` in Firebase Storage, reporting 0..1 progress. */
+  putFile: (path: string, file: File, onProgress: (fraction: number) => void) => Promise<void>;
+  fetch: (url: string, init?: RequestInit) => Promise<Response>;
+}
+
+function randomUploadId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** A Storage SDK failure as a send error: a rules refusal is permanent, anything else retries. */
+export function storageUploadFailure(error: unknown): SendRequestError {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === 'storage/unauthorized' || code === 'storage/unauthenticated') {
+    return new SendRequestError("That file couldn't be uploaded. Use an image or a PDF up to 10 MB.", {
+      kind: 'http',
+      status: 403,
+    });
+  }
+  return new SendRequestError('Upload failed. Check your connection.', { kind: 'network' });
+}
+
+async function firebasePutFile(path: string, file: File, onProgress: (fraction: number) => void): Promise<void> {
+  const [{ ref, uploadBytesResumable }, { storage }] = await Promise.all([
+    import('firebase/storage'),
+    import('@/lib/firebase/config'),
+  ]);
+  if (!storage) throw new Error('Storage is not configured');
+  const bucket = storage;
+  await new Promise<void>((resolve, reject) => {
+    const task = uploadBytesResumable(ref(bucket, path), file, { contentType: file.type });
+    // Same give-up point as the XHR path; a cancelled task rejects as retryable.
+    const timer = setTimeout(() => task.cancel(), UPLOAD_TIMEOUT_MS);
+    task.on(
+      'state_changed',
+      (snap) => {
+        if (snap.totalBytes > 0) onProgress(Math.min(1, snap.bytesTransferred / snap.totalBytes));
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(storageUploadFailure(error));
+      },
+      () => {
+        clearTimeout(timer);
+        resolve();
+      }
+    );
+  });
+}
+
+const firebaseDirectDeps: DirectUploadDeps = {
+  uid: async () => (await import('@/lib/firebase/config')).auth?.currentUser?.uid ?? null,
+  putFile: firebasePutFile,
+  fetch: (url, init) => fetch(url, init),
+};
+
 /**
- * Same upload as uploadChatImage, over XMLHttpRequest so the pending photo can
- * show real progress (fetch has no upload progress). `onProgress` receives 0..1.
- * Network errors and timeouts reject with a retryable SendRequestError.
+ * Uploads a prepared file straight to Firebase Storage under
+ * chat-pending/{uid}/, then hands only that path to /api/portal/chat/media,
+ * which checks the object and moves it into the channel's folder. Used for
+ * files too big for a request body (PDFs up to 10 MB, large GIFs).
  */
-export function uploadChatImageWithProgress(
+export async function uploadChatFileDirect(
+  deps: DirectUploadDeps,
   idToken: string,
   channelId: string,
   file: File,
@@ -300,6 +370,53 @@ export function uploadChatImageWithProgress(
   height: number | undefined,
   onProgress: (fraction: number) => void
 ): Promise<ChatAttachment> {
+  const ext = uploadExtForMime(file.type);
+  if (!ext) throw new Error('Unsupported file — use an image or PDF.');
+  const uid = await deps.uid();
+  if (!uid) {
+    throw new SendRequestError('You are signed out. Sign in and resend.', { kind: 'http', status: 401 });
+  }
+  const pendingPath = chatPendingPath(uid, randomUploadId(), ext);
+  // The bytes are nearly all of the work; the attach call is the last 5%.
+  await deps.putFile(pendingPath, file, (fraction) => onProgress(fraction * 0.95));
+  let response: Response;
+  try {
+    response = await deps.fetch('/api/portal/chat/media', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({
+        channelId,
+        pendingPath,
+        ...(file.type === PDF_MIME ? { name: file.name } : {}),
+      }),
+    });
+  } catch {
+    throw new SendRequestError('Upload failed. Check your connection.', { kind: 'network' });
+  }
+  const attachment = toUploadedAttachment(response.status, await response.text(), width, height);
+  onProgress(1);
+  return attachment;
+}
+
+/**
+ * Same upload as uploadChatImage, over XMLHttpRequest so the pending photo can
+ * show real progress (fetch has no upload progress). `onProgress` receives 0..1.
+ * Network errors and timeouts reject with a retryable SendRequestError. A file
+ * over DIRECT_UPLOAD_THRESHOLD goes straight to Storage instead
+ * (uploadChatFileDirect), since the API body cannot carry it.
+ */
+export function uploadChatImageWithProgress(
+  idToken: string,
+  channelId: string,
+  file: File,
+  width: number | undefined,
+  height: number | undefined,
+  onProgress: (fraction: number) => void,
+  directDeps: DirectUploadDeps = firebaseDirectDeps
+): Promise<ChatAttachment> {
+  if (file.size > DIRECT_UPLOAD_THRESHOLD) {
+    return uploadChatFileDirect(directDeps, idToken, channelId, file, width, height, onProgress);
+  }
   return new Promise((resolve, reject) => {
     const body = new FormData();
     body.set('channelId', channelId);

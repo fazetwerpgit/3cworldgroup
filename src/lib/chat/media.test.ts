@@ -1,5 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { readStoredAttachment, sanitizeAttachmentFileName, validateMessageAttachment } from './media';
+import {
+  CHAT_PENDING_PREFIX,
+  MAX_UPLOAD_BYTES,
+  chatPendingPath,
+  parseChatPendingPath,
+  readStoredAttachment,
+  sanitizeAttachmentFileName,
+  validateMessageAttachment,
+} from './media';
 
 const BUCKET = 'demo-bucket.appspot.com';
 
@@ -109,5 +119,50 @@ describe('sanitizeAttachmentFileName — content filter', () => {
     expect(sanitizeAttachmentFileName('retard_list.pdf')).toBe('document.pdf');
     expect(sanitizeAttachmentFileName('fuck-this.pdf')).toBe('document.pdf');
     expect(sanitizeAttachmentFileName('Pay stub.pdf')).toBe('Pay stub.pdf');
+  });
+});
+
+describe('chat pending paths (direct uploads)', () => {
+  const ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
+
+  it("round-trips the caller's own path", () => {
+    expect(chatPendingPath('rep1', ID, 'pdf')).toBe(`chat-pending/rep1/${ID}.pdf`);
+    expect(parseChatPendingPath(chatPendingPath('rep1', ID, 'pdf'), 'rep1')).toEqual({ ext: 'pdf' });
+    expect(parseChatPendingPath(chatPendingPath('rep1', ID, 'jpg'), 'rep1')).toEqual({ ext: 'jpg' });
+  });
+
+  it('refuses anything else', () => {
+    for (const path of [
+      `chat-pending/rep2/${ID}.pdf`,
+      `chat-pending/rep1/a/${ID}.pdf`,
+      `chat-pending/rep1/${ID}.exe`,
+      `chat-pending/rep1/${ID}.jpeg`,
+      `chat-pending/rep1/short.pdf`,
+      `chat-pending/rep1/.${ID}.pdf`,
+      `chat/rep1/${ID}.pdf`,
+      `/chat-pending/rep1/${ID}.pdf`,
+      null,
+    ]) {
+      expect(parseChatPendingPath(path, 'rep1'), String(path)).toBeNull();
+    }
+    expect(parseChatPendingPath(`chat-pending/a/b/${ID}.pdf`, 'a/b')).toBeNull();
+    expect(parseChatPendingPath(`chat-pending//${ID}.pdf`, '')).toBeNull();
+  });
+});
+
+describe('storage.rules agree with the chat upload limits', () => {
+  const rules = readFileSync(resolve(__dirname, '../../../storage.rules'), 'utf8');
+  const block = rules.slice(rules.indexOf(`match /${CHAT_PENDING_PREFIX}/{uid}/{name}`));
+
+  it('has an owner-only, create-only pending folder capped at MAX_UPLOAD_BYTES', () => {
+    expect(block.length).toBeGreaterThan(0);
+    expect(rules).toContain(`match /${CHAT_PENDING_PREFIX}/{uid}/{name}`);
+    expect(block).toContain('request.auth.uid == uid');
+    expect(block).toContain('request.resource.size <= 10 * 1024 * 1024');
+    expect(MAX_UPLOAD_BYTES).toBe(10 * 1024 * 1024);
+    expect(block).toMatch(/allow read, update, delete: if false;/);
+    for (const type of ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/gif']) {
+      expect(block).toContain(`request.resource.contentType == '${type}'`);
+    }
   });
 });
