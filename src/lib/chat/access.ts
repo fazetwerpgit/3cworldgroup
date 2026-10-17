@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 import { getEffectiveRole, isManagementRole, resolveRoles, PlatformRole, FieldRole } from '@/types';
 
 // The verified chat identity. Everything is derived from a real Firebase ID token
@@ -37,7 +38,9 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
     return { ok: false, error: 'Account is not active', status: 403 };
   }
 
-  const { role, fieldRole } = resolveRoles(data.role, data.fieldRole);
+  // A demo account keeps a working chat screen with no channels: with no role it
+  // reaches no audience, so it can neither read nor post where others would see it.
+  const { role, fieldRole } = isDemoAccount(data) ? {} : resolveRoles(data.role, data.fieldRole);
 
   return {
     ok: true,

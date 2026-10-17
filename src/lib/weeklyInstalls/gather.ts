@@ -2,6 +2,7 @@ import type { CompPlanCompanyRates, CompPlanRates, FiberOrder, Sale } from '@/ty
 import { resolveCompRole, resolveRoles } from '@/types';
 import { COMP_PLAN_RATES } from '@/data/compPlan.generated';
 import { emailFromUserDoc } from '@/lib/email/userEmail';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 // The Firestore half of the Monday email. READ ONLY: every function here reads
 // and returns plain data; nothing in this module writes, so building a digest
@@ -132,7 +133,7 @@ export async function gatherAllReps(db: Db): Promise<WeeklyRepInput[]> {
   }
 
   return usersSnap.docs
-    .filter((doc) => salesByRep.has(doc.id) || ordersByRep.has(doc.id))
+    .filter((doc) => !isDemoAccount(doc.data()) && (salesByRep.has(doc.id) || ordersByRep.has(doc.id)))
     .map((doc) =>
       userInput(doc.id, doc, rates, salesByRep.get(doc.id) ?? [], ordersByRep.get(doc.id) ?? [])
     );

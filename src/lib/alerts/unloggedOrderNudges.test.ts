@@ -112,6 +112,18 @@ beforeEach(() => {
 });
 
 describe('runUnloggedOrderNudges', () => {
+  it('never tells a demo account, as if it were not active', async () => {
+    const data = seed();
+    (data.users as Record<string, Data>).gone = { displayName: 'App Review', status: 'active', role: 'field', demoAccount: true };
+    const { db } = fakeDb(data);
+    const dispatch = vi.fn(async () => {});
+
+    const { counts } = await runUnloggedOrderNudges({ db, now: MORNING, dispatch });
+
+    expect(counts).toMatchObject({ found: 5, skippedInactiveRep: 1, repsTold: 2 });
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ userId: 'gone' }));
+  });
+
   it('tells each rep once about their live, recent orders no sale claims', async () => {
     const { db, creates } = fakeDb(seed());
     const dispatch = vi.fn(async () => {});

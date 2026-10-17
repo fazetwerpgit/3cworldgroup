@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 import { personPushState, type PushHealth, type PushStatusRow } from '@/lib/push/pushNudge';
+import { withoutDemoDocs } from '@/lib/users/demoAccount';
 
 // Admin/owner Notifications list (People > Notifications).
 // GET   /api/portal/admin/push                      → every active user's push state
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
     if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 
     const snapshot = await adminDb.collection('users').where('status', '==', 'active').get();
-    const users: PushStatusRow[] = snapshot.docs.map((doc) => {
+    const users: PushStatusRow[] = withoutDemoDocs(snapshot.docs).map((doc) => {
       const data = doc.data();
       // Web (browser / PWA) and 3C iOS app devices both count as somewhere to send.
       const tokens =

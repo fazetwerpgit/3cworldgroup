@@ -5,6 +5,7 @@ import { loadDayMessages } from '@/lib/alerts/calloutNudges';
 import { COMP_PLAN_MARGIN, COMP_PLAN_RATES } from '@/data/compPlan.generated';
 import type { CompPlanMargin, CompPlanRates, Sale } from '@/types';
 import type { ActivatedUser, OwnerBook, OwnerSummarySource, RepRoles } from './companySummary';
+import { DEMO_ACCOUNT_FIELD, isDemoAccount } from '@/lib/users/demoAccount';
 
 // Admin SDK reads behind the owner summary. READ ONLY — nothing here writes.
 //
@@ -123,8 +124,12 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
     },
 
     async countPendingSignups() {
-      const snap = await db().collection('users').where('status', '==', 'pending').select('fieldRole', 'suspectedBot').get();
-      return snap.docs.filter((doc) => !doc.get('fieldRole') && !doc.get('suspectedBot')).length;
+      const snap = await db()
+        .collection('users')
+        .where('status', '==', 'pending')
+        .select('fieldRole', 'suspectedBot', DEMO_ACCOUNT_FIELD)
+        .get();
+      return snap.docs.filter((doc) => !doc.get('fieldRole') && !doc.get('suspectedBot') && !isDemoAccount(doc.data())).length;
     },
 
     async countStalledOnboarding() {
@@ -147,14 +152,14 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
     // id; activationsByWeek picks activatedAt first.
     async loadActivatedSince(since) {
       const users = db().collection('users');
-      const fields = ['status', 'fieldRole', 'hireDate', 'activatedAt'] as const;
+      const fields = ['status', 'fieldRole', 'hireDate', 'activatedAt', DEMO_ACCOUNT_FIELD] as const;
       const [byActivated, byHire] = await Promise.all([
         users.where('activatedAt', '>=', since).select(...fields).get(),
         users.where('hireDate', '>=', since).select(...fields).get(),
       ]);
       const byId = new Map<string, ActivatedUser>();
       for (const doc of [...byActivated.docs, ...byHire.docs]) {
-        if (byId.has(doc.id)) continue;
+        if (byId.has(doc.id) || isDemoAccount(doc.data())) continue;
         byId.set(doc.id, {
           status: doc.get('status') ?? null,
           fieldRole: doc.get('fieldRole') ?? null,

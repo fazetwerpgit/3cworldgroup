@@ -8,6 +8,7 @@ import {
   roleRequiresOnboarding,
 } from '@/types';
 import { resolveRoles, PlatformRole, FieldRole } from '@/types';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 export interface ChatChannelMembership {
   channelIds: string[];
@@ -93,6 +94,7 @@ export function userCanAccessChannelDoc(
 }
 
 export function isEligibleChatMember(data: FirebaseFirestore.DocumentData): boolean {
+  if (isDemoAccount(data)) return false;
   const { fieldRole } = resolveRoles(data.role, data.fieldRole);
   return data.status === 'active' ||
     (data.status === 'pending' && roleRequiresOnboarding(fieldRole));

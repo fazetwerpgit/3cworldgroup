@@ -74,8 +74,10 @@ vi.mock('@/lib/firebase/admin', () => ({
 
 import { FieldValue } from 'firebase-admin/firestore';
 import {
+  belongsInChannelDoc,
   createChannelId,
   getMemberIdsForAudience,
+  isEligibleChatMember,
   reconcileChatMembershipForUser,
   syncChatChannels,
 } from './channels';
@@ -111,6 +113,19 @@ describe('syncChatChannels', () => {
     const memberIds = await getMemberIdsForAudience('field');
 
     expect(memberIds.sort()).toEqual(['active-rep', 'pending-hire']);
+  });
+
+  it('leaves a demo account out of every audience, even as a manual extra', async () => {
+    firestore.users.set('active-rep', { status: 'active', fieldRole: 'entry_rep' });
+    firestore.users.set('demo', { status: 'active', role: 'rep', fieldRole: 'entry_level_rep', demoAccount: true });
+
+    for (const audience of ['all', 'field'] as const) {
+      expect(await getMemberIdsForAudience(audience)).toEqual(['active-rep']);
+    }
+    expect(isEligibleChatMember({ status: 'active', fieldRole: 'entry_level_rep', demoAccount: true })).toBe(false);
+    expect(isEligibleChatMember({ status: 'active', fieldRole: 'entry_level_rep', demoAccount: false })).toBe(true);
+    const channel = { id: 'general', name: 'General', audience: 'all', order: 0, active: true, extraMemberIds: ['demo'] };
+    expect(belongsInChannelDoc(channel, 'demo', firestore.users.get('demo')!)).toBe(false);
   });
 
   it('unions audience-derived members with surviving extras, dropping deleted and deactivated extras', async () => {

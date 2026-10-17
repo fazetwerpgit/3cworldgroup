@@ -7,6 +7,7 @@
 import { resolveRoles } from '@/types/auth';
 import { planWithoutCarrier } from '@/lib/sales/carrierMark';
 import { installDayKey } from '@/lib/sales/saleDate';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 export interface UnrankedRep {
   salesRepId: string;
@@ -59,7 +60,7 @@ export function unrankedReps(
 ): UnrankedRep[] {
   return users
     .filter(({ id, data }) => {
-      if (data.status !== 'active' || rankedIds.has(id)) return false;
+      if (data.status !== 'active' || rankedIds.has(id) || isDemoAccount(data)) return false;
       const { fieldRole } = resolveRoles(text(data.role) || undefined, text(data.fieldRole) || undefined);
       return Boolean(fieldRole) && Boolean(text(data.displayName));
     })

@@ -40,6 +40,25 @@ function userDoc(uid: string, data: Record<string, unknown>) {
 }
 
 describe('getVerifiedChatUser', () => {
+  it('gives a demo account a working identity that reaches no channel audience', async () => {
+    mockVerify.mockResolvedValue({ ok: true, uid: 'demo', name: 'App Review', email: 'a@x.com' });
+    userDoc('demo', { status: 'active', role: 'rep', fieldRole: 'entry_level_rep', demoAccount: true });
+    const res = await getVerifiedChatUser(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.user.role).toBeUndefined();
+      expect(res.user.fieldRole).toBeUndefined();
+      expect(res.user.canModerate).toBe(false);
+    }
+  });
+
+  it('keeps the field role of an ordinary active rep', async () => {
+    mockVerify.mockResolvedValue({ ok: true, uid: 'u2', name: 'Rep', email: 'r@x.com' });
+    userDoc('u2', { status: 'active', fieldRole: 'entry_level_rep', demoAccount: false });
+    const res = await getVerifiedChatUser(req());
+    expect(res.ok && res.user.fieldRole).toBe('entry_level_rep');
+  });
+
   it('rejects when the token is invalid', async () => {
     mockVerify.mockResolvedValue({ ok: false, error: 'Invalid authentication token', status: 401 });
     const res = await getVerifiedChatUser(req());

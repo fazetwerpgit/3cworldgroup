@@ -8,6 +8,7 @@ import {
   PipelineStage,
   PIPELINE_STAGE_ORDER,
 } from '@/types';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 // GET /api/portal/pipeline - Recruiting pipeline overview.
 // Aggregates every field rep's onboarding progress, channel clearances and
@@ -100,6 +101,7 @@ export async function GET(request: NextRequest) {
       const data = doc.data();
       const { fieldRole } = resolveRoles(data.role, data.fieldRole);
       if (!fieldRole) continue; // pipeline tracks field sales users only
+      if (isDemoAccount(data)) continue; // demo accounts stay out of the roster and its counts
 
       const isIBO = data.isIBO ?? false;
       const checklist = getOnboardingItemsForUser(fieldRole, isIBO);

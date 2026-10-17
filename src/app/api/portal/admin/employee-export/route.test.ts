@@ -119,6 +119,8 @@ beforeEach(() => {
   });
   db.store.set('users/u-casey', { displayName: 'Casey Moss', email: 'casey@example.com', status: 'active' });
   db.store.set('users/u-pending', { displayName: 'Aaron Pending', email: 'p@example.com', status: 'pending' });
+  // A demo account (App Review): active, but never exported.
+  db.store.set('users/u-demo', { displayName: 'App Review', email: 'demo@example.com', fieldRole: 'entry_level_rep', status: 'active', demoAccount: true });
 
   db.store.set('userSensitive/u-alex', {
     ssnEncrypted: encryptField('123456789'),
@@ -156,7 +158,7 @@ describe('employee export owner gate', () => {
 });
 
 describe('employee export', () => {
-  it('sends active users only, sorted by name, with full SSN and DL# and no caching', async () => {
+  it('sends active users only (no demo accounts), sorted by name, with full SSN and DL# and no caching', async () => {
     const response = await exportRequest();
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toContain('no-store');

@@ -4,6 +4,7 @@ import { unloggedOrders, unloggedOrdersPush, type UnloggedOrder } from '@/lib/sa
 import { toFiberOrder, toSale } from '@/lib/weeklyInstalls/gather';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 import type { UnloggedOrderNudgeCounts } from '@/types/fiberOrder';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 // The carrier backstop for sales nobody logged. After a report lands, a live
 // carrier order matched to a rep that no sale claims (the board's "Not in the
@@ -102,6 +103,7 @@ export async function runUnloggedOrderNudges(deps: UnloggedOrderRunDeps): Promis
   const activeUsers = new Set<string>();
   for (const doc of usersSnap.docs) {
     const data = doc.data() ?? {};
+    if (isDemoAccount(data)) continue;
     const name = text(data.displayName) ?? text(data.name);
     if (name) repNames.set(doc.id, name);
     if (data.status === 'active') activeUsers.add(doc.id);

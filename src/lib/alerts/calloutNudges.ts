@@ -11,6 +11,7 @@ import {
   type LoggedSale,
 } from '@/lib/sales/calloutNudge';
 import { chicagoDayKey, chicagoHour } from '@/lib/weeklyInstalls/week';
+import { DEMO_ACCOUNT_FIELD, withoutDemoDocs } from '@/lib/users/demoAccount';
 
 // The reads behind the callout nudge (lib/sales/calloutNudge.ts has the rule and
 // the words), and the 9 PM push.
@@ -195,11 +196,11 @@ export async function runCalloutNudges(deps: CalloutRunDeps): Promise<CalloutRun
 
   const [short, usersSnap] = await Promise.all([
     calloutGapsFor(db, day),
-    db.collection('users').where('status', '==', 'active').select('status').get(),
+    db.collection('users').where('status', '==', 'active').select('status', DEMO_ACCOUNT_FIELD).get(),
   ]);
   summary.short = short.length;
   // Active users only, as the overdue alerts do: a rep who left is not nudged.
-  const active = new Set(usersSnap.docs.map((doc) => doc.id));
+  const active = new Set(withoutDemoDocs(usersSnap.docs).map((doc) => doc.id));
 
   for (const entry of short) {
     if (!active.has(entry.repId)) {

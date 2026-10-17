@@ -112,6 +112,19 @@ beforeEach(() => {
 });
 
 describe('runCalloutNudges', () => {
+  it('never nudges a demo account, as if it were not active', async () => {
+    const data = seed();
+    (data.users as Record<string, Data>).demo = { displayName: 'App Review', status: 'active', demoAccount: true };
+    (data['chatChannels/all-company/messages'] as Record<string, Data>).m9 = msg('demo', 'App Review', '1 gig', chicago('2026-10-09', '13:30'));
+    const { db } = fakeDb(data);
+    const dispatch = vi.fn(async () => {});
+
+    const summary = await runCalloutNudges({ db, now: NINE_PM, dispatch });
+
+    expect(summary).toMatchObject({ short: 3, skippedInactiveRep: 2, sent: 1 });
+    expect(dispatch.mock.calls.map((call) => (call as unknown as [{ userId: string }])[0].userId)).toEqual(['miles']);
+  });
+
   it('pushes each active rep still short today once, with the counts', async () => {
     const { db, creates } = fakeDb(seed());
     const dispatch = vi.fn(async () => {});

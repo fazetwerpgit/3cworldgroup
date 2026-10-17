@@ -97,3 +97,15 @@ it('shows no checklist count for an active rep from before the checklist, but ke
   expect(rep('veteran').onboarding).toBeNull();
   expect(rep('hire').onboarding).toMatchObject({ approved: 1 });
 });
+
+it('leaves a demo account out of the pipeline roster', async () => {
+  state.users = [
+    { id: 'rep', fieldRole: 'entry_level_rep', status: 'active' },
+    { id: 'demo', fieldRole: 'entry_level_rep', status: 'active', displayName: 'App Review', demoAccount: true },
+  ];
+
+  const rep = await pipeline();
+
+  expect(rep('rep')).toBeDefined();
+  expect(rep('demo')).toBeUndefined();
+});
