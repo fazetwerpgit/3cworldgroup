@@ -251,11 +251,25 @@ export function Invites({
     if (shouldShareViaApp()) {
       // In the app the share sheet replaces the clipboard (Copy is one of its actions).
       try {
-        const link = await url;
+        let link: string;
+        try {
+          link = await url;
+        } catch {
+          setError("Couldn't load the link. Try again.");
+          return;
+        }
         setShownLink({ id: invite.id, url: link });
-        await shareLinkViaApp(link, `Invite for ${invite.candidateName}`);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not load the link');
+        try {
+          await shareLinkViaApp(link, `Invite for ${invite.candidateName}`);
+        } catch {
+          // The share sheet didn't open: copy instead, in plain words.
+          try {
+            await navigator.clipboard.writeText(link);
+            setSuccess(`Link for ${invite.candidateName} copied.`);
+          } catch {
+            setWarning("Couldn't open sharing. Select the link under their name and copy it.");
+          }
+        }
       } finally {
         setLinkBusy(null);
       }
@@ -309,10 +323,19 @@ export function Invites({
   const copyLatestInvite = async () => {
     if (!latestInviteUrl) return;
     if (shouldShareViaApp()) {
-      await shareLinkViaApp(latestInviteUrl, 'Onboarding invite').catch(() => undefined);
+      try {
+        await shareLinkViaApp(latestInviteUrl, 'Onboarding invite');
+        return;
+      } catch {
+        // The share sheet didn't open: fall through to copying.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(latestInviteUrl);
+    } catch {
+      setWarning("Couldn't copy the link. Select it and copy it.");
       return;
     }
-    await navigator.clipboard.writeText(latestInviteUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
