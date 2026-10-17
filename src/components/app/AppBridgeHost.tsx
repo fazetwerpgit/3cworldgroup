@@ -8,13 +8,15 @@ import { installAppLinkHandling } from '@/lib/app/links';
 import { registerNativePushToken, syncNativePush } from '@/lib/app/nativePush';
 import { installStatusBarSync } from '@/lib/app/statusBar';
 import { installResumeMotionReset } from '@/lib/app/appVisibility';
+import AppNotice from './AppNotice';
 
 // Mounted once in the portal layout. Inside the 3C iOS app it installs the
 // bridge receiver and in-app link handling, picks up an already-granted push
 // token after sign-in (never prompts: that only happens from a tap in
 // Settings), stores a rotated token the shell reports, and keeps the iOS
 // status bar style in step with the page theme. On the web every
-// effect returns at its first line, so it does nothing. Renders nothing.
+// effect returns at its first line, so it does nothing. Renders only the
+// in-app notice toast (nothing on the web).
 export default function AppBridgeHost() {
   const { user, loading } = useAuth();
   const signedIn = !loading && !!user;
@@ -46,5 +48,6 @@ export default function AppBridgeHost() {
     });
   }, [signedIn, user]);
 
-  return null;
+  // The shell's download toasts (BRIDGE.md notice); nothing on the web.
+  return <AppNotice />;
 }

@@ -156,7 +156,17 @@ export interface ResumedEvent {
   type: 'resumed';
   awayMs: number;
 }
-export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent | VisibleEvent | ResumedEvent;
+export type NoticeKind = 'progress' | 'success' | 'error' | 'dismiss';
+export const NOTICE_KINDS: readonly NoticeKind[] = ['progress', 'success', 'error', 'dismiss'];
+/** A short status toast from the shell (downloads). Same id replaces; 'dismiss' removes. */
+export interface NoticeEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'notice';
+  id: string;
+  kind: NoticeKind;
+  message: string;
+}
+export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent | VisibleEvent | ResumedEvent | NoticeEvent;
 
 const ERROR_CODES: readonly NativeErrorCode[] = ['canceled', 'denied', 'not_configured', 'unsupported', 'failed'];
 
@@ -214,6 +224,13 @@ export function parseNativeMessage(raw: unknown): NativeToWebMessage | null {
   if (m.type === 'visible') {
     if (typeof m.visible !== 'boolean') return null;
     return { source: NATIVE_SOURCE, type: 'visible', visible: m.visible };
+  }
+  if (m.type === 'notice') {
+    if (typeof m.id !== 'string' || !m.id || m.id.length > 200) return null;
+    if (!NOTICE_KINDS.includes(m.kind as NoticeKind)) return null;
+    const message = typeof m.message === 'string' ? m.message.slice(0, 300) : '';
+    if (m.kind !== 'dismiss' && !message) return null;
+    return { source: NATIVE_SOURCE, type: 'notice', id: m.id, kind: m.kind as NoticeKind, message };
   }
   if (m.type === 'resumed') {
     if (typeof m.awayMs !== 'number' || !Number.isFinite(m.awayMs) || m.awayMs < 0) return null;
