@@ -26,13 +26,13 @@ const clickButton = async () => {
 };
 
 describe('ClearNotes', () => {
-  it('shows a short error and a Retry when the clear fails', async () => {
+  it('shows a short error and a Try again when the clear fails', async () => {
     const clearAll = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
     await act(async () => root.render(<ClearNotes clearAll={clearAll} />));
 
     await clickButton();
     expect(container.querySelector('[role=alert]')?.textContent).toBe("Couldn't clear");
-    expect(container.querySelector('button')?.textContent).toBe('Retry');
+    expect(container.querySelector('button')?.textContent).toBe('Try again');
 
     await clickButton();
     expect(clearAll).toHaveBeenCalledTimes(2);

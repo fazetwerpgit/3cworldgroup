@@ -105,12 +105,12 @@ function ManagerInterviewForm() {
         body: JSON.stringify(form),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to submit');
+      if (!res.ok) throw new Error(json.error || "Couldn't submit");
       setReferenceId(json.id);
       setForm(EMPTY);
       setRound((r) => r + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      setError(err instanceof Error ? err.message : "Couldn't submit");
     } finally {
       setSaving(false);
     }
@@ -201,7 +201,7 @@ function ManagerInterviewForm() {
                 Couldn&apos;t load markets
                 <button type="button" className={s.retry} onClick={retryOptions}>
                   <RotateCw size={14} aria-hidden="true" />
-                  Retry
+                  Try again
                 </button>
               </span>
             ) : (

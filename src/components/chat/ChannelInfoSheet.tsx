@@ -150,12 +150,12 @@ export function ChannelInfoSheet({
         const response = await authedFetch(`/api/portal/chat/channels/${channelId}/members`);
         const json = await response.json();
         if (isCancelled?.()) return;
-        if (!response.ok) throw new Error(json.error || 'Failed to load members');
+        if (!response.ok) throw new Error(json.error || "Couldn't load members");
         setMembers(Array.isArray(json.members) ? json.members : []);
         setAddable(Array.isArray(json.addable) ? json.addable : []);
       } catch (err) {
         if (isCancelled?.()) return;
-        setError(err instanceof Error ? err.message : 'Failed to load members');
+        setError(err instanceof Error ? err.message : "Couldn't load members");
       } finally {
         if (!isCancelled?.()) setLoading(false);
       }
@@ -206,11 +206,11 @@ export function ChannelInfoSheet({
       );
       if (!response.ok) {
         const json = await response.json().catch(() => ({}));
-        throw new Error(json.error || 'Failed to add member');
+        throw new Error(json.error || "Couldn't add member");
       }
       await loadMembers();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to add member');
+      setActionError(err instanceof Error ? err.message : "Couldn't add member");
     } finally {
       setMutatingUid(null);
     }
@@ -233,11 +233,11 @@ export function ChannelInfoSheet({
       );
       if (!response.ok) {
         const json = await response.json().catch(() => ({}));
-        throw new Error(json.error || 'Failed to remove member');
+        throw new Error(json.error || "Couldn't remove member");
       }
       await loadMembers();
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to remove member');
+      setActionError(err instanceof Error ? err.message : "Couldn't remove member");
     } finally {
       setMutatingUid(null);
     }
@@ -253,13 +253,13 @@ export function ChannelInfoSheet({
       try {
         const response = await authedFetch(`/api/portal/chat/channels/${channelId}/media`);
         const json = await response.json();
-        if (!response.ok) throw new Error(json.error || 'Failed to load media');
+        if (!response.ok) throw new Error(json.error || "Couldn't load media");
         if (!cancelled) {
           setMedia(Array.isArray(json.media) ? json.media : []);
           setMediaLoaded(true);
         }
       } catch (err) {
-        if (!cancelled) setMediaError(err instanceof Error ? err.message : 'Failed to load media');
+        if (!cancelled) setMediaError(err instanceof Error ? err.message : "Couldn't load media");
       } finally {
         if (!cancelled) setMediaLoading(false);
       }
@@ -282,13 +282,13 @@ export function ChannelInfoSheet({
           `/api/portal/chat/messages/pin?channelId=${encodeURIComponent(channelId)}`
         );
         const json = await response.json();
-        if (!response.ok) throw new Error(json.error || 'Failed to load pinned messages');
+        if (!response.ok) throw new Error(json.error || "Couldn't load pinned messages");
         if (!cancelled) {
           setPins(Array.isArray(json.pins) ? json.pins : []);
           setPinsLoaded(true);
         }
       } catch (err) {
-        if (!cancelled) setPinsError(err instanceof Error ? err.message : 'Failed to load pinned messages');
+        if (!cancelled) setPinsError(err instanceof Error ? err.message : "Couldn't load pinned messages");
       } finally {
         if (!cancelled) setPinsLoading(false);
       }

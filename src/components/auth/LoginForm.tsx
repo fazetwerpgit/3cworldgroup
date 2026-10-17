@@ -189,7 +189,7 @@ export function LoginForm() {
       await resetPassword(email);
       setResetEmailSent(true);
     } catch {
-      setError('Failed to send reset email. Please check your email address.');
+      setError("Couldn't send the reset email. Check your email address.");
     } finally {
       setLoading(false);
     }

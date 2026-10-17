@@ -200,7 +200,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Failed to fetch sales');
+        if (!response.ok) throw new Error(data.error || "Couldn't load sales");
         if (!cancelled) setSales(Array.isArray(data.sales) ? data.sales : []);
       } catch {
         // Pages and actions stay usable even if the sales fetch fails; allow a

@@ -330,10 +330,10 @@ export function ProofCapture({
                           type="button"
                           className={l.thumbRetry}
                           onClick={() => uploads.retry(tile.key)}
-                          aria-label={`Retry ${label.toLowerCase()}`}
+                          aria-label={`Try ${label.toLowerCase()} again`}
                         >
                           <RotateCcw size={14} aria-hidden="true" />
-                          Retry
+                          Try again
                         </button>
                       </span>
                     )}

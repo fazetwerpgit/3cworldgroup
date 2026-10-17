@@ -103,7 +103,7 @@ export function ReactionBar({
         body: JSON.stringify({ channelId, messageId, emoji }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to update reaction');
+      if (!response.ok) throw new Error(json.error || "Couldn't update reaction");
     } catch (error) {
       // Revert this emoji's optimistic flip; props become the source of truth.
       setOverlay((prev) => {
@@ -112,7 +112,7 @@ export function ReactionBar({
         next.delete(emoji);
         return next;
       });
-      onError?.(error instanceof Error ? error.message : 'Failed to update reaction');
+      onError?.(error instanceof Error ? error.message : "Couldn't update reaction");
     } finally {
       inFlightRef.current.delete(emoji);
     }

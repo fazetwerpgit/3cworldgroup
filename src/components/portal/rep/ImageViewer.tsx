@@ -148,7 +148,7 @@ export function ImageViewer({
             <div className={v.panel}>
               <AlertTriangle size={28} aria-hidden="true" />
               <p role="alert">
-                {content.status === 'error' ? content.message : 'Could not load the image. Close and try again.'}
+                {content.status === 'error' ? content.message : "Couldn't load the image. Close and try again."}
               </p>
             </div>
           ) : content.status === 'loading' ? (
@@ -225,7 +225,7 @@ export function useAttachmentViewer() {
       const settle = (content: ViewerContent) => {
         if (request.current === id) setState((prev) => (prev ? { ...prev, content } : prev));
       };
-      const failed: ViewerContent = { status: 'error', message: 'Could not load the file. Close and try again.' };
+      const failed: ViewerContent = { status: 'error', message: "Couldn't load the file. Close and try again." };
       resolveUrl().then(
         (url) => settle(url ? (isPdfUrl(url) ? { status: 'pdf', url } : { status: 'image', url }) : failed),
         () => settle(failed)

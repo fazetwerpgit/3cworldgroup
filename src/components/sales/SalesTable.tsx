@@ -536,7 +536,7 @@ export function SalesTable({
                 {payPlan.onRetry ? (
                   <button type="button" className={s.retry} onClick={payPlan.onRetry}>
                     <RotateCw size={14} aria-hidden="true" />
-                    Retry
+                    Try again
                   </button>
                 ) : null}
               </div>

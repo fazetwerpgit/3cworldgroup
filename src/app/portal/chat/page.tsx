@@ -500,7 +500,7 @@ export default function TeamChatPage() {
         await safety.report({ channelId: activeChannelId, messageId: message.id, reason });
         setNotice('Thanks. An admin will review it.');
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not send the report. Try again.');
+        setError(err instanceof Error ? err.message : "Couldn't send the report. Try again.");
       }
     },
     [activeChannelId, safety]
@@ -513,7 +513,7 @@ export default function TeamChatPage() {
         const name = await safety.block(message.authorId);
         setNotice(`${name || message.authorName} is blocked.`);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not block. Try again.');
+        setError(err instanceof Error ? err.message : "Couldn't block. Try again.");
       }
     },
     [safety]
@@ -526,7 +526,7 @@ export default function TeamChatPage() {
         await safety.unblock(message.authorId);
         setNotice(`${message.authorName} is unblocked.`);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not unblock. Try again.');
+        setError(err instanceof Error ? err.message : "Couldn't unblock. Try again.");
       }
     },
     [safety]
@@ -993,7 +993,7 @@ export default function TeamChatPage() {
   const copyMessageText = (text: string) => {
     if (!text) return;
     void navigator.clipboard?.writeText(text).catch(() => {
-      setError('Could not copy to clipboard');
+      setError("Couldn't copy to clipboard");
     });
   };
 
@@ -1015,9 +1015,9 @@ export default function TeamChatPage() {
         body: JSON.stringify({ channelId: activeChannelId, messageId: target.id, text }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to edit message');
+      if (!response.ok) throw new Error(json.error || "Couldn't edit message");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to edit message');
+      setError(err instanceof Error ? err.message : "Couldn't edit message");
       setPendingEdits((prev) => {
         const next = { ...prev };
         delete next[target.id];
@@ -1039,9 +1039,9 @@ export default function TeamChatPage() {
         }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to delete message');
+      if (!response.ok) throw new Error(json.error || "Couldn't delete message");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete message');
+      setError(err instanceof Error ? err.message : "Couldn't delete message");
     }
   };
 
@@ -1062,9 +1062,9 @@ export default function TeamChatPage() {
         }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to pin message');
+      if (!response.ok) throw new Error(json.error || "Couldn't pin message");
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to pin message');
+      setError(err instanceof Error ? err.message : "Couldn't pin message");
     }
   };
 
@@ -1280,7 +1280,7 @@ export default function TeamChatPage() {
                                   )
                                 ) : (
                                   <button type="button" onClick={() => retryPending(message)} className={c.retryBtn}>
-                                    <RotateCw size={14} aria-hidden="true" /> {failedStatusLabel(message)} · Retry
+                                    <RotateCw size={14} aria-hidden="true" /> {failedStatusLabel(message)} · Try again
                                   </button>
                                 )}
                                 <button type="button" onClick={() => discardPending(message.id)} aria-label="Discard message" className={c.discardBtn}>

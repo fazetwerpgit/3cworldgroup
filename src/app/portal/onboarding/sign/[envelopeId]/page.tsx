@@ -271,7 +271,7 @@ function EsignSign() {
           {failure.retry ? (
             <button type="button" className={s.retry} onClick={() => setAttempt((n) => n + 1)}>
               <RotateCw size={14} aria-hidden="true" />
-              Retry
+              Try again
             </button>
           ) : (
             <Link href={CHECKLIST_HREF} className={`${s.retry} ${styles.linkBtn}`}>

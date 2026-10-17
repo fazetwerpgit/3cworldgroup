@@ -90,7 +90,7 @@ function OnboardingChecklist() {
         headers: await authHeaders(),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to load checklist');
+      if (!response.ok) throw new Error(json.error || "Couldn't load checklist");
       setData(json);
       setLoadError(false);
     } catch {
@@ -151,7 +151,7 @@ function OnboardingChecklist() {
         }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to submit');
+      if (!response.ok) throw new Error(json.error || "Couldn't submit");
 
       setSubmitModal(null);
       setReference('');
@@ -161,7 +161,7 @@ function OnboardingChecklist() {
       setOpenItemId(null);
       await fetchChecklist();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      setError(err instanceof Error ? err.message : "Couldn't submit");
     } finally {
       setSubmitting(false);
     }
@@ -377,7 +377,7 @@ function OnboardingChecklist() {
               <span>Couldn&apos;t load your checklist</span>
               <button type="button" className={s.retry} onClick={retryLoad}>
                 <RotateCw size={14} aria-hidden="true" />
-                Retry
+                Try again
               </button>
             </div>
           ) : data?.items?.length ? (

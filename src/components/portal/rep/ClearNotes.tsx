@@ -22,7 +22,7 @@ export function ClearNotes({ clearAll }: { clearAll: () => Promise<boolean> }) {
         </span>
       ) : null}
       <button type="button" className={s.textBtn} disabled={status === 'busy'} onClick={() => void run()}>
-        {status === 'failed' ? 'Retry' : 'Clear all'}
+        {status === 'failed' ? 'Try again' : 'Clear all'}
       </button>
     </div>
   );

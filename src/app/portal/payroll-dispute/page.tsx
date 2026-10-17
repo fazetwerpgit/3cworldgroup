@@ -97,12 +97,12 @@ function PayrollDisputeForm() {
         body: JSON.stringify({ ...form, uploadId }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to submit');
+      if (!res.ok) throw new Error(json.error || "Couldn't submit");
       setReferenceId(json.id);
       setForm({ ...EMPTY, ...identity });
       setUploadId(newFormUploadId()); // next dispute gets a fresh folder (and a fresh upload widget)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      setError(err instanceof Error ? err.message : "Couldn't submit");
     } finally {
       setSaving(false);
     }

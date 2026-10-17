@@ -214,13 +214,13 @@ export default function CallsSchedulePage() {
     try {
       const response = await fetch('/api/portal/calls', { headers: await authHeaders() });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to load call schedule');
+      if (!response.ok) throw new Error(json.error || "Couldn't load call schedule");
       setData(json);
       lastGoodAt.current = Date.now();
       setStaleAt(null);
       setLoadError('');
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Failed to load call schedule');
+      setLoadError(err instanceof Error ? err.message : "Couldn't load call schedule");
       if (lastGoodAt.current !== null) setStaleAt(lastGoodAt.current);
     } finally {
       setLoading(false);
@@ -250,12 +250,12 @@ export default function CallsSchedulePage() {
         body: JSON.stringify(form),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to add call');
+      if (!response.ok) throw new Error(json.error || "Couldn't add call");
       setShowForm(false);
       setForm(EMPTY_FORM);
       await fetchCalls();
     } catch (err) {
-      setError(friendlyError(err instanceof Error ? err.message : 'Failed to add call', 'save').message);
+      setError(friendlyError(err instanceof Error ? err.message : "Couldn't add call", 'save').message);
     } finally {
       setSaving(false);
     }
@@ -272,10 +272,10 @@ export default function CallsSchedulePage() {
         body: JSON.stringify({ callId: call.id }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to remove call');
+      if (!response.ok) throw new Error(json.error || "Couldn't remove call");
       await fetchCalls();
     } catch (err) {
-      setError(friendlyError(err instanceof Error ? err.message : 'Failed to remove call', 'remove it').message);
+      setError(friendlyError(err instanceof Error ? err.message : "Couldn't remove call", 'remove it').message);
     } finally {
       setDeletingId(null);
     }
@@ -339,7 +339,7 @@ export default function CallsSchedulePage() {
           <div className={s.failed} role="alert">
             <span>Couldn&apos;t load the call schedule</span>
             <button type="button" className={s.retry} onClick={retryLoad}>
-              <RotateCw size={14} aria-hidden="true" /> Retry
+              <RotateCw size={14} aria-hidden="true" /> Try again
             </button>
             {loadError ? <span className={s.srOnly}>{loadError}</span> : null}
           </div>

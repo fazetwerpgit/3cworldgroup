@@ -485,7 +485,7 @@ export function InviteSignAll({ token, signingKey, onSessionLost }: Props) {
                           onClick={() => void run([doc])}
                         >
                           <RotateCw size={14} aria-hidden="true" />
-                          Retry
+                          Try again
                         </button>
                       </div>
                     ) : null}

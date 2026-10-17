@@ -39,7 +39,7 @@ export default function PushNotificationsCard() {
     setError(
       result === 'blocked'
         ? 'Notifications were blocked. Enable them in your browser settings and try again.'
-        : 'Could not enable notifications. Please try again.'
+        : "Couldn't enable notifications. Try again."
     );
     setState('off');
   };

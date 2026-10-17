@@ -90,7 +90,7 @@ export function ChannelRows({
       <div className={s.failed} role="alert">
         Couldn&apos;t load channels
         <button type="button" className={s.retry} onClick={onRetry}>
-          <RotateCw size={14} aria-hidden="true" /> Retry
+          <RotateCw size={14} aria-hidden="true" /> Try again
         </button>
       </div>
     );
@@ -107,7 +107,7 @@ export function ChannelRows({
           <WifiOff size={16} aria-hidden="true" />
           <span>Chat&apos;s offline</span>
           <button type="button" onClick={onRetry} className={c.listOfflineRetry}>
-            <RotateCw size={14} aria-hidden="true" /> Retry
+            <RotateCw size={14} aria-hidden="true" /> Try again
           </button>
         </p>
       ) : null}

@@ -97,7 +97,7 @@ export function RepPayStructure() {
         headers: { Authorization: `Bearer ${token ?? ''}` },
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to load pay structure');
+      if (!response.ok) throw new Error(json.error || "Couldn't load pay structure");
       writeDataCache(user.uid, PAY_STRUCTURE_CACHE_KEY, json, gen);
       lastGoodAt.current = Date.now();
       setStaleAt(null);
@@ -142,14 +142,14 @@ export function RepPayStructure() {
         body: JSON.stringify({ tiers: draft }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to save');
+      if (!response.ok) throw new Error(json.error || "Couldn't save");
       invalidateAfterCompPlanWrite();
       setEditing(false);
       setSuccess('Pay structure updated');
       window.setTimeout(() => setSuccess(''), 3000);
       await fetchStructure();
     } catch (err) {
-      setError(friendlyError(err instanceof Error ? err.message : 'Failed to save', 'save').message);
+      setError(friendlyError(err instanceof Error ? err.message : "Couldn't save", 'save').message);
     } finally {
       setSaving(false);
     }

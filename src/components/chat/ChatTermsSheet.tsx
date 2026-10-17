@@ -29,7 +29,7 @@ export function ChatTermsSheet({ onAccept }: { onAccept: () => Promise<void> }) 
     try {
       await onAccept();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save. Try again.');
+      setError(err instanceof Error ? err.message : "Couldn't save. Try again.");
       setSaving(false);
     }
   };

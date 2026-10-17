@@ -222,7 +222,7 @@ export function LoadFailed({ what, onRetry }: { what: string; onRetry: () => voi
     <div className={s.failed} role="alert">
       <span>Couldn&apos;t load {what}</span>
       <button type="button" className={s.retry} onClick={onRetry}>
-        <RotateCw size={14} aria-hidden="true" /> Retry
+        <RotateCw size={14} aria-hidden="true" /> Try again
       </button>
     </div>
   );

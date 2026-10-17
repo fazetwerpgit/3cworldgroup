@@ -711,7 +711,7 @@ export function Attachment({
           </span>
           <span className={f.fileActions}>
             <button type="button" className={f.fileBtn} onClick={() => void pick(fileRef.current)}>
-              Retry
+              Try again
             </button>
             <label className={f.fileBtn}>
               {input}

@@ -266,7 +266,7 @@ export function RepLogSale() {
           <span className={l.estNone}>Couldn&apos;t load pay rates</span>
           <span className={l.estRetryLabel}>
             <RotateCw size={12} strokeWidth={2.5} aria-hidden="true" />
-            Retry
+            Try again
           </span>
         </button>
       ) : (

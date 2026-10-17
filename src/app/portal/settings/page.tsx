@@ -137,7 +137,7 @@ export default function SettingsPage() {
         // Empty means never picked: leave it unset rather than send a blank.
         body: JSON.stringify({ displayName, phone, ...(shirtSize ? { shirtSize } : {}) }),
       });
-      if (!response.ok) throw new Error('Failed to update profile');
+      if (!response.ok) throw new Error("Couldn't update profile");
       await refreshUser();
       setProfileMsg({ ok: true, text: 'Changes saved.' });
       setTimeout(() => setProfileMsg(null), 3000);

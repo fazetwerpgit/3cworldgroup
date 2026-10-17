@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Review item 14: a stalled upload has a Cancel that aborts it, clears the
-// tile and unblocks Send; a timeout leaves Retry for the same file.
+// tile and unblocks Send; a timeout leaves Try again for the same file.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -73,7 +73,7 @@ describe('Attachment upload cancel and retry', () => {
     expect(container.querySelector<HTMLInputElement>('input[type=file]')?.disabled).toBe(false);
   });
 
-  it('a timeout offers Retry, which sends the same file again', async () => {
+  it('a timeout offers Try again, which sends the same file again', async () => {
     const upload = vi
       .fn<(file: File, signal: AbortSignal) => Promise<string>>()
       .mockRejectedValueOnce(new FormUploadError('Upload timed out'))
@@ -84,7 +84,7 @@ describe('Attachment upload cancel and retry', () => {
     expect(container.textContent).toContain('Upload timed out');
     expect(busy).toHaveBeenLastCalledWith(false);
 
-    await act(async () => button('Retry')!.click());
+    await act(async () => button('Try again')!.click());
 
     expect(upload).toHaveBeenCalledTimes(2);
     expect(upload.mock.calls[1][0]).toBe(photo);

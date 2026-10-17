@@ -63,13 +63,13 @@ export default function ReportBugCard() {
         body: JSON.stringify({ area, summary, details, pageUrl }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to submit');
+      if (!res.ok) throw new Error(json.error || "Couldn't submit");
       setDone(true);
       setSummary('');
       setDetails('');
       setPage('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit');
+      setError(err instanceof Error ? err.message : "Couldn't submit");
     } finally {
       setSaving(false);
     }

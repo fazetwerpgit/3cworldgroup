@@ -90,7 +90,7 @@ function StatusLine({
           <span>Couldn&apos;t upload{uploadError ? `: ${uploadError}` : ''}</span>
           <button type="button" className={b.statusAction} onClick={onRetryUpload}>
             <RotateCcw size={14} aria-hidden="true" />
-            Retry
+            Try again
           </button>
         </div>
       );

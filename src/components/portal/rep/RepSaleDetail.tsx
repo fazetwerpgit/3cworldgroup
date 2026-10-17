@@ -384,7 +384,7 @@ export function RepSaleDetail() {
         <>
           <span className={x.payQuiet}>Couldn&apos;t load rates</span>
           <button type="button" className={x.retryLink} onClick={comp.retry}>
-            Retry
+            Try again
           </button>
         </>
       );
@@ -633,7 +633,7 @@ export function RepSaleDetail() {
         <DeleteSheet
           name={name}
           deleting={deleting}
-          error={deleteFailed ? error || 'Could not delete the sale. Try again.' : null}
+          error={deleteFailed ? error || "Couldn't delete the sale. Try again." : null}
           onCancel={() => {
             setConfirmDelete(false);
             setDeleteFailed(false);

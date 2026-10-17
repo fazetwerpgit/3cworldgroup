@@ -178,7 +178,7 @@ describe('InviteSignAll', () => {
     expect(button(/Sign 1 document/)).toBeTruthy();
     expect(container.textContent).not.toContain('all set');
 
-    await click(button(/Retry/));
+    await click(button(/Try again/));
 
     expect(signedEnvelopes).toEqual(['env-w9', 'env-contract', 'env-direct_deposit', 'env-contract']);
     expect(container.textContent).toContain('You’re all set');

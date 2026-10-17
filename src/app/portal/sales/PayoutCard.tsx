@@ -96,7 +96,7 @@ export function PayoutCard<T extends CardSale>({
               <span>Couldn&apos;t load pay rates</span>
               <button type="button" className={s.retry} onClick={onRetryPlan}>
                 <RotateCw size={14} aria-hidden="true" />
-                Retry
+                Try again
               </button>
             </div>
           ) : hasPlan && upcoming ? (

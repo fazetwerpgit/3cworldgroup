@@ -84,7 +84,7 @@ function LoadFailed({ onRetry }: { onRetry: () => void }) {
         <span>Couldn&apos;t load your sales</span>
         <button type="button" className={s.retry} onClick={onRetry}>
           <RotateCw size={14} aria-hidden="true" />
-          Retry
+          Try again
         </button>
       </div>
     </section>

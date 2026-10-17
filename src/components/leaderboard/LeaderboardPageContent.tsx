@@ -90,7 +90,7 @@ export function LeaderboardPageContent({
           <span>{entries.length > 0 ? "Couldn't refresh the board" : "Couldn't load the board"}</span>
           {onRetry ? (
             <button type="button" className={`${s.retry} ${styles.errorRetry}`} onClick={onRetry}>
-              <RotateCw size={14} aria-hidden="true" /> Retry
+              <RotateCw size={14} aria-hidden="true" /> Try again
             </button>
           ) : null}
         </div>
