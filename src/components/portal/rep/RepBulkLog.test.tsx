@@ -617,6 +617,47 @@ describe('RepBulkLog', () => {
     expect(saved()?.rows[0].shots.every((shot) => shot.checked)).toBe(true);
   });
 
+  it('drags the sheet closed when nothing changed, but not once the rep has edited', async () => {
+    writeBulkBatch(KEY, [savedRow('a')]);
+    await render();
+    await settle();
+    const dialog = () => document.body.querySelector<HTMLElement>('[role="dialog"]');
+    const open = () => act(async () => cards()[0].querySelector<HTMLButtonElement>('button[aria-label="Check sale 1"]')!.click());
+    const drag = async () => {
+      const title = document.getElementById('bulk-edit-title')!;
+      const fire = (type: string, y: number, t: number) => {
+        const event = new Event(type, { bubbles: true, cancelable: true });
+        const point = { clientX: 100, clientY: y };
+        Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [point] });
+        Object.defineProperty(event, 'changedTouches', { value: [point] });
+        Object.defineProperty(event, 'timeStamp', { value: t });
+        title.dispatchEvent(event);
+      };
+      await act(async () => {
+        fire('touchstart', 100, 0);
+        fire('touchmove', 140, 50);
+        fire('touchmove', 400, 100);
+        fire('touchend', 400, 120);
+      });
+      await act(async () => new Promise((r) => setTimeout(r, 400)));
+    };
+
+    await open();
+    expect(dialog()).not.toBeNull();
+    await drag();
+    expect(dialog()).toBeNull();
+
+    await open();
+    const name = document.getElementById('customerName') as HTMLInputElement;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(name, 'Ana M. Ruiz');
+      name.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await drag();
+    expect(dialog()).not.toBeNull();
+    expect((document.getElementById('customerName') as HTMLInputElement).value).toBe('Ana M. Ruiz');
+  });
+
   it('marks the order number required in the sheet, screenshot or not', async () => {
     writeBulkBatch(KEY, [savedRow('a')]);
     await render();

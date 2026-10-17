@@ -63,6 +63,17 @@ export function sheetEdits(opened: BulkSaleFields, now: BulkSaleFields): BulkShe
   };
 }
 
+/** Whether `edits` would change the sale (a cleared "Check this" alone does not count). */
+export function hasSheetEdits(edits: BulkSheetEdits | null | undefined): boolean {
+  if (!edits) return false;
+  return (
+    Object.keys(edits.formData).length > 0 ||
+    edits.products !== undefined ||
+    edits.provider !== undefined ||
+    edits.saleDateTouched !== undefined
+  );
+}
+
 /** `fields` with the rep's edits put back on top. */
 export function withSheetEdits(fields: BulkSaleFields, edits: BulkSheetEdits | null | undefined): BulkSaleFields {
   if (!edits) return fields;
@@ -150,7 +161,20 @@ export function BulkSaleSheet({
   // The list behind keeps re-rendering while other screenshots are read: the
   // focus and the Escape handler are set up once, not on every new onClose.
   // (close is stable: the hook reads the latest onClose itself.)
-  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onClose);
+  // Unsaved edits (typed here, or carried over when the sheet was opened again):
+  // no drag-to-dismiss, so a stray pull down can't throw them away. Close,
+  // Escape and the backdrop still close it on purpose.
+  const current: BulkSaleChange = {
+    formData: form.formData,
+    products: form.products,
+    provider: form.provider ?? providerChoice,
+    saleDateTouched: form.saleDateTouched,
+    flags,
+  };
+  // Measured against the form as first rendered, so the form's own setup never reads as an edit.
+  const [baseline] = useState(current);
+  const dirty = hasSheetEdits(edits) || hasSheetEdits(sheetEdits(baseline, current));
+  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onClose, { drag: !dirty });
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
@@ -196,14 +220,7 @@ export function BulkSaleSheet({
 
   const save = (event: React.FormEvent) => {
     event.preventDefault();
-    const change: BulkSaleChange = {
-      formData: form.formData,
-      products: form.products,
-      provider: form.provider ?? providerChoice,
-      saleDateTouched: form.saleDateTouched,
-      flags,
-    };
-    onSave(change, shown, sheetEdits(opened, change));
+    onSave(current, shown, sheetEdits(opened, current));
   };
 
   // The full screenshot once uploaded; the card thumbnail only until then.
