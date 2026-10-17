@@ -166,7 +166,7 @@ export default function PrivacyPolicyPage() {
                   <strong>Ask 3C.</strong> Ask 3C answers questions about the portal and selling. Your
                   question, the earlier messages in that conversation, any photo you attach, and some
                   portal information about you (your first name, city and state, dealer codes, and a
-                  summary of your recent sales) are sent to an AI provider to write the answer. Email addresses and phone numbers you type are removed before your
+                  summary of your recent sales) are sent to a third-party AI provider{/* TODO(Jacob): name */} to write the answer. Email addresses and phone numbers you type are removed before your
                   question is sent or saved. We keep a record of each question and answer so we can
                   improve Ask 3C. Photos you attach are not saved.
                   {/* TODO(Jacob): name the Ask 3C provider. The code defaults to DeepSeek
@@ -180,8 +180,8 @@ export default function PrivacyPolicyPage() {
                   Google&apos;s Gemini service to turn your speech into text, and the homeowner&apos;s
                   replies are spoken using Google&apos;s Gemini text-to-speech. Otherwise, your speech is
                   turned into text by your phone or browser&apos;s built-in speech recognition (on
-                  iPhone, provided by Apple). The text of your practice conversation is sent to our AI
-                  provider to write the homeowner&apos;s replies and your coaching feedback, and we keep a
+                  iPhone, provided by Apple). The text of your practice conversation is sent to a third-party
+                  AI provider{/* TODO(Jacob): name */} to write the homeowner&apos;s replies and your coaching feedback, and we keep a
                   record of each finished practice session and its feedback. We do not save recordings
                   of your voice.
                 </li>
@@ -225,6 +225,11 @@ export default function PrivacyPolicyPage() {
                 report was resolved and by whom. To stop misuse, we keep a small count of how often
                 each person reports and blocks.
               </p>
+              <p>
+                Reports are kept after they are resolved, as a moderation record. If a person named
+                in a report deletes their account, their name in the report is replaced with
+                &ldquo;Deleted user,&rdquo; but the copy of the reported message is kept as evidence.
+              </p>
             </LegalSection>
 
             <LegalSection id="privacy-6" title="6. How We Share Your Information">
@@ -241,7 +246,12 @@ export default function PrivacyPolicyPage() {
                     <li>Google Firebase and Google Cloud, for sign-in, our database, file storage, and push notifications.</li>
                     <li>Vercel, which hosts our website and portal and provides our cookieless page analytics.</li>
                     <li>Postmark, which sends our email.</li>
-                    <li>Google Gemini, for the AI features described above.</li>
+                    <li>Google Gemini, for sale screenshot auto-fill and for speech in hands-free voice practice.</li>
+                    <li>
+                      A third-party AI provider, which writes Ask 3C answers and the practice
+                      homeowner&apos;s replies and coaching feedback.
+                      {/* TODO(Jacob): name the Ask/Practice provider here (see the TODO in section 4). */}
+                    </li>
                     <li>Google reCAPTCHA, which helps block automated sign-ups.</li>
                     <li>Google Workspace, where we keep a copy of contractor applications.</li>
                     <li>GIPHY, for GIFs in team chat.</li>
@@ -311,16 +321,19 @@ export default function PrivacyPolicyPage() {
                 the request from that screen. When your account is deleted, we close your sign-in and
                 remove your personal profile details (contact information, address, profile photo),
                 your Social Security and driver&apos;s license numbers and license photos, and your
-                notification devices. Your profile and the chat messages you sent show as &ldquo;Deleted
-                user.&rdquo;
+                notification devices. Your profile, the chat messages you sent, the chat list preview of
+                your last message, other people&apos;s block lists, and chat reports you filed or that
+                name you show as &ldquo;Deleted user.&rdquo;
               </p>
               <p>
                 Some records are kept after deletion because we need them for business and legal
                 reasons: your sales, commission, and pay records, including the sale screenshots
                 attached to them, which we must keep for payroll, tax, and carrier reconciliation;
                 signed contractor paperwork, such as tax and direct-deposit forms and contractor
-                agreements; and a log of who viewed your identity information. Records of your Ask 3C
-                questions and practice sessions are also kept.
+                agreements; a log of who viewed your identity information; and, in chat reports, the
+                copy of a reported message (its text and any attachment link), kept as moderation
+                evidence with the names replaced. Records of your Ask 3C questions and practice
+                sessions are also kept.
                 {/* TODO(Jacob): the self-delete route does not remove askLog or practiceLog rows, or the
                     message text itself (only the author name is replaced). Confirm that is intended, or
                     we add those to the deletion. */}
