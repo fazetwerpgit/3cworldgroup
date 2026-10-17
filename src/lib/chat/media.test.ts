@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readStoredAttachment, validateMessageAttachment } from './media';
+import { readStoredAttachment, sanitizeAttachmentFileName, validateMessageAttachment } from './media';
 
 const BUCKET = 'demo-bucket.appspot.com';
 
@@ -101,5 +101,13 @@ describe('readStoredAttachment — PDF preview', () => {
     expect(stored).toMatchObject({ type: 'file', name: 'Rate card.pdf' });
     expect(stored).not.toHaveProperty('previewUrl');
     expect(stored).not.toHaveProperty('previewWidth');
+  });
+});
+
+describe('sanitizeAttachmentFileName — content filter', () => {
+  it('replaces a file name the chat filter would refuse or mask with the fallback', () => {
+    expect(sanitizeAttachmentFileName('retard_list.pdf')).toBe('document.pdf');
+    expect(sanitizeAttachmentFileName('fuck-this.pdf')).toBe('document.pdf');
+    expect(sanitizeAttachmentFileName('Pay stub.pdf')).toBe('Pay stub.pdf');
   });
 });

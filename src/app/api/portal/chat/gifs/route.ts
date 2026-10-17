@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getVerifiedChatUser } from '@/lib/chat/access';
+import { isFilteredLabel } from '@/lib/chat/contentFilter';
 
 interface GifResult {
   id: string;
@@ -61,6 +62,11 @@ export async function GET(request: NextRequest) {
     }
 
     const q = (request.nextUrl.searchParams.get('q') ?? '').trim();
+    // A search the chat filter would refuse or mask is never sent to GIPHY:
+    // it answers with no results, the same as a search that matched nothing.
+    if (q && isFilteredLabel(q)) {
+      return NextResponse.json({ enabled: true, results: [] });
+    }
     const params = new URLSearchParams({
       api_key: key,
       limit: '24',

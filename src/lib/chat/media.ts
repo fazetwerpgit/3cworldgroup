@@ -1,4 +1,5 @@
 import { ChatAttachment } from '@/types';
+import { isFilteredLabel } from './contentFilter';
 
 // Allowed image MIME types for chat uploads, mapped to the extension we store the
 // object under. The extension is ALWAYS derived from the validated MIME type here —
@@ -51,13 +52,15 @@ export const MAX_ATTACHMENT_NAME_LENGTH = 120;
 /**
  * A display-safe file name: the last path segment only, control characters and
  * slashes removed, whitespace collapsed, capped at 120 chars (extension kept).
- * Falls back to `fallback` when nothing usable is left.
+ * Falls back to `fallback` when nothing usable is left, or when the chat
+ * content filter would refuse or mask the name (it is shown to the channel).
  */
 export function sanitizeAttachmentFileName(raw: unknown, fallback = 'document.pdf'): string {
   if (typeof raw !== 'string') return fallback;
   const lastSegment = raw.split(/[\\/]/).pop() ?? '';
   let name = lastSegment.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').replace(/\s+/g, ' ').trim();
   if (!name || name === '.' || name === '..') return fallback;
+  if (isFilteredLabel(name)) return fallback;
   if (name.length > MAX_ATTACHMENT_NAME_LENGTH) {
     const ext = name.match(/\.[A-Za-z0-9]{1,8}$/)?.[0] ?? '';
     name = `${name.slice(0, MAX_ATTACHMENT_NAME_LENGTH - ext.length - 1).trimEnd()}…${ext}`;

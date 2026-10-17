@@ -165,4 +165,20 @@ describe('GET /api/portal/chat/gifs', () => {
     const calledUrl = fetchSpy.mock.calls[0][0] as string;
     expect(calledUrl).toContain('/v1/gifs/trending');
   });
+
+  it('never sends a search the chat filter would refuse or mask to GIPHY', async () => {
+    mockGate.mockResolvedValue(REP);
+    process.env.GIPHY_API_KEY = 'k';
+    const fetchSpy = vi.fn(async (_url: string) => ({ ok: true, json: async () => ({ data: [] }) }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    for (const q of ['retard', 'fag!', 'fuck yeah']) {
+      const res = await GET(req(q));
+      expect(await res.json()).toEqual({ enabled: true, results: [] });
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    await GET(req('celebrate'));
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
 });
