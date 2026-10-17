@@ -126,3 +126,18 @@ describe('owner counts leave demo accounts out', () => {
     expect(users.map((u) => u.fieldRole).sort()).toEqual(['ae_tier_1', 'entry_level_rep']);
   });
 });
+
+describe('owner book leaves demo-account sales out', () => {
+  it('projects the demo stamp and drops stamped sales from the book', async () => {
+    const base = { products: [], status: 'approved', totalValue: 60, saleDate: new Date('2026-10-05T17:00:00Z') };
+    saleDocs.push(
+      { id: 'real', data: () => ({ ...base, salesRepId: 'miles', salesRepName: 'Miles Scoonover' }) },
+      { id: 'demo', data: () => ({ ...base, salesRepId: 'demo', salesRepName: 'App Review', demoAccount: true }) },
+    );
+
+    const book = await createFirestoreOwnerSource().loadBook();
+
+    expect(selectMock.mock.calls.at(-1)).toContain('demoAccount');
+    expect(book.sales.map((sale) => sale.id)).toEqual(['real']);
+  });
+});

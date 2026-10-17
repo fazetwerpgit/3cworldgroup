@@ -3,6 +3,7 @@ import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { periodBounds } from '@/lib/leaderboard/periods';
 import { summarizeCompanySales, type CompanyTapeStats, type TapeSale } from '@/lib/sales/companyTape';
+import { saleVisibleTo } from '@/lib/users/demoAccount';
 
 // Names, counts and times only: the tape never renders a per-sale or per-rep
 // amount, so an individual rep's sale value has no reason to leave this endpoint.
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
 
     snapshot.forEach((doc) => {
       const data = doc.data();
+      // A demo account's sales never reach the company tape.
+      if (!saleVisibleTo(data, caller.uid)) return;
       // Bucket on the day the sale HAPPENED, not the day it was uploaded or
       // approved: a rep back-entering last month's work must not inflate this
       // month's tape (or read as today's latest sale). approvedAt/createdAt

@@ -6,6 +6,7 @@ import { FiberOrder, FiberStatusResponse } from '@/types';
 import { attachLoggedCustomerNames, attachMatchedUserNames, LoggedSale } from '@/lib/fiberReport/matchSales';
 import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 import { ownDealerCodes } from '@/lib/fiberReport/dealerCodes';
+import { isDemoSale } from '@/lib/users/demoAccount';
 
 function sortByOrderDate(orders: FiberOrder[]): FiberOrder[] {
   return [...orders].sort((a, b) => {
@@ -101,7 +102,10 @@ export async function GET(request: NextRequest) {
     const allOrders = await getAllFiberOrders(lastReportAt, { fresh });
     const matchedOrders = allOrders.filter((order) => order.matchedUserId !== null);
     const salesSnapshot = await adminDb.collection('sales').get();
-    const sales = salesSnapshot.docs.map((doc) => toLoggedSale(doc.data()));
+    // A demo account's sales never name a real carrier order's customer or rep.
+    const sales = salesSnapshot.docs
+      .filter((doc) => !isDemoSale(doc.data()))
+      .map((doc) => toLoggedSale(doc.data()));
     const orders = sortByOrderDate(
       attachMatchedUserNames(attachLoggedCustomerNames(matchedOrders, sales), sales)
     );

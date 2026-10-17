@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeAskDb } from './fakeAskDb';
-import { loadRepSnapshot } from './liveData';
+import { loadRepSnapshot, rankBoard, type BoardSale } from './liveData';
 
 // loadRepSnapshot: only the asking rep's documents, never a pay or money
 // field, contact details redacted, and a failing or slow section left out
@@ -286,5 +286,20 @@ describe('loadRepSnapshot and the carrier report stamp (Noah, 2026-10-10)', () =
   it('calls it overdue once the report covers the day', async () => {
     const text = await loadRepSnapshot(createFakeAskDb(withStamp('2026-09-30')).db as unknown as Firestore, 'r1', OCT1);
     expect(text).toMatch(/Maria Johnson[^\n]*install: install overdue/);
+  });
+});
+
+describe('rankBoard — demo account sales', () => {
+  const sale = (repId: string, name: string, points: number, demo = false): BoardSale => ({ repId, name, points, at: 100, demo });
+  const sales = [sale('r1', 'Real One', 5), sale('demo', 'App Review', 50, true), sale('r2', 'Real Two', 3)];
+
+  it("leaves a demo account's sales off a real rep's Board", () => {
+    const [week] = rankBoard(sales, [0], 'r1');
+    expect(week.map((row) => row.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('keeps the demo account on its own Board', () => {
+    const [week] = rankBoard(sales, [0], 'demo');
+    expect(week.map((row) => row.id)).toEqual(['demo', 'r1', 'r2']);
   });
 });

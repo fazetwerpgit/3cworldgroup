@@ -5,7 +5,7 @@ import { loadDayMessages } from '@/lib/alerts/calloutNudges';
 import { COMP_PLAN_MARGIN, COMP_PLAN_RATES } from '@/data/compPlan.generated';
 import type { CompPlanMargin, CompPlanRates, Sale } from '@/types';
 import type { ActivatedUser, OwnerBook, OwnerSummarySource, RepRoles } from './companySummary';
-import { DEMO_ACCOUNT_FIELD, isDemoAccount } from '@/lib/users/demoAccount';
+import { DEMO_ACCOUNT_FIELD, isDemoAccount, isDemoSale } from '@/lib/users/demoAccount';
 
 // Admin SDK reads behind the owner summary. READ ONLY — nothing here writes.
 //
@@ -27,6 +27,7 @@ import { DEMO_ACCOUNT_FIELD, isDemoAccount } from '@/lib/users/demoAccount';
 
 const SALE_FIELDS = [
   'salesRepId',
+  DEMO_ACCOUNT_FIELD,
   'salesRepName',
   'customerAddress',
   'orderNumberOrBtn',
@@ -73,7 +74,8 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
         const asOf = statusDoc.exists ? statusDoc.data()?.lastReportAsOf : null;
         const reportAsOf = typeof asOf === 'string' ? asOf : null;
         const orders = await getAllFiberOrders(lastReportAt);
-        const sales = salesSnap.docs.map((doc) => {
+        // The owner never sees a demo account's sales (nor do they join carrier orders).
+        const sales = salesSnap.docs.filter((doc) => !isDemoSale(doc.data())).map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,

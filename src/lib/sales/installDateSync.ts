@@ -16,6 +16,7 @@ import {
 import { isLiveSale, normalizeOrderNumber } from '@/lib/sales/orderNumber';
 import { formatInstallDay, installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
 import type { FiberOrder, InstallDateSyncCounts } from '@/types/fiberOrder';
+import { isDemoSale } from '@/lib/users/demoAccount';
 
 // The carrier moves install dates and tells nobody. Until now the report only
 // ever landed in `fiberOrders`, so a rep's own sale kept the day they typed and
@@ -490,9 +491,10 @@ export async function syncInstallDatesFromOrders(
 
   const orders = await withStoredSaleLinks(input.orders);
   const snapshot = await adminDb.collection('sales').get();
-  const sales = snapshot.docs.map((doc) =>
-    toSyncSale(doc.id, doc.data() ?? {}, doc.updateTime ?? null)
-  );
+  // A demo account's sales never take a real carrier row (date or number).
+  const sales = snapshot.docs
+    .filter((doc) => !isDemoSale(doc.data()))
+    .map((doc) => toSyncSale(doc.id, doc.data() ?? {}, doc.updateTime ?? null));
   // Rows a sale holds by order number are that sale's; no other sale may reach
   // them by street (the same rule matchFiberOrdersToSales applies).
   const join = numberJoinFor(sales, orders);

@@ -11,7 +11,7 @@ import {
   type LoggedSale,
 } from '@/lib/sales/calloutNudge';
 import { chicagoDayKey, chicagoHour } from '@/lib/weeklyInstalls/week';
-import { DEMO_ACCOUNT_FIELD, withoutDemoDocs } from '@/lib/users/demoAccount';
+import { DEMO_ACCOUNT_FIELD, isDemoSale, withoutDemoDocs } from '@/lib/users/demoAccount';
 
 // The reads behind the callout nudge (lib/sales/calloutNudge.ts has the rule and
 // the words), and the 9 PM push.
@@ -83,11 +83,12 @@ export async function loadDaySales(db: Db, day: string): Promise<LoggedSale[]> {
   const to = new Date(end.getTime() + DAY_MS);
   const sales = db.collection('sales');
   const [bySaleDate, byCreated] = await Promise.all([
-    sales.where('saleDate', '>=', from).where('saleDate', '<', to).select('salesRepId', 'saleDate', 'createdAt').get(),
-    sales.where('createdAt', '>=', from).where('createdAt', '<', to).select('salesRepId', 'saleDate', 'createdAt').get(),
+    sales.where('saleDate', '>=', from).where('saleDate', '<', to).select('salesRepId', 'saleDate', 'createdAt', DEMO_ACCOUNT_FIELD).get(),
+    sales.where('createdAt', '>=', from).where('createdAt', '<', to).select('salesRepId', 'saleDate', 'createdAt', DEMO_ACCOUNT_FIELD).get(),
   ]);
   const byId = new Map<string, LoggedSale>();
   for (const doc of [...bySaleDate.docs, ...byCreated.docs]) {
+    if (isDemoSale(doc.data())) continue; // company-wide gaps never count a demo sale
     if (!byId.has(doc.id)) byId.set(doc.id, toLoggedSale(doc.data()));
   }
   return [...byId.values()];
