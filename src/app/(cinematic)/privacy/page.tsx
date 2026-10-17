@@ -202,16 +202,29 @@ export default function PrivacyPolicyPage() {
                 servers, but the GIFs themselves load directly from GIPHY, which can see your IP address
                 and device information when they do.
               </p>
-              {/* TODO(Jacob): chat reporting and blocking are not on master yet (no report/block code
-                  found 2026-10-17). Uncomment and adjust this paragraph once that ships, and before
-                  App Store submission:
               <p>
-                You can report a message or a person, and you can block someone so you no longer see
-                their messages. Reports go to 3C World Group administrators, who review them and may
-                remove content or suspend accounts that break our rules. When you report something,
-                we keep the report, the reported content, and who sent it.
+                In the 3C app, before you first post in team chat, you agree to the team chat rules, and we record
+                when you agreed. Chat has an automatic filter: a message containing a slur is not sent,
+                and a small set of severe profanity is replaced with asterisks before the message is
+                saved.
               </p>
-              */}
+              <p>
+                You can report another person&rsquo;s message, and you can block someone. When you
+                report a message, we keep the report with your name, the reason and any note you add,
+                a copy of the reported message (its text and any attachment link), who sent it, and
+                the channel. When you block someone, we keep that on your account with their display
+                name; their messages are hidden behind a &ldquo;Show&rdquo; button for you, and you
+                stop getting notifications for their messages. You can unblock them at any time. The
+                person you report or block is not told.
+              </p>
+              <p>
+                Reports and blocks alert 3C World Group back-office administrators by push
+                notification and email. Those alerts name the people involved and the reason, but
+                never include the reported message itself. Administrators review reports and may remove
+                content or take action on accounts that break our rules. We keep a record of how each
+                report was resolved and by whom. To stop misuse, we keep a small count of how often
+                each person reports and blocks.
+              </p>
             </LegalSection>
 
             <LegalSection id="privacy-6" title="6. How We Share Your Information">
