@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { pushSupported } from '@/lib/firebase/messaging';
-import { enablePushOnDevice } from '@/lib/push/enablePushOnDevice';
+import { askAndEnablePush } from '@/lib/push/enablePushOnDevice';
 import { Check } from 'lucide-react';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -28,20 +28,24 @@ export default function PushNotificationsCard() {
     })();
   }, []);
 
-  const enable = async () => {
+  // Must stay a plain click handler: askAndEnablePush calls requestPermission()
+  // before its first await (and before the messaging SDK loads), which is what
+  // keeps the iOS user gesture.
+  const enable = () => {
     setState('working');
     setError('');
-    const result = await enablePushOnDevice();
-    if (result === 'enabled') {
-      setState('on');
-      return;
-    }
-    setError(
-      result === 'blocked'
-        ? 'Notifications were blocked. Enable them in your browser settings and try again.'
-        : "Couldn't enable notifications. Try again."
-    );
-    setState('off');
+    void askAndEnablePush().then(({ result }) => {
+      if (result === 'enabled') {
+        setState('on');
+        return;
+      }
+      setError(
+        result === 'blocked'
+          ? 'Notifications were blocked. Enable them in your browser settings and try again.'
+          : "Couldn't enable notifications. Try again."
+      );
+      setState('off');
+    });
   };
 
   if (state === 'unsupported') {

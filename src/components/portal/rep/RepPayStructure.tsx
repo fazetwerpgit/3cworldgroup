@@ -8,7 +8,6 @@ import {
   cacheTimeLabel,
   dataCacheGeneration,
   invalidateAfterCompPlanWrite,
-  readDataCache,
   readDataCacheEntry,
   writeDataCache,
 } from '@/lib/cache/dataCache';
