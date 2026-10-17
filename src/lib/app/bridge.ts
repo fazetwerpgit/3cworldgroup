@@ -11,7 +11,7 @@ import { isNativeApp } from './isNativeApp';
 //
 // Requests that expect an answer carry an `id`; the shell answers each with
 // exactly one { type: 'reply', id, ok, ... }. Fire-and-forget messages
-// (haptic, openExternal) carry no id and get no reply.
+// (haptic, openExternal, nativeSignOut) carry no id and get no reply.
 
 export const BRIDGE_VERSION = 1;
 export const NATIVE_SOURCE = '3c-shell';
@@ -77,14 +77,40 @@ export interface OpenExternalMessage {
   url: string;
 }
 
-export type BridgeRequest = PushTokenRequest | ShareRequest | SaveFileRequest | BiometricLockRequest | NativeSignInRequest;
 /** Status bar text colour: 'light' (white) over a dark page, 'dark' (black) over a light page. */
 export type StatusBarStyle = 'light' | 'dark';
 export interface StatusBarMessage {
   type: 'statusBar';
   style: StatusBarStyle;
 }
-export type BridgeEvent = HapticMessage | OpenExternalMessage | StatusBarMessage;
+/** The web's sign-in, handed to the shell's native Firebase Auth (native chat). */
+export interface NativeAuthRequest {
+  type: 'nativeAuth';
+  id: string;
+  /** Firebase custom token for the signed-in uid (POST /api/portal/auth/custom-token). */
+  customToken: string;
+}
+/** The web signed out (or loaded signed out): sign the native Firebase Auth out too. */
+export interface NativeSignOutMessage {
+  type: 'nativeSignOut';
+}
+/** Open the native chat screen instead of /portal/chat. Sent only when the shell advertised nativeChat. */
+export interface OpenNativeChatRequest {
+  type: 'openNativeChat';
+  id: string;
+  /** The channel to open (from /portal/chat?channel=<id>); omitted for the channel list. */
+  channelId?: string;
+}
+
+export type BridgeRequest =
+  | PushTokenRequest
+  | ShareRequest
+  | SaveFileRequest
+  | BiometricLockRequest
+  | NativeSignInRequest
+  | NativeAuthRequest
+  | OpenNativeChatRequest;
+export type BridgeEvent = HapticMessage | OpenExternalMessage | StatusBarMessage | NativeSignOutMessage;
 export type WebToNativeMessage = BridgeRequest | BridgeEvent;
 
 // ---- native -> web -------------------------------------------------------
@@ -119,6 +145,10 @@ export interface BridgeResultMap {
   saveFile: CompletedResult;
   biometricLock: BiometricLockResult;
   nativeSignIn: NativeSignInResult;
+  /** ok once the shell's native Firebase Auth signed in with the custom token. */
+  nativeAuth: unknown;
+  /** ok once the native chat screen is showing. */
+  openNativeChat: unknown;
 }
 
 export type BridgeRequestType = BridgeRequest['type'];
@@ -166,7 +196,25 @@ export interface NoticeEvent {
   kind: NoticeKind;
   message: string;
 }
-export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent | VisibleEvent | ResumedEvent | NoticeEvent;
+/** Features this shell build supports beyond contract v1. Unknown keys are dropped. */
+export interface AppCapabilities {
+  /** The shell has a native chat screen and accepts openNativeChat. */
+  nativeChat?: boolean;
+}
+/** Unsolicited: what this shell build can do. May be sent again; the latest wins. */
+export interface CapabilitiesEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'capabilities';
+  capabilities: AppCapabilities;
+}
+export type NativeToWebMessage =
+  | ReplySuccess
+  | ReplyFailure
+  | PushTokenEvent
+  | VisibleEvent
+  | ResumedEvent
+  | NoticeEvent
+  | CapabilitiesEvent;
 
 const ERROR_CODES: readonly NativeErrorCode[] = ['canceled', 'denied', 'not_configured', 'unsupported', 'failed'];
 
@@ -185,7 +233,18 @@ declare global {
     __3C_BRIDGE__?: { version: number; receive: (message: unknown) => void };
     /** Set by shells that send `visible`: the latest value (false before the first). */
     __3C_VISIBLE__?: boolean;
+    /** Optional: the shell may inject its capabilities before content loads. */
+    __3C_APP_CAPS__?: AppCapabilities;
   }
+}
+
+/** Keeps only the known boolean capability flags. Null if `raw` is not an object. */
+export function parseCapabilities(raw: unknown): AppCapabilities | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const c = raw as Record<string, unknown>;
+  const caps: AppCapabilities = {};
+  if (typeof c.nativeChat === 'boolean') caps.nativeChat = c.nativeChat;
+  return caps;
 }
 
 /** Validates anything that arrived on the message channel. Null if it is not ours. */
@@ -235,6 +294,11 @@ export function parseNativeMessage(raw: unknown): NativeToWebMessage | null {
   if (m.type === 'resumed') {
     if (typeof m.awayMs !== 'number' || !Number.isFinite(m.awayMs) || m.awayMs < 0) return null;
     return { source: NATIVE_SOURCE, type: 'resumed', awayMs: m.awayMs };
+  }
+  if (m.type === 'capabilities') {
+    const caps = parseCapabilities(m.capabilities);
+    if (!caps) return null;
+    return { source: NATIVE_SOURCE, type: 'capabilities', capabilities: caps };
   }
   return null;
 }
@@ -332,6 +396,9 @@ const DEFAULT_TIMEOUT_MS: Record<BridgeRequestType, number> = {
   saveFile: 10 * 60_000,
   biometricLock: 60_000,
   nativeSignIn: 5 * 60_000,
+  nativeAuth: 15_000,
+  // Short: on no answer the web falls back to its own chat page.
+  openNativeChat: 1_500,
 };
 
 /**

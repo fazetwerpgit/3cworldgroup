@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { askOpenTo } from '@/lib/ask/flag';
+import { openNativeChatForHref } from '@/lib/app/nativeChat';
 import { PlatformRole, Sale, UserRole } from '@/types';
 import {
   ONBOARDING_HUB,
@@ -282,6 +283,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const select = useCallback(
     (href: string) => {
       onOpenChange(false);
+      // Inside the iOS app with native chat, Team Chat opens the native screen.
+      if (openNativeChatForHref(href)) return;
       router.push(href);
     },
     [onOpenChange, router]

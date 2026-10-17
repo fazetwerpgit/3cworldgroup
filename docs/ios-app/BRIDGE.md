@@ -45,10 +45,11 @@ not know the message type), `failed` (anything else). The shell should answer
 an unknown request `type` with `ok: false, code: "unsupported"`.
 
 The web stops waiting after a timeout (60 s for `pushToken` and
-`biometricLock`, 5 min for `nativeSignIn`, 10 min for `share` and `saveFile`).
+`biometricLock`, 5 min for `nativeSignIn`, 10 min for `share` and `saveFile`,
+15 s for `nativeAuth`, 1.5 s for `openNativeChat`).
 A late reply is ignored.
 
-Messages without an `id` (`haptic`, `openExternal`, `statusBar`) are
+Messages without an `id` (`haptic`, `openExternal`, `statusBar`, `nativeSignOut`) are
 fire-and-forget: no reply.
 
 ## web -> native messages
@@ -192,11 +193,82 @@ classes ThemeContext puts on `<body>`:
   `.portal-shell-header`), so `dark`.
 - No `portal-scope` yet (before ThemeProvider runs, or outside the portal):
   `light`, so the bar never flashes dark.
- The shell defaults to `light`
-before the first message, and its own screens (lock, privacy cover, offline)
-always use `light`. Older shells ignore it.
+
+The shell defaults to `light` before the first message, and its own screens
+(lock, privacy cover, offline) always use `light`. Older shells ignore it.
+
+### Native chat: origin check and token hygiene
+
+The shell must act on `nativeAuth`, `nativeSignOut` and `openNativeChat` only
+when `event.nativeEvent.url` is on the portal origin
+(`https://www.3cworldgroup.com`, or the dev origin in a dev build). Drop them
+from any other page the WebView may have loaded. Never log, persist or send
+anywhere the `customToken` (or any Firebase token): no `console.log`, no crash
+reporter breadcrumbs, no analytics.
+
+### `nativeAuth` (request, native chat)
+```json
+{ "type": "nativeAuth", "id": "w8", "customToken": "<firebase custom token>" }
+```
+Sign the shell's own Firebase Auth (`@react-native-firebase/auth`, used by the
+native chat screen) in with `signInWithCustomToken(customToken)`, then reply
+`{ ok: true }` (no result needed). On any failure reply `ok: false`
+(`code: "failed"`); the web then keeps chat on the web page. The web marks
+native chat usable for a uid only after this ok reply.
+
+The web gets the token from `POST /api/portal/auth/custom-token` (Bearer ID
+token, checked for revocation; active accounts only; the uid comes from the
+token, never the body). It sends it only while the shell advertises
+`nativeChat` (and the bridge is present): at once for the first auth event after
+a page load, then on each ID-token refresh (`onIdTokenChanged`) debounced 1.5 s,
+at most once every 5 minutes for the same uid. If the web user changes after a
+token was sent, the web first posts `nativeSignOut`, then sends `nativeAuth`
+for the new user. Custom tokens expire after an hour; the native SDK keeps its
+own session after signing in.
+
+### `nativeSignOut` (event, native chat)
+```json
+{ "type": "nativeSignOut" }
+```
+The web signed out, loaded signed out, or switched accounts. Sign the native
+Firebase Auth out and close the native chat screen if it is open. No reply.
+
+### `openNativeChat` (request, native chat)
+```json
+{ "type": "openNativeChat", "id": "w9" }
+{ "type": "openNativeChat", "id": "w10", "channelId": "<chat channel id>" }
+```
+Show the native chat screen, on `channelId` when given, else the channel list,
+and reply `{ ok: true }` once it is showing. Reply `ok: false` if it cannot
+open (for example the native sign-in is gone). **Answer within 1.5 s**: on a
+failed reply or no reply in time, the web opens its own chat page instead.
+
+Sent only when the shell advertised `nativeChat` (see `capabilities` below) and
+answered the current web user's `nativeAuth` with ok. It replaces every way into
+`/portal/chat` inside the app: the Chat tab and nav links, the command palette,
+any in-page chat link, and a direct load of `/portal/chat?channel=<id>` (a push
+tap). On a direct load the web shows a short "Opening chat…" screen while the
+native sign-in and the open are under way (no flash of the web chat); after the
+ok reply it steps back in history, or replaces its page with
+`/portal/dashboard` on a cold load, so that page stays behind the native
+screen. If the open fails the web chat shows. Without the capability, chat stays
+the web page exactly as before.
 
 ## native -> web events
+
+### `capabilities`
+```json
+{ "source": "3c-shell", "type": "capabilities", "capabilities": { "nativeChat": true } }
+```
+What this shell build supports beyond contract v1. Known flags: `nativeChat`
+(boolean). Unknown keys are ignored; a later message overrides an earlier one
+flag by flag, so `{ "nativeChat": false }` backs out: chat goes back to the web
+page and no more custom tokens are fetched. Like every native -> web message, a
+DOM `message` event is accepted only with this window as its source, so an
+iframe cannot fake it. Preferred: also inject `window.__3C_APP_CAPS__ = { nativeChat: true };`
+in `injectedJavaScriptBeforeContentLoaded`, so the page knows before its first
+render; otherwise send the message after every page load (`onLoadEnd`). A
+message overrides the injected value.
 
 ### `pushToken`
 ```json
