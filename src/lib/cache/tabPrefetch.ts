@@ -40,6 +40,8 @@ export interface TabPrefetchContext {
   /** Per-tab gates, as the tab bar shows them. */
   canSales: boolean;
   canLeaderboard: boolean;
+  /** Has a platform `role` (owner/admin/operations...): their pay and carrier report are not the rep's, so not warmed. */
+  management: boolean;
 }
 
 /** An entry younger than this is left alone: the screen's own refresh is enough. */
@@ -80,6 +82,8 @@ function warmSales(ctx: TabPrefetchContext): void {
       return { sales: data.sales ?? [], truncated: data.truncated === true };
     });
   }
+  // Management has no rep pay plan or own carrier report worth a spec read.
+  if (ctx.management) return;
   warm(uid, FIBER_CACHE_KEY, () => getJson('/api/portal/sales/status'));
   if (ctx.active) {
     warm(uid, COMP_PLAN_CACHE_KEY, async () => compPlanState(uid, await getJson<CompPlanResponse>('/api/portal/comp-plan')));
@@ -99,10 +103,23 @@ export function prefetchTab(href: string, ctx: TabPrefetchContext): void {
   else if (href === '/portal/leaderboard') warmLeaderboard(ctx);
 }
 
-/** Warms every tab's data except the one on screen. */
+// The leaderboard is a heavy read: the idle pass warms it at most once per
+// app session (per account); after that only a finger on the tab warms it.
+const leaderboardIdleWarmed = new Set<string>();
+
+/** Test hook: forget which accounts had their idle leaderboard warm. */
+export function resetTabPrefetchSession(): void {
+  leaderboardIdleWarmed.clear();
+}
+
+/** Warms every tab's data except the one on screen (the idle pass). */
 export function prefetchTabs(currentPath: string | null | undefined, ctx: TabPrefetchContext): void {
   for (const href of ['/portal/sales', '/portal/leaderboard']) {
     if (currentPath && (currentPath === href || currentPath.startsWith(`${href}/`))) continue;
+    if (href === '/portal/leaderboard') {
+      if (!ctx.canLeaderboard || leaderboardIdleWarmed.has(ctx.uid)) continue;
+      leaderboardIdleWarmed.add(ctx.uid);
+    }
     prefetchTab(href, ctx);
   }
 }

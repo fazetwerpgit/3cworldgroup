@@ -23,9 +23,10 @@ function useTabPrefetchContext(): TabPrefetchContext | null {
   const canViewAll = hasPermission('sales:read:all');
   const canSales = hasPermission('sales:read');
   const canLeaderboard = hasPermission('leaderboard:read');
+  const management = !!user?.role;
   return useMemo(
-    () => (allowed && uid ? { uid, active, canViewAll, canSales, canLeaderboard } : null),
-    [allowed, uid, active, canViewAll, canSales, canLeaderboard]
+    () => (allowed && uid ? { uid, active, canViewAll, canSales, canLeaderboard, management } : null),
+    [allowed, uid, active, canViewAll, canSales, canLeaderboard, management]
   );
 }
 

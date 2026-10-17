@@ -10,14 +10,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'token') }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { uid: 'rep-1' } }) }));
 
-import { prefetchTab, prefetchTabs, type TabPrefetchContext } from './tabPrefetch';
+import { prefetchTab, prefetchTabs, resetTabPrefetchSession, type TabPrefetchContext } from './tabPrefetch';
 import { readDataCache, setDataCacheOwner, writeDataCache, dataCacheGeneration } from './dataCache';
 import { salesListCacheKey, useSales } from '@/hooks/useSales';
 import { FIRST_LEADERBOARD_BOARD, leaderboardCacheKey } from '@/hooks/useLeaderboard';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const REP: TabPrefetchContext = { uid: 'rep-1', active: true, canViewAll: false, canSales: true, canLeaderboard: true };
+const REP: TabPrefetchContext = { uid: 'rep-1', active: true, canViewAll: false, canSales: true, canLeaderboard: true, management: false };
 const OWN = { limit: 500, salesRepId: 'rep-1' };
 
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -32,6 +32,7 @@ function answer(url: string) {
 }
 
 beforeEach(() => {
+  resetTabPrefetchSession();
   setDataCacheOwner(null);
   setDataCacheOwner('rep-1');
   fetchMock = vi.fn(async (url: string) => ({ ok: true, json: async () => answer(url) }));
@@ -72,6 +73,31 @@ describe('prefetchTabs', () => {
     prefetchTabs('/portal/sales', REP);
     await flush();
     expect(urls()).toEqual([]);
+  });
+
+  it('the idle pass warms the leaderboard once per session; a touch still warms it', async () => {
+    const board = '/api/portal/leaderboard?';
+    prefetchTabs('/portal/sales', REP);
+    await flush();
+    expect(urls().filter((url) => url.startsWith(board))).toHaveLength(1);
+    // Cache gone cold (or emptied): the idle pass leaves it alone now.
+    setDataCacheOwner(null);
+    setDataCacheOwner('rep-1');
+    prefetchTabs('/portal/sales', REP);
+    await flush();
+    expect(urls().filter((url) => url.startsWith(board))).toHaveLength(1);
+    prefetchTab('/portal/leaderboard', REP);
+    await flush();
+    expect(urls().filter((url) => url.startsWith(board))).toHaveLength(2);
+  });
+
+  it('skips the plan and carrier report prefetch for management', async () => {
+    prefetchTabs('/portal/dashboard', { ...REP, canViewAll: true, management: true });
+    prefetchTab('/portal/sales', { ...REP, management: true });
+    await flush();
+    expect(urls().some((url) => url.startsWith('/api/portal/comp-plan'))).toBe(false);
+    expect(urls().some((url) => url.startsWith('/api/portal/sales/status'))).toBe(false);
+    expect(urls().some((url) => url.startsWith('/api/portal/leaderboard?'))).toBe(true);
   });
 
   it("never fetches management's company book on spec", async () => {
