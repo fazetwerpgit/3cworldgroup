@@ -357,10 +357,11 @@ export function OwnerDashboard() {
   const { retry } = data;
   // 3C iOS app: drop the splash once the money board has settled (no-op on the web).
   useAppReady(data.money.status !== 'loading');
-  // 3C iOS app: the home-screen widget gets the owner payload (no pay or rank).
-  // Without it an owner's widget never leaves "Open the app".
+  // 3C iOS app: the home-screen widget gets the company numbers loaded here
+  // (sales and installs this month, top rep). Without it an owner's widget
+  // never leaves "Open the app".
   const { user } = useAuth();
-  useOwnerWidgetData(user?.uid);
+  useOwnerWidgetData(user?.uid, data);
 
   return (
     <>

@@ -1,10 +1,12 @@
 import type { Sale } from '@/types';
 import { US_STATES } from '@/lib/validation/address';
+import { firstNameLastInitial } from '@/lib/sales/orderNumber';
 
 // Sales by market for the owner home: a market is the US state of the sale's
 // customer address. There is no market field anywhere (users.state is the
 // rep's HOME state, not where they sell), so the state is parsed from the free-
-// text customerAddress. Aggregates only: the output is state names and counts.
+// text customerAddress. Aggregates only: state names and counts, plus the
+// month's top rep as first name + last initial (owner-only, like the rest).
 
 const NAME_BY_CODE = new Map(US_STATES.map((s) => [s.code, s.name]));
 const CODE_BY_NAME = new Map(US_STATES.map((s) => [s.name.toLowerCase(), s.code]));
@@ -111,6 +113,12 @@ export interface MarketsSummary {
   total: number;
   /** Sales whose address gave no state, placed by where that rep's other sales are. */
   placedByRep: number;
+  /**
+   * The rep with the most counted sales this month ("Wil T."), for the owners'
+   * home-screen widget. A tie goes to the name first alphabetically. null: no
+   * named rep has a sale yet. Absent in responses cached before it existed.
+   */
+  topRep?: { name: string; sales: number } | null;
 }
 
 interface Window {
@@ -175,9 +183,16 @@ export function summarizeMarkets(sales: Sale[], window: Window): MarketsSummary 
   const counts = new Map<string, number>();
   let total = 0;
   let placedByRep = 0;
+  const byRep = new Map<string, { name: string; sales: number }>();
   for (const sale of sales) {
     if (!countsForMonth(sale, window)) continue;
     total += 1;
+    const name = sale.salesRepId ? firstNameLastInitial(sale.salesRepName) : '';
+    if (name) {
+      const rep = byRep.get(sale.salesRepId) ?? { name, sales: 0 };
+      rep.sales += 1;
+      byRep.set(sale.salesRepId, rep);
+    }
     let code = addressState(sale.customerAddress);
     if (!code && sale.salesRepId && home.has(sale.salesRepId)) {
       code = home.get(sale.salesRepId)!;
@@ -192,5 +207,6 @@ export function summarizeMarkets(sales: Sale[], window: Window): MarketsSummary 
       if ((a.market === OTHER_MARKET) !== (b.market === OTHER_MARKET)) return a.market === OTHER_MARKET ? 1 : -1;
       return b.count - a.count || a.market.localeCompare(b.market);
     });
-  return { markets, total, placedByRep };
+  const topRep = [...byRep.values()].sort((a, b) => b.sales - a.sales || a.name.localeCompare(b.name))[0] ?? null;
+  return { markets, total, placedByRep, topRep };
 }

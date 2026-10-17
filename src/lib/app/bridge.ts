@@ -94,8 +94,11 @@ export interface BadgeMessage {
   type: 'badge';
   count: number;
 }
-/** The home-screen widget's numbers. Pay is an estimate only: never a pay date. */
-export interface WidgetData {
+/** The home-screen widget's numbers: a rep's own (RepDashboard) or the company's (owners only). */
+export type WidgetData = RepWidgetData | OwnerWidgetData;
+/** A rep's own numbers. Pay is an estimate only: never a pay date. No `kind` (the original contract). */
+export interface RepWidgetData {
+  kind?: undefined;
   /** First 16 hex chars of SHA-256(uid); the shell clears the widget and badge when it changes. */
   uidHash: string;
   /** Expected pay MTD in whole dollars (negative when chargebacks net it below zero); null when not on a comp plan. */
@@ -107,6 +110,26 @@ export interface WidgetData {
   rankOf: number | null;
   /** Sales this month, counted as the dashboard counts them. */
   salesMtd: number | null;
+  /** ISO 8601. */
+  updatedAt: string;
+}
+/**
+ * The owners' widget: company numbers from OwnerDashboard's own sections.
+ * Owner role only (OwnerDashboard renders for nobody else). A null figure is
+ * a section that failed to load. No money amounts.
+ */
+export interface OwnerWidgetData {
+  kind: 'owner';
+  uidHash: string;
+  /** Month the numbers cover, e.g. "October". */
+  periodLabel: string;
+  /** Approved sales this month, company-wide (the leaderboard's count). */
+  companySalesMtd: number | null;
+  /** Installs this month, company-wide. */
+  companyInstallsMtd: number | null;
+  /** The month's top rep by sales, first name + last initial ("Wil T."); null when nobody has one. */
+  topRepName: string | null;
+  topRepSalesMtd: number | null;
   /** ISO 8601. */
   updatedAt: string;
 }
