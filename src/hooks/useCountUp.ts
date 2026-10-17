@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { firstThisSession, markPlayedThisSession, motionAllowed } from '@/lib/motion/sessionOnce';
 import { useAppVisible } from '@/lib/app/appVisibility';
 
@@ -19,6 +19,8 @@ function shouldCount(sessionKey: string | undefined): boolean {
   return sessionKey ? firstThisSession(sessionKey) : motionAllowed();
 }
 
+const noSubscribe = () => () => {};
+
 const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 
 /**
@@ -29,13 +31,22 @@ const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
  * an already-counted `sessionKey`, or blocked storage show the value outright.
  * In the iOS app the decision waits until the portal is on screen (not behind
  * the splash or Face ID lock); until then the value shows outright, unseen.
+ * Like useFirstReveal, the hydration render never reads sessionStorage: a
+ * numeral that is already in the server HTML shows its value and never counts
+ * (so hydration markup always matches the server's).
  */
 export function useCountUp(target: number, { durationMs = 600, sessionKey }: CountUpOptions = {}): number {
   const visible = useAppVisible();
+  const hydrated = useSyncExternalStore(
+    noSubscribe,
+    () => true,
+    () => false
+  );
   // Decided once, at mount (or when the app first shows the portal): the value
   // the count is for, or null for no count. undefined = not decided yet.
+  // Mounted during hydration: no count, without touching storage.
   const [countFor, setCountFor] = useState<number | null | undefined>(() =>
-    visible ? (shouldCount(sessionKey) ? target : null) : undefined
+    !hydrated ? null : visible ? (shouldCount(sessionKey) ? target : null) : undefined
   );
   const [shown, setShown] = useState<number | null>(countFor === null || countFor === undefined ? null : 0);
   if (countFor === undefined && visible) {
