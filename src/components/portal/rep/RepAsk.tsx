@@ -23,6 +23,7 @@ import s from './rep.module.css';
 import p from './rep-page.module.css';
 import a from './rep-ask.module.css';
 import { RepPractice } from './RepPractice';
+import { isComposerSend } from './composerKeys';
 
 // Ask 3C: a rep at a customer's door asks what to do; the answer comes from
 // the owner's knowledge notes only (POST /api/portal/ask). One conversation per
@@ -464,7 +465,9 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
             readOnly={sending}
             onChange={(event) => setQuestion(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void send();
+              if (!isComposerSend(event.nativeEvent)) return;
+              event.preventDefault();
+              void send();
             }}
           />
           {photo ? (

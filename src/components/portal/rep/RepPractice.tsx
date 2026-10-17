@@ -39,6 +39,7 @@ import { askForMic, canHandsFree } from './handsFreeMic';
 import { useHandsFree } from './useHandsFree';
 import { useSoftKeyboardOpen } from './RepForm';
 import { useHideRepTabBar } from './RepShell';
+import { isComposerSend } from './composerKeys';
 
 // Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
 // answers until the door closes, they sign up, or the rep ends it, then a
@@ -1345,7 +1346,9 @@ export function RepPractice({
                   setDraft(event.target.value);
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) sendLine(draft);
+                  if (!isComposerSend(event.nativeEvent)) return;
+                  event.preventDefault();
+                  if (!listening) sendLine(draft);
                 }}
               />
               {draft.length > COUNTER_FROM ? (
