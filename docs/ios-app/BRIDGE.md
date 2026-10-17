@@ -401,8 +401,12 @@ length in ms (the web clamps it to 0..1000). `easing` is RN's
 
 In the app, the chat thread uses this instead of `visualViewport` timing: one
 transition on the composer inset (`--kb`) with the keyboard's own duration
-and curve, then a single snap to the newest message. With the event absent
-(older shell, browser, PWA) the page keeps its visualViewport path.
+and curve, then a single snap to the newest message. The composers that keep
+themselves above the keyboard (Ask, Practice, the bulk sale sheet:
+`src/hooks/useKeyboardInset.ts`) also switch to this event's `height` once the
+first one arrives, so they move as the keys start rather than after the
+viewport resizes. With the event absent (older shell, browser, PWA) the page
+keeps its visualViewport path.
 
 ### `navigate`
 ```json

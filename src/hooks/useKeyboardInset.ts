@@ -1,13 +1,17 @@
 'use client';
 
 import { useEffect, useSyncExternalStore, type RefObject } from 'react';
+import { onNativeMessage } from '@/lib/app/bridge';
+import { isNativeApp } from '@/lib/app/isNativeApp';
 
 // The on-screen keyboard, read from the visual viewport. iOS Safari, the PWA
 // and the app's WKWebView all leave the layout viewport alone when the
 // keyboard opens and shrink (and sometimes pan) the visual viewport instead,
 // so a field at the bottom of the page or in a bottom sheet ends up under the
-// keyboard. The shell does not send a keyboard event (docs/ios-app/BRIDGE.md),
-// so the visual viewport is the one source in every surface.
+// keyboard. In the app, a shell that sends the `keyboard` bridge event
+// (docs/ios-app/BRIDGE.md) is the source once its first event arrives: it
+// lands as the keys start to move, before the viewport resizes. Browsers, the
+// PWA and older shells keep the visual viewport.
 
 export interface KeyboardViewportSample {
   /** window.innerHeight: the layout viewport. */
@@ -55,8 +59,18 @@ export function overlapBelowVisible(
 
 const CLOSED: KeyboardState = { inset: 0, viewportHeight: 0 };
 let snapshot: KeyboardState = CLOSED;
+// The covered height from the shell's latest `keyboard` event; null until one
+// arrives (then the visual viewport is the source).
+let nativeHeight: number | null = null;
 
 function sample(): KeyboardState {
+  if (nativeHeight !== null) {
+    const inset = nativeHeight > KEYBOARD_MIN_PX ? Math.round(nativeHeight) : 0;
+    if (inset === 0) return CLOSED;
+    const viewportHeight = Math.max(0, Math.round(window.innerHeight - inset));
+    if (snapshot.inset === inset && snapshot.viewportHeight === viewportHeight) return snapshot;
+    return { inset, viewportHeight };
+  }
   const vv = window.visualViewport;
   if (!vv) return CLOSED;
   const inset = keyboardInsetFrom({
@@ -88,7 +102,15 @@ function attach() {
   vv?.addEventListener('resize', refresh);
   vv?.addEventListener('scroll', refresh);
   window.addEventListener('resize', refresh);
+  const stopNative = isNativeApp()
+    ? onNativeMessage((message) => {
+        if (message.type !== 'keyboard') return;
+        nativeHeight = message.height;
+        refresh();
+      })
+    : () => {};
   return () => {
+    stopNative();
     vv?.removeEventListener('resize', refresh);
     vv?.removeEventListener('scroll', refresh);
     window.removeEventListener('resize', refresh);
@@ -138,9 +160,13 @@ export function useKeepAboveKeyboard(targetRef: RefObject<HTMLElement | null>, e
     if (!el || !el.contains(document.activeElement)) return;
     // After the spacer has rendered, so there is room to scroll into.
     const frame = window.requestAnimationFrame(() => {
-      const vv = window.visualViewport;
-      if (!vv) return;
-      const overlap = overlapBelowVisible(el.getBoundingClientRect().bottom, vv);
+      // Visible bottom = innerHeight - inset: the same as the visual viewport's
+      // bottom on the viewport path, and already final when the shell's
+      // keyboard event arrives before the viewport has resized.
+      const overlap = overlapBelowVisible(el.getBoundingClientRect().bottom, {
+        offsetTop: 0,
+        height: window.innerHeight - inset,
+      });
       if (overlap <= 0) return;
       const scroller = scrollParent(el);
       if (scroller) scroller.scrollBy({ top: overlap });
@@ -155,6 +181,7 @@ export function useKeepAboveKeyboard(targetRef: RefObject<HTMLElement | null>, e
 /** Test-only: forget the cached keyboard state. */
 export function __resetKeyboardForTests(): void {
   snapshot = CLOSED;
+  nativeHeight = null;
   listeners.clear();
   detach?.();
   detach = null;

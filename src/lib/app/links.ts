@@ -65,12 +65,6 @@ function stubTab(): Window {
   return { closed: false, opener: null, close() {}, focus() {}, location } as unknown as Window;
 }
 
-/** Path + query + hash of a same-host URL, for client-side navigation. */
-function localPath(href: string): string {
-  const url = new URL(href);
-  return `${url.pathname}${url.search}${url.hash}`;
-}
-
 let installed = false;
 
 /** Installs the click and window.open handlers. Inside the app only; idempotent. Returns the uninstall. */
@@ -86,9 +80,12 @@ export function installAppLinkHandling(): () => void {
     const decision = classifyLink(anchor.getAttribute('href'), window.location.href);
     if (decision.kind === 'ignore') return;
     // A chat link opens the native chat screen when the shell has one.
-    if (decision.kind === 'internal' && openNativeChatForHref(localPath(decision.url))) {
-      event.preventDefault();
-      return;
+    if (decision.kind === 'internal') {
+      const route = inAppRoute(decision.url, window.location.href);
+      if (route && openNativeChatForHref(route)) {
+        event.preventDefault();
+        return;
+      }
     }
     // A plain same-tab internal link is left to Next.js / the browser.
     const newTab = anchor.target && anchor.target !== '_self';

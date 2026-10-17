@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { receiveNativeMessage } from '@/lib/app/bridge';
 import {
   __resetKeyboardForTests,
   keyboardInsetFrom,
@@ -112,5 +113,59 @@ describe('useKeyboardInset', () => {
       vv.dispatchEvent(new Event('resize'));
     });
     expect(shown()).toBe('0/0');
+  });
+});
+
+describe('useKeyboardInset in the app (keyboard bridge event)', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  const vv = Object.assign(new EventTarget(), { height: 844, offsetTop: 0, scale: 1 });
+  const win = window as Window & { __3C_APP__?: boolean };
+
+  function Probe() {
+    const { inset, viewportHeight } = useKeyboardInset();
+    return <output id="kbn">{`${inset}/${viewportHeight}`}</output>;
+  }
+  const shown = () => document.getElementById('kbn')?.textContent;
+  const keyboard = (height: number) =>
+    receiveNativeMessage({ source: '3c-shell', type: 'keyboard', height, duration: 250, easing: 'keyboard' });
+
+  beforeEach(async () => {
+    __resetKeyboardForTests();
+    win.__3C_APP__ = true;
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: vv });
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 });
+    vv.height = 844;
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root.render(<Probe />));
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    delete win.__3C_APP__;
+  });
+
+  it('takes the shell event before the viewport resizes, then ignores the viewport', async () => {
+    await act(async () => keyboard(336));
+    expect(shown()).toBe('336/508');
+    // The late viewport resize does not change the answer.
+    await act(async () => {
+      vv.height = 500;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(shown()).toBe('336/508');
+    await act(async () => keyboard(0));
+    expect(shown()).toBe('0/0');
+  });
+
+  it('keeps the viewport path until the shell sends one', async () => {
+    await act(async () => {
+      vv.height = 500;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(shown()).toBe('344/500');
   });
 });
