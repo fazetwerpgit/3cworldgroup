@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, CalendarClock, Check, ChevronDown, Plus, RotateCw, ShieldCheck, Users, Video, X } from 'lucide-react';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import { useSheetDismiss } from '@/hooks/useSheetDismiss';
+import { cacheTimeLabel } from '@/lib/cache/dataCache';
 import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
 import { friendlyError } from '@/lib/forms/friendlyError';
 import s from '@/components/portal/rep/rep.module.css';
@@ -184,6 +185,9 @@ export default function CallsSchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [loadError, setLoadError] = useState('');
+  // A refresh failed with the schedule showing: keep it, and say when it loaded.
+  const [staleAt, setStaleAt] = useState<number | null>(null);
+  const lastGoodAt = useRef<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
@@ -212,9 +216,12 @@ export default function CallsSchedulePage() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load call schedule');
       setData(json);
+      lastGoodAt.current = Date.now();
+      setStaleAt(null);
       setLoadError('');
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to load call schedule');
+      if (lastGoodAt.current !== null) setStaleAt(lastGoodAt.current);
     } finally {
       setLoading(false);
     }
@@ -340,6 +347,11 @@ export default function CallsSchedulePage() {
       ) : (
         <div className={c.layout}>
           <div className={c.colA}>
+            {staleAt !== null ? (
+              <p className={p.hint} role="status">
+                Couldn&apos;t refresh · as of {cacheTimeLabel(staleAt)}
+              </p>
+            ) : null}
             {nextCall && nextCallMinutes !== null ? (
               <section className={`${s.panel} ${c.next}`} aria-labelledby="next-call-title">
                 <div className={c.nextBody}>

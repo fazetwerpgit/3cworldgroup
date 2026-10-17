@@ -17,6 +17,7 @@ import type { MonthKey } from '@/lib/sales/monthWindow';
 import styles from './leaderboard.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import s from '@/components/portal/rep/rep.module.css';
+import { cacheTimeLabel } from '@/lib/cache/dataCache';
 
 interface LeaderboardPageContentProps {
   entries: LeaderboardEntry[];
@@ -27,6 +28,8 @@ interface LeaderboardPageContentProps {
   recent?: RecentSale[];
   loading: boolean;
   error: string | null;
+  /** A quiet refresh failed with the board still showing: when it was loaded. */
+  staleAt?: number | null;
   /** Loads the board again after a failed load. */
   onRetry?: () => void;
   period: LeaderboardPeriod;
@@ -55,6 +58,7 @@ export function LeaderboardPageContent({
   recent,
   loading,
   error,
+  staleAt = null,
   onRetry,
   period,
   metric,
@@ -90,6 +94,11 @@ export function LeaderboardPageContent({
             </button>
           ) : null}
         </div>
+      ) : null}
+      {!error && !loading && staleAt !== null && entries.length > 0 ? (
+        <p className={p.hint} role="status">
+          Couldn&apos;t refresh · as of {cacheTimeLabel(staleAt)}
+        </p>
       ) : null}
       {loading ? (
         <LeaderboardSkeleton />

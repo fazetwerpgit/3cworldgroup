@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { dataCacheGeneration } from '@/lib/cache/dataCache';
+import { cacheTimeLabel, dataCacheGeneration } from '@/lib/cache/dataCache';
 import { readCachedTrainingList, trainingProgress, useTraining, writeCachedTrainingList } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
@@ -28,6 +28,7 @@ export function Training() {
     fetchResources,
     fetchProgress,
     seeded,
+    staleAt,
   } = useTraining();
 
   const initialTab: TrainingTab = searchParams.get('view') === 'shorts' ? 'shorts' : 'path';
@@ -63,7 +64,7 @@ export function Training() {
     const filters: { category?: TrainingCategory; type?: ResourceType } = {};
     if (categoryFilter) filters.category = categoryFilter;
     if (typeFilter) filters.type = typeFilter;
-    return Promise.all([fetchResources(filters), user ? fetchProgress(user.uid) : undefined]);
+    return Promise.all([fetchResources(filters, { quiet: true }), user ? fetchProgress(user.uid) : undefined]);
   });
 
   useEffect(() => {
@@ -157,7 +158,15 @@ export function Training() {
                 </div>
               </div>
             ) : (
-              <ModuleList resources={resources} progress={progress} />
+              <>
+                {/* A pull or background refresh failed: the list shown is the last good one. */}
+                {staleAt !== null ? (
+                  <p className={p.hint} role="status">
+                    Couldn&apos;t refresh · as of {cacheTimeLabel(staleAt)}
+                  </p>
+                ) : null}
+                <ModuleList resources={resources} progress={progress} />
+              </>
             )}
           </section>
         ) : (

@@ -577,6 +577,12 @@
   inset: -6px 0;
 }
 
+/* The row above sits flush: grow the combine target downward only, so it
+   never takes taps meant for that row. */
+.combine::after {
+  inset: 0 0 -6px;
+}
+
 /* ---------- press ---------- */
 /* Text buttons and the card row dim; the box and the remove icon give a little. */
 .combine:active,

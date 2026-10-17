@@ -57,11 +57,20 @@ const PAY_STRUCTURE_CACHE_KEY = 'commission';
 export function RepPayStructure() {
   const { user, isRole } = useAuth();
   // Revisit: last time's tiers show at once and refresh in the background.
-  const [cached] = useState(() => readDataCache<PayStructureResponse>(user?.uid, PAY_STRUCTURE_CACHE_KEY));
+  const [cachedEntry] = useState(() => readDataCacheEntry<PayStructureResponse>(user?.uid, PAY_STRUCTURE_CACHE_KEY));
+  const cached = cachedEntry?.value;
   const [data, setData] = useState<PayStructureResponse | null>(() => cached ?? null);
   const [loading, setLoading] = useState(() => !cached);
   const [error, setError] = useState('');
   const [staleAt, setStaleAt] = useState<number | null>(null);
+  // What is on screen and when it last loaded: a refetch with tiers showing
+  // stays quiet (no skeleton) even after the cache entry aged out or was
+  // invalidated, and a failure keeps them with the "as of" note.
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+  const lastGoodAt = useRef<number | null>(cachedEntry?.at ?? null);
   const [editing, setEditing] = useState(false);
   const editingRef = useRef(editing);
   useEffect(() => {
@@ -77,9 +86,10 @@ export function RepPayStructure() {
 
   const fetchStructure = useCallback(async () => {
     if (!user) return;
-    const shown = readDataCacheEntry<PayStructureResponse>(user.uid, PAY_STRUCTURE_CACHE_KEY);
+    const entry = readDataCacheEntry<PayStructureResponse>(user.uid, PAY_STRUCTURE_CACHE_KEY);
+    const shownAt = dataRef.current ? lastGoodAt.current : (entry?.at ?? null);
     const gen = dataCacheGeneration();
-    if (!shown) setLoading(true);
+    if (!dataRef.current && !entry) setLoading(true);
     try {
       // Tiers are scoped to the caller's own role, resolved from this token.
       const token = await getIdToken();
@@ -89,6 +99,7 @@ export function RepPayStructure() {
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load pay structure');
       writeDataCache(user.uid, PAY_STRUCTURE_CACHE_KEY, json, gen);
+      lastGoodAt.current = Date.now();
       setStaleAt(null);
       setData(json);
       // A background refresh never clobbers rates being edited.
@@ -97,7 +108,7 @@ export function RepPayStructure() {
     } catch {
       // Cached tiers still showing: one quiet "as of" line, not an error box.
       // With nothing on screen the page shows its Retry; never the raw error.
-      if (shown) setStaleAt(shown.at);
+      if (shownAt !== null) setStaleAt(shownAt);
       else setError("Couldn't refresh just now. What you see may be out of date.");
     } finally {
       setLoading(false);

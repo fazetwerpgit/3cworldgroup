@@ -74,3 +74,54 @@ describe('useTraining fetchResource', () => {
     expect(training.error).toBe('Boom');
   });
 });
+
+describe('useTraining fetchResources (pull to refresh)', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  type Api = ReturnType<typeof useTraining>;
+  const latest: { current: Api | null } = { current: null };
+
+  function Harness() {
+    const training = useTraining();
+    useEffect(() => {
+      latest.current = training;
+    });
+    return null;
+  }
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+    container.remove();
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps the list on a failed quiet refetch and reports when it was loaded', async () => {
+    const list = [mod('A', false), mod('B', true)];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ resources: list }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: 'boom' }), { status: 500 }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root.render(<Harness />));
+    await act(async () => {
+      await latest.current!.fetchResources();
+    });
+    expect(latest.current!.staleAt).toBeNull();
+
+    let loadingDuring = false;
+    await act(async () => {
+      const run = latest.current!.fetchResources(undefined, { quiet: true });
+      loadingDuring = latest.current!.loading;
+      await run;
+    });
+    expect(loadingDuring).toBe(false);
+    expect(latest.current!.resources.map((r) => r.id)).toEqual(['A', 'B']);
+    expect(latest.current!.error).toBeNull();
+    expect(latest.current!.loading).toBe(false);
+    expect(typeof latest.current!.staleAt).toBe('number');
+  });
+});

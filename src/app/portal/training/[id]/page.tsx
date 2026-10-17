@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useTraining } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
+import { postToNative } from '@/lib/app/bridge';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { storage } from '@/lib/firebase/config';
 import { TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
@@ -197,6 +198,22 @@ export default function TrainingDetailPage() {
                       Open in a new tab <ExternalLink size={14} aria-hidden="true" />
                     </a>
                   )}
+                  {/* In the app, video and PDF play inline already; any other file
+                      opens over the portal in the shell's browser. */}
+                  {fileUrl &&
+                    inApp &&
+                    currentResource.type !== 'video' &&
+                    currentResource.mimeType !== 'application/pdf' && (
+                      <a
+                        href={fileUrl}
+                        className={l.openLink}
+                        onClick={(event) => {
+                          if (postToNative({ type: 'openExternal', url: fileUrl })) event.preventDefault();
+                        }}
+                      >
+                        Open file <ExternalLink size={14} aria-hidden="true" />
+                      </a>
+                    )}
                 </div>
               )}
 

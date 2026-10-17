@@ -32,6 +32,7 @@ type FetchBoard = (
 ) => Promise<void>;
 
 let renders: Snapshot[] = [];
+let lastStaleAt: number | null = null;
 // The hook's fetch, as of the latest render.
 const fetchers: FetchBoard[] = [];
 let pending: Array<{ url: string; resolve: (response: FakeResponse) => void }> = [];
@@ -39,6 +40,7 @@ let pending: Array<{ url: string; resolve: (response: FakeResponse) => void }> =
 function Probe() {
   const hook = useLeaderboard();
   fetchers.push(hook.fetchLeaderboard);
+  lastStaleAt = hook.staleAt;
   renders.push({ rep: hook.leaderboard[0]?.salesRepId ?? null, loading: hook.loading, error: hook.error });
   return null;
 }
@@ -99,5 +101,20 @@ describe('useLeaderboard', () => {
     await answer(2, true, board('after'));
     expect(renders.at(-1)).toEqual({ rep: 'after', loading: false, error: null });
     expect(renders.slice(before).some((r) => r.loading)).toBe(false);
+  });
+
+  it('notes when the board was loaded after a quiet refresh fails, and clears it on success', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await act(async () => void fetchLeaderboard('week'));
+    await answer(0, true, board('before'));
+    expect(lastStaleAt).toBeNull();
+
+    await act(async () => void fetchLeaderboard('week', 'totalPoints', 10, 'approved', { quiet: true }));
+    await answer(1, false, { error: 'down' });
+    expect(typeof lastStaleAt).toBe('number');
+
+    await act(async () => void fetchLeaderboard('week', 'totalPoints', 10, 'approved', { quiet: true }));
+    await answer(2, true, board('after'));
+    expect(lastStaleAt).toBeNull();
   });
 });

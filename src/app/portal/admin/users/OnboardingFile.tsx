@@ -13,7 +13,7 @@ import {
 import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { downloadBlob } from '@/lib/export/csv';
-import { shouldSaveViaApp } from '@/lib/app/saveFile';
+import { saveBlobViaApp, shouldSaveViaApp } from '@/lib/app/saveFile';
 import type { OnboardingFileItem, OnboardingFileSummary } from '@/lib/onboarding/onboardingFile';
 import { isAppleMobile, onboardingFileItemStatus, opensInViewer } from '@/lib/onboarding/onboardingFileStatus';
 import { OnboardingCategoryLabels } from '@/types';
@@ -33,9 +33,6 @@ async function authHeaders(): Promise<Record<string, string>> {
 const FILENAME = /filename="([^"]+)"/;
 
 function canShareFile(file: File): boolean {
-  // In the app, downloadBlob hands the zip to the shell's share sheet right
-  // away (no extra "Save file" tap needed).
-  if (shouldSaveViaApp()) return false;
   try {
     return (
       typeof navigator !== 'undefined' &&
@@ -165,7 +162,15 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
       }
       const filename = FILENAME.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? 'onboarding-file.zip';
       const zip = new File([await response.blob()], filename, { type: 'application/zip' });
-      if (canShareFile(zip)) {
+      if (shouldSaveViaApp()) {
+        // In the app the shell saves it; a failure is shown here, not lost
+        // in the console (downloadBlob's fire-and-forget path).
+        try {
+          if (await saveBlobViaApp(filename, zip)) setDownloaded(true);
+        } catch {
+          setError("Couldn't save the file on this phone. Try again.");
+        }
+      } else if (canShareFile(zip)) {
         setReady(zip);
       } else {
         downloadBlob(filename, zip);

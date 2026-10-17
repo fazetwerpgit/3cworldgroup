@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { TrainingResource, TrainingCategory, ResourceType } from '@/types';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useCacheSubject } from '@/lib/cache/useCacheSubject';
-import { dataCacheGeneration, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
+import { dataCacheGeneration, readDataCache, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
 
 // training/progress verifies the caller from the ID token and allows self or
 // management. userId stays as the TARGET row being read/written.
@@ -87,15 +87,29 @@ export function useTraining() {
   // The module asked for is deleted or unpublished (a 404): retrying can't bring it back.
   const [missing, setMissing] = useState(false);
 
-  const fetchResources = useCallback(async (filters?: TrainingFilters) => {
+  // After a background refresh failed with a list still showing: when that
+  // list was loaded, for the quiet "Couldn't refresh · as of" note.
+  const [staleAt, setStaleAt] = useState<number | null>(null);
+  const lastGoodAt = useRef<number | null>(null);
+
+  /**
+   * Loads the list for `filters`. `quiet` (pull to refresh) keeps whatever is
+   * on screen: no skeleton, no error box; a failure only sets `staleAt`.
+   */
+  const fetchResources = useCallback(async (filters?: TrainingFilters, { quiet = false }: { quiet?: boolean } = {}) => {
     const query = trainingQuery(filters);
     const gen = dataCacheGeneration();
     // Seen before: show it now and refresh in the background (no skeleton, and
     // a failed refresh keeps the list rather than an error).
-    const cached = readDataCache<TrainingResource[]>(uid, listKey(query));
-    if (cached) setResources(cached);
-    else setLoading(true);
-    setError(null);
+    const entry = readDataCacheEntry<TrainingResource[]>(uid, listKey(query));
+    const cached = entry?.value;
+    if (cached) {
+      setResources(cached);
+      lastGoodAt.current = entry.at;
+    } else if (!quiet) {
+      setLoading(true);
+    }
+    if (!quiet) setError(null);
 
     try {
       const response = await fetch(`/api/portal/training?${query}`, {
@@ -108,13 +122,19 @@ export function useTraining() {
       }
 
       writeDataCache(uid, listKey(query), data.resources, gen);
+      lastGoodAt.current = Date.now();
+      setStaleAt(null);
       setResources(data.resources);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch training resources';
-      if (cached) console.error('Background training refresh failed:', message);
-      else setError(message);
+      if (cached || quiet) {
+        console.error('Background training refresh failed:', message);
+        if (lastGoodAt.current !== null) setStaleAt(lastGoodAt.current);
+      } else {
+        setError(message);
+      }
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }, [uid]);
 
@@ -227,6 +247,7 @@ export function useTraining() {
     /** The list came from the last visit's copy (a background refresh is due). */
     seeded: cachedList !== undefined,
     resources,
+    staleAt,
     currentResource,
     progress,
     loading,
