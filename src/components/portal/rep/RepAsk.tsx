@@ -6,6 +6,7 @@ import { BorderBeam } from 'border-beam';
 import { ThinkingOrb } from 'thinking-orbs';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
+import { useKeepAboveKeyboard } from '@/hooks/useKeyboardInset';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { askOpenTo, practiceOpenTo } from '@/lib/ask/flag';
 import { isOwner } from '@/types';
@@ -209,6 +210,8 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
   const [fileKey, setFileKey] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
+  // The keyboard covers the bottom of the page: keep the composer above it.
+  const { inset: keyboardInset } = useKeepAboveKeyboard(composerRef);
   const reducedMotion = usePrefersReducedMotion();
 
   /** Bring the whole composer into view; its scroll margin keeps it above the phone tab bar. */
@@ -522,6 +525,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
           </div>
         </form>
       </BorderBeam>
+      {keyboardInset > 0 ? <div aria-hidden="true" style={{ height: keyboardInset }} /> : null}
     </>
   );
 }
