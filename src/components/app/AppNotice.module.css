@@ -1,0 +1,73 @@
+.notice {
+  position: fixed;
+  z-index: 70;
+  right: 12px;
+  /* Above the mobile tab bar (68px + home indicator). */
+  bottom: calc(68px + env(safe-area-inset-bottom) + 12px);
+  left: 12px;
+  display: flex;
+  max-width: 440px;
+  align-items: center;
+  gap: 10px;
+  margin: 0 auto;
+  border: 1px solid var(--rail-line, rgba(229, 238, 246, 0.15));
+  background: var(--rail-panel, #0a1f44);
+  padding: 12px 14px;
+  color: var(--rail-ink, #f3f6f8);
+  font-size: 14px;
+  line-height: 1.35;
+  pointer-events: none;
+  animation: notice-in 180ms ease-out;
+}
+
+.error {
+  border-color: rgba(248, 113, 113, 0.55);
+}
+
+.success .dot {
+  background: var(--rail-lime, #a3e635);
+}
+
+.error .dot {
+  background: #f87171;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--rail-muted, #9eabba);
+}
+
+.progress .dot {
+  animation: notice-pulse 1s ease-in-out infinite alternate;
+}
+
+@media (min-width: 1024px) {
+  .notice {
+    right: 20px;
+    bottom: 20px;
+    left: auto;
+  }
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes notice-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice,
+  .progress .dot {
+    animation: none;
+  }
+}

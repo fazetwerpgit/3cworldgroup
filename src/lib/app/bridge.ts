@@ -78,7 +78,13 @@ export interface OpenExternalMessage {
 }
 
 export type BridgeRequest = PushTokenRequest | ShareRequest | SaveFileRequest | BiometricLockRequest | NativeSignInRequest;
-export type BridgeEvent = HapticMessage | OpenExternalMessage;
+/** Status bar text colour: 'light' (white) over a dark page, 'dark' (black) over a light page. */
+export type StatusBarStyle = 'light' | 'dark';
+export interface StatusBarMessage {
+  type: 'statusBar';
+  style: StatusBarStyle;
+}
+export type BridgeEvent = HapticMessage | OpenExternalMessage | StatusBarMessage;
 export type WebToNativeMessage = BridgeRequest | BridgeEvent;
 
 // ---- native -> web -------------------------------------------------------
@@ -138,7 +144,29 @@ export interface PushTokenEvent {
   type: 'pushToken';
   token: string;
 }
-export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent;
+/** The portal is on screen (true) or behind the splash / lock / cover / in the background (false). */
+export interface VisibleEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'visible';
+  visible: boolean;
+}
+/** The app came back after 30+ minutes in the background (sent before visible:true). */
+export interface ResumedEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'resumed';
+  awayMs: number;
+}
+export type NoticeKind = 'progress' | 'success' | 'error' | 'dismiss';
+export const NOTICE_KINDS: readonly NoticeKind[] = ['progress', 'success', 'error', 'dismiss'];
+/** A short status toast from the shell (downloads). Same id replaces; 'dismiss' removes. */
+export interface NoticeEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'notice';
+  id: string;
+  kind: NoticeKind;
+  message: string;
+}
+export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent | VisibleEvent | ResumedEvent | NoticeEvent;
 
 const ERROR_CODES: readonly NativeErrorCode[] = ['canceled', 'denied', 'not_configured', 'unsupported', 'failed'];
 
@@ -155,6 +183,8 @@ declare global {
   interface Window {
     ReactNativeWebView?: { postMessage: (message: string) => void };
     __3C_BRIDGE__?: { version: number; receive: (message: unknown) => void };
+    /** Set by shells that send `visible`: the latest value (false before the first). */
+    __3C_VISIBLE__?: boolean;
   }
 }
 
@@ -190,6 +220,21 @@ export function parseNativeMessage(raw: unknown): NativeToWebMessage | null {
   if (m.type === 'pushToken') {
     if (typeof m.token !== 'string' || !m.token) return null;
     return { source: NATIVE_SOURCE, type: 'pushToken', token: m.token };
+  }
+  if (m.type === 'visible') {
+    if (typeof m.visible !== 'boolean') return null;
+    return { source: NATIVE_SOURCE, type: 'visible', visible: m.visible };
+  }
+  if (m.type === 'notice') {
+    if (typeof m.id !== 'string' || !m.id || m.id.length > 200) return null;
+    if (!NOTICE_KINDS.includes(m.kind as NoticeKind)) return null;
+    const message = typeof m.message === 'string' ? m.message.slice(0, 300) : '';
+    if (m.kind !== 'dismiss' && !message) return null;
+    return { source: NATIVE_SOURCE, type: 'notice', id: m.id, kind: m.kind as NoticeKind, message };
+  }
+  if (m.type === 'resumed') {
+    if (typeof m.awayMs !== 'number' || !Number.isFinite(m.awayMs) || m.awayMs < 0) return null;
+    return { source: NATIVE_SOURCE, type: 'resumed', awayMs: m.awayMs };
   }
   return null;
 }

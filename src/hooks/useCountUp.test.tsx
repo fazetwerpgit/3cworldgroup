@@ -122,4 +122,25 @@ describe('useCountUp', () => {
     await advance(600);
     expect(shown()).toBe('5210');
   });
+
+  it('a numeral hydrated from server HTML shows its value and never counts or reads storage', async () => {
+    const { renderToString } = await import('react-dom/server');
+    const { hydrateRoot } = await import('react-dom/client');
+    const opts = { sessionKey: '3c:countup:hydrate' };
+    const html = renderToString(<Num value={250} options={opts} />);
+    expect(html).toContain('250');
+    const host = document.createElement('div');
+    host.innerHTML = html;
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    let hydrated!: ReturnType<typeof hydrateRoot>;
+    await act(async () => {
+      hydrated = hydrateRoot(host, <Num value={250} options={opts} />);
+    });
+    await advance(1000);
+    expect(host.textContent).toBe('250');
+    expect(window.sessionStorage.getItem('3c:countup:hydrate')).toBeNull();
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+    await act(async () => hydrated.unmount());
+  });
 });

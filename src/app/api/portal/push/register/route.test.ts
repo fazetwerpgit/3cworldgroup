@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 const fake = vi.hoisted(() => ({
   set: vi.fn(async () => undefined),
   gate: vi.fn(),
+  claim: vi.fn(async (..._args: unknown[]) => ({ removedFrom: [] as string[] })),
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -17,6 +18,7 @@ vi.mock('firebase-admin/firestore', () => ({
   },
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: fake.gate }));
+vi.mock('@/lib/push/claimPushToken', () => ({ claimPushToken: fake.claim }));
 
 import { DELETE, POST } from './route';
 
@@ -34,20 +36,30 @@ beforeEach(() => {
 });
 
 describe('/api/portal/push/register', () => {
-  it('stores a web token exactly as before (no platform)', async () => {
-    expect((await POST(req('POST', { token: 'web-1' }))).status).toBe(200);
-    expect(fake.set).toHaveBeenCalledWith(
-      { pushTokens: { __union: ['web-1'] }, pushTokensUpdatedAt: '__TS__' },
-      { merge: true }
-    );
+  it('registers a web token (no platform) through claimPushToken', async () => {
+    expect((await POST(req('POST', { token: ' web-1 ' }))).status).toBe(200);
+    expect(fake.claim).toHaveBeenCalledWith(expect.anything(), 'u1', 'web-1', 'web');
   });
 
-  it("stores an iOS app token platform-tagged on nativePushTokens", async () => {
+  it('registers an iOS app token as ios-native', async () => {
     expect((await POST(req('POST', { token: 'n-1', platform: 'ios-native' }))).status).toBe(200);
-    expect(fake.set).toHaveBeenCalledWith(
-      { nativePushTokens: { __union: [{ token: 'n-1', platform: 'ios-native' }] }, pushTokensUpdatedAt: '__TS__' },
-      { merge: true }
-    );
+    expect(fake.claim).toHaveBeenCalledWith(expect.anything(), 'u1', 'n-1', 'ios-native');
+  });
+
+  it('still succeeds when the token moved from another account', async () => {
+    fake.claim.mockResolvedValueOnce({ removedFrom: ['old-rep'] });
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    expect((await POST(req('POST', { token: 'n-1', platform: 'ios-native' }))).status).toBe(200);
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(String(info.mock.calls[0][0])).not.toContain('n-1');
+    info.mockRestore();
+  });
+
+  it('answers 500 when the transaction fails', async () => {
+    fake.claim.mockRejectedValueOnce(new Error('contention'));
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await POST(req('POST', { token: 'n-1', platform: 'ios-native' }))).status).toBe(500);
+    err.mockRestore();
   });
 
   it('removes from the matching list', async () => {
@@ -62,6 +74,6 @@ describe('/api/portal/push/register', () => {
 
   it('rejects an unknown platform', async () => {
     expect((await POST(req('POST', { token: 'x', platform: 'android' }))).status).toBe(400);
-    expect(fake.set).not.toHaveBeenCalled();
+    expect(fake.claim).not.toHaveBeenCalled();
   });
 });

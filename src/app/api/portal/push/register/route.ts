@@ -3,8 +3,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { NATIVE_PUSH_PLATFORM, nativeTokenEntry } from '@/lib/push/pushTargets';
+import { claimPushToken } from '@/lib/push/claimPushToken';
 
 // POST   /api/portal/push/register  { token, platform? }  → add this device's FCM token to the user
+//                                                         (and remove it from any other user)
 // DELETE /api/portal/push/register  { token, platform? }  → remove it (opt-out / sign-out)
 // Web (browser / PWA) tokens — no platform — are stored on users/{uid}.pushTokens[].
 // The 3C iOS app sends platform: 'ios-native'; those are stored platform-tagged
@@ -33,18 +35,13 @@ export async function POST(request: NextRequest) {
     const platform = readPlatform(body);
     if (!platform) return NextResponse.json({ error: 'Unknown platform' }, { status: 400 });
 
-    await adminDb.collection('users').doc(gate.uid).set(
-      {
-        ...(platform === NATIVE_PUSH_PLATFORM
-          ? { nativePushTokens: FieldValue.arrayUnion(nativeTokenEntry(token)) }
-          : { pushTokens: FieldValue.arrayUnion(token) }),
-        // Stamped on every (re-)registration, including no-op same-token ones —
-        // lets ops tell "device re-registered, token unchanged" apart from
-        // "client never ran registration" when debugging delivery.
-        pushTokensUpdatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+    // Also takes the token off any other account that still holds it (a phone
+    // that switched users without a clean sign-out), so pushes follow the
+    // signed-in rep only.
+    const { removedFrom } = await claimPushToken(adminDb, gate.uid, token, platform);
+    if (removedFrom.length) {
+      console.info(`[push/register] moved a ${platform} token from ${removedFrom.length} other account(s) to ${gate.uid}`);
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error registering push token:', error);

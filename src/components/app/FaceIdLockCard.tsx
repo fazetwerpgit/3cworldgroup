@@ -7,8 +7,8 @@ import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import st from '@/components/portal/rep/rep-settings.module.css';
 
-// Settings row, 3C iOS app only: "Require Face ID to open the app". Off by
-// default. The shell stores the setting per device and locks on resume.
+// Settings row, 3C iOS app only: "Require Face ID or passcode to open the
+// app". Off by default. Works with Face ID, or the passcode alone. The shell stores the setting per device and locks on resume.
 export default function FaceIdLockCard() {
   const [enabled, setEnabled] = useState(false);
   const [available, setAvailable] = useState(true);
@@ -45,8 +45,8 @@ export default function FaceIdLockCard() {
     } catch (err) {
       setError(
         err instanceof NativeBridgeError && err.code === 'canceled'
-          ? 'Face ID was cancelled, so nothing changed.'
-          : "Couldn't change the Face ID setting. Try again."
+          ? 'The Face ID or passcode check was cancelled, so nothing changed.'
+          : "Couldn't change the app lock setting. Try again."
       );
     } finally {
       setWorking(false);
@@ -57,10 +57,12 @@ export default function FaceIdLockCard() {
     <div className={st.setting}>
       <div className={st.settingText}>
         <span className={st.settingTitle} id="face-id-lock-label">
-          Require Face ID to open the app
+          Require Face ID or passcode to open the app
         </span>
         <span className={st.settingSub}>
-          {available ? 'Asks for Face ID when you come back to the app.' : "Face ID isn't set up on this iPhone."}
+          {available
+            ? 'Asks for Face ID or your passcode when you come back to the app.'
+            : 'Set a passcode on this iPhone to use this.'}
         </span>
       </div>
       <button

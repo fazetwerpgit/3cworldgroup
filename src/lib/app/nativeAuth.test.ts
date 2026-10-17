@@ -11,6 +11,8 @@ import {
   generateRawNonce,
   getNativeCredential,
   isAccountExistsError,
+  isNativeSignInCanceled,
+  isNativeSignInPending,
   linkedMethodRows,
   nativeAuthErrorMessage,
   peekPendingLink,
@@ -92,6 +94,24 @@ describe('getNativeCredential (Apple)', () => {
     expect(sent.nonce).toBe(await sha256Hex(rawNonce));
     expect(sent.nonce).not.toBe(rawNonce);
     expect(native.displayName).toBe('Ana Ruiz');
+  });
+
+  it('drops a second call while one is pending with a silent canceled', async () => {
+    const first = getNativeCredential('apple');
+    expect(isNativeSignInPending()).toBe(true);
+    const second = getNativeCredential('google');
+    await expect(second).rejects.toSatisfy(isNativeSignInCanceled);
+    await expect(first).resolves.toMatchObject({ provider: 'apple' });
+    expect(isNativeSignInPending()).toBe(false);
+    expect((window as unknown as { __posted: string[] }).__posted).toHaveLength(1);
+  });
+});
+
+describe('isNativeSignInCanceled', () => {
+  it('is true only for a canceled bridge error', () => {
+    expect(isNativeSignInCanceled(new NativeBridgeError('canceled', 'x'))).toBe(true);
+    expect(isNativeSignInCanceled(new NativeBridgeError('failed', 'x'))).toBe(false);
+    expect(isNativeSignInCanceled(new Error('canceled'))).toBe(false);
   });
 });
 

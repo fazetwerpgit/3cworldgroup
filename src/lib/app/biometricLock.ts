@@ -1,7 +1,7 @@
 import { requestNative, type BiometricLockResult } from './bridge';
 import { isNativeApp } from './isNativeApp';
 
-// "Require Face ID to open the app" (3C iOS app only). The shell owns the real
+// "Require Face ID or passcode to open the app" (3C iOS app only). The shell owns the real
 // setting (it stores it and locks on resume); localStorage only mirrors it so
 // the Settings toggle shows the right state before the shell answers.
 

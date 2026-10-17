@@ -21,6 +21,8 @@ import {
   getNativeCredential,
   isAccountExistsError,
   nativeAuthErrorMessage,
+  isNativeSignInCanceled,
+  isNativeSignInPending,
   peekPendingLink,
   providerLabel,
   rememberPendingDisplayName,
@@ -141,6 +143,8 @@ export function LoginForm() {
   // returned credential. AuthContext then loads the profile (or creates the
   // pending users doc on a first sign-in) exactly as for the web popup.
   const handleNativeSignIn = async (provider: NativeSignInProvider) => {
+    // A second tap while the sheet is open does nothing.
+    if (isNativeSignInPending()) return;
     setError('');
     setLinkNotice('');
     setNativeLoading(provider);
@@ -164,7 +168,8 @@ export function LoginForm() {
       await finishPendingLink();
     } catch (err: unknown) {
       rememberPendingDisplayName(undefined);
-      setError(nativeAuthErrorMessage(err, provider));
+      // A cancel (the person closed the sheet) needs no message.
+      if (!isNativeSignInCanceled(err)) setError(nativeAuthErrorMessage(err, provider));
     } finally {
       setNativeLoading(null);
     }
