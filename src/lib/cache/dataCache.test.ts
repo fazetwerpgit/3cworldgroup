@@ -142,3 +142,46 @@ describe('dataCache', () => {
     expect(readDataCache('owner-1', 'sales?limit=500')).toBe(4);
   });
 });
+
+describe('revalidateDataCache', () => {
+  it('runs every registered refetch and waits for them', async () => {
+    const { onRevalidateDataCache, revalidateDataCache, hasDataRevalidators } = await import('./dataCache');
+    let finished = false;
+    const sync = vi.fn();
+    const offA = onRevalidateDataCache(sync);
+    const offB = onRevalidateDataCache(
+      () =>
+        new Promise<void>((resolve) =>
+          setTimeout(() => {
+            finished = true;
+            resolve();
+          }, 10)
+        )
+    );
+    expect(hasDataRevalidators()).toBe(true);
+    await revalidateDataCache();
+    expect(sync).toHaveBeenCalledTimes(1);
+    expect(finished).toBe(true);
+    offA();
+    offB();
+    expect(hasDataRevalidators()).toBe(false);
+  });
+
+  it('settles when a refetch fails or throws', async () => {
+    const { onRevalidateDataCache, revalidateDataCache } = await import('./dataCache');
+    const offA = onRevalidateDataCache(() => Promise.reject(new Error('offline')));
+    const offB = onRevalidateDataCache(() => {
+      throw new Error('boom');
+    });
+    await expect(revalidateDataCache()).resolves.toBeUndefined();
+    offA();
+    offB();
+  });
+
+  it('stops waiting on a hung refetch', async () => {
+    const { onRevalidateDataCache, revalidateDataCache } = await import('./dataCache');
+    const off = onRevalidateDataCache(() => new Promise(() => {}));
+    await expect(revalidateDataCache({ timeoutMs: 20 })).resolves.toBeUndefined();
+    off();
+  });
+});

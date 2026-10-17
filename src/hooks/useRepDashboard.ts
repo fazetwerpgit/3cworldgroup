@@ -313,7 +313,8 @@ export function useRepDashboard() {
   );
 
   /** Reopened after a while: reload every section without leaving the screen. */
-  const refresh = useCallback(() => void run(undefined, { quiet: true }), [run]);
+  // Returns the run, so pull to refresh can wait for it.
+  const refresh = useCallback(() => run(undefined, { quiet: true }), [run]);
   useRefreshOnResume(refresh, { enabled: !!uid });
 
   return { ...state, staleAt, retry, installDateSaved };

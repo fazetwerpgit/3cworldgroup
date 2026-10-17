@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { dataCacheGeneration } from '@/lib/cache/dataCache';
 import { readCachedTrainingList, trainingProgress, useTraining, writeCachedTrainingList } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { TrainingCategory, TrainingResource, ResourceType, TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 import { LoadFailed, ModuleList, ProgressCard, RowsSkeleton, ShortsEmpty } from '@/components/portal/rep/RepLearn';
@@ -56,6 +57,14 @@ export function Training() {
   useEffect(() => {
     if (user) fetchProgress(user.uid);
   }, [user, fetchProgress]);
+
+  // Pull to refresh (app): the list as filtered now, and the progress, in place.
+  useRevalidateOnPull(() => {
+    const filters: { category?: TrainingCategory; type?: ResourceType } = {};
+    if (categoryFilter) filters.category = categoryFilter;
+    if (typeFilter) filters.type = typeFilter;
+    return Promise.all([fetchResources(filters), user ? fetchProgress(user.uid) : undefined]);
+  });
 
   useEffect(() => {
     if (!user) return;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
 
 // The installed app is backgrounded for hours and comes back to the same page.
 // Pages that load once on mount call this so a rep reopening the app sees
@@ -10,10 +11,12 @@ export const RESUME_REFRESH_STALE_MS = 60_000;
 /**
  * Calls `refresh` when the page becomes visible again (or is restored from the
  * back/forward cache) and it has been at least `staleMs` since mount or the
- * last resume refresh. `refresh` must reload quietly: keep the data on screen
+ * last resume refresh, and on pull to refresh. `refresh` must reload quietly: keep the data on screen
  * and swap it when the new data arrives, never back to a skeleton.
  */
-export function useRefreshOnResume(refresh: () => void, { enabled = true, staleMs = RESUME_REFRESH_STALE_MS } = {}) {
+export function useRefreshOnResume(refresh: () => unknown, { enabled = true, staleMs = RESUME_REFRESH_STALE_MS } = {}) {
+  // The same quiet refetch answers pull to refresh in the app.
+  useRevalidateOnPull(refresh, enabled);
   const refreshRef = useRef(refresh);
   useEffect(() => {
     refreshRef.current = refresh;

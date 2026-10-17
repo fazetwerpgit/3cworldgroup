@@ -213,8 +213,7 @@ function SalesContent() {
   const { refetch: refetchFiber } = fiber;
   const refreshQuietly = useCallback(() => {
     if (!salesFilters) return;
-    void fetchSales(salesFilters, { quiet: true });
-    void refetchFiber().catch(() => undefined);
+    return Promise.all([fetchSales(salesFilters, { quiet: true }), refetchFiber().catch(() => undefined)]);
   }, [fetchSales, refetchFiber, salesFilters]);
   useRefreshOnResume(refreshQuietly, { enabled: !!salesFilters });
 

@@ -28,6 +28,7 @@ import { RepBoot } from './RepBoot';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, type RepBackLink } from './RepTopBar';
 import { PushNudge } from './PushNudge';
+import { PullToRefresh } from './PullToRefresh';
 import { isRepShellPath } from './repShellRoutes';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import s from './rep.module.css';
@@ -100,6 +101,7 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [tabBarHidden, setTabBarHidden] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   return (
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
@@ -114,7 +116,9 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
         {/* Push not working on this device: a banner here, or a full-screen sheet for a required person. */}
         {viewing || inApp ? null : <PushNudge />}
         <main className={s.scroller} id="rep-main" ref={mainRef}>
-          <div className={s.main}>
+          {/* The shell's own pull to refresh is off in the app: this one refetches the screen. */}
+          {inApp ? <PullToRefresh scrollerRef={mainRef} contentRef={contentRef} /> : null}
+          <div className={s.main} ref={contentRef}>
             {viewing && isViewAsPath(pathname) ? (
               <ViewAsScope loading={<ViewAsLoading />}>{children}</ViewAsScope>
             ) : (

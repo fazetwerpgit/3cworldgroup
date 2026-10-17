@@ -128,3 +128,45 @@ export function invalidateAfterCompPlanWrite(): void {
 export function cacheTimeLabel(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
+
+// ---- revalidate (pull to refresh) ----
+// Screens register their quiet refetch while mounted (useRevalidateOnPull,
+// useRefreshOnResume). revalidateDataCache asks every one of them to refetch
+// now, keeping what is on screen until the new data lands.
+
+type Revalidator = () => unknown;
+const revalidators = new Set<Revalidator>();
+
+/** Registers a mounted screen's quiet refetch. Returns the unregister. */
+export function onRevalidateDataCache(revalidate: Revalidator): () => void {
+  revalidators.add(revalidate);
+  return () => {
+    revalidators.delete(revalidate);
+  };
+}
+
+/** True when some mounted screen can refetch (pull to refresh has something to do). */
+export function hasDataRevalidators(): boolean {
+  return revalidators.size > 0;
+}
+
+/**
+ * Asks every mounted screen to refetch quietly. Resolves when the refetches
+ * that return a promise have settled (failures included: each screen shows its
+ * own error), or after `timeoutMs` so a hung request never pins the spinner.
+ */
+export async function revalidateDataCache({ timeoutMs = 10_000 }: { timeoutMs?: number } = {}): Promise<void> {
+  const runs = [...revalidators].map((revalidate) => {
+    try {
+      return Promise.resolve(revalidate());
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs);
+  });
+  await Promise.race([Promise.allSettled(runs).then(() => undefined), timeout]);
+  clearTimeout(timer);
+}

@@ -43,7 +43,8 @@ export function LeaderboardRoute() {
   // Reopened after a while: the same board, reloaded in place. A load already
   // under way (a filter tap) is left to land on its own.
   const refreshQuietly = useCallback(() => {
-    if (user && !loading) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true, ...(monthParam ? { month: monthParam } : {}) });
+    if (!user || loading) return;
+    return fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true, ...(monthParam ? { month: monthParam } : {}) });
   }, [user, loading, period, metric, monthParam, fetchLeaderboard]);
   useRefreshOnResume(refreshQuietly, { enabled: !!user });
 

@@ -193,6 +193,7 @@
   }
 
   .scroller {
+    position: relative;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -231,6 +232,58 @@
 @media (min-width: 1024px) {
   .main {
     padding-top: var(--s6);
+  }
+}
+
+/* ---------- pull to refresh (app only, PullToRefresh) ----------
+   Sits at the top of the scroller, under the content; the content slides
+   down off it as the pull grows. Position, scale and fade are set inline per
+   frame (transform and opacity only). */
+.ptr {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: 0;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: -18px;
+  border-radius: 50%;
+  background: var(--c-raised);
+  color: var(--c-text-3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(0, -18px, 0) scale(0.6);
+}
+
+.ptr[data-state='armed'],
+.ptr[data-state='refreshing'] {
+  color: var(--c-lime);
+}
+
+.ptrArc {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  /* Three quarters of the ring (r 9: 56.5 around). */
+  stroke-dasharray: 42.4 56.5;
+}
+
+.ptr[data-state='refreshing'] .ptrArc {
+  animation: ptrSpin 760ms linear infinite;
+}
+
+@keyframes ptrSpin {
+  from {
+    transform: rotate(270deg);
+  }
+
+  to {
+    transform: rotate(630deg);
   }
 }
 

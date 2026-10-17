@@ -12,6 +12,7 @@ import {
   readDataCacheEntry,
   writeDataCache,
 } from '@/lib/cache/dataCache';
+import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
 import { ratesArePending, CommissionConfig, FieldRole, IBO_FIELD_ROLES, RoleDisplayNames, repFacingRoleLabel } from '@/types';
 import { LoadFailed } from './RepLearn';
 import { PayHelpSheet } from './PayHelpSheet';
@@ -100,6 +101,8 @@ export function RepPayStructure() {
       setLoading(false);
     }
   }, [user]);
+  // Pull to refresh (app): the tiers in place, never over rates being edited.
+  useRevalidateOnPull(fetchStructure, !!user);
 
   useEffect(() => {
     void fetchStructure();

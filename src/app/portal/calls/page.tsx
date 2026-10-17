@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, CalendarClock, Check, ChevronDown, Plus, RotateCw, ShieldCheck, Users, Video, X } from 'lucide-react';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import { useSheetDismiss } from '@/hooks/useSheetDismiss';
+import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import c from '@/components/portal/rep/rep-calls.module.css';
@@ -221,6 +222,8 @@ export default function CallsSchedulePage() {
   useEffect(() => {
     fetchCalls();
   }, [fetchCalls]);
+  // Pull to refresh (app): the schedule in place.
+  useRevalidateOnPull(fetchCalls, !!user);
 
   // The clock is not an animation, so it ticks under reduce-motion too.
   useEffect(() => {
