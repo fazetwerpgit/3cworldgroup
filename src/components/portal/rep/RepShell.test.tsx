@@ -294,13 +294,16 @@ describe('main scroll memory', () => {
     }
   });
 
-  it('keeps a separate spot per query string', () => {
+  it('keys the spot on the path only: a same-path query change (router.replace) keeps it', () => {
     render('/portal/sales', <RepShell key="sales"><p>sales</p></RepShell>);
     scrollTo(500);
-    state.search = 'tab=pending';
+    // e.g. the Sales month moving into the URL with router.replace / replaceState.
+    state.search = 'month=2026-09';
     render('/portal/sales', <RepShell key="sales"><p>sales</p></RepShell>);
+    expect(main().scrollTop).toBe(500);
+    // Away and Back: the path's spot comes back whatever the query was.
+    render('/portal/sales/abc', <RepShell key="sale"><p>sale</p></RepShell>);
     expect(main().scrollTop).toBe(0);
-    scrollTo(80);
     act(() => {
       window.dispatchEvent(new PopStateEvent('popstate'));
     });

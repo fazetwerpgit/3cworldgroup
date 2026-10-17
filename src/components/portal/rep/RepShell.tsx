@@ -8,12 +8,11 @@ import {
   useId,
   useLayoutEffect,
   useMemo,
-  Suspense,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { CommandPalette } from '@/components/portal/CommandPalette';
 import { useAuth } from '@/contexts/AuthContext';
@@ -102,15 +101,14 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   const [tabBarHidden, setTabBarHidden] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  // Keyed on the path only: a same-page router.replace that changes the query
+  // or hash (a filter, the Sales month) keeps the spot instead of jumping to the top.
+  useMainScrollMemory(mainRef, pathname ?? '');
 
   return (
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
       <SharedChatProvider value={sharedChat}>
       <div className={s.root} data-shell="rep">
-        {/* Search params suspend while prerendering; scroll memory is client-only anyway. */}
-        <Suspense fallback={null}>
-          <MainScrollMemory mainRef={mainRef} />
-        </Suspense>
         <RepTopBar chatUnread={anyUnread} navCounts={navCounts} task={task} back={back} />
         <ViewAsBanner />
         {/* Push not working on this device: a banner here, or a full-screen sheet for a required person. */}
@@ -139,14 +137,6 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
 const RESTORE_WINDOW_MS = 1500;
 /** A Back / Forward that doesn't change the page (same URL) must not leave the flag set for the next tap. */
 const POP_SETTLE_MS = 1000;
-
-/** Keys scroll memory on the full location (path and query), so /sales?tab=a and ?tab=b keep their own spots. */
-function MainScrollMemory({ mainRef }: { mainRef: React.RefObject<HTMLElement | null> }) {
-  const pathname = usePathname() ?? '';
-  const search = useSearchParams()?.toString() ?? '';
-  useMainScrollMemory(mainRef, search ? `${pathname}?${search}` : pathname);
-  return null;
-}
 
 /**
  * On phones <main> is the scroller and now outlives each page, so it keeps a
