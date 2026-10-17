@@ -111,6 +111,9 @@ function attach() {
     : () => {};
   return () => {
     stopNative();
+    // Nobody is listening for the shell's events any more, so its last height
+    // would go stale: the next consumer starts on the visual viewport again.
+    nativeHeight = null;
     vv?.removeEventListener('resize', refresh);
     vv?.removeEventListener('scroll', refresh);
     window.removeEventListener('resize', refresh);

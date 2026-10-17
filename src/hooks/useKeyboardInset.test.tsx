@@ -161,6 +161,22 @@ describe('useKeyboardInset in the app (keyboard bridge event)', () => {
     expect(shown()).toBe('0/0');
   });
 
+  it('forgets the shell height once the last consumer leaves', async () => {
+    await act(async () => keyboard(336));
+    expect(shown()).toBe('336/508');
+    // Last consumer unmounts (store detaches), then a new one mounts.
+    act(() => root.unmount());
+    root = createRoot(container);
+    await act(async () => root.render(<Probe />));
+    // Back on the visual viewport: the stale 336 is gone.
+    expect(shown()).toBe('0/0');
+    await act(async () => {
+      vv.height = 500;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(shown()).toBe('344/500');
+  });
+
   it('keeps the viewport path until the shell sends one', async () => {
     await act(async () => {
       vv.height = 500;

@@ -430,7 +430,8 @@ and curve, then a single snap to the newest message. The composers that keep
 themselves above the keyboard (Ask, Practice, the bulk sale sheet:
 `src/hooks/useKeyboardInset.ts`) also switch to this event's `height` once the
 first one arrives, so they move as the keys start rather than after the
-viewport resizes. With the event absent (older shell, browser, PWA) the page
+viewport resizes. When the last of them unmounts the shell height is
+forgotten, and the next one starts on the visual viewport until a new event. With the event absent (older shell, browser, PWA) the page
 keeps its visualViewport path.
 
 ### `navigate`
