@@ -59,11 +59,6 @@ export function readCachedTrainingList(uid: string | null | undefined): Training
   return readDataCache<TrainingResource[]>(uid, listKey(''));
 }
 
-/** Stores the whole published list for the next visit. */
-export function writeCachedTrainingList(uid: string | null | undefined, list: TrainingResource[], gen?: number): void {
-  writeDataCache(uid, listKey(''), list, gen);
-}
-
 export function useTraining() {
   const uid = useCacheSubject();
   // Revisit: last time's list and the viewer's own progress show at once while
@@ -95,8 +90,12 @@ export function useTraining() {
   /**
    * Loads the list for `filters`. `quiet` (pull to refresh) keeps whatever is
    * on screen: no skeleton, no error box; a failure only sets `staleAt`.
+   * Resolves to the fresh list, or null when the request failed.
    */
-  const fetchResources = useCallback(async (filters?: TrainingFilters, { quiet = false }: { quiet?: boolean } = {}) => {
+  const fetchResources = useCallback(async (
+    filters?: TrainingFilters,
+    { quiet = false }: { quiet?: boolean } = {}
+  ): Promise<TrainingResource[] | null> => {
     const query = trainingQuery(filters);
     const gen = dataCacheGeneration();
     // Seen before: show it now and refresh in the background (no skeleton, and
@@ -125,6 +124,7 @@ export function useTraining() {
       lastGoodAt.current = Date.now();
       setStaleAt(null);
       setResources(data.resources);
+      return data.resources as TrainingResource[];
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch training resources';
       if (cached || quiet) {
@@ -133,6 +133,7 @@ export function useTraining() {
       } else {
         setError(message);
       }
+      return null;
     } finally {
       if (!quiet) setLoading(false);
     }

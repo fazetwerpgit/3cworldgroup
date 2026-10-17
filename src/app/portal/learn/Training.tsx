@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { cacheTimeLabel, dataCacheGeneration } from '@/lib/cache/dataCache';
-import { readCachedTrainingList, trainingProgress, useTraining, writeCachedTrainingList } from '@/hooks/useTraining';
+import { cacheTimeLabel } from '@/lib/cache/dataCache';
+import { readCachedTrainingList, trainingProgress, useTraining } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
-import { getIdToken } from '@/lib/firebase/getIdToken';
 import { TrainingCategory, TrainingResource, ResourceType, TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
 import { LoadFailed, ModuleList, ProgressCard, RowsSkeleton, ShortsEmpty } from '@/components/portal/rep/RepLearn';
 import s from '@/components/portal/rep/rep.module.css';
@@ -47,8 +46,12 @@ export function Training() {
     if (categoryFilter) filters.category = categoryFilter;
     if (typeFilter) filters.type = typeFilter;
     let active = true;
-    void fetchResources(filters).then(() => {
-      if (active) setLoadedKey(`${categoryFilter}|${typeFilter}|${reloadKey}`);
+    void fetchResources(filters).then((list) => {
+      if (!active) return;
+      // Unfiltered, this IS the whole published list (and the hook caches it
+      // as such): the progress count uses it rather than a second GET.
+      if (list && !categoryFilter && !typeFilter) setAllResources(list);
+      setLoadedKey(`${categoryFilter}|${typeFilter}|${reloadKey}`);
     });
     return () => {
       active = false;
@@ -64,30 +67,13 @@ export function Training() {
     const filters: { category?: TrainingCategory; type?: ResourceType } = {};
     if (categoryFilter) filters.category = categoryFilter;
     if (typeFilter) filters.type = typeFilter;
-    return Promise.all([fetchResources(filters, { quiet: true }), user ? fetchProgress(user.uid) : undefined]);
+    return Promise.all([
+      fetchResources(filters, { quiet: true }).then((list) => {
+        if (list && !categoryFilter && !typeFilter) setAllResources(list);
+      }),
+      user ? fetchProgress(user.uid) : undefined,
+    ]);
   });
-
-  useEffect(() => {
-    if (!user) return;
-    let active = true;
-    const loadCount = async () => {
-      const gen = dataCacheGeneration();
-      try {
-        const token = await getIdToken();
-        const response = await fetch('/api/portal/training', {
-          headers: { Authorization: `Bearer ${token ?? ''}` },
-        });
-        if (!response.ok) return;
-        const data = await response.json() as { resources?: TrainingResource[] };
-        writeCachedTrainingList(user.uid, data.resources ?? [], gen);
-        if (active) setAllResources(data.resources ?? []);
-      } catch {
-        // The filtered list still renders when the count request is unavailable.
-      }
-    };
-    void loadCount();
-    return () => { active = false; };
-  }, [user]);
 
   const loaded = loadedKey === requestKey;
   // Progress and required-left read the whole published list, not the filtered one.
