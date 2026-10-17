@@ -10,8 +10,14 @@ const auth = vi.hoisted(() => ({ user: { uid: 'rep-1' } as { uid: string } | nul
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: auth.user }) }));
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'token') }));
 
-import { useSales } from './useSales';
-import { readDataCache, setDataCacheOwner, writeDataCache } from '@/lib/cache/dataCache';
+import { salesQuery, useSales } from './useSales';
+import {
+  dataCacheGeneration,
+  readDataCache,
+  readDataCacheEntry,
+  setDataCacheOwner,
+  writeDataCache,
+} from '@/lib/cache/dataCache';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -93,6 +99,28 @@ describe('useSales cache', () => {
     expect(renders.at(-1)!.sales).toEqual([{ id: 'a' }]);
     expect(renders.at(-1)!.error).toBe('down');
     await unmount();
+  });
+
+  it('a cache hit keeps its original time across a remount until a fetch succeeds', async () => {
+    const key = `sales?${salesQuery(FILTERS)}`;
+    const fetchedAt = Date.now() - 5 * 60 * 1000;
+    writeDataCache('rep-1', key, { sales: [{ id: 'a' }], truncated: false }, dataCacheGeneration(), fetchedAt);
+
+    // Mount, background refresh fails, unmount, mount again: still the original time.
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({ error: 'down' }) })));
+    await mount();
+    expect(renders[0].seeded).toBe(true);
+    await unmount();
+    await mount();
+    expect(renders[0].seeded).toBe(true);
+    await unmount();
+    expect(readDataCacheEntry('rep-1', key)?.at).toBe(fetchedAt);
+
+    // A fetch that succeeds restamps it.
+    respond([{ id: 'a' }]);
+    await mount();
+    await unmount();
+    expect(readDataCacheEntry('rep-1', key)!.at).toBeGreaterThan(fetchedAt);
   });
 
   it('never shows one user’s list to the next user, after sign-out or a switch', async () => {

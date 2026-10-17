@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { useCacheSubject } from '@/lib/cache/useCacheSubject';
-import { dataCacheGeneration, invalidateAfterSaleWrite, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
+import { dataCacheGeneration, invalidateAfterSaleWrite, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
 
@@ -84,14 +84,17 @@ export function useSales(seed?: SalesFilters | null) {
   useEffect(() => {
     uidRef.current = uid;
   }, [uid]);
-  const [seeded] = useState<CachedSales | undefined>(() =>
-    seed ? readDataCache<CachedSales>(uid, listCacheKey(salesQuery(seed))) : undefined
+  const [seededEntry] = useState(() =>
+    seed ? readDataCacheEntry<CachedSales>(uid, listCacheKey(salesQuery(seed))) : undefined
   );
-  // The query (and whose list, under which account generation) the list on
-  // screen came from, so local edits keep that cached copy current and never
-  // write it under another user.
-  const listKey = useRef<{ key: string; subject: string | null; gen: number } | null>(
-    seed && seeded ? { key: listCacheKey(salesQuery(seed)), subject: uid, gen: dataCacheGeneration() } : null
+  const seeded = seededEntry?.value;
+  // The query (and whose list, under which account generation, fetched when)
+  // the list on screen came from, so local edits keep that cached copy current
+  // without restamping it, and never write it under another user.
+  const listKey = useRef<{ key: string; subject: string | null; gen: number; at: number } | null>(
+    seed && seededEntry
+      ? { key: listCacheKey(salesQuery(seed)), subject: uid, gen: dataCacheGeneration(), at: seededEntry.at }
+      : null
   );
   const [sales, setSales] = useState<Sale[]>(() => seeded?.sales ?? []);
   // The list query hit its cap and this book is short. Rows cut this way are
@@ -102,10 +105,13 @@ export function useSales(seed?: SalesFilters | null) {
   const [error, setError] = useState<string | null>(null);
 
   // Deletes and cancellations patch the list in place: keep its cached copy in step.
+  // The seeded list is the cached copy itself: writing it back would only restamp it.
   useEffect(() => {
     const list = listKey.current;
-    if (list) writeDataCache<CachedSales>(list.subject, list.key, { sales, truncated }, list.gen);
-  }, [sales, truncated]);
+    if (!list) return;
+    if (seeded && sales === seeded.sales && truncated === seeded.truncated) return;
+    writeDataCache<CachedSales>(list.subject, list.key, { sales, truncated }, list.gen, list.at);
+  }, [sales, truncated, seeded]);
 
   /**
    * `quiet` reloads without touching what is on screen: no loading flag, and a
@@ -141,7 +147,8 @@ export function useSales(seed?: SalesFilters | null) {
       }
 
       // An answer from before an account switch never becomes the cached copy.
-      listKey.current = gen === dataCacheGeneration() ? { key: listCacheKey(query), subject, gen } : null;
+      listKey.current =
+        gen === dataCacheGeneration() ? { key: listCacheKey(query), subject, gen, at: Date.now() } : null;
       setSales(data.sales);
       setTruncated(data.truncated === true);
       setError(null);

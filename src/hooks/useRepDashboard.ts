@@ -150,7 +150,7 @@ export function useRepDashboard() {
   // quiet "Couldn't refresh · as of" note.
   const lastGoodAt = useRef<number | null>(cachedEntry?.at ?? null);
   const [staleAt, setStaleAt] = useState<number | null>(null);
-  const [state, setState] = useState<RepDashboardState>(() => ({
+  const [initialState] = useState<RepDashboardState>(() => ({
     book: LOADING,
     plan: LOADING,
     standing: LOADING,
@@ -159,15 +159,24 @@ export function useRepDashboard() {
     paperwork: LOADING,
     ...cached,
   }));
+  const [state, setState] = useState<RepDashboardState>(initialState);
+  // When a section on screen last came from the server. Starts at the cached
+  // entry's time and moves only when a fetch succeeds, so writing the sections
+  // back (or a local install-date edit) never makes the entry look fresher.
+  const fetchedAt = useRef<number | null>(cachedEntry?.at ?? null);
 
-  // Keep the cache in step with every section that is on screen.
+  // Keep the cache in step with every section that is on screen. The seeded
+  // state is what the cache already holds: writing it back would only restamp it.
   useEffect(() => {
+    if (state === initialState) return;
     const ready: Partial<RepDashboardState> = {};
     for (const key of Object.keys(state) as RepSectionKey[]) {
       if (state[key].status === 'ready') (ready as Record<string, unknown>)[key] = state[key];
     }
-    if (Object.keys(ready).length) writeDataCache(uid, DASHBOARD_CACHE_KEY, ready, gen);
-  }, [state, uid, gen]);
+    if (Object.keys(ready).length) {
+      writeDataCache(uid, DASHBOARD_CACHE_KEY, ready, gen, fetchedAt.current ?? Date.now());
+    }
+  }, [state, initialState, uid, gen]);
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
@@ -251,6 +260,7 @@ export function useRepDashboard() {
           try {
             const data = await all[key]!(token, controller.signal);
             if (controller.signal.aborted) return;
+            fetchedAt.current = Date.now();
             setState((current) => ({ ...current, [key]: { status: 'ready', data } }));
           } catch (error) {
             // Only a real abort (unmount / superseded retry) is silent. A plain

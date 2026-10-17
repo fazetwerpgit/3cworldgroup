@@ -76,13 +76,22 @@ export function readDataCache<T>(subject: string | null | undefined, key: string
 /**
  * Stores a value for this subject and key. A no-op with no signed-in account,
  * or when `gen` (captured at fetch start) is from an earlier account.
+ * `at` is when the value was fetched (default now). A screen writing back a
+ * local edit of data it fetched earlier passes that fetch's time, so the entry
+ * never looks fresher than the server copy it came from.
  */
-export function writeDataCache<T>(subject: string | null | undefined, key: string, value: T, gen?: number): void {
+export function writeDataCache<T>(
+  subject: string | null | undefined,
+  key: string,
+  value: T,
+  gen?: number,
+  at: number = Date.now()
+): void {
   if (!owner || !subject) return;
   if (gen !== undefined && gen !== generation) return;
   const id = fullKey(subject, key);
   entries.delete(id);
-  entries.set(id, { value, at: Date.now() });
+  entries.set(id, { value, at });
   while (entries.size > DATA_CACHE_MAX_ENTRIES) {
     const oldest = entries.keys().next().value;
     if (oldest === undefined) break;

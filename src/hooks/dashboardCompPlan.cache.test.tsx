@@ -14,7 +14,7 @@ vi.mock('@/hooks/useRefreshOnResume', () => ({ useRefreshOnResume: () => {} }));
 
 import { useRepDashboard } from './useRepDashboard';
 import { useCompPlan } from './useCompPlan';
-import { setDataCacheOwner } from '@/lib/cache/dataCache';
+import { readDataCacheEntry, setDataCacheOwner, writeDataCache } from '@/lib/cache/dataCache';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -97,6 +97,29 @@ describe('useRepDashboard cache', () => {
     expect(last.book.status).toBe('ready');
     expect(typeof last.staleAt).toBe('number');
     await unmount();
+  });
+
+  it('a cache hit keeps its original time across a remount until a fetch succeeds', async () => {
+    const fetchedAt = Date.now() - 5 * 60 * 1000;
+    writeDataCache('rep-1', 'dashboard', { calls: { status: 'ready', data: [] } }, undefined, fetchedAt);
+
+    respondDashboard(true);
+    renders = [];
+    await mount(<Harness />);
+    expect(renders[0].calls.status).toBe('ready');
+    expect(renders.at(-1)!.staleAt).toBe(fetchedAt);
+    await unmount();
+    renders = [];
+    await mount(<Harness />);
+    expect(renders[0].calls.status).toBe('ready');
+    await unmount();
+    expect(readDataCacheEntry('rep-1', 'dashboard')?.at).toBe(fetchedAt);
+
+    respondDashboard();
+    renders = [];
+    await mount(<Harness />);
+    await unmount();
+    expect(readDataCacheEntry('rep-1', 'dashboard')!.at).toBeGreaterThan(fetchedAt);
   });
 });
 
