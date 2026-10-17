@@ -12,6 +12,7 @@ const state = vi.hoisted(() => ({
   pathname: '/portal/dashboard',
   topBarMounts: 0,
   tabBarMounts: 0,
+  search: '',
   channelListeners: 0,
   unreadListeners: 0,
   presenceStarts: 0,
@@ -21,6 +22,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: () => state.pathname,
+  useSearchParams: () => new URLSearchParams(state.search),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { uid: 'rep-1' }, loading: false }) }));
@@ -98,6 +100,7 @@ function render(path: string, page: ReactNode) {
 }
 
 beforeEach(() => {
+  state.search = '';
   state.topBarMounts = 0;
   state.tabBarMounts = 0;
   state.channelListeners = 0;
@@ -268,5 +271,41 @@ describe('main scroll memory', () => {
     // A fresh push to a page seen before still opens at the top.
     render('/portal/sales/abc', <RepShell key="sale"><p>sale</p></RepShell>);
     expect(main().scrollTop).toBe(0);
+  });
+
+  it('forgets a Back that did not change the page once it settles', () => {
+    vi.useFakeTimers();
+    try {
+      render('/portal/sales', <RepShell key="sales"><p>sales</p></RepShell>);
+      scrollTo(300);
+      render('/portal/sales/abc', <RepShell key="sale"><p>sale</p></RepShell>);
+      // Same-path popstate (e.g. a hash or a no-op history entry): no navigation.
+      act(() => {
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      });
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      // The next ordinary tap opens at the top, not at the remembered spot.
+      render('/portal/sales', <RepShell key="sales"><p>sales</p></RepShell>);
+      expect(main().scrollTop).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a separate spot per query string', () => {
+    render('/portal/sales', <RepShell key="sales"><p>sales</p></RepShell>);
+    scrollTo(500);
+    state.search = 'tab=pending';
+    render('/portal/sales', <RepShell key="sales"><p>sales</p></RepShell>);
+    expect(main().scrollTop).toBe(0);
+    scrollTo(80);
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    });
+    state.search = '';
+    render('/portal/sales', <RepShell key="sales"><p>sales</p></RepShell>);
+    expect(main().scrollTop).toBe(500);
   });
 });
