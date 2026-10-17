@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, useRef, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useRef, ReactNode } from 'react';
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -30,9 +30,6 @@ import { clearViewAs } from '@/lib/viewAs/storage';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 import { setDataCacheOwner } from '@/lib/cache/dataCache';
 import { clearSessionProfile, readSessionProfile, writeSessionProfile } from '@/lib/auth/sessionProfile';
-
-// Layout effects warn on the server; the provider only runs them in the browser.
-const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
@@ -185,23 +182,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // True once the user on screen came from a real read of users/{uid} for the
   // confirmed session (not the device's remembered copy).
   const profileVerified = useRef(false);
-
-  // Cold open: paint the portal with the profile this device remembered from
-  // the last session (see sessionProfile.ts) instead of a splash, while Firebase
-  // Auth restores and checks the session and the profile is read again below.
-  // Pages start their own reads at once; getIdToken() waits for the session.
-  // The confirmed answer replaces this guess: another account or none clears it.
-  useIsoLayoutEffect(() => {
-    if (!isFirebaseConfigured() || !auth || !db || auth.currentUser) return;
-    const remembered = readSessionProfile();
-    if (!remembered) return;
-    // The cache belongs to this account from the start, so the first page's
-    // reads are kept (a later setDataCacheOwner with the same uid is a no-op).
-    setDataCacheOwner(remembered.uid);
-    setState((prev) =>
-      prev.loading && !prev.user ? { user: remembered, loading: false, error: null, pendingApproval: false } : prev
-    );
-  }, []);
 
   // Keep the remembered copy in step with the confirmed profile; drop it when
   // the session ends or resolves to anything but this account. A profile read
@@ -390,6 +370,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setDataCacheOwner(firebaseUser?.uid ?? null);
       if (signingUp.current || bootstrappingPendingProfile.current) return; // explicit auth flows own state
       if (firebaseUser) {
+        // Cold open: Firebase has restored and checked this session. Paint the
+        // portal now with the profile this device remembered for this same
+        // account (sessionProfile.ts) instead of holding the splash for the
+        // Firestore read below, which then replaces it (or signs out). The
+        // user only appears once auth.currentUser is set, as before.
+        const remembered = readSessionProfile();
+        if (remembered?.uid === firebaseUser.uid) {
+          setState((prev) =>
+            prev.user ? prev : { user: remembered, loading: false, error: null, pendingApproval: false }
+          );
+        }
         await resolveProfile(firebaseUser);
       } else {
         resolveGeneration.current += 1;

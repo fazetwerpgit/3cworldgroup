@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 //
-// Cold open: the portal paints with the profile this device remembered while
-// Firebase Auth restores the session, then the confirmed profile replaces it;
-// no session (or another account) clears it, and sign-out forgets it.
+// Cold open: once Firebase Auth restores the session, the portal paints with
+// the profile this device remembered for that account instead of waiting on
+// the Firestore read, which then replaces it; no session, another account or
+// sign-out clears it.
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const fb = vi.hoisted(() => ({
   authListener: null as ((user: unknown) => void) | null,
   profile: null as Record<string, unknown> | null,
+  hold: null as Promise<void> | null,
   auth: { currentUser: null as unknown },
 }));
 
@@ -33,7 +35,10 @@ vi.mock('firebase/auth', () => ({
 }));
 vi.mock('firebase/firestore', () => ({
   doc: (_db: unknown, ...path: string[]) => path.join('/'),
-  getDoc: vi.fn(async () => ({ exists: () => fb.profile !== null, data: () => fb.profile })),
+  getDoc: vi.fn(async () => {
+    if (fb.hold) await fb.hold;
+    return { exists: () => fb.profile !== null, data: () => fb.profile };
+  }),
   onSnapshot: vi.fn(() => () => undefined),
   setDoc: vi.fn(),
   serverTimestamp: vi.fn(),
@@ -75,6 +80,7 @@ beforeEach(() => {
   seen = [];
   window.localStorage.clear();
   fb.profile = null;
+  fb.hold = null;
   fb.auth.currentUser = null;
 });
 
@@ -89,20 +95,41 @@ describe('AuthProvider remembered profile', () => {
     expect(seen.at(-1)).toEqual({ uid: null, name: null, loading: true });
   });
 
-  it('paints the remembered profile at once, then the confirmed one replaces and is remembered', async () => {
+  it('waits for auth even with a remembered profile (auth.currentUser must be set first)', async () => {
     writeSessionProfile(REP);
     await mount();
-    expect(seen.at(-1)).toEqual({ uid: 'rep-1', name: 'Old Name', loading: false });
-    // The first page's reads are kept for this account.
-    writeDataCache('rep-1', 'probe', 1, dataCacheGeneration());
-    expect(readDataCache('rep-1', 'probe')).toBe(1);
+    expect(seen.at(-1)).toEqual({ uid: null, name: null, loading: true });
+  });
 
+  it('paints the remembered profile as soon as the session is restored, then the read replaces it', async () => {
+    writeSessionProfile(REP);
+    await mount();
+    let release!: () => void;
+    fb.hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     fb.profile = { email: 'rep@x.com', displayName: 'New Name', status: 'active', fieldRole: 'rep' };
-    await act(async () => fb.authListener?.({ uid: 'rep-1', photoURL: null, providerData: [] }));
+    await act(async () => {
+      fb.authListener?.({ uid: 'rep-1', photoURL: null, providerData: [] });
+    });
+    // The Firestore read is still out: the remembered copy is on screen.
+    expect(seen.at(-1)).toEqual({ uid: 'rep-1', name: 'Old Name', loading: false });
+    writeDataCache('rep-1', 'probe', 1, dataCacheGeneration());
+    await act(async () => release());
     expect(seen.at(-1)).toEqual({ uid: 'rep-1', name: 'New Name', loading: false });
     expect(readSessionProfile()?.displayName).toBe('New Name');
-    // Same account confirmed: the cache was not emptied.
+    // Same account confirmed: the first page's cached reads are kept.
     expect(readDataCache('rep-1', 'probe')).toBe(1);
+  });
+
+  it('ignores a profile remembered for another account', async () => {
+    writeSessionProfile(REP);
+    await mount();
+    fb.hold = new Promise<void>(() => undefined);
+    await act(async () => {
+      fb.authListener?.({ uid: 'rep-2', photoURL: null, providerData: [] });
+    });
+    expect(seen.at(-1)).toEqual({ uid: null, name: null, loading: true });
   });
 
   it('clears the remembered profile when there is no session', async () => {
