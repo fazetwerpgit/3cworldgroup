@@ -37,8 +37,11 @@ export interface NativeAuthSyncDeps {
   onCanSyncChange: (callback: () => void) => () => void;
   /** Exchanges an ID token for a custom token, or null on any failure. */
   fetchCustomToken: (idToken: string) => Promise<string | null>;
-  /** Sends the nativeAuth request; true only on the shell's ok reply. */
-  sendNativeAuth: (customToken: string) => Promise<boolean>;
+  /**
+   * Sends the nativeAuth request. Resolves to the uid the shell's ok reply says
+   * it signed in as, or null on a failed reply or one without a uid.
+   */
+  sendNativeAuth: (customToken: string) => Promise<string | null>;
   postSignOut: () => void;
   setStatus: (status: NativeAuthStatus, uid?: string | null) => void;
   now?: () => number;
@@ -84,13 +87,18 @@ export function createNativeAuthSync(deps: NativeAuthSyncDeps): () => void {
         if (target.uid !== lastSentUid) deps.setStatus('failed');
         return;
       }
-      let ok = false;
+      let confirmedUid: string | null = null;
       try {
-        ok = await deps.sendNativeAuth(customToken);
+        confirmedUid = await deps.sendNativeAuth(customToken);
       } catch {
-        ok = false;
+        confirmedUid = null;
       }
       if (stale(target, gen)) return;
+      // Native chat is marked usable only for the uid the shell says it signed
+      // in as, and only when that is the web user right now (stale() just
+      // checked target.uid against the current uid). Any other answer,
+      // including an ok with no uid, counts as a failure.
+      const ok = confirmedUid !== null && confirmedUid === target.uid;
       if (ok) {
         lastSentUid = target.uid;
         lastSentAt = now();
@@ -170,12 +178,13 @@ async function fetchCustomToken(idToken: string): Promise<string | null> {
   return typeof body?.token === 'string' && body.token ? body.token : null;
 }
 
-async function sendNativeAuth(customToken: string): Promise<boolean> {
+async function sendNativeAuth(customToken: string): Promise<string | null> {
   try {
-    await requestNative<'nativeAuth'>({ type: 'nativeAuth', customToken });
-    return true;
+    const result = await requestNative<'nativeAuth'>({ type: 'nativeAuth', customToken });
+    const uid = result && typeof result === 'object' ? result.uid : undefined;
+    return typeof uid === 'string' && uid ? uid : null;
   } catch {
-    return false;
+    return null;
   }
 }
 

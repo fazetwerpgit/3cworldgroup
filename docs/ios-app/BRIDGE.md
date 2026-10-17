@@ -213,9 +213,11 @@ reporter breadcrumbs, no analytics.
 ```
 Sign the shell's own Firebase Auth (`@react-native-firebase/auth`, used by the
 native chat screen) in with `signInWithCustomToken(customToken)`, then reply
-`{ ok: true }` (no result needed). On any failure reply `ok: false`
-(`code: "failed"`); the web then keeps chat on the web page. The web marks
-native chat usable for a uid only after this ok reply.
+`{ ok: true, result: { uid } }` with the uid the native Auth is now signed in
+as. On any failure reply `ok: false` (`code: "failed"`); the web then keeps
+chat on the web page. The web marks native chat usable for a uid only after
+an ok reply whose `uid` equals the current web user's uid; an ok reply with a
+different uid, or with none, counts as a failure.
 
 The web gets the token from `POST /api/portal/auth/custom-token` (Bearer ID
 token, checked for revocation; active accounts only; the uid comes from the

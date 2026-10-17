@@ -18,7 +18,7 @@ let canSync: boolean;
 let log: string[];
 let statuses: [NativeAuthStatus, string | null | undefined][];
 let fetchCustomToken: ReturnType<typeof vi.fn<(idToken: string) => Promise<string | null>>>;
-let sendNativeAuth: ReturnType<typeof vi.fn<(customToken: string) => Promise<boolean>>>;
+let sendNativeAuth: ReturnType<typeof vi.fn<(customToken: string) => Promise<string | null>>>;
 let stop: () => void;
 
 function user(uid: string): SyncUser {
@@ -61,9 +61,10 @@ beforeEach(() => {
   log = [];
   statuses = [];
   fetchCustomToken = vi.fn(async (idToken: string) => `custom-${idToken}`);
+  // The shell signs in as the token's user and echoes that uid in its ok reply.
   sendNativeAuth = vi.fn(async (token: string) => {
     log.push(`auth:${token}`);
-    return true;
+    return token.replace(/^custom-id-/, '');
   });
   start();
 });
@@ -105,10 +106,24 @@ describe('createNativeAuthSync', () => {
   });
 
   it('marks failed (no uid) when the shell refuses', async () => {
-    sendNativeAuth.mockResolvedValueOnce(false);
+    sendNativeAuth.mockResolvedValueOnce(null);
     signIn('u1');
     await vi.advanceTimersByTimeAsync(0);
     expect(lastStatus()).toEqual(['failed', undefined]);
+  });
+
+  it('marks failed when the ok reply names a different uid than the web user', async () => {
+    sendNativeAuth.mockResolvedValueOnce('someone-else');
+    signIn('u1');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lastStatus()).toEqual(['failed', undefined]);
+    expect(statuses.some(([status]) => status === 'ok')).toBe(false);
+  });
+
+  it('marks ok, for that uid, only when the reply uid matches the web user', async () => {
+    signIn('u1');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lastStatus()).toEqual(['ok', 'u1']);
   });
 
   it('marks failed when the server refuses (inactive user)', async () => {

@@ -192,8 +192,11 @@ export interface BridgeResultMap {
   saveFile: CompletedResult;
   biometricLock: BiometricLockResult;
   nativeSignIn: NativeSignInResult;
-  /** ok once the shell's native Firebase Auth signed in with the custom token. */
-  nativeAuth: unknown;
+  /**
+   * ok once the shell's native Firebase Auth signed in with the custom token;
+   * `uid` is the uid it is now signed in as (checked against the web user).
+   */
+  nativeAuth: { uid?: unknown } | undefined;
   /** ok once the native chat screen is showing. */
   openNativeChat: unknown;
 }
