@@ -251,9 +251,12 @@ button.row {
   transition: background-color 160ms ease;
 }
 
+/* The press tint waits --press-delay (rep.module.css): a touch that turns into a
+   scroll within it never flashes the row; letting go clears it at once. */
 a.row:active,
 button.row:active {
   background: var(--c-panel-hi);
+  transition-delay: var(--press-delay, 90ms);
 }
 
 @media (hover: hover) {

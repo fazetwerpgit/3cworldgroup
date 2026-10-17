@@ -9,6 +9,9 @@
 
 .root,
 .layer {
+  /* Rows light up on :active only after this long held (rep-page .row and
+     friends), so a finger that lands on a row to scroll never flashes it. */
+  --press-delay: 90ms;
   /* Surface ladder (direction C): well < ground < panel < raised < panel-hi.
      Depth is these tone steps alone (taste pass, Oct 2026): no resting
      shadows, no outlines. Only real floating overlays (sheets, drops) keep one

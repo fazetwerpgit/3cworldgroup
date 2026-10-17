@@ -941,8 +941,10 @@
   transform: scale(0.97);
 }
 
+/* Delayed press tint (--press-delay, rep.module.css): no flash under a scroll. */
 .hubRow:active,
 .drop:active,
 .row:not(:has(input:checked)):active {
   background: var(--c-panel-hi);
+  transition: background-color 0s linear var(--press-delay, 90ms);
 }
