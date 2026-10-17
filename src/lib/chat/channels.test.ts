@@ -78,6 +78,7 @@ import {
   createChannelId,
   getMemberIdsForAudience,
   isEligibleChatMember,
+  isEligibleSandboxMember,
   reconcileChatMembershipForUser,
   syncChatChannels,
   userCanAccessChannelDoc,
@@ -280,5 +281,73 @@ describe('userCanAccessChannelDoc — demo accounts', () => {
   it('still lets a real manual extra and a real audience member in', () => {
     expect(userCanAccessChannelDoc(custom, { uid: 'r1', demoAccount: false })).toBe(true);
     expect(userCanAccessChannelDoc(general, { uid: 'r2', fieldRole: 'entry_level_rep', demoAccount: false })).toBe(true);
+  });
+});
+
+describe('demo sandbox channel', () => {
+  const sandbox = { id: 'app-review', name: 'App Review', audience: 'all', order: 99, active: true, demoSandbox: true, extraMemberIds: ['rep'] };
+  const general = { id: 'general', name: 'General', audience: 'all', order: 0, active: true };
+
+  it('admits a demo account to the sandbox and nowhere else', () => {
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'demo', demoAccount: true })).toBe(true);
+    expect(userCanAccessChannelDoc(general, { uid: 'demo', demoAccount: true })).toBe(false);
+  });
+
+  it('keeps real users out of the sandbox whatever their audience or extras, admins/owners excepted', () => {
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'rep', fieldRole: 'entry_level_rep', demoAccount: false })).toBe(false);
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'mgr', fieldRole: 'l1_manager', demoAccount: false })).toBe(false);
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'ops', role: 'operations', demoAccount: false })).toBe(false);
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'adm', role: 'admin', demoAccount: false })).toBe(true);
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'own', role: 'owner', demoAccount: false })).toBe(true);
+  });
+
+  it('closes an archived sandbox to everyone, the demo account included', () => {
+    const archived = { ...sandbox, active: false };
+    expect(userCanAccessChannelDoc(archived, { uid: 'demo', demoAccount: true })).toBe(false);
+    expect(userCanAccessChannelDoc(archived, { uid: 'adm', role: 'admin', demoAccount: false })).toBe(false);
+  });
+
+  it('limits sandbox eligibility to active demo accounts and admins/owners', () => {
+    expect(isEligibleSandboxMember({ status: 'active', demoAccount: true })).toBe(true);
+    expect(isEligibleSandboxMember({ status: 'inactive', demoAccount: true })).toBe(false);
+    expect(isEligibleSandboxMember({ status: 'active', role: 'admin' })).toBe(true);
+    expect(isEligibleSandboxMember({ status: 'active', role: 'owner' })).toBe(true);
+    expect(isEligibleSandboxMember({ status: 'active', role: 'operations' })).toBe(false);
+    expect(isEligibleSandboxMember({ status: 'active', fieldRole: 'l1_manager' })).toBe(false);
+    expect(isEligibleChatMember({ status: 'active', demoAccount: true }, sandbox)).toBe(true);
+    expect(isEligibleChatMember({ status: 'active', fieldRole: 'entry_level_rep' }, sandbox)).toBe(false);
+    expect(isEligibleChatMember({ status: 'active', demoAccount: true }, general)).toBe(false);
+  });
+
+  it('belongsInChannelDoc ignores audience and extras for the sandbox', () => {
+    expect(belongsInChannelDoc(sandbox, 'demo', { status: 'active', demoAccount: true })).toBe(true);
+    expect(belongsInChannelDoc(sandbox, 'adm', { status: 'active', role: 'admin' })).toBe(true);
+    expect(belongsInChannelDoc(sandbox, 'rep', { status: 'active', fieldRole: 'entry_level_rep' })).toBe(false);
+  });
+
+  it('sync sets sandbox memberIds to demo accounts plus admins/owners only, and keeps demo out of the rest', async () => {
+    firestore.reset();
+    firestore.channelDocs.push({ id: 'app-review', data: sandbox }, { id: 'general', data: general });
+    firestore.users.set('demo', { status: 'active', demoAccount: true });
+    firestore.users.set('adm', { status: 'active', role: 'admin' });
+    firestore.users.set('own', { status: 'active', role: 'owner' });
+    firestore.users.set('ops', { status: 'active', role: 'operations' });
+    firestore.users.set('rep', { status: 'active', fieldRole: 'entry_level_rep' });
+    firestore.users.set('hire', { status: 'pending', fieldRole: 'entry_level_rep' });
+
+    await syncChatChannels();
+
+    const byId = new Map(firestore.batchSets.map((set) => [set.ref.__id, set.data.memberIds as string[]]));
+    expect([...(byId.get('app-review') ?? [])].sort()).toEqual(['adm', 'demo', 'own']);
+    expect(byId.get('general')).not.toContain('demo');
+    expect(byId.get('general')).toContain('rep');
+  });
+
+  it('reconcile adds the demo account to the sandbox only', async () => {
+    firestore.reset();
+    firestore.channelDocs.push({ id: 'app-review', data: { ...sandbox, memberIds: [] } }, { id: 'general', data: { ...general, memberIds: [] } });
+    const channels = await reconcileChatMembershipForUser('demo', { status: 'active', demoAccount: true });
+    expect(channels.map((c) => c.id)).toEqual(['app-review']);
+    expect(channels[0].demoSandbox).toBe(true);
   });
 });

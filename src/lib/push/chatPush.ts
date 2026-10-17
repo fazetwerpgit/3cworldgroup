@@ -29,13 +29,15 @@ export function resolveChatPushRecipients(
 
 // A push carries a message preview, so it goes only to an account that may chat
 // today (active, or a hire mid-onboarding) and still reaches this channel by its
-// current role or a manual addition.
+// current role or a manual addition. A demo sandbox channel pushes only to its
+// own members (demo accounts and admins/owners): isEligibleChatMember with the
+// channel doc applies the sandbox rule, and userCanAccessChannelDoc re-checks it.
 export function shouldPushChatRecipient(
   channelData: FirebaseFirestore.DocumentData,
   uid: string,
   userData: FirebaseFirestore.DocumentData
 ): boolean {
-  if (!isEligibleChatMember(userData)) return false;
+  if (!isEligibleChatMember(userData, channelData)) return false;
   const { role, fieldRole } = resolveRoles(userData.role, userData.fieldRole);
   return userCanAccessChannelDoc(channelData, { uid, role, fieldRole, demoAccount: isDemoAccount(userData) });
 }

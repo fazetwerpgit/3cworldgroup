@@ -73,6 +73,11 @@ export async function POST(
     if (!channel.active) {
       return NextResponse.json({ error: 'Channel is archived' }, { status: 400 });
     }
+    // The demo sandbox's membership is fixed (demo accounts plus admins/owners);
+    // an extra would never grant access there, so refuse rather than store one.
+    if (channel.demoSandbox) {
+      return NextResponse.json({ error: 'The demo sandbox takes no added members' }, { status: 400 });
+    }
 
     // The target must be a real, active user (matches getVerifiedChatUser's own active gate).
     const userSnap = await adminDb.collection('users').doc(uid).get();

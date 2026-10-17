@@ -4,6 +4,7 @@ import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
 import {
   createChannelId,
+  isDemoSandboxChannel,
   getMemberIdsForAudience,
   isChatChannelAudience,
   toChatChannel,
@@ -136,12 +137,19 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid audience' }, { status: 400 });
       }
       updates.audience = body.audience;
-      updates.memberIds = await getMemberIdsForAudience(body.audience);
     }
 
     const ref = adminDb.collection('chatChannels').doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
+    if ('audience' in updates) {
+      // The demo sandbox's memberIds never follow an audience (demo accounts plus
+      // admins/owners only); an audience edit there must not put real people in.
+      if (isDemoSandboxChannel(snap.data())) {
+        return NextResponse.json({ error: 'The demo sandbox has no audience to change' }, { status: 400 });
+      }
+      updates.memberIds = await getMemberIdsForAudience(updates.audience as ChatChannelAudience);
+    }
 
     await ref.set(updates, { merge: true });
     return NextResponse.json({ success: true });

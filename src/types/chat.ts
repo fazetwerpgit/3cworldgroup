@@ -9,6 +9,8 @@ export interface ChatChannel {
   audience: ChatChannelAudience;
   order: number;
   active: boolean;
+  /** The App Review demo sandbox (chatChannels/{id}.demoSandbox === true); absent elsewhere. */
+  demoSandbox?: boolean;
 }
 
 // A single media attachment on a message. `image` is a file the sender uploaded

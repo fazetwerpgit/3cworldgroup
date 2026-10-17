@@ -8,6 +8,7 @@ import {
   readExtraMemberIds,
   toChatChannel,
   userCanAccessChannelDoc,
+  isDemoSandboxChannel,
 } from '@/lib/chat/channels';
 import { memberAvatarUrl, memberName } from '@/lib/chat/memberDisplay';
 
@@ -100,8 +101,10 @@ export async function GET(
 
     // Admins get a pick-list of people they can add (active users not already members).
     // Never returned to non-admins — the key is entirely absent for them.
-    if (!isAdmin) {
-      return NextResponse.json({ members, memberCount: members.length });
+    // The demo sandbox takes no manual additions (membership is demo accounts
+    // plus admins/owners), so it offers nobody to add.
+    if (!isAdmin || isDemoSandboxChannel(data)) {
+      return NextResponse.json({ members, memberCount: members.length, ...(isAdmin ? { addable: [] } : {}) });
     }
 
     const memberIdSet = new Set(memberIds);

@@ -185,6 +185,19 @@ describe('/api/portal/chat/channels/manage', () => {
     });
   });
 
+  it('PATCH refuses an audience change on the demo sandbox so real people never land in its memberIds', async () => {
+    mockGate.mockResolvedValue(ADMIN);
+    firestore.channels.set('app-review', {
+      id: 'app-review', name: 'App Review', description: '', audience: 'all', order: 99, active: true,
+      demoSandbox: true, memberIds: ['demo', 'admin-1'],
+    });
+
+    const res = await PATCH(req('PATCH', { id: 'app-review', audience: 'all' }));
+
+    expect(res.status).toBe(400);
+    expect(firestore.channels.get('app-review')).toMatchObject({ memberIds: ['demo', 'admin-1'] });
+  });
+
   it('DELETE removes the channel doc and its messages', async () => {
     mockGate.mockResolvedValue(ADMIN);
     firestore.channels.set('old-channel', { id: 'old-channel', name: 'Old', audience: 'all', order: 1, active: true });

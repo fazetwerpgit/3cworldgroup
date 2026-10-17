@@ -120,4 +120,24 @@ describe('POST /api/portal/chat/messages/report', () => {
     expect(await again.json()).toEqual({ success: true, duplicate: true });
     expect(notifyMock).toHaveBeenCalledTimes(1);
   });
+
+  it('works inside the demo sandbox: the demo account reports, the report goes to the back office as usual', async () => {
+    store.set('chatChannels/app-review', { name: 'App Review', audience: 'all', active: true, demoSandbox: true, memberIds: ['demo', 'demo-2'] });
+    store.set('chatChannels/app-review/messages/s1', { authorId: 'demo-2', authorName: 'Sam Demo', text: 'seeded', deletedAt: null });
+    verified.mockResolvedValue({ ok: true, user: { uid: 'demo', displayName: 'App Review', canModerate: false, demoAccount: true } });
+
+    expect((await post({ channelId: 'app-review', messageId: 's1', reason: 'spam' })).status).toBe(200);
+    await Promise.all(afterTasks);
+    expect(store.get('chatReports/s1_demo')).toMatchObject({ channelId: 'app-review', authorId: 'demo-2', status: 'open' });
+    expect(notifyMock).toHaveBeenCalledTimes(1);
+
+    // ...and still cannot reach a real channel.
+    expect((await post({ channelId: 'all-company', messageId: 'm1', reason: 'spam' })).status).toBe(403);
+  });
+
+  it('keeps a real rep out of the demo sandbox', async () => {
+    store.set('chatChannels/app-review', { name: 'App Review', audience: 'all', active: true, demoSandbox: true, memberIds: ['demo'] });
+    store.set('chatChannels/app-review/messages/s1', { authorId: 'demo', text: 'seeded', deletedAt: null });
+    expect((await post({ channelId: 'app-review', messageId: 's1', reason: 'spam' })).status).toBe(403);
+  });
 });

@@ -14,7 +14,7 @@ export interface ChatUser {
   fieldRole?: FieldRole;
   effectiveRole?: PlatformRole | FieldRole;
   canModerate: boolean;
-  /** users/{uid}.demoAccount === true: denied every channel, extras included. */
+  /** users/{uid}.demoAccount === true: denied every channel except a demo sandbox, extras included. */
   demoAccount: boolean;
   /** Whether they accepted the one-time chat agreement (users/{uid}.chatTermsAcceptedAt). */
   chatTermsAccepted?: boolean;
@@ -42,8 +42,9 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
     return { ok: false, error: 'Account is not active', status: 403 };
   }
 
-  // A demo account keeps a working chat screen with no channels: with no role it
-  // reaches no audience, so it can neither read nor post where others would see it.
+  // A demo account has no role, so it reaches no audience: the only channel it
+  // can read or post in is a demo sandbox (userCanAccessChannelDoc), which real
+  // users other than admins/owners never see.
   const demoAccount = isDemoAccount(data);
   const { role, fieldRole } = demoAccount ? {} : resolveRoles(data.role, data.fieldRole);
 

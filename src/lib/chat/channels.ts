@@ -7,8 +7,34 @@ import {
   ChatChannelAudience,
   roleRequiresOnboarding,
 } from '@/types';
-import { resolveRoles, PlatformRole, FieldRole } from '@/types';
+import { isAdminLevel, resolveRoles, PlatformRole, FieldRole } from '@/types';
 import { isDemoAccount } from '@/lib/users/demoAccount';
+
+// APP REVIEW DEMO SANDBOX. A channel doc with `demoSandbox: true` is the one
+// place a demo account (users/{uid}.demoAccount === true) may chat, so App
+// Review can exercise send, report and block without ever seeing or reaching
+// a real person. Its membership is fixed, not audience-based: demo accounts
+// plus admins/owners (who moderate it). Every other user is kept out whatever
+// their role, audience or extraMemberIds, and a demo account stays out of
+// every non-sandbox channel. Setup: docs/ios-app/APP-REVIEW-DEMO.md.
+
+/** The channel doc field that marks the App Review demo sandbox. */
+export const DEMO_SANDBOX_FIELD = 'demoSandbox';
+
+export function isDemoSandboxChannel(data: FirebaseFirestore.DocumentData | null | undefined): boolean {
+  return data?.[DEMO_SANDBOX_FIELD] === true;
+}
+
+/**
+ * Whether a users/{uid} doc belongs in a sandbox channel: an active demo
+ * account, or an active admin/owner. Nobody else, ever.
+ */
+export function isEligibleSandboxMember(data: FirebaseFirestore.DocumentData): boolean {
+  if (data.status !== 'active') return false;
+  if (isDemoAccount(data)) return true;
+  const { role } = resolveRoles(data.role, data.fieldRole);
+  return isAdminLevel(role);
+}
 
 export interface ChatChannelMembership {
   channelIds: string[];
@@ -65,6 +91,7 @@ export function toChatChannel(id: string, data: FirebaseFirestore.DocumentData):
     audience: data.audience,
     order: typeof data.order === 'number' && Number.isFinite(data.order) ? data.order : 999,
     active: data.active !== false,
+    ...(isDemoSandboxChannel(data) ? { demoSandbox: true } : {}),
   };
 }
 
@@ -79,24 +106,36 @@ export function readExtraMemberIds(data: FirebaseFirestore.DocumentData): string
 // can honor manual additions: a uid in extraMemberIds gets in even when the role/audience
 // check fails. Every chat route gates on this so added people see the channel and its
 // messages/media. Falls back to the audience check for everyone else.
-// A demo account reaches no channel at all: `demoAccount` is required so every caller
-// has to carry the flag (a raw uid in extraMemberIds must not let one in).
+// A demo account reaches ONLY a demo sandbox channel (see the top of this file):
+// `demoAccount` is required so every caller has to carry the flag (a raw uid in
+// extraMemberIds must not let one in anywhere else). A sandbox channel admits
+// demo accounts and admins/owners only, never by audience or extraMemberIds.
 export function userCanAccessChannelDoc(
   data: FirebaseFirestore.DocumentData,
   identity: { uid: string; role?: PlatformRole; fieldRole?: FieldRole; demoAccount: boolean }
 ): boolean {
-  if (identity.demoAccount) return false;
+  const sandbox = isDemoSandboxChannel(data);
+  if (identity.demoAccount && !sandbox) return false;
   const channel = toChatChannel(typeof data.id === 'string' ? data.id : '', data);
   // A malformed (unparseable) or archived (active:false) channel is off-limits to
   // EVERYONE — extras included. Only fall through to the manual-members check once the
   // channel parses and is active, so archiving a channel revokes extras too (matching the
   // pre-task behavior where an inactive channel 403'd even admins).
   if (!channel || !channel.active) return false;
+  if (sandbox) return identity.demoAccount || isAdminLevel(identity.role);
   if (canAccessChatChannel(channel, identity.role, identity.fieldRole)) return true;
   return readExtraMemberIds(data).includes(identity.uid);
 }
 
-export function isEligibleChatMember(data: FirebaseFirestore.DocumentData): boolean {
+// Whether an account may be a chat member at all. Pass the channel doc when the
+// question is about one channel: a demo sandbox takes demo accounts plus
+// admins/owners only (isEligibleSandboxMember); every other channel never takes
+// a demo account.
+export function isEligibleChatMember(
+  data: FirebaseFirestore.DocumentData,
+  channelData?: FirebaseFirestore.DocumentData | null
+): boolean {
+  if (isDemoSandboxChannel(channelData)) return isEligibleSandboxMember(data);
   if (isDemoAccount(data)) return false;
   const { fieldRole } = resolveRoles(data.role, data.fieldRole);
   return data.status === 'active' ||
@@ -112,7 +151,9 @@ export function belongsInChannelDoc(
   uid: string,
   userData: FirebaseFirestore.DocumentData
 ): boolean {
-  if (!isEligibleChatMember(userData)) return false;
+  if (!isEligibleChatMember(userData, channelData)) return false;
+  // Sandbox membership is the eligibility rule alone (no audience, no extras).
+  if (isDemoSandboxChannel(channelData)) return !!toChatChannel(typeof channelData.id === 'string' ? channelData.id : '', channelData);
   const channel = toChatChannel(typeof channelData.id === 'string' ? channelData.id : '', channelData);
   if (!channel) return false;
   const { role, fieldRole } = resolveRoles(userData.role, userData.fieldRole);
@@ -161,6 +202,11 @@ export async function getMemberIdsForAudience(
     .map((user) => user.uid);
 }
 
+/** The memberIds a demo sandbox channel should hold, from the prefetched users. */
+export function sandboxMemberIds(users: readonly ChatUserSnapshot[]): string[] {
+  return users.filter((doc) => isEligibleSandboxMember(doc.data())).map((doc) => doc.id);
+}
+
 export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
   if (!adminDb) throw new Error('Database not configured');
 
@@ -179,6 +225,14 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
     const data = doc.data();
     const channel = toChatChannel(doc.id, data);
     if (!channel) continue;
+
+    // The demo sandbox: demo accounts plus admins/owners, nothing else.
+    if (isDemoSandboxChannel(data)) {
+      const memberIds = sandboxMemberIds(users);
+      batch.set(doc.ref, { id: channel.id, memberIds, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      channelsSynced += 1;
+      continue;
+    }
 
     const audienceMemberIds = await getMemberIdsForAudience(channel.audience, users);
 

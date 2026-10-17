@@ -104,6 +104,25 @@ describe('sendChatPush', () => {
     expect(totals).toEqual({ recipients: 2, sent: 2, failed: 0, pruned: 0 });
   });
 
+  it('pushes a demo sandbox message only to its members (demo accounts and admins/owners)', async () => {
+    fake.users.set('demo', { status: 'active', demoAccount: true, pushTokens: ['t-demo'] });
+    fake.users.set('adm', { status: 'active', role: 'admin', pushTokens: ['t-adm'] });
+    fake.users.set('rep', { status: 'active', fieldRole: 'entry_rep', pushTokens: ['t-rep'] });
+    fake.users.set('mgr', { status: 'active', fieldRole: 'l1_manager', pushTokens: ['t-mgr'] });
+    const sandbox = { id: 'app-review', name: 'App Review', audience: 'all', order: 99, active: true, demoSandbox: true };
+
+    // A stale roster that somehow lists real people still never reaches them.
+    await sendChatPush({ ...sandbox, memberIds: ['demo2', 'demo', 'adm', 'rep', 'mgr'] }, 'demo2', payload);
+    expect(pushedTo()).toEqual(['adm', 'demo']);
+  });
+
+  it('never pushes a normal channel message to a demo account', async () => {
+    fake.users.set('demo', { status: 'active', demoAccount: true, fieldRole: 'l1_manager', pushTokens: ['t-demo'] });
+    fake.users.set('mgr', { status: 'active', fieldRole: 'l1_manager', pushTokens: ['t-mgr'] });
+    await sendChatPush({ ...managers, memberIds: ['boss', 'demo', 'mgr'] }, 'boss', payload);
+    expect(pushedTo()).toEqual(['mgr']);
+  });
+
   it('skips members who blocked the author', async () => {
     fake.users.set('mgr', { status: 'active', fieldRole: 'l1_manager', pushTokens: ['t-mgr'] });
     fake.users.set('mgr-2', { status: 'active', fieldRole: 'l1_manager', pushTokens: ['t-mgr-2'] });
