@@ -6,7 +6,7 @@ const verifyIdToken = vi.fn();
 const userGet = vi.fn();
 const userDocs = new Map<string, Record<string, unknown> | null>();
 vi.mock('@/lib/firebase/admin', () => ({
-  adminAuth: { verifyIdToken: (token: string) => verifyIdToken(token) },
+  adminAuth: { verifyIdToken: (...args: unknown[]) => verifyIdToken(...args) },
   adminDb: {
     collection: vi.fn((name: string) => {
       if (name !== 'users') throw new Error(`Unexpected collection: ${name}`);
@@ -482,5 +482,36 @@ describe('requireVerifiedRequester / requireVerifiedSelfOrManagement — managem
       expect(res.status).toBe(403);
       expect(res.error).toBe('Forbidden: you can only access your own data');
     }
+  });
+});
+
+describe('revocation check is opt-in', () => {
+  it('every helper verifies with the token alone (one argument) by default', async () => {
+    userDoc({ status: 'active', role: 'admin' });
+    for (const call of [
+      () => requireVerifiedUser(req()),
+      () => requireVerifiedManagement(req()),
+      () => requireVerifiedSelfOrManagement(req(), 'u1'),
+      () => requireVerifiedFieldManagerOrManagement(req()),
+      () => requireVerifiedAdmin(req()),
+      () => requireVerifiedRequester(req()),
+    ]) {
+      verifyIdToken.mockClear();
+      await call();
+      expect(verifyIdToken).toHaveBeenCalledTimes(1);
+      expect(verifyIdToken.mock.calls[0]).toEqual(['good-token']);
+    }
+  });
+
+  it('requireVerifiedUser with checkRevoked passes true', async () => {
+    userDoc({ status: 'active', role: 'user' });
+    await requireVerifiedUser(req(), { checkRevoked: true });
+    expect(verifyIdToken.mock.calls[0]).toEqual(['good-token', true]);
+  });
+
+  it('without checkRevoked, any verify failure stays a 401', async () => {
+    verifyIdToken.mockRejectedValue(new Error('network down'));
+    const res = await requireVerifiedUser(req());
+    expect(res).toMatchObject({ ok: false, status: 401 });
   });
 });

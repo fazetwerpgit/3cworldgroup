@@ -11,8 +11,7 @@ import { isNativeApp } from './isNativeApp';
 //
 // Requests that expect an answer carry an `id`; the shell answers each with
 // exactly one { type: 'reply', id, ok, ... }. Fire-and-forget messages
-// (haptic, openExternal, nativeAuth, nativeSignOut, openNativeChat) carry no id
-// and get no reply.
+// (haptic, openExternal, nativeSignOut) carry no id and get no reply.
 
 export const BRIDGE_VERSION = 1;
 export const NATIVE_SOURCE = '3c-shell';
@@ -79,8 +78,9 @@ export interface OpenExternalMessage {
 }
 
 /** The web's sign-in, handed to the shell's native Firebase Auth (native chat). */
-export interface NativeAuthMessage {
+export interface NativeAuthRequest {
   type: 'nativeAuth';
+  id: string;
   /** Firebase custom token for the signed-in uid (POST /api/portal/auth/custom-token). */
   customToken: string;
 }
@@ -89,19 +89,22 @@ export interface NativeSignOutMessage {
   type: 'nativeSignOut';
 }
 /** Open the native chat screen instead of /portal/chat. Sent only when the shell advertised nativeChat. */
-export interface OpenNativeChatMessage {
+export interface OpenNativeChatRequest {
   type: 'openNativeChat';
+  id: string;
   /** The channel to open (from /portal/chat?channel=<id>); omitted for the channel list. */
   channelId?: string;
 }
 
-export type BridgeRequest = PushTokenRequest | ShareRequest | SaveFileRequest | BiometricLockRequest | NativeSignInRequest;
-export type BridgeEvent =
-  | HapticMessage
-  | OpenExternalMessage
-  | NativeAuthMessage
-  | NativeSignOutMessage
-  | OpenNativeChatMessage;
+export type BridgeRequest =
+  | PushTokenRequest
+  | ShareRequest
+  | SaveFileRequest
+  | BiometricLockRequest
+  | NativeSignInRequest
+  | NativeAuthRequest
+  | OpenNativeChatRequest;
+export type BridgeEvent = HapticMessage | OpenExternalMessage | NativeSignOutMessage;
 export type WebToNativeMessage = BridgeRequest | BridgeEvent;
 
 // ---- native -> web -------------------------------------------------------
@@ -136,6 +139,10 @@ export interface BridgeResultMap {
   saveFile: CompletedResult;
   biometricLock: BiometricLockResult;
   nativeSignIn: NativeSignInResult;
+  /** ok once the shell's native Firebase Auth signed in with the custom token. */
+  nativeAuth: unknown;
+  /** ok once the native chat screen is showing. */
+  openNativeChat: unknown;
 }
 
 export type BridgeRequestType = BridgeRequest['type'];
@@ -337,6 +344,9 @@ const DEFAULT_TIMEOUT_MS: Record<BridgeRequestType, number> = {
   saveFile: 10 * 60_000,
   biometricLock: 60_000,
   nativeSignIn: 5 * 60_000,
+  nativeAuth: 15_000,
+  // Short: on no answer the web falls back to its own chat page.
+  openNativeChat: 1_500,
 };
 
 /**

@@ -1,21 +1,30 @@
 import { useSyncExternalStore } from 'react';
+import { auth } from '@/lib/firebase/config';
 import { isNativeApp } from './isNativeApp';
-import { hasNativeBridge, onNativeMessage, parseCapabilities, postToNative, type AppCapabilities } from './bridge';
+import { hasNativeBridge, onNativeMessage, parseCapabilities, requestNative, type AppCapabilities } from './bridge';
 
 // Native chat hand-off for the 3C iOS app (docs/ios-app/BRIDGE.md).
 //
 // A shell build with a native chat screen says so with a `capabilities`
 // message ({ nativeChat: true }) or by injecting window.__3C_APP_CAPS__ before
-// the page loads. Once the web has also handed that shell a sign-in
-// (`nativeAuth`, see nativeAuthSync.ts), every way into /portal/chat (tab bar,
-// nav links, command palette, a push deep link) posts `openNativeChat` instead
-// of showing the web chat. Without both, chat stays the web page. Outside the
-// app none of this runs: supportsNativeChat() is false at its first check.
+// the page loads; { nativeChat: false } backs out. Once the shell has also
+// confirmed a native sign-in for the current web user (`nativeAuth` reply ok,
+// see nativeAuthSync.ts), every way into /portal/chat (tab bar, nav links,
+// command palette, a push deep link) asks the shell to `openNativeChat`. If the
+// shell refuses or does not answer within 1.5 s, the web chat page opens as
+// before. Outside the app none of this runs: every check starts with
+// isNativeApp() and the bridge.
 
 export const CHAT_PATH = '/portal/chat';
+export const CHAT_FALLBACK_PATH = '/portal/dashboard';
+
+/** idle: no auth event yet. pending: a custom token is on its way to the shell. */
+export type NativeAuthStatus = 'idle' | 'pending' | 'ok' | 'failed' | 'signedOut';
 
 let shellCaps: AppCapabilities = {};
 let nativeAuthUid: string | null = null;
+let nativeAuthStatus: NativeAuthStatus = 'idle';
+let opening = false;
 const subscribers = new Set<() => void>();
 
 function notify() {
@@ -28,26 +37,50 @@ export function readCapabilities(): AppCapabilities {
   return { ...(injected ?? {}), ...shellCaps };
 }
 
-/** Records that the shell now holds a native sign-in for `uid` (null after nativeSignOut). */
-export function setNativeAuthUid(uid: string | null): void {
-  if (nativeAuthUid === uid) return;
-  nativeAuthUid = uid;
+/** True inside the app with the bridge present and the shell advertising nativeChat. */
+export function nativeChatAdvertised(): boolean {
+  return isNativeApp() && hasNativeBridge() && readCapabilities().nativeChat === true;
+}
+
+/** Records the shell's native sign-in: the uid it holds (kept only for status 'ok') and the sync status. */
+export function setNativeAuth(status: NativeAuthStatus, uid: string | null = null): void {
+  const nextUid = status === 'ok' ? uid : null;
+  if (nativeAuthStatus === status && nativeAuthUid === nextUid) return;
+  nativeAuthStatus = status;
+  nativeAuthUid = nextUid;
   notify();
 }
 
-/** The uid the shell was last signed in as, or null. */
 export function getNativeAuthUid(): string | null {
   return nativeAuthUid;
 }
 
+export function getNativeAuthStatus(): NativeAuthStatus {
+  return nativeAuthStatus;
+}
+
+function currentWebUid(): string | null {
+  return auth?.currentUser?.uid ?? null;
+}
+
 /**
- * True when chat should open natively: inside the app, with the bridge
- * present, the shell advertising nativeChat, and a native sign-in delivered
- * this session. Always false on the web and the PWA.
+ * True when chat should open natively: nativeChat advertised, and the shell
+ * confirmed a sign-in as the uid signed in on the web right now. Always false
+ * on the web and the PWA.
  */
 export function supportsNativeChat(): boolean {
-  if (!isNativeApp() || !hasNativeBridge()) return false;
-  return readCapabilities().nativeChat === true && nativeAuthUid !== null;
+  if (!nativeChatAdvertised() || nativeAuthUid === null) return false;
+  return nativeAuthUid === currentWebUid();
+}
+
+/**
+ * True while /portal/chat should show a holding state instead of the web chat:
+ * nativeChat is advertised and the native sign-in or the open is still under
+ * way. Never true on the web.
+ */
+export function nativeChatPending(): boolean {
+  if (!nativeChatAdvertised()) return false;
+  return opening || nativeAuthStatus === 'idle' || nativeAuthStatus === 'pending';
 }
 
 let listening = false;
@@ -67,7 +100,8 @@ export function installCapabilityListener(): () => void {
   };
 }
 
-function subscribe(fn: () => void) {
+/** Subscribes to capability and native-auth changes. Returns the unsubscribe. */
+export function subscribeNativeChat(fn: () => void): () => void {
   subscribers.add(fn);
   return () => {
     subscribers.delete(fn);
@@ -76,7 +110,12 @@ function subscribe(fn: () => void) {
 
 /** Hook form of supportsNativeChat(). False during SSR and hydration, and always on the web. */
 export function useSupportsNativeChat(): boolean {
-  return useSyncExternalStore(subscribe, supportsNativeChat, () => false);
+  return useSyncExternalStore(subscribeNativeChat, supportsNativeChat, () => false);
+}
+
+/** Hook form of nativeChatPending(). False during SSR and hydration, and always on the web. */
+export function useNativeChatPending(): boolean {
+  return useSyncExternalStore(subscribeNativeChat, nativeChatPending, () => false);
 }
 
 /** If `href` points at the portal chat page, its ?channel= (or null); undefined when it is not chat. */
@@ -95,27 +134,86 @@ export function chatTargetFromHref(href: string, base: string): { channelId: str
   return { channelId: channelId ? channelId : null };
 }
 
-/** Posts openNativeChat when native chat is supported. Returns false (sends nothing) otherwise. */
-export function openNativeChat(channelId?: string | null): boolean {
+/**
+ * Asks the shell to show native chat. Resolves true only on an ok reply; false
+ * when native chat is not supported, the shell refused, or it did not answer
+ * within 1.5 s.
+ */
+export async function openNativeChat(channelId?: string | null): Promise<boolean> {
   if (!supportsNativeChat()) return false;
-  return postToNative(channelId ? { type: 'openNativeChat', channelId } : { type: 'openNativeChat' });
+  opening = true;
+  notify();
+  try {
+    await requestNative<'openNativeChat'>(channelId ? { type: 'openNativeChat', channelId } : { type: 'openNativeChat' });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    opening = false;
+    notify();
+  }
+}
+
+type Navigate = (href: string) => void;
+
+const hardNavigate: Navigate = (href) => window.location.assign(href);
+let chatNavigate: Navigate = hardNavigate;
+
+/** The client-side navigation used when native chat fails (AppBridgeHost sets router.push). */
+export function setChatNavigate(fn: Navigate | null): void {
+  chatNavigate = fn ?? hardNavigate;
 }
 
 /**
- * Opens native chat when `href` is the chat page and native chat is supported.
- * Returns true when it did, so the caller skips its own navigation.
+ * Takes over a navigation to the chat page when native chat is supported:
+ * returns true (the caller must not navigate) and asks the shell to open
+ * native chat, navigating to `href` itself if that fails. Returns false, doing
+ * nothing, for any other link or when native chat is not supported.
  */
-export function openNativeChatForHref(href: string): boolean {
+export function openNativeChatForHref(href: string, navigate?: Navigate): boolean {
   if (typeof window === 'undefined' || !supportsNativeChat()) return false;
   const target = chatTargetFromHref(href, window.location.href);
   if (!target) return false;
-  return openNativeChat(target.channelId);
+  void openNativeChat(target.channelId).then((ok) => {
+    if (!ok) (navigate ?? chatNavigate)(href);
+  });
+  return true;
+}
+
+export interface ChatDeepLinkRouter {
+  back: () => void;
+  replace: (href: string) => void;
+}
+
+/**
+ * /portal/chat reached directly (push tap, cold deep link, a navigation that
+ * escaped the link handler): ask the shell to open that channel natively, and
+ * only after its ok step back (or go to the dashboard on a cold load) so the
+ * page behind the native screen is not the chat. On failure the web chat
+ * stays. Resolves whether native chat opened.
+ */
+export async function handleChatDeepLink(
+  pathname: string | null | undefined,
+  search: string,
+  router: ChatDeepLinkRouter,
+  historyLength: number
+): Promise<boolean> {
+  if (!supportsNativeChat() || pathname?.replace(/\/+$/, '') !== CHAT_PATH) return false;
+  const channelId = new URLSearchParams(search).get('channel');
+  const ok = await openNativeChat(channelId);
+  if (!ok) return false;
+  if (historyLength > 1) router.back();
+  else router.replace(CHAT_FALLBACK_PATH);
+  return true;
 }
 
 /** Test-only: forget capabilities and the native sign-in. */
 export function __resetNativeChatForTests(): void {
   shellCaps = {};
   nativeAuthUid = null;
+  nativeAuthStatus = 'idle';
+  opening = false;
   listening = false;
   subscribers.clear();
+  chatNavigate = hardNavigate;
 }

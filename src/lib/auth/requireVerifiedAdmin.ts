@@ -66,7 +66,13 @@ async function verifyCaller(
       ? await adminAuth.verifyIdToken(token, true)
       : await adminAuth.verifyIdToken(token);
     uid = decoded.uid;
-  } catch {
+  } catch (error) {
+    // With checkRevoked the SDK also calls the Auth backend; an outage there
+    // (no auth/* code) is a 503, not a reason to tell the client its token is bad.
+    const code = (error as { code?: unknown } | null)?.code;
+    if (options.checkRevoked && !(typeof code === 'string' && code.startsWith('auth/'))) {
+      return { ok: false, error: 'Auth service unavailable', status: 503 };
+    }
     return { ok: false, error: 'Invalid authentication token', status: 401 };
   }
   const snap = await adminDb.collection('users').doc(uid).get();

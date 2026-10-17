@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/firebase/config', () => ({ auth: null }));
 
-import type { WebToNativeMessage } from './bridge';
+import type { NativeAuthStatus } from './nativeChat';
 import {
   NATIVE_AUTH_DEBOUNCE_MS,
   NATIVE_AUTH_MIN_INTERVAL_MS,
@@ -12,46 +12,60 @@ import {
 } from './nativeAuthSync';
 
 let emit: (user: SyncUser | null) => void;
+let capsListener: () => void;
 let currentUid: string | null;
-let posted: WebToNativeMessage[];
+let canSync: boolean;
+let log: string[];
+let statuses: [NativeAuthStatus, string | null | undefined][];
 let fetchCustomToken: ReturnType<typeof vi.fn<(idToken: string) => Promise<string | null>>>;
-let nativeUid: (string | null)[];
+let sendNativeAuth: ReturnType<typeof vi.fn<(customToken: string) => Promise<boolean>>>;
 let stop: () => void;
 
 function user(uid: string): SyncUser {
   return { uid, getIdToken: async () => `id-${uid}` };
 }
-
 function signIn(uid: string) {
   currentUid = uid;
   emit(user(uid));
 }
-
 function signOut() {
   currentUid = null;
   emit(null);
 }
+const lastStatus = () => statuses[statuses.length - 1];
 
-beforeEach(() => {
-  vi.useFakeTimers();
-  currentUid = null;
-  posted = [];
-  nativeUid = [];
-  fetchCustomToken = vi.fn(async (idToken: string) => `custom-${idToken}`);
+function start() {
   stop = createNativeAuthSync({
     subscribe: (cb) => {
       emit = cb;
       return () => {};
     },
     currentUid: () => currentUid,
-    fetchCustomToken,
-    post: (m) => {
-      posted.push(m);
-      return true;
+    canSync: () => canSync,
+    onCanSyncChange: (cb) => {
+      capsListener = cb;
+      return () => {};
     },
-    onNativeAuth: (uid) => nativeUid.push(uid),
+    fetchCustomToken,
+    sendNativeAuth,
+    postSignOut: () => log.push('signOut'),
+    setStatus: (status, uid) => statuses.push([status, uid]),
     now: () => Date.now(),
   });
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  currentUid = null;
+  canSync = true;
+  log = [];
+  statuses = [];
+  fetchCustomToken = vi.fn(async (idToken: string) => `custom-${idToken}`);
+  sendNativeAuth = vi.fn(async (token: string) => {
+    log.push(`auth:${token}`);
+    return true;
+  });
+  start();
 });
 
 afterEach(() => {
@@ -60,74 +74,118 @@ afterEach(() => {
 });
 
 describe('createNativeAuthSync', () => {
-  it('posts nativeAuth with the custom token after the debounce', async () => {
+  it('sends the first event after a page load at once, and marks ok only on the reply', async () => {
     signIn('u1');
-    expect(posted).toEqual([]);
-    await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
+    expect(lastStatus()).toEqual(['pending', undefined]);
+    await vi.advanceTimersByTimeAsync(0);
     expect(fetchCustomToken).toHaveBeenCalledWith('id-u1');
-    expect(posted).toEqual([{ type: 'nativeAuth', customToken: 'custom-id-u1' }]);
-    expect(nativeUid).toEqual(['u1']);
+    expect(log).toEqual(['auth:custom-id-u1']);
+    expect(lastStatus()).toEqual(['ok', 'u1']);
   });
 
-  it('collapses a burst of token events into one message', async () => {
+  it('debounces later events and collapses a burst', async () => {
     signIn('u1');
-    signIn('u1');
-    signIn('u1');
-    await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
-    expect(posted).toHaveLength(1);
-  });
-
-  it('does not resend for the same uid within the minimum interval, then does', async () => {
-    signIn('u1');
-    await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
-    signIn('u1'); // forced refresh a minute later
-    await vi.advanceTimersByTimeAsync(60_000);
-    expect(posted).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(NATIVE_AUTH_MIN_INTERVAL_MS);
-    signIn('u1'); // hourly refresh
+    signIn('u1');
+    signIn('u1');
+    signIn('u1');
+    await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS - 1);
+    expect(sendNativeAuth).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(sendNativeAuth).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not resend for the same uid within the minimum interval', async () => {
+    signIn('u1');
+    await vi.advanceTimersByTimeAsync(0);
+    signIn('u1');
     await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
-    expect(posted).toHaveLength(2);
+    expect(sendNativeAuth).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks failed (no uid) when the shell refuses', async () => {
+    sendNativeAuth.mockResolvedValueOnce(false);
+    signIn('u1');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lastStatus()).toEqual(['failed', undefined]);
+  });
+
+  it('marks failed when the server refuses (inactive user)', async () => {
+    fetchCustomToken.mockResolvedValueOnce(null);
+    signIn('u1');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sendNativeAuth).not.toHaveBeenCalled();
+    expect(lastStatus()).toEqual(['failed', undefined]);
+  });
+
+  it('fetches nothing without the bridge + nativeChat, then syncs when nativeChat arrives', async () => {
+    canSync = false;
+    stop();
+    start();
+    signIn('u1');
+    await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
+    expect(fetchCustomToken).not.toHaveBeenCalled();
+    canSync = true;
+    capsListener();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(log).toEqual(['auth:custom-id-u1']);
+    capsListener(); // no transition: no resend
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sendNativeAuth).toHaveBeenCalledTimes(1);
   });
 
   it('posts nativeSignOut once on sign-out and once on a signed-out load', async () => {
-    signOut(); // first event: loaded signed out
     signOut();
-    expect(posted).toEqual([{ type: 'nativeSignOut' }]);
+    signOut();
+    expect(log).toEqual(['signOut']);
     signIn('u1');
     await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
     signOut();
-    expect(posted.map((m) => m.type)).toEqual(['nativeSignOut', 'nativeAuth', 'nativeSignOut']);
-    expect(nativeUid).toEqual([null, 'u1', null]);
+    expect(log).toEqual(['signOut', 'auth:custom-id-u1', 'signOut']);
+    expect(lastStatus()).toEqual(['signedOut', undefined]);
   });
 
   it('drops a token that arrives after sign-out', async () => {
     let release!: (token: string) => void;
     fetchCustomToken.mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
     signIn('u1');
-    await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
+    await vi.advanceTimersByTimeAsync(0);
     signOut();
     release('late-token');
     await vi.runAllTimersAsync();
-    expect(posted).toEqual([{ type: 'nativeSignOut' }]);
+    expect(log).toEqual(['signOut']);
+    expect(sendNativeAuth).not.toHaveBeenCalled();
   });
 
-  it('sends nothing when the server refuses (inactive user)', async () => {
-    fetchCustomToken.mockResolvedValueOnce(null);
-    signIn('u1');
+  it('A -> B: signs the shell out before fetching for B; B failing leaves no native user', async () => {
+    signIn('a');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(lastStatus()).toEqual(['ok', 'a']);
+    fetchCustomToken.mockImplementationOnce(async () => {
+      log.push('fetch:b');
+      return null;
+    });
+    signIn('b');
+    // Signed out and marked pending (uid cleared) before any fetch for b.
+    expect(log).toEqual(['auth:custom-id-a', 'signOut']);
+    expect(lastStatus()).toEqual(['pending', undefined]);
     await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
-    expect(posted).toEqual([]);
-    expect(nativeUid).toEqual([]);
+    expect(log).toEqual(['auth:custom-id-a', 'signOut', 'fetch:b']);
+    expect(lastStatus()).toEqual(['failed', undefined]);
   });
 
-  it('re-sends right away for a different account', async () => {
-    signIn('u1');
+  it('A -> B while A is still in flight: B is not blocked', async () => {
+    let releaseA!: (token: string) => void;
+    fetchCustomToken.mockImplementationOnce(() => new Promise((resolve) => (releaseA = resolve)));
+    signIn('a');
+    await vi.advanceTimersByTimeAsync(0);
+    signIn('b');
     await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
-    signIn('u2');
-    await vi.advanceTimersByTimeAsync(NATIVE_AUTH_DEBOUNCE_MS);
-    expect(posted).toEqual([
-      { type: 'nativeAuth', customToken: 'custom-id-u1' },
-      { type: 'nativeAuth', customToken: 'custom-id-u2' },
-    ]);
+    releaseA('token-a');
+    await vi.runAllTimersAsync();
+    expect(log).toEqual(['auth:custom-id-b']);
+    expect(lastStatus()).toEqual(['ok', 'b']);
   });
 });
 

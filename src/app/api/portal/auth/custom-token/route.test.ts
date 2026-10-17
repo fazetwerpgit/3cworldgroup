@@ -64,6 +64,13 @@ describe('POST /api/portal/auth/custom-token', () => {
     expect(fake.createCustomToken).not.toHaveBeenCalled();
   });
 
+  it('answers 503 when the Auth backend fails without an auth/* code', async () => {
+    fake.verifyIdToken.mockRejectedValue(Object.assign(new Error('socket hang up'), { code: 'app/network-error' }));
+    const res = await POST(req());
+    expect(res.status).toBe(503);
+    expect(fake.createCustomToken).not.toHaveBeenCalled();
+  });
+
   it('rejects an inactive user', async () => {
     fake.userDoc = { status: 'inactive', role: 'user', fieldRole: 'sales_rep' };
     const res = await POST(req());
@@ -86,6 +93,7 @@ describe('POST /api/portal/auth/custom-token', () => {
   it('mints a custom token for the verified uid', async () => {
     const res = await POST(req());
     expect(res.status).toBe(200);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
     expect(await res.json()).toEqual({ token: `custom-for-u${uidCounter}` });
     expect(fake.createCustomToken).toHaveBeenCalledWith(`u${uidCounter}`);
   });

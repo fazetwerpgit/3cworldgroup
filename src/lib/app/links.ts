@@ -65,6 +65,12 @@ function stubTab(): Window {
   return { closed: false, opener: null, close() {}, focus() {}, location } as unknown as Window;
 }
 
+/** Path + query + hash of a same-host URL, for client-side navigation. */
+function localPath(href: string): string {
+  const url = new URL(href);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 let installed = false;
 
 /** Installs the click and window.open handlers. Inside the app only; idempotent. Returns the uninstall. */
@@ -80,7 +86,7 @@ export function installAppLinkHandling(): () => void {
     const decision = classifyLink(anchor.getAttribute('href'), window.location.href);
     if (decision.kind === 'ignore') return;
     // A chat link opens the native chat screen when the shell has one.
-    if (decision.kind === 'internal' && openNativeChatForHref(decision.url)) {
+    if (decision.kind === 'internal' && openNativeChatForHref(localPath(decision.url))) {
       event.preventDefault();
       return;
     }
