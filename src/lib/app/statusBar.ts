@@ -2,14 +2,18 @@ import { isNativeApp } from './isNativeApp';
 import { postToNative, type StatusBarStyle } from './bridge';
 
 // In the 3C iOS app, keep the iOS status bar readable over the page
-// (BRIDGE.md statusBar). The portal's theme is the `dark` class on <body>
-// (ThemeContext): dark page -> 'light' (white) text; without it the old light
-// chrome (white .portal-shell-header) shows -> 'dark' (black) text.
+// (BRIDGE.md statusBar). ThemeContext puts `portal-scope` (and `dark`) on
+// <body>: dark page -> 'light' (white) text; `portal-scope` without `dark` is
+// the old light chrome (white .portal-shell-header) -> 'dark' (black) text.
+// Before the theme classes are there (AppBridgeHost's effect runs before
+// ThemeProvider's, and pages outside the portal have none) it stays 'light',
+// the shell's default, so the status bar never flashes dark.
 // Never installed on the web.
 
-/** The status bar style for the current page theme. */
+/** The status bar style for the current page theme ('light' until a theme is applied). */
 export function statusBarStyleFor(body: Pick<HTMLElement, 'classList'> | null | undefined): StatusBarStyle {
-  return body?.classList.contains('dark') ? 'light' : 'dark';
+  if (!body?.classList.contains('portal-scope')) return 'light';
+  return body.classList.contains('dark') ? 'light' : 'dark';
 }
 
 let installed = false;

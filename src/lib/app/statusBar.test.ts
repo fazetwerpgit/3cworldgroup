@@ -33,7 +33,12 @@ describe('statusBarStyleFor', () => {
     expect(statusBarStyleFor(document.body)).toBe('light');
     document.body.className = 'portal-scope';
     expect(statusBarStyleFor(document.body)).toBe('dark');
-    expect(statusBarStyleFor(null)).toBe('dark');
+  });
+
+  it("stays light until the theme classes are applied", () => {
+    document.body.className = '';
+    expect(statusBarStyleFor(document.body)).toBe('light');
+    expect(statusBarStyleFor(null)).toBe('light');
   });
 });
 
@@ -47,6 +52,7 @@ describe('installStatusBarSync', () => {
     document.body.classList.remove('dark');
     await flush();
     expect(posted.at(-1)).toEqual({ type: 'statusBar', style: 'dark' });
+    expect(posted).toHaveLength(2);
 
     document.body.classList.add('some-other-class');
     await flush();
@@ -59,6 +65,15 @@ describe('installStatusBarSync', () => {
       { type: 'statusBar', style: 'dark' },
       { type: 'statusBar', style: 'light' },
     ]);
+  });
+
+  it('does not flash dark when it starts before ThemeProvider adds the classes', async () => {
+    enterApp(true);
+    document.body.className = '';
+    uninstall = installStatusBarSync();
+    document.body.classList.add('portal-scope', 'dark');
+    await flush();
+    expect(posted).toEqual([{ type: 'statusBar', style: 'light' }]);
   });
 
   it('stops after uninstall', async () => {
