@@ -229,6 +229,8 @@ export default function PrivacyPolicyPage() {
                 Reports are kept after they are resolved, as a moderation record. If a person named
                 in a report deletes their account, their name in the report is replaced with
                 &ldquo;Deleted user,&rdquo; but the copy of the reported message is kept as evidence.
+                If a reported message with a photo or file is deleted, we keep a private copy of
+                that photo or file with the report as evidence.
               </p>
             </LegalSection>
 
@@ -331,8 +333,8 @@ export default function PrivacyPolicyPage() {
                 attached to them, which we must keep for payroll, tax, and carrier reconciliation;
                 signed contractor paperwork, such as tax and direct-deposit forms and contractor
                 agreements; a log of who viewed your identity information; and, in chat reports, the
-                copy of a reported message (its text and any attachment link), kept as moderation
-                evidence with the names replaced. Records of your Ask 3C questions and practice
+                copy of a reported message (its text, and any attached photo or file), kept as
+                moderation evidence with the names replaced. Records of your Ask 3C questions and practice
                 sessions are also kept.
                 {/* TODO(Jacob): the self-delete route does not remove askLog or practiceLog rows, or the
                     message text itself (only the author name is replaced). Confirm that is intended, or
