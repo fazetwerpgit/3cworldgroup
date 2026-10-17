@@ -28,7 +28,7 @@ import { setScrollTopInstant, useStickToBottom } from '@/hooks/chat/useStickToBo
 import { isNativeApp, useIsNativeApp } from '@/lib/app/isNativeApp';
 import { nativeHaptic, onNativeMessage, type KeyboardEasing } from '@/lib/app/bridge';
 import type { ReportReason } from '@/lib/chat/moderationShared';
-import { authorIndex, isBlockedQuote, shouldCollapseBlocked } from '@/lib/chat/blocked';
+import { BLOCKED_PINNED_LABEL, authorIndex, isBlockedPin, isBlockedQuote, shouldCollapseBlocked } from '@/lib/chat/blocked';
 import { BlockedMessageButton, MessageQuote } from '@/components/chat/BlockedContent';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 import c from './chat.module.css';
@@ -441,6 +441,9 @@ export function MobileThread({
       () => {
         longPressTimer.current = undefined;
         longPressFired.current = true;
+        // The finger is still down: the same touch sliding sideways must not
+        // also swipe the row to reply under the action sheet.
+        swipeRef.current = null;
         nativeHaptic('light');
         setActionSheet(message);
       },
@@ -480,7 +483,8 @@ export function MobileThread({
   } | null>(null);
   const startSwipe = (event: TouchEvent, message: ThreadMessage) => {
     swipeRef.current = null;
-    if (!inApp || event.touches.length !== 1) return;
+    // No swipe-to-reply while the long-press action sheet is open.
+    if (!inApp || actionSheet || event.touches.length !== 1) return;
     const touch = event.touches[0];
     if (touch.clientX < SWIPE_EDGE_PX) return;
     const row = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-swipe-row]');
@@ -912,8 +916,12 @@ export function MobileThread({
   }, [gifOpen]);
 
   const memberTotal = channel ? memberCount ?? channel.memberIds?.length ?? 0 : 0;
+  // A pin by someone the reader blocked: no words and no name, as with a blocked quote.
+  const pinBlocked = isBlockedPin(pinnedMessage, currentUserId, blockedUids);
   const pinnedCopy = pinnedMessage
-    ? pinnedMessage.text || attachmentSnippet(pinnedMessage.attachment)
+    ? pinBlocked
+      ? BLOCKED_PINNED_LABEL
+      : pinnedMessage.text || attachmentSnippet(pinnedMessage.attachment)
     : '';
 
   return (
@@ -944,7 +952,7 @@ export function MobileThread({
           <Pin size={16} aria-hidden="true" />
           <span className={s.srOnly}>Pinned:</span>
           <span className={c.pinnedText}>{pinnedCopy}</span>
-          <span className={c.pinnedBy}>{pinnedMessage.authorName}</span>
+          {pinBlocked ? null : <span className={c.pinnedBy}>{pinnedMessage.authorName}</span>}
         </div>
       )}
 

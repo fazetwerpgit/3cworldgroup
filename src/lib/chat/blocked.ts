@@ -22,6 +22,16 @@ export function authorIndex(messages: ReadonlyArray<{ id: string; authorId: stri
 
 export const BLOCKED_QUOTE_LABEL = 'Quoted message from a blocked user';
 export const BLOCKED_MESSAGE_LABEL = 'Message from a blocked user';
+export const BLOCKED_PINNED_LABEL = 'Pinned message from a blocked user';
+
+/** Whether the pinned banner hides its message: written by someone the reader blocked (never your own). */
+export function isBlockedPin(
+  pinned: { authorId: string } | null | undefined,
+  currentUserId: string | null | undefined,
+  blockedUids: ReadonlySet<string> | undefined
+): boolean {
+  return !!pinned && pinned.authorId !== currentUserId && !!blockedUids?.has(pinned.authorId);
+}
 
 /** Whether a message renders as the collapsed "blocked user" row (never your own, not once shown). */
 export function shouldCollapseBlocked(

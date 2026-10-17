@@ -33,7 +33,7 @@ import { useChatSafety } from '@/hooks/chat/useChatSafety';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { reportChatContext } from '@/lib/app/bridge';
 import { APP_NAVIGATE_EVENT } from '@/lib/app/links';
-import { authorIndex, isBlockedQuote, shouldCollapseBlocked } from '@/lib/chat/blocked';
+import { BLOCKED_PINNED_LABEL, authorIndex, isBlockedPin, isBlockedQuote, shouldCollapseBlocked } from '@/lib/chat/blocked';
 import { BlockedMessageButton, MessageQuote } from '@/components/chat/BlockedContent';
 import type { ReportReason } from '@/lib/chat/moderationShared';
 import { useMarkChannelRead } from '@/hooks/chat/useMarkChannelRead';
@@ -1079,8 +1079,12 @@ export default function TeamChatPage() {
   };
 
   const pinnedMessage = usePinnedMessage(activeChannelId || null);
+  // A pin by someone the reader blocked: no words and no name, as with a blocked quote.
+  const pinBlocked = isBlockedPin(pinnedMessage, user?.uid, safety.blockedUids);
   const pinnedCopy = pinnedMessage
-    ? pinnedMessage.text || attachmentSnippet(pinnedMessage.attachment)
+    ? pinBlocked
+      ? BLOCKED_PINNED_LABEL
+      : pinnedMessage.text || attachmentSnippet(pinnedMessage.attachment)
     : '';
   // Role labels carry comp tiers, manager titles and IBO levels: admins only.
   const activeMemberCount = activeChannel ? memberCounts[activeChannel.id] ?? activeChannel.memberIds?.length ?? 0 : 0;
@@ -1155,7 +1159,7 @@ export default function TeamChatPage() {
               <span className={s.srOnly}>Pinned:</span>
               <span className={c.pinnedText}>{pinnedCopy}</span>
               <span className={c.pinnedBy}>
-                {pinnedMessage.authorName} · {formatTime(pinnedMessage.createdAt)}
+                {pinBlocked ? formatTime(pinnedMessage.createdAt) : `${pinnedMessage.authorName} · ${formatTime(pinnedMessage.createdAt)}`}
               </span>
             </div>
           )}

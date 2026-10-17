@@ -362,3 +362,83 @@ describe('MobileThread PDF attachments', () => {
     expect(input?.hasAttribute('capture')).toBe(false);
   });
 });
+
+describe('MobileThread blocked pin', () => {
+  const pin = (authorId: string): ThreadMessage => ({ ...message('p1', 1), text: 'rude pinned thing', authorId, authorName: 'Cole Hart' });
+
+  it('hides the words and name of a pin by someone the reader blocked', () => {
+    act(() => root.render(<MobileThread {...props({ pinnedMessage: pin('cole'), blockedUids: new Set(['cole']) })} />));
+    const banner = container.querySelector('[class*="pinned"]')!;
+    expect(banner.textContent).toContain('Pinned message from a blocked user');
+    expect(banner.textContent).not.toContain('rude pinned thing');
+    expect(banner.textContent).not.toContain('Cole Hart');
+  });
+
+  it('shows a pin by anyone else, and your own even if your uid is in the set', () => {
+    act(() => root.render(<MobileThread {...props({ pinnedMessage: pin('cole'), blockedUids: new Set(['someone']) })} />));
+    expect(container.querySelector('[class*="pinned"]')!.textContent).toContain('rude pinned thing');
+    act(() => root.render(<MobileThread {...props({ pinnedMessage: pin('me'), blockedUids: new Set(['me']) })} />));
+    expect(container.querySelector('[class*="pinned"]')!.textContent).toContain('rude pinned thing');
+  });
+});
+
+describe('MobileThread swipe-to-reply in the app', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    (window as Window).__3C_APP__ = true;
+    // Reply focuses the composer, whose keyboard check reads matchMedia.
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener() {}, removeEventListener() {} }));
+  });
+  afterEach(() => {
+    delete (window as Window).__3C_APP__;
+    vi.useRealTimers();
+  });
+
+  const bubble = () => {
+    const rows = container.querySelectorAll('[data-swipe-row]');
+    const col = rows[rows.length - 1]?.querySelector('[class*="bubbleCol"]');
+    if (!col) throw new Error('no bubble');
+    return col;
+  };
+  const fire = (target: Element, type: string, x: number, y = 300) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    const point = { clientX: x, clientY: y };
+    Object.defineProperty(event, 'touches', { value: type === 'touchend' ? [] : [point] });
+    Object.defineProperty(event, 'changedTouches', { value: [point] });
+    act(() => {
+      target.dispatchEvent(event);
+    });
+  };
+
+  it('replies on a plain swipe right', () => {
+    const onReply = vi.fn();
+    act(() => root.render(<MobileThread {...props({ onReply })} />));
+    const col = bubble();
+    fire(col, 'touchstart', 100);
+    fire(col, 'touchmove', 140);
+    fire(col, 'touchmove', 240);
+    fire(col, 'touchend', 240);
+    expect(onReply).toHaveBeenCalledTimes(1);
+  });
+
+  it('is disarmed once the long-press action sheet opens', () => {
+    const onReply = vi.fn();
+    act(() => root.render(<MobileThread {...props({ onReply })} />));
+    const col = bubble();
+    fire(col, 'touchstart', 100);
+    act(() => {
+      vi.advanceTimersByTime(600);
+    });
+    // The same finger slides right with the sheet open.
+    fire(col, 'touchmove', 140);
+    fire(col, 'touchmove', 240);
+    fire(col, 'touchend', 240);
+    expect(onReply).not.toHaveBeenCalled();
+    // A new touch on a row while the sheet is still open does not swipe either.
+    fire(col, 'touchstart', 100);
+    fire(col, 'touchmove', 140);
+    fire(col, 'touchmove', 240);
+    fire(col, 'touchend', 240);
+    expect(onReply).not.toHaveBeenCalled();
+  });
+});
