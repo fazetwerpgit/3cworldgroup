@@ -163,6 +163,16 @@ export function useSheetDismiss<S extends HTMLElement = HTMLElement, B extends H
     let snapTimer: ReturnType<typeof setTimeout> | null = null;
 
     const backdrop = () => backdropRef.current;
+    // The non-passive touchmove is attached only while a drag can begin (a
+    // touch that landed with the body at its top), so ordinary scrolling in
+    // the sheet never waits on script.
+    let moving = false;
+    const listenMoves = (on: boolean) => {
+      if (on === moving) return;
+      moving = on;
+      if (on) sheet.addEventListener('touchmove', onMove, { passive: false });
+      else sheet.removeEventListener('touchmove', onMove);
+    };
     const reset = () => {
       start = null;
       decided = false;
@@ -187,9 +197,13 @@ export function useSheetDismiss<S extends HTMLElement = HTMLElement, B extends H
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest('input[type="range"], [data-sheet-nodrag]')) return;
       const touch = event.touches[0];
-      start = { x: touch.clientX, y: touch.clientY };
       atTop = !scrolledWithin(target, sheet);
+      // A body mid-scroll can only scroll: leave the touch to the browser, and
+      // keep scrolling passive (no non-passive touchmove listener at all).
+      if (!atTop) return;
+      start = { x: touch.clientX, y: touch.clientY };
       samples = [{ y: touch.clientY, t: event.timeStamp }];
+      listenMoves(true);
     };
 
     const onMove = (event: TouchEvent) => {
@@ -199,12 +213,16 @@ export function useSheetDismiss<S extends HTMLElement = HTMLElement, B extends H
       const dx = touch.clientX - start.x;
       const dy = touch.clientY - start.y;
       if (!decided) {
+        // Mostly downward from the top: hold the body's bounce off from the
+        // very first move, or iOS commits to it before the drag is decided.
+        if (atTop && dy > 0 && dy >= Math.abs(dx) && event.cancelable) event.preventDefault();
         if (Math.abs(dx) < DECIDE_PX && Math.abs(dy) < DECIDE_PX) return;
         decided = true;
         claimed = dy > 0 && Math.abs(dy) > Math.abs(dx) && atTop;
         if (!claimed) {
-          // An upward or sideways move, or a body mid-scroll: the browser scrolls it.
+          // An upward or sideways move: the browser scrolls it.
           start = null;
+          listenMoves(false);
           return;
         }
         height = sheet.getBoundingClientRect().height;
@@ -224,6 +242,7 @@ export function useSheetDismiss<S extends HTMLElement = HTMLElement, B extends H
     };
 
     const onEnd = (event: TouchEvent) => {
+      listenMoves(false);
       if (!start || !claimed) {
         reset();
         return;
@@ -242,13 +261,12 @@ export function useSheetDismiss<S extends HTMLElement = HTMLElement, B extends H
     };
 
     sheet.addEventListener('touchstart', onStart, { passive: true });
-    sheet.addEventListener('touchmove', onMove, { passive: false });
     sheet.addEventListener('touchend', onEnd);
     sheet.addEventListener('touchcancel', onEnd);
     return () => {
       if (snapTimer) clearTimeout(snapTimer);
+      listenMoves(false);
       sheet.removeEventListener('touchstart', onStart);
-      sheet.removeEventListener('touchmove', onMove);
       sheet.removeEventListener('touchend', onEnd);
       sheet.removeEventListener('touchcancel', onEnd);
     };
