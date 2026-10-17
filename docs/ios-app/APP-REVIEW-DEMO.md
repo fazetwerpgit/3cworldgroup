@@ -94,6 +94,17 @@ in production, done by an owner/admin. Do it before submitting a build.
    shows up in the admin chat-reports queue. Signed in as a rep, the sandbox
    is not in the list.
 
+## Storage lifecycle for chat uploads (one-time, not run by the app)
+
+Direct chat uploads land in `chat-pending/` first. The daily
+`/api/cron/chat-evidence` cron deletes ones older than an hour; as a backstop,
+apply `docs/ios-app/storage-lifecycle.json` (delete `chat-pending/` objects
+older than 1 day). This replaces the bucket's whole lifecycle config, so check
+`gcloud storage buckets describe gs://<bucket> --format="default(lifecycle_config)"`
+first and merge any existing rules:
+
+    gcloud storage buckets update gs://<bucket> --lifecycle-file=docs/ios-app/storage-lifecycle.json
+
 ## After review
 
 Set `active: false` on the sandbox channel (archiving closes it to everyone,
