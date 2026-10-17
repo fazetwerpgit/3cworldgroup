@@ -25,7 +25,8 @@ import r from './chat-reports.module.css';
 // Chat reports (App Store guideline 1.2): messages people reported from the
 // chat long-press menu. Remove message soft-deletes it through the chat's own
 // DELETE route (the same one a moderator's Delete uses), Dismiss keeps it, and
-// either one closes every open report on that message.
+// either one closes every open report on that message. Open reports list
+// oldest first, resolved ones most recently handled first, a page at a time.
 
 type View = 'open' | 'resolved';
 
@@ -70,31 +71,68 @@ function ReportedMessage({ report }: { report: ChatReportView }) {
 
 function ChatReports() {
   const { user } = useAuth();
-  const { refresh: refreshQueues } = useOpsQueues();
+  const { cards, refresh: refreshQueues } = useOpsQueues();
   const [view, setView] = useState<View>('open');
-  const [rows, setRows] = useState<{ view: View; reports: ChatReportView[] } | null>(null);
+  const [rows, setRows] = useState<{ view: View; reports: ChatReportView[]; nextCursor: string | null } | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [moreBusy, setMoreBusy] = useState(false);
+  const [moreError, setMoreError] = useState('');
   const [error, setError] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const load = useCallback(async (which: View) => {
     setLoadError('');
+    setMoreError('');
     try {
       const res = await authedFetch(`/api/portal/admin/chat-reports?status=${which}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load');
-      setRows({ view: which, reports: json.reports });
+      setRows({ view: which, reports: json.reports, nextCursor: typeof json.nextCursor === 'string' ? json.nextCursor : null });
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to load');
     }
   }, []);
+
+  // The next page after the last row shown, appended (rows already on screen
+  // are skipped in case one moved between pages).
+  const loadMore = async () => {
+    if (!rows?.nextCursor) return;
+    const { view: which, nextCursor } = rows;
+    setMoreBusy(true);
+    setMoreError('');
+    try {
+      const res = await authedFetch(
+        `/api/portal/admin/chat-reports?status=${which}&cursor=${encodeURIComponent(nextCursor)}`
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to load more');
+      const more: ChatReportView[] = Array.isArray(json.reports) ? json.reports : [];
+      setRows((prev) => {
+        if (!prev || prev.view !== which) return prev;
+        const seen = new Set(prev.reports.map((row) => row.id));
+        return {
+          view: which,
+          reports: [...prev.reports, ...more.filter((row) => !seen.has(row.id))],
+          nextCursor: typeof json.nextCursor === 'string' ? json.nextCursor : null,
+        };
+      });
+    } catch (err) {
+      setMoreError(err instanceof Error ? err.message : 'Failed to load more');
+    } finally {
+      setMoreBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (user) void load(view);
   }, [user, view, load]);
 
   const shown = rows?.view === view ? rows.reports : null;
+  const hasMore = rows?.view === view && !!rows.nextCursor;
+  // With more pages to come the list is not the whole queue: the badge count is.
+  const queueCount = cards?.find((card) => card.key === 'chat-reports' && !card.error)?.count;
+  const openCount = shown ? (hasMore && queueCount !== undefined ? Math.max(queueCount, shown.length) : shown.length) : null;
 
   const resolve = async (report: ChatReportView, action: 'removed' | 'dismissed') => {
     setBusyId(report.id);
@@ -133,9 +171,9 @@ function ChatReports() {
       <AdminPageHead
         title="Chat reports"
         meta={
-          view === 'open' && shown ? (
+          view === 'open' && openCount !== null ? (
             <>
-              <b>{shown.length}</b> open
+              <b>{hasMore && queueCount === undefined ? `${openCount}+` : openCount}</b> open
             </>
           ) : null
         }
@@ -275,6 +313,23 @@ function ChatReports() {
             })}
           </ul>
         )}
+        {shown && hasMore ? (
+          <div className={r.more}>
+            {moreError ? (
+              <p className={r.moreError} role="alert">
+                {moreError}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className={`${s.btnSecondary} ${u.sm}`}
+              disabled={moreBusy}
+              onClick={() => void loadMore()}
+            >
+              {moreBusy ? 'Loading' : 'Load more'}
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   );

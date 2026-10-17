@@ -158,10 +158,16 @@ const SOURCES: QueueSource[] = [
     label: 'Chat reports',
     hub: CHAT_REPORTS_HUB,
     tab: 'open',
+    // Aggregates only: the queue page lists the reports, the badge never reads them.
     load: async (get) => {
-      const json = await get('/api/portal/admin/chat-reports?status=open');
-      const reports: { createdAt?: string | null }[] = Array.isArray(json.reports) ? json.reports : [];
-      return figuresFrom(reports.map((report) => report.createdAt));
+      const json = await get('/api/portal/admin/chat-reports/count');
+      const count = typeof json.open === 'number' ? json.open : 0;
+      const oldest = typeof json.oldestCreatedAt === 'string' ? new Date(json.oldestCreatedAt).getTime() : Number.NaN;
+      return {
+        count,
+        oldestWaitMs: Number.isNaN(oldest) ? null : Math.max(0, Date.now() - oldest),
+        newToday: typeof json.newToday === 'number' ? json.newToday : 0,
+      };
     },
   },
 ];

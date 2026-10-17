@@ -9,13 +9,18 @@ import { chatReportId, isSafeDocId } from '@/lib/chat/moderationShared';
 // through the Admin SDK only; the Firestore rules deny every client read, so
 // this route is the one way back-office staff see them.
 //
-// GET  ?status=open (default) | resolved  -> newest first, at most 100.
+// GET  ?status=open (default) | resolved [&cursor=<report id>]
+//   open: oldest first (the longest wait on top), by createdAt.
+//   resolved: most recently handled first, by resolvedAt.
+//   PAGE_LIMIT rows per call; nextCursor (a report id, or null at the end)
+//   fetches the next page. Both orders need a composite index on chatReports
+//   (firestore.indexes.json). The nav badge reads ./count instead.
 // PATCH { id, action: 'removed' | 'dismissed' } -> resolves the report and
 //   every other open report on the same message, stamped with who and when.
 //   Removing the message itself is the existing DELETE /api/portal/chat/messages;
 //   the queue calls that first, then records the outcome here.
 
-const LIST_LIMIT = 100;
+const PAGE_LIMIT = 50;
 const ACTIONS = ['removed', 'dismissed'] as const;
 type ReportAction = (typeof ACTIONS)[number];
 
@@ -71,31 +76,37 @@ function toReport(id: string, data: FirebaseFirestore.DocumentData) {
 
 export type ChatReportView = ReturnType<typeof toReport>;
 
-const byNewest = (key: 'createdAt' | 'resolvedAt') => (a: ChatReportView, b: ChatReportView) =>
-  (b[key] ?? '').localeCompare(a[key] ?? '');
-
 export async function GET(request: NextRequest) {
   const gate = await requireVerifiedManagement(request);
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
   if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 
-  const status = request.nextUrl.searchParams.get('status') ?? 'open';
+  const params = request.nextUrl.searchParams;
+  const status = params.get('status') ?? 'open';
   if (status !== 'open' && status !== 'resolved') {
     return NextResponse.json({ error: 'status must be open or resolved' }, { status: 400 });
   }
+  const cursor = params.get('cursor');
+  if (cursor !== null && !isReportId(cursor)) {
+    return NextResponse.json({ error: 'Invalid cursor' }, { status: 400 });
+  }
 
   try {
-    // Equality filters only, sorted here: no composite index to deploy.
     const reports = adminDb.collection('chatReports');
-    const snaps =
+    let query =
       status === 'open'
-        ? [await reports.where('status', '==', 'open').get()]
-        : await Promise.all(ACTIONS.map((action) => reports.where('status', '==', action).get()));
-    const rows = snaps
-      .flatMap((snap) => snap.docs.map((doc) => toReport(doc.id, doc.data())))
-      .sort(byNewest(status === 'open' ? 'createdAt' : 'resolvedAt'))
-      .slice(0, LIST_LIMIT);
-    return NextResponse.json({ reports: rows });
+        ? reports.where('status', '==', 'open').orderBy('createdAt', 'asc')
+        : reports.where('status', 'in', [...ACTIONS]).orderBy('resolvedAt', 'desc');
+    if (cursor) {
+      const after = await reports.doc(cursor).get();
+      if (!after.exists) return NextResponse.json({ error: 'Invalid cursor' }, { status: 400 });
+      query = query.startAfter(after);
+    }
+    // One extra row says whether another page exists.
+    const snap = await query.limit(PAGE_LIMIT + 1).get();
+    const docs = snap.docs.slice(0, PAGE_LIMIT);
+    const nextCursor = snap.docs.length > PAGE_LIMIT ? docs[docs.length - 1].id : null;
+    return NextResponse.json({ reports: docs.map((doc) => toReport(doc.id, doc.data())), nextCursor });
   } catch (error) {
     console.error('[chat reports] list failed', error);
     return NextResponse.json({ error: 'Failed to load chat reports' }, { status: 500 });

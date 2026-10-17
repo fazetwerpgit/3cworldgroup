@@ -59,7 +59,8 @@ function respond(url: string) {
       },
     };
   if (path === '/api/portal/pipeline') return { ok: true, body: { counts: { processing: 2, need_logins: 1 } } };
-  if (path === '/api/portal/admin/chat-reports') return { ok: true, body: { reports: [{ createdAt: ago(3 * HOUR) }] } };
+  if (path === '/api/portal/admin/chat-reports/count')
+    return { ok: true, body: { open: 1, newToday: 1, oldestCreatedAt: ago(3 * HOUR) } };
   // Every request type: one open item, one handled.
   return { ok: true, body: { submissions: [{ status: 'new', createdAt: ago(2 * HOUR) }, { status: 'handled' }] } };
 }
