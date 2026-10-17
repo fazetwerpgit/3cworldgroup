@@ -121,6 +121,24 @@ export function buildWidgetData(input: WidgetInput): WidgetData {
 }
 
 /**
+ * The owners' widget payload. The owners don't sell, so their home is the
+ * company view (OwnerDashboard), never RepDashboard: there is no Est. pay,
+ * rank or personal sales to show. Every figure is null, and the widget says
+ * there is nothing for this account instead of "Open the app" forever.
+ */
+export function buildOwnerWidgetData(uidHash: string, now: Date): WidgetData {
+  return {
+    uidHash,
+    estPayMtd: null,
+    periodLabel: periodFormat.format(now),
+    rank: null,
+    rankOf: null,
+    salesMtd: null,
+    updatedAt: now.toISOString(),
+  };
+}
+
+/**
  * Sends widget data when the numbers change (updatedAt aside), or when the
  * same numbers were last sent WIDGET_REFRESH_MS ago. null clears the widget.
  */
@@ -139,6 +157,24 @@ export function useNativeWidgetData(data: WidgetData | null): void {
   useEffect(() => {
     if (data) sendNativeWidgetData(data);
   }, [data]);
+}
+
+/**
+ * OwnerDashboard's widget feed: the owner payload once the uid hash is ready,
+ * offered again every WIDGET_REFRESH_MS so a dashboard left open keeps the
+ * widget inside its 48h window. A no-op on the web.
+ */
+export function useOwnerWidgetData(uid: string | null | undefined): void {
+  const uidHash = useUidHash(uid);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!uidHash) return;
+    const timer = setInterval(() => setTick((n) => n + 1), WIDGET_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [uidHash]);
+  useEffect(() => {
+    if (uidHash) sendNativeWidgetData(buildOwnerWidgetData(uidHash, new Date()));
+  }, [uidHash, tick]);
 }
 
 // ---- sign-out -------------------------------------------------------------

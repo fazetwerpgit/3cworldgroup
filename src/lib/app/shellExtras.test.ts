@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   WIDGET_REFRESH_MS,
   __resetShellExtrasForTests,
+  buildOwnerWidgetData,
   buildWidgetData,
   clearNativeExtras,
   countUnread,
@@ -152,5 +153,23 @@ describe('sendNativeWidgetData', () => {
     sendNativeWidgetData(base);
     clearNativeExtras();
     expect(posted).toEqual([]);
+  });
+});
+
+describe('buildOwnerWidgetData', () => {
+  it('owners send a payload with no figures, so the widget leaves "Open the app"', () => {
+    const at = new Date('2026-10-17T15:00:00.000Z');
+    const data = buildOwnerWidgetData('abc123abc123abc1', at);
+    expect(data).toEqual({
+      uidHash: 'abc123abc123abc1',
+      estPayMtd: null,
+      periodLabel: 'October',
+      rank: null,
+      rankOf: null,
+      salesMtd: null,
+      updatedAt: '2026-10-17T15:00:00.000Z',
+    });
+    sendNativeWidgetData(data);
+    expect(posted).toEqual([{ type: 'widgetData', data }]);
   });
 });
