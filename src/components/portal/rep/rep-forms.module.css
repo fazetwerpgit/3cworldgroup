@@ -898,6 +898,11 @@
   background: rgba(1, 4, 10, 0.94);
 }
 
+/* Its own, deeper dim: not the sheet backdrop's layer on top. */
+.viewer::before {
+  content: none;
+}
+
 .viewerImg {
   max-width: 100%;
   max-height: calc(100dvh / var(--pz, 1) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 96px);

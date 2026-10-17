@@ -6,6 +6,7 @@ import type { Sale } from '@/types';
 import { dateToSaleDateInput, installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
 import { firstRescheduleDay, missedInstallDay } from '@/lib/sales/rescheduleDay';
 import { saveInstallDate } from '@/lib/sales/saveInstallDate';
+import { useSheetDismiss } from '@/hooks/useSheetDismiss';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
 import l from './rep-logsale.module.css';
@@ -55,18 +56,20 @@ export function InstallDateSheet({
   const [saving, setSaving] = useState(false);
   const closeRef = useRef<HTMLButtonElement | null>(null);
   const savingRef = useRef(false);
+  // Closing mid-save would hide whether the date went through: no drag then.
+  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onClose, { drag: !saving });
 
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !savingRef.current) {
         event.preventDefault();
-        onClose();
+        close();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [close]);
 
   const title = missed ? 'Reschedule the install' : current ? 'Change install date' : 'Add install date';
   const soldDay = inputDay(sale.saleDate);
@@ -104,18 +107,27 @@ export function InstallDateSheet({
       return;
     }
     onSaved(sale.id || '', result.installDate);
-    onClose();
+    close();
   };
 
   return (
     <BodyLayer>
       <div
+        ref={backdropRef}
         className={s.backdrop}
+        data-closing={closing || undefined}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !savingRef.current) onClose();
+          if (event.target === event.currentTarget && !savingRef.current) close();
         }}
       >
-        <section className={s.sheet} role="dialog" aria-modal="true" aria-labelledby="install-date-title">
+        <section
+          ref={sheetRef}
+          className={s.sheet}
+          data-closing={closing || undefined}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="install-date-title"
+        >
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={s.sheetHead}>
             <h2 id="install-date-title" className={s.sheetTitle}>
@@ -128,7 +140,7 @@ export function InstallDateSheet({
               aria-label="Close"
               // Closing mid-save would hide whether the date went through.
               disabled={saving}
-              onClick={onClose}
+              onClick={close}
             >
               <X size={20} aria-hidden="true" />
             </button>

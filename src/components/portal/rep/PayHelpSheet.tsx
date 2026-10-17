@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
+import { useSheetDismiss } from '@/hooks/useSheetDismiss';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
 import d from './rep-dashboard.module.css';
@@ -23,34 +24,44 @@ const WINDOWS: Array<[string, string]> = [
 /** "How T-Fiber pay works": bottom sheet on phone, centred dialog on desktop, portaled to <body>. */
 export function PayHelpSheet({ onClose }: { onClose: () => void }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onClose);
 
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        close();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [close]);
 
   return (
     <BodyLayer>
       <div
+        ref={backdropRef}
         className={s.backdrop}
+        data-closing={closing || undefined}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget) onClose();
+          if (event.target === event.currentTarget) close();
         }}
       >
-        <section className={s.sheet} role="dialog" aria-modal="true" aria-labelledby="pay-help-title">
+        <section
+          ref={sheetRef}
+          className={s.sheet}
+          data-closing={closing || undefined}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pay-help-title"
+        >
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={s.sheetHead}>
             <h2 id="pay-help-title" className={s.sheetTitle}>
               How T-Fiber pay works
             </h2>
-            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={onClose}>
+            <button ref={closeRef} type="button" className={s.iconBtn} aria-label="Close" onClick={close}>
               <X size={20} aria-hidden="true" />
             </button>
           </div>

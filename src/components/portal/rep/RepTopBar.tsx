@@ -327,6 +327,7 @@ export function RepTopBar({
             onClose={close}
             onSignOut={handleSignOut}
             classes={repSheetClasses}
+            animated
           />
         </BodyLayer>
       ) : null}

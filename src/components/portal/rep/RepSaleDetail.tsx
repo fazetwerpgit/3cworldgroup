@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useSales } from '@/hooks/useSales';
+import { useSheetDismiss } from '@/hooks/useSheetDismiss';
 import { CHARGEBACK_STATUS_LABEL, isOverdue, rowStatus, type RowStatus } from '@/lib/dashboard/repSummary';
 import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -122,33 +123,46 @@ function DeleteSheet({
   useEffect(() => {
     busyRef.current = deleting;
   });
+  const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onCancel, { drag: !deleting });
+  const cancel = () => {
+    if (!busyRef.current) close();
+  };
   useEffect(() => {
     cancelRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !busyRef.current) {
         event.preventDefault();
-        onCancel();
+        close();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  }, [close]);
 
   return (
     <BodyLayer>
       <div
+        ref={backdropRef}
         className={s.backdrop}
+        data-closing={closing || undefined}
         onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !busyRef.current) onCancel();
+          if (event.target === event.currentTarget) cancel();
         }}
       >
-        <section className={s.sheet} role="alertdialog" aria-modal="true" aria-labelledby="delete-sale-title">
+        <section
+          ref={sheetRef}
+          className={s.sheet}
+          data-closing={closing || undefined}
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="delete-sale-title"
+        >
           <div className={s.sheetHandle} aria-hidden="true" />
           <div className={s.sheetHead}>
             <h2 id="delete-sale-title" className={s.sheetTitle}>
               Delete this sale?
             </h2>
-            <button type="button" className={s.iconBtn} aria-label="Close" disabled={deleting} onClick={onCancel}>
+            <button type="button" className={s.iconBtn} aria-label="Close" disabled={deleting} onClick={cancel}>
               <X size={20} aria-hidden="true" />
             </button>
           </div>
@@ -166,7 +180,7 @@ function DeleteSheet({
                 <Trash2 size={18} aria-hidden="true" />
                 {deleting ? 'Deleting…' : 'Delete sale'}
               </button>
-              <button ref={cancelRef} type="button" className={`${s.btnSecondary} ${s.btnBlock}`} disabled={deleting} onClick={onCancel}>
+              <button ref={cancelRef} type="button" className={`${s.btnSecondary} ${s.btnBlock}`} disabled={deleting} onClick={cancel}>
                 Keep it
               </button>
             </div>

@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import Link from 'next/link';
 import { ArrowLeftToLine, LogOut, Settings, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSheetDismiss } from '@/hooks/useSheetDismiss';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import {
   portalNavGroups,
@@ -188,6 +189,7 @@ export function NavSheet({
   onClose,
   onSignOut,
   classes = legacyNavSheetClasses,
+  animated = false,
 }: {
   id: string;
   titleId: string;
@@ -198,7 +200,15 @@ export function NavSheet({
   onClose: () => void;
   onSignOut: () => void;
   classes?: NavSheetClasses;
+  /**
+   * The D shell's sheet: slides out before it unmounts and follows a drag
+   * down (useSheetDismiss). The old chrome's CSS has no exit, so it is off there.
+   */
+  animated?: boolean;
 }) {
+  const sheet = useSheetDismiss<HTMLElement>(onClose, { drag: animated });
+  const dismiss = animated ? sheet.close : onClose;
+  const closing = animated && sheet.closing ? true : undefined;
   const content = (
     <>
       <NavGroupsList
@@ -206,22 +216,26 @@ export function NavSheet({
         pathname={pathname}
         canAccess={canAccess}
         counts={counts}
-        onLinkClick={onClose}
+        onLinkClick={dismiss}
         classes={classes}
       />
-      <NavSheetActions onClose={onClose} onSignOut={onSignOut} classes={classes} />
+      <NavSheetActions onClose={dismiss} onSignOut={onSignOut} classes={classes} />
     </>
   );
 
   return (
     <div
+      ref={sheet.backdropRef}
       className={classes.backdrop}
+      data-closing={closing}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) dismiss();
       }}
     >
       <section
+        ref={sheet.sheetRef}
         id={id}
+        data-closing={closing}
         className={classes.sheet}
         role="dialog"
         aria-modal="true"
@@ -231,7 +245,7 @@ export function NavSheet({
         <div className={classes.handle} aria-hidden="true" />
         <div className={classes.header}>
           <h2 id={titleId} className={classes.title}>Menu</h2>
-          <button type="button" onClick={onClose} aria-label="Close menu" className={classes.close}>
+          <button type="button" onClick={dismiss} aria-label="Close menu" className={classes.close}>
             <X aria-hidden="true" />
             <span className={classes.closeLabel}>Close</span>
           </button>
