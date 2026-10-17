@@ -133,9 +133,15 @@ export function invalidateAfterCompPlanWrite(): void {
   invalidateAllSubjects(['comp-plan', 'dashboard', 'commission']);
 }
 
-/** "3:07 PM" for a cached entry's "as of" note. */
-export function cacheTimeLabel(at: number): string {
-  return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+/**
+ * "3:07 PM" for a cached entry's "as of" note, or "Thu 3:07 PM" when it is
+ * not from today (a bare time from before midnight would read as today's).
+ */
+export function cacheTimeLabel(at: number, now: Date = new Date()): string {
+  const date = new Date(at);
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (date.toDateString() === now.toDateString()) return time;
+  return `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${time}`;
 }
 
 // ---- revalidate (pull to refresh) ----

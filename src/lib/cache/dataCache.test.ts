@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DATA_CACHE_MAX_AGE_MS,
   DATA_CACHE_MAX_ENTRIES,
+  cacheTimeLabel,
   clearDataCache,
   dataCacheGeneration,
   invalidateAfterCompPlanWrite,
@@ -183,5 +184,17 @@ describe('revalidateDataCache', () => {
     const off = onRevalidateDataCache(() => new Promise(() => {}));
     await expect(revalidateDataCache({ timeoutMs: 20 })).resolves.toBeUndefined();
     off();
+  });
+});
+
+describe('cacheTimeLabel', () => {
+  const now = new Date(2026, 9, 15, 9, 0); // Thu Oct 15, 9:00 AM
+
+  it('is the bare time for today', () => {
+    expect(cacheTimeLabel(new Date(2026, 9, 15, 8, 40).getTime(), now)).toMatch(/^8:40\sAM$/);
+  });
+
+  it('names the day when it is not today', () => {
+    expect(cacheTimeLabel(new Date(2026, 9, 14, 23, 55).getTime(), now)).toMatch(/^Wed 11:55\sPM$/);
   });
 });
