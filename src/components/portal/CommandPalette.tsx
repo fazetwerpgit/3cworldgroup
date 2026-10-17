@@ -16,6 +16,7 @@ import {
   ReceiptText,
   Search,
   Settings,
+  ShieldAlert,
   Trophy,
   Users,
   type LucideIcon,
@@ -26,6 +27,7 @@ import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboarding
 import { askOpenTo } from '@/lib/ask/flag';
 import { PlatformRole, Sale, UserRole } from '@/types';
 import {
+  CHAT_REPORTS_HUB,
   ONBOARDING_HUB,
   PEOPLE_HUB,
   REQUESTS_HUB,
@@ -73,7 +75,7 @@ type PaletteRow = { key: string; label: string; href: string; meta?: string };
 
 // This is the single portal navigation source of truth. The sidebar, mobile
 // sheet, and palette all consume these same labels, routes, and gates. The
-// admin side is five pages (Ops Home's queues are Home's Needs attention and
+// admin side is six pages (Ops Home's queues are Home's Needs attention and
 // the nav badges); the old admin pages live on as tabs inside People,
 // Onboarding, Requests and Admin settings (see admin-d/adminHubs.ts), each tab
 // under its old gate.
@@ -100,6 +102,7 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Hiring', href: ONBOARDING_HUB.href, icon: ClipboardCheck, roles: hubRoles(ONBOARDING_HUB), hub: ONBOARDING_HUB },
       { label: 'Requests', href: REQUESTS_HUB.href, icon: Inbox, roles: hubRoles(REQUESTS_HUB), hub: REQUESTS_HUB },
       { label: 'Announcements', href: '/portal/admin/announcements', icon: Megaphone, roles: ['owner'] },
+      { label: 'Chat reports', href: CHAT_REPORTS_HUB.href, icon: ShieldAlert, roles: hubRoles(CHAT_REPORTS_HUB) },
       { label: 'Admin settings', href: SETTINGS_HUB.href, icon: Settings, roles: hubRoles(SETTINGS_HUB), hub: SETTINGS_HUB },
     ],
   },

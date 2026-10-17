@@ -1,0 +1,103 @@
+/* Chat reports. Shared pieces are admin-ui.module.css. */
+
+.item {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s3) var(--s4);
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s1) var(--s2);
+}
+
+.when {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+/* The reported message, as it read when it was reported. */
+.quote {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: var(--s2) var(--s3);
+  border-radius: var(--r-control);
+  background: var(--c-well);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.quoteEmpty {
+  color: var(--c-text-3);
+  font-style: italic;
+}
+
+.thumb {
+  display: block;
+  width: 96px;
+  height: 96px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--c-panel-hi);
+}
+
+.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px var(--s3);
+  margin: 0;
+  font-size: var(--t-sm);
+}
+
+.facts dt {
+  color: var(--c-text-3);
+}
+
+.facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--c-text-2);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s3);
+  font-size: var(--t-sm);
+}
+
+.links a {
+  color: var(--c-text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.confirm {
+  margin: 0 calc(-1 * var(--s4)) calc(-1 * var(--s3));
+}

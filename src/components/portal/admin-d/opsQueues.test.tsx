@@ -59,6 +59,7 @@ function respond(url: string) {
       },
     };
   if (path === '/api/portal/pipeline') return { ok: true, body: { counts: { processing: 2, need_logins: 1 } } };
+  if (path === '/api/portal/admin/chat-reports') return { ok: true, body: { reports: [{ createdAt: ago(3 * HOUR) }] } };
   // Every request type: one open item, one handled.
   return { ok: true, body: { submissions: [{ status: 'new', createdAt: ago(2 * HOUR) }, { status: 'handled' }] } };
 }
@@ -119,6 +120,7 @@ describe('useOpsQueues', () => {
       'Fiber reports',
       'Manager interviews',
       'Bug reports',
+      'Chat reports',
       'Sign-ups waiting for a role',
     ]);
     const byKey = Object.fromEntries(queues.cards!.map((card) => [card.key, card]));
@@ -137,6 +139,7 @@ describe('useOpsQueues', () => {
     expect(counts).toEqual({
       '/portal/admin/onboarding': 2 + 1 + 2 + 4,
       '/portal/admin/requests': 6,
+      '/portal/admin/chat-reports': 1,
     });
     expect(tabs).toEqual({ todo: 2 + 1 + 2 + 4 });
   });
