@@ -88,4 +88,29 @@ describe('useKeyboardInset', () => {
     });
     expect(shown()).toBe('0/0');
   });
+
+  it('updates every mounted consumer (Ask and Practice at once)', async () => {
+    function Second() {
+      const { inset } = useKeyboardInset();
+      return <output id="kb2">{String(inset)}</output>;
+    }
+    const extra = document.createElement('div');
+    document.body.appendChild(extra);
+    const second = createRoot(extra);
+    await act(async () => second.render(<Second />));
+    await act(async () => {
+      vv.height = 520;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(shown()).toBe('324/520');
+    expect(document.getElementById('kb2')?.textContent).toBe('324');
+    // One consumer leaving keeps the other live.
+    act(() => second.unmount());
+    extra.remove();
+    await act(async () => {
+      vv.height = 844;
+      vv.dispatchEvent(new Event('resize'));
+    });
+    expect(shown()).toBe('0/0');
+  });
 });

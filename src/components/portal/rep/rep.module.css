@@ -193,7 +193,6 @@
   }
 
   .scroller {
-    position: relative;
     flex: 1;
     min-height: 0;
     overflow-y: auto;
@@ -239,6 +238,13 @@
    Sits at the top of the scroller, under the content; the content slides
    down off it as the pull grows. Position, scale and fade are set inline per
    frame (transform and opacity only). */
+/* Zero-height positioned rail at the top of the scroller's content: the
+   indicator's containing block, so the scroller itself stays unpositioned. */
+.ptrRail {
+  position: relative;
+  height: 0;
+}
+
 .ptr {
   position: absolute;
   top: 0;

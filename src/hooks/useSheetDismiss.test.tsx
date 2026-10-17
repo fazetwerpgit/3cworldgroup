@@ -196,4 +196,34 @@ describe('useSheetDismiss', () => {
     expect(move.defaultPrevented).toBe(false);
     expect(sheetEl().style.transform).toBe('');
   });
+
+  it('holds the bounce off from the first small downward move at the top', async () => {
+    await act(async () => {
+      touch('touchstart', 100, 0);
+    });
+    const first = await act(async () => touch('touchmove', 103, 10));
+    expect(first.defaultPrevented).toBe(true);
+    // Not decided yet: nothing moves until the 6px threshold.
+    expect(sheetEl().style.transform).toBe('');
+  });
+
+  it('listens for moves only while a drag can begin', async () => {
+    const sheet = sheetEl();
+    const add = vi.spyOn(sheet, 'addEventListener');
+    const remove = vi.spyOn(sheet, 'removeEventListener');
+    await act(async () => {
+      touch('touchstart', 100, 0);
+    });
+    expect(add.mock.calls.filter(([type]) => type === 'touchmove')).toHaveLength(1);
+    await act(async () => {
+      touch('touchend', 100, 20);
+    });
+    expect(remove.mock.calls.filter(([type]) => type === 'touchmove')).toHaveLength(1);
+    const body = document.getElementById('body')!;
+    Object.defineProperty(body, 'scrollTop', { configurable: true, value: 120 });
+    await act(async () => {
+      touch('touchstart', 100, 30);
+    });
+    expect(add.mock.calls.filter(([type]) => type === 'touchmove')).toHaveLength(1);
+  });
 });

@@ -71,22 +71,40 @@ function sample(): KeyboardState {
   return { inset, viewportHeight };
 }
 
-function subscribe(onChange: () => void) {
+// One store for every consumer (Ask and Practice can both be mounted): a single
+// set of viewport listeners updates the snapshot once, then tells everyone.
+const listeners = new Set<() => void>();
+let detach: (() => void) | null = null;
+
+function refresh() {
+  const next = sample();
+  if (next === snapshot) return;
+  snapshot = next;
+  for (const listener of Array.from(listeners)) listener();
+}
+
+function attach() {
   const vv = window.visualViewport;
-  const update = () => {
-    const next = sample();
-    if (next === snapshot) return;
-    snapshot = next;
-    onChange();
-  };
-  update();
-  vv?.addEventListener('resize', update);
-  vv?.addEventListener('scroll', update);
-  window.addEventListener('resize', update);
+  vv?.addEventListener('resize', refresh);
+  vv?.addEventListener('scroll', refresh);
+  window.addEventListener('resize', refresh);
   return () => {
-    vv?.removeEventListener('resize', update);
-    vv?.removeEventListener('scroll', update);
-    window.removeEventListener('resize', update);
+    vv?.removeEventListener('resize', refresh);
+    vv?.removeEventListener('scroll', refresh);
+    window.removeEventListener('resize', refresh);
+  };
+}
+
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  if (!detach) detach = attach();
+  refresh();
+  return () => {
+    listeners.delete(onChange);
+    if (listeners.size === 0 && detach) {
+      detach();
+      detach = null;
+    }
   };
 }
 
@@ -137,4 +155,7 @@ export function useKeepAboveKeyboard(targetRef: RefObject<HTMLElement | null>, e
 /** Test-only: forget the cached keyboard state. */
 export function __resetKeyboardForTests(): void {
   snapshot = CLOSED;
+  listeners.clear();
+  detach?.();
+  detach = null;
 }
