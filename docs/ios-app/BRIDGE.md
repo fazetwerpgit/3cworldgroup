@@ -252,10 +252,14 @@ answered the current web user's `nativeAuth` with ok. It replaces every way into
 `/portal/chat` inside the app: the Chat tab and nav links, the command palette,
 any in-page chat link, and a direct load of `/portal/chat?channel=<id>` (a push
 tap). On a direct load the web shows a short "Opening chat…" screen while the
-native sign-in and the open are under way (no flash of the web chat); after the
-ok reply it steps back in history, or replaces its page with
-`/portal/dashboard` on a cold load, so that page stays behind the native
-screen. If the open fails the web chat shows. Without the capability, chat stays
+native sign-in and the open are under way (no flash of the web chat), but waits
+at most 3 s for the sign-in before showing the web chat; after the ok reply it
+steps back in history, or replaces its page with `/portal/dashboard` on a cold
+load, so that page stays behind the native screen. If the open fails the web
+chat shows. Native or web is decided once per stay on `/portal/chat`: once the
+web chat has shown, a `nativeAuth` ok that lands later does not send
+`openNativeChat` until the person leaves and comes back, and at most one
+`openNativeChat` goes out per stay. Without the capability, chat stays
 the web page exactly as before.
 ### Native chat: the same API, terms gate and user agent
 
