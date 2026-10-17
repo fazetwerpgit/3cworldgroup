@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { InstallStatusLine } from '@/components/sales/InstallStatusLine';
+import { nativeHaptic } from '@/lib/app/bridge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
@@ -291,6 +292,8 @@ export function RepSaleDetail() {
   }, [sale, orders, now, reportAsOf]);
 
   const handleDelete = async () => {
+    // A destructive confirm: the warning tick, in the app only.
+    nativeHaptic('warning');
     setDeleting(true);
     setDeleteFailed(false);
     const success = await deleteSale(saleId);

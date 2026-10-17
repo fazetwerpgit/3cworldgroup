@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { nativeHaptic } from '@/lib/app/bridge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSales } from '@/hooks/useSales';
 import { formFileMime, prepareFormFile } from '@/lib/forms/uploadFormAttachment';
@@ -456,6 +457,12 @@ export function useBulkLog() {
     } finally {
       sendingRef.current = false;
       if (alive.current) setSending(false);
+      // One tick for the send, in the app (nothing on the web): success when
+      // every sale went on the books, error when any did not.
+      if (alive.current && results.size > 0) {
+        const kinds = [...results.values()].map((result) => result.kind);
+        nativeHaptic(kinds.includes('failed') ? 'error' : kinds.includes('logged') ? 'success' : 'warning');
+      }
       if (generation.current === run) {
         if (alive.current && (wholeBatch || finished)) setFinished(true);
         if (batchSettled(withResults())) {

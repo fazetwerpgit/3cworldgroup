@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactK
 import Link from 'next/link';
 import { Check, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
+import { nativeHaptic } from '@/lib/app/bridge';
 import type { FiberOrder, FiberStatusResponse } from '@/types';
 import type { CompPlanCompanyRates } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -404,6 +405,8 @@ export function SalesTable({
     if (!deletingId || !onDelete) return;
     const id = deletingId;
     setDeletingId(null);
+    // A destructive confirm: the warning tick, in the app only.
+    nativeHaptic('warning');
     await onDelete(id);
   };
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { FIBER_COMPANIES, RoleDisplayNames, isOwner } from '@/types';
+import { nativeHaptic } from '@/lib/app/bridge';
 import type { CompPlanCompanyRates, CompPlanRole, FiberOrder, FiberStatusResponse, Sale } from '@/types';
 import { saleNetRevenue, type OwnerPricing } from '@/lib/owner/revenue';
 import { useAuth } from '@/contexts/AuthContext';
@@ -1060,6 +1061,8 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                 const id = deletingId;
                 setDeletingId(null);
                 setSelectedId(null);
+                // A destructive confirm: the warning tick, in the app only.
+                nativeHaptic('warning');
                 if (id) void onDelete?.(id);
               }}
             >
