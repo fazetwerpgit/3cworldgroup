@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
+import { chatObjectPathFromUrl, getChatStorageBucketName } from '@/lib/chat/media';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { chatReportId, isSafeDocId } from '@/lib/chat/moderationShared';
 
@@ -47,7 +48,50 @@ function text(value: unknown): string | null {
   return typeof value === 'string' && value ? value : null;
 }
 
-function toReport(id: string, data: FirebaseFirestore.DocumentData) {
+// How long a signed link to a report's upload opens it. Minted on every list
+// call, so a reload of the queue renews it.
+const SIGNED_URL_TTL_MS = 10 * 60 * 1000;
+const EVIDENCE_PREFIX = 'moderation/chat-reports/';
+
+type AttachmentLink = { url: string | null; expiresAt: string | null };
+
+async function signedRead(objectPath: string, expires: number): Promise<string | null> {
+  try {
+    const [url] = await getOnboardingBucket().file(objectPath).getSignedUrl({ version: 'v4', action: 'read', expires });
+    return url;
+  } catch (error) {
+    console.error('[chat reports] could not sign an upload link', (error as { code?: unknown } | null)?.code ?? 'unknown');
+    return null;
+  }
+}
+
+// The link the queue shows for a report's upload. The saved moderation copy
+// (evidencePath) and a chat upload still in place both get a short-lived V4
+// signed URL, so no link the queue hands out keeps working. Older reports
+// carry only a tokened evidenceUrl, which is shown as stored. A GIF (or a
+// link that cannot be signed) falls back to the stored attachmentUrl.
+async function attachmentLink(data: FirebaseFirestore.DocumentData): Promise<AttachmentLink> {
+  const expires = Date.now() + SIGNED_URL_TTL_MS;
+  const expiresAt = new Date(expires).toISOString();
+  const evidencePath = text(data.evidencePath);
+  if (evidencePath && evidencePath.startsWith(EVIDENCE_PREFIX) && !evidencePath.includes('..')) {
+    const url = await signedRead(evidencePath, expires);
+    if (url) return { url, expiresAt };
+  }
+  const legacyEvidence = text(data.evidenceUrl);
+  if (legacyEvidence) return { url: legacyEvidence, expiresAt: null };
+  const attachmentUrl = text(data.attachmentUrl);
+  const bucketName = getChatStorageBucketName();
+  const channelId = text(data.channelId);
+  const chatPath = attachmentUrl && bucketName && channelId ? chatObjectPathFromUrl(attachmentUrl, bucketName, channelId) : null;
+  if (chatPath) {
+    const url = await signedRead(chatPath, expires);
+    if (url) return { url, expiresAt };
+  }
+  return { url: attachmentUrl, expiresAt: null };
+}
+
+function toReport(id: string, data: FirebaseFirestore.DocumentData, link: AttachmentLink) {
   return {
     id,
     messageId: text(data.messageId) ?? '',
@@ -59,8 +103,10 @@ function toReport(id: string, data: FirebaseFirestore.DocumentData) {
     details: text(data.details),
     messageText: typeof data.messageText === 'string' ? data.messageText : '',
     // Once the message is removed its chat upload is gone; the copy saved to
-    // the moderation folder (evidenceUrl) is what the queue shows from then on.
-    attachmentUrl: text(data.evidenceUrl) ?? text(data.attachmentUrl),
+    // the moderation folder (evidencePath) is what the queue shows from then on.
+    // A signed link stops working at attachmentExpiresAt (null: not signed).
+    attachmentUrl: link.url,
+    attachmentExpiresAt: link.expiresAt,
     evidencePath: text(data.evidencePath),
     attachmentType: text(data.attachmentType),
     authorId: text(data.authorId) ?? '',
@@ -106,7 +152,13 @@ export async function GET(request: NextRequest) {
     const snap = await query.limit(PAGE_LIMIT + 1).get();
     const docs = snap.docs.slice(0, PAGE_LIMIT);
     const nextCursor = snap.docs.length > PAGE_LIMIT ? docs[docs.length - 1].id : null;
-    return NextResponse.json({ reports: docs.map((doc) => toReport(doc.id, doc.data())), nextCursor });
+    const reportsOut = await Promise.all(
+      docs.map(async (doc) => {
+        const data = doc.data();
+        return toReport(doc.id, data, await attachmentLink(data));
+      })
+    );
+    return NextResponse.json({ reports: reportsOut, nextCursor });
   } catch (error) {
     console.error('[chat reports] list failed', error);
     return NextResponse.json({ error: 'Failed to load chat reports' }, { status: 500 });

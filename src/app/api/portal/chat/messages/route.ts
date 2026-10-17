@@ -1,7 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse, after } from 'next/server';
-import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
+import { deletableChatObjectPaths, deleteChatObject, preserveReportedEvidence } from '@/lib/chat/evidence';
 import { ChatAttachment, ChatChannel } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { CHAT_TERMS_REFUSAL, needsChatTerms } from '@/lib/chat/terms';
@@ -12,9 +12,6 @@ import { checkChatText } from '@/lib/chat/contentFilter';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   attachmentSnippet,
-  buildTokenedDownloadUrl,
-  chatObjectPathFromUrl,
-  chatObjectUrlBase,
   getChatStorageBucketName,
   readStoredAttachment,
   validateMessageAttachment,
@@ -474,136 +471,6 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// The Storage objects behind a deleted message's photo, or its PDF and the
-// PDF's first-page preview: chat/{channelId}/{name} parsed from each download
-// URL. None for a GIF or a missing attachment, and never any URL outside this
-// bucket + channel folder (those are never deleted).
-function deletableChatObjectPaths(attachment: unknown, channelId: string): string[] {
-  if (!attachment || typeof attachment !== 'object') return [];
-  const { type, url, previewUrl } = attachment as { type?: unknown; url?: unknown; previewUrl?: unknown };
-  if (type !== 'image' && type !== 'file') return [];
-  const bucketName = getChatStorageBucketName();
-  if (!bucketName) return [];
-  const urls = type === 'file' ? [url, previewUrl] : [url];
-  const paths = urls
-    .map((candidate) => chatObjectPathFromUrl(candidate, bucketName, channelId))
-    .filter((path): path is string => !!path);
-  return [...new Set(paths)];
-}
-
-// Where another message can point at a chat object: its attachment url, or a
-// PDF's preview url.
-const CHAT_OBJECT_URL_FIELDS = ['attachment.url', 'attachment.previewUrl'] as const;
-
-// The error code of a failed Storage/Firestore call, for logs that must never
-// carry the object's download URL or token.
-function errorCode(error: unknown): string {
-  const code = (error as { code?: unknown } | null)?.code;
-  return code === undefined ? 'unknown' : String(code);
-}
-
-// Deletes the photo of a just-deleted message from Storage, unless another
-// standing message in the channel still points at the same object (the send
-// path accepts any URL in the channel's folder, so one could). A missing object
-// counts as deleted. Never throws: the message is already scrubbed, so a Storage
-// failure is logged (ids and error code only) and the delete still succeeds.
-async function deleteChatPhotoObject(
-  channelId: string,
-  messageId: string,
-  objectPath: string
-): Promise<void> {
-  try {
-    const bucketName = getChatStorageBucketName();
-    if (!bucketName) return;
-    const urlBase = chatObjectUrlBase(bucketName, objectPath);
-    const messages = adminDb!.collection('chatChannels').doc(channelId).collection('messages');
-    const sharing = await Promise.all(
-      CHAT_OBJECT_URL_FIELDS.map((field) =>
-        messages.where(field, '>=', urlBase).where(field, '<', `${urlBase}\uf8ff`).get()
-      )
-    );
-    const stillUsed = sharing.some((snapshot) =>
-      snapshot.docs.some((doc) => {
-        if (doc.id === messageId) return false;
-        const data = doc.data();
-        if (data.deletedAt) return false;
-        return deletableChatObjectPaths(data.attachment, channelId).includes(objectPath);
-      })
-    );
-    if (stillUsed) {
-      console.warn(`Chat photo kept: another message still shows it (channel ${channelId}, message ${messageId})`);
-      return;
-    }
-    await getOnboardingBucket().file(objectPath).delete({ ignoreNotFound: true });
-  } catch (error) {
-    if (errorCode(error) === '404') return;
-    console.error(`Error deleting chat photo (channel ${channelId}, message ${messageId}): code ${errorCode(error)}`);
-  }
-}
-
-// Where a reported message's upload is kept once the message is deleted.
-// Admin SDK only: storage.rules deny every client read and write outside
-// training/, and the copy gets its own download token, so the chat URL's
-// token never opens it.
-function chatEvidencePath(channelId: string, messageId: string, objectPath: string): string {
-  const name = objectPath.slice(objectPath.lastIndexOf('/') + 1);
-  return `moderation/chat-reports/${channelId}/${messageId}/${name}`;
-}
-
-// Before a reported message's upload is deleted, copies it to the moderation
-// folder and points every report on the message at the copy (evidencePath +
-// evidenceUrl), so removing the message never destroys what was reported.
-// Answers whether the chat objects may now be deleted: true when the message
-// has no reports or no upload of ours, or the evidence is saved; false when
-// any step failed, and the original then stays in place (its tokened URL is
-// still on the report). Never throws.
-async function preserveReportedEvidence(
-  channelId: string,
-  messageId: string,
-  attachment: unknown
-): Promise<boolean> {
-  try {
-    const reports = (await adminDb!.collection('chatReports').where('messageId', '==', messageId).get()).docs.filter(
-      (doc) => doc.data().channelId === channelId
-    );
-    if (reports.length === 0) return true;
-    const bucketName = getChatStorageBucketName();
-    const url = attachment && typeof attachment === 'object' ? (attachment as { url?: unknown }).url : undefined;
-    const objectPath = bucketName ? chatObjectPathFromUrl(url, bucketName, channelId) : null;
-    if (!bucketName || !objectPath || !deletableChatObjectPaths(attachment, channelId).includes(objectPath)) return true;
-
-    const evidencePath = chatEvidencePath(channelId, messageId, objectPath);
-    const bucket = getOnboardingBucket();
-    const evidence = bucket.file(evidencePath);
-    await bucket.file(objectPath).copy(evidence);
-    // The copy carries the chat object's download token; replace it so only
-    // the URL recorded on the report opens the evidence.
-    const token = randomUUID();
-    try {
-      await evidence.setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
-    } catch (tokenError) {
-      await evidence.delete({ ignoreNotFound: true }).catch(() => undefined);
-      throw tokenError;
-    }
-
-    const batch = adminDb!.batch();
-    for (const doc of reports) {
-      batch.update(doc.ref, {
-        evidencePath,
-        evidenceUrl: buildTokenedDownloadUrl(bucketName, evidencePath, token),
-        evidenceSavedAt: FieldValue.serverTimestamp(),
-      });
-    }
-    await batch.commit();
-    return true;
-  } catch (error) {
-    console.error(
-      `Chat evidence not saved; upload kept (channel ${channelId}, message ${messageId}): code ${errorCode(error)}`
-    );
-    return false;
-  }
-}
-
 // DELETE — author (self) or a moderator (admin/operations) can soft-delete.
 export async function DELETE(request: NextRequest) {
   try {
@@ -670,11 +537,12 @@ export async function DELETE(request: NextRequest) {
     // reachable. Path resolved from the pre-scrub read, deleted only now that the
     // doc no longer points at it.
     // A reported upload is copied to the moderation folder first; if that
-    // fails the objects stay rather than lose the evidence.
+    // fails the objects stay (with a new token, queued for the cron sweep)
+    // rather than lose the evidence.
     const objectPaths = deletableChatObjectPaths(message?.attachment, channelId);
     if (objectPaths.length > 0 && (await preserveReportedEvidence(channelId, messageId, message?.attachment))) {
       for (const objectPath of objectPaths) {
-        await deleteChatPhotoObject(channelId, messageId, objectPath);
+        await deleteChatObject(channelId, messageId, objectPath);
       }
     }
 

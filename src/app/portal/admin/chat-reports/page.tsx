@@ -17,7 +17,7 @@ import { useOpsQueues } from '@/components/portal/admin-d/opsQueues';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import type { ChatReportView } from '@/app/api/portal/admin/chat-reports/route';
-import { REPORT_REASON_LABELS, isReportReason } from '@/lib/chat/moderationShared';
+import { REPORT_REASON_LABELS, isReportReason, reportLinkExpired } from '@/lib/chat/moderationShared';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './chat-reports.module.css';
@@ -43,8 +43,15 @@ async function authedFetch(url: string, init?: RequestInit) {
   });
 }
 
-function ReportedMessage({ report }: { report: ChatReportView }) {
+// The upload link is signed and works for 10 minutes. Opening it after that
+// reloads the queue for fresh links instead of landing on an error page.
+function ReportedMessage({ report, onLinkExpired }: { report: ChatReportView; onLinkExpired: () => void }) {
   const isImage = report.attachmentUrl && (report.attachmentType === 'image' || report.attachmentType === 'gif');
+  const openLink = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!reportLinkExpired(report.attachmentExpiresAt)) return;
+    event.preventDefault();
+    onLinkExpired();
+  };
   return (
     <blockquote className={r.quote}>
       {report.messageText ? (
@@ -54,12 +61,12 @@ function ReportedMessage({ report }: { report: ChatReportView }) {
       ) : null}
       {report.attachmentUrl ? (
         isImage ? (
-          <a href={report.attachmentUrl} target="_blank" rel="noreferrer" aria-label="Open the reported image">
+          <a href={report.attachmentUrl} target="_blank" rel="noreferrer" aria-label="Open the reported image" onClick={openLink}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={report.attachmentUrl} alt="" className={r.thumb} loading="lazy" />
           </a>
         ) : (
-          <a href={report.attachmentUrl} target="_blank" rel="noreferrer" className={r.file}>
+          <a href={report.attachmentUrl} target="_blank" rel="noreferrer" className={r.file} onClick={openLink}>
             <FileText size={16} aria-hidden="true" />
             Open the reported file
           </a>
@@ -225,7 +232,7 @@ function ChatReports() {
                     )}
                   </div>
 
-                  <ReportedMessage report={report} />
+                  <ReportedMessage report={report} onLinkExpired={() => void load(view)} />
 
                   <dl className={r.facts}>
                     <dt>Posted by</dt>

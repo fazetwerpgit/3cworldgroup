@@ -169,6 +169,8 @@ const storageSetMetadataMock = vi.hoisted(() =>
 // that query rejects.
 const CHAT_REPORTS = vi.hoisted((): Record<string, Record<string, unknown>> => ({}));
 let reportsQueryError: Error | null = null;
+// chatEvidencePending/{id} writes: an evidence copy that failed, for the sweep.
+const PENDING_EVIDENCE = vi.hoisted((): Record<string, Record<string, unknown>> => ({}));
 
 // messages.where('attachment.url', '>=', a).where('attachment.url', '<', b) — the
 // messages whose photo URL (or, for attachment.previewUrl, PDF preview URL)
@@ -260,7 +262,15 @@ vi.mock('@/lib/firebase/admin', () => ({
   }),
   adminDb: {
     collection: (name: string) =>
-      name === 'chatReports'
+      name === 'chatEvidencePending'
+        ? {
+            doc: (id: string) => ({
+              set: async (data: Record<string, unknown>) => {
+                PENDING_EVIDENCE[id] = data;
+              },
+            }),
+          }
+        : name === 'chatReports'
         ? {
             where: (_field: string, _op: string, messageId: string) => ({
               get: async () => {
@@ -427,6 +437,7 @@ beforeEach(() => {
   storageSetMetadataMock.mockResolvedValue([{}]);
   for (const id of Object.keys(CHAT_REPORTS)) delete CHAT_REPORTS[id];
   reportsQueryError = null;
+  for (const id of Object.keys(PENDING_EVIDENCE)) delete PENDING_EVIDENCE[id];
   sendPushMock.mockClear();
   afterTasks.length = 0;
   process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
@@ -1265,21 +1276,18 @@ describe('DELETE /api/portal/chat/messages (reported upload kept as evidence)', 
 
     const evidencePath = 'moderation/chat-reports/all-company/bad-photo/bad.png';
     expect(storageCopyMock).toHaveBeenCalledWith('chat/all-company/bad.png', evidencePath);
-    // The copy gets a fresh token, never the chat URL's.
-    const [metaPath, meta] = storageSetMetadataMock.mock.calls[0];
-    expect(metaPath).toBe(evidencePath);
-    const token = (meta.metadata as Record<string, string>).firebaseStorageDownloadTokens;
-    expect(token).toBeTruthy();
-    expect(token).not.toBe('tok');
+    // The copy keeps no download token: no URL opens it, only a signed one.
+    expect(storageSetMetadataMock.mock.calls).toEqual([
+      [evidencePath, { metadata: { firebaseStorageDownloadTokens: null } }],
+    ]);
 
     const updates = batchUpdates.filter((u) => u.id.startsWith('bad-photo_'));
     expect(updates.map((u) => u.id).sort()).toEqual(['bad-photo_r1', 'bad-photo_r2']);
     for (const { data } of updates) {
       expect(data.evidencePath).toBe(evidencePath);
-      expect(data.evidenceUrl).toBe(
-        `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(evidencePath)}?alt=media&token=${token}`
-      );
+      expect(data).not.toHaveProperty('evidenceUrl');
     }
+    expect(PENDING_EVIDENCE).toEqual({});
     expect(storageDeleteMock).toHaveBeenCalledWith('chat/all-company/bad.png', { ignoreNotFound: true });
     expect(storageCopyMock.mock.invocationCallOrder[0]).toBeLessThan(storageDeleteMock.mock.invocationCallOrder[0]);
   });
@@ -1305,7 +1313,7 @@ describe('DELETE /api/portal/chat/messages (reported upload kept as evidence)', 
     ]);
   });
 
-  it('skips the Storage delete when the copy fails, so the evidence is never lost', async () => {
+  it('skips the Storage delete when the copy fails, rotates the token and queues a retry', async () => {
     mockGate.mockResolvedValue(MODERATOR);
     storageCopyMock.mockRejectedValue(Object.assign(new Error('copy failed'), { code: 503 }));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -1317,13 +1325,45 @@ describe('DELETE /api/portal/chat/messages (reported upload kept as evidence)', 
       expect(msgSetMock).toHaveBeenCalledTimes(1);
       expect(storageDeleteMock).not.toHaveBeenCalled();
       expect(batchUpdates.filter((u) => u.id === 'bad-photo_r1')).toEqual([]);
+      // The original stays, but the chat URL's token no longer opens it.
+      expect(storageSetMetadataMock).toHaveBeenCalledTimes(1);
+      const [rotatedPath, meta] = storageSetMetadataMock.mock.calls[0];
+      expect(rotatedPath).toBe('chat/all-company/bad.png');
+      const token = (meta.metadata as Record<string, unknown>).firebaseStorageDownloadTokens;
+      expect(token).toMatch(/^[0-9a-f-]{36}$/);
+      expect(token).not.toBe('tok');
+      expect(PENDING_EVIDENCE['all-company_bad-photo']).toMatchObject({
+        path: 'chat/all-company/bad.png',
+        reportId: 'bad-photo_r1',
+        channelId: 'all-company',
+        messageId: 'bad-photo',
+        deletePaths: ['chat/all-company/bad.png'],
+      });
+      expect(PENDING_EVIDENCE['all-company_bad-photo'].createdAt).toBeDefined();
       expect(errorSpy.mock.calls.flat().map(String).join(' ')).not.toMatch(/https?:|token=/);
     } finally {
       errorSpy.mockRestore();
     }
   });
 
-  it('removes the copy and keeps the original when the new token cannot be set', async () => {
+  it('leaves the token alone when another standing message still shows the upload', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    storageCopyMock.mockRejectedValue(Object.assign(new Error('copy failed'), { code: 503 }));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      storeReportedPhoto('bad-photo', 'bad.png');
+      storeReportedPhoto('same-photo', 'bad.png');
+      report('bad-photo_r1', 'bad-photo');
+      const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'bad-photo' }));
+      expect(res.status).toBe(200);
+      expect(storageSetMetadataMock).not.toHaveBeenCalled();
+      expect(PENDING_EVIDENCE['all-company_bad-photo']).toMatchObject({ path: 'chat/all-company/bad.png' });
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('removes the copy and keeps the original when the copy\'s token cannot be removed', async () => {
     mockGate.mockResolvedValue(MODERATOR);
     storageSetMetadataMock.mockRejectedValue(Object.assign(new Error('nope'), { code: 503 }));
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -1349,6 +1389,9 @@ describe('DELETE /api/portal/chat/messages (reported upload kept as evidence)', 
       const res = await DELETE(deleteReq({ channelId: 'all-company', messageId: 'bad-photo' }));
       expect(res.status).toBe(200);
       expect(storageDeleteMock).not.toHaveBeenCalled();
+      // Not known whether it was reported: the token is rotated and the sweep decides.
+      expect(storageSetMetadataMock.mock.calls.map(([path]) => path)).toEqual(['chat/all-company/bad.png']);
+      expect(PENDING_EVIDENCE['all-company_bad-photo']).toMatchObject({ path: 'chat/all-company/bad.png', reportId: null });
     } finally {
       errorSpy.mockRestore();
     }

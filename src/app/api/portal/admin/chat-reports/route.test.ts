@@ -78,7 +78,20 @@ const fake = vi.hoisted(() => {
   return { reports, updates, gate, adminDb, queries };
 });
 
-vi.mock('@/lib/firebase/admin', () => ({ adminDb: fake.adminDb }));
+// Signed read links: getOnboardingBucket().file(path).getSignedUrl(options).
+const signMock = vi.hoisted(() =>
+  vi.fn<(path: string, options: { version?: string; action: string; expires: number }) => Promise<string[]>>(
+    async (path) => [`https://signed.example/${path}?X-Goog-Expires=600`]
+  )
+);
+vi.mock('@/lib/firebase/admin', () => ({
+  adminDb: fake.adminDb,
+  getOnboardingBucket: () => ({
+    file: (path: string) => ({
+      getSignedUrl: (options: { version?: string; action: string; expires: number }) => signMock(path, options),
+    }),
+  }),
+}));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedManagement: vi.fn(async () => fake.gate.result),
 }));
@@ -95,7 +108,11 @@ function req(method: 'GET' | 'PATCH', options: { body?: unknown; query?: string 
 
 const at = (iso: string) => ({ toDate: () => new Date(iso) });
 
+const BUCKET = 'demo-bucket';
+
 beforeEach(() => {
+  process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
+  signMock.mockClear();
   fake.reports.clear();
   fake.updates.length = 0;
   fake.queries.length = 0;
@@ -203,17 +220,66 @@ describe('GET /api/portal/admin/chat-reports', () => {
     expect((await GET(req('GET', { query: '?cursor=gone_rep-a' }))).status).toBe(400);
   });
 
-  it('shows the saved evidence copy in place of the deleted chat upload', async () => {
+  it('signs a short-lived link to the saved evidence copy in place of the deleted chat upload', async () => {
     fake.reports.set('m2_rep-a', {
       ...fake.reports.get('m2_rep-a'),
-      attachmentUrl: 'https://firebasestorage.googleapis.com/v0/b/b/o/chat%2Fnew-reps%2Fx.png?alt=media&token=old',
+      attachmentUrl: `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/chat%2Fnew-reps%2Fx.png?alt=media&token=old`,
       attachmentType: 'image',
       evidencePath: 'moderation/chat-reports/new-reps/m2/x.png',
-      evidenceUrl: 'https://firebasestorage.googleapis.com/v0/b/b/o/moderation%2Fx.png?alt=media&token=new',
+    });
+    const before = Date.now();
+    const json = await (await GET(req('GET', { query: '?status=resolved' }))).json();
+    const row = json.reports[0];
+    expect(row.attachmentUrl).toBe('https://signed.example/moderation/chat-reports/new-reps/m2/x.png?X-Goog-Expires=600');
+    expect(row.attachmentUrl).not.toContain('token=');
+    expect(row.evidencePath).toBe('moderation/chat-reports/new-reps/m2/x.png');
+    const [path, options] = signMock.mock.calls[0];
+    expect(path).toBe('moderation/chat-reports/new-reps/m2/x.png');
+    expect(options).toMatchObject({ version: 'v4', action: 'read' });
+    expect(options.expires - before).toBeGreaterThanOrEqual(10 * 60 * 1000 - 50);
+    expect(options.expires - before).toBeLessThanOrEqual(10 * 60 * 1000 + 1000);
+    expect(new Date(row.attachmentExpiresAt).getTime()).toBe(options.expires);
+  });
+
+  it('keeps showing the stored evidenceUrl of an older report that has no evidencePath', async () => {
+    fake.reports.set('m2_rep-a', {
+      ...fake.reports.get('m2_rep-a'),
+      attachmentType: 'image',
+      evidenceUrl: 'https://firebasestorage.googleapis.com/v0/b/b/o/moderation%2Fx.png?alt=media&token=legacy',
     });
     const json = await (await GET(req('GET', { query: '?status=resolved' }))).json();
-    expect(json.reports[0].attachmentUrl).toContain('token=new');
-    expect(json.reports[0].evidencePath).toBe('moderation/chat-reports/new-reps/m2/x.png');
+    expect(json.reports[0].attachmentUrl).toContain('token=legacy');
+    expect(json.reports[0].attachmentExpiresAt).toBeNull();
+    expect(signMock).not.toHaveBeenCalled();
+  });
+
+  it('signs the chat upload of an open report instead of handing out its tokened URL', async () => {
+    fake.reports.set('m1_rep-a', {
+      ...fake.reports.get('m1_rep-a'),
+      attachmentUrl: `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/chat%2Fall-company%2Fp.png?alt=media&token=t`,
+      attachmentType: 'image',
+    });
+    const json = await (await GET(req('GET'))).json();
+    const row = json.reports.find((r: { id: string }) => r.id === 'm1_rep-a');
+    expect(row.attachmentUrl).toBe('https://signed.example/chat/all-company/p.png?X-Goog-Expires=600');
+  });
+
+  it('falls back to the stored link when signing fails, and leaves a GIF link as it is', async () => {
+    signMock.mockRejectedValueOnce(Object.assign(new Error('no signer'), { code: 403 }));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      fake.reports.set('m2_rep-a', {
+        ...fake.reports.get('m2_rep-a'),
+        attachmentType: 'image',
+        evidencePath: 'moderation/chat-reports/new-reps/m2/x.png',
+        attachmentUrl: 'https://media.giphy.com/x.gif',
+      });
+      const json = await (await GET(req('GET', { query: '?status=resolved' }))).json();
+      expect(json.reports[0].attachmentUrl).toBe('https://media.giphy.com/x.gif');
+      expect(json.reports[0].attachmentExpiresAt).toBeNull();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('rejects an unknown status filter', async () => {

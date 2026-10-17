@@ -31,3 +31,13 @@ export function chatReportId(messageId: string, reporterUid: string): string {
 
 /** Where the back office reviews reports. */
 export const CHAT_REPORTS_PATH = '/portal/admin/chat-reports';
+
+/**
+ * Whether a report's signed upload link (attachmentExpiresAt from the queue
+ * API) has stopped working. A null expiry is a link that is not signed.
+ */
+export function reportLinkExpired(expiresAt: string | null, now = Date.now()): boolean {
+  if (!expiresAt) return false;
+  const at = Date.parse(expiresAt);
+  return !Number.isNaN(at) && now >= at;
+}
