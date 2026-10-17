@@ -121,6 +121,30 @@ describe('useRepDashboard cache', () => {
     await unmount();
     expect(readDataCacheEntry('rep-1', 'dashboard')!.at).toBeGreaterThan(fetchedAt);
   });
+  it('a successful Retry clears the "as of" note once the kept sections reload', async () => {
+    writeDataCache('rep-1', 'dashboard', { calls: { status: 'ready', data: [] } });
+    respondDashboard(true);
+    renders = [];
+    await mount(<Harness />);
+    let last = renders.at(-1)!;
+    expect(last.calls.status).toBe('ready');
+    expect(last.book.status).toBe('error');
+    expect(typeof last.staleAt).toBe('number');
+
+    respondDashboard();
+    await act(async () => {
+      last.retry('book');
+    });
+    // The retry, then the quiet reload of the kept section it chains.
+    await vi.waitFor(async () => {
+      await act(async () => {});
+      expect(renders.at(-1)!.staleAt).toBeNull();
+    });
+    last = renders.at(-1)!;
+    expect(last.book.status).toBe('ready');
+    expect(last.staleAt).toBeNull();
+    await unmount();
+  });
 });
 
 describe('useCompPlan cache', () => {

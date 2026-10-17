@@ -182,6 +182,9 @@ export function useRepDashboard() {
     stateRef.current = state;
   }, [state]);
   const controllers = useRef(new Map<RepSectionKey, AbortController>());
+  // Sections still showing an older copy after their refresh failed: the
+  // "as of" note stays until every one of them has reloaded.
+  const staleKeys = useRef(new Set<RepSectionKey>());
 
   const loaders = useCallback((): Partial<Loaders> => {
     if (!uid) return {};
@@ -243,16 +246,17 @@ export function useRepDashboard() {
   }, [active, uid]);
 
   const run = useCallback(
-    async (keys?: RepSectionKey[], { quiet = false }: { quiet?: boolean } = {}) => {
+    /** Resolves true when every requested section loaded. */
+    async (keys?: RepSectionKey[], { quiet = false }: { quiet?: boolean } = {}): Promise<boolean> => {
       const all = loaders();
       const wanted = (keys ?? (Object.keys(all) as RepSectionKey[])).filter((key) => all[key]);
-      if (!wanted.length) return;
+      if (!wanted.length) return true;
 
       const token = await getIdToken().catch(() => null);
       let keptStale = false;
       let failed = false;
 
-      await Promise.allSettled(
+      return Promise.allSettled(
         wanted.map(async (key) => {
           controllers.current.get(key)?.abort();
           const controller = new AbortController();
@@ -261,6 +265,7 @@ export function useRepDashboard() {
             const data = await all[key]!(token, controller.signal);
             if (controller.signal.aborted) return;
             fetchedAt.current = Date.now();
+            staleKeys.current.delete(key);
             setState((current) => ({ ...current, [key]: { status: 'ready', data } }));
           } catch (error) {
             // Only a real abort (unmount / superseded retry) is silent. A plain
@@ -268,7 +273,10 @@ export function useRepDashboard() {
             if (controller.signal.aborted) return;
             console.error(`Dashboard section "${key}" failed:`, error);
             failed = true;
-            if (quiet && stateRef.current[key]?.status === 'ready') keptStale = true;
+            if (quiet && stateRef.current[key]?.status === 'ready') {
+              keptStale = true;
+              staleKeys.current.add(key);
+            }
             // A quiet refresh keeps what is on screen rather than trading it for
             // an error; a section with nothing loaded yet still gets its error.
             setState((current) =>
@@ -282,7 +290,10 @@ export function useRepDashboard() {
         } else if (!failed && !keys) {
           lastGoodAt.current = Date.now();
           setStaleAt(null);
+        } else if (staleKeys.current.size === 0) {
+          setStaleAt(null);
         }
+        return !failed;
       });
     },
     [loaders]
@@ -304,7 +315,12 @@ export function useRepDashboard() {
   const retry = useCallback(
     (key: RepSectionKey) => {
       setState((current) => ({ ...current, [key]: LOADING }));
-      void run([key]);
+      // Back online: the sections kept from an older copy reload too, so the
+      // "Couldn't refresh · as of" note clears once they land.
+      void run([key]).then((ok) => {
+        const stale = [...staleKeys.current];
+        if (ok && stale.length) void run(stale, { quiet: true });
+      });
     },
     [run]
   );
