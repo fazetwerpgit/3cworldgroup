@@ -79,13 +79,27 @@ function scrolledWithin(target: Element | null, sheet: HTMLElement): boolean {
   return false;
 }
 
+const scrolls = (overflow: string) => overflow === 'auto' || overflow === 'scroll';
+
+/** Width a both-ways scroller must overflow by to count as scrolling sideways. */
+const REAL_SIDEWAYS_PX = 8;
+
 /** True when `target` sits in a horizontal scroller inside `sheet` (a chip row, a wide table).
- *  A touch there belongs to that scroller: the sheet never takes it for a drag. */
+ *  A touch there belongs to that scroller: the sheet never takes it for a drag.
+ *  A node counts only when it overflows by more than 1px and either scrolls
+ *  sideways only (overflow-x auto/scroll, overflow-y not), or genuinely scrolls
+ *  sideways (already scrolled, or wider by more than a rounding error). A
+ *  vertical body scroller (overflow: auto) a sub-pixel too wide never blocks
+ *  drag-to-dismiss. */
 function inHorizontalScroller(target: Element | null, sheet: HTMLElement): boolean {
   for (let node = target; node && node !== sheet; node = node.parentElement) {
-    if (!(node instanceof HTMLElement) || node.scrollWidth <= node.clientWidth) continue;
-    const overflowX = window.getComputedStyle(node).overflowX;
-    if (overflowX === 'auto' || overflowX === 'scroll') return true;
+    if (!(node instanceof HTMLElement)) continue;
+    const extra = node.scrollWidth - node.clientWidth;
+    if (extra <= 1) continue;
+    const style = window.getComputedStyle(node);
+    if (!scrolls(style.overflowX)) continue;
+    if (!scrolls(style.overflowY)) return true;
+    if (node.scrollLeft > 0 || extra > REAL_SIDEWAYS_PX) return true;
   }
   return false;
 }

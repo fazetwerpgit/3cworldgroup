@@ -87,6 +87,9 @@ describe('useSheetDismiss', () => {
           <div id="row" style={{ overflowX: 'auto' }}>
             <span id="chip">chip</span>
           </div>
+          <div id="scroller" style={{ overflowX: 'auto', overflowY: 'auto' }}>
+            <span id="line">line</span>
+          </div>
         </section>
       </div>
     );
@@ -269,6 +272,45 @@ describe('useSheetDismiss', () => {
     expect(first.defaultPrevented).toBe(false);
     const drag = await act(async () => touch('touchmove', 300, 50, 100, 'chip'));
     expect(drag.defaultPrevented).toBe(false);
+    expect(sheetEl().style.transform).toBe('');
+  });
+
+  function widen(id: string, scrollWidth: number, clientWidth: number, scrollLeft = 0) {
+    const el = document.getElementById(id)!;
+    Object.defineProperty(el, 'scrollWidth', { configurable: true, value: scrollWidth });
+    Object.defineProperty(el, 'clientWidth', { configurable: true, value: clientWidth });
+    Object.defineProperty(el, 'scrollLeft', { configurable: true, value: scrollLeft });
+  }
+
+  async function dragFrom(targetId: string) {
+    await act(async () => {
+      touch('touchstart', 100, 0, 100, targetId);
+      touch('touchmove', 140, 50, 100, targetId);
+    });
+    return act(async () => touch('touchmove', 200, 100, 100, targetId));
+  }
+
+  it('still drags from a row only 1px too wide (a rounding error)', async () => {
+    widen('row', 301, 300);
+    expect((await dragFrom('chip')).defaultPrevented).toBe(true);
+    expect(sheetEl().style.transform).toBe('translate3d(0, 100px, 0)');
+  });
+
+  it('still drags from a vertical body scroller a few pixels too wide', async () => {
+    widen('scroller', 304, 300);
+    expect((await dragFrom('line')).defaultPrevented).toBe(true);
+    expect(sheetEl().style.transform).toBe('translate3d(0, 100px, 0)');
+  });
+
+  it('leaves a both-ways scroller that really scrolls sideways to it', async () => {
+    widen('scroller', 900, 300);
+    expect((await dragFrom('line')).defaultPrevented).toBe(false);
+    expect(sheetEl().style.transform).toBe('');
+  });
+
+  it('leaves a both-ways scroller already scrolled sideways to it', async () => {
+    widen('scroller', 304, 300, 3);
+    expect((await dragFrom('line')).defaultPrevented).toBe(false);
     expect(sheetEl().style.transform).toBe('');
   });
 
