@@ -12,6 +12,7 @@ import {
   readDataCacheEntry,
   writeDataCache,
 } from '@/lib/cache/dataCache';
+import { friendlyError } from '@/lib/forms/friendlyError';
 import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
 import { ratesArePending, CommissionConfig, FieldRole, IBO_FIELD_ROLES, RoleDisplayNames, repFacingRoleLabel } from '@/types';
 import { LoadFailed } from './RepLearn';
@@ -93,10 +94,11 @@ export function RepPayStructure() {
       // A background refresh never clobbers rates being edited.
       if (!editingRef.current) setDraft(json.tiers);
       setError('');
-    } catch (err) {
+    } catch {
       // Cached tiers still showing: one quiet "as of" line, not an error box.
+      // With nothing on screen the page shows its Retry; never the raw error.
       if (shown) setStaleAt(shown.at);
-      else setError(err instanceof Error ? err.message : 'Failed to load pay structure');
+      else setError("Couldn't refresh just now. What you see may be out of date.");
     } finally {
       setLoading(false);
     }
@@ -136,7 +138,7 @@ export function RepPayStructure() {
       window.setTimeout(() => setSuccess(''), 3000);
       await fetchStructure();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      setError(friendlyError(err instanceof Error ? err.message : 'Failed to save', 'save').message);
     } finally {
       setSaving(false);
     }

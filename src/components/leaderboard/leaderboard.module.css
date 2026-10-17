@@ -763,6 +763,10 @@
   font-size: 15px;
 }
 
+.errorRetry {
+  margin-left: auto;
+}
+
 /* ---------- loading ----------
    The same stage and panel, drawn empty: the band, three block silhouettes on
    the floor, and row slots in alternating tones. Nothing shimmers. */

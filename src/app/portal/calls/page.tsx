@@ -5,6 +5,7 @@ import { AlertCircle, CalendarClock, Check, ChevronDown, Plus, RotateCw, ShieldC
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import { useSheetDismiss } from '@/hooks/useSheetDismiss';
 import { useRevalidateOnPull } from '@/lib/cache/useRevalidateOnPull';
+import { friendlyError } from '@/lib/forms/friendlyError';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import c from '@/components/portal/rep/rep-calls.module.css';
@@ -247,7 +248,7 @@ export default function CallsSchedulePage() {
       setForm(EMPTY_FORM);
       await fetchCalls();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add call');
+      setError(friendlyError(err instanceof Error ? err.message : 'Failed to add call', 'save').message);
     } finally {
       setSaving(false);
     }
@@ -267,7 +268,7 @@ export default function CallsSchedulePage() {
       if (!response.ok) throw new Error(json.error || 'Failed to remove call');
       await fetchCalls();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to remove call');
+      setError(friendlyError(err instanceof Error ? err.message : 'Failed to remove call', 'remove it').message);
     } finally {
       setDeletingId(null);
     }

@@ -47,6 +47,9 @@ export function LeaderboardRoute() {
     return fetchLeaderboard(period, metric, 100, 'approved', { team: true, quiet: true, ...(monthParam ? { month: monthParam } : {}) });
   }, [user, loading, period, metric, monthParam, fetchLeaderboard]);
   useRefreshOnResume(refreshQuietly, { enabled: !!user });
+  const retry = useCallback(() => {
+    if (user) void fetchLeaderboard(period, metric, 100, 'approved', { team: true, ...(monthParam ? { month: monthParam } : {}) });
+  }, [user, period, metric, monthParam, fetchLeaderboard]);
 
   const busy = loading || !user;
 
@@ -75,6 +78,7 @@ export function LeaderboardRoute() {
           recent={recent}
           loading={busy}
           error={error}
+          onRetry={retry}
           period={period}
           metric={metric}
           onPeriodChange={setPeriod}
