@@ -21,7 +21,7 @@ import { isOwner } from '@/types';
 import { datedSales, undatedSales } from '@/lib/pay/payGroups';
 import { isTFiberSale, payoutsInMonth } from '@/lib/pay/payoutWindow';
 import { countedSales } from '@/lib/sales/installBucket';
-import { monthFromParam } from '@/lib/sales/loggedSale';
+import { monthFromParam, salesPageSearch } from '@/lib/sales/loggedSale';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import {
@@ -154,18 +154,24 @@ function SalesContent() {
 
   // `?view=pay` opens the rep's pay list directly.
   const [payView, setPayView] = useState(() => params.get('view') === 'pay');
-  // Log Sale sends `?logged=<id>&month=YYYY-MM`: open on the month the sale was
-  // sold in (a backdated sale is not in this month) and confirm it by name.
-  const [month, setMonth] = useState<MonthKey>(() => monthFromParam(params.get('month')) ?? currentMonth());
+  // `?month=YYYY-MM` opens on that month: Log Sale sends the month the sale was
+  // sold in (a backdated sale is not in this month) with `logged=<id>` to
+  // confirm it by name, and the page keeps its own month there (below).
+  const [month, setMonth] = useState<MonthKey>(
+    () =>
+      monthFromParam(params.get('month'), new Date(), latestPickableMonth(params.get('view') === 'pay')) ??
+      currentMonth()
+  );
   const [loggedId, setLoggedId] = useState(() => params.get('logged'));
   useEffect(() => {
-    // Consumed: a reload or Back should not confirm the same sale again.
+    // The month and view live in the URL (replaced, not pushed), so Back from a
+    // sale or a reload reopens the same month; `logged` is consumed so the same
+    // sale is never confirmed again.
     const url = new URL(window.location.href);
-    if (!url.searchParams.has('logged') && !url.searchParams.has('month')) return;
-    url.searchParams.delete('logged');
-    url.searchParams.delete('month');
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
-  }, []);
+    const search = salesPageSearch(url.search, { month, payView });
+    if (search === url.search) return;
+    window.history.replaceState(window.history.state, '', `${url.pathname}${search}${url.hash}`);
+  }, [month, payView]);
   // The pay list may look a month ahead for scheduled installs; the ledger
   // (what was sold) may not, so leaving Pay pulls a future month back.
   const maxMonth = latestPickableMonth(payView);
