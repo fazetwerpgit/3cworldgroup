@@ -4,7 +4,7 @@
 // the profile this device remembered for that account instead of waiting on
 // the Firestore read, which then replaces it; no session, another account or
 // sign-out clears it.
-import { act } from 'react';
+import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -55,11 +55,13 @@ import type { User } from '@/types';
 
 type Seen = { uid: string | null; name: string | null; loading: boolean };
 let seen: Seen[] = [];
-let signOut: (() => Promise<void>) | null = null;
+const handle: { signOut: (() => Promise<void>) | null } = { signOut: null };
 
 function Probe() {
   const ctx = useAuth();
-  signOut = ctx.signOut;
+  useEffect(() => {
+    handle.signOut = ctx.signOut;
+  });
   seen.push({ uid: ctx.user?.uid ?? null, name: ctx.user?.displayName ?? null, loading: ctx.loading });
   return null;
 }
@@ -155,7 +157,7 @@ describe('AuthProvider remembered profile', () => {
     fb.profile = { email: 'rep@x.com', displayName: 'Old Name', status: 'active', fieldRole: 'rep' };
     await act(async () => fb.authListener?.({ uid: 'rep-1', photoURL: null, providerData: [] }));
     expect(readSessionProfile()).not.toBeNull();
-    await act(async () => signOut?.());
+    await act(async () => handle.signOut?.());
     expect(readSessionProfile()).toBeNull();
   });
 });
