@@ -1,6 +1,12 @@
 import { FieldValue, type DocumentReference, type Firestore } from 'firebase-admin/firestore';
 import { NATIVE_PUSH_PLATFORM, nativeTokenEntry } from './pushTargets';
 
+/**
+ * Most other holders cleared per registration. A token is one device, so more
+ * than a couple is already abnormal; the cap bounds the transaction.
+ */
+export const CLAIM_QUERY_LIMIT = 25;
+
 export type PushTokenPlatform = 'web' | typeof NATIVE_PUSH_PLATFORM;
 
 /**
@@ -28,8 +34,8 @@ export async function claimPushToken(
 
   return db.runTransaction(async (tx) => {
     const [webHolders, nativeHolders] = await Promise.all([
-      tx.get(users.where('pushTokens', 'array-contains', token)),
-      tx.get(users.where('nativePushTokens', 'array-contains', entry)),
+      tx.get(users.where('pushTokens', 'array-contains', token).limit(CLAIM_QUERY_LIMIT)),
+      tx.get(users.where('nativePushTokens', 'array-contains', entry).limit(CLAIM_QUERY_LIMIT)),
     ]);
 
     // One update per other doc, even when it holds the token in both lists.

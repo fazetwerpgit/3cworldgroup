@@ -10,7 +10,7 @@ vi.mock('firebase-admin/firestore', () => ({
 }));
 
 import type { Firestore } from 'firebase-admin/firestore';
-import { claimPushToken } from './claimPushToken';
+import { CLAIM_QUERY_LIMIT, claimPushToken } from './claimPushToken';
 
 type Doc = Record<string, unknown>;
 type Op = { __op: 'union' | 'remove' | 'ts'; items?: unknown[] };
@@ -40,12 +40,13 @@ function apply(doc: Doc, data: Doc) {
 function fakeDb(initial: Record<string, Doc>) {
   const docs = new Map(Object.entries(initial).map(([id, d]) => [id, structuredClone(d)]));
   const writes: Array<{ kind: 'update' | 'set'; id: string; data: Doc }> = [];
+  const queries: Array<{ field: string; max: number }> = [];
   const ref = (id: string) => ({ id, path: `users/${id}` });
   const users = {
     doc: (id: string) => ref(id),
     where: (field: string, op: string, value: unknown) => {
       expect(op).toBe('array-contains');
-      return { field, value };
+      return { field, value, max: Infinity, limit: (n: number) => ({ field, value, max: n }) };
     },
   };
   const db = {
@@ -56,11 +57,15 @@ function fakeDb(initial: Record<string, Doc>) {
     runTransaction: async <T>(fn: (tx: unknown) => Promise<T>) => {
       const pending: typeof writes = [];
       const tx = {
-        get: async (q: { field: string; value: unknown }) => ({
-          docs: [...docs.entries()]
-            .filter(([, d]) => Array.isArray(d[q.field]) && (d[q.field] as unknown[]).some((x) => same(x, q.value)))
-            .map(([id]) => ({ id, ref: ref(id) })),
-        }),
+        get: async (q: { field: string; value: unknown; max: number }) => {
+          queries.push(q);
+          return {
+            docs: [...docs.entries()]
+              .filter(([, d]) => Array.isArray(d[q.field]) && (d[q.field] as unknown[]).some((x) => same(x, q.value)))
+              .slice(0, q.max)
+              .map(([id]) => ({ id, ref: ref(id) })),
+          };
+        },
         update: (r: { id: string }, data: Doc) => {
           if (!docs.has(r.id)) throw new Error('update of a missing doc');
           pending.push({ kind: 'update', id: r.id, data });
@@ -77,7 +82,7 @@ function fakeDb(initial: Record<string, Doc>) {
       return result;
     },
   };
-  return { db: db as unknown as Firestore, docs, writes };
+  return { db: db as unknown as Firestore, docs, writes, queries };
 }
 
 const native = (token: string) => ({ token, platform: 'ios-native' });
@@ -123,5 +128,15 @@ describe('claimPushToken', () => {
     const f = fakeDb({ a: { nativePushTokens: [{ platform: 'ios-native', token: 't' }, native('t2')] }, b: {} });
     await claimPushToken(f.db, 'b', 't', 'ios-native');
     expect(f.docs.get('a')!.nativePushTokens).toEqual([native('t2')]);
+  });
+
+  it('caps both holder queries at CLAIM_QUERY_LIMIT', async () => {
+    const f = fakeDb({ b: {} });
+    await claimPushToken(f.db, 'b', 't', 'web');
+    expect(CLAIM_QUERY_LIMIT).toBe(25);
+    expect(f.queries.map((q) => [q.field, q.max])).toEqual([
+      ['pushTokens', 25],
+      ['nativePushTokens', 25],
+    ]);
   });
 });
