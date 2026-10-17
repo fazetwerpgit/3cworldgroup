@@ -7,6 +7,7 @@ import { installNativeReceiver, onNativeMessage } from '@/lib/app/bridge';
 import { installAppLinkHandling } from '@/lib/app/links';
 import { registerNativePushToken, syncNativePush } from '@/lib/app/nativePush';
 import { installStatusBarSync } from '@/lib/app/statusBar';
+import { installResumeMotionReset } from '@/lib/app/appVisibility';
 
 // Mounted once in the portal layout. Inside the 3C iOS app it installs the
 // bridge receiver and in-app link handling, picks up an already-granted push
@@ -25,9 +26,12 @@ export default function AppBridgeHost() {
     const uninstallLinks = installAppLinkHandling();
     // Status bar text follows the page theme (BRIDGE.md statusBar).
     const uninstallStatusBar = installStatusBarSync();
+    // Back after 30+ minutes away: replay the once-per-session reveals.
+    const uninstallResumeReset = installResumeMotionReset();
     return () => {
       uninstallLinks();
       uninstallStatusBar();
+      uninstallResumeReset();
     };
   }, []);
 

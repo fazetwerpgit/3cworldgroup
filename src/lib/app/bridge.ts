@@ -144,7 +144,19 @@ export interface PushTokenEvent {
   type: 'pushToken';
   token: string;
 }
-export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent;
+/** The portal is on screen (true) or behind the splash / lock / cover / in the background (false). */
+export interface VisibleEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'visible';
+  visible: boolean;
+}
+/** The app came back after 30+ minutes in the background (sent before visible:true). */
+export interface ResumedEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'resumed';
+  awayMs: number;
+}
+export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent | VisibleEvent | ResumedEvent;
 
 const ERROR_CODES: readonly NativeErrorCode[] = ['canceled', 'denied', 'not_configured', 'unsupported', 'failed'];
 
@@ -161,6 +173,8 @@ declare global {
   interface Window {
     ReactNativeWebView?: { postMessage: (message: string) => void };
     __3C_BRIDGE__?: { version: number; receive: (message: unknown) => void };
+    /** Set by shells that send `visible`: the latest value (false before the first). */
+    __3C_VISIBLE__?: boolean;
   }
 }
 
@@ -196,6 +210,14 @@ export function parseNativeMessage(raw: unknown): NativeToWebMessage | null {
   if (m.type === 'pushToken') {
     if (typeof m.token !== 'string' || !m.token) return null;
     return { source: NATIVE_SOURCE, type: 'pushToken', token: m.token };
+  }
+  if (m.type === 'visible') {
+    if (typeof m.visible !== 'boolean') return null;
+    return { source: NATIVE_SOURCE, type: 'visible', visible: m.visible };
+  }
+  if (m.type === 'resumed') {
+    if (typeof m.awayMs !== 'number' || !Number.isFinite(m.awayMs) || m.awayMs < 0) return null;
+    return { source: NATIVE_SOURCE, type: 'resumed', awayMs: m.awayMs };
   }
   return null;
 }

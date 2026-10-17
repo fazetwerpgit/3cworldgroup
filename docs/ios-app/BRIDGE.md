@@ -172,6 +172,35 @@ always use `light`. Older shells ignore it.
 Send this whenever FCM issues or rotates the token (`onTokenRefresh`). If the
 person is signed in, the web registers it.
 
+### `visible`
+```json
+{ "source": "3c-shell", "type": "visible", "visible": true }
+```
+Whether the portal is really on screen. The WebView loads behind the splash,
+the cold-start cover and the Face ID lock, so without this the portal's
+once-per-session reveals and count-ups play unseen and spend their
+sessionStorage keys (which also live for days in WKWebView).
+
+- `true` once the splash is hidden, no lock or privacy cover is up and the app
+  is in the foreground; `false` when it is covered again or backgrounded.
+  Sent on every change and again at the end of every page load.
+- The shell also keeps `window.__3C_VISIBLE__` current: it is set before content
+  on every page load (starting `false` until the portal is on screen) and
+  updated by each `visible` injection before `receive` runs. The flag being
+  defined is how the web knows the shell sends `visible`; in older shells it is
+  undefined and the page counts as visible.
+- Web (`src/lib/app/appVisibility.ts`): in the app, `useFirstReveal` and
+  `useCountUp` wait for visible before deciding to play and before marking
+  their keys. On the web nothing changes.
+
+### `resumed`
+```json
+{ "source": "3c-shell", "type": "resumed", "awayMs": 1860000 }
+```
+The app came back after 30+ minutes in the background. Sent before the matching
+`visible: true`. The web clears its `3c:reveal:*` and `3c:countup:*`
+sessionStorage keys so reveals replay, as in a relaunched PWA.
+
 ## Push payload the shell receives (A4)
 
 Native tokens get an FCM message with `notification: { title, body }`,

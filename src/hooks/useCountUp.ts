@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { firstThisSession, markPlayedThisSession, motionAllowed } from '@/lib/motion/sessionOnce';
+import { useAppVisible } from '@/lib/app/appVisibility';
 
 export interface CountUpOptions {
   /** Length of the count, ease-out. */
@@ -26,11 +27,22 @@ const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
  * starts from a loading placeholder. A later change of `target` (a data
  * refresh) shows the new value at once, with no second count. Reduced motion,
  * an already-counted `sessionKey`, or blocked storage show the value outright.
+ * In the iOS app the decision waits until the portal is on screen (not behind
+ * the splash or Face ID lock); until then the value shows outright, unseen.
  */
 export function useCountUp(target: number, { durationMs = 600, sessionKey }: CountUpOptions = {}): number {
-  // Decided once, at mount: the value the count is for, or null for no count.
-  const [countFor] = useState<number | null>(() => (shouldCount(sessionKey) ? target : null));
-  const [shown, setShown] = useState<number | null>(countFor === null ? null : 0);
+  const visible = useAppVisible();
+  // Decided once, at mount (or when the app first shows the portal): the value
+  // the count is for, or null for no count. undefined = not decided yet.
+  const [countFor, setCountFor] = useState<number | null | undefined>(() =>
+    visible ? (shouldCount(sessionKey) ? target : null) : undefined
+  );
+  const [shown, setShown] = useState<number | null>(countFor === null || countFor === undefined ? null : 0);
+  if (countFor === undefined && visible) {
+    const decided = shouldCount(sessionKey) ? target : null;
+    setCountFor(decided);
+    setShown(decided === null ? null : 0);
+  }
   const start = useRef<number | null>(null);
   const counting = countFor !== null && countFor === target;
 
