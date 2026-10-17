@@ -11,7 +11,8 @@ import { isNativeApp } from './isNativeApp';
 //
 // Requests that expect an answer carry an `id`; the shell answers each with
 // exactly one { type: 'reply', id, ok, ... }. Fire-and-forget messages
-// (haptic, openExternal) carry no id and get no reply.
+// (haptic, openExternal, nativeAuth, nativeSignOut, openNativeChat) carry no id
+// and get no reply.
 
 export const BRIDGE_VERSION = 1;
 export const NATIVE_SOURCE = '3c-shell';
@@ -77,8 +78,30 @@ export interface OpenExternalMessage {
   url: string;
 }
 
+/** The web's sign-in, handed to the shell's native Firebase Auth (native chat). */
+export interface NativeAuthMessage {
+  type: 'nativeAuth';
+  /** Firebase custom token for the signed-in uid (POST /api/portal/auth/custom-token). */
+  customToken: string;
+}
+/** The web signed out (or loaded signed out): sign the native Firebase Auth out too. */
+export interface NativeSignOutMessage {
+  type: 'nativeSignOut';
+}
+/** Open the native chat screen instead of /portal/chat. Sent only when the shell advertised nativeChat. */
+export interface OpenNativeChatMessage {
+  type: 'openNativeChat';
+  /** The channel to open (from /portal/chat?channel=<id>); omitted for the channel list. */
+  channelId?: string;
+}
+
 export type BridgeRequest = PushTokenRequest | ShareRequest | SaveFileRequest | BiometricLockRequest | NativeSignInRequest;
-export type BridgeEvent = HapticMessage | OpenExternalMessage;
+export type BridgeEvent =
+  | HapticMessage
+  | OpenExternalMessage
+  | NativeAuthMessage
+  | NativeSignOutMessage
+  | OpenNativeChatMessage;
 export type WebToNativeMessage = BridgeRequest | BridgeEvent;
 
 // ---- native -> web -------------------------------------------------------
@@ -138,7 +161,18 @@ export interface PushTokenEvent {
   type: 'pushToken';
   token: string;
 }
-export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent;
+/** Features this shell build supports beyond contract v1. Unknown keys are dropped. */
+export interface AppCapabilities {
+  /** The shell has a native chat screen and accepts openNativeChat. */
+  nativeChat?: boolean;
+}
+/** Unsolicited: what this shell build can do. May be sent again; the latest wins. */
+export interface CapabilitiesEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'capabilities';
+  capabilities: AppCapabilities;
+}
+export type NativeToWebMessage = ReplySuccess | ReplyFailure | PushTokenEvent | CapabilitiesEvent;
 
 const ERROR_CODES: readonly NativeErrorCode[] = ['canceled', 'denied', 'not_configured', 'unsupported', 'failed'];
 
@@ -155,7 +189,18 @@ declare global {
   interface Window {
     ReactNativeWebView?: { postMessage: (message: string) => void };
     __3C_BRIDGE__?: { version: number; receive: (message: unknown) => void };
+    /** Optional: the shell may inject its capabilities before content loads. */
+    __3C_APP_CAPS__?: AppCapabilities;
   }
+}
+
+/** Keeps only the known boolean capability flags. Null if `raw` is not an object. */
+export function parseCapabilities(raw: unknown): AppCapabilities | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const c = raw as Record<string, unknown>;
+  const caps: AppCapabilities = {};
+  if (typeof c.nativeChat === 'boolean') caps.nativeChat = c.nativeChat;
+  return caps;
 }
 
 /** Validates anything that arrived on the message channel. Null if it is not ours. */
@@ -190,6 +235,11 @@ export function parseNativeMessage(raw: unknown): NativeToWebMessage | null {
   if (m.type === 'pushToken') {
     if (typeof m.token !== 'string' || !m.token) return null;
     return { source: NATIVE_SOURCE, type: 'pushToken', token: m.token };
+  }
+  if (m.type === 'capabilities') {
+    const caps = parseCapabilities(m.capabilities);
+    if (!caps) return null;
+    return { source: NATIVE_SOURCE, type: 'capabilities', capabilities: caps };
   }
   return null;
 }

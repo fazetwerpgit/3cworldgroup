@@ -48,8 +48,8 @@ The web stops waiting after a timeout (60 s for `pushToken` and
 `biometricLock`, 5 min for `nativeSignIn`, 10 min for `share` and `saveFile`).
 A late reply is ignored.
 
-Messages without an `id` (`haptic`, `openExternal`) are fire-and-forget: no
-reply.
+Messages without an `id` (`haptic`, `openExternal`, `nativeAuth`,
+`nativeSignOut`, `openNativeChat`) are fire-and-forget: no reply.
 
 ## web -> native messages
 
@@ -149,7 +149,54 @@ The web then calls `signInWithCredential` with
 reply `code: "canceled"`. If Sign in with Apple is not available or set up,
 reply `code: "not_configured"`.
 
+### `nativeAuth` (event, native chat)
+```json
+{ "type": "nativeAuth", "customToken": "<firebase custom token>" }
+```
+Sign the shell's own Firebase Auth (`@react-native-firebase/auth`, used by the
+native chat screen) in with `signInWithCustomToken(customToken)`. The web gets
+the token from `POST /api/portal/auth/custom-token` (Bearer ID token, checked
+for revocation; active accounts only; the uid comes from the token, never the
+body) and sends it after sign-in and on ID-token refresh (`onIdTokenChanged`),
+debounced 1.5 s, at most once every 5 minutes for the same uid. A token for a
+different uid than the current native user means the account changed: sign in
+as the new one. Custom tokens expire after an hour; the native SDK keeps its
+own session after signing in.
+
+### `nativeSignOut` (event, native chat)
+```json
+{ "type": "nativeSignOut" }
+```
+The web signed out, or loaded signed out. Sign the native Firebase Auth out
+and close the native chat screen if it is open.
+
+### `openNativeChat` (event, native chat)
+```json
+{ "type": "openNativeChat" }
+{ "type": "openNativeChat", "channelId": "<chat channel id>" }
+```
+Show the native chat screen, on `channelId` when given, else the channel list.
+Sent only when the shell advertised `nativeChat` (see `capabilities` below) and
+the web has already sent `nativeAuth` this page session. It replaces every way
+into `/portal/chat` inside the app: the Chat tab and nav links, the command
+palette, any in-page chat link, and a direct load of
+`/portal/chat?channel=<id>` (a push tap). On a direct load the web posts this
+and then replaces its own page with `/portal/dashboard`, which stays behind the
+native screen. Without the capability, chat stays the web page exactly as
+before.
+
 ## native -> web events
+
+### `capabilities`
+```json
+{ "source": "3c-shell", "type": "capabilities", "capabilities": { "nativeChat": true } }
+```
+What this shell build supports beyond contract v1. Known flags: `nativeChat`
+(boolean). Unknown keys are ignored; a later message overrides an earlier one
+flag by flag. Preferred: also inject `window.__3C_APP_CAPS__ = { nativeChat: true };`
+in `injectedJavaScriptBeforeContentLoaded`, so the page knows before its first
+render; otherwise send the message after every page load (`onLoadEnd`). A
+message overrides the injected value.
 
 ### `pushToken`
 ```json
