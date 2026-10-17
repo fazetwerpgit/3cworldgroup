@@ -39,12 +39,13 @@ const NO_CHANNELS: ChatChannelDoc[] = [];
 // for the signed-in uid, so a first visit shows the skeleton (not "No channels
 // yet") until the first snapshot lands, and a listener failure after channels
 // loaded keeps the stale list alongside the error. retry() resubscribes.
-export function useChatChannels() {
+export function useChatChannels({ enabled = true }: { enabled?: boolean } = {}) {
   const { user, loading: authLoading } = useAuth();
   const [snap, setSnap] = useState<{ key: string; channels: ChatChannelDoc[] } | null>(null);
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const uid = user && canSubscribeToChat(user) ? user.uid : undefined;
+  // Disabled when the rep shell already shares its live list (useSharedChatChannels).
+  const uid = enabled && user && canSubscribeToChat(user) ? user.uid : undefined;
   const key = uid ? `${uid}:${attempt}` : '';
 
   useEffect(() => {

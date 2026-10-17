@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { TrainingResource, TrainingCategory, ResourceType } from '@/types';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { useCacheSubject } from '@/lib/cache/useCacheSubject';
+import { readDataCache, writeDataCache } from '@/lib/cache/dataCache';
 
 // training/progress verifies the caller from the ID token and allows self or
 // management. userId stays as the TARGET row being read/written.
@@ -41,26 +43,58 @@ export function trainingProgress(resources: TrainingResource[], progress: UserPr
   };
 }
 
+function trainingQuery(filters?: TrainingFilters): string {
+  const params = new URLSearchParams();
+  if (filters?.category) params.append('category', filters.category);
+  if (filters?.type) params.append('type', filters.type);
+  if (filters?.required) params.append('required', 'true');
+  return params.toString();
+}
+
+const listKey = (query: string) => `training?${query}`;
+const progressKey = (userId: string) => `training-progress:${userId}`;
+
+/** The whole published list from the last visit (no filters), or undefined. */
+export function readCachedTrainingList(uid: string | null | undefined): TrainingResource[] | undefined {
+  return readDataCache<TrainingResource[]>(uid, listKey(''));
+}
+
+/** Stores the whole published list for the next visit. */
+export function writeCachedTrainingList(uid: string | null | undefined, list: TrainingResource[]): void {
+  writeDataCache(uid, listKey(''), list);
+}
+
 export function useTraining() {
-  const [resources, setResources] = useState<TrainingResource[]>([]);
+  const uid = useCacheSubject();
+  // Revisit: last time's list and the viewer's own progress show at once while
+  // the page's fetches refresh them in the background.
+  const [cachedList] = useState(() => readCachedTrainingList(uid));
+  const [resources, setResources] = useState<TrainingResource[]>(() => cachedList ?? []);
   const [currentResource, setCurrentResource] = useState<TrainingResource | null>(null);
-  const [progress, setProgress] = useState<UserProgress>({});
+  const [progress, setProgress] = useState<UserProgress>(
+    () => (uid ? readDataCache<UserProgress>(uid, progressKey(uid)) : undefined) ?? {}
+  );
+  // Whose progress is on screen, so a local update keeps that copy current.
+  const progressOwner = useRef<string | null>(null);
+  useEffect(() => {
+    if (progressOwner.current) writeDataCache(uid, progressKey(progressOwner.current), progress);
+  }, [progress, uid]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The module asked for is deleted or unpublished (a 404): retrying can't bring it back.
   const [missing, setMissing] = useState(false);
 
   const fetchResources = useCallback(async (filters?: TrainingFilters) => {
-    setLoading(true);
+    const query = trainingQuery(filters);
+    // Seen before: show it now and refresh in the background (no skeleton, and
+    // a failed refresh keeps the list rather than an error).
+    const cached = readDataCache<TrainingResource[]>(uid, listKey(query));
+    if (cached) setResources(cached);
+    else setLoading(true);
     setError(null);
 
     try {
-      const params = new URLSearchParams();
-      if (filters?.category) params.append('category', filters.category);
-      if (filters?.type) params.append('type', filters.type);
-      if (filters?.required) params.append('required', 'true');
-
-      const response = await fetch(`/api/portal/training?${params.toString()}`, {
+      const response = await fetch(`/api/portal/training?${query}`, {
         headers: await authHeaders(),
       });
       const data = await response.json();
@@ -69,14 +103,16 @@ export function useTraining() {
         throw new Error(data.error || 'Failed to fetch training resources');
       }
 
+      writeDataCache(uid, listKey(query), data.resources);
       setResources(data.resources);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch training resources';
-      setError(message);
+      if (cached) console.error('Background training refresh failed:', message);
+      else setError(message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [uid]);
 
   const fetchResource = useCallback(async (id: string): Promise<TrainingResource | null> => {
     setLoading(true);
@@ -120,6 +156,7 @@ export function useTraining() {
         throw new Error(data.error || 'Failed to fetch progress');
       }
 
+      progressOwner.current = userId;
       setProgress(data.progress);
     } catch (err) {
       console.error('Error fetching progress:', err);
@@ -183,6 +220,8 @@ export function useTraining() {
   }, [resources, progress]);
 
   return {
+    /** The list came from the last visit's copy (a background refresh is due). */
+    seeded: cachedList !== undefined,
     resources,
     currentResource,
     progress,

@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { useCacheSubject } from '@/lib/cache/useCacheSubject';
+import { invalidateDataCache, readDataCache, writeDataCache } from '@/lib/cache/dataCache';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
 
@@ -57,38 +59,77 @@ export function isNetworkFailure(err: unknown): boolean {
   );
 }
 
-export function useSales() {
-  const [sales, setSales] = useState<Sale[]>([]);
+/** The list query for these filters (also the list's cache key). */
+export function salesQuery(filters?: SalesFilters): string {
+  const params = new URLSearchParams();
+  if (filters?.status) params.append('status', filters.status);
+  if (filters?.salesRepId) params.append('salesRepId', filters.salesRepId);
+  if (filters?.startDate) params.append('startDate', filters.startDate);
+  if (filters?.endDate) params.append('endDate', filters.endDate);
+  if (filters?.limit) params.append('limit', filters.limit.toString());
+  return params.toString();
+}
+
+/** A write changed this rep's numbers: the dashboard's cached copy must not show the old ones. */
+function dropDashboardCache(uid: string | null) {
+  invalidateDataCache(uid, 'dashboard');
+}
+
+type CachedSales = { sales: Sale[]; truncated: boolean };
+const listCacheKey = (query: string) => `sales?${query}`;
+
+/**
+ * Sales list and writes. `seed` (the filters the caller is about to fetch)
+ * fills the list from the last visit's copy at once; `seeded` says it did, so
+ * the caller can skip its skeleton and refresh in the background.
+ */
+export function useSales(seed?: SalesFilters | null) {
+  const uid = useCacheSubject();
+  const uidRef = useRef(uid);
+  useEffect(() => {
+    uidRef.current = uid;
+  }, [uid]);
+  const [seeded] = useState<CachedSales | undefined>(() =>
+    seed ? readDataCache<CachedSales>(uid, listCacheKey(salesQuery(seed))) : undefined
+  );
+  // The query the list on screen came from, so local edits keep its cached copy current.
+  const listKey = useRef<string | null>(seed && seeded ? listCacheKey(salesQuery(seed)) : null);
+  const [sales, setSales] = useState<Sale[]>(() => seeded?.sales ?? []);
   // The list query hit its cap and this book is short. Rows cut this way are
   // missing from every month AND their carrier orders come back as red "never
   // logged" rows, so the board has to be able to say the figures are partial.
-  const [truncated, setTruncated] = useState(false);
+  const [truncated, setTruncated] = useState(() => seeded?.truncated ?? false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Deletes and cancellations patch the list in place: keep its cached copy in step.
+  useEffect(() => {
+    if (listKey.current) writeDataCache<CachedSales>(uid, listKey.current, { sales, truncated });
+  }, [sales, truncated, uid]);
 
   /**
    * `quiet` reloads without touching what is on screen: no loading flag, and a
    * failure keeps the current list (and any earlier error) instead of flagging
    * a new one. For the refresh when the app is reopened.
+   * `background` refreshes a list shown from cache: no loading flag (no
+   * skeleton), but a failure still lands in `error`.
    */
-  const fetchSales = useCallback(async (filters?: SalesFilters, { quiet = false }: { quiet?: boolean } = {}) => {
-    if (!quiet) {
+  const fetchSales = useCallback(async (
+    filters?: SalesFilters,
+    { quiet = false, background = false }: { quiet?: boolean; background?: boolean } = {}
+  ) => {
+    if (!quiet && !background) {
       setLoading(true);
       setError(null);
       setTruncated(false);
     }
 
     try {
-      const params = new URLSearchParams();
-      if (filters?.status) params.append('status', filters.status);
-      if (filters?.salesRepId) params.append('salesRepId', filters.salesRepId);
-      if (filters?.startDate) params.append('startDate', filters.startDate);
-      if (filters?.endDate) params.append('endDate', filters.endDate);
-      if (filters?.limit) params.append('limit', filters.limit.toString());
+      const query = salesQuery(filters);
 
       // The list endpoint requires a verified login (sales carry customer PII).
       const token = await getIdToken();
-      const response = await fetch(`/api/portal/sales?${params.toString()}`, {
+      const response = await fetch(`/api/portal/sales?${query}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const data = await response.json();
@@ -97,6 +138,7 @@ export function useSales() {
         throw new Error(data.error || 'Failed to fetch sales');
       }
 
+      listKey.current = listCacheKey(query);
       setSales(data.sales);
       setTruncated(data.truncated === true);
       setError(null);
@@ -105,7 +147,7 @@ export function useSales() {
       if (quiet) console.error('Quiet sales refresh failed:', message);
       else setError(message);
     } finally {
-      if (!quiet) setLoading(false);
+      if (!quiet && !background) setLoading(false);
     }
   }, []);
 
@@ -182,6 +224,7 @@ export function useSales() {
         throw new Error(data.error || 'Failed to create sale');
       }
 
+      dropDashboardCache(uidRef.current);
       return { sale: data.sale, duplicate: data.duplicate === true };
     } catch (err) {
       const message =
@@ -223,6 +266,7 @@ export function useSales() {
         throw new Error(data.error || 'Failed to update sale');
       }
 
+      dropDashboardCache(uidRef.current);
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update sale';
@@ -249,6 +293,7 @@ export function useSales() {
         throw new Error(data.error || 'Failed to delete sale');
       }
 
+      dropDashboardCache(uidRef.current);
       setSales((prev) => prev.filter((s) => s.id !== id));
       return true;
     } catch (err) {
@@ -289,6 +334,7 @@ export function useSales() {
         throw new Error(data.error || (cancelled ? 'Failed to cancel sale' : 'Failed to restore sale'));
       }
 
+      dropDashboardCache(uidRef.current);
       // Patch in place rather than refetching: the board is scoped to a month
       // and a refetch would flash the whole list for a one-field change.
       setSales((prev) =>
@@ -314,6 +360,7 @@ export function useSales() {
   }, []);
 
   return {
+    seeded: seeded !== undefined,
     sales,
     truncated,
     loading,

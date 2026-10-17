@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { trainingProgress, useTraining } from '@/hooks/useTraining';
+import { readCachedTrainingList, trainingProgress, useTraining, writeCachedTrainingList } from '@/hooks/useTraining';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { TrainingCategory, TrainingResource, ResourceType, TRAINING_CATEGORIES, RESOURCE_TYPES } from '@/types';
@@ -25,15 +25,17 @@ export function Training() {
     error,
     fetchResources,
     fetchProgress,
+    seeded,
   } = useTraining();
 
   const initialTab: TrainingTab = searchParams.get('view') === 'shorts' ? 'shorts' : 'path';
   const [activeTab, setActiveTab] = useState<TrainingTab>(initialTab);
   const [categoryFilter, setCategoryFilter] = useState<TrainingCategory | ''>('');
   const [typeFilter, setTypeFilter] = useState<ResourceType | ''>('');
-  const [allResources, setAllResources] = useState<TrainingResource[] | null>(null);
+  const [allResources, setAllResources] = useState<TrainingResource[] | null>(() => readCachedTrainingList(user?.uid) ?? null);
   // The hook starts with an empty list; don't show "no modules" before the first answer.
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  // A list from the last visit (no filters yet) counts as answered; it refreshes underneath.
+  const [loadedKey, setLoadedKey] = useState<string | null>(() => (seeded ? '||0' : null));
   const [reloadKey, setReloadKey] = useState(0);
   const requestKey = `${categoryFilter}|${typeFilter}|${reloadKey}`;
 
@@ -65,6 +67,7 @@ export function Training() {
         });
         if (!response.ok) return;
         const data = await response.json() as { resources?: TrainingResource[] };
+        writeCachedTrainingList(user.uid, data.resources ?? []);
         if (active) setAllResources(data.resources ?? []);
       } catch {
         // The filtered list still renders when the count request is unavailable.

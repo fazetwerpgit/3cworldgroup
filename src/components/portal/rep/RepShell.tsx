@@ -18,6 +18,7 @@ import { CommandPalette } from '@/components/portal/CommandPalette';
 import { useAuth } from '@/contexts/AuthContext';
 import { useChatChannels } from '@/hooks/chat/useChatChannels';
 import { useChatUnread } from '@/hooks/chat/useChatUnread';
+import { SharedChatProvider } from '@/hooks/chat/sharedChat';
 import { useAdminNavCounts } from '@/components/portal/admin-d/opsQueues';
 import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { isViewAsPath, useViewAs, ViewAsScope } from '@/contexts/ViewAsContext';
@@ -83,8 +84,17 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   // Inside the 3C iOS app there is nothing to install and the shell owns push.
   const inApp = useIsNativeApp();
   usePresenceHeartbeat({ enabled: !viewing });
-  const { channels } = useChatChannels();
-  const { anyUnread } = useChatUnread(channels, user?.uid);
+  // One live channel list and read-receipt listener per session, shared with
+  // the chat page (useSharedChatChannels) instead of a second pair there.
+  const { channels, loading: channelsLoading, error: channelsError, retry: retryChannels } = useChatChannels();
+  const { unreadByChannel, anyUnread } = useChatUnread(channels, user?.uid);
+  const sharedChat = useMemo(
+    () => ({
+      channels: { channels, loading: channelsLoading, error: channelsError, retry: retryChannels },
+      unread: { unreadByChannel, anyUnread },
+    }),
+    [anyUnread, channels, channelsError, channelsLoading, retryChannels, unreadByChannel]
+  );
   const navCounts = useAdminNavCounts();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [tabBarHidden, setTabBarHidden] = useState(false);
@@ -93,6 +103,7 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
 
   return (
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
+      <SharedChatProvider value={sharedChat}>
       <div className={s.root} data-shell="rep">
         <RepTopBar chatUnread={anyUnread} navCounts={navCounts} task={task} back={back} />
         <ViewAsBanner />
@@ -111,6 +122,7 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
         {/* Keeps the portal-wide Ctrl/Cmd+K search working on D pages. */}
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>
+      </SharedChatProvider>
     </TabBarHiddenContext.Provider>
   );
 }

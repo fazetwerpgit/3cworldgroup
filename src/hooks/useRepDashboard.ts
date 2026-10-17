@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { readDataCache, writeDataCache } from '@/lib/cache/dataCache';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -75,6 +76,9 @@ export type RepSectionKey = Exclude<keyof RepDashboardState, never>;
 
 const LOADING = { status: 'loading' } as const;
 
+/** Cache key for the dashboard's sections (a sale write drops it: see useSales). */
+const DASHBOARD_CACHE_KEY = 'dashboard';
+
 async function getJson<T>(url: string, token: string | null, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -135,6 +139,9 @@ export function useRepDashboard() {
   const uid = user?.uid ?? null;
   const active = user?.status === 'active';
 
+  // Revisit: the sections loaded last time show at once (from the in-memory,
+  // per-account cache) and refresh quietly underneath.
+  const [cached] = useState(() => readDataCache<Partial<RepDashboardState>>(uid, DASHBOARD_CACHE_KEY));
   const [state, setState] = useState<RepDashboardState>(() => ({
     book: LOADING,
     plan: LOADING,
@@ -142,7 +149,17 @@ export function useRepDashboard() {
     challenge: LOADING,
     calls: LOADING,
     paperwork: LOADING,
+    ...cached,
   }));
+
+  // Keep the cache in step with every section that is on screen.
+  useEffect(() => {
+    const ready: Partial<RepDashboardState> = {};
+    for (const key of Object.keys(state) as RepSectionKey[]) {
+      if (state[key].status === 'ready') (ready as Record<string, unknown>)[key] = state[key];
+    }
+    if (Object.keys(ready).length) writeDataCache(uid, DASHBOARD_CACHE_KEY, ready);
+  }, [state, uid]);
   const controllers = useRef(new Map<RepSectionKey, AbortController>());
 
   const loaders = useCallback((): Partial<Loaders> => {
@@ -238,9 +255,13 @@ export function useRepDashboard() {
     [loaders]
   );
 
+  const showedCached = useRef(!!cached);
   useEffect(() => {
     const running = controllers.current;
-    void run();
+    // From cache: a quiet refresh keeps each section on screen if its reload fails.
+    const quiet = showedCached.current;
+    showedCached.current = false;
+    void run(undefined, { quiet });
     return () => {
       for (const controller of running.values()) controller.abort();
       running.clear();
