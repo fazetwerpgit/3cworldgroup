@@ -1,0 +1,31 @@
+/* Inside the 3C iOS app only (AppBridgeHost sets html[data-app]; never on the
+   web, never during server render or hydration). A long press on the app's
+   chrome — bars, tabs, buttons — should feel native: no link/image callout,
+   no text selection loupe. Inputs and message text are left alone. */
+html[data-app],
+html[data-app] body {
+  overscroll-behavior: none;
+}
+
+html[data-app] :is(
+    header,
+    nav,
+    button,
+    [role='button'],
+    [role='tab'],
+    [role='tablist'],
+    [role='menuitem'],
+    [role='switch']
+  ) {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS stops typing in a field under user-select:none, so every editable field
+   (even one inside a header or a role=button) keeps normal selection. */
+html[data-app] :is(input, textarea, select, [contenteditable]:not([contenteditable='false'])) {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
+}

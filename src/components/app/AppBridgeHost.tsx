@@ -7,8 +7,9 @@ import { installNativeReceiver, onNativeMessage } from '@/lib/app/bridge';
 import { installAppLinkHandling } from '@/lib/app/links';
 import { registerNativePushToken, syncNativePush } from '@/lib/app/nativePush';
 
-// Mounted once in the portal layout. Inside the 3C iOS app it installs the
-// bridge receiver and in-app link handling, picks up an already-granted push
+// Mounted once in the portal layout. Inside the 3C iOS app it marks <html>
+// with data-app (app-only touch CSS), installs the bridge receiver and in-app
+// link handling, picks up an already-granted push
 // token after sign-in (never prompts: that only happens from a tap in
 // Settings), and stores a rotated token the shell reports. On the web every
 // effect returns at its first line, so it does nothing. Renders nothing.
@@ -19,8 +20,16 @@ export default function AppBridgeHost() {
 
   useEffect(() => {
     if (!isNativeApp()) return;
+    // Scopes the app-only touch polish (styles/app-touch.css). Set after
+    // hydration, so the server markup and the first client render match.
+    const html = document.documentElement;
+    html.setAttribute('data-app', '');
     installNativeReceiver();
-    return installAppLinkHandling();
+    const uninstallLinks = installAppLinkHandling();
+    return () => {
+      html.removeAttribute('data-app');
+      uninstallLinks();
+    };
   }, []);
 
   useEffect(() => {

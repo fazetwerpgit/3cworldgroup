@@ -13,6 +13,7 @@ import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
 import AppBridgeHost from '@/components/app/AppBridgeHost';
 import { RepShellHost } from '@/components/portal/rep/RepShell';
 import '@/styles/sweep-shell.css';
+import '@/styles/app-touch.css';
 
 // Display face for portal brand moments (login, KPI headers) — exposed as
 // --font-archivo and consumed by the .portal-display helper in globals.css.
