@@ -252,10 +252,17 @@
   padding: var(--s3);
 }
 
-/* Phones: scrolling the composer into view stops it above the fixed tab bar
-   (same height the scroller pads by in rep.module.css). */
+/* Scrolled into view after send and when the keyboard opens: it sits after the
+   keyboard spacer, so the composer lands above the keyboard. On phones it stops
+   above the fixed tab bar (same height the scroller pads by in rep.module.css).
+   The negative margin takes back the column's gap it would add. */
+.anchor {
+  height: 0;
+  margin-top: calc(var(--s3) * -1);
+}
+
 @media (max-width: 1023px) {
-  .composer {
+  .anchor {
     scroll-margin-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + var(--s3) - var(--pwa-bottom-gap, 0px));
   }
 }

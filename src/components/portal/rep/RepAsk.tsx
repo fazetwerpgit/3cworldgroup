@@ -210,13 +210,16 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
   const [fileKey, setFileKey] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
+  // After the keyboard spacer: scrolling to it shows the composer and the room the keyboard takes.
+  const bottomRef = useRef<HTMLDivElement>(null);
   // The keyboard covers the bottom of the page: keep the composer above it.
   const { inset: keyboardInset } = useKeepAboveKeyboard(composerRef);
   const reducedMotion = usePrefersReducedMotion();
 
-  /** Bring the whole composer into view; its scroll margin keeps it above the phone tab bar. */
+  /** Bring the whole composer into view by scrolling to the anchor after the keyboard spacer
+   *  (the RepPractice pattern); its scroll margin keeps it above the phone tab bar. */
   const showComposer = useCallback((behavior: ScrollBehavior) => {
-    window.requestAnimationFrame(() => composerRef.current?.scrollIntoView({ block: 'end', behavior }));
+    window.requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end', behavior }));
   }, []);
 
   useEffect(() => {
@@ -526,6 +529,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
         </form>
       </BorderBeam>
       {keyboardInset > 0 ? <div aria-hidden="true" style={{ height: keyboardInset }} /> : null}
+      <div ref={bottomRef} className={a.anchor} aria-hidden="true" />
     </>
   );
 }
