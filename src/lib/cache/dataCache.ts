@@ -138,10 +138,21 @@ type Revalidator = () => unknown;
 const revalidators = new Set<Revalidator>();
 
 /** Registers a mounted screen's quiet refetch. Returns the unregister. */
+const revalidatorWatchers = new Set<() => void>();
+
 export function onRevalidateDataCache(revalidate: Revalidator): () => void {
   revalidators.add(revalidate);
   return () => {
-    revalidators.delete(revalidate);
+    if (!revalidators.delete(revalidate)) return;
+    for (const watch of Array.from(revalidatorWatchers)) watch();
+  };
+}
+
+/** Called whenever a screen's revalidator is disposed (it left the screen). Returns the unsubscribe. */
+export function onRevalidatorDisposed(watch: () => void): () => void {
+  revalidatorWatchers.add(watch);
+  return () => {
+    revalidatorWatchers.delete(watch);
   };
 }
 

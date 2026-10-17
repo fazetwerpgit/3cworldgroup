@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { nativeHaptic } from '@/lib/app/bridge';
-import { hasDataRevalidators, revalidateDataCache } from '@/lib/cache/dataCache';
+import { hasDataRevalidators, onRevalidatorDisposed, revalidateDataCache } from '@/lib/cache/dataCache';
 import { PULL_HOLD, pullDistance, pullProgress, readPullIntent, shouldRefresh } from './pullToRefresh';
 import s from './rep.module.css';
 
@@ -36,11 +36,17 @@ function scrolledWithin(target: Element | null, root: HTMLElement): boolean {
 export function PullToRefresh({
   scrollerRef,
   contentRef,
+  pathname,
 }: {
   scrollerRef: RefObject<HTMLElement | null>;
   contentRef: RefObject<HTMLElement | null>;
+  /** The route: a refresh still spinning when it changes is dropped at once. */
+  pathname?: string | null;
 }) {
   const indicatorRef = useRef<HTMLDivElement | null>(null);
+  // Ends a running refresh now (route change, or the screen that was
+  // refetching unmounted): no minimum spin, no settle animation.
+  const cancelRef = useRef<(() => void) | null>(null);
   const arcRef = useRef<SVGSVGElement | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
 
@@ -54,6 +60,15 @@ export function PullToRefresh({
     let refreshing = false;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     let disposed = false;
+    // The non-passive touchmove is attached only for a touch that can become
+    // a pull (landed at the top), so every other scroll stays passive.
+    let moving = false;
+    const listenMoves = (on: boolean) => {
+      if (on === moving) return;
+      moving = on;
+      if (on) scroller.addEventListener('touchmove', onMove, { passive: false });
+      else scroller.removeEventListener('touchmove', onMove);
+    };
 
     /** Places the content and the indicator for a pull of `d` px. */
     const paint = (d: number, transition: boolean) => {
@@ -88,20 +103,44 @@ export function PullToRefresh({
       }, SETTLE_MS);
     };
 
+    /** Puts everything back at once (no transition) and goes idle. */
+    const reset = () => {
+      if (settleTimer) clearTimeout(settleTimer);
+      paint(0, false);
+      const content = contentRef.current;
+      if (content) {
+        content.style.transition = '';
+        content.style.transform = '';
+      }
+      if (!disposed) setPhase('idle');
+    };
+
     const refresh = async () => {
       refreshing = true;
       setPhase('refreshing');
       paint(PULL_HOLD, true);
       const started = Date.now();
-      try {
-        await revalidateDataCache();
-      } finally {
+      let cancel: () => void = () => undefined;
+      const cancelled = new Promise<'cancelled'>((resolve) => {
+        cancel = () => resolve('cancelled');
+      });
+      cancelRef.current = cancel;
+      const outcome = await Promise.race([revalidateDataCache().then(() => 'done' as const), cancelled]);
+      if (outcome === 'done') {
         const left = MIN_SPIN_MS - (Date.now() - started);
-        if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
-        refreshing = false;
-        if (!disposed) settle();
+        if (left > 0) await Promise.race([new Promise((resolve) => setTimeout(resolve, left)), cancelled]);
       }
+      if (cancelRef.current === cancel) cancelRef.current = null;
+      refreshing = false;
+      if (disposed) return;
+      if (outcome === 'cancelled') reset();
+      else settle();
     };
+
+    // The screen that was refreshing went away (its revalidator was disposed).
+    const stopWatching = onRevalidatorDisposed(() => {
+      if (refreshing && !hasDataRevalidators()) cancelRef.current?.();
+    });
 
     const onStart = (event: TouchEvent) => {
       start = null;
@@ -116,6 +155,7 @@ export function PullToRefresh({
       if (target && scrolledWithin(target, scroller)) return;
       const touch = event.touches[0];
       start = { x: touch.clientX, y: touch.clientY };
+      listenMoves(true);
     };
 
     const onMove = (event: TouchEvent) => {
@@ -128,6 +168,7 @@ export function PullToRefresh({
         const intent = readPullIntent(dx, dy);
         if (intent === 'scroll' || scroller.scrollTop > 0) {
           start = null;
+          listenMoves(false);
           return;
         }
         // Mostly downward at the top: hold the native bounce off from the very
@@ -151,6 +192,7 @@ export function PullToRefresh({
     };
 
     const onEnd = (event: TouchEvent) => {
+      listenMoves(false);
       const wasPulling = pulling;
       start = null;
       pulling = false;
@@ -162,14 +204,15 @@ export function PullToRefresh({
     };
 
     scroller.addEventListener('touchstart', onStart, { passive: true });
-    scroller.addEventListener('touchmove', onMove, { passive: false });
     scroller.addEventListener('touchend', onEnd);
     scroller.addEventListener('touchcancel', onEnd);
     return () => {
       disposed = true;
+      stopWatching();
+      cancelRef.current?.();
       if (settleTimer) clearTimeout(settleTimer);
+      listenMoves(false);
       scroller.removeEventListener('touchstart', onStart);
-      scroller.removeEventListener('touchmove', onMove);
       scroller.removeEventListener('touchend', onEnd);
       scroller.removeEventListener('touchcancel', onEnd);
       const content = contentRef.current;
@@ -180,12 +223,19 @@ export function PullToRefresh({
     };
   }, [scrollerRef, contentRef]);
 
+  // A new route: drop a refresh that is still spinning for the old one.
+  useEffect(() => {
+    cancelRef.current?.();
+  }, [pathname]);
+
   return (
     <>
-      <div ref={indicatorRef} className={s.ptr} data-state={phase} aria-hidden="true">
-        <svg ref={arcRef} className={s.ptrArc} viewBox="0 0 24 24" focusable="false">
-          <circle cx="12" cy="12" r="9" />
-        </svg>
+      <div className={s.ptrRail} aria-hidden="true">
+        <div ref={indicatorRef} className={s.ptr} data-state={phase}>
+          <svg ref={arcRef} className={s.ptrArc} viewBox="0 0 24 24" focusable="false">
+            <circle cx="12" cy="12" r="9" />
+          </svg>
+        </div>
       </div>
       <span className={s.srOnly} role="status" aria-live="polite">
         {phase === 'refreshing' ? 'Refreshing' : ''}

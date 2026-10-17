@@ -117,7 +117,7 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
         {viewing || inApp ? null : <PushNudge />}
         <main className={s.scroller} id="rep-main" ref={mainRef}>
           {/* The shell's own pull to refresh is off in the app: this one refetches the screen. */}
-          {inApp ? <PullToRefresh scrollerRef={mainRef} contentRef={contentRef} /> : null}
+          {inApp ? <PullToRefresh scrollerRef={mainRef} contentRef={contentRef} pathname={pathname} /> : null}
           <div className={s.main} ref={contentRef}>
             {viewing && isViewAsPath(pathname) ? (
               <ViewAsScope loading={<ViewAsLoading />}>{children}</ViewAsScope>
