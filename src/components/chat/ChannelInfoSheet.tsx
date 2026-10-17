@@ -9,6 +9,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import { getInitials } from '@/lib/chat/authorColor';
 import { attachmentSnippet } from '@/lib/chat/media';
 import { ChatAttachment, ChatChannel } from '@/types';
+import { CHAT_SUPPORT_EMAIL } from './ChatTermsSheet';
 import c from './chat.module.css';
 
 const audienceCopy: Record<ChatChannel['audience'], string> = {
@@ -544,6 +545,11 @@ export function ChannelInfoSheet({
               </div>
             )}
           </div>
+
+          <p className={c.infoSupport}>
+            Problem with someone in chat? Press and hold their message to report or block, or email{' '}
+            <a href={`mailto:${CHAT_SUPPORT_EMAIL}`}>{CHAT_SUPPORT_EMAIL}</a>.
+          </p>
 
           {isAdmin && (
             <div className={c.infoFoot}>

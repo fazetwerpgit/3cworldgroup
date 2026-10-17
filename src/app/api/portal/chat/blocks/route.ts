@@ -3,6 +3,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { CHAT_REPORTS_PATH, isSafeDocId, notifyChatModerators } from '@/lib/chat/moderation';
+import { BLOCKS_PER_DAY, takeBlockSlot } from '@/lib/chat/moderationLimits';
 
 // Per-user chat blocks: users/{uid}/chatBlocks/{blockedUid}. Blocking hides the
 // person's messages on the blocker's own screens and stops chat pushes from
@@ -58,19 +59,30 @@ export async function POST(request: NextRequest) {
     if (target === user.uid) return NextResponse.json({ error: 'You can’t block yourself' }, { status: 400 });
     if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 
+    // The answer never carries the target's name or email: the caller already
+    // has the name from the message they blocked from, and a uid alone must not
+    // look anyone up. An unknown uid answers the same as a known one.
+    const blockRef = blocksOf(user.uid).doc(target);
+    if ((await blockRef.get()).exists) return NextResponse.json({ success: true, duplicate: true });
+
     const targetSnap = await adminDb.collection('users').doc(target).get();
-    if (!targetSnap.exists) return NextResponse.json({ error: 'Person not found' }, { status: 404 });
+    if (!targetSnap.exists) return NextResponse.json({ success: true });
     const targetData = targetSnap.data() ?? {};
-    const name =
-      (typeof targetData.displayName === 'string' && targetData.displayName) ||
-      (typeof targetData.email === 'string' && targetData.email) ||
-      '3C User';
+    // Display name only (never the email) for the caller's own block list.
+    const name = (typeof targetData.displayName === 'string' && targetData.displayName.trim()) || '3C User';
+
+    if (!(await takeBlockSlot(user.uid))) {
+      return NextResponse.json(
+        { error: `You can block up to ${BLOCKS_PER_DAY} people a day. Try again tomorrow.` },
+        { status: 429 }
+      );
+    }
 
     try {
-      await blocksOf(user.uid).doc(target).create({ blockedAt: FieldValue.serverTimestamp(), name });
+      await blockRef.create({ blockedAt: FieldValue.serverTimestamp(), name });
     } catch (createError) {
       if (!isAlreadyExists(createError)) throw createError;
-      return NextResponse.json({ success: true, duplicate: true, name });
+      return NextResponse.json({ success: true, duplicate: true });
     }
 
     after(() =>
@@ -78,10 +90,13 @@ export async function POST(request: NextRequest) {
         title: 'Chat block',
         message: `${user.displayName} blocked ${name} in team chat.`,
         link: CHAT_REPORTS_PATH,
+        actorId: user.uid,
+        // The blocked person is never told, even if they're back office.
+        excludeUids: [target],
       })
     );
 
-    return NextResponse.json({ success: true, name });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error blocking chat user:', error);
     return NextResponse.json({ error: 'Failed to block' }, { status: 500 });

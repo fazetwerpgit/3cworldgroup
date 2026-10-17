@@ -6,6 +6,7 @@ import { getVerifiedChatUser } from '@/lib/chat/access';
 import { buildChatPushBody, pushChatMessageOnce } from '@/lib/push/chatPush';
 import { chatMessageDocId, isValidClientMessageId } from '@/lib/chat/outbox';
 import { buildLastMessage } from '@/lib/chat/lastMessage';
+import { checkChatText } from '@/lib/chat/contentFilter';
 import { ensureChatChannelMember, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import {
   attachmentSnippet,
@@ -26,7 +27,7 @@ const DELETED_REPLY_TEXT = 'Message deleted';
 function buildReplySnippet(
   messageId: string,
   data: FirebaseFirestore.DocumentData
-): { messageId: string; authorName: string; text: string } {
+): { messageId: string; authorId?: string; authorName: string; text: string } {
   const authorName =
     typeof data.authorName === 'string' && data.authorName ? data.authorName : '3C User';
   const rawText = typeof data.text === 'string' ? data.text.trim() : '';
@@ -36,7 +37,10 @@ function buildReplySnippet(
   } else if (data.attachment && typeof data.attachment === 'object') {
     text = attachmentSnippet(data.attachment as { type?: unknown; name?: unknown }).slice(0, 140);
   }
-  return { messageId, authorName, text };
+  // authorId lets readers who blocked the quoted person collapse the quote.
+  return typeof data.authorId === 'string' && data.authorId
+    ? { messageId, authorId: data.authorId, authorName, text }
+    : { messageId, authorName, text };
 }
 
 // Returns the channel view AND its raw doc data — the raw data carries extraMemberIds,
@@ -171,10 +175,13 @@ async function recomputeLastMessageAt(
   await adminDb!.runTransaction(async (tx) => {
     const channel = (await tx.get(channelRef)).data();
     const current = channel?.lastMessageAt;
-    const previewShowsDeleted = channel?.lastMessage?.messageId === deletedId;
+    // The delete scrub already cleared a preview showing this message; a missing
+    // preview (that, or a channel from before previews) is filled from the newest
+    // standing message too.
+    const previewShowsDeleted = !channel?.lastMessage || channel.lastMessage.messageId === deletedId;
     // Bumped by a later send (pre-atomic bumps trail their message by a moment).
     if (current instanceof Timestamp && current.toMillis() > deletedMs + 5000) {
-      if (previewShowsDeleted) tx.set(channelRef, { lastMessage: FieldValue.delete() }, { merge: true });
+      if (channel?.lastMessage?.messageId === deletedId) tx.set(channelRef, { lastMessage: FieldValue.delete() }, { merge: true });
       return;
     }
     const recent = await tx.get(
@@ -214,6 +221,11 @@ async function refreshLastMessagePreview(
   });
 }
 
+/** The 3C iOS app's WebView (user agent marker, docs/ios-app/BRIDGE.md). */
+function isAppRequest(request: NextRequest): boolean {
+  return /\b3CPortalApp\//.test(request.headers.get('user-agent') ?? '');
+}
+
 // POST — send a message as the VERIFIED caller. Author identity is stamped server-side.
 // Admin SDK create() on an existing doc rejects with gRPC ALREADY_EXISTS (6).
 function isAlreadyExists(error: unknown): boolean {
@@ -227,21 +239,31 @@ export async function POST(request: NextRequest) {
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
     const user = result.user;
 
+    // The app shows the one-time chat agreement before chat opens; a send from
+    // the app without it on file is refused (the user doc is already read).
+    if (user.chatTermsAccepted === false && isAppRequest(request)) {
+      return NextResponse.json({ error: 'Agree to the team chat rules first.', code: 'chat_terms' }, { status: 403 });
+    }
+
     const body = await request.json();
     const channelId = typeof body.channelId === 'string' ? body.channelId : '';
-    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const rawText = typeof body.text === 'string' ? body.text.trim() : '';
     const hasAttachmentInput = body.attachment !== undefined && body.attachment !== null;
 
     if (!channelId) {
       return NextResponse.json({ error: 'channelId is required' }, { status: 400 });
     }
     // Text is optional ONLY when a (later-validated) attachment is present.
-    if (!text && !hasAttachmentInput) {
+    if (!rawText && !hasAttachmentInput) {
       return NextResponse.json({ error: 'channelId and text are required' }, { status: 400 });
     }
-    if (text.length > 1000) {
+    if (rawText.length > 1000) {
       return NextResponse.json({ error: 'Message is limited to 1000 characters' }, { status: 400 });
     }
+    // Slurs are refused; severe profanity is masked (see contentFilter.ts).
+    const filtered = checkChatText(rawText);
+    if (!filtered.ok) return NextResponse.json({ error: filtered.error, code: 'content_filter' }, { status: 400 });
+    const text = filtered.text;
 
     const found = await getFirestoreChatChannel(channelId);
     if (!found) {
@@ -391,15 +413,18 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const channelId = typeof body.channelId === 'string' ? body.channelId : '';
     const messageId = typeof body.messageId === 'string' ? body.messageId : '';
-    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    const rawText = typeof body.text === 'string' ? body.text.trim() : '';
 
     if (!channelId || !messageId) {
       return NextResponse.json({ error: 'channelId and messageId are required' }, { status: 400 });
     }
     // Edited text must be non-empty and within the same 1..1000 bound as new sends.
-    if (!text || text.length > 1000) {
+    if (!rawText || rawText.length > 1000) {
       return NextResponse.json({ error: 'Message must be 1 to 1000 characters' }, { status: 400 });
     }
+    const filtered = checkChatText(rawText);
+    if (!filtered.ok) return NextResponse.json({ error: filtered.error, code: 'content_filter' }, { status: 400 });
+    const text = filtered.text;
 
     const found = await getFirestoreChatChannel(channelId);
     if (
@@ -414,24 +439,23 @@ export async function PATCH(request: NextRequest) {
       .doc(channelId)
       .collection('messages')
       .doc(messageId);
-    const messageDoc = await messageRef.get();
-    if (!messageDoc.exists) {
-      return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    // Read and write in one transaction, so a delete that lands between the
+    // checks and the write can't be undone by the edit.
+    const outcome = await adminDb!.runTransaction(async (tx) => {
+      const messageDoc = await tx.get(messageRef);
+      if (!messageDoc.exists) return { status: 404 as const, error: 'Message not found' };
+      const current = messageDoc.data() ?? {};
+      // A deleted message can't be edited back into existence.
+      if (current.deletedAt) return { status: 400 as const, error: 'Message has been deleted' };
+      // Author ONLY — moderators can delete others' messages but never rewrite them.
+      if (current.authorId !== user.uid) return { status: 403 as const, error: 'Forbidden' };
+      tx.set(messageRef, { text: text.slice(0, 1000), editedAt: FieldValue.serverTimestamp() }, { merge: true });
+      return { status: 200 as const, message: current };
+    });
+    if (outcome.status !== 200) {
+      return NextResponse.json({ error: outcome.error }, { status: outcome.status });
     }
-    const message = messageDoc.data() ?? {};
-    // A deleted message can't be edited back into existence.
-    if (message.deletedAt) {
-      return NextResponse.json({ error: 'Message has been deleted' }, { status: 400 });
-    }
-    // Author ONLY — moderators can delete others' messages but never rewrite them.
-    if (message.authorId !== user.uid) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    await messageRef.set(
-      { text: text.slice(0, 1000), editedAt: FieldValue.serverTimestamp() },
-      { merge: true }
-    );
+    const message = outcome.message;
 
     try {
       await refreshLastMessagePreview(
@@ -555,19 +579,30 @@ export async function DELETE(request: NextRequest) {
 
     // Soft-delete scrubs the content too: channel members can still read the doc
     // through the Firestore rules, and a pin would keep surfacing it.
-    await messageRef.set(
-      {
-        deletedAt: FieldValue.serverTimestamp(),
-        deletedBy: user.uid,
-        text: '',
-        attachment: FieldValue.delete(),
-        hasAttachment: FieldValue.delete(),
-        isPinned: false,
-        pinnedAt: null,
-        pinnedBy: null,
-      },
-      { merge: true }
-    );
+    // The channel preview (lastMessage) is cleared in the same transaction when
+    // it shows this message, so the deleted text never outlives the scrub;
+    // recomputeLastMessageAt below then points it at the newest standing message.
+    const channelRef = adminDb!.collection('chatChannels').doc(channelId);
+    await adminDb!.runTransaction(async (tx) => {
+      const channelSnap = await tx.get(channelRef);
+      tx.set(
+        messageRef,
+        {
+          deletedAt: FieldValue.serverTimestamp(),
+          deletedBy: user.uid,
+          text: '',
+          attachment: FieldValue.delete(),
+          hasAttachment: FieldValue.delete(),
+          isPinned: false,
+          pinnedAt: null,
+          pinnedBy: null,
+        },
+        { merge: true }
+      );
+      if (channelSnap.data()?.lastMessage?.messageId === messageId) {
+        tx.set(channelRef, { lastMessage: FieldValue.delete() }, { merge: true });
+      }
+    });
 
     // The photo (or PDF and its preview) goes with the message: a tokened URL would otherwise keep it
     // reachable. Path resolved from the pre-scrub read, deleted only now that the

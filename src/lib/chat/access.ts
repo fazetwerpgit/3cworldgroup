@@ -13,6 +13,8 @@ export interface ChatUser {
   fieldRole?: FieldRole;
   effectiveRole?: PlatformRole | FieldRole;
   canModerate: boolean;
+  /** Whether they accepted the one-time chat agreement (users/{uid}.chatTermsAcceptedAt). */
+  chatTermsAccepted?: boolean;
 }
 
 type ChatUserResult =
@@ -48,6 +50,7 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
       fieldRole,
       effectiveRole: getEffectiveRole({ role, fieldRole }),
       canModerate: isManagementRole(role),
+      chatTermsAccepted: !!data.chatTermsAcceptedAt,
     },
   };
 }

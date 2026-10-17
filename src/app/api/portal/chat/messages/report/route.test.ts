@@ -114,6 +114,7 @@ describe('POST /api/portal/chat/messages/report', () => {
     });
     expect(notifyMock).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(notifyMock.mock.calls[0])).not.toContain('something rude');
+    expect(notifyMock).toHaveBeenCalledWith(expect.objectContaining({ actorId: 'rep-1', excludeUids: ['rep-2'] }));
 
     const again = await post({ channelId: 'all-company', messageId: 'm1', reason: 'spam' });
     expect(await again.json()).toEqual({ success: true, duplicate: true });

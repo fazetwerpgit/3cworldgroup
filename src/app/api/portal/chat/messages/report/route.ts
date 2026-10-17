@@ -104,6 +104,9 @@ export async function POST(request: NextRequest) {
         title: 'Chat message reported',
         message: `${user.displayName} reported a message from ${authorName} in ${channel.name}: ${REPORT_REASON_LABELS[reason]}.`,
         link: CHAT_REPORTS_PATH,
+        actorId: user.uid,
+        // The reported person never hears about it, even if they're back office.
+        excludeUids: typeof message.authorId === 'string' && message.authorId ? [message.authorId] : [],
       })
     );
 

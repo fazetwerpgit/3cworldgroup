@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { collection, getCountFromServer, limit, query, Timestamp, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/config';
 import type { ChatChannelDoc } from '@/hooks/chat/useChatChannels';
@@ -47,32 +47,45 @@ export function useChatUnreadCounts(
     return out;
   }, [channels, unreadByChannel, lastReadByChannel]);
 
+  // The effect keys on this string, not the array, so a re-render that changes
+  // nothing (a new channels array with the same times) never re-runs it.
+  const wantedKey = wanted.map((entry) => `${entry.id}@${entry.key}`).join('|');
+  const latestRef = useRef<Map<string, { key: string; after: Date | null }>>(new Map());
+  const inFlightRef = useRef<Map<string, string>>(new Map());
+  const countsRef = useRef(counts);
   useEffect(() => {
+    countsRef.current = counts;
+  }, [counts]);
+
+  useEffect(() => {
+    latestRef.current = new Map(wanted.map((entry) => [entry.id, { key: entry.key, after: entry.after }]));
     const firestore = db;
     if (!firestore) return;
-    let cancelled = false;
-    for (const entry of wanted) {
-      if (counts[entry.id]?.key === entry.key) continue;
-      const messages = collection(firestore, 'chatChannels', entry.id, 'messages');
-      const q = entry.after
-        ? query(messages, where('createdAt', '>', Timestamp.fromDate(entry.after)), limit(UNREAD_COUNT_CAP))
+    for (const [id, { key, after }] of latestRef.current) {
+      if (countsRef.current[id]?.key === key || inFlightRef.current.get(id) === key) continue;
+      inFlightRef.current.set(id, key);
+      const messages = collection(firestore, 'chatChannels', id, 'messages');
+      const q = after
+        ? query(messages, where('createdAt', '>', Timestamp.fromDate(after)), limit(UNREAD_COUNT_CAP))
         : query(messages, limit(UNREAD_COUNT_CAP));
       getCountFromServer(q)
         .then((snap) => {
-          if (cancelled) return;
+          // Kept whenever the channel still wants this exact count, even if
+          // other channels changed while it was in flight.
+          if (latestRef.current.get(id)?.key !== key) return;
           const count = snap.data().count;
-          setCounts((prev) => ({ ...prev, [entry.id]: { key: entry.key, count } }));
+          setCounts((prev) => ({ ...prev, [id]: { key, count } }));
         })
         .catch(() => {
           // Leave it uncounted: the row keeps the dot.
+        })
+        .finally(() => {
+          if (inFlightRef.current.get(id) === key) inFlightRef.current.delete(id);
         });
     }
-    return () => {
-      cancelled = true;
-    };
-    // counts is read only to skip work already done; re-running on it would loop.
+    // wanted is fully described by wantedKey.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wanted]);
+  }, [wantedKey]);
 
   return useMemo(() => {
     if (wanted.length === 0) return NO_COUNTS;

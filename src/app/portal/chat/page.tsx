@@ -34,6 +34,8 @@ import { useChatSafety } from '@/hooks/chat/useChatSafety';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { reportChatContext } from '@/lib/app/bridge';
 import { APP_NAVIGATE_EVENT } from '@/lib/app/links';
+import { authorIndex, isBlockedQuote, shouldCollapseBlocked } from '@/lib/chat/blocked';
+import { BlockedMessageButton, MessageQuote } from '@/components/chat/BlockedContent';
 import type { ReportReason } from '@/lib/chat/moderationShared';
 import { useMarkChannelRead } from '@/hooks/chat/useMarkChannelRead';
 import { useConnectionNotice } from '@/hooks/chat/useConnectionNotice';
@@ -436,6 +438,7 @@ export default function TeamChatPage() {
       return edit ? { ...message, text: edit.text, editedAt: edit.editedAt } : message;
     });
   }, [threadMessages, pendingEdits]);
+  const authorById = useMemo(() => authorIndex(displayMessages), [displayMessages]);
 
   // Drop an optimistic edit once the realtime message confirms it (editedAt present
   // and the stored text matches what we saved) so the override can't get stuck.
@@ -482,6 +485,8 @@ export default function TeamChatPage() {
   const inApp = useIsNativeApp();
   const safety = useChatSafety(user?.uid, authedFetch);
   const [notice, setNotice] = useState('');
+  // Blocked authors' messages the reader chose to show (desktop thread).
+  const [revealedBlocked, setRevealedBlocked] = useState<ReadonlySet<string>>(() => new Set());
   useEffect(() => {
     if (!notice) return;
     const timer = window.setTimeout(() => setNotice(''), 4000);
@@ -812,9 +817,9 @@ export default function TeamChatPage() {
   // The server re-stamps authoritative values on the delivered message.
   const makeReplySnippet = (message: ThreadMessage): ChatReplySnippet => {
     const trimmed = message.text?.trim();
-    if (trimmed) return { messageId: message.id, authorName: message.authorName, text: trimmed.slice(0, 140) };
-    const kind = attachmentSnippet(message.attachment).slice(0, 140);
-    return { messageId: message.id, authorName: message.authorName, text: kind };
+    const base = { messageId: message.id, authorId: message.authorId, authorName: message.authorName };
+    if (trimmed) return { ...base, text: trimmed.slice(0, 140) };
+    return { ...base, text: attachmentSnippet(message.attachment).slice(0, 140) };
   };
 
   // Reply fields for the next echo — empty unless a reply is staged. Cleared by the
@@ -1185,6 +1190,17 @@ export default function TeamChatPage() {
                   const canEdit = isOwn && !!message.text;
                   const canDelete = canModerate || isOwn;
                   const isDev = isDeveloperAuthor(message.authorId);
+                  // A blocked author's message keeps its place as one quiet row.
+                  if (shouldCollapseBlocked(message, user?.uid, safety.blockedUids, revealedBlocked)) {
+                    return (
+                      <Fragment key={message.id}>
+                        {showDayDivider && <div className={c.day}>{formatChatLineDayDivider(message.createdAt)}</div>}
+                        <div data-mid={message.id} className={c.deskBlockedRow}>
+                          <BlockedMessageButton onShow={() => setRevealedBlocked((prev) => new Set(prev).add(message.id))} />
+                        </div>
+                      </Fragment>
+                    );
+                  }
                   return (
                     <Fragment key={message.id}>
                       {showDayDivider && <div className={c.day}>{formatChatLineDayDivider(message.createdAt)}</div>}
@@ -1224,10 +1240,7 @@ export default function TeamChatPage() {
                             </span>
                           )}
                           {message.replyTo && (
-                            <div className={c.quote}>
-                              <strong>{message.replyTo.authorName}</strong>
-                              <span>{message.replyTo.text}</span>
-                            </div>
+                            <MessageQuote replyTo={message.replyTo} blocked={isBlockedQuote(message.replyTo, safety.blockedUids, authorById)} />
                           )}
                           <DesktopAttachment
                             message={message}

@@ -196,6 +196,8 @@ function messagesWhere(field: string, op: string, messageId: string) {
 
 // lastMessageAt as written by the route (server timestamps resolved to now).
 const channelLastMessageAt: Record<string, Timestamp> = {};
+// lastMessage previews as written by the route.
+const channelLastMessage: Record<string, Record<string, unknown>> = {};
 // users/{uid}/chatReads/{channelId} writes, keyed `${uid}/${channelId}`.
 const receipts: Record<string, Record<string, unknown>> = {};
 // chatChannels/{c}/pushLog/{messageId}, keyed `${c}/${messageId}`; create() of an
@@ -268,6 +270,7 @@ vi.mock('@/lib/firebase/admin', () => ({
                   CHANNEL_DOCS[channelId] && {
                     ...CHANNEL_DOCS[channelId],
                     ...(channelLastMessageAt[channelId] ? { lastMessageAt: channelLastMessageAt[channelId] } : {}),
+                    ...(channelLastMessage[channelId] ? { lastMessage: channelLastMessage[channelId] } : {}),
                   },
               })),
               set: (data: Record<string, unknown>, options?: { merge?: boolean }) => {
@@ -276,6 +279,11 @@ vi.mock('@/lib/firebase/admin', () => ({
                   if (value instanceof Timestamp) channelLastMessageAt[channelId] = value;
                   else if (FieldValue.delete().isEqual(value as FieldValue)) delete channelLastMessageAt[channelId];
                   else channelLastMessageAt[channelId] = Timestamp.now();
+                }
+                if ('lastMessage' in data) {
+                  const value = data.lastMessage;
+                  if (value instanceof FieldValue) delete channelLastMessage[channelId];
+                  else channelLastMessage[channelId] = value as Record<string, unknown>;
                 }
                 return setMock(data, options);
               },
@@ -380,6 +388,7 @@ beforeEach(() => {
   msgUpdateMock.mockClear();
   for (const id of Object.keys(createdDocs)) delete createdDocs[id];
   for (const id of Object.keys(channelLastMessageAt)) delete channelLastMessageAt[id];
+  for (const id of Object.keys(channelLastMessage)) delete channelLastMessage[id];
   for (const id of Object.keys(receipts)) delete receipts[id];
   for (const id of Object.keys(pushLogs)) delete pushLogs[id];
   batchUpdates.length = 0;
@@ -640,6 +649,7 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     };
     expect(written.replyTo).toEqual({
       messageId: 'src-text',
+      authorId: 'other-uid',
       authorName: 'Author One',
       text: 'Original message text',
     });
@@ -1188,3 +1198,87 @@ describe('DELETE /api/portal/chat/messages (photo in Storage)', () => {
     }
   });
 });
+
+describe('channel lastMessage preview across send, edit and delete', () => {
+  function deleteReq(body: unknown) {
+    return new NextRequest('http://localhost/api/portal/chat/messages', { method: 'DELETE', body: JSON.stringify(body) });
+  }
+  const preview = (messageId: string, text: string, authorId = 'real-uid', authorName = 'Real User') => ({
+    messageId,
+    authorId,
+    authorName,
+    text,
+  });
+
+  it('a send writes the preview', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    await POST(req({ channelId: 'all-company', text: 'Doors at 4' }));
+    expect(channelLastMessage['all-company']).toMatchObject({ authorId: 'real-uid', authorName: 'Real User', text: 'Doors at 4' });
+  });
+
+  it('an edit rewrites the preview only when it shows that message', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    channelLastMessage['all-company'] = preview('own-msg', 'my message');
+    await PATCH(patchReq({ channelId: 'all-company', messageId: 'own-msg', text: 'my message, fixed' }));
+    expect(channelLastMessage['all-company']).toMatchObject({ messageId: 'own-msg', text: 'my message, fixed' });
+
+    channelLastMessage['all-company'] = preview('others-msg', 'not mine', 'someone-else', 'Someone');
+    await PATCH(patchReq({ channelId: 'all-company', messageId: 'own-msg', text: 'again' }));
+    expect(channelLastMessage['all-company']).toMatchObject({ messageId: 'others-msg', text: 'not mine' });
+  });
+
+  it('a delete clears the preview in the scrub, then points it at the newest standing message', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    channelLastMessageAt['all-company'] = Timestamp.fromMillis(2_000_000);
+    channelLastMessage['all-company'] = preview('own-msg', 'my message');
+    await DELETE(deleteReq({ channelId: 'all-company', messageId: 'own-msg' }));
+    // The scrub's own transaction dropped the deleted text from the channel doc.
+    expect(setMock).toHaveBeenCalledWith({ lastMessage: expect.any(FieldValue) }, { merge: true });
+    expect(channelLastMessage['all-company']).toMatchObject({ messageId: 'others-msg', text: 'not mine' });
+  });
+
+  it('a delete of a message the preview does not show leaves it', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    channelLastMessageAt['all-company'] = Timestamp.fromMillis(2_000_000);
+    channelLastMessage['all-company'] = preview('own-msg', 'my message');
+    await DELETE(deleteReq({ channelId: 'all-company', messageId: 'others-msg' }));
+    expect(channelLastMessage['all-company']).toMatchObject({ messageId: 'own-msg', text: 'my message' });
+  });
+});
+
+describe('content filter and chat agreement on send', () => {
+  it('refuses a slur on send and on edit, without writing', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const sent = await POST(req({ channelId: 'all-company', text: 'what a retard' }));
+    expect(sent.status).toBe(400);
+    expect((await sent.json()).code).toBe('content_filter');
+    expect(addMock).not.toHaveBeenCalled();
+
+    const edited = await PATCH(patchReq({ channelId: 'all-company', messageId: 'own-msg', text: 'f4ggot' }));
+    expect(edited.status).toBe(400);
+    expect(msgSetMock).not.toHaveBeenCalled();
+  });
+
+  it('masks severe profanity and still sends', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    const res = await POST(req({ channelId: 'all-company', text: 'fuck yes, 5 installs' }));
+    expect(res.status).toBe(200);
+    expect((addMock.mock.calls[0][0] as { text: string }).text).toBe('f*** yes, 5 installs');
+  });
+
+  it('refuses a send from the app before the chat agreement, and only from the app', async () => {
+    mockGate.mockResolvedValue({ ...VERIFIED, user: { ...VERIFIED.user, chatTermsAccepted: false } });
+    const appReq = new NextRequest('http://localhost/api/portal/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify({ channelId: 'all-company', text: 'hi' }),
+      headers: { 'user-agent': 'Mozilla/5.0 (iPhone) AppleWebKit 3CPortalApp/1.0.0' },
+    });
+    const blocked = await POST(appReq);
+    expect(blocked.status).toBe(403);
+    expect((await blocked.json()).code).toBe('chat_terms');
+    expect(addMock).not.toHaveBeenCalled();
+
+    expect((await POST(req({ channelId: 'all-company', text: 'hi' }))).status).toBe(200);
+  });
+});
+

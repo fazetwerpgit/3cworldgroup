@@ -2365,3 +2365,34 @@ button.person {
 .alertNotice svg {
   color: var(--c-lime);
 }
+
+/* Blocked authors in the desktop thread: one quiet row in the avatar column's place. */
+.deskBlockedRow {
+  padding: 2px var(--s4);
+}
+
+.deskBlockedRow .blockedRow {
+  /* Lines up with message text: past the 36px avatar column and its gap. */
+  margin-left: calc(36px + var(--s3));
+}
+
+/* A quote of a blocked author: no name, no words. */
+.quoteBlocked span {
+  color: var(--c-text-3);
+  font-style: italic;
+}
+
+/* Channel info: the chat support contact (guideline 1.2). */
+.infoSupport {
+  margin: 0;
+  padding: var(--s3) var(--s4) 0;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  line-height: 1.45;
+}
+
+.infoSupport a {
+  color: var(--c-text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

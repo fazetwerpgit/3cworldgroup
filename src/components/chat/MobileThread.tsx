@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, RefObject, TouchEvent } from 'react';
 import { AlertCircle, ArrowDown, Check, ChevronLeft, Clock, FileText, ImagePlus, Info, Lock, Pin, Reply, RotateCw, Send, X } from 'lucide-react';
 import { ChatAvatar } from '@/components/chat/ChatAvatar';
@@ -28,6 +28,8 @@ import { setScrollTopInstant, useStickToBottom } from '@/hooks/chat/useStickToBo
 import { isNativeApp, useIsNativeApp } from '@/lib/app/isNativeApp';
 import { nativeHaptic, onNativeMessage, type KeyboardEasing } from '@/lib/app/bridge';
 import type { ReportReason } from '@/lib/chat/moderationShared';
+import { authorIndex, isBlockedQuote, shouldCollapseBlocked } from '@/lib/chat/blocked';
+import { BlockedMessageButton, MessageQuote } from '@/components/chat/BlockedContent';
 import { ChatChannel, ChatAttachment, ChatReplySnippet } from '@/types';
 import c from './chat.module.css';
 
@@ -531,6 +533,7 @@ export function MobileThread({
 
   // Collapsed messages from blocked authors the reader tapped open (this visit only).
   const [revealedBlocked, setRevealedBlocked] = useState<ReadonlySet<string>>(() => new Set());
+  const authorById = useMemo(() => authorIndex(messages), [messages]);
   // Composer media state (mobile owns its own, mirroring the desktop composer).
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [attachFile, setAttachFile] = useState<File | null>(null);
@@ -1008,19 +1011,12 @@ export function MobileThread({
 
               // A blocked author's message stays in the flow (scroll anchoring,
               // day separators) as one quiet row the reader can open.
-              if (!isOwn && blockedUids?.has(message.authorId) && !revealedBlocked.has(message.id)) {
+              if (shouldCollapseBlocked(message, currentUserId, blockedUids, revealedBlocked)) {
                 return (
                   <div key={message.id}>
                     {showDaySeparator && message.createdAt && <div className={c.threadDay}>{dayLabel(message.createdAt)}</div>}
                     <div data-mid={message.id} className={`${c.bubbleWrap} ${spacing}`}>
-                      <button
-                        type="button"
-                        className={c.blockedRow}
-                        onClick={() => setRevealedBlocked((prev) => new Set(prev).add(message.id))}
-                      >
-                        Message from a blocked user
-                        <span>Show</span>
-                      </button>
+                      <BlockedMessageButton onShow={() => setRevealedBlocked((prev) => new Set(prev).add(message.id))} />
                     </div>
                   </div>
                 );
@@ -1104,10 +1100,7 @@ export function MobileThread({
                         }}
                       >
                         {message.replyTo && (
-                          <div className={c.quote}>
-                            <strong>{message.replyTo.authorName}</strong>
-                            <span>{message.replyTo.text}</span>
-                          </div>
+                          <MessageQuote replyTo={message.replyTo} blocked={isBlockedQuote(message.replyTo, blockedUids, authorById)} />
                         )}
                         {(message.attachment || message.localPreviewUrl || message.photoPending) && (
                           <BubbleImage
