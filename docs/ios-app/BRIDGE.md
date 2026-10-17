@@ -95,6 +95,13 @@ Write the file to the cache directory under `filename` and open the share sheet
 prefix. The portal sends every download this way inside the app: CSV exports,
 the employee export, onboarding zips. Result: `{ "completed": boolean }`.
 
+Shell-side safety net for downloads the web does not route: a
+`Content-Disposition: attachment` navigation (`onFileDownload`) or a click on a
+same-origin `<a download href="https://...">` makes the page fetch the file
+itself (with its cookies) and post a normal `saveFile` with an id starting
+`shell-download-`. The web ignores the reply (no pending request has that id).
+If the fetch fails, the shell opens the URL with `openExternal`.
+
 ### `openExternal` (event)
 ```json
 { "type": "openExternal", "url": "https://meet.google.com/abc-defg-hij" }
