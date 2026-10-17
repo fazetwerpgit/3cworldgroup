@@ -133,6 +133,39 @@ afterEach(() => {
 });
 
 describe('ChatOutboxProvider', () => {
+  it('parks a send refused for the chat rules, asks for the rules sheet, and resends after Agree', async () => {
+    fetchMock.mockReturnValueOnce(respond(403, { error: 'Agree to the team chat rules first.', code: 'chat_terms' }));
+    fetchMock.mockReturnValueOnce(respond(200, { success: true, messageId: ECHO_ID }));
+    render(true);
+    const onTerms = vi.fn();
+    const onError = vi.fn();
+    const stopTerms = outbox.subscribeTermsRequired(onTerms);
+    const stopErrors = outbox.subscribeErrors(onError);
+    act(() => outbox.send(echo()));
+    await settle();
+    expect(onTerms).toHaveBeenCalledTimes(1);
+    expect(onError).not.toHaveBeenCalledWith('Agree to the team chat rules first.');
+    expect(outbox.echoes[0].pendingState).toBe('failed');
+
+    act(() => outbox.retryTermsBlocked());
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(outbox.echoes[0].deliveredId).toBe(ECHO_ID);
+    stopTerms();
+    stopErrors();
+  });
+
+  it('shows the rules refusal as a plain error when no Chat page listens for it', async () => {
+    fetchMock.mockReturnValueOnce(respond(403, { error: 'Agree to the team chat rules first.', code: 'chat_terms' }));
+    render(true);
+    const onError = vi.fn();
+    const stopErrors = outbox.subscribeErrors(onError);
+    act(() => outbox.send(echo()));
+    await settle();
+    expect(onError).toHaveBeenCalledWith('Agree to the team chat rules first.');
+    stopErrors();
+  });
+
   it('keeps retrying a failed send after the Chat page closes, and stores it once', async () => {
     fetchMock.mockReturnValueOnce(respond(503, { error: 'busy' }));
     fetchMock.mockReturnValueOnce(respond(200, { success: true, messageId: ECHO_ID }));
