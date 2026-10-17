@@ -126,6 +126,19 @@ export function parseChatPendingPath(path: unknown, uid: string): { ext: string 
   return match ? { ext: match[2] } : null;
 }
 
+/**
+ * True when the path is somewhere inside THIS uid's pending folder
+ * (chat-pending/{uid}/...) with no empty, "." or ".." segment, even if it is
+ * not a well-formed pending name. Used only to clean up a refused upload: the
+ * caller may remove what it wrote, never another user's object.
+ */
+export function isOwnChatPendingObject(path: unknown, uid: string): path is string {
+  if (typeof path !== 'string' || !uid || uid.includes('/')) return false;
+  const parts = path.split('/');
+  if (parts.length < 3 || parts[0] !== CHAT_PENDING_PREFIX || parts[1] !== uid) return false;
+  return parts.slice(2).every((part) => part !== '' && part !== '.' && part !== '..');
+}
+
 /** Storage object path for a chat image: chat/{channelId}/{uuid}.{ext}. */
 export function chatObjectPath(channelId: string, uuid: string, ext: string): string {
   return `chat/${channelId}/${uuid}.${ext}`;

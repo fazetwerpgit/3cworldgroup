@@ -11,6 +11,7 @@ import {
   PDF_MIME,
   getChatStorageBucketName,
   hasPdfMagic,
+  isOwnChatPendingObject,
   parseChatPendingPath,
   sanitizeAttachmentFileName,
   uploadExtForMime,
@@ -144,6 +145,19 @@ async function uploadMultipart(request: NextRequest, user: ChatUser): Promise<Ne
   return uploadedResponse(buildTokenedDownloadUrl(bucketName, objectPath, token), file.type, name, buffer.length);
 }
 
+/**
+ * Best-effort removal of a refused upload. Callers pass only a path inside the
+ * caller's own chat-pending folder. Without a bucket config nothing can be done.
+ */
+async function discardOwnPending(pendingPath: string): Promise<void> {
+  if (!getChatStorageBucketName()) return;
+  try {
+    await getOnboardingBucket().file(pendingPath).delete({ ignoreNotFound: true });
+  } catch (error) {
+    console.error('[chat/media] failed to remove a refused pending upload', pendingPath, error);
+  }
+}
+
 async function attachPending(request: NextRequest, user: ChatUser): Promise<NextResponse> {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const channelId = typeof body?.channelId === 'string' ? body.channelId : '';
@@ -154,11 +168,18 @@ async function attachPending(request: NextRequest, user: ChatUser): Promise<Next
   const pendingPath = body?.pendingPath;
   const pending = parseChatPendingPath(pendingPath, user.uid);
   if (!pending || typeof pendingPath !== 'string') {
+    // A malformed name still inside the caller's own folder is theirs to lose.
+    if (isOwnChatPendingObject(pendingPath, user.uid)) await discardOwnPending(pendingPath);
     return NextResponse.json({ error: 'Invalid upload path' }, { status: 400 });
   }
 
   const refused = await checkChannel(channelId, user);
-  if (refused) return refused;
+  if (refused) {
+    // The upload can never be posted to this channel: drop it rather than
+    // leave it for the cron sweep.
+    if (refused.status === 403 || refused.status === 404) await discardOwnPending(pendingPath);
+    return refused;
+  }
 
   const bucketName = getChatStorageBucketName();
   if (!bucketName) {

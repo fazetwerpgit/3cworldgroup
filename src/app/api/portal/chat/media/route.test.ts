@@ -305,14 +305,37 @@ describe('POST /api/portal/chat/media (direct upload, JSON)', () => {
       expect(res.status, String(pendingPath)).toBe(400);
     }
     expect(copyMock).not.toHaveBeenCalled();
+    // Only the malformed paths inside the caller's own folder are removed;
+    // another user's object, a traversal and a chat/ object are never touched.
+    expect(deleteMock.mock.calls.map(([path]) => path).sort()).toEqual([
+      'chat-pending/rep-1/0f8fad5b-d9cb-469f-a165-70867728950e.exe',
+      'chat-pending/rep-1/x/0f8fad5b-d9cb-469f-a165-70867728950e.pdf',
+    ]);
+  });
+
+  it('does not delete a bad own path when storage is not configured', async () => {
+    mockGate.mockResolvedValue(REP);
+    delete process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    const pendingPath = 'chat-pending/rep-1/0f8fad5b-d9cb-469f-a165-70867728950e.exe';
+    putPdf(pendingPath);
+    expect((await POST(attach({ channelId: 'all-company', pendingPath }))).status).toBe(400);
     expect(deleteMock).not.toHaveBeenCalled();
+  });
+
+  it('removes the pending upload when the channel refuses it (403 or 404)', async () => {
+    mockGate.mockResolvedValue(REP);
+    putPdf();
+    expect((await POST(attach({ channelId: 'managers', pendingPath: PENDING_PDF }))).status).toBe(403);
+    expect(deleteMock).toHaveBeenCalledWith(PENDING_PDF);
+    putPdf();
+    expect((await POST(attach({ channelId: 'nope', pendingPath: PENDING_PDF }))).status).toBe(404);
+    expect(deleteMock).toHaveBeenCalledTimes(2);
+    expect(copyMock).not.toHaveBeenCalled();
   });
 
   it('checks the channel and the chat agreement before touching storage', async () => {
     putPdf();
     mockGate.mockResolvedValue(REP);
-    expect((await POST(attach({ channelId: 'managers', pendingPath: PENDING_PDF }))).status).toBe(403);
-    expect((await POST(attach({ channelId: 'nope', pendingPath: PENDING_PDF }))).status).toBe(404);
     expect((await POST(attach({ pendingPath: PENDING_PDF }))).status).toBe(400);
 
     const appUA = { 'user-agent': 'Mozilla/5.0 (iPhone) 3CPortal 3CPortalApp/1.0.0' };
