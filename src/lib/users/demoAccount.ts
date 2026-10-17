@@ -17,6 +17,8 @@
 // demo account at once, but firestore.rules reads chatChannels.memberIds
 // directly, and only the sync drops the uid from memberIds on every channel;
 // until then the client SDK can still read channels it was a member of.
+// Un-flagging (removing demoAccount from users/{uid}) does NOT un-hide its
+// sales: they keep their stamp and stay hidden until it is removed by hand.
 
 /** The users/{uid} field that marks a demo account (also stamped on its sales). */
 export const DEMO_ACCOUNT_FIELD = 'demoAccount';

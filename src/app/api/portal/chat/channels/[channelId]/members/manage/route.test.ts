@@ -231,6 +231,17 @@ describe('POST /api/portal/chat/channels/[channelId]/members/manage', () => {
     expect(firestore.setCalls).toHaveLength(0);
   });
 
+  it('returns 400 for a demo account and stores nothing', async () => {
+    mockGetUser.mockResolvedValue(ADMIN);
+    firestore.channels.set('managers', managersChannel());
+    firestore.users.set('demo', { status: 'active', fieldRole: 'entry_rep', demoAccount: true });
+
+    const res = await POST(req('managers', { uid: 'demo' }, 'POST'), ctx('managers'));
+
+    expect(res.status).toBe(400);
+    expect(firestore.setCalls).toHaveLength(0);
+  });
+
   it('adds an active user to BOTH extraMemberIds and memberIds', async () => {
     mockGetUser.mockResolvedValue(ADMIN);
     firestore.channels.set('managers', managersChannel());

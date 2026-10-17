@@ -303,3 +303,27 @@ describe('rankBoard — demo account sales', () => {
     expect(week.map((row) => row.id)).toEqual(['demo', 'r1', 'r2']);
   });
 });
+
+describe('loadRepSnapshot — demo account on the shared Board cache', () => {
+  it('a demo viewer first does not put its sale on a real viewer’s Board second', async () => {
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
+    data.users.demo = { status: 'active', fieldRole: 'entry_rep', demoAccount: true };
+    data.sales.demoSale = {
+      salesRepId: 'demo',
+      salesRepName: 'App Review',
+      status: 'approved',
+      saleDate: noon('2026-09-26'),
+      createdAt: noon('2026-09-26'),
+      totalPoints: 99,
+      demoAccount: true,
+    };
+    const { db } = createFakeAskDb(data);
+
+    const demoText = await loadRepSnapshot(db as unknown as Firestore, 'demo', NOW);
+    const realText = await loadRepSnapshot(db as unknown as Firestore, 'r1', NOW);
+
+    expect(demoText).toContain('#1 of 4 with 1 sale, 99 points');
+    expect(realText).toContain('#2 of 3 with 1 sale, 10 points');
+    expect(realText).not.toContain('App Review');
+  });
+});
