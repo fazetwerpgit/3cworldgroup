@@ -45,8 +45,12 @@ function checkStatus(
 
 // Verifies a real Firebase ID token and returns the caller's uid + user doc data.
 // Shared by the verified-auth helpers below. Expects: Authorization: Bearer <idToken>.
+// `checkRevoked` also rejects a token whose session was revoked (password
+// change, disabled account, revokeRefreshTokens). It costs an Auth lookup, so
+// only routes that mint credentials opt in; everything else keeps the plain check.
 async function verifyCaller(
-  request: NextRequest
+  request: NextRequest,
+  options: { checkRevoked?: boolean } = {}
 ): Promise<{ ok: true; uid: string; data: FirebaseFirestore.DocumentData } | { ok: false; error: string; status: number }> {
   if (!adminAuth || !adminDb) {
     return { ok: false, error: 'Auth not configured', status: 500 };
@@ -58,7 +62,9 @@ async function verifyCaller(
   }
   let uid: string;
   try {
-    const decoded = await adminAuth.verifyIdToken(token);
+    const decoded = options.checkRevoked
+      ? await adminAuth.verifyIdToken(token, true)
+      : await adminAuth.verifyIdToken(token);
     uid = decoded.uid;
   } catch {
     return { ok: false, error: 'Invalid authentication token', status: 401 };
@@ -79,12 +85,13 @@ async function verifyCaller(
 // self-submit). Returns the verified uid + name/email — the route stamps from this,
 // never from client input. `isOwner` lets a route open a feature to the owner first.
 export async function requireVerifiedUser(
-  request: NextRequest
+  request: NextRequest,
+  options: { checkRevoked?: boolean } = {}
 ): Promise<
   | { ok: true; uid: string; name: string; email: string; isOwner: boolean; isAdmin: boolean }
   | { ok: false; error: string; status: number }
 > {
-  const c = await verifyCaller(request);
+  const c = await verifyCaller(request, options);
   if (!c.ok) return c;
   const { role } = resolveRoles(c.data.role, c.data.fieldRole);
   return {
