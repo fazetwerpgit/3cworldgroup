@@ -8,6 +8,7 @@ import {
   roleRequiresOnboarding,
 } from '@/types';
 import { resolveRoles, PlatformRole, FieldRole } from '@/types';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 export interface ChatChannelMembership {
   channelIds: string[];
@@ -78,10 +79,13 @@ export function readExtraMemberIds(data: FirebaseFirestore.DocumentData): string
 // can honor manual additions: a uid in extraMemberIds gets in even when the role/audience
 // check fails. Every chat route gates on this so added people see the channel and its
 // messages/media. Falls back to the audience check for everyone else.
+// A demo account reaches no channel at all: `demoAccount` is required so every caller
+// has to carry the flag (a raw uid in extraMemberIds must not let one in).
 export function userCanAccessChannelDoc(
   data: FirebaseFirestore.DocumentData,
-  identity: { uid: string; role?: PlatformRole; fieldRole?: FieldRole }
+  identity: { uid: string; role?: PlatformRole; fieldRole?: FieldRole; demoAccount: boolean }
 ): boolean {
+  if (identity.demoAccount) return false;
   const channel = toChatChannel(typeof data.id === 'string' ? data.id : '', data);
   // A malformed (unparseable) or archived (active:false) channel is off-limits to
   // EVERYONE — extras included. Only fall through to the manual-members check once the
@@ -93,6 +97,7 @@ export function userCanAccessChannelDoc(
 }
 
 export function isEligibleChatMember(data: FirebaseFirestore.DocumentData): boolean {
+  if (isDemoAccount(data)) return false;
   const { fieldRole } = resolveRoles(data.role, data.fieldRole);
   return data.status === 'active' ||
     (data.status === 'pending' && roleRequiresOnboarding(fieldRole));

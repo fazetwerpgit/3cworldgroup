@@ -19,6 +19,7 @@ import { isAwaitingCarrier } from '@/lib/sales/installBucket';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { LIVE_DEFAULT_ZONE, zoneFor } from './prompt';
 import { redactContact } from './redact';
+import { DEMO_ACCOUNT_FIELD, isDemoSale } from '@/lib/users/demoAccount';
 
 // The asking rep's own portal data, as a short plain-text block for Ask 3C's
 // prompt: their sales and install status, their spot on the Board, the next
@@ -228,7 +229,7 @@ const BOARD_PERIODS: Array<[LeaderboardPeriod, string]> = [
   ['month', 'This month'],
 ];
 
-interface BoardRow {
+export interface BoardRow {
   id: string;
   name: string;
   sales: number;
@@ -239,41 +240,27 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const rowText = (row: BoardRow, rank: number) =>
   `#${rank} ${clean(row.name, 40) || 'Unknown'} (${plural(row.sales, 'sale')}, ${plural(row.points, 'point')})`;
 
-/** Each period's ranking, company-wide, kept for a minute per db so back-to-back questions don't re-read. */
-const boardCache = new WeakMap<Db, { key: string; expires: number; ranked: BoardRow[][] }>();
+/** One counted sale as the Board reads it; `demo` marks a demo account's sale. */
+export interface BoardSale {
+  repId: string;
+  name: string;
+  points: number;
+  at: number;
+  demo: boolean;
+}
+
+/** The period's counted sales, company-wide, kept for a minute per db so back-to-back questions don't re-read. */
+const boardCache = new WeakMap<Db, { key: string; expires: number; sales: BoardSale[] }>();
 
 /**
- * The Board as GET /api/portal/leaderboard builds it: approved sales since the
- * period start, ranked by points. Only sales since the earlier of the week and
- * month starts are read, with a field mask. Filtering status in memory keeps
- * this a single-field range on saleDate (Firestore's automatic index); status
- * + saleDate in the query would need a composite index that doesn't exist.
+ * Each period's ranking for `viewerUid`: a demo account's sales are left out
+ * unless the viewer is that demo account (it still sees its own standing).
  */
-async function boardRankings(db: Db, now: Date): Promise<BoardRow[][]> {
-  const starts = BOARD_PERIODS.map(([period]) => periodBounds(period, now)?.start.getTime() ?? 0);
-  const key = starts.join('|');
-  const cached = boardCache.get(db);
-  if (cached && cached.key === key && cached.expires > now.getTime()) return cached.ranked;
-
-  const snap = await db
-    .collection('sales')
-    .where('saleDate', '>=', new Date(Math.min(...starts)))
-    .orderBy('saleDate', 'desc')
-    .select('salesRepId', 'salesRepName', 'totalPoints', 'saleDate', 'status')
-    .limit(BOARD_FETCH)
-    .get();
-  const sales = snap.docs
-    .map((doc) => doc.data() as Data)
-    .filter((data) => data.status === 'approved')
-    .map((data) => ({
-      repId: str(data.salesRepId),
-      name: str(data.salesRepName) || 'Unknown',
-      points: typeof data.totalPoints === 'number' ? data.totalPoints : 0,
-      at: toDate(data.saleDate)?.getTime() ?? 0,
-    }));
-  const ranked = starts.map((start) => {
+export function rankBoard(sales: readonly BoardSale[], starts: readonly number[], viewerUid: string): BoardRow[][] {
+  const counted = sales.filter((sale) => !sale.demo || sale.repId === viewerUid);
+  return starts.map((start) => {
     const byRep = new Map<string, BoardRow>();
-    for (const sale of sales) {
+    for (const sale of counted) {
       if (sale.at < start || !sale.repId) continue;
       const row = byRep.get(sale.repId) ?? { id: sale.repId, name: sale.name, sales: 0, points: 0 };
       row.sales += 1;
@@ -282,14 +269,46 @@ async function boardRankings(db: Db, now: Date): Promise<BoardRow[][]> {
     }
     return [...byRep.values()].sort((a, b) => boardOrder({ score: a.points, name: a.name, id: a.id }, { score: b.points, name: b.name, id: b.id }));
   });
-  boardCache.set(db, { key, expires: now.getTime() + BOARD_CACHE_MS, ranked });
-  return ranked;
+}
+
+/**
+ * The Board as GET /api/portal/leaderboard builds it: approved sales since the
+ * period start, ranked by points. Only sales since the earlier of the week and
+ * month starts are read, with a field mask. Filtering status in memory keeps
+ * this a single-field range on saleDate (Firestore's automatic index); status
+ * + saleDate in the query would need a composite index that doesn't exist.
+ */
+async function boardRankings(db: Db, now: Date, viewerUid: string): Promise<BoardRow[][]> {
+  const starts = BOARD_PERIODS.map(([period]) => periodBounds(period, now)?.start.getTime() ?? 0);
+  const key = starts.join('|');
+  const cached = boardCache.get(db);
+  if (cached && cached.key === key && cached.expires > now.getTime()) return rankBoard(cached.sales, starts, viewerUid);
+
+  const snap = await db
+    .collection('sales')
+    .where('saleDate', '>=', new Date(Math.min(...starts)))
+    .orderBy('saleDate', 'desc')
+    .select('salesRepId', 'salesRepName', 'totalPoints', 'saleDate', 'status', DEMO_ACCOUNT_FIELD)
+    .limit(BOARD_FETCH)
+    .get();
+  const sales: BoardSale[] = snap.docs
+    .map((doc) => doc.data() as Data)
+    .filter((data) => data.status === 'approved')
+    .map((data) => ({
+      repId: str(data.salesRepId),
+      name: str(data.salesRepName) || 'Unknown',
+      points: typeof data.totalPoints === 'number' ? data.totalPoints : 0,
+      at: toDate(data.saleDate)?.getTime() ?? 0,
+      demo: isDemoSale(data),
+    }));
+  boardCache.set(db, { key, expires: now.getTime() + BOARD_CACHE_MS, sales });
+  return rankBoard(sales, starts, viewerUid);
 }
 
 const BOARD_LIST_MAX = 10;
 
 async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
-  const rankings = await boardRankings(db, now);
+  const rankings = await boardRankings(db, now, uid);
   const lines = BOARD_PERIODS.map(([period, name], i) => {
     // The period's own dates (Central, like the Board), so "when does the week reset" is never a guess.
     const bounds = periodBounds(period, now);

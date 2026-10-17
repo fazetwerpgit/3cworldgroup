@@ -152,3 +152,25 @@ describe('GET /api/portal/sales/company-stats', () => {
     expect(json.topRep).toEqual({ repName: 'Braeden Crouse', count: 2 });
   });
 });
+
+describe('GET /api/portal/sales/company-stats — demo accounts', () => {
+  it("leaves a demo account's sales off the company tape", async () => {
+    state.docs = [
+      { salesRepId: 'r1', salesRepName: 'Wil Teasdale', totalValue: 120, saleDate: stamp(thisMonth), createdAt: stamp(thisMonth) },
+      {
+        salesRepId: 'demo',
+        salesRepName: 'App Review',
+        totalValue: 999,
+        saleDate: stamp(thisMonth),
+        createdAt: stamp(new Date(thisMonth.getTime() + 60_000)),
+        demoAccount: true,
+      },
+    ];
+
+    const json = await (await GET(get())).json();
+
+    expect(json.mtdCount).toBe(1);
+    expect(json.mtdMonthlyValue).toBe(120);
+    expect(JSON.stringify(json)).not.toMatch(/App Review/);
+  });
+});

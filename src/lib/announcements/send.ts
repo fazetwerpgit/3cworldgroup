@@ -2,6 +2,7 @@ import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { sendPushToTokens, type PushPayload } from '@/lib/push/sendPush';
 import { pushTargetsOf } from '@/lib/push/pushTargets';
 import { ANNOUNCEMENT_URL, type AnnouncementStatus, type AnnouncementView } from './schedule';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 // Server side of owner announcements: who receives them, the fan-out, and the
 // cron's due-and-claim loop. The announcements collection is server-only
@@ -44,7 +45,7 @@ export async function announcementRecipients(db: Firestore): Promise<Recipient[]
   for (const doc of snap.docs) {
     const data = doc.data();
     // The query already filters; this guards against a doc changing shape.
-    if (data.status !== 'active') continue;
+    if (data.status !== 'active' || isDemoAccount(data)) continue;
     const recipient = recipientOf(doc.id, data);
     if (recipient.tokens.length || recipient.nativeTokens?.length) recipients.push(recipient);
   }

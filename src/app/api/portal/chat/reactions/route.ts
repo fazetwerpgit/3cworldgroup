@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
         uid: user.uid,
         role: user.role,
         fieldRole: user.fieldRole,
+        demoAccount: user.demoAccount,
       })
     ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

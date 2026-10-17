@@ -15,6 +15,7 @@ import { chicagoMonthBounds, formatMonthParam, parseLeaderboardMonth, periodBoun
 import { chicagoMonthKey, type MonthKey } from '@/lib/sales/monthWindow';
 import { boardOrder } from '@/lib/leaderboard/order';
 import { recentSales, unrankedReps, type RecentSale, type UnrankedRep } from '@/lib/leaderboard/team';
+import { saleVisibleTo } from '@/lib/users/demoAccount';
 
 // How many ranked rows a non-management caller may pull in one request. The
 // most any rep-facing view asks for is 100 (dashboard); the mini widget asks 5.
@@ -114,6 +115,9 @@ export async function GET(request: NextRequest) {
     const rawById = new Map<string, Record<string, unknown>>();
     salesSnapshot.forEach((doc) => {
       const data = doc.data() as Record<string, unknown>;
+      // A demo account's sales never reach anyone else's board, weekly
+      // challenge, recent feed or carrier join; the demo account sees its own.
+      if (!saleVisibleTo(data, gate.uid)) return;
       rawById.set(doc.id, data);
       sales.push(toSale(doc.id, data));
     });

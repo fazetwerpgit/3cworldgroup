@@ -4,6 +4,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { canAccessChatChannel, isAdminLevel, resolveRoles } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { readExtraMemberIds, toChatChannel } from '@/lib/chat/channels';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 // Manage a channel's manually-added members. PLATFORM ADMINS ONLY (client decision:
 // "add people = admins only" — moderator/operations is intentionally not enough).
@@ -80,6 +81,10 @@ export async function POST(
     }
     if ((userSnap.data() ?? {}).status !== 'active') {
       return NextResponse.json({ error: 'User is not active' }, { status: 400 });
+    }
+    // A demo account reaches no channel; storing it as an extra would only put it in memberIds.
+    if (isDemoAccount(userSnap.data())) {
+      return NextResponse.json({ error: 'Demo accounts cannot join channels' }, { status: 400 });
     }
 
     await ref.set(

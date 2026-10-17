@@ -16,6 +16,18 @@ describe('unrankedReps', () => {
       { salesRepId: 'a', salesRepName: 'Cara' },
     ]);
   });
+
+  it('never lists a demo account, while a non-true demoAccount value stays listed', () => {
+    const users = [
+      { id: 'a', data: { status: 'active', role: 'rep', fieldRole: 'entry_level_rep', displayName: 'App Review', demoAccount: true } },
+      { id: 'b', data: { status: 'active', role: 'rep', fieldRole: 'entry_level_rep', displayName: 'Ben', demoAccount: false } },
+      { id: 'c', data: { status: 'active', role: 'rep', fieldRole: 'entry_level_rep', displayName: 'Cara', demoAccount: 'true' } },
+    ];
+    expect(unrankedReps(users, new Set())).toEqual([
+      { salesRepId: 'b', salesRepName: 'Ben' },
+      { salesRepId: 'c', salesRepName: 'Cara' },
+    ]);
+  });
 });
 
 describe('recentSales', () => {

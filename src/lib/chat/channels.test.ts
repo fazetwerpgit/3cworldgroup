@@ -74,10 +74,13 @@ vi.mock('@/lib/firebase/admin', () => ({
 
 import { FieldValue } from 'firebase-admin/firestore';
 import {
+  belongsInChannelDoc,
   createChannelId,
   getMemberIdsForAudience,
+  isEligibleChatMember,
   reconcileChatMembershipForUser,
   syncChatChannels,
+  userCanAccessChannelDoc,
 } from './channels';
 import { canAccessChatChannel, MANAGEMENT_FIELD_ROLES } from '@/types';
 import type { ChatChannel } from '@/types';
@@ -111,6 +114,19 @@ describe('syncChatChannels', () => {
     const memberIds = await getMemberIdsForAudience('field');
 
     expect(memberIds.sort()).toEqual(['active-rep', 'pending-hire']);
+  });
+
+  it('leaves a demo account out of every audience, even as a manual extra', async () => {
+    firestore.users.set('active-rep', { status: 'active', fieldRole: 'entry_rep' });
+    firestore.users.set('demo', { status: 'active', role: 'rep', fieldRole: 'entry_level_rep', demoAccount: true });
+
+    for (const audience of ['all', 'field'] as const) {
+      expect(await getMemberIdsForAudience(audience)).toEqual(['active-rep']);
+    }
+    expect(isEligibleChatMember({ status: 'active', fieldRole: 'entry_level_rep', demoAccount: true })).toBe(false);
+    expect(isEligibleChatMember({ status: 'active', fieldRole: 'entry_level_rep', demoAccount: false })).toBe(true);
+    const channel = { id: 'general', name: 'General', audience: 'all', order: 0, active: true, extraMemberIds: ['demo'] };
+    expect(belongsInChannelDoc(channel, 'demo', firestore.users.get('demo')!)).toBe(false);
   });
 
   it('unions audience-derived members with surviving extras, dropping deleted and deactivated extras', async () => {
@@ -249,5 +265,20 @@ describe('canAccessChatChannel', () => {
       expect(canAccessChatChannel(channel, undefined, fieldRole)).toBe(false);
     }
     expect(canAccessChatChannel(channel, undefined, undefined)).toBe(false);
+  });
+});
+
+describe('userCanAccessChannelDoc — demo accounts', () => {
+  const custom = { id: 'leads', name: 'Leads', audience: 'managers', order: 5, active: true, extraMemberIds: ['demo', 'r1'] };
+  const general = { id: 'general', name: 'General', audience: 'all', order: 0, active: true };
+
+  it('denies a demo account even when its raw uid sits in extraMemberIds', () => {
+    expect(userCanAccessChannelDoc(custom, { uid: 'demo', demoAccount: true })).toBe(false);
+    expect(userCanAccessChannelDoc(general, { uid: 'demo', fieldRole: 'entry_level_rep', demoAccount: true })).toBe(false);
+  });
+
+  it('still lets a real manual extra and a real audience member in', () => {
+    expect(userCanAccessChannelDoc(custom, { uid: 'r1', demoAccount: false })).toBe(true);
+    expect(userCanAccessChannelDoc(general, { uid: 'r2', fieldRole: 'entry_level_rep', demoAccount: false })).toBe(true);
   });
 });

@@ -142,6 +142,29 @@ beforeEach(() => {
 });
 
 describe('runOverdueInstallAlerts', () => {
+  it('never alerts a demo account, as if it were not active', async () => {
+    const data = seed();
+    (data.users as Record<string, Data>).gone = { displayName: 'App Review', status: 'active', role: 'field', demoAccount: true };
+    const { db } = fakeDb(data);
+    const dispatch = vi.fn().mockResolvedValue(undefined);
+    const result = await runOverdueInstallAlerts({ db, now: morning('2026-10-09'), dispatch });
+
+    expect(result.counts).toMatchObject({ overdue: 2, repAlertsSent: 1, skippedInactiveRep: 1 });
+    expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ userId: 'gone' }));
+  });
+
+  it("leaves a demo account's sales out of the overdue list and the owner digest", async () => {
+    const data = seed();
+    const sales = data.sales as Record<string, Data>;
+    sales.orphan = { ...sales.orphan, salesRepId: 'demo', salesRepName: 'App Review', demoAccount: true };
+    const { db } = fakeDb(data);
+    const dispatch = vi.fn().mockResolvedValue(undefined);
+    const result = await runOverdueInstallAlerts({ db, now: morning('2026-10-09'), dispatch });
+
+    expect(result.counts.overdue).toBe(1);
+    expect(JSON.stringify([result, dispatch.mock.calls])).not.toMatch(/App Review|Olive/);
+  });
+
   it('tells the active rep about each overdue sale and the owners once, with no money', async () => {
     const { db, store } = fakeDb(seed());
     const dispatch = vi.fn().mockResolvedValue(undefined);

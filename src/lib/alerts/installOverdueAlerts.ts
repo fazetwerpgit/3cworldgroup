@@ -13,6 +13,7 @@ import {
 } from '@/lib/sales/installOverdue';
 import { toFiberOrder, toSale } from '@/lib/weeklyInstalls/gather';
 import type { OverdueAlertCounts } from '@/types/fiberOrder';
+import { isDemoAccount, isDemoSale } from '@/lib/users/demoAccount';
 
 // Overdue installs, told after the daily carrier report lands (the moment the
 // data changes). The rule and the words are lib/sales/installOverdue.ts; this
@@ -190,12 +191,14 @@ export async function runOverdueInstallAlerts(deps: OverdueRunDeps): Promise<Ove
   const ownerIds: string[] = [];
   for (const doc of usersSnap.docs) {
     const data = doc.data() ?? {};
+    if (isDemoAccount(data)) continue;
     const name = text(data.displayName) ?? text(data.name);
     if (name) repNames.set(doc.id, name);
     if (data.status === 'active') activeUsers.add(doc.id);
     if (data.role === 'owner') ownerIds.push(doc.id);
   }
-  const sales = salesSnap.docs.map((doc) => toSale(doc.id, doc.data() ?? {}));
+  // Demo sales stay out: no overdue alert (owner digest included) names one.
+  const sales = salesSnap.docs.filter((doc) => !isDemoSale(doc.data())).map((doc) => toSale(doc.id, doc.data() ?? {}));
   const orders = ordersSnap.docs.map((doc) => toFiberOrder(doc.id, doc.data() ?? {}));
   const book = buildMergedBook(sales, orders, { now, repNames, reportAsOf });
 

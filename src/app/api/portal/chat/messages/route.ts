@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     if (!found) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })) {
+    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     await ensureChatChannelMember(channelId, user.uid);
@@ -215,7 +215,7 @@ export async function POST(request: NextRequest) {
     if (!found) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })) {
+    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -367,7 +367,7 @@ export async function PATCH(request: NextRequest) {
     const found = await getFirestoreChatChannel(channelId);
     if (
       !found ||
-      !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })
+      !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })
     ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -486,7 +486,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const found = await getFirestoreChatChannel(channelId);
-    if (!found || !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole })) {
+    if (!found || !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

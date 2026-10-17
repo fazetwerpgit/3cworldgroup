@@ -4,7 +4,7 @@ const { defaultDispatch } = vi.hoisted(() => ({ defaultDispatch: vi.fn() }));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: defaultDispatch }));
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: null }));
 
-import { isCalloutNudgeHour, repCalloutDay, runCalloutNudges } from './calloutNudges';
+import { isCalloutNudgeHour, loadDaySales, repCalloutDay, runCalloutNudges } from './calloutNudges';
 
 type Data = Record<string, unknown>;
 type Filter = (data: Data) => boolean;
@@ -26,7 +26,10 @@ function fakeDb(seed: Record<string, Record<string, Data>>) {
     const value = (x: unknown) => (x instanceof Date ? x.getTime() : (x as number));
     return value(a) - value(b);
   };
-  const query = (path: string, filters: Filter[]): Record<string, unknown> => ({
+  // select() projects like Firestore: a field it leaves out is not on the doc.
+  const project = (data: Data, fields: string[] | null) =>
+    fields ? Object.fromEntries(fields.filter((f) => f in data).map((f) => [f, data[f]])) : data;
+  const query = (path: string, filters: Filter[], fields: string[] | null = null): Record<string, unknown> => ({
     where: (field: string, op: string, value: unknown) => {
       const test: Filter =
         op === '=='
@@ -38,11 +41,16 @@ function fakeDb(seed: Record<string, Record<string, Data>>) {
               : () => {
                   throw new Error(`fakeDb: unsupported op ${op}`);
                 };
-      return query(path, [...filters, test]);
+      return query(path, [...filters, test], fields);
     },
-    select: () => query(path, filters),
+    select: (...picked: string[]) => query(path, filters, picked),
     get: async () => ({
-      docs: [...table(path).keys()].filter((id) => filters.every((f) => f(table(path).get(id)!))).map((id) => snap(path, id)),
+      docs: [...table(path).keys()]
+        .filter((id) => filters.every((f) => f(table(path).get(id)!)))
+        .map((id) => {
+          const data = project(table(path).get(id)!, fields);
+          return { id, exists: true, data: () => data, get: (field: string) => data[field] };
+        }),
     }),
   });
   const collection = (path: string) => ({
@@ -112,6 +120,19 @@ beforeEach(() => {
 });
 
 describe('runCalloutNudges', () => {
+  it('never nudges a demo account, as if it were not active', async () => {
+    const data = seed();
+    (data.users as Record<string, Data>).demo = { displayName: 'App Review', status: 'active', demoAccount: true };
+    (data['chatChannels/all-company/messages'] as Record<string, Data>).m9 = msg('demo', 'App Review', '1 gig', chicago('2026-10-09', '13:30'));
+    const { db } = fakeDb(data);
+    const dispatch = vi.fn(async () => {});
+
+    const summary = await runCalloutNudges({ db, now: NINE_PM, dispatch });
+
+    expect(summary).toMatchObject({ short: 3, skippedInactiveRep: 2, sent: 1 });
+    expect(dispatch.mock.calls.map((call) => (call as unknown as [{ userId: string }])[0].userId)).toEqual(['miles']);
+  });
+
   it('pushes each active rep still short today once, with the counts', async () => {
     const { db, creates } = fakeDb(seed());
     const dispatch = vi.fn(async () => {});
@@ -214,6 +235,23 @@ describe('repCalloutDay', () => {
       callouts: 0,
       gap: 0,
     });
+  });
+});
+
+describe('loadDaySales — demo accounts', () => {
+  it("drops a demo account's sale (the select carries the stamp, so the filter sees it)", async () => {
+    const data = seed();
+    (data.sales as Record<string, Data>).s3 = {
+      salesRepId: 'demo',
+      saleDate: saleNoon('2026-10-09'),
+      createdAt: chicago('2026-10-09', '13:00'),
+      demoAccount: true,
+    };
+    const { db } = fakeDb(data);
+
+    const sales = await loadDaySales(db, '2026-10-09');
+
+    expect(sales.map((sale) => sale.salesRepId).sort()).toEqual(['mason', 'miles']);
   });
 });
 

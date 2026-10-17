@@ -76,6 +76,8 @@ function seed(announcements: Record<string, Doc>) {
       nodevice: { status: 'active', role: 'rep', pushTokens: [] },
       pending1: { status: 'pending', role: 'rep', pushTokens: ['p1'] },
       gone1: { status: 'inactive', role: 'rep', pushTokens: ['g1'] },
+      // A demo account (App Review) with a device: never a recipient.
+      demo1: { status: 'active', role: 'rep', demoAccount: true, pushTokens: ['d1'] },
     },
     announcements,
   });
@@ -90,7 +92,7 @@ beforeEach(() => {
 });
 
 describe('announcementRecipients', () => {
-  it('is every active user, any role, with a registered device', async () => {
+  it('is every active user, any role, with a registered device, minus demo accounts', async () => {
     const { db } = seed({});
     const recipients = await announcementRecipients(db);
     expect(recipients.map((r) => r.uid).sort()).toEqual(['admin1', 'owner1', 'rep1']);

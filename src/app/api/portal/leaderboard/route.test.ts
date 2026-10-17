@@ -282,3 +282,41 @@ describe('GET /api/portal/leaderboard — owner viewing as a rep', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('GET /api/portal/leaderboard — demo account sales', () => {
+  beforeEach(() => vi.setSystemTime(new Date('2026-09-16T17:00:00.000Z')));
+
+  const demoSale = (minutesAgo: number) => ({
+    ...sale(new Date(Date.UTC(2026, 8, 16, 16, 59 - minutesAgo)).toISOString(), 'demo'),
+    salesRepName: 'App Review',
+    createdAt: new Date(Date.UTC(2026, 8, 16, 16, 59 - minutesAgo)),
+    products: [{ productName: 'TFiber 1 Gig', company: 'tfiber' }],
+    demoAccount: true,
+  });
+  const realSale = {
+    ...sale('2026-09-15T17:00:00.000Z', 'u2'),
+    salesRepName: 'Real Rep',
+    createdAt: new Date('2026-09-15T17:00:00.000Z'),
+    products: [{ productName: 'TFiber 1 Gig', company: 'tfiber' }],
+  };
+
+  it('keeps a demo sale off the board, the weekly challenge and the recent feed for everyone else', async () => {
+    state.docs = [demoSale(0), demoSale(1), realSale];
+    const ranked = await (await GET(new NextRequest('http://localhost/api/portal/leaderboard?period=week&limit=100&include=team'))).json();
+    const submitted = await (await GET(new NextRequest('http://localhost/api/portal/leaderboard?period=week&scope=submitted'))).json();
+
+    expect(ranked.leaderboard.map((row: { salesRepId: string }) => row.salesRepId)).toEqual(['u2']);
+    expect(ranked.totalRanked).toBe(1);
+    expect(ranked.recent.map((row: { repName: string }) => row.repName)).toEqual(['Real Rep']);
+    expect(submitted.leaderboard.map((row: { salesRepId: string }) => row.salesRepId)).toEqual(['u2']);
+    expect(JSON.stringify([ranked, submitted])).not.toMatch(/App Review|"demo"/);
+  });
+
+  it('still shows the demo account its own sales', async () => {
+    vi.mocked(requireVerifiedRequester).mockResolvedValueOnce({ ok: true, uid: 'demo', isManagement: false } as never);
+    state.docs = [demoSale(0), realSale];
+    const json = await response('week');
+
+    expect(json.currentUser).toMatchObject({ salesRepId: 'demo', totalSales: 1 });
+  });
+});

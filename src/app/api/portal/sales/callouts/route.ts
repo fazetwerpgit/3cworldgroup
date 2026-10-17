@@ -4,6 +4,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveSubject } from '@/lib/auth/viewAs';
 import { repCalloutDay } from '@/lib/alerts/calloutNudges';
 import type { CalloutStatus } from '@/lib/sales/calloutNudge';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 export const runtime = 'nodejs';
 
@@ -24,8 +25,13 @@ export async function GET(request: NextRequest) {
     if (!subject.ok) {
       return NextResponse.json({ error: subject.error }, { status: subject.status });
     }
-    const { day, callouts, logged, gap } = await repCalloutDay(adminDb, subject.uid);
-    const body: CalloutStatus = { day, callouts, logged, gap };
+    const [{ day, callouts, logged, gap }, userSnap] = await Promise.all([
+      repCalloutDay(adminDb, subject.uid),
+      adminDb.collection('users').doc(subject.uid).get(),
+    ]);
+    // A demo account has no chat to call a sale out in, so it is never short.
+    const demo = isDemoAccount(userSnap.data());
+    const body: CalloutStatus = { day, callouts, logged, gap: demo ? 0 : gap };
     return NextResponse.json(body, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('[sales/callouts]', error);

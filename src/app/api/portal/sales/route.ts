@@ -16,6 +16,7 @@ import {
   orderNumberRawVariants,
   type OrderDuplicate,
 } from '@/lib/sales/orderNumber';
+import { isDemoAccount, saleVisibleTo } from '@/lib/users/demoAccount';
 
 // Helper function to create a notification
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -153,6 +154,11 @@ export async function GET(request: NextRequest) {
       if (status && data.status !== status) {
         return;
       }
+      // A demo account's sales stay out of everyone else's book; an admin who
+      // filters to that account by id still reads them.
+      if (!saleVisibleTo(data, gate.uid) && data.salesRepId !== salesRepId) {
+        return;
+      }
 
       sales.push({
         id: doc.id,
@@ -240,7 +246,7 @@ function saleTime(value: unknown): number {
  */
 async function findOrderDuplicate(
   rawOrderNumber: unknown,
-  caller: { uid: string; isAdmin: boolean }
+  caller: { uid: string; isAdmin: boolean; demoAccount: boolean }
 ): Promise<OrderDuplicate | null> {
   if (!adminDb) return null;
   const key = normalizeOrderNumber(rawOrderNumber);
@@ -258,7 +264,11 @@ async function findOrderDuplicate(
   for (const snap of [byKey, byRaw]) {
     snap?.forEach((doc) => {
       const data = doc.data() ?? {};
-      if (!seen.has(doc.id) && isLiveSale(data) && normalizeOrderNumber(data.orderNumberOrBtn) === key) {
+      // A demo sale never clashes for anyone else (it would name the demo
+      // account), and a demo caller only clashes with its own sales (a real
+      // rep's name must not reach App Review).
+      const inScope = caller.demoAccount ? data.salesRepId === caller.uid : saleVisibleTo(data, caller.uid);
+      if (!seen.has(doc.id) && inScope && isLiveSale(data) && normalizeOrderNumber(data.orderNumberOrBtn) === key) {
         seen.set(doc.id, data);
       }
     });
@@ -303,6 +313,8 @@ export async function POST(request: NextRequest) {
     // trust a client-supplied managerId (it routes the approval notification).
     const repSnap = await adminDb.collection('users').doc(salesRepId).get();
     const managerId = repSnap.data()?.reportsToId || null;
+    // A demo account's sales are stamped so every cross-user view can drop them.
+    const demoAccount = isDemoAccount(repSnap.data());
 
     const body = await request.json();
     const {
@@ -432,7 +444,7 @@ export async function POST(request: NextRequest) {
     // submit of THIS sale still comes back as itself, not as a clash.
     if (allowDuplicate !== true) {
       // Fails open: a check that cannot run must never cost the rep the sale.
-      const existing = await findOrderDuplicate(orderNumberOrBtn, gate).catch((error) => {
+      const existing = await findOrderDuplicate(orderNumberOrBtn, { ...gate, demoAccount }).catch((error) => {
         console.error('Order number duplicate check failed:', error);
         return null;
       });
@@ -471,6 +483,7 @@ export async function POST(request: NextRequest) {
       productSold: productSold || '',
       createdAt: new Date(),
       updatedAt: new Date(),
+      ...(demoAccount ? { demoAccount: true as const } : {}),
     };
 
     let docRef: FirebaseFirestore.DocumentReference;

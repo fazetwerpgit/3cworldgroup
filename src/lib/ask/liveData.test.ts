@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeAskDb } from './fakeAskDb';
-import { loadRepSnapshot } from './liveData';
+import { loadRepSnapshot, rankBoard, type BoardSale } from './liveData';
 
 // loadRepSnapshot: only the asking rep's documents, never a pay or money
 // field, contact details redacted, and a failing or slow section left out
@@ -286,5 +286,44 @@ describe('loadRepSnapshot and the carrier report stamp (Noah, 2026-10-10)', () =
   it('calls it overdue once the report covers the day', async () => {
     const text = await loadRepSnapshot(createFakeAskDb(withStamp('2026-09-30')).db as unknown as Firestore, 'r1', OCT1);
     expect(text).toMatch(/Maria Johnson[^\n]*install: install overdue/);
+  });
+});
+
+describe('rankBoard — demo account sales', () => {
+  const sale = (repId: string, name: string, points: number, demo = false): BoardSale => ({ repId, name, points, at: 100, demo });
+  const sales = [sale('r1', 'Real One', 5), sale('demo', 'App Review', 50, true), sale('r2', 'Real Two', 3)];
+
+  it("leaves a demo account's sales off a real rep's Board", () => {
+    const [week] = rankBoard(sales, [0], 'r1');
+    expect(week.map((row) => row.id)).toEqual(['r1', 'r2']);
+  });
+
+  it('keeps the demo account on its own Board', () => {
+    const [week] = rankBoard(sales, [0], 'demo');
+    expect(week.map((row) => row.id)).toEqual(['demo', 'r1', 'r2']);
+  });
+});
+
+describe('loadRepSnapshot — demo account on the shared Board cache', () => {
+  it('a demo viewer first does not put its sale on a real viewer’s Board second', async () => {
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
+    data.users.demo = { status: 'active', fieldRole: 'entry_rep', demoAccount: true };
+    data.sales.demoSale = {
+      salesRepId: 'demo',
+      salesRepName: 'App Review',
+      status: 'approved',
+      saleDate: noon('2026-09-26'),
+      createdAt: noon('2026-09-26'),
+      totalPoints: 99,
+      demoAccount: true,
+    };
+    const { db } = createFakeAskDb(data);
+
+    const demoText = await loadRepSnapshot(db as unknown as Firestore, 'demo', NOW);
+    const realText = await loadRepSnapshot(db as unknown as Firestore, 'r1', NOW);
+
+    expect(demoText).toContain('#1 of 4 with 1 sale, 99 points');
+    expect(realText).toContain('#2 of 3 with 1 sale, 10 points');
+    expect(realText).not.toContain('App Review');
   });
 });

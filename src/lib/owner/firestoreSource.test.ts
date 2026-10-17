@@ -4,11 +4,35 @@ import type { FiberOrder, Sale } from '@/types';
 // Sharon T., 149 Varsity Dr: a missed-install row beside her real order. The
 // owner home reads sales through this projection; it must carry the order
 // number so its join (companyBook) lands where the board's does.
-const { selectMock, saleDocs, orders } = vi.hoisted(() => ({
+const { selectMock, saleDocs, orders, userRows } = vi.hoisted(() => ({
   selectMock: vi.fn(),
   saleDocs: [] as { id: string; data: () => Record<string, unknown> }[],
   orders: [] as unknown[],
+  userRows: new Map<string, Record<string, unknown>>(),
 }));
+
+// users: where(field, '==' | '>=', value).select(...fields).get(), projecting
+// only the selected fields, as Firestore does.
+function usersCollection() {
+  return {
+    where: (field: string, op: string, value: unknown) => ({
+      select: (...fields: string[]) => ({
+        get: async () => ({
+          docs: [...userRows.entries()]
+            .filter(([, data]) => {
+              const have = data[field];
+              if (op === '==') return have === value;
+              return have instanceof Date && value instanceof Date && have.getTime() >= value.getTime();
+            })
+            .map(([id, data]) => {
+              const projected = Object.fromEntries(fields.filter((f) => f in data).map((f) => [f, data[f]]));
+              return { id, data: () => projected, get: (f: string) => projected[f] };
+            }),
+        }),
+      }),
+    }),
+  };
+}
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
@@ -22,7 +46,9 @@ vi.mock('@/lib/firebase/admin', () => ({
               },
             }),
           }
-        : { doc: () => ({ get: async () => ({ exists: false, data: () => ({}) }) }) },
+        : name === 'users'
+          ? usersCollection()
+          : { doc: () => ({ get: async () => ({ exists: false, data: () => ({}) }) }) },
   },
 }));
 vi.mock('@/lib/fiberReport/ordersCache', () => ({ getAllFiberOrders: vi.fn(async () => orders) }));
@@ -46,6 +72,7 @@ function carrier(overrides: Partial<FiberOrder>): FiberOrder {
 beforeEach(() => {
   saleDocs.length = 0;
   orders.length = 0;
+  userRows.clear();
 });
 
 describe('owner home reads the order number, so it joins as the board does', () => {
@@ -77,5 +104,40 @@ describe('owner home reads the order number, so it joins as the board does', () 
     const owner = companyBook(book.sales as Sale[], book.orders, NOW);
     expect(owner.installs.map((install) => install.saleId)).toEqual(['sharon']);
     expect(owner.installs[0].installDate.getDate()).toBe(7); // real's activation, not the miss
+  });
+});
+
+describe('owner counts leave demo accounts out', () => {
+  it('countPendingSignups skips a demo account, counts a real self-signup', async () => {
+    userRows.set('real', { status: 'pending' });
+    userRows.set('bot', { status: 'pending', suspectedBot: true });
+    userRows.set('demo', { status: 'pending', demoAccount: true });
+    userRows.set('notdemo', { status: 'pending', demoAccount: false });
+    expect(await createFirestoreOwnerSource().countPendingSignups()).toBe(2);
+  });
+
+  it('loadActivatedSince skips a demo account', async () => {
+    const since = new Date('2026-10-01T00:00:00Z');
+    const after = new Date('2026-10-05T00:00:00Z');
+    userRows.set('rep', { status: 'active', fieldRole: 'entry_level_rep', activatedAt: after });
+    userRows.set('hired', { status: 'active', fieldRole: 'ae_tier_1', hireDate: after });
+    userRows.set('demo', { status: 'active', fieldRole: 'entry_level_rep', activatedAt: after, hireDate: after, demoAccount: true });
+    const users = await createFirestoreOwnerSource().loadActivatedSince(since);
+    expect(users.map((u) => u.fieldRole).sort()).toEqual(['ae_tier_1', 'entry_level_rep']);
+  });
+});
+
+describe('owner book leaves demo-account sales out', () => {
+  it('projects the demo stamp and drops stamped sales from the book', async () => {
+    const base = { products: [], status: 'approved', totalValue: 60, saleDate: new Date('2026-10-05T17:00:00Z') };
+    saleDocs.push(
+      { id: 'real', data: () => ({ ...base, salesRepId: 'miles', salesRepName: 'Miles Scoonover' }) },
+      { id: 'demo', data: () => ({ ...base, salesRepId: 'demo', salesRepName: 'App Review', demoAccount: true }) },
+    );
+
+    const book = await createFirestoreOwnerSource().loadBook();
+
+    expect(selectMock.mock.calls.at(-1)).toContain('demoAccount');
+    expect(book.sales.map((sale) => sale.id)).toEqual(['real']);
   });
 });

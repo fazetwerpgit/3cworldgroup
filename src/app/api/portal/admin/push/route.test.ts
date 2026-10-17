@@ -84,6 +84,13 @@ describe('GET /api/portal/admin/push', () => {
     expect(users[1]).toMatchObject({ name: 'Wil Default', state: 'never-allowed', required: true });
     expect(users[2]).toMatchObject({ state: 'on', checkedAt: null });
   });
+
+  it('leaves demo accounts out of the list', async () => {
+    fake.users.set('demo', { status: 'active', displayName: 'App Review', demoAccount: true, pushTokens: [] });
+    const res = await GET(req('GET'));
+    const { users } = await res.json();
+    expect(users.map((u: { uid: string }) => u.uid)).toEqual(['miles', 'wil', 'on']);
+  });
 });
 
 describe('PATCH /api/portal/admin/push', () => {
