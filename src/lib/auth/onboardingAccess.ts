@@ -43,6 +43,9 @@ export const ONBOARDING_ALLOWED_APIS = [
   // Guideline 1.2 safety: anyone who can read chat can block, report and accept the agreement.
   '/api/portal/chat/blocks',
   '/api/portal/chat/terms',
+  // The iOS app's native chat signs in to Firebase with a custom token minted
+  // for the verified caller only (no body is read).
+  '/api/portal/auth/custom-token',
 ] as const satisfies readonly string[];
 
 // Listed prefixes that must NOT match, even though a listed prefix covers them.

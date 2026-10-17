@@ -72,15 +72,35 @@ describe('POST /api/portal/auth/custom-token', () => {
   });
 
   it('rejects an inactive user', async () => {
-    fake.userDoc = { status: 'inactive', role: 'user', fieldRole: 'sales_rep' };
+    fake.userDoc = { status: 'inactive', fieldRole: 'entry_rep' };
     const res = await POST(req());
     expect(res.status).toBe(403);
     expect(fake.createCustomToken).not.toHaveBeenCalled();
   });
 
-  it('rejects a pending user', async () => {
-    fake.userDoc = { status: 'pending', role: 'user', fieldRole: 'sales_rep' };
+  it('mints for a hire mid-onboarding (pending with a field role), as chat does', async () => {
+    fake.userDoc = { status: 'pending', fieldRole: 'entry_rep' };
+    const res = await POST(req());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ token: `custom-for-u${uidCounter}` });
+  });
+
+  it('rejects an unapproved self-signup (pending, no field role)', async () => {
+    fake.userDoc = { status: 'pending' };
     expect((await POST(req())).status).toBe(403);
+    expect(fake.createCustomToken).not.toHaveBeenCalled();
+  });
+
+  it.each(['rejected', 'disabled', undefined])('rejects a user whose status is %s', async (status) => {
+    fake.userDoc = { status, fieldRole: 'entry_rep' };
+    expect((await POST(req())).status).toBe(403);
+    expect(fake.createCustomToken).not.toHaveBeenCalled();
+  });
+
+  it('rejects a disabled Firebase account even when the doc says pending', async () => {
+    fake.userDoc = { status: 'pending', fieldRole: 'entry_rep' };
+    fake.verifyIdToken.mockRejectedValue(Object.assign(new Error('disabled'), { code: 'auth/user-disabled' }));
+    expect((await POST(req())).status).toBe(401);
     expect(fake.createCustomToken).not.toHaveBeenCalled();
   });
 

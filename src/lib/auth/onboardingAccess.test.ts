@@ -238,6 +238,9 @@ describe('page and api allowlists agree', () => {
       // verified caller's own users/{uid} document. The shell posts it on every
       // load, so a hire without it takes a 403 on every page.
       '/api/portal/push/health',
+      // The web mints the native chat sign-in after every sign-in and token
+      // refresh (lib/app/nativeAuthSync.ts), from any page in the app.
+      '/api/portal/auth/custom-token',
     ];
     const depended = new Set(Object.values(PAGE_API_DEPENDENCIES).flat());
     for (const api of ONBOARDING_ALLOWED_APIS) {

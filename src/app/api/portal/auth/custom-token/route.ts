@@ -11,9 +11,12 @@ import { createRateLimiter } from '@/lib/rateLimit';
 // `nativeAuth`, docs/ios-app/BRIDGE.md).
 //
 // Identity comes only from the Bearer ID token, checked for revocation; the
-// body is never read, so no caller can mint a token for another uid. Only an
-// active account gets one (a pending or inactive user doc is refused by the
-// shared status gate).
+// body is never read, so no caller can mint a token for another uid. The shared
+// status gate admits an active account, and a hire mid-onboarding (pending with
+// a field role) because this path is in ONBOARDING_ALLOWED_APIS: onboarding
+// hires have chat, so they get native chat too. An unapproved self-signup
+// (pending, no field role), an inactive account, any other status, and a
+// disabled or revoked Firebase sign-in are refused.
 
 // The web asks once per sign-in and ID-token refresh (about hourly), debounced.
 // This only stops a stuck client from looping.
