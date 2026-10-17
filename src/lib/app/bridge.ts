@@ -310,7 +310,7 @@ declare global {
     __3C_BRIDGE__?: { version: number; receive: (message: unknown) => void; features: BridgeFeature[] };
     /** Set by shells that send `visible`: the latest value (false before the first). */
     __3C_VISIBLE__?: boolean;
-    /** Optional: the shell may inject its capabilities before content loads. */
+    /** The primary capability source: injected by the shell before page scripts run (BRIDGE.md capabilities). */
     __3C_APP_CAPS__?: AppCapabilities;
   }
 }

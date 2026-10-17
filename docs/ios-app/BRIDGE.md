@@ -352,14 +352,22 @@ sent when signed out. Owners (company dashboard) send nothing.
 { "source": "3c-shell", "type": "capabilities", "capabilities": { "nativeChat": true } }
 ```
 What this shell build supports beyond contract v1. Known flags: `nativeChat`
-(boolean). Unknown keys are ignored; a later message overrides an earlier one
-flag by flag, so `{ "nativeChat": false }` backs out: chat goes back to the web
-page and no more custom tokens are fetched. Like every native -> web message, a
-DOM `message` event is accepted only with this window as its source, so an
-iframe cannot fake it. Preferred: also inject `window.__3C_APP_CAPS__ = { nativeChat: true };`
-in `injectedJavaScriptBeforeContentLoaded`, so the page knows before its first
-render; otherwise send the message after every page load (`onLoadEnd`). A
-message overrides the injected value.
+(boolean). Unknown keys are ignored.
+
+**Primary source: `window.__3C_APP_CAPS__`.** The shell injects
+`window.__3C_APP_CAPS__ = { nativeChat: true };` in
+`injectedJavaScriptBeforeContentLoaded`, so it is set before any page script
+runs and the page knows from its first render (no flash of the web chat, no
+wait for a message). The web reads it live (`readCapabilities()` in
+`src/lib/app/nativeChat.ts`); it is what every check starts from.
+
+**Update: the `capabilities` message.** Send it when a flag changes at runtime,
+and after every page load (`onLoadEnd`) for shells that cannot inject. It is
+merged over the injected value flag by flag (a later message over an earlier
+one too), so `{ "nativeChat": false }` backs out: chat goes back to the web
+page and no more custom tokens are fetched. A flag the message leaves out keeps
+its injected value. Like every native -> web message, a DOM `message` event is
+accepted only with this window as its source, so an iframe cannot fake it.
 
 ### `pushToken`
 ```json

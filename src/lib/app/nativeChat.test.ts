@@ -13,6 +13,7 @@ import {
   nativeChatPending,
   openNativeChat,
   openNativeChatForHref,
+  readCapabilities,
   setNativeAuth,
   supportsNativeChat,
 } from './nativeChat';
@@ -118,6 +119,25 @@ describe('supportsNativeChat', () => {
     expect(supportsNativeChat()).toBe(true);
     fakeAuth.currentUser = { uid: 'u2' };
     expect(supportsNativeChat()).toBe(false);
+  });
+
+  it('the injected window.__3C_APP_CAPS__ alone is enough (primary source, no message needed)', () => {
+    ready();
+    // No capability listener, no message: the injected value is read directly.
+    expect(readCapabilities()).toEqual({ nativeChat: true });
+    expect(supportsNativeChat()).toBe(true);
+  });
+
+  it('a capabilities message updates an injected false; flags it omits keep the injected value', () => {
+    stub({ caps: { nativeChat: false } });
+    fakeAuth.currentUser = { uid: 'u1' };
+    setNativeAuth('ok', 'u1');
+    installCapabilityListener();
+    expect(supportsNativeChat()).toBe(false);
+    receiveNativeMessage(capsMessage({}));
+    expect(readCapabilities()).toEqual({ nativeChat: false });
+    receiveNativeMessage(capsMessage({ nativeChat: true }));
+    expect(supportsNativeChat()).toBe(true);
   });
 
   it('a later {nativeChat:false} backs out of an injected true', () => {

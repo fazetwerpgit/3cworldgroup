@@ -5,9 +5,10 @@ import { hasNativeBridge, onNativeMessage, parseCapabilities, requestNative, typ
 
 // Native chat hand-off for the 3C iOS app (docs/ios-app/BRIDGE.md).
 //
-// A shell build with a native chat screen says so with a `capabilities`
-// message ({ nativeChat: true }) or by injecting window.__3C_APP_CAPS__ before
-// the page loads; { nativeChat: false } backs out. Once the shell has also
+// A shell build with a native chat screen says so by injecting
+// window.__3C_APP_CAPS__ = { nativeChat: true } before page scripts run (the
+// primary source); a `capabilities` message updates it flag by flag, so a
+// later { nativeChat: false } backs out. Once the shell has also
 // confirmed a native sign-in for the current web user (`nativeAuth` reply ok,
 // see nativeAuthSync.ts), every way into /portal/chat (tab bar, nav links,
 // command palette, a push deep link) asks the shell to `openNativeChat`. If the
@@ -31,7 +32,11 @@ function notify() {
   for (const fn of subscribers) fn();
 }
 
-/** The capabilities in effect: injected window.__3C_APP_CAPS__, overridden by any capabilities message. */
+/**
+ * The capabilities in effect. The primary source is window.__3C_APP_CAPS__,
+ * injected by the shell before page scripts run and read live here; any
+ * `capabilities` message is an update merged over it flag by flag.
+ */
 export function readCapabilities(): AppCapabilities {
   const injected = typeof window !== 'undefined' ? parseCapabilities(window.__3C_APP_CAPS__) : null;
   return { ...(injected ?? {}), ...shellCaps };
