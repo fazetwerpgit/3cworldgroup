@@ -95,12 +95,24 @@ Write the file to the cache directory under `filename` and open the share sheet
 prefix. The portal sends every download this way inside the app: CSV exports,
 the employee export, onboarding zips. Result: `{ "completed": boolean }`.
 
-Shell-side safety net for downloads the web does not route: a
-`Content-Disposition: attachment` navigation (`onFileDownload`) or a click on a
-same-origin `<a download href="https://...">` makes the page fetch the file
-itself (with its cookies) and post a normal `saveFile` with an id starting
-`shell-download-`. The web ignores the reply (no pending request has that id).
-If the fetch fails, the shell opens the URL with `openExternal`.
+Shell-side fallback for downloads the web does not route itself. Two cases are
+covered: a `Content-Disposition: attachment` navigation (`onFileDownload`), and
+a tap on a same-origin `<a download href="https://...">` that no portal handler
+took. In both, a helper script the shell injects before content fetches the file
+in the page (same origin, with the page's cookies). It then posts a normal
+`saveFile` whose id starts with `shell-download-`.
+
+- While it fetches, the helper shows a `notice` (`progress`, "Preparing
+  download…"). One download runs per URL; a second tap only shows that notice
+  again.
+- An HTTP error (4xx/5xx) shows an error `notice` and plays the `error` haptic.
+  The same happens for a file over the bridge cap (about 56 MB, checked before
+  encoding). Neither opens the URL anywhere else.
+- Only a network failure of the fetch itself (no response at all) hands the URL
+  to `openExternal`.
+- The shell consumes the `saveFile` reply; the web never sees it. Success plays
+  the `success` haptic and shows "Download ready." A failure plays the `error`
+  haptic and shows the reason. A cancel shows nothing.
 
 ### `openExternal` (event)
 ```json
@@ -120,15 +132,17 @@ web handler.
 { "type": "biometricLock", "id": "w4" }
 { "type": "biometricLock", "id": "w5", "enabled": true }
 ```
-Without `enabled`, read the setting. With it, change the Face ID lock-on-resume
-setting. Result: `{ "enabled": boolean, "available": boolean }`, where
-`available` is false when no biometrics are enrolled.
+Without `enabled`, read the setting. With it, change the app lock-on-resume
+setting. Result: `{ "enabled": boolean, "available": boolean }`. `available`
+is true when Face ID / Touch ID is enrolled or the device has a passcode
+(iOS falls back to the passcode). It is false only when the device has no
+passcode at all.
 
-The portal's Settings toggle "Require Face ID to open the app" (app only, off by
-default) reads the setting on mount and sends `enabled` when the rep flips it.
+The portal's Settings toggle "Require Face ID or passcode to open the app" (app
+only, off by default) reads the setting on mount and sends `enabled` when the rep flips it.
 The shell owns the setting: it stores it on the device (for example in
 SecureStore), applies it on the next resume, and replies with the stored value.
-If turning it on needs a Face ID check and the rep cancels, reply with code
+If turning it on needs a Face ID or passcode check and the rep cancels, reply with code
 `canceled` and leave the setting unchanged. The web mirrors the reply in
 `localStorage['3c-face-id-lock']` (`on`/`off`) only to draw the toggle before
 the shell answers; that copy is never the source of truth.
@@ -156,6 +170,12 @@ The web then calls `signInWithCredential` with
 reply `code: "canceled"`. If Sign in with Apple is not available or set up,
 reply `code: "not_configured"`.
 
+One sheet at a time. While one is open, a request with the same provider and
+nonce (a double tap) shares its result. Any other request is answered
+`canceled`. A sheet still open after 120 s stops blocking new requests. The web
+also drops a second tap while its request is pending, and shows no message for
+`canceled`.
+
 ### `statusBar` (event)
 ```json
 { "type": "statusBar", "style": "light" }
@@ -164,9 +184,15 @@ reply `code: "not_configured"`.
 for a light page). Any other value is dropped.
 
 The web (`src/lib/app/statusBar.ts`, from `AppBridgeHost`) sends it on mount and
-whenever the page theme changes: the `dark` class on `<body>` (ThemeContext)
-means `light`; without it the old light chrome (white `.portal-shell-header`)
-shows, so `dark`. It sends only on a change. The shell defaults to `light`
+whenever the page theme changes, and only when the style changes. It reads the
+classes ThemeContext puts on `<body>`:
+
+- `portal-scope` and `dark`: dark page, so `light`.
+- `portal-scope` without `dark`: the old light chrome (white
+  `.portal-shell-header`), so `dark`.
+- No `portal-scope` yet (before ThemeProvider runs, or outside the portal):
+  `light`, so the bar never flashes dark.
+ The shell defaults to `light`
 before the first message, and its own screens (lock, privacy cover, offline)
 always use `light`. Older shells ignore it.
 
@@ -189,23 +215,39 @@ once-per-session reveals and count-ups play unseen and spend their
 sessionStorage keys (which also live for days in WKWebView).
 
 - `true` once the splash is hidden, no lock or privacy cover is up and the app
-  is in the foreground; `false` when it is covered again or backgrounded.
-  Sent on every change and again at the end of every page load.
-- The shell also keeps `window.__3C_VISIBLE__` current: it is set before content
-  on every page load (starting `false` until the portal is on screen) and
-  updated by each `visible` injection before `receive` runs. The flag being
-  defined is how the web knows the shell sends `visible`; in older shells it is
-  undefined and the page counts as visible.
+  is in the foreground. `false` when it is covered again or backgrounded.
+  Sent on every change, and again at the end of every full page load (including
+  a reload after the web content process crashed).
+- The shell also keeps `window.__3C_VISIBLE__` current. The before-content
+  script sets it to the visibility at the time the WebView was mounted.
+  Every `visible` injection updates it before `receive` runs. Because a full
+  page load can start with a stale value, the shell sends `visible` again when
+  the load ends.
+- The flag being defined is how the web knows the shell sends `visible`. In
+  older shells it is undefined, and the page counts as visible.
 - Web (`src/lib/app/appVisibility.ts`): in the app, `useFirstReveal` and
   `useCountUp` wait for visible before deciding to play and before marking
   their keys. On the web nothing changes.
+
+### `notice`
+```json
+{ "source": "3c-shell", "type": "notice", "id": "shell-download-1-1", "kind": "progress", "message": "Preparing download…" }
+```
+A short status toast, used for downloads (see `saveFile`). `kind` is `progress`,
+`success`, `error` or `dismiss`.
+
+- A notice with the same `id` replaces the current one.
+- `dismiss` removes the toast only if its `id` matches.
+- `progress` stays until it is replaced. `success` and `error` hide by
+  themselves.
+- Web: `src/components/app/AppNotice.tsx`, in the app only.
 
 ### `resumed`
 ```json
 { "source": "3c-shell", "type": "resumed", "awayMs": 1860000 }
 ```
-The app came back after 30+ minutes in the background. Sent before the matching
-`visible: true`. The web clears its `3c:reveal:*` and `3c:countup:*`
+The app came back after 30+ minutes in the background. Always sent before the
+`visible: true` that follows it. The web clears its `3c:reveal:*` and `3c:countup:*`
 sessionStorage keys so reveals replay, as in a relaunched PWA.
 
 ## Push payload the shell receives (A4)
