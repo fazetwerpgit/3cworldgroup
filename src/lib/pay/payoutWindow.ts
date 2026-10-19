@@ -126,8 +126,8 @@ interface WindowGroup<T> extends UpcomingPayout {
 
 /**
  * Every payout window the dated T-Fiber `installs` fall into, earliest first,
- * with the same per-window math everywhere: whole dollars per sale (as each
- * Pay row shows it, so a window's total matches its rows), the install count,
+ * with the same per-window math everywhere: the exact sum of each sale's est.
+ * pay (rounded once, down, at display: lib/pay/estimate), the install count,
  * how many are still scheduled, and a null amount when any rate is missing.
  */
 function groupByWindow<T extends PayoutSale>(
@@ -141,8 +141,8 @@ function groupByWindow<T extends PayoutSale>(
     const window = payoutWindowForSale(sale, true);
     if (!window) continue;
     const key = window.start.getTime();
-    const raw = expectedPayForSale(sale, rates);
-    const pay = raw === null ? null : Math.round(raw);
+    // Exact: the window's total is rounded once, where it is shown.
+    const pay = expectedPayForSale(sale, rates);
     const scheduled = (toDate(sale.installDate as Date | string | undefined)?.getTime() ?? 0) > now.getTime() ? 1 : 0;
     const entry = byWindow.get(key);
     if (entry) {

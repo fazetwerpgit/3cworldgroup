@@ -28,6 +28,7 @@ import { SalesDialog } from './SalesDialog';
 import { InstallStatusLine } from './InstallStatusLine';
 import { FiberRows, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
 import { foldLeftoverOrders, matchFiberOrdersToSalesDetailed } from '@/lib/fiberReport/matchSales';
+import { formatEstimate } from '@/lib/pay/estimate';
 
 /** Sales | Pay: switches the VIEW of the page, so it is the canonical page tabs. */
 export function SalesViewTabs({ payView, onChange }: { payView: boolean; onChange: (payView: boolean) => void }) {
@@ -69,10 +70,9 @@ interface SalesTableProps {
   arriveId?: string | null;
 }
 
-/** "$280", or "−$280" for a chargeback. */
+/** "$280", or "−$280" for a chargeback. Est. pay only: rounded down once (lib/pay/estimate). */
 function formatMoney(value: number) {
-  const rounded = Math.round(value);
-  return `${rounded < 0 ? '−' : ''}$${Math.abs(rounded).toLocaleString('en-US')}`;
+  return formatEstimate(value);
 }
 
 function formatDate(value: Date | string | null | undefined) {
@@ -340,9 +340,9 @@ export function SalesTable({
     () => formatPlanMix(planMix(boardCountedSales(monthSales, fiberBySale))),
     [fiberBySale, monthSales]
   );
-  // Whole dollars per row first, as each row prints, so the total adds up.
+  // Exact amounts summed, rounded once (down) where the total prints.
   const expectedTotal = hasPlan
-    ? listSales.reduce((sum, sale) => sum + Math.round(expectedBySale[sale.id || ''] ?? 0), 0)
+    ? listSales.reduce((sum, sale) => sum + (expectedBySale[sale.id || ''] ?? 0), 0)
     : null;
   const fiberBucketCounts = useMemo(() => {
     const counts: Record<FiberBucket, number> = { pending: 0, active: 0, cancelled: 0, attention: 0 };

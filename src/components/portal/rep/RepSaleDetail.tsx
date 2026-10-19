@@ -43,10 +43,11 @@ import { EscalinkPanel } from './EscalinkPanel';
 import { BodyLayer } from './BodyLayer';
 import { CarrierStaleNote } from './CarrierStaleNote';
 import { useAttachmentViewer } from './ImageViewer';
-import { formatDay, formatMoney, num } from './saleFormat';
+import { formatDay, num } from './saleFormat';
 import { displayPhone, telHref } from '@/lib/phone';
 import s from './rep.module.css';
 import x from './rep-sale.module.css';
+import { formatEstimate } from '@/lib/pay/estimate';
 
 /** A legacy free-text carrier has no mark; show its name rather than nothing. */
 function carrierName(company: string) {
@@ -395,7 +396,7 @@ export function RepSaleDetail() {
     return (
       <span className={x.pay}>
         <span className={x.payEst}>est.</span>
-        {formatMoney(estPay)}
+        {formatEstimate(estPay)}
       </span>
     );
   };
@@ -464,7 +465,7 @@ export function RepSaleDetail() {
               {ownSale ? <Row label="Est. pay">{payCell()}</Row> : null}
               {ownSale && chargeback ? (
                 <Row label="Est. chargeback">
-                  {comp.hasPlan && estPay ? `−${formatMoney(estPay)} · ` : ''}
+                  {comp.hasPlan && estPay ? `−${formatEstimate(estPay)} · ` : ''}
                   {CHARGEBACK_REASON} ({chargebackMonth(chargeback.deactivationDay)})
                 </Row>
               ) : null}

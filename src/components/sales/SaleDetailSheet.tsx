@@ -39,6 +39,7 @@ import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import { displayPhone, telHref } from '@/lib/phone';
+import { formatEstimate } from '@/lib/pay/estimate';
 
 interface SaleDetailSheetProps {
   sale: Sale | null;
@@ -371,7 +372,7 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
             <div>
               <span className={x.dMoneyLabel}>Est. pay</span>
               <span className={x.dMoneyNum}>
-                {shownPay === null ? '—' : shownPay === 0 ? <span className={x.amtQuiet}>Rate pending</span> : <><span className={x.amtEst}>est.</span>{formatMoney(shownPay)}</>}
+                {shownPay === null ? '—' : shownPay === 0 ? <span className={x.amtQuiet}>Rate pending</span> : <><span className={x.amtEst}>est.</span>{formatEstimate(shownPay)}</>}
               </span>
             </div>
             <dl className={x.dSummary}>

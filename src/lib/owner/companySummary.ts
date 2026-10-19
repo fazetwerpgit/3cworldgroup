@@ -9,6 +9,7 @@ import { unloggedOrders } from '@/lib/sales/unloggedOrders';
 import { saleCommission, saleRevenue } from '@/lib/owner/revenue';
 import { summarizeMarkets, type MarketsSummary } from '@/lib/owner/markets';
 import { chargebackFor, dayKeyDate } from '@/lib/pay/chargeback';
+import { estimateDollars } from '@/lib/pay/estimate';
 
 // The owner's company view: money, what needs attention, recruiting. Pure and
 // framework-free — every read comes through an injected OwnerSummarySource, so
@@ -281,8 +282,11 @@ function figuresIn(priced: PricedInstall[], window: Window, chargebacks: PricedC
     figures.revenue -= chargeback.revenue;
     figures.commissions -= chargeback.commission;
   }
+  // Summed exact, rounded once. Commissions are rep pay, so they round DOWN
+  // like every est. pay figure the reps see (lib/pay/estimate): the owner's
+  // commissions for a set of installs equal the reps' own estimates for them.
   figures.revenue = Math.round(figures.revenue);
-  figures.commissions = Math.round(figures.commissions);
+  figures.commissions = estimateDollars(figures.commissions);
   figures.margin = figures.revenue - figures.commissions;
   return figures;
 }

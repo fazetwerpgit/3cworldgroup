@@ -219,7 +219,8 @@ describe('buildOwnerSummary', () => {
     expect(summary.money!.week.current).toEqual({ installs: 3, chargebacks: 0, revenue: 1270, commissions: 414, margin: 856 });
     expect(summary.money!.week.prior).toEqual({ installs: 1, chargebacks: 0, revenue: 400, commissions: 120, margin: 280 });
     expect(summary.money!.month.current).toEqual({ installs: 5, chargebacks: 0, revenue: 2230, commissions: 870, margin: 1360 });
-    expect(summary.money!.month.prior).toEqual({ installs: 1, chargebacks: 0, revenue: 325, commissions: 98, margin: 227 });
+    // 97.5 in commission rounds DOWN once (an estimate never overstates pay).
+    expect(summary.money!.month.prior).toEqual({ installs: 1, chargebacks: 0, revenue: 325, commissions: 97, margin: 228 });
     expect(summary.money!.unratedInstalls).toBe(1);
     expect(summary.money!.unpricedInstalls).toBe(0);
     expect(summary.problems).toBeUndefined();
@@ -265,7 +266,7 @@ describe('buildOwnerSummary', () => {
     // September: the same 5 installs, less 460 revenue (3C Receives) and 138 commission.
     expect(summary.money!.month.current).toEqual({ installs: 5, chargebacks: 1, revenue: 1770, commissions: 732, margin: 1038 });
     // August keeps the install (history does not change).
-    expect(summary.money!.month.prior).toEqual({ installs: 2, chargebacks: 0, revenue: 785, commissions: 236, margin: 549 });
+    expect(summary.money!.month.prior).toEqual({ installs: 2, chargebacks: 0, revenue: 785, commissions: 235, margin: 550 });
     // The week windows hold neither.
     expect(summary.money!.week.current).toEqual({ installs: 3, chargebacks: 0, revenue: 1270, commissions: 414, margin: 856 });
   });

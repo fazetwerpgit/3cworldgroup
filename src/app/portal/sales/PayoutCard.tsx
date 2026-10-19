@@ -7,15 +7,16 @@ import { defaultPayoutIndex, formatPayoutWindow, type MonthPayout } from '@/lib/
 import type { Sale } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
+import { estimateDollars } from '@/lib/pay/estimate';
 
 function PayNumeral({ amount }: { amount: number }) {
   // One count per session on this surface. Stepping to another window changes
   // the target, which useCountUp shows outright: no replay per window.
-  const shown = useCountUp(Math.round(amount), { sessionKey: '3c:countup:sales-pay' });
+  const shown = useCountUp(estimateDollars(amount), { sessionKey: '3c:countup:sales-pay' });
   return (
     <p className={x.payNum}>
       <span className={x.payCur}>$</span>
-      <span className={s.srOnly}>{Math.round(amount).toLocaleString('en-US')}</span>
+      <span className={s.srOnly}>{estimateDollars(amount).toLocaleString('en-US')}</span>
       <span aria-hidden="true">{shown.toLocaleString('en-US')}</span>
     </p>
   );

@@ -39,10 +39,12 @@ import { LOG_SALE_HREF } from './repNav';
 import s from './rep.module.css';
 import d from './rep-dashboard.module.css';
 import { cacheTimeLabel } from '@/lib/cache/dataCache';
+import { estimateDollars, formatEstimate } from '@/lib/pay/estimate';
 
 // ---------------------------------------------------------------- format
 
-const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+// Est. pay only: rounded down once (lib/pay/estimate).
+const money = (n: number) => formatEstimate(n);
 
 function ordinalSuffix(n: number) {
   const tens = n % 100;
@@ -175,7 +177,7 @@ function MonthStack({ counts, total }: { counts: PaySummary['counts']; total: nu
 /** The big est. pay numeral: counts up from $0 on the first Home of a session. */
 function PayAmount({ amount }: { amount: number }) {
   // A month whose chargebacks outweigh its installs reads "−$280", never "$-280".
-  const shown = useCountUp(Math.round(Math.abs(amount)), { sessionKey: '3c:countup:home-pay' });
+  const shown = useCountUp(Math.abs(estimateDollars(amount)), { sessionKey: '3c:countup:home-pay' });
   return (
     <>
       {amount < 0 ? '−' : null}
@@ -188,7 +190,7 @@ function PayAmount({ amount }: { amount: number }) {
 /** "Includes est. −$280 chargeback · Rosaria M. cancelled within 120 days of install". */
 export function chargebackNote(lines: PaySummary['chargebacks']): string {
   const total = lines.reduce((sum, line) => sum + (line.amount ?? 0), 0);
-  const amount = `−${money(Math.abs(total))}`;
+  const amount = money(total);
   if (lines.length === 1) {
     return `Includes est. ${amount} chargeback · ${lines[0].customer} cancelled within 120 days of install`;
   }

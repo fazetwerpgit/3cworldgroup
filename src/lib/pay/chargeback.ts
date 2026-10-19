@@ -99,13 +99,13 @@ export interface ChargebackLine<T extends Sale = Sale> {
   chargeback: Chargeback;
   /** "Rosaria M.": first name and last initial, else the street, else "Customer". */
   customer: string;
-  /** The sale's est. pay as a NEGATIVE whole-dollar figure; null = no pay plan. */
+  /** The sale's est. pay as a NEGATIVE exact figure (round at display); null = no pay plan. */
   amount: number | null;
 }
 
 /**
  * Every chargeback in the book, newest deactivation first, priced at the same
- * whole-dollar est. pay the sale earned in its install month.
+ * exact est. pay the sale earned in its install month.
  */
 export function chargebackLines<T extends Sale>(
   sales: T[],
@@ -124,7 +124,7 @@ export function chargebackLines<T extends Sale>(
         firstNameLastInitial(sale.customerName) ||
         (sale.customerAddress || '').split(',')[0].trim() ||
         'Customer',
-      amount: pay === null ? null : -Math.round(pay),
+      amount: pay === null ? null : -pay,
     });
   }
   return lines.sort((a, b) => b.chargeback.deactivationDay.localeCompare(a.chargeback.deactivationDay));

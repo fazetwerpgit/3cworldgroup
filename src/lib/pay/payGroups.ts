@@ -55,13 +55,14 @@ export function undatedSales<T extends Sale>(sales: T[], fiberBySale: FiberMap):
 }
 
 /**
- * Σ expected pay, or null when the rep has no pay plan (never a confident $0).
- * Each sale is rounded to whole dollars first, the way its row shows it, so a
- * total always equals the rows printed above it.
+ * Σ expected pay, EXACT (cents kept), or null when the rep has no pay plan
+ * (never a confident $0). Nothing is rounded here: a per-sale round read $0.50
+ * high on every half-dollar rate. The figure is rounded once, down, where it
+ * is shown (lib/pay/estimate).
  */
 export function sumExpectedPay(sales: Array<Pick<Sale, 'products'>>, rates: CompPlanCompanyRates | null): number | null {
   if (!rates) return null;
-  return sales.reduce((sum, sale) => sum + Math.round(expectedPayForSale(sale, rates) ?? 0), 0);
+  return sales.reduce((sum, sale) => sum + (expectedPayForSale(sale, rates) ?? 0), 0);
 }
 
 export type PayGroupKind = 'window' | 'other' | 'chargeback' | 'missed' | 'undated';
@@ -79,7 +80,7 @@ export interface PayGroup<T extends Sale = Sale> {
   sales: T[];
   /** 'chargeback' groups only: the customers who disconnected within 120 days of install. */
   chargebacks: ChargebackLine<T>[];
-  /** Σ est. pay (negative on a 'chargeback' group); null = no pay plan. */
+  /** Σ est. pay, exact (negative on a 'chargeback' group); null = no pay plan. Round at display (formatEstimate). */
   amount: number | null;
 }
 

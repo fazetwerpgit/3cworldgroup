@@ -62,16 +62,17 @@ describe('dated / undated', () => {
     expect(sumExpectedPay([sale()], null)).toBeNull();
   });
 
-  it('totals the whole-dollar rows, so $68 + $68 reads $136, not $135', () => {
+  it('sums exact amounts (67.5 + 67.5 = 135, never 136 from rounding each sale up)', () => {
     const half = { tfiber: { 'tfiber-1gig': 67.5 } };
-    expect(sumExpectedPay([sale(), sale()], half)).toBe(136);
+    expect(sumExpectedPay([sale(), sale()], half)).toBe(135);
+    expect(sumExpectedPay([sale()], half)).toBe(67.5);
     const [group] = groupPaySales(
       [sale({ installDate: d(2026, 9, 9) }), sale({ installDate: d(2026, 9, 10) })],
       noFiber,
       half
     );
     expect(group.sales).toHaveLength(2);
-    expect(group.amount).toBe(136);
+    expect(group.amount).toBe(135);
   });
 });
 

@@ -37,6 +37,7 @@ import { DEFAULT_PROVIDER, SaleFields } from './SaleFields';
 import { useSaleScan, type ScanFill, type ScanTarget } from './useSaleScan';
 import s from './rep.module.css';
 import l from './rep-logsale.module.css';
+import { estimateDollars } from '@/lib/pay/estimate';
 
 // The orb only shows while a screenshot is being read, so it loads in its own
 // chunk; RepLogSale warms that chunk on mount, long before a scan can start.
@@ -58,7 +59,7 @@ const FORM_ID = 'rep-log-sale';
 const Amount = ({ value }: { value: number }) => (
   <>
     <span className={l.cur}>$</span>
-    {Math.round(value).toLocaleString('en-US')}
+    {estimateDollars(value).toLocaleString('en-US')}
   </>
 );
 const shortSaleDate = (value: Date | string) =>

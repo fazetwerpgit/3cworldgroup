@@ -36,6 +36,7 @@ import { SalesDialog } from './SalesDialog';
 import { ChargebackRow, PayGroupHead } from './SalesTable';
 import { Collapse } from '@/components/portal/Collapse';
 import { invalidateAfterSaleWrite } from '@/lib/cache/dataCache';
+import { formatEstimate } from '@/lib/pay/estimate';
 
 // The company book, for admins and owners. One row per CUSTOMER — the sales the
 // reps logged and the carrier's morning report merged into a single list, so the
@@ -901,7 +902,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
           </div>
           <div className={x.figs}>
             <div className={`${x.fig} ${x.figPay}`} data-part="fig">
-              <strong><small className={x.est}>est.</small>{formatMoney(myExpected)}</strong>
+              <strong><small className={x.est}>est.</small>{formatEstimate(myExpected)}</strong>
               <span>Estimated this month</span>
             </div>
           </div>
@@ -945,7 +946,7 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
                       {/* A rate of 0 means the comp plan has no contracted rate for
                           that product yet — say so rather than promising $0. */}
                       <span className={x.bVal}>
-                        {expected ? <><small className={x.est}>est.</small><b>{formatMoney(expected)}</b></> : 'Rate pending'}
+                        {expected ? <><small className={x.est}>est.</small><b>{formatEstimate(expected)}</b></> : 'Rate pending'}
                       </span>
                       <span className={x.bProd}>
                         {productSummary(sale) || '—'} · install {formatDate(sale.installDate)} · sold {formatDate(sale.saleDate)}
