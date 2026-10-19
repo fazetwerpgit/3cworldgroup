@@ -11,8 +11,8 @@ import { isNativeApp } from './isNativeApp';
 //
 // Requests that expect an answer carry an `id`; the shell answers each with
 // exactly one { type: 'reply', id, ok, ... }. Fire-and-forget messages
-// (haptic, openExternal, statusBar, nativeSignOut, chatContext, ready, badge,
-// widgetData) carry no id and get no reply.
+// (haptic, openExternal, statusBar, backGestures, nativeSignOut, chatContext,
+// ready, badge, widgetData) carry no id and get no reply.
 
 export const BRIDGE_VERSION = 1;
 export const NATIVE_SOURCE = '3c-shell';
@@ -150,6 +150,11 @@ export interface StatusBarMessage {
   type: 'statusBar';
   style: StatusBarStyle;
 }
+/** Edge-swipe back/forward gestures on (the default) or off (the solar deck, while open). */
+export interface BackGesturesMessage {
+  type: 'backGestures';
+  enabled: boolean;
+}
 /** The web's sign-in, handed to the shell's native Firebase Auth (native chat). */
 export interface NativeAuthRequest {
   type: 'nativeAuth';
@@ -181,6 +186,7 @@ export type BridgeEvent =
   | HapticMessage
   | OpenExternalMessage
   | StatusBarMessage
+  | BackGesturesMessage
   | NativeSignOutMessage
   | ChatContextMessage
   | ReadyMessage

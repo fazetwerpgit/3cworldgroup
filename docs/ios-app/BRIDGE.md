@@ -49,7 +49,7 @@ The web stops waiting after a timeout (60 s for `pushToken` and
 15 s for `nativeAuth`, 1.5 s for `openNativeChat`).
 A late reply is ignored.
 
-Messages without an `id` (`haptic`, `openExternal`, `statusBar`,
+Messages without an `id` (`haptic`, `openExternal`, `statusBar`, `backGestures`,
 `nativeSignOut`, `chatContext`, `ready`, `badge`, `widgetData`) are
 fire-and-forget: no reply.
 
@@ -197,6 +197,18 @@ classes ThemeContext puts on `<body>`:
 
 The shell defaults to `light` before the first message, and its own screens
 (lock, privacy cover, offline) always use `light`. Older shells ignore it.
+
+### `backGestures` (event)
+```json
+{ "type": "backGestures", "enabled": false }
+```
+Turns the WebView's edge-swipe back/forward gestures off (`false`) or back on
+(`true`). The shell default is on. The solar presenter deck
+(`/portal/solar/present`, `src/lib/app/backGestures.ts`) sends `false` on mount
+and `true` on unmount, so a left-edge swipe cannot leave the deck mid-pitch.
+As a safety net the shell turns them back on whenever the WebView navigates to
+any URL other than the deck. A non-boolean `enabled` is dropped. Older shells
+ignore it (unknown event without an `id`), so the deck keeps swipe-back there.
 
 ### Native chat: origin check and token hygiene
 

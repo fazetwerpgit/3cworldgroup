@@ -7,6 +7,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { DeckProvider, hasLeadInProgress, useDeck } from './deckState';
 import { finishLead } from './solarClient';
 import { overrideStatusBar } from '@/lib/app/statusBar';
+import { disableBackGestures } from '@/lib/app/backGestures';
 import { CalculatorSlide } from './CalculatorSlide';
 import { LeadFormSlide } from './LeadFormSlide';
 import { BookingSlide, ConfirmationSlide, PrequalSlide } from './InteractiveSlides';
@@ -80,6 +81,10 @@ function Deck() {
   // A light deck inside the dark portal: in the iOS app the status bar text
   // goes dark (black) while it is up, or the clock vanishes into the page.
   useEffect(() => overrideStatusBar('dark'), []);
+
+  // In the iOS app a left-edge swipe is WebView history back: off while the
+  // deck is up so it cannot kick the rep out mid-pitch.
+  useEffect(() => disableBackGestures(), []);
 
   const go = useCallback((target: number) => {
     setPos((cur) => {
