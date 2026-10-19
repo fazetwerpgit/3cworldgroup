@@ -1,3 +1,4 @@
+import { secretsMatch } from '@/lib/auth/secretCompare';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
@@ -75,7 +76,7 @@ function loadedStamp(status: FirebaseFirestore.DocumentData | undefined): Report
 export async function GET(request: NextRequest) {
   const expectedToken = process.env.POSTMARK_INBOUND_TOKEN;
   const suppliedToken = request.nextUrl.searchParams.get('token');
-  if (!expectedToken || suppliedToken !== expectedToken) {
+  if (!secretsMatch(suppliedToken, expectedToken)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   if (!adminDb) {
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const expectedToken = process.env.POSTMARK_INBOUND_TOKEN;
   const suppliedToken = request.nextUrl.searchParams.get('token');
-  if (!expectedToken || suppliedToken !== expectedToken) {
+  if (!secretsMatch(suppliedToken, expectedToken)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

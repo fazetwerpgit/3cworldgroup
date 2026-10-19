@@ -1,3 +1,4 @@
+import { bearerMatches } from '@/lib/auth/secretCompare';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { runDueAnnouncements } from '@/lib/announcements/send';
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'cron secret is not configured' }, { status: 500 });
   }
 
-  if (request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+  if (!bearerMatches(request.headers.get('authorization'), cronSecret)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
