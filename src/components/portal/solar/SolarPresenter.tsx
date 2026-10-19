@@ -171,7 +171,7 @@ function Deck() {
               </button>
               <Link
                 className={s.exit}
-                href="/portal/dashboard"
+                href="/portal/solar"
                 onClick={() => {
                   // Leaving with a saved, unbooked lead: send its alert now.
                   if (state.leadId && !state.booking) void finishLead(state.leadId);

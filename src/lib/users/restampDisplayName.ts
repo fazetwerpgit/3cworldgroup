@@ -13,6 +13,8 @@ const FORM_SUBMISSION_COLLECTIONS = [
   'leadsRequests',
   'managerInterviews',
   'bugReports',
+  // Solar leads go through submitFormRecord too (repUid / repName).
+  'solarLeads',
 ] as const;
 
 interface RestampTarget {
