@@ -18,6 +18,7 @@ import type { LeaderboardEntry } from '../LeaderboardTable';
 import { recentSaleLabel, recentSaleWhen, spotLine, useMinuteClock, zeroEntries } from '../belowPodium';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
+import { periodBounds } from '@/lib/leaderboard/periods';
 
 type Metric = 'totalPoints' | 'totalSales';
 type Period = 'week' | 'month' | 'year' | 'all';
@@ -126,15 +127,12 @@ function ChaseProgress({ current, target }: { current: number; target: number })
   );
 }
 
-function periodDaysLeft(period: Period) {
-  if (period === 'all') return null;
-  const now = new Date();
-  const end = period === 'week'
-    ? new Date(now.getFullYear(), now.getMonth(), now.getDate() + ((8 - now.getDay()) % 7 || 7))
-    : period === 'month'
-      ? new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      : new Date(now.getFullYear() + 1, 0, 1);
-  return Math.max(1, Math.ceil((end.getTime() - now.getTime()) / 86_400_000));
+/* Days until the board resets, on the office clock: the same Chicago
+   periodBounds the server ranks by (week Sunday to Sunday), not the device. */
+function periodDaysLeft(period: Period, now = new Date()) {
+  const bounds = periodBounds(period, now);
+  if (!bounds) return null;
+  return Math.max(1, Math.ceil((bounds.end.getTime() - now.getTime()) / 86_400_000));
 }
 
 function EmptyState({ pastMonth }: { pastMonth: MonthKey | null }) {
@@ -180,7 +178,7 @@ function AcrossTheBoard({ entries, currentUser, metric, period, pastMonth }: { e
       <div className={d.stat}>
         <span className={d.statLabel}>Your climb</span>
         <strong className={d.statValue}>{!currentUser ? 'First sale' : soleLeader ? 'Top of the board' : currentUser.rank === 1 ? `Leading by ${formatNumber(lead ?? 0)}` : nextGap !== null ? `${formatNumber(nextGap)} ${unit}` : 'Keep climbing'}</strong>
-        <span className={d.statSub}>{!currentUser ? 'puts you on the board' : soleLeader ? 'Only rep on the board' : currentUser.rank === 1 ? 'over #2 in pts' : nextGap !== null ? `to #${currentUser.rank - 1}` : 'next rank is outside this view'}</span>
+        <span className={d.statSub}>{!currentUser ? 'puts you on the board' : soleLeader ? 'Only rep on the board' : currentUser.rank === 1 ? `over #2 in ${unit}` : nextGap !== null ? `to #${currentUser.rank - 1}` : 'next rank is outside this view'}</span>
       </div>
       <div className={d.stat}>
         <span className={d.statLabel}>Team pulse</span>
