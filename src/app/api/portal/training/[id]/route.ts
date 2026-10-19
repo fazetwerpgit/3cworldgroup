@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
 import { requireVerifiedManagement, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { TRAINING_EDITABLE_FIELDS, isValidTrainingStoragePath, trainingUploadFolder } from '@/lib/training/storagePath';
 
 // GET /api/portal/training/[id] - Get a single training resource
 export async function GET(
@@ -87,10 +88,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Resource not found' }, { status: 404 });
     }
 
-    // Don't allow updating certain fields. `requestedBy` is no longer read as
-    // identity, but updateData is built by spreading the whole body — keep
-    // stripping it so an old client cannot persist it onto the training doc.
-    const { id: _, createdAt, requestedBy: _requestedBy, ...updateData } = body;
+    // Only the resource's own fields can change (no mass assignment of
+    // arbitrary keys), and a storagePath must name one file in one upload
+    // folder: DELETE clears that folder.
+    const updateData: Record<string, unknown> = {};
+    for (const field of TRAINING_EDITABLE_FIELDS) {
+      if (body && typeof body === 'object' && field in body) updateData[field] = body[field];
+    }
+    if ('storagePath' in updateData && updateData.storagePath !== '' && !isValidTrainingStoragePath(updateData.storagePath)) {
+      return NextResponse.json({ error: 'Invalid storagePath' }, { status: 400 });
+    }
 
     await docRef.update({
       ...updateData,
@@ -141,11 +148,13 @@ export async function DELETE(
     // Best-effort: remove the uploaded file(s) under training/{uploadId}/.
     if (data?.storagePath) {
       try {
-        const folder = String(data.storagePath).replace(/[^/]+$/, ''); // training/{uploadId}/
-        // Guard against a malformed path collapsing to an empty prefix (which
-        // would target the whole bucket); only ever delete under training/.
-        if (folder.startsWith('training/')) {
+        // Only ever one upload folder (training/{uploadId}/): a malformed path
+        // must not widen the prefix to training/ or the whole bucket.
+        const folder = trainingUploadFolder(data.storagePath);
+        if (folder) {
           await getOnboardingBucket().deleteFiles({ prefix: folder, force: true });
+        } else {
+          console.error('Training file cleanup skipped: invalid storagePath', { id });
         }
       } catch (err) {
         console.error('Training file cleanup failed:', err);

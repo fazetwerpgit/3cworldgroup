@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { TrainingResource } from '@/types';
 import { requireVerifiedManagement, requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { deriveResourceType } from '@/lib/training/fileKind';
+import { isValidTrainingStoragePath } from '@/lib/training/storagePath';
 
 // GET /api/portal/training - Get training resources
 export async function GET(request: NextRequest) {
@@ -117,6 +118,11 @@ export async function POST(request: NextRequest) {
     const resolvedType = mimeType ? deriveResourceType(mimeType) : type;
 
     // Validate required fields
+    // DELETE clears the storagePath's folder: it must be one upload folder.
+    if (storagePath && !isValidTrainingStoragePath(storagePath)) {
+      return NextResponse.json({ error: 'Invalid storagePath' }, { status: 400 });
+    }
+
     if (!title || !resolvedType || !category) {
       return NextResponse.json(
         { error: 'Missing required fields: title, type, category' },
