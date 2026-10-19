@@ -124,7 +124,8 @@ export function validateLead(f: LeadFields): Partial<Record<keyof LeadFields, st
   if (!/^[A-Za-z]{2}$/.test(f.state.trim())) e.state = 'Two letters, like CA';
   if (!/^\d{5}(-\d{4})?$/.test(f.zip.trim())) e.zip = 'Five digits';
   if (f.phone.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '').length !== 10) e.phone = 'Ten digits';
-  if (f.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Check the email';
+  if (!f.email.trim()) e.email = 'Add an email';
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) e.email = 'Check the email';
   return e;
 }
 

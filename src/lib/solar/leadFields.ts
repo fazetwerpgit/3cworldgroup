@@ -45,9 +45,9 @@ export function parseLead(body: Record<string, unknown>, uid: string): { ok: tru
   const phone = str(body.phone, 40);
   const email = str(body.email, 200).toLowerCase();
   if (!first || !last) return { ok: false, error: 'First and last name are required' };
-  if (!phone && !email) return { ok: false, error: 'A phone number or email is required' };
+  if (!email) return { ok: false, error: 'Email is required' };
+  if (!EMAIL_RE.test(email)) return { ok: false, error: 'Enter a valid email' };
   if (phone && !/^[\d\s()+.-]{7,40}$/.test(phone)) return { ok: false, error: 'Enter a valid phone number' };
-  if (email && !EMAIL_RE.test(email)) return { ok: false, error: 'Enter a valid email' };
 
   let monthlyBill: number | null = null;
   if (body.monthlyBill !== undefined && body.monthlyBill !== null && body.monthlyBill !== '') {

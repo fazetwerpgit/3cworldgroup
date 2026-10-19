@@ -53,13 +53,14 @@ describe('solar deck helpers', () => {
 
   it('validates the lead form inline', () => {
     expect(Object.keys(validateLead(EMPTY_LEAD)).sort()).toEqual(
-      ['address', 'city', 'first', 'last', 'phone', 'state', 'zip'].sort()
+      ['address', 'city', 'email', 'first', 'last', 'phone', 'state', 'zip'].sort()
     );
     const ok = {
       first: 'Ana', last: 'Ruiz', address: '1 Main St', city: 'Fresno', state: 'CA',
-      zip: '93701', phone: '(559) 555-0100', email: '',
+      zip: '93701', phone: '(559) 555-0100', email: 'ana@example.com',
     };
     expect(validateLead(ok)).toEqual({});
     expect(validateLead({ ...ok, email: 'nope' })).toEqual({ email: 'Check the email' });
+    expect(validateLead({ ...ok, email: '  ' })).toEqual({ email: 'Add an email' });
   });
 });

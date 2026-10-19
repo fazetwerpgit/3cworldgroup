@@ -42,7 +42,7 @@ const FIELDS: FieldDef[] = [
   { key: 'state', label: 'State', type: 'text', autoComplete: 'address-level1', className: s.fieldState, maxLength: 2 },
   { key: 'zip', label: 'Zip', type: 'text', autoComplete: 'postal-code', inputMode: 'numeric', className: s.fieldZip, maxLength: 10 },
   { key: 'phone', label: 'Phone', type: 'tel', autoComplete: 'tel', inputMode: 'tel' },
-  { key: 'email', label: 'Email (optional)', type: 'email', autoComplete: 'email', inputMode: 'email' },
+  { key: 'email', label: 'Email', type: 'email', autoComplete: 'email', inputMode: 'email' },
 ];
 
 export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {

@@ -136,6 +136,7 @@ describe('POST /api/portal/solar/leads', () => {
   it.each([
     ['missing name', { first: '' }],
     ['no contact', { phone: '', email: '' }],
+    ['no email', { email: '' }],
     ['bad email', { email: 'nope' }],
     ['bad bill', { monthlyBill: 'lots' }],
     ['bad credit tier', { creditTier: 'gold' }],
