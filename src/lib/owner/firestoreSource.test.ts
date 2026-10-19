@@ -51,7 +51,11 @@ vi.mock('@/lib/firebase/admin', () => ({
           : { doc: () => ({ get: async () => ({ exists: false, data: () => ({}) }) }) },
   },
 }));
-vi.mock('@/lib/fiberReport/ordersCache', () => ({ getAllFiberOrders: vi.fn(async () => orders) }));
+vi.mock('@/lib/fiberReport/ordersCache', async (importOriginal) => ({
+  // The real cache key (the book cache is keyed on it); the orders are stubbed.
+  fiberOrdersCacheKey: (await importOriginal<typeof import('@/lib/fiberReport/ordersCache')>()).fiberOrdersCacheKey,
+  getAllFiberOrders: vi.fn(async () => orders),
+}));
 
 import { clearOwnerBookCache, createFirestoreOwnerSource } from './firestoreSource';
 import { companyBook } from './companySummary';
