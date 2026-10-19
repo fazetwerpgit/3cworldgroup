@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
-import { isManagementRole, resolveRoles } from '@/types';
 import { userRateLimited } from '@/lib/userRateLimits';
+import { activeManagementUsers } from '@/lib/forms/notifySubmission';
 
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
@@ -17,13 +17,8 @@ const AREAS = ['Forms', 'Sales', 'Onboarding', 'Chat', 'Leaderboard', 'Other'];
 async function notifyAdmins(title: string, message: string) {
   if (!adminDb) return;
   try {
-    const snap = await adminDb.collection('users').get();
-    const adminUids = snap.docs
-      .filter((d) => {
-        const data = d.data();
-        return data.status === 'active' && isManagementRole(resolveRoles(data.role, data.fieldRole).role);
-      })
-      .map((d) => d.id);
+    // Targeted role query, not every user doc (lib/forms/notifySubmission).
+    const adminUids = (await activeManagementUsers()).map((d) => d.id);
     await Promise.all(
       adminUids.map((uid) =>
         adminDb!.collection('notifications').add({

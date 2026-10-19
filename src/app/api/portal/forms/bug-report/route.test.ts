@@ -82,20 +82,27 @@ describe('POST /api/portal/forms/bug-report', () => {
       id,
       data: () => ({ role, fieldRole, status }),
     });
-    mockAdminCollection.mockImplementation(() => ({
-      get: vi.fn(async () => ({
-        docs: [
+    const wheres: unknown[][] = [];
+    const docsList = () => [
           user('owner1', 'owner', 'active'),
           user('ops1', 'operations', 'active'),
           user('ops2', 'operations', 'inactive'),
           user('admin2', 'admin', 'inactive'),
           user('rep1', undefined, 'active', 'entry_rep'),
-        ],
-      })),
+    ];
+    mockAdminCollection.mockImplementation(() => ({
+      // Only the targeted role query is served; it filters like Firestore.
+      where: (field: string, op: string, values: string[]) => ({
+        get: vi.fn(async () => {
+          wheres.push([field, op, values]);
+          return { docs: docsList().filter((d) => values.includes(d.data().role as string)) };
+        }),
+      }),
       add,
     }));
     const res = await POST(req(VALID));
     expect(res.status).toBe(200);
     expect(add.mock.calls.map((c) => c[0].userId).sort()).toEqual(['ops1', 'owner1']);
+    expect(wheres).toEqual([['role', 'in', ['admin', 'operations', 'owner']]]);
   });
 });

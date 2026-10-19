@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const alertDocGet = vi.fn();
 const usersGet = vi.fn();
 const userDocGet = vi.fn();
+const userWheres: Array<{ field: string; op: string; values: string[] }> = [];
 const notifAdd = vi.fn(async (_doc: Record<string, unknown>) => ({ id: 'n1' }));
 const sendEmailMock = vi.fn(async (_args: Record<string, unknown>) => ({ ok: true }));
 
@@ -12,7 +13,18 @@ vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: (name: string) => {
       if (name === 'formAlerts') return { doc: () => ({ get: alertDocGet }) };
-      if (name === 'users') return { get: usersGet, doc: (id: string) => ({ get: () => userDocGet(id) }) };
+      // Only a where('role','in',...) read exists: a whole-collection get() would
+      // throw here. The mock applies the filter like Firestore does.
+      if (name === 'users') return {
+        where: (field: string, op: string, values: string[]) => ({
+          get: async () => {
+            userWheres.push({ field, op, values });
+            const snap = await usersGet();
+            return { docs: snap.docs.filter((d: { data: () => Record<string, unknown> }) => op === 'in' && values.includes(d.data()[field] as string)) };
+          },
+        }),
+        doc: (id: string) => ({ get: () => userDocGet(id) }),
+      };
       if (name === 'notifications') return { add: notifAdd };
       return { get: vi.fn() };
     },
@@ -38,6 +50,7 @@ function usersSnapshot(users: MockUser[]) {
     docs: users.map((u) => ({
       id: u.id,
       data: () => ({ role: u.role, fieldRole: u.fieldRole, status: u.status ?? 'active' }),
+      get: (field: string) => (u as Record<string, unknown>)[field],
     })),
   };
 }
@@ -48,6 +61,7 @@ beforeEach(() => {
   userDocGet.mockReset();
   notifAdd.mockClear();
   sendEmailMock.mockClear();
+  userWheres.length = 0;
 });
 
 describe('notifySubmission', () => {
@@ -108,6 +122,15 @@ describe('notifySubmission', () => {
     await notifySubmission('application', 'New Recruit (Dallas)');
     const to = sendEmailMock.mock.calls.map((c) => (c[0] as { to: string }).to).sort();
     expect(to).toEqual(['jeremy@example.com', 'jmyers@3cworldgroup.com']);
+  });
+
+  it('reads users with a targeted management-role query, and no per-user doc reads for email', async () => {
+    alertDocGet.mockResolvedValue({ exists: false });
+    usersGet.mockResolvedValue(usersSnapshot([{ id: 'admin1', role: 'admin', email: 'a@x.com' }]));
+    await notifySubmission('application', 'New Recruit');
+    expect(userWheres).toEqual([{ field: 'role', op: 'in', values: ['admin', 'operations', 'owner'] }]);
+    expect(userDocGet).not.toHaveBeenCalled();
+    expect(sendEmailMock.mock.calls.map((c) => c[0].to)).toEqual(['a@x.com']);
   });
 
   it('does nothing for an unknown form key', async () => {

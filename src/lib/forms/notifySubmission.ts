@@ -2,7 +2,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { appBaseUrl, formSubmissionEmail } from '@/lib/email/templates';
-import { isManagementRole, resolveRoles } from '@/types';
+import { MANAGEMENT_PLATFORM_ROLES, isManagementRole, resolveRoles } from '@/types';
 
 // Per-form alert config. Each rebuilt form has a stable key; the label + review
 // link drive the notification text and deep-link. Adding a form here is all it
@@ -35,18 +35,22 @@ async function alertsEnabled(key: string): Promise<boolean> {
   }
 }
 
-// The UIDs of every active management user — the people who work the review
-// queues. Deactivated accounts lost access, so they get no alerts either.
-async function managementUids(): Promise<string[]> {
+// Every active management user — the people who work the review queues.
+// Deactivated accounts lost access, so they get no alerts either.
+//
+// A management role is only ever stored in the raw `role` field (resolveRoles
+// reads platform roles from there alone), so a where('role','in',...) query
+// returns exactly the docs the old whole-collection read kept. That read cost
+// one read per user on every public job application (P2-5); this costs one per
+// back-office user. Single-field index only; status is filtered in code.
+export async function activeManagementUsers(): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
   if (!adminDb) return [];
-  const snap = await adminDb.collection('users').get();
-  return snap.docs
-    .filter((d) => {
-      const data = d.data();
-      const { role } = resolveRoles(data.role, data.fieldRole);
-      return data.status === 'active' && isManagementRole(role);
-    })
-    .map((d) => d.id);
+  const snap = await adminDb.collection('users').where('role', 'in', [...MANAGEMENT_PLATFORM_ROLES]).get();
+  return snap.docs.filter((d) => {
+    const data = d.data();
+    const { role } = resolveRoles(data.role, data.fieldRole);
+    return data.status === 'active' && isManagementRole(role);
+  });
 }
 
 // Fire in-portal bell notifications to admins + operations when a form is submitted.
@@ -58,7 +62,8 @@ export async function notifySubmission(formKey: string, submittedBy: string): Pr
   if (!meta) return;
   try {
     if (!(await alertsEnabled(formKey))) return;
-    const uids = await managementUids();
+    const users = await activeManagementUsers();
+    const uids = users.map((d) => d.id);
     const now = new Date();
     await Promise.all(
       uids.map((uid) =>
@@ -82,8 +87,8 @@ export async function notifySubmission(formKey: string, submittedBy: string): Pr
         link: `${appBaseUrl()}${meta.reviewLink}`,
       });
       const results = await Promise.allSettled(
-        uids.map(async (uid) => {
-          const user = await adminDb!.collection('users').doc(uid).get();
+        users.map(async (user) => {
+          // The query above already holds each doc; no second read per user.
           const to = emailFromUserDoc(user);
           if (!to) return;
 
