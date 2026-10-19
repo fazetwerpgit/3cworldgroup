@@ -1,3 +1,4 @@
+import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { cleanDlNumber, cleanSsn } from '@/lib/onboarding/sensitiveFields';
 import { formatPhone } from '@/lib/phone';
 import { last4 } from '@/lib/security/fieldEncryption';
@@ -191,7 +192,8 @@ export function matchUsers(users: PortalUser[], rows: SheetRow[]): SheetMatch {
   const claims = new Map<number, number>();
 
   for (const user of users) {
-    const email = typeof user.data.email === 'string' ? user.data.email.trim().toLowerCase() : '';
+    // Legacy user docs keep the address under 'Email' (capital E).
+    const email = emailFromUserDoc({ get: (field) => user.data[field] })?.toLowerCase() ?? '';
     let found = email ? rows.flatMap((row, index) => (row.email === email ? [index] : [])) : [];
     if (found.length === 0) {
       const portalName = normalizeName(String(user.data.displayName ?? ''));

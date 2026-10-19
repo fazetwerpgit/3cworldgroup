@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { installDayKey } from '@/lib/sales/saleDate';
 import { decryptField } from '@/lib/security/fieldEncryption';
 import { getEffectiveRole, repFacingRoleLabel, type FieldRole, type PlatformRole } from '@/types/auth';
@@ -86,7 +87,8 @@ export function buildExportRows(
       return {
         name,
         phone: text(data.phone),
-        email: text(data.email),
+        // Legacy user docs keep the address under 'Email' (capital E).
+        email: emailFromUserDoc({ get: (field) => data[field] }) ?? '',
         street: text(data.address),
         city: text(data.city),
         state: text(data.state),
