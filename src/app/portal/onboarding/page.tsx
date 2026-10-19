@@ -17,6 +17,7 @@ import { isStorageItem, IMAGE_TYPES, DOC_TYPES } from '@/lib/onboarding/uploads'
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
 import { draftReference as draftReferenceFor } from './draftReference';
+import { addDlSlot, dlReference, EMPTY_DL_SLOTS, type DlSlots } from './dlSlots';
 
 interface ChecklistItem extends OnboardingItem {
   status: OnboardingStatus;
@@ -65,20 +66,18 @@ function OnboardingChecklist() {
   const { uploading, onBusyChange } = useUploadsInFlight();
   // dl_photos requires both slots before the reference (shared folder path) is
   // set. Only read inside the setter's updater, so the value binding is unused.
-  const [, setDlSlots] = useState<{ front: string; back: string }>({
-    front: '',
-    back: '',
-  });
+  const [, setDlSlots] = useState<DlSlots>(EMPTY_DL_SLOTS);
   // Typed license number for dl_photos. Sent once on submit, never read back.
   const [dlNumber, setDlNumber] = useState('');
   // A number is on file; the rep chose to replace it.
   const [dlReplace, setDlReplace] = useState(false);
 
-  const markDlSlot = (slot: 'front' | 'back', folderPath: string, reset = false) => {
+  // Whether to start fresh is decided from the current slots, not the render
+  // the file was picked in: front and back can upload at the same time.
+  const markDlSlot = (itemId: string, slot: 'front' | 'back', folderPath: string) => {
     setDlSlots((prev) => {
-      const base = reset ? { front: '', back: '' } : prev;
-      const next = { ...base, [slot]: folderPath };
-      setReference(next.front && next.back ? folderPath : '');
+      const next = addDlSlot(prev, itemId, slot, folderPath);
+      setReference(dlReference(next, folderPath));
       return next;
     });
   };
@@ -135,6 +134,7 @@ function OnboardingChecklist() {
     if (submitModal?.id !== item.id) {
       setSubmitModal(item);
       setReference(submittedReference);
+      setDlSlots(EMPTY_DL_SLOTS);
     }
     setSubmitting(true);
     setError('');
@@ -155,7 +155,7 @@ function OnboardingChecklist() {
 
       setSubmitModal(null);
       setReference('');
-      setDlSlots({ front: '', back: '' });
+      setDlSlots(EMPTY_DL_SLOTS);
       setDlNumber('');
       setDlReplace(false);
       setOpenItemId(null);
@@ -171,7 +171,7 @@ function OnboardingChecklist() {
     if (submitModal?.id !== item.id) {
       setSubmitModal(item);
       setReference(nextReference);
-      setDlSlots({ front: '', back: '' });
+      setDlSlots(EMPTY_DL_SLOTS);
       return;
     }
     setReference(nextReference);
@@ -269,9 +269,8 @@ function OnboardingChecklist() {
                 upload={(file, signal) => uploadFile(item, file, signal, IMAGE_TYPES, 'front')}
                 onBusyChange={onBusyChange}
                 onUploaded={(path) => {
-                  const isNewSubmission = submitModal?.id !== item.id;
-                  if (isNewSubmission) setSubmitModal(item);
-                  markDlSlot('front', path, isNewSubmission);
+                  if (submitModal?.id !== item.id) setSubmitModal(item);
+                  markDlSlot(item.id, 'front', path);
                 }}
               />
               <Attachment
@@ -283,9 +282,8 @@ function OnboardingChecklist() {
                 upload={(file, signal) => uploadFile(item, file, signal, IMAGE_TYPES, 'back')}
                 onBusyChange={onBusyChange}
                 onUploaded={(path) => {
-                  const isNewSubmission = submitModal?.id !== item.id;
-                  if (isNewSubmission) setSubmitModal(item);
-                  markDlSlot('back', path, isNewSubmission);
+                  if (submitModal?.id !== item.id) setSubmitModal(item);
+                  markDlSlot(item.id, 'back', path);
                 }}
               />
             </div>
