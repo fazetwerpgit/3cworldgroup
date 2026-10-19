@@ -79,6 +79,34 @@ const PROFILE_RETRY_DELAYS_MS = [1000, 3000];
 const QUIET_PROFILE_RETRY_DELAYS_MS = [5000, 15000, 30000, 60000];
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+// Per-tab state that belongs to the account signed in on this device. Every
+// path to a signed-out state drops it (an explicit sign-out, a forced one on
+// deactivation, or Firebase ending the session itself) so a shared phone or
+// the iOS app's long-lived WebView never hands it to whoever signs in next.
+function clearDeviceSession() {
+  // The e-sign signature lives in sessionStorage for reuse across the five
+  // onboarding documents, under one key for everybody.
+  clearSignature();
+  // The owner's "View as rep" session ends with the sign-in it belongs to.
+  clearViewAs();
+  // Same for the Ask 3C conversation and practice: the next rep must not see or send them.
+  try {
+    window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);
+    window.sessionStorage.removeItem(PRACTICE_SESSION_KEY);
+  } catch {
+    // Storage blocked: the page's uid check still keeps it from the next rep.
+  }
+}
+
+// Removes this device's push registration while the session can still prove
+// who it belongs to (the route needs the ID token). Capped so a rep on weak
+// signal never waits on it: after 2.5s it lets the request finish in the background.
+async function unregisterPushCapped() {
+  const cap = Promise.withResolvers<void>();
+  setTimeout(cap.resolve, 2500);
+  await Promise.race([Promise.all([unregisterPushOnDevice(), unregisterNativePush()]), cap.promise]);
+}
+
 // Best-effort, fire-and-forget: copies a Google SSO photoURL onto the caller's
 // own users doc via a server route that verifies the ID token and derives both
 // the target uid and the photo server-side (never trusts client input). Only
@@ -187,6 +215,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const profileLoadFailedRef = useRef(false);
   // The one live listener on the signed-in user's own users doc.
   const profileUnsubscribe = useRef<(() => void) | null>(null);
+  // The account the auth listener last saw on this tab: a change away from it
+  // (to none or to someone else) clears that account's per-tab state.
+  const lastAuthUid = useRef<string | null>(null);
   useEffect(() => {
     profileLoadFailedRef.current = profileLoadFailed;
   }, [profileLoadFailed]);
@@ -280,6 +311,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileUnsubscribe.current = null;
     };
 
+    // An account the portal turns away (deactivated, or still waiting on a
+    // role) gets the same device cleanup as signOut(): its push registration
+    // goes while the ID token can still prove whose it is, then its per-tab state.
+    const forceSignOut = async () => {
+      clearDeviceSession();
+      if (!auth) return;
+      await unregisterPushCapped();
+      await firebaseSignOut(auth);
+    };
+
     // After the profile resolves to a signed-in state, keep listening so an
     // admin's change (deactivation, activation, a new role) reaches an open tab.
     const watchProfile = (uid: string) => {
@@ -307,7 +348,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           cancelQuietRetry();
           resolveGeneration.current += 1;
           void (async () => {
-            if (auth) await firebaseSignOut(auth);
+            await forceSignOut();
             setState({ user: null, loading: false, error: disabledAccountMessage, pendingApproval: false });
           })();
         },
@@ -371,7 +412,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } else if (isAwaitingRoleAssignment(userData)) {
           await parkPendingIdToken(firebaseUser);
-          if (auth) await firebaseSignOut(auth);
+          await forceSignOut();
           setState({ user: null, loading: false, error: null, pendingApproval: true });
         } else if (userData.status === 'pending') {
           // The confirmed profile usually equals the remembered one already on
@@ -385,7 +426,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }));
           watchProfile(firebaseUser.uid);
         } else {
-          if (auth) await firebaseSignOut(auth);
+          await forceSignOut();
           setState({
             user: null,
             loading: false,
@@ -458,6 +499,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       // Cached screens belong to one account: another account, or none, empties them.
       setDataCacheOwner(firebaseUser?.uid ?? null);
+      // Firebase can end a session on its own (auth account disabled or
+      // deleted, refresh token revoked) or switch accounts; the per-tab state of
+      // the account that left goes with it. Only a change away from an account
+      // seen on this tab counts: a cold open with no session (a new hire on an
+      // /onboard link) keeps its own signature.
+      const previousUid = lastAuthUid.current;
+      lastAuthUid.current = firebaseUser?.uid ?? null;
+      if (previousUid !== null && previousUid !== lastAuthUid.current) clearDeviceSession();
       if (signingUp.current || bootstrappingPendingProfile.current) return; // explicit auth flows own state
       if (firebaseUser) {
         // Cold open: Firebase has restored and checked this session. Paint the
@@ -589,12 +638,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Firebase Auth is not configured');
     }
     try {
-      // The e-sign signature lives in sessionStorage for reuse across the five
-      // onboarding documents. Drop it here so a shared phone never hands one
-      // rep's signature to whoever signs in next.
-      clearSignature();
-      // The owner's "View as rep" session ends with the sign-in it belongs to.
-      clearViewAs();
+      // Signature, View as, Ask conversation: see clearDeviceSession.
+      clearDeviceSession();
       // Cached screens (an owner's include financials) never outlive the sign-in.
       setDataCacheOwner(null);
       // Nor does the remembered profile: the next open starts at the sign-in.
@@ -603,19 +648,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearSessionProfile();
       // And the dashboard kept on the device for fast cold opens.
       clearDashboardSnapshots();
-      // Same for the Ask 3C conversation and practice: the next rep must not see or send them.
-      try {
-        window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);
-        window.sessionStorage.removeItem(PRACTICE_SESSION_KEY);
-      } catch {
-        // Storage blocked: the page's uid check still keeps it from the next rep.
-      }
-      // Started before sign-out (it reads this user's ID token first), but a
-      // rep on weak signal shouldn't wait on it: after 2.5s sign out anyway and
-      // let the request finish in the background.
-      const cap = Promise.withResolvers<void>();
-      setTimeout(cap.resolve, 2500);
-      await Promise.race([Promise.all([unregisterPushOnDevice(), unregisterNativePush()]), cap.promise]);
+      // Started before sign-out (it reads this user's ID token first).
+      await unregisterPushCapped();
       await firebaseSignOut(auth);
       setProfileLoadFailed(false);
       setState({ user: null, loading: false, error: null, pendingApproval: false });
