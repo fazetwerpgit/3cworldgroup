@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Camera, ChevronDown, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { AskLogView } from '@/lib/ask/chat';
@@ -388,19 +388,22 @@ export function KnowledgeManager() {
   );
 }
 
-function Questions({ onAddToKnowledge }: { onAddToKnowledge: (row: AskLogView) => void }) {
+export function Questions({ onAddToKnowledge }: { onAddToKnowledge: (row: AskLogView) => void }) {
   const [filter, setFilter] = useState<'all' | 'down'>('all');
   const [rows, setRows] = useState<Load<AskLogView[]>>({ status: 'loading' });
+  // Only the newest request may set rows, so a slow "All" answer cannot land under "Thumbs down".
+  const latest = useRef(0);
 
   const load = useCallback(async (which: 'all' | 'down') => {
+    const request = ++latest.current;
     setRows({ status: 'loading' });
     try {
       const { questions } = await api<{ questions: AskLogView[] }>(
         `/api/portal/knowledge/questions${which === 'down' ? '?rating=down' : ''}`
       );
-      setRows({ status: 'ready', data: questions });
+      if (request === latest.current) setRows({ status: 'ready', data: questions });
     } catch {
-      setRows({ status: 'error' });
+      if (request === latest.current) setRows({ status: 'error' });
     }
   }, []);
 
@@ -778,12 +781,13 @@ function PracticeAssignments() {
 }
 
 /** "Coach was wrong": the owner's right take on one part of a session's feedback, which the coach learns from. */
-function CoachWasWrong({ row, onChange }: { row: PracticeLogView; onChange: () => void }) {
+export function CoachWasWrong({ row, onChange }: { row: PracticeLogView; onChange: () => void }) {
   const [part, setPart] = useState<CorrectionPart>('score');
   const [take, setTake] = useState('');
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [removeError, setRemoveError] = useState('');
 
   const save = async () => {
     setBusy(true);
@@ -801,11 +805,12 @@ function CoachWasWrong({ row, onChange }: { row: PracticeLogView; onChange: () =
 
   const remove = async (id: string) => {
     setBusy(true);
+    setRemoveError('');
     try {
       await api(`/api/portal/knowledge/practice/corrections?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
       onChange();
     } catch {
-      setError('That did not delete. Try again.');
+      setRemoveError('That did not delete. Try again.');
     }
     setBusy(false);
   };
@@ -826,6 +831,7 @@ function CoachWasWrong({ row, onChange }: { row: PracticeLogView; onChange: () =
           </div>
         </div>
       ))}
+      {removeError ? <p className={`${u.hint} ${u.hintError}`} role="alert">{removeError}</p> : null}
       {open ? (
         <div className={u.formGrid}>
           <label className={u.field}>
