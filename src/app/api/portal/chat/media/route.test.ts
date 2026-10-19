@@ -63,6 +63,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 
 import { POST } from './route';
+import { resetUserRateLimits } from '@/lib/userRateLimits';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 
 const mockGate = getVerifiedChatUser as unknown as ReturnType<typeof vi.fn>;
@@ -97,6 +98,7 @@ function pngFile(bytes: number, type = 'image/png') {
 }
 
 beforeEach(() => {
+  resetUserRateLimits();
   firestore.reset();
   mockGate.mockReset();
   saveMock.mockClear();

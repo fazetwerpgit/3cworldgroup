@@ -7,6 +7,17 @@ import {
   sniffUploadMime,
   SUBMISSION_COLLECTION,
 } from '@/lib/forms/formUploads';
+import { userRateLimited } from '@/lib/userRateLimits';
+
+/** Whether any sale stores this proof folder (array field or the legacy single one). */
+async function saleReferencesProofFolder(folder: string): Promise<boolean> {
+  const sales = adminDb!.collection('sales');
+  const [inList, single] = await Promise.all([
+    sales.where('proofScreenshotPaths', 'array-contains', folder).limit(1).get(),
+    sales.where('proofScreenshotPath', '==', folder).limit(1).get(),
+  ]);
+  return !inList.empty || !single.empty;
+}
 
 // POST /api/portal/forms/upload - verified user uploads a form attachment.
 // Writes ONLY under the verified caller's own folder. Payroll Dispute / Leads
@@ -16,6 +27,8 @@ export async function POST(request: NextRequest) {
   try {
     const gate = await requireVerifiedUser(request);
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+    const limited = userRateLimited('formUpload', gate.uid);
+    if (limited) return limited;
 
     const form = await request.formData();
     const formType = String(form.get('formType') ?? '');
@@ -38,6 +51,19 @@ export async function POST(request: NextRequest) {
       const used = await adminDb.collection(collection).where('uploadId', '==', uploadId).limit(1).get();
       if (!used.empty) {
         return NextResponse.json({ error: 'This request was already sent. Start a new one to attach a file.' }, { status: 409 });
+      }
+    }
+
+    // A sale's proof is final once the sale is logged: the folder it points at
+    // can't be overwritten (each new screenshot gets its own fresh slot, so a
+    // folder a sale already references is only ever reached by a swap).
+    if (formType === 'sale-proof') {
+      if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+      if (await saleReferencesProofFolder(folder)) {
+        return NextResponse.json(
+          { error: 'This screenshot is already on a logged sale and can no longer be replaced.' },
+          { status: 409 }
+        );
       }
     }
 

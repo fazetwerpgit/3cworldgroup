@@ -16,6 +16,7 @@ import {
   readStoredAttachment,
   validateMessageAttachment,
 } from '@/lib/chat/media';
+import { userRateLimited } from '@/lib/userRateLimits';
 
 // What a reply quote shows once its source message is deleted.
 const DELETED_REPLY_TEXT = 'Message deleted';
@@ -234,6 +235,9 @@ export async function POST(request: NextRequest) {
     const result = await getVerifiedChatUser(request);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
     const user = result.user;
+    // Every send pushes to each member's phone: cap a looping client.
+    const limited = userRateLimited('chatMessage', user.uid);
+    if (limited) return limited;
 
     // The app shows the one-time chat agreement before chat opens; a send from
     // the app without it on file is refused (the user doc is already read).

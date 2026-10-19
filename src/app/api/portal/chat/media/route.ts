@@ -16,6 +16,7 @@ import {
   sanitizeAttachmentFileName,
   uploadExtForMime,
 } from '@/lib/chat/media';
+import { userRateLimited } from '@/lib/userRateLimits';
 
 // POST /api/portal/chat/media — verified caller who can access the channel adds
 // an image or a PDF to chat storage, in one of two ways:
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest) {
     const result = await getVerifiedChatUser(request);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
     const user = result.user;
+    const limited = userRateLimited('chatUpload', user.uid);
+    if (limited) return limited;
 
     // Same gate as a send: an app caller without the chat agreement on file
     // may not upload, so no attachment is stored for a message it can't post.

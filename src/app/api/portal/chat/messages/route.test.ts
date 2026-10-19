@@ -361,6 +361,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 
 import { POST, PATCH, DELETE } from './route';
+import { resetUserRateLimits } from '@/lib/userRateLimits';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 
 const mockGate = getVerifiedChatUser as unknown as ReturnType<typeof vi.fn>;
@@ -415,6 +416,7 @@ const MODERATOR = {
 };
 
 beforeEach(() => {
+  resetUserRateLimits();
   mockGate.mockReset();
   addMock.mockClear();
   setMock.mockClear();

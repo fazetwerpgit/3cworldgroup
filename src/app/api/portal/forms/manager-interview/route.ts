@@ -5,6 +5,7 @@ import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { isValidOption } from '@/lib/forms/formOptions';
 import { isPromotionRole, validateSignatureDataUrl, isEmailShaped } from '@/lib/forms/managerInterview';
+import { userRateLimited } from '@/lib/userRateLimits';
 
 function s(v: unknown, max = 200) {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
@@ -23,6 +24,9 @@ export async function POST(request: NextRequest) {
   try {
     const gate = await requireVerifiedFieldManagerOrManagement(request);
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+    // Each submission emails the managers: cap a looping client.
+    const limited = userRateLimited('formSubmit', gate.uid);
+    if (limited) return limited;
 
     const body = await request.json();
     const opts = await getResolvedFormOptions();
