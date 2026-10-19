@@ -12,7 +12,7 @@ type CompleteEsignItem = (input: {
   itemId: string;
   envelopeId: string;
   pdf: Buffer | null;
-}) => Promise<{ completedPdfPath: string | null }>;
+}) => Promise<{ completedPdfPath: string | null; status: 'approved' | 'upload_failed' | 'superseded' }>;
 
 const {
   docGetMock,
@@ -102,8 +102,18 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const ROUTING_NUMBER = '021000021';
 const ACCOUNT_NUMBER = '000123456789';
 
-function pngDataUrl(body: Buffer = Buffer.from('ink')): string {
-  return `data:image/png;base64,${Buffer.concat([PNG_MAGIC, body]).toString('base64')}`;
+// PNG magic plus an IHDR header; the server reads the declared size.
+function pngHeader(width: number, height: number): Buffer {
+  const header = Buffer.alloc(16);
+  header.writeUInt32BE(13, 0);
+  header.write('IHDR', 4, 'latin1');
+  header.writeUInt32BE(width, 8);
+  header.writeUInt32BE(height, 12);
+  return header;
+}
+
+function pngDataUrl(body: Buffer = Buffer.from('ink'), width = 600, height = 200): string {
+  return `data:image/png;base64,${Buffer.concat([PNG_MAGIC, pngHeader(width, height), body]).toString('base64')}`;
 }
 
 function snapshot(data: Record<string, unknown> | null): DocSnapshot {
@@ -164,7 +174,7 @@ beforeEach(() => {
     stampedSha256: 'b'.repeat(64),
     pageCount: 3,
   });
-  completeEsignItemMock.mockResolvedValue({ completedPdfPath: COMPLETED_PATH });
+  completeEsignItemMock.mockResolvedValue({ completedPdfPath: COMPLETED_PATH, status: 'approved' });
 });
 
 describe('request rejection', () => {
@@ -222,6 +232,28 @@ describe('request rejection', () => {
     const res = await POST(signRequest(signBody({ signaturePng: pngDataUrl(Buffer.alloc(205_000)) })));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'invalid signature image' });
+    expect(stampDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a small PNG that declares huge dimensions', async () => {
+    // A solid-colour 20000x20000 PNG compresses to a few KB but would inflate
+    // to over 1 GB inside pdf-lib.
+    const res = await POST(signRequest(signBody({ signaturePng: pngDataUrl(undefined, 20_000, 20_000) })));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'invalid signature image' });
+    expect(stampDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a PNG over the pixel budget even when each side is allowed', async () => {
+    const res = await POST(signRequest(signBody({ signaturePng: pngDataUrl(undefined, 4000, 4000) })));
+    expect(res.status).toBe(400);
+    expect(stampDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a PNG whose first chunk is not IHDR', async () => {
+    const bogus = `data:image/png;base64,${Buffer.concat([PNG_MAGIC, Buffer.alloc(16)]).toString('base64')}`;
+    const res = await POST(signRequest(signBody({ signaturePng: bogus })));
+    expect(res.status).toBe(400);
     expect(stampDocumentMock).not.toHaveBeenCalled();
   });
 
@@ -348,10 +380,18 @@ function expectClaimReleased() {
 
 describe('failure after the rep pressed sign', () => {
   it('returns 502 and leaves the envelope open when the upload did not land', async () => {
-    completeEsignItemMock.mockResolvedValue({ completedPdfPath: null });
+    completeEsignItemMock.mockResolvedValue({ completedPdfPath: null, status: 'upload_failed' });
     const res = await POST(signRequest(signBody()));
     expect(res.status).toBe(502);
     await expect(res.json()).resolves.toEqual({ error: 'upload failed' });
+    expectClaimReleased();
+  });
+
+  it('returns 409 superseded and leaves the envelope open when a rejection landed mid-signing', async () => {
+    completeEsignItemMock.mockResolvedValue({ completedPdfPath: null, status: 'superseded' });
+    const res = await POST(signRequest(signBody()));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'superseded' });
     expectClaimReleased();
   });
 
@@ -445,7 +485,7 @@ describe('concurrent signing', () => {
   });
 
   it('can sign again after a failed attempt released the claim', async () => {
-    completeEsignItemMock.mockResolvedValueOnce({ completedPdfPath: null });
+    completeEsignItemMock.mockResolvedValueOnce({ completedPdfPath: null, status: 'upload_failed' });
     const first = await POST(signRequest(signBody()));
     expect(first.status).toBe(502);
     // The release write is a plain set; mirror it into the stored envelope.

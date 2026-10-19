@@ -64,7 +64,14 @@ import { GET as listDocuments } from './route';
 import { POST as signDocument } from './sign/route';
 import { GET as getPdf } from './[envelopeId]/pdf/route';
 
-const PNG = `data:image/png;base64,${Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]).toString('base64')}`;
+// PNG magic plus an IHDR header for a 300x100 image (the server reads the size).
+const PNG_HEADER = Buffer.alloc(24);
+Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(PNG_HEADER, 0);
+PNG_HEADER.writeUInt32BE(13, 8);
+PNG_HEADER.write('IHDR', 12, 'latin1');
+PNG_HEADER.writeUInt32BE(300, 16);
+PNG_HEADER.writeUInt32BE(100, 20);
+const PNG = `data:image/png;base64,${Buffer.concat([PNG_HEADER, Buffer.from([1])]).toString('base64')}`;
 let key = '';
 
 function req(method: 'GET' | 'POST', body?: unknown, signingKey: string | null = key) {

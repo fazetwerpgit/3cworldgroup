@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   docMock,
   onboardingSetMock,
+  itemGetMock,
+  runTransactionMock,
   userGetMock,
   bucketMock,
   fileMock,
@@ -15,6 +17,8 @@ const {
 } = vi.hoisted(() => ({
   docMock: vi.fn(),
   onboardingSetMock: vi.fn(),
+  itemGetMock: vi.fn(),
+  runTransactionMock: vi.fn(),
   userGetMock: vi.fn(),
   bucketMock: vi.fn(),
   fileMock: vi.fn(),
@@ -29,7 +33,7 @@ const {
 // Same module specifiers the sign route tests mock, so the helper keeps
 // working inside those routes without either test knowing about the other.
 vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: { doc: docMock },
+  adminDb: { doc: docMock, runTransaction: runTransactionMock },
   adminStorage: { bucket: bucketMock },
 }));
 vi.mock('@/lib/notifications/createNotification', () => ({
@@ -50,6 +54,7 @@ vi.mock('@/types/onboarding', () => ({
 }));
 
 import { completeEsignItem, completedPdfPathFor } from './complete';
+import { envelopeSuperseded } from './superseded';
 
 const PDF = Buffer.from('%PDF-signed');
 
@@ -59,6 +64,11 @@ const input = (overrides: Partial<Parameters<typeof completeEsignItem>[0]> = {})
   envelopeId: 'env_current',
   pdf: PDF,
   ...overrides,
+});
+
+const itemDoc = (data: Record<string, unknown> | null) => ({
+  exists: data !== null,
+  data: () => data ?? undefined,
 });
 
 const userDoc = (displayName?: string, email?: string) => ({
@@ -71,9 +81,17 @@ beforeEach(() => {
   vi.stubEnv('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET', 'bucket.example');
   vi.spyOn(console, 'error').mockImplementation(consoleErrorMock);
   docMock.mockImplementation((path: string) =>
-    path.startsWith('users/') ? { get: userGetMock } : { set: onboardingSetMock }
+    path.startsWith('users/') ? { get: userGetMock } : { path }
   );
-  onboardingSetMock.mockResolvedValue(undefined);
+  // The approval is a transactional set on the onboarding item.
+  runTransactionMock.mockImplementation(async (body: (tx: unknown) => Promise<unknown>) =>
+    body({
+      get: itemGetMock,
+      set: (_ref: unknown, data: unknown, options: unknown) => onboardingSetMock(data, options),
+    })
+  );
+  itemGetMock.mockResolvedValue(itemDoc({ esignEnvelopeId: 'env_current', status: 'submitted' }));
+  onboardingSetMock.mockReturnValue(undefined);
   userGetMock.mockResolvedValue(userDoc('Rep One', 'rep@example.com'));
   bucketMock.mockReturnValue({ file: fileMock });
   fileMock.mockReturnValue({ save: saveMock });
@@ -90,12 +108,18 @@ afterEach(() => {
 });
 
 describe('completeEsignItem', () => {
-  it('approves the item before anything else can fail', async () => {
-    await completeEsignItem(input());
+  it('stores the signed pdf first, then approves with its path in one write', async () => {
+    const result = await completeEsignItem(input());
 
     expect(docMock).toHaveBeenCalledWith('userOnboarding/user-1_contract');
-    expect(onboardingSetMock).toHaveBeenNthCalledWith(
-      1,
+    expect(bucketMock).toHaveBeenCalledWith('bucket.example');
+    expect(fileMock).toHaveBeenCalledWith('esign-completed/user-1/contract.pdf');
+    expect(saveMock).toHaveBeenCalledWith(PDF, {
+      contentType: 'application/pdf',
+      resumable: false,
+    });
+    expect(onboardingSetMock).toHaveBeenCalledOnce();
+    expect(onboardingSetMock).toHaveBeenCalledWith(
       {
         userId: 'user-1',
         itemId: 'contract',
@@ -105,29 +129,17 @@ describe('completeEsignItem', () => {
         reviewerName: 'E-sign (auto)',
         reviewedAt: expect.any(Date),
         updatedAt: expect.any(Date),
+        completedPdfPath: 'esign-completed/user-1/contract.pdf',
       },
       { merge: true }
     );
-    expect(onboardingSetMock.mock.invocationCallOrder[0]).toBeLessThan(
-      saveMock.mock.invocationCallOrder[0]
+    expect(saveMock.mock.invocationCallOrder[0]).toBeLessThan(
+      onboardingSetMock.mock.invocationCallOrder[0]
     );
-  });
-
-  it('uploads the signed pdf and records its path', async () => {
-    const result = await completeEsignItem(input());
-
-    expect(bucketMock).toHaveBeenCalledWith('bucket.example');
-    expect(fileMock).toHaveBeenCalledWith('esign-completed/user-1/contract.pdf');
-    expect(saveMock).toHaveBeenCalledWith(PDF, {
-      contentType: 'application/pdf',
-      resumable: false,
+    expect(result).toEqual({
+      completedPdfPath: 'esign-completed/user-1/contract.pdf',
+      status: 'approved',
     });
-    expect(onboardingSetMock).toHaveBeenNthCalledWith(
-      2,
-      { completedPdfPath: 'esign-completed/user-1/contract.pdf' },
-      { merge: true }
-    );
-    expect(result).toEqual({ completedPdfPath: 'esign-completed/user-1/contract.pdf' });
   });
 
   it('notifies the rep and the owners and re-checks activation', async () => {
@@ -154,48 +166,78 @@ describe('completeEsignItem', () => {
 
     expect(saveMock).not.toHaveBeenCalled();
     expect(onboardingSetMock).toHaveBeenCalledOnce();
+    expect(onboardingSetMock.mock.calls[0][0]).not.toHaveProperty('completedPdfPath');
     expect(createNotificationMock).toHaveBeenCalledOnce();
     expect(notifyDocSignedMock).toHaveBeenCalledOnce();
     expect(maybeFlagActivationReadyMock).toHaveBeenCalledWith('user-1');
-    expect(result).toEqual({ completedPdfPath: null });
+    expect(result).toEqual({ completedPdfPath: null, status: 'approved' });
   });
 
-  it('reports a null path and keeps going when the upload fails', async () => {
+  it('approves nothing and sends nothing when the upload fails', async () => {
     saveMock.mockRejectedValueOnce(new Error('storage unavailable'));
 
     const result = await completeEsignItem(input());
 
-    expect(result).toEqual({ completedPdfPath: null });
-    expect(onboardingSetMock).toHaveBeenCalledOnce();
+    expect(result).toEqual({ completedPdfPath: null, status: 'upload_failed' });
+    expect(runTransactionMock).not.toHaveBeenCalled();
+    expect(onboardingSetMock).not.toHaveBeenCalled();
     expect(consoleErrorMock).toHaveBeenCalledWith(
       '[esign complete] completed pdf failed',
       expect.objectContaining({ userId: 'user-1', itemId: 'contract', envelopeId: 'env_current' })
     );
-    expect(createNotificationMock).toHaveBeenCalledOnce();
-    expect(maybeFlagActivationReadyMock).toHaveBeenCalledWith('user-1');
+    expect(createNotificationMock).not.toHaveBeenCalled();
+    expect(notifyDocSignedMock).not.toHaveBeenCalled();
+    expect(resolveSigningAlertTasksMock).not.toHaveBeenCalled();
+    expect(maybeFlagActivationReadyMock).not.toHaveBeenCalled();
   });
 
-  it('reports a null path when the bucket is not configured', async () => {
+  it('approves nothing when the bucket is not configured', async () => {
     vi.stubEnv('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET', '');
 
     const result = await completeEsignItem(input());
 
     expect(bucketMock).not.toHaveBeenCalled();
-    expect(result).toEqual({ completedPdfPath: null });
+    expect(result).toEqual({ completedPdfPath: null, status: 'upload_failed' });
+    expect(onboardingSetMock).not.toHaveBeenCalled();
+    expect(notifyDocSignedMock).not.toHaveBeenCalled();
     expect(consoleErrorMock).toHaveBeenCalledWith(
       '[esign complete] completed pdf failed',
       expect.objectContaining({ userId: 'user-1' })
     );
   });
 
-  it('reports a null path when recording the uploaded path fails', async () => {
-    onboardingSetMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('write failed'));
+  it('does not overwrite a rejection that landed while the rep was signing', async () => {
+    // review/route.ts rejects by moving the envelope to supersededEnvelopeIds
+    // and deleting esignEnvelopeId.
+    itemGetMock.mockResolvedValue(
+      itemDoc({ status: 'rejected', supersededEnvelopeIds: ['env_current'] })
+    );
 
     const result = await completeEsignItem(input());
 
-    expect(saveMock).toHaveBeenCalledOnce();
-    expect(result).toEqual({ completedPdfPath: null });
-    expect(createNotificationMock).toHaveBeenCalledOnce();
+    expect(result).toEqual({ completedPdfPath: null, status: 'superseded' });
+    expect(onboardingSetMock).not.toHaveBeenCalled();
+    expect(createNotificationMock).not.toHaveBeenCalled();
+    expect(notifyDocSignedMock).not.toHaveBeenCalled();
+    expect(maybeFlagActivationReadyMock).not.toHaveBeenCalled();
+  });
+
+  it('does not approve from an envelope a newer one replaced', async () => {
+    itemGetMock.mockResolvedValue(itemDoc({ status: 'submitted', esignEnvelopeId: 'env_newer' }));
+
+    const result = await completeEsignItem(input());
+
+    expect(result.status).toBe('superseded');
+    expect(onboardingSetMock).not.toHaveBeenCalled();
+  });
+
+  it('approves an item with no onboarding doc yet', async () => {
+    itemGetMock.mockResolvedValue(itemDoc(null));
+
+    const result = await completeEsignItem(input());
+
+    expect(result.status).toBe('approved');
+    expect(onboardingSetMock).toHaveBeenCalledOnce();
   });
 
   it('falls back to the rep email when the users document has no display name', async () => {
@@ -227,6 +269,7 @@ describe('completeEsignItem', () => {
 
     await expect(completeEsignItem(input())).resolves.toEqual({
       completedPdfPath: 'esign-completed/user-1/contract.pdf',
+      status: 'approved',
     });
     expect(consoleErrorMock).toHaveBeenCalledWith(
       '[esign complete] owner signed notification failed',
@@ -240,6 +283,7 @@ describe('completeEsignItem', () => {
 
     await expect(completeEsignItem(input())).resolves.toEqual({
       completedPdfPath: 'esign-completed/user-1/contract.pdf',
+      status: 'approved',
     });
     expect(consoleErrorMock).toHaveBeenCalledWith(
       '[esign complete] failed to flag activation readiness',
@@ -263,6 +307,7 @@ describe('completeEsignItem', () => {
 
     await expect(completeEsignItem(input())).resolves.toEqual({
       completedPdfPath: 'esign-completed/user-1/contract.pdf',
+      status: 'approved',
     });
     expect(consoleErrorMock).toHaveBeenCalledWith(
       '[esign complete] failed to resolve signing alerts',
@@ -271,25 +316,29 @@ describe('completeEsignItem', () => {
     expect(maybeFlagActivationReadyMock).toHaveBeenCalledWith('user-1');
   });
 
-  it('does not close signing alerts when the approval write fails', async () => {
-    onboardingSetMock.mockRejectedValueOnce(new Error('firestore unavailable'));
+  it('propagates a failed approval write without notifying anyone', async () => {
+    runTransactionMock.mockRejectedValueOnce(new Error('firestore unavailable'));
 
     await expect(completeEsignItem(input())).rejects.toThrow('firestore unavailable');
+    expect(createNotificationMock).not.toHaveBeenCalled();
+    expect(notifyDocSignedMock).not.toHaveBeenCalled();
     expect(resolveSigningAlertTasksMock).not.toHaveBeenCalled();
   });
 
-  it('propagates a failed approval write', async () => {
-    onboardingSetMock.mockRejectedValueOnce(new Error('firestore unavailable'));
-
-    await expect(completeEsignItem(input())).rejects.toThrow('firestore unavailable');
-    expect(saveMock).not.toHaveBeenCalled();
-    expect(createNotificationMock).not.toHaveBeenCalled();
-  });
-
-  it('propagates a failed rep notification so the caller can retry', async () => {
+  it('reports the approval when the rep notification fails, so the sign is not retried', async () => {
+    // A thrown error used to make the sign route release the claim after the
+    // approval was written; every retry then approved and notified again.
     createNotificationMock.mockRejectedValueOnce(new Error('notifications unavailable'));
 
-    await expect(completeEsignItem(input())).rejects.toThrow('notifications unavailable');
+    await expect(completeEsignItem(input())).resolves.toEqual({
+      completedPdfPath: 'esign-completed/user-1/contract.pdf',
+      status: 'approved',
+    });
+    expect(consoleErrorMock).toHaveBeenCalledWith(
+      '[esign complete] rep signed notification failed',
+      expect.objectContaining({ userId: 'user-1', itemId: 'contract' })
+    );
+    expect(notifyDocSignedMock).toHaveBeenCalledOnce();
   });
 
   it('rejects an item that is not on the onboarding checklist', async () => {
@@ -308,6 +357,15 @@ describe('completeEsignItem', () => {
 
     vi.doUnmock('@/lib/firebase/admin');
     vi.resetModules();
+  });
+});
+
+describe('envelopeSuperseded', () => {
+  it('flags an envelope in supersededEnvelopeIds or replaced by a newer one', () => {
+    expect(envelopeSuperseded({ supersededEnvelopeIds: ['env-1'] }, 'env-1')).toBe(true);
+    expect(envelopeSuperseded({ esignEnvelopeId: 'env-2' }, 'env-1')).toBe(true);
+    expect(envelopeSuperseded({ esignEnvelopeId: 'env-1' }, 'env-1')).toBe(false);
+    expect(envelopeSuperseded(undefined, 'env-1')).toBe(false);
   });
 });
 

@@ -11,11 +11,17 @@ import { adminDb } from '@/lib/firebase/admin';
 import { envelopeRef, type InhouseEnvelopeRecord } from '@/lib/esign/inhouse';
 import { sha256Hex, stampDocument } from '@/lib/esign/stamp';
 import { completeEsignItem } from '@/lib/esign/complete';
+import { envelopeSuperseded } from '@/lib/esign/superseded';
 import { isHeldOnboardingItem } from '@/types/onboardingHold';
 
 const PNG_DATA_URL_PREFIX = 'data:image/png;base64,';
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const MAX_SIGNATURE_BYTES = 200 * 1024;
+// pdf-lib inflates the whole bitmap into memory, so a tiny, highly compressed
+// PNG with huge dimensions could exhaust the function. Real signatures (a
+// 3x iPhone pad, a typed name at 96px) stay far below these limits.
+const MAX_SIGNATURE_SIDE = 4000;
+const MAX_SIGNATURE_PIXELS = 4_000_000;
 const SIGNATURE_METHODS = ['draw', 'type'] as const;
 
 export type SignatureMethod = (typeof SIGNATURE_METHODS)[number];
@@ -39,6 +45,13 @@ function decodeSignaturePng(value: unknown): Buffer | null {
   const png = Buffer.from(value.slice(PNG_DATA_URL_PREFIX.length), 'base64');
   if (png.length === 0 || png.length > MAX_SIGNATURE_BYTES) return null;
   if (!png.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC)) return null;
+  // The IHDR chunk must come first: length (4), type (4), width (4), height (4).
+  if (png.length < 24 || png.toString('latin1', 12, 16) !== 'IHDR') return null;
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  if (width === 0 || height === 0) return null;
+  if (width > MAX_SIGNATURE_SIDE || height > MAX_SIGNATURE_SIDE) return null;
+  if (width * height > MAX_SIGNATURE_PIXELS) return null;
   return png;
 }
 
@@ -127,18 +140,7 @@ function claimTime(value: unknown): number | undefined {
  */
 type ClaimResult = 'claimed' | 'already_signed' | 'in_progress' | 'superseded';
 
-/**
- * Whether the checklist item now points at a different envelope: a reviewer
- * rejected it (its id went to supersededEnvelopeIds) or a newer one was sent.
- * Such an envelope still says 'sent' but must not approve the item.
- */
-export function envelopeSuperseded(item: Record<string, unknown> | undefined, envelopeId: string): boolean {
-  if (!item) return false;
-  const superseded = item.supersededEnvelopeIds;
-  if (Array.isArray(superseded) && superseded.includes(envelopeId)) return true;
-  const current = item.esignEnvelopeId;
-  return typeof current === 'string' && current !== '' && current !== envelopeId;
-}
+export { envelopeSuperseded };
 
 async function claimEnvelopeForSigning(
   envelopeId: string,
@@ -223,7 +225,7 @@ export async function signInhouseEnvelope(input: {
   }
 
   let pdf: Buffer;
-  let completedPdfPath: string | null;
+  let completion: Awaited<ReturnType<typeof completeEsignItem>>;
   try {
     const stamped = await stampDocument({
       docKey: envelope.docKey,
@@ -243,12 +245,12 @@ export async function signInhouseEnvelope(input: {
       },
     });
     pdf = stamped.pdf;
-    ({ completedPdfPath } = await completeEsignItem({
+    completion = await completeEsignItem({
       userId,
       itemId: envelope.itemId,
       envelopeId,
       pdf,
-    }));
+    });
   } catch (error) {
     // Field values are never part of this log line.
     console.error('[esign] in-house sign failed', {
@@ -262,8 +264,17 @@ export async function signInhouseEnvelope(input: {
     return { ok: false, status: 500, error: 'sign failed' };
   }
 
-  // The envelope goes back to 'sent' when the upload failed, so the rep can sign again.
-  if (!completedPdfPath) {
+  // A rejection or newer envelope landed while this one was being stamped:
+  // nothing was approved, and the rep has to sign the newest copy.
+  if (completion.status === 'superseded') {
+    await releaseSigningClaim(envelopeId);
+    return { ok: false, status: 409, error: 'This document was replaced. Sign the newest copy.', code: 'superseded' };
+  }
+  // The envelope goes back to 'sent' when the upload failed, so the rep can sign
+  // again. completeEsignItem stores the PDF before approving, so nothing was
+  // approved or announced.
+  const { completedPdfPath } = completion;
+  if (completion.status !== 'approved' || !completedPdfPath) {
     await releaseSigningClaim(envelopeId);
     return { ok: false, status: 502, error: 'upload failed' };
   }
