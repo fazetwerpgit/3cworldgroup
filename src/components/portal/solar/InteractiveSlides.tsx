@@ -68,7 +68,7 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
         <h2 className={s.title}>
           Pre-Qualification <span className={s.accent}>Requirements</span>
         </h2>
-        <p className={s.lede}>Let's see what we can get you qualified for and what program would best suit your needs!</p>
+        <p className={s.lede}>Let&apos;s see what we can get you qualified for and what program would best suit your needs!</p>
       </div>
       <div className={s.tiers}>
         {TIERS.map((t) => (
@@ -166,7 +166,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
   return (
     <>
       <h2 className={s.title}>
-        Let's Book <span className={s.accent}>Solar Consultation</span>
+        Let&apos;s Book <span className={s.accent}>Solar Consultation</span>
       </h2>
       <div className={s.seg} role="group" aria-label="Consultation type">
         {(['virtual', 'in_person'] as const).map((m) => (
