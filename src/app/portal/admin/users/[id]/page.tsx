@@ -54,7 +54,10 @@ export default function EditUserPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [salesCount, setSalesCount] = useState(0);
+  // undefined while loading, null when the leaderboard couldn't be read: a
+  // failed read never shows as a confident "0".
+  const [salesCount, setSalesCount] = useState<number | null | undefined>(undefined);
+  const [salesReload, setSalesReload] = useState(0);
   // ssnLast4 comes back for owners only; an admin learns just that an SSN is on file.
   const [sensitive, setSensitive] = useState<{
     ssnOnFile: boolean;
@@ -104,24 +107,29 @@ export default function EditUserPage() {
   useEffect(() => {
     if (!currentUser || !userId) return;
     let active = true;
+    setSalesCount(undefined);
     (async () => {
       try {
         const token = await auth?.currentUser?.getIdToken();
         const res = await fetch('/api/portal/leaderboard?period=all&metric=totalSales&limit=1000', {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
-        const data = await res.json();
-        if (!active || !res.ok) return;
-        const entry = (data.leaderboard || []).find((e: { salesRepId: string }) => e.salesRepId === userId);
+        const data = await res.json().catch(() => ({}));
+        if (!active) return;
+        if (!res.ok || !Array.isArray(data.leaderboard)) {
+          setSalesCount(null);
+          return;
+        }
+        const entry = data.leaderboard.find((e: { salesRepId: string }) => e.salesRepId === userId);
         setSalesCount(entry ? entry.totalSales : 0);
       } catch {
-        if (active) setSalesCount(0);
+        if (active) setSalesCount(null);
       }
     })();
     return () => {
       active = false;
     };
-  }, [currentUser, userId]);
+  }, [currentUser, userId, salesReload]);
 
   // Where this person stands (stage, last sign-in, checklist, sales), from the
   // existing management-only pipeline route. It covers field reps only.
@@ -378,8 +386,16 @@ export default function EditUserPage() {
                           Approved sales
                         </h2>
                         <p className={u.hint}>Sales entered in the portal and approved for this person.</p>
-                        <strong className={`${u.statValue} ${salesCount > 0 ? u.statHot : ''}`}>{salesCount}</strong>
-                        <span className={u.statNote}>All time</span>
+                        {salesCount === null ? (
+                          <AdminFailed what="approved sales" onRetry={() => setSalesReload((n) => n + 1)} />
+                        ) : salesCount === undefined ? (
+                          <AdminSkeletonRows rows={1} label="Loading approved sales" />
+                        ) : (
+                          <>
+                            <strong className={`${u.statValue} ${salesCount > 0 ? u.statHot : ''}`}>{salesCount}</strong>
+                            <span className={u.statNote}>All time</span>
+                          </>
+                        )}
                       </div>
                     </section>
                   ) : null}

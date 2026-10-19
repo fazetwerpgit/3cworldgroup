@@ -20,6 +20,7 @@ type Reply = { ok: boolean; body: Record<string, unknown> } | Error;
 let container: HTMLDivElement;
 let root: Root;
 let revealReplies: Reply[];
+let leaderboardReplies: Reply[];
 let fetchMock: Mock<(url: string) => Promise<unknown>>;
 
 function button(label: string) {
@@ -46,9 +47,11 @@ beforeEach(async () => {
   auth.user.role = 'admin';
   Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
   revealReplies = [];
+  leaderboardReplies = [];
   fetchMock = vi.fn(async (url: string) => {
     let reply: Reply = { ok: true, body: {} };
     if (url.includes('?reveal=true')) reply = revealReplies.shift()!;
+    else if (url.includes('/leaderboard')) reply = leaderboardReplies.shift() ?? { ok: true, body: { leaderboard: [] } };
     else if (url.includes('/admin/sensitive/')) {
       // The route gives the SSN last 4 to owners only; an admin learns it is on file.
       reply = {
@@ -123,4 +126,50 @@ it('catches a network error instead of leaving the button dead', async () => {
   expect(container.textContent).toContain('Failed to fetch');
   expect(container.textContent).not.toContain('Reveal logged');
   expect(button('Retry')).toBeDefined();
+});
+
+function salesPanel() {
+  return container.querySelector('section[aria-labelledby="person-sales-heading"]');
+}
+
+async function renderSales() {
+  await act(async () => {
+    root.render(<EditUserPage />);
+  });
+  await act(async () => {
+    await vi.waitFor(() => expect(salesPanel()?.querySelector('[role="status"]')).toBeNull());
+  });
+}
+
+it('says approved sales could not load, not "0", when the leaderboard fails', async () => {
+  leaderboardReplies.push({ ok: false, body: { error: 'boom' } });
+  await renderSales();
+
+  expect(salesPanel()!.textContent).toContain("Couldn't load approved sales");
+  expect(salesPanel()!.textContent).not.toContain('All time');
+
+  leaderboardReplies.push({ ok: true, body: { leaderboard: [{ salesRepId: 'rep-1', totalSales: 7 }] } });
+  await act(async () => {
+    [...salesPanel()!.querySelectorAll('button')].find((b) => b.textContent?.includes('Retry'))!.click();
+  });
+  await act(async () => {
+    await vi.waitFor(() => expect(salesPanel()!.textContent).toContain('All time'));
+  });
+  expect(salesPanel()!.textContent).toContain('7');
+  expect(salesPanel()!.textContent).not.toContain("Couldn't load");
+});
+
+it('says approved sales could not load when the leaderboard request throws', async () => {
+  leaderboardReplies.push(new TypeError('Failed to fetch'));
+  await renderSales();
+
+  expect(salesPanel()!.textContent).toContain("Couldn't load approved sales");
+});
+
+it('shows 0 approved sales when the board loads and the person is not on it', async () => {
+  leaderboardReplies.push({ ok: true, body: { leaderboard: [{ salesRepId: 'someone-else', totalSales: 3 }] } });
+  await renderSales();
+
+  expect(salesPanel()!.querySelector('strong')!.textContent).toBe('0');
+  expect(salesPanel()!.textContent).toContain('All time');
 });
