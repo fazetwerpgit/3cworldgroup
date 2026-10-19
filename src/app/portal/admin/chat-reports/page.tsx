@@ -19,6 +19,7 @@ import { auth } from '@/lib/firebase/config';
 import type { ChatReportView } from '@/app/api/portal/admin/chat-reports/route';
 import { REPORT_REASON_LABELS, isReportReason, reportLinkExpired } from '@/lib/chat/moderationShared';
 import { openSignedLink } from '@/lib/signedLinks';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './chat-reports.module.css';
@@ -108,16 +109,20 @@ function ChatReports() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  const load = useCallback(async (which: View) => {
-    setLoadError('');
-    setMoreError('');
+  const load = useCallback(async (which: View, background = false) => {
+    if (!background) {
+      setLoadError('');
+      setMoreError('');
+    }
     try {
       const res = await authedFetch(`/api/portal/admin/chat-reports?status=${which}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load');
       setRows({ view: which, reports: json.reports, nextCursor: typeof json.nextCursor === 'string' ? json.nextCursor : null });
+      setLoadError('');
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Failed to load');
+      // A background refresh that fails keeps the list on screen.
+      if (!background) setLoadError(err instanceof Error ? err.message : 'Failed to load');
     }
   }, []);
 
@@ -154,6 +159,8 @@ function ChatReports() {
   useEffect(() => {
     if (user) void load(view);
   }, [user, view, load]);
+  // Back from the background (throttled): fresh reports and freshly signed links.
+  useRefreshOnResume(() => load(view, true), { enabled: !!user });
 
   // Re-signs one report's links in place (null when it could not be read).
   const refreshReport = useCallback(async (id: string): Promise<ChatReportView | null> => {

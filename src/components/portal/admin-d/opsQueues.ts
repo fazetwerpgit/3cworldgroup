@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import {
   CHAT_REPORTS_HUB,
   ONBOARDING_HUB,
@@ -229,6 +230,11 @@ function ensureQueues(viewer: string) {
   if (!fresh) void loadQueues(viewer);
 }
 
+/** Reloads the current viewer's queues unless a load is already running. */
+function resumeQueues() {
+  if (snapshot.viewer && !snapshot.loading) void loadQueues(snapshot.viewer);
+}
+
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -292,7 +298,11 @@ export function useOpsQueues(): OpsQueues {
 
 /** Things waiting on you per hub page, for the nav badges (Hiring, Requests). */
 export function useAdminNavCounts(): Record<string, number> {
-  const { cards } = useOpsQueues();
+  const { cards, loading } = useOpsQueues();
+  // When the app comes back to the foreground (throttled to once a minute) the
+  // badges reload; the shell and the admin frame both mount this, one load runs.
+  // Off for anyone with no queues (reps), so it adds no pull-to-refresh there.
+  useRefreshOnResume(resumeQueues, { enabled: cards !== null || loading });
   return useMemo(() => {
     const counts: Record<string, number> = {};
     for (const card of cards ?? []) {

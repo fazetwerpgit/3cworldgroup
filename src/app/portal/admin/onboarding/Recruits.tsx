@@ -8,6 +8,7 @@ import { RECRUITING_ROLES } from '@/components/portal/admin-d/adminHubs';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import { ApplicationRecord } from '@/types';
 import { Invites, type InviteView } from './Invites';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
 // Hiring → Recruits: one list of everyone being recruited (website
 // applications and invites, one row per person), with "Send an invite" and a
@@ -40,9 +41,9 @@ function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
 
   // The recruiting route verifies the caller from the ID token: the acting
   // identity is never sent in the query string or body.
-  const load = useCallback(async () => {
+  const load = useCallback(async (background = false) => {
     if (!user || !canAccess) return;
-    setLoading(true);
+    if (!background) setLoading(true);
     try {
       const token = await getIdToken();
       const response = await fetch('/api/portal/recruiting/invites', {
@@ -55,7 +56,8 @@ function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
       setLoadFailed(false);
     } catch {
       // Load failures render in place (AdminFailed); action errors are Invites' notices.
-      setLoadFailed(true);
+      // A background refresh that fails keeps the list on screen.
+      if (!background) setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -64,6 +66,8 @@ function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
   useEffect(() => {
     load();
   }, [load]);
+  // Back from the background (throttled): a quiet reload, no skeleton.
+  useRefreshOnResume(() => load(true));
 
   return (
     <div className={u.page}>
@@ -73,7 +77,7 @@ function RecruitsBody({ onChanged }: { onChanged?: () => void }) {
         applications={applications}
         loading={loading}
         loadFailed={loadFailed}
-        reload={load}
+        reload={() => load()}
         onChanged={onChanged}
       />
     </div>

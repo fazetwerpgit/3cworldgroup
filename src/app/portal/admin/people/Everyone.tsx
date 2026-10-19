@@ -22,6 +22,7 @@ import { useViewAs } from '@/contexts/ViewAsContext';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import p from './users.module.css';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
 // Assignable field roles only — retired tiers (IBO levels, L1/L2 manager)
 // stay valid for users who already hold them but are never offered here.
@@ -107,10 +108,12 @@ export function Everyone() {
   const [approveFieldRole, setApproveFieldRole] = useState<FieldRole>('entry_level_rep');
   const [approving, setApproving] = useState(false);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (background = false) => {
     if (!currentUser) return;
-    setLoading(true);
-    setLoadError('');
+    if (!background) {
+      setLoading(true);
+      setLoadError('');
+    }
     try {
       const response = await fetch('/api/portal/auth/users', {
         headers: await authHeaders(),
@@ -118,16 +121,20 @@ export function Everyone() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Failed to fetch users');
       setUsers(data.users);
+      setLoadError('');
     } catch (err) {
-      setLoadError(err instanceof Error ? err.message : 'Failed to fetch users');
+      // A background refresh that fails keeps the list on screen.
+      if (!background) setLoadError(err instanceof Error ? err.message : 'Failed to fetch users');
     } finally {
-      setLoading(false);
+      if (!background) setLoading(false);
     }
   }, [currentUser]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+  // Back from the background (throttled): pending sign-ups may have come in.
+  useRefreshOnResume(() => fetchUsers(true));
 
   // Real approved-sales-per-person count, reused from the existing leaderboard
   // endpoint (all-time totalSales, no new route). Absence from the board means

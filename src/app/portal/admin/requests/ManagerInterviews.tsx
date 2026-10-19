@@ -6,6 +6,7 @@ import { AdminQueue, QueueField, QueueRow, queueValue } from '@/components/porta
 import { useMarkHandled } from '@/components/portal/admin-ops/useMarkHandled';
 import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
 type Row = Record<string, unknown> & { id: string; status: string; signatureDataUrl?: string };
 
@@ -48,6 +49,7 @@ export function ManagerInterviews() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to load');
       setRows(json.submissions);
+      setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
@@ -56,6 +58,8 @@ export function ManagerInterviews() {
   }, [user, isRole, authedFetch]);
 
   useEffect(() => { load(); }, [load]);
+  // Back from the background (throttled): the queue may have moved on.
+  useRefreshOnResume(load);
 
   const retry = () => {
     setError('');

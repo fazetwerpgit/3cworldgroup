@@ -27,6 +27,7 @@ import {
   Channel,
   ChannelOnboardingStatus,
 } from '@/types';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
 interface ChannelRow extends Channel {
   status: ChannelOnboardingStatus;
@@ -125,6 +126,8 @@ export function Pipeline() {
   }, [user]);
 
   useEffect(() => { fetchPipeline(); }, [fetchPipeline]);
+  // Back from the background (throttled): the stages may have moved on.
+  useRefreshOnResume(fetchPipeline);
 
   const retry = () => {
     setLoading(true);

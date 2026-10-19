@@ -33,6 +33,7 @@ import { CheckDocumentsSheet } from './CheckDocumentsSheet';
 import { personName, type ChecklistPerson } from './checklist';
 import type { InviteView } from './Invites';
 import { buildTodoRows, type Signup, type TodoRow } from './todoRows';
+import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
 // To do: everything in hiring that waits on you, as one list, oldest first.
 // One row is one thing with one button. The rows are exactly what the Hiring
@@ -139,7 +140,7 @@ function useRecruiting() {
   const { user } = useAuth();
   const [data, setData] = useState<Loaded<Recruiting>>();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (background = false) => {
     if (!user) return;
     try {
       const response = await fetch('/api/portal/recruiting/invites', { headers: await authHeaders() });
@@ -152,7 +153,8 @@ function useRecruiting() {
         applied: applications.filter((application) => application.status === 'applied'),
       });
     } catch {
-      setData(null);
+      // A background refresh keeps what is on screen.
+      if (!background) setData(null);
     }
   }, [user]);
 
@@ -186,6 +188,11 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
   const signups = useSignups(canSeeSignups);
   const { people, load: loadChecklists } = useChecklists();
   const { data: recruitingData, load: loadRecruiting } = useRecruiting();
+  // Back from the background (throttled): quiet reloads that keep the list on a failure.
+  useRefreshOnResume(() => {
+    void loadChecklists(true);
+    void loadRecruiting(true);
+  });
   const [openPerson, setOpenPerson] = useState<string | null>(null);
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error' | 'warn'; text: string } | null>(null);
