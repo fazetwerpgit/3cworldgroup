@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { reviewQuery, markHandled } from '@/lib/forms/reviewQuery';
+import { reviewQuery, reviewField, markHandled } from '@/lib/forms/reviewQuery';
 
 const COLLECTION = 'managerInterviews';
+// Signature PNGs run up to ~270 KB each; the list leaves them out and the queue
+// loads one per opened row with ?id=, so the response stays under 4.5 MB.
+const SIGNATURE_FIELD = 'signatureDataUrl';
 
 export async function GET(request: NextRequest) {
-  const result = await reviewQuery(COLLECTION, request);
+  const id = request.nextUrl.searchParams.get('id');
+  if (id !== null) {
+    const one = await reviewField(COLLECTION, request, id, SIGNATURE_FIELD);
+    if (!one.ok) return NextResponse.json({ error: one.error }, { status: one.status });
+    return NextResponse.json({ id, signatureDataUrl: typeof one.value === 'string' ? one.value : null });
+  }
+  const result = await reviewQuery(COLLECTION, request, [SIGNATURE_FIELD]);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
   return NextResponse.json({ submissions: result.submissions });
 }

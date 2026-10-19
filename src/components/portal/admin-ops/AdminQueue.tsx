@@ -123,6 +123,7 @@ export function AdminQueue({
   csvRows,
   emptyTitle = 'Nothing to review',
   emptyBody,
+  onOpenRow,
 }: {
   title: string;
   lede?: string;
@@ -144,6 +145,8 @@ export function AdminQueue({
   csvRows?: Record<string, unknown>[];
   emptyTitle?: string;
   emptyBody: string;
+  /** Called when a row's sheet opens (lazy-load heavy evidence like a signature). */
+  onOpenRow?: (id: string) => void;
 }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(DEFAULT_STATUS);
@@ -180,6 +183,10 @@ export function AdminQueue({
     [rows, passes, kept, leaving]
   );
 
+  const openSheet = (id: string) => {
+    setOpenId(id);
+    onOpenRow?.(id);
+  };
   const markHandled = async (id: string) => {
     await onMarkHandled(id);
     setKept((prev) => new Set(prev).add(id));
@@ -254,10 +261,10 @@ export function AdminQueue({
             >
               {leaving.has(row.id) ? (
                 <div className={s.qFold} inert>
-                  <QueueRowButton row={row} onOpen={() => setOpenId(row.id)} />
+                  <QueueRowButton row={row} onOpen={() => openSheet(row.id)} />
                 </div>
               ) : (
-                <QueueRowButton row={row} onOpen={() => setOpenId(row.id)} />
+                <QueueRowButton row={row} onOpen={() => openSheet(row.id)} />
               )}
             </li>
           ))}

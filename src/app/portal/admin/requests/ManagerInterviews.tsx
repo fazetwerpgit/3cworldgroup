@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminQueue, QueueField, QueueRow, queueValue } from '@/components/portal/admin-ops/AdminQueue';
 import { useMarkHandled } from '@/components/portal/admin-ops/useMarkHandled';
@@ -8,7 +8,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
-type Row = Record<string, unknown> & { id: string; status: string; signatureDataUrl?: string };
+// The list leaves signatures out (withheld: ['signatureDataUrl']); each one loads
+// when its row opens, so the response stays under Vercel's 4.5 MB body limit.
+type Row = Record<string, unknown> & { id: string; status: string; withheld?: string[] };
+const hasSignature = (row: Row) => Array.isArray(row.withheld) && row.withheld.includes('signatureDataUrl');
 
 const COLUMNS = [
   { key: 'repName', label: 'Submitted by' },
@@ -34,6 +37,8 @@ export function ManagerInterviews() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [signatures, setSignatures] = useState<Record<string, string>>({});
+  const requested = useRef(new Set<string>());
 
   const authedFetch = useCallback(async (url: string, init?: RequestInit) => {
     const token = await auth?.currentUser?.getIdToken();
@@ -71,6 +76,26 @@ export function ManagerInterviews() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: 'handled' } : r)))
   );
 
+  const loadSignature = useCallback(
+    async (id: string) => {
+      const row = rows.find((r) => r.id === id);
+      if (!row || !hasSignature(row) || requested.current.has(id)) return;
+      requested.current.add(id);
+      try {
+        const res = await authedFetch(`/api/portal/forms/manager-interview/review?id=${encodeURIComponent(id)}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Failed to load');
+        if (typeof json.signatureDataUrl === 'string') {
+          setSignatures((prev) => ({ ...prev, [id]: json.signatureDataUrl }));
+        }
+      } catch {
+        // Let the next open retry; the summary still says a signature exists.
+        requested.current.delete(id);
+      }
+    },
+    [rows, authedFetch]
+  );
+
   const providers = useMemo(
     () => Array.from(new Set(rows.map((r) => queueValue(r.provider)).filter((c) => c !== '—'))).sort(),
     [rows]
@@ -95,8 +120,8 @@ export function ManagerInterviews() {
           subjectSub: queueValue(row.jobPosition),
           secondary: queueValue(row.provider),
           secondarySub: queueValue(row.market),
-          evidenceKind: row.signatureDataUrl ? 'signature' : 'none',
-          signatureUrl: row.signatureDataUrl,
+          evidenceKind: hasSignature(row) ? 'signature' : 'none',
+          signatureUrl: signatures[row.id],
           detailTitle: `${queueValue(row.jobPosition)} interview`,
           detailFields: [
             { label: 'Candidate', value: candidate },
@@ -118,7 +143,7 @@ export function ManagerInterviews() {
           filterValue: queueValue(row.provider),
         };
       }),
-    [rows]
+    [rows, signatures]
   );
 
   return (
@@ -134,6 +159,7 @@ export function ManagerInterviews() {
         error={error}
         onRetry={retry}
         onMarkHandled={markHandled}
+        onOpenRow={loadSignature}
         filterLabel="Provider"
         filterOptions={providers}
         downloadFilename="manager-interviews.csv"

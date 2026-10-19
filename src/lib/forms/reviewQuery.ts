@@ -38,13 +38,25 @@ export const REVIEW_RECENT_LIMIT = 200;
 
 type ReviewDoc = { id: string; data: () => Record<string, unknown> };
 
-function toSubmission(d: ReviewDoc): Record<string, unknown> & { createdAt: Date | null } {
-  const data = d.data() as Record<string, unknown> & {
+function toSubmission(
+  d: ReviewDoc,
+  omitFields: readonly string[] = []
+): Record<string, unknown> & { createdAt: Date | null } {
+  const data = { ...d.data() } as Record<string, unknown> & {
     createdAt?: { toDate(): Date } | null;
     updatedAt?: { toDate(): Date } | null;
   };
+  // Heavy fields (signature PNGs) stay out of the list so the response stays
+  // well under Vercel's 4.5 MB body limit; `withheld` names the ones that exist
+  // so the queue can load each one per row (reviewField).
+  const withheld: string[] = [];
+  for (const field of omitFields) {
+    if (data[field] != null && data[field] !== '') withheld.push(field);
+    delete data[field];
+  }
   return {
     ...data,
+    ...(omitFields.length > 0 ? { withheld } : {}),
     id: d.id,
     createdAt: data.createdAt?.toDate() ?? null,
     updatedAt: data.updatedAt?.toDate() ?? null,
@@ -54,10 +66,14 @@ function toSubmission(d: ReviewDoc): Record<string, unknown> & { createdAt: Date
 // Merges the newest-N page with every unhandled doc (deduped by id), newest first.
 // The New view and the owner "Needs attention" count (status == 'new') then agree,
 // however old an unhandled item is.
-export function mergeReviewDocs(recent: ReviewDoc[], unhandled: ReviewDoc[]): Record<string, unknown>[] {
+export function mergeReviewDocs(
+  recent: ReviewDoc[],
+  unhandled: ReviewDoc[],
+  omitFields: readonly string[] = []
+): Record<string, unknown>[] {
   const byId = new Map<string, ReturnType<typeof toSubmission>>();
   for (const d of [...unhandled, ...recent]) {
-    if (!byId.has(d.id)) byId.set(d.id, toSubmission(d));
+    if (!byId.has(d.id)) byId.set(d.id, toSubmission(d, omitFields));
   }
   return [...byId.values()].sort(
     (a, b) => (b.createdAt?.getTime() ?? -Infinity) - (a.createdAt?.getTime() ?? -Infinity)
@@ -67,9 +83,11 @@ export function mergeReviewDocs(recent: ReviewDoc[], unhandled: ReviewDoc[]): Re
 // Verified-management-gated fetch of a form's submissions, newest first, timestamps
 // serialized to Dates so NextResponse.json yields ISO strings. These lists expose
 // customer PII, so they require a real Firebase token (not a client-supplied UID).
+// `omitFields` leaves heavy fields out of the list (see toSubmission).
 export async function reviewQuery(
   collection: string,
-  request: NextRequest
+  request: NextRequest,
+  omitFields: readonly string[] = []
 ): Promise<
   | { ok: true; submissions: Record<string, unknown>[] }
   | { ok: false; error: string; status: number }
@@ -85,5 +103,24 @@ export async function reviewQuery(
     col.orderBy('createdAt', 'desc').limit(REVIEW_RECENT_LIMIT).get(),
     col.where('status', '==', 'new').get(),
   ]);
-  return { ok: true, submissions: mergeReviewDocs(recent.docs, unhandled.docs) };
+  return { ok: true, submissions: mergeReviewDocs(recent.docs, unhandled.docs, omitFields) };
+}
+
+// Verified-management-gated read of one field a review list withheld (a row's
+// signature), so the list only carries what it renders.
+export async function reviewField(
+  collection: string,
+  request: NextRequest,
+  id: string,
+  field: string
+): Promise<{ ok: true; value: unknown } | { ok: false; error: string; status: number }> {
+  if (!adminDb) return { ok: false, error: 'Database not configured', status: 500 };
+
+  const gate = await requireVerifiedManagement(request);
+  if (!gate.ok) return { ok: false, error: gate.error, status: gate.status };
+  if (!id) return { ok: false, error: 'id is required', status: 400 };
+
+  const doc = await adminDb.collection(collection).doc(id).get();
+  if (!doc.exists) return { ok: false, error: 'Not found', status: 404 };
+  return { ok: true, value: doc.data()?.[field] ?? null };
 }
