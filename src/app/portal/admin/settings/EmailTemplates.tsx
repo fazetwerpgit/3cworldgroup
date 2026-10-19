@@ -24,6 +24,7 @@ import {
   EmailTemplateCategory,
   EmailTemplateCategoryLabels,
 } from '@/types';
+import { chicagoTodayKey } from '@/lib/sales/saleDate';
 
 interface TemplateEntry {
   id: string;
@@ -51,12 +52,20 @@ const CATEGORY_OPTIONS: { value: EmailTemplateCategory | 'all'; label: string }[
   })),
 ];
 
-function relativeUpdated(iso: string | null) {
+/** Calendar days between two YYYY-MM-DD keys (UTC noon arithmetic, DST-proof). */
+function dayKeyGap(from: string, to: string) {
+  return Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000);
+}
+
+/** "updated today / yesterday / Mar 4", by calendar day on the company clock (Chicago). */
+export function relativeUpdated(iso: string | null, now: Date = new Date()) {
   if (!iso) return 'never updated';
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  const updated = new Date(iso);
+  if (Number.isNaN(updated.getTime())) return 'never updated';
+  const days = dayKeyGap(chicagoTodayKey(updated), chicagoTodayKey(now));
   if (days <= 0) return 'updated today';
   if (days === 1) return 'updated yesterday';
-  return `updated ${new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  return `updated ${updated.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Chicago' })}`;
 }
 
 function tokenCount(body: string) {
@@ -137,9 +146,19 @@ export function EmailTemplates() {
     if (editingId) editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [editingId]);
 
+  // One flash timer at a time: a newer message restarts the 3s window, so an
+  // older timer can never clear it early.
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+  }, []);
   const flash = (message: string) => {
     setSuccess(message);
-    setTimeout(() => setSuccess(''), 3000);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => {
+      flashTimer.current = null;
+      setSuccess('');
+    }, 3000);
   };
 
   const handleSave = async () => {
