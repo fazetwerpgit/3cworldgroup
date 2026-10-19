@@ -52,6 +52,23 @@ describe('parseFiberReport', () => {
     expect(result.orders.find((order) => order.status === 'breakage')?.id).toMatch(/^brk_[a-f0-9]{40}$/);
   });
 
+  it('keys breakage rows by unit so same-day misses in one building stay separate', async () => {
+    const workbook = new ExcelJS.Workbook();
+    const breakage = workbook.addWorksheet('Customer Driven Breakage');
+    breakage.addRow(['SCHEDULED_INSTALL_DATE', 'ADDRESS', 'UNIT_NUMBER', 'CSTMR_FIRST_NAME', 'CSTMR_LAST_NAME']);
+    breakage.addRow([46300, '100 Main St', '4B', 'Ann', 'Lee']);
+    breakage.addRow([46300, '100 Main St', '7C', 'Bob', 'King']);
+    breakage.addRow([46300, '200 Oak Ave', '', 'Cy', 'Ng']);
+    const result = await parseFiberReport(Buffer.from(await workbook.xlsx.writeBuffer()), '2026-08-25T12:00:00.000Z');
+    expect(result.rowCounts['Customer Driven Breakage']).toBe(3);
+    expect(result.orders).toHaveLength(3);
+    expect(result.orders.map((order) => order.unit).sort()).toEqual(['4B', '7C', null].sort());
+    // Rows without a unit keep the original address|date id.
+    const { createHash } = await import('node:crypto');
+    expect(result.orders.find((order) => order.unit === null)?.id)
+      .toBe(`brk_${createHash('sha1').update('200 Oak Ave|46300').digest('hex')}`);
+  });
+
   it('reads rich-text, formula and hyperlink cells as their text and result', async () => {
     const workbook = new ExcelJS.Workbook();
     const orders = workbook.addWorksheet('Orders To Date');

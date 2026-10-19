@@ -13,7 +13,7 @@ export type FiberOrderStatus =
 
 export interface FiberOrder {
   // Firestore doc id: Alt Order ID (e.g. TMO20260824UZMTV) for order rows,
-  // or 'brk_<sha1(address|installDate)>' for breakage rows (that sheet has no order id).
+  // or 'brk_<sha1(address|unit|installDate)>' (unit omitted when blank) for breakage rows (that sheet has no order id).
   id: string;
   status: FiberOrderStatus;
   // Raw status string from the sheet, shown as-is when it doesn't map cleanly.

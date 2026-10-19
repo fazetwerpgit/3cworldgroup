@@ -157,7 +157,11 @@ function parseBreakageRow(row: ExcelJS.Row, map: Map<string, number>, reportRece
   const serial = dateValue instanceof Date
     ? String((dateValue.getTime() - Date.UTC(1899, 11, 30)) / 86400000)
     : text(dateValue);
-  const id = `brk_${createHash('sha1').update(`${address}|${serial}`).digest('hex')}`;
+  const unit = text(cell(row, map, 'UNIT_NUMBER'));
+  // Units in one building share ADDRESS, so the unit is part of the key. Rows
+  // without a unit keep the original address|date key so their ids don't move.
+  const key = unit ? `${address}|${unit}|${serial}` : `${address}|${serial}`;
+  const id = `brk_${createHash('sha1').update(key).digest('hex')}`;
   const result = emptyOrder(id, 'Customer Driven Breakage', reportReceivedAt);
   result.status = 'breakage';
   result.rawStatus = text(cell(row, map, 'ACCOUNT_STATUS'));
@@ -166,7 +170,7 @@ function parseBreakageRow(row: ExcelJS.Row, map: Map<string, number>, reportRece
   result.estInstallDate = dateFromCell(dateValue);
   result.fiberPlan = text(cell(row, map, 'OFFER')) || null;
   result.address = address;
-  result.unit = text(cell(row, map, 'UNIT_NUMBER')) || null;
+  result.unit = unit || null;
   result.city = text(cell(row, map, 'CITY')) || null;
   result.state = text(cell(row, map, 'STATE')) || null;
   result.zip = text(cell(row, map, 'ZIP_CODE')) || null;
