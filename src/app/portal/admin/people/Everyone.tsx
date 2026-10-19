@@ -23,6 +23,7 @@ import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import p from './users.module.css';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
+import { requestedAgo } from './requestedAgo';
 
 // Assignable field roles only — retired tiers (IBO levels, L1/L2 manager)
 // stay valid for users who already hold them but are never offered here.
@@ -65,16 +66,6 @@ function bucketForUser(user: User): RoleBucket {
   if (role === 'admin') return 'admin';
   if (role === 'operations') return 'operations';
   return 'field rep';
-}
-
-function timeAgo(date: Date | string | number | undefined) {
-  if (!date) return 'recently';
-  const d = new Date(date).getTime();
-  const diffMs = Date.now() - d;
-  const days = Math.floor(diffMs / 86400000);
-  if (days <= 0) return 'today';
-  if (days === 1) return 'yesterday';
-  return `${days} days ago`;
 }
 
 export function Everyone() {
@@ -294,7 +285,7 @@ export function Everyone() {
                           <span>{name}</span>
                         </span>
                         <span className={u.personSub}>
-                          {user.email} · requested {timeAgo(user.createdAt)}
+                          {user.email} · requested {requestedAgo(user.createdAt)}
                         </span>
                       </span>
                     </Link>
