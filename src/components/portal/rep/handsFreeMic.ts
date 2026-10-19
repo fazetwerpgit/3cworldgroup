@@ -79,6 +79,8 @@ export async function openHandsFreeMic(
   let source: MediaStreamAudioSourceNode | null = null;
   let sink: GainNode | null = null;
   let closed = false;
+  // Until the handle is returned, a failure is reported only by returning null (not onLost too).
+  let live = false;
 
   const close = () => {
     if (closed) return;
@@ -96,7 +98,7 @@ export async function openHandsFreeMic(
   const lost = () => {
     if (closed) return;
     close();
-    events.onLost();
+    if (live) events.onLost();
   };
 
   try {
@@ -183,6 +185,7 @@ export async function openHandsFreeMic(
     return null;
   }
 
+  live = true;
   return {
     finish: () => {
       if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ realtimeInput: { audioStreamEnd: true } }));
