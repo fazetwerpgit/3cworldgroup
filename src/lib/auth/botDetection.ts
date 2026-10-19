@@ -86,9 +86,16 @@ function isHexLikeToken(token: string): boolean {
   return /\d/.test(token) && /[a-f]/.test(token);
 }
 
+// Apple "Hide My Email" relay addresses have a deliberately random local
+// part (e.g. 8x4kq2mzpd@privaterelay.appleid.com). Apple issues them only
+// through a verified Sign in with Apple, so the local part says nothing about
+// whether the signup is a bot and must never be scored as gibberish.
+const APPLE_PRIVATE_RELAY_DOMAIN = 'privaterelay.appleid.com';
+
 function emailScore(email: string): number {
   const trimmed = email.trim().toLowerCase();
   const at = trimmed.indexOf('@');
+  if (at !== -1 && trimmed.slice(at + 1) === APPLE_PRIVATE_RELAY_DOMAIN) return 0;
   const rawLocal = at === -1 ? trimmed : trimmed.slice(0, at);
   // Strip a +tag suffix (e.g. "jane+signup" -> "jane") before analysis.
   const local = rawLocal.replace(/\+.*$/, '');

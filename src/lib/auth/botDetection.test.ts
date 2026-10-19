@@ -132,3 +132,37 @@ describe('looksLikeBotSignup — edge cases', () => {
     expect(looksLikeBotSignup('someone@gmail.com', 'Xkfjdqwpzmrx')).toBe(true);
   });
 });
+
+describe('looksLikeBotSignup — Apple Hide My Email relay addresses', () => {
+  const relayLocals = ['8x4kq2mzpd', '2hdpcqgxyz', 'jb5s8g8xa8'];
+
+  for (const local of relayLocals) {
+    it(`does not flag ${local}@privaterelay.appleid.com`, () => {
+      expect(looksLikeBotSignup(`${local}@privaterelay.appleid.com`, 'Jacob Myers')).toBe(false);
+      expect(looksLikeBotSignup(`${local}@privaterelay.appleid.com`, '')).toBe(false);
+      expect(looksLikeBotSignup(`${local.toUpperCase()}@PrivateRelay.AppleID.com `, '')).toBe(false);
+    });
+  }
+
+  it('never flags any random 10-char relay local part on email alone', () => {
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let seed = 42;
+    const next = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return seed;
+    };
+    for (let i = 0; i < 2000; i += 1) {
+      let local = '';
+      for (let j = 0; j < 10; j += 1) local += alphabet[next() % alphabet.length];
+      expect(looksLikeBotSignup(`${local}@privaterelay.appleid.com`, 'Jacob Myers')).toBe(false);
+    }
+  });
+
+  it('still scores the same local part on a normal domain', () => {
+    expect(looksLikeBotSignup('8x4kq2mzpd@gmail.com', 'Jacob Myers')).toBe(true);
+  });
+
+  it('still flags a gibberish display name on a relay address', () => {
+    expect(looksLikeBotSignup('8x4kq2mzpd@privaterelay.appleid.com', 'Xkfjdqwpzmrx')).toBe(true);
+  });
+});
