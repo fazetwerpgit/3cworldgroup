@@ -13,7 +13,7 @@ import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
 
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
-const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false };
+const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false, solarRole: 'ae_canvasser' };
 
 function patch(id: string, body: unknown) {
   return PATCH(
@@ -43,7 +43,7 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
   });
 
   it('lets an admin set it', async () => {
-    mockGate.mockResolvedValue({ ...REP, uid: 'adm', isAdmin: true });
+    mockGate.mockResolvedValue({ ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null });
     expect((await patch('rep1_c1', { creditTier: 'purchase_600' })).status).toBe(200);
   });
 
@@ -54,7 +54,7 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
   });
 
   it('403s a caller without solar access', async () => {
-    mockGate.mockResolvedValue({ ...REP, uid: 'fiber' });
+    mockGate.mockResolvedValue({ ...REP, uid: 'fiber', fieldRole: 'ae_tier_1', solarRole: null });
     expect((await patch('rep1_c1', { creditTier: 'purchase_600' })).status).toBe(403);
   });
 

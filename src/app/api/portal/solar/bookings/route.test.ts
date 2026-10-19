@@ -30,7 +30,7 @@ const mockNotifyMany = createNotificationForMany as unknown as ReturnType<typeof
 const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
 const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 
-const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false };
+const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false, solarRole: 'canvass_closer' };
 const SLOT = '2026-10-26T15:00:00.000Z'; // Monday 8:00 AM PDT
 const BODY = { leadId: 'rep1_c1', mode: 'in_person', consultantUid: 'own', start: SLOT };
 
@@ -196,12 +196,12 @@ describe('POST /api/portal/solar/bookings', () => {
   it("403s booking another rep's lead, and callers without solar access", async () => {
     mockGate.mockResolvedValue({ ...REP, uid: 'rep2' });
     expect((await post(BODY)).status).toBe(403);
-    mockGate.mockResolvedValue({ ...REP, uid: 'fiber' });
+    mockGate.mockResolvedValue({ ...REP, uid: 'fiber', fieldRole: 'ae_tier_1', solarRole: null });
     expect((await post(BODY)).status).toBe(403);
   });
 
   it('lets an admin book any lead', async () => {
-    mockGate.mockResolvedValue({ ...REP, uid: 'jac', isAdmin: true });
+    mockGate.mockResolvedValue({ ...REP, uid: 'jac', isAdmin: true, isOwner: true, role: 'owner', solarRole: null });
     expect((await post(BODY)).status).toBe(200);
   });
 

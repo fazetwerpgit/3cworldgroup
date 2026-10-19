@@ -139,6 +139,15 @@ describe('requireVerifiedUser — account status', () => {
     }
   });
 
+  it('returns the resolved roles and a valid solarRole (null for none or junk)', async () => {
+    userDoc({ status: 'active', email: 'a@x.com', fieldRole: 'entry_rep', solarRole: 'canvass_closer' });
+    const res = await requireVerifiedUser(req());
+    expect(res).toMatchObject({ ok: true, role: undefined, fieldRole: 'entry_rep', solarRole: 'canvass_closer' });
+
+    userDoc({ status: 'active', email: 'b@x.com', role: 'admin', solarRole: 'bogus' });
+    expect(await requireVerifiedUser(req())).toMatchObject({ ok: true, role: 'admin', solarRole: null });
+  });
+
   it('rejects an unapproved self-signup (pending, no field role) by default', async () => {
     userDoc({ status: 'pending', email: 'bot@x.com' });
     const res = await requireVerifiedUser(req());

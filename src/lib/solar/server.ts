@@ -4,7 +4,7 @@
 import { NextRequest } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
-import { canSeeSolar } from '@/lib/solar/access';
+import { permissionsFor } from '@/types/auth';
 import {
   SOLAR_SLOT_MIN,
   SOLAR_TZ,
@@ -17,24 +17,20 @@ import {
 export const JACOB_EMAIL = 'jmyers@3cworldgroup.com';
 
 type Gate = Awaited<ReturnType<typeof requireVerifiedUser>>;
-export type SolarGate =
-  | (Extract<Gate, { ok: true }> & { solarRole: string | null })
-  | { ok: false; error: string; status: number };
+export type SolarGate = Extract<Gate, { ok: true }> | { ok: false; error: string; status: number };
 
-/** requireVerifiedUser + canSeeSolar (solarRole set, or admin level). 403 otherwise. */
+/**
+ * requireVerifiedUser + solar:write (a solar role, or admin/owner through
+ * ADMIN_PERMISSIONS). 403 otherwise. The gate already carries the roles, so
+ * there is no second users/{uid} read.
+ */
 export async function requireSolarUser(request: NextRequest): Promise<SolarGate> {
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return gate;
-  let solarRole: string | null = null;
-  if (adminDb) {
-    const snap = await adminDb.collection('users').doc(gate.uid).get();
-    const raw = snap.get('solarRole');
-    solarRole = typeof raw === 'string' ? raw : null;
-  }
-  if (!canSeeSolar({ role: gate.isAdmin ? 'admin' : undefined, solarRole })) {
+  if (!permissionsFor(gate).includes('solar:write')) {
     return { ok: false, error: 'Forbidden', status: 403 };
   }
-  return { ...gate, solarRole };
+  return gate;
 }
 
 export interface UserContact {

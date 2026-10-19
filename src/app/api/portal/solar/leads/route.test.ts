@@ -29,7 +29,7 @@ const mockNotify = createNotificationForMany as unknown as ReturnType<typeof vi.
 const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
 const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 
-const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false };
+const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false, solarRole: 'entry_canvasser' };
 const UP = 'a'.repeat(32);
 const UP2 = 'b'.repeat(32);
 const VALID = {
@@ -78,13 +78,13 @@ describe('POST /api/portal/solar/leads', () => {
   });
 
   it('403s a fiber rep with no solar role', async () => {
-    mockGate.mockResolvedValue({ ...REP, uid: 'fiber' });
+    mockGate.mockResolvedValue({ ...REP, uid: 'fiber', fieldRole: 'ae_tier_1', solarRole: null });
     expect((await POST(req(VALID))).status).toBe(403);
     expect(db.store.get('solarLeads')).toBeUndefined();
   });
 
   it('lets an admin without a solar role in', async () => {
-    mockGate.mockResolvedValue({ ...REP, uid: 'own', isAdmin: true });
+    mockGate.mockResolvedValue({ ...REP, uid: 'own', isAdmin: true, isOwner: true, role: 'owner', solarRole: null });
     expect((await POST(req({ ...VALID, photos: undefined }))).status).toBe(200);
   });
 

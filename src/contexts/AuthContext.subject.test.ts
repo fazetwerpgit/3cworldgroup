@@ -38,3 +38,17 @@ describe('subjectAuthValue (owner viewing as a rep)', () => {
     expect(value.isRole('owner')).toBe(false);
   });
 });
+
+describe('subjectAuthValue with a solar rep', () => {
+  const sol = { uid: 'rep-sol', displayName: 'Sol Rep', fieldRole: 'ae_tier_1', solarRole: 'canvass_closer', status: 'active' } as User;
+  const value = subjectAuthValue(owner, sol);
+
+  it('answers solar:read from the solar role but never solar:write', () => {
+    expect(value.hasPermission('solar:read')).toBe(true);
+    expect(value.hasPermission('solar:write')).toBe(false);
+  });
+
+  it('gives a fiber-only rep no solar at all', () => {
+    expect(subjectAuthValue(owner, noah).hasPermission('solar:read')).toBe(false);
+  });
+});

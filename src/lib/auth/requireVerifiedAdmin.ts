@@ -7,10 +7,12 @@ import {
   isAdminLevel,
   isManagementRole,
   isOwner,
+  isSolarRole,
   MANAGEMENT_FIELD_ROLES,
   resolveRoles,
   PlatformRole,
   FieldRole,
+  SolarRole,
 } from '@/types';
 
 // The onboarding-stage status relaxation is derived from the shared API
@@ -116,14 +118,21 @@ export async function requireVerifiedUser(
       demoAccount: boolean;
       /** The AI providers the caller has agreed to (lib/ai/consent). */
       aiConsent: AiConsentState;
+      /** The resolved roles, for permissionsFor (the solar gate) without a second users read. */
+      role?: PlatformRole;
+      fieldRole?: FieldRole;
+      solarRole: SolarRole | null;
     }
   | { ok: false; error: string; status: number }
 > {
   const c = await verifyCaller(request, options);
   if (!c.ok) return c;
-  const { role } = resolveRoles(c.data.role, c.data.fieldRole);
+  const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
   return {
     ok: true,
+    role,
+    fieldRole,
+    solarRole: isSolarRole(c.data.solarRole) ? c.data.solarRole : null,
     uid: c.uid,
     name: c.data.displayName || callerEmail(c.data) || c.uid,
     email: callerEmail(c.data),

@@ -19,6 +19,9 @@ const PERSISTED_FIELDS = [
   'displayName',
   'role',
   'fieldRole',
+  // Solar is a second role axis: without it a solar rep's cold open paints
+  // the shell with no Solar nav until the profile read lands.
+  'solarRole',
   'isIBO',
   'status',
   'avatarUrl',

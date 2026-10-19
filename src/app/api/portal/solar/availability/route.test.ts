@@ -13,7 +13,7 @@ import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
 
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
-const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false };
+const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false, solarRole: 'virtual_closer' };
 const MON = 'from=2026-10-26T07:00:00.000Z&to=2026-10-27T07:00:00.000Z';
 
 function get(query: string) {
@@ -95,7 +95,7 @@ describe('GET /api/portal/solar/availability', () => {
     expect((await get(`mode=phone&${MON}`)).status).toBe(400);
     expect((await get('mode=virtual&from=2026-10-27T00:00:00Z&to=2026-10-26T00:00:00Z')).status).toBe(400);
     expect((await get('mode=virtual&from=garbage')).status).toBe(400);
-    mockGate.mockResolvedValue({ ...REP, uid: 'fiber' });
+    mockGate.mockResolvedValue({ ...REP, uid: 'fiber', fieldRole: 'ae_tier_1', solarRole: null });
     expect((await get(`mode=virtual&${MON}`)).status).toBe(403);
   });
 

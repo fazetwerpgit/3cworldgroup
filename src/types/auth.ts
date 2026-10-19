@@ -126,6 +126,10 @@ const ADMIN_PERMISSIONS = [
   'recruiting:read',
   'recruiting:write',
   'recruiting:convert',
+  // The solar deck, leads and bookings (see SolarRolePermissions). Admin and
+  // owner inherit them; operations does not.
+  'solar:read',
+  'solar:write',
 ];
 
 // Permission sets for each role - central authorization logic
@@ -345,7 +349,8 @@ export function isShirtSize(value: unknown): value is ShirtSize {
 }
 
 // Solar sales roles. A separate axis from FieldRole (which stays fiber-only):
-// see docs/solar/PLAN.md. Access rule lives in lib/solar/access.ts.
+// see docs/solar/PLAN.md. What they grant is SolarRolePermissions, combined
+// with the platform/field role by permissionsFor.
 export const SOLAR_ROLES = [
   'entry_canvasser',
   'ae_canvasser',
@@ -371,6 +376,38 @@ export const SolarRoleDisplayNames: Record<SolarRole, string> = {
 
 export function isSolarRole(value: unknown): value is SolarRole {
   return typeof value === 'string' && (SOLAR_ROLES as readonly string[]).includes(value);
+}
+
+/** solar:read opens the Solar page and Home card; solar:write the deck, lead submit and booking. */
+const SOLAR_PERMISSIONS = ['solar:read', 'solar:write'];
+
+// Every solar role carries both today; the record keeps room for a role that
+// should only read (a future office or marketing seat).
+export const SolarRolePermissions: Record<SolarRole, string[]> = {
+  entry_canvasser: [...SOLAR_PERMISSIONS],
+  ae_canvasser: [...SOLAR_PERMISSIONS],
+  canvass_manager: [...SOLAR_PERMISSIONS],
+  canvass_closer: [...SOLAR_PERMISSIONS],
+  in_person_closer: [...SOLAR_PERMISSIONS],
+  virtual_closer: [...SOLAR_PERMISSIONS],
+  marketing_director: [...SOLAR_PERMISSIONS],
+  sales_director: [...SOLAR_PERMISSIONS],
+};
+
+/**
+ * Everything a user may do: their platform or field role's permissions
+ * (role ?? fieldRole, as getEffectiveRole) plus their solar role's. The one
+ * permission lookup for the client (AuthContext) and the server (solar gate).
+ * Pure: works on the client User and on a resolved users doc.
+ */
+export function permissionsFor(
+  user: { role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown } | null | undefined
+): string[] {
+  if (!user) return [];
+  const roleKey = user.role ?? user.fieldRole;
+  const base = (roleKey && RolePermissions[roleKey]) || [];
+  if (!isSolarRole(user.solarRole)) return base;
+  return [...new Set([...base, ...SolarRolePermissions[user.solarRole]])];
 }
 
 // User document type

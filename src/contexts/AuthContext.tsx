@@ -27,7 +27,7 @@ import { takePendingDisplayName } from '@/lib/app/nativeAuth';
 import { clearPendingIdToken, rememberPendingIdToken } from '@/lib/auth/pendingSession';
 import { unregisterNativePush } from '@/lib/app/nativePush';
 import { clearViewAs } from '@/lib/viewAs/storage';
-import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles, isSolarRole } from '@/types';
+import { User, AuthState, UserRole, isOwner, permissionsFor, resolveRoles, isSolarRole } from '@/types';
 import { setDataCacheOwner } from '@/lib/cache/dataCache';
 import { clearDashboardSnapshots } from '@/lib/cache/dashboardSnapshot';
 import { clearSessionProfile, readSessionProfile, writeSessionProfile } from '@/lib/auth/sessionProfile';
@@ -699,12 +699,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const hasPermission = (permission: string): boolean => {
-    if (!state.user) return false;
-    const roleKey = state.user.role ?? state.user.fieldRole;
-    const permissions = roleKey ? RolePermissions[roleKey] : [];
-    return permissions.includes(permission);
-  };
+  // The role's permissions plus the solar role's (permissionsFor).
+  const hasPermission = (permission: string): boolean => permissionsFor(state.user).includes(permission);
 
   // An owner satisfies a check for 'admin' as well as for 'owner': the tier sits
   // above admin, so every isRole('admin') call site in the portal admits it
@@ -768,8 +764,7 @@ export function AuthSubjectProvider({ user, children }: { user: User; children: 
 
 /** The auth value the rep screens see while the owner views as `user` (read only). */
 export function subjectAuthValue(parent: AuthContextType, user: User): AuthContextType {
-  const roleKey = user.role ?? user.fieldRole;
-  const permissions = roleKey ? RolePermissions[roleKey] : [];
+  const permissions = permissionsFor(user);
   return {
     ...parent,
     user,

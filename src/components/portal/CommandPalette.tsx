@@ -26,7 +26,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { askOpenTo } from '@/lib/ask/flag';
-import { canSeeSolar } from '@/lib/solar/access';
 import { openNativeChatForHref } from '@/lib/app/nativeChat';
 import { PlatformRole, Sale, UserRole } from '@/types';
 import {
@@ -57,8 +56,6 @@ export interface PortalNavItem {
   hub?: HubConfig;
   /** A feature behind a kill switch or a rollout: the item shows only while this answers true for the viewer's platform role. */
   openTo?: (role: PlatformRole | undefined, uid?: string) => boolean;
-  /** A gate on the whole signed-in user (fields beyond role, such as solarRole). */
-  visibleTo?: (user: Parameters<typeof canSeeSolar>[0]) => boolean;
 }
 
 export interface PortalNavGroup {
@@ -99,7 +96,7 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'Leaderboard', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
       { label: 'Forms', href: '/portal/forms', icon: ReceiptText },
       { label: 'Learn', href: '/portal/learn', icon: GraduationCap },
-      { label: 'Solar deck', href: '/portal/solar/present', icon: Sun, visibleTo: canSeeSolar },
+      { label: 'Solar', href: '/portal/solar', icon: Sun, permissions: ['solar:read'] },
       { label: 'EscaLink', href: '/portal/escalink', icon: LifeBuoy, permissions: ['sales:read'] },
       { label: 'Ask 3C', href: '/portal/ask', icon: MessageCircleQuestion, openTo: askOpenTo },
       { label: 'My Onboarding', href: '/portal/onboarding', icon: ClipboardCheck, onboardingOnly: true },
@@ -145,7 +142,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const canAccess = useCallback(
     (item: PortalNavItem) => {
       if (item.openTo && !item.openTo(user?.role, user?.uid)) return false;
-      if (item.visibleTo && !item.visibleTo(user)) return false;
       if (item.onboardingOnly && !isOnboardingUser(user)) return false;
       if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
       if (onboardingUser && !isOnboardingAllowedPage(item.href)) return false;

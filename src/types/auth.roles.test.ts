@@ -12,6 +12,7 @@ import {
   RoleDisplayNames,
   repFacingRoleLabel,
   RolePermissions,
+  permissionsFor,
 } from './auth';
 import type { FieldRole, PlatformRole } from './auth';
 
@@ -137,5 +138,38 @@ describe('repFacingRoleLabel', () => {
   it('returns null when there is no role', () => {
     expect(repFacingRoleLabel(undefined)).toBeNull();
     expect(repFacingRoleLabel(null)).toBeNull();
+  });
+});
+
+// Solar is a second axis beside the platform/field role: permissionsFor adds a
+// solar role's permissions to the role's own. Admin and owner hold solar
+// through ADMIN_PERMISSIONS; operations and fiber-only reps never do.
+describe('permissionsFor (solar)', () => {
+  it('gives any solar role solar:read and solar:write, alone or beside a fiber role', () => {
+    expect(permissionsFor({ solarRole: 'entry_canvasser' })).toEqual(['solar:read', 'solar:write']);
+    const dual = permissionsFor({ fieldRole: 'ae_tier_1', solarRole: 'sales_director' });
+    expect(dual).toEqual(expect.arrayContaining([...RolePermissions.ae_tier_1, 'solar:read', 'solar:write']));
+    expect(new Set(dual).size).toBe(dual.length);
+  });
+
+  it('opens solar to admin and owner without a solar role', () => {
+    for (const role of ['admin', 'owner'] as const) {
+      expect(permissionsFor({ role })).toEqual(expect.arrayContaining(['solar:read', 'solar:write']));
+      expect(permissionsFor({ role, solarRole: null })).toEqual(RolePermissions[role]);
+    }
+  });
+
+  it('denies solar to operations, fiber-only reps, unknown solar roles and nobody', () => {
+    expect(permissionsFor({ role: 'operations' })).not.toContain('solar:read');
+    expect(permissionsFor({ fieldRole: 'entry_rep', solarRole: null })).toEqual(RolePermissions.entry_rep);
+    expect(permissionsFor({ fieldRole: 'entry_rep', solarRole: 'bogus' })).not.toContain('solar:write');
+    expect(permissionsFor({})).toEqual([]);
+    expect(permissionsFor(null)).toEqual([]);
+  });
+
+  it('keeps solar off every field role', () => {
+    for (const role of Object.values(FieldRoles) as FieldRole[]) {
+      expect(RolePermissions[role].some((p) => p.startsWith('solar:'))).toBe(false);
+    }
   });
 });

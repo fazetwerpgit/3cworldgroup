@@ -39,7 +39,7 @@ const mockNotifyMany = createNotificationForMany as unknown as ReturnType<typeof
 const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
 const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 
-const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false };
+const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false, solarRole: 'entry_canvasser' };
 const UP = 'a'.repeat(32);
 const LEAD = {
   repUid: 'rep1',
@@ -181,7 +181,7 @@ describe('POST /api/portal/solar/leads/{id}/finish', () => {
     mockGate.mockResolvedValue({ ...REP, uid: 'rep2' });
     expect((await finish()).status).toBe(403);
     expect(mockEmail).not.toHaveBeenCalled();
-    mockGate.mockResolvedValue({ ...REP, uid: 'jac', isAdmin: true });
+    mockGate.mockResolvedValue({ ...REP, uid: 'jac', isAdmin: true, isOwner: true, role: 'owner', solarRole: null });
     expect((await finish()).status).toBe(200);
     expect((await finish('missing')).status).toBe(404);
     expect((await finish('bad id')).status).toBe(404);
