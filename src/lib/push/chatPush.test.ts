@@ -41,6 +41,7 @@ import {
   pushChatMessageOnce,
   resolveChatPushRecipients,
   sendChatPush,
+  shouldPushChatRecipient,
 } from './chatPush';
 
 describe('resolveChatPushRecipients', () => {
@@ -260,5 +261,15 @@ describe('buildChatPushBody', () => {
 
   it('falls back to a generic body when there is neither text nor attachment', () => {
     expect(buildChatPushBody('Sender', '   ')).toBe('Sender sent a message');
+  });
+});
+
+describe('shouldPushChatRecipient — the Solar channel', () => {
+  const solar = { id: 'solar', name: 'Solar', audience: 'solar', order: 5, active: true };
+
+  it('pushes to solar members and admins, never to a fiber rep left in a stale roster', () => {
+    expect(shouldPushChatRecipient(solar, 's1', { status: 'active', solarRole: 'entry_canvasser' })).toBe(true);
+    expect(shouldPushChatRecipient(solar, 'a1', { status: 'active', role: 'admin' })).toBe(true);
+    expect(shouldPushChatRecipient(solar, 'f1', { status: 'active', fieldRole: 'entry_rep' })).toBe(false);
   });
 });

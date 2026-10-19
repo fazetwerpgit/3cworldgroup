@@ -43,6 +43,7 @@ const audienceCopy: Record<ChatChannelAudience, string> = {
   field: 'Field users',
   managers: 'Managers',
   platform: 'Admin/Ops',
+  solar: 'Solar team',
 };
 
 const emptyDraft: ChannelDraft = { name: '', description: '', audience: 'all' };

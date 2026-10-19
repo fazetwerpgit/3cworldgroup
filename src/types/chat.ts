@@ -1,6 +1,8 @@
 import { isManagementRole, isSolarRole, PlatformRole, FieldRole, MANAGEMENT_FIELD_ROLES } from './auth';
 
-export type ChatChannelAudience = 'all' | 'field' | 'managers' | 'platform';
+// 'solar': solar-role holders (users/{uid}.solarRole) plus management (admin,
+// operations, owner). Fiber reps without a solar role never reach it.
+export type ChatChannelAudience = 'all' | 'field' | 'managers' | 'platform' | 'solar';
 
 export interface ChatChannel {
   id: string;
@@ -129,6 +131,7 @@ export function canAccessChatChannel(
     return fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false;
   }
   if (channel.audience === 'platform') return isManagementRole(role);
+  if (channel.audience === 'solar') return isSolarRole(solarRole);
   return false;
 }
 

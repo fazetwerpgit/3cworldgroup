@@ -45,7 +45,7 @@ export interface ChatChannelMembership {
   channels: ChatChannel[];
 }
 
-const CHAT_CHANNEL_AUDIENCES: ChatChannelAudience[] = ['all', 'field', 'managers', 'platform'];
+const CHAT_CHANNEL_AUDIENCES: ChatChannelAudience[] = ['all', 'field', 'managers', 'platform', 'solar'];
 
 export function isChatChannelAudience(value: unknown): value is ChatChannelAudience {
   return typeof value === 'string' && CHAT_CHANNEL_AUDIENCES.includes(value as ChatChannelAudience);

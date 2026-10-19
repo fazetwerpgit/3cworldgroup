@@ -414,3 +414,42 @@ describe('demo sandbox channel', () => {
     expect(channels[0].demoSandbox).toBe(true);
   });
 });
+
+describe('the Solar channel (audience: solar)', () => {
+  beforeEach(() => firestore.reset());
+  const solar = { id: 'solar', name: 'Solar', description: '', audience: 'solar', order: 5, active: true };
+  const asChannel = solar as ChatChannel;
+
+  it('denies a fiber rep with no solar role, in every gate', () => {
+    expect(canAccessChatChannel(asChannel, undefined, 'entry_rep')).toBe(false);
+    expect(canAccessChatChannel(asChannel, undefined, 'regional_manager')).toBe(false);
+    expect(userCanAccessChannelDoc(solar, { uid: 'f1', fieldRole: 'entry_rep', demoAccount: false })).toBe(false);
+    expect(belongsInChannelDoc(solar, 'f1', { status: 'active', fieldRole: 'entry_rep' })).toBe(false);
+  });
+
+  it('allows a solar rep, solar-only or with a fiber role too', () => {
+    expect(canAccessChatChannel(asChannel, undefined, undefined, 'entry_canvasser')).toBe(true);
+    expect(canAccessChatChannel(asChannel, undefined, 'entry_rep', 'virtual_closer')).toBe(true);
+    expect(userCanAccessChannelDoc(solar, { uid: 's1', solarRole: 'virtual_closer', demoAccount: false })).toBe(true);
+    expect(belongsInChannelDoc(solar, 's1', { status: 'active', solarRole: 'virtual_closer' })).toBe(true);
+  });
+
+  it('allows an admin', () => {
+    expect(canAccessChatChannel(asChannel, 'admin')).toBe(true);
+    expect(userCanAccessChannelDoc(solar, { uid: 'a1', role: 'admin', demoAccount: false })).toBe(true);
+  });
+
+  it('keeps a demo account and an unknown solar value out', () => {
+    expect(userCanAccessChannelDoc(solar, { uid: 's1', solarRole: 'virtual_closer', demoAccount: true })).toBe(false);
+    expect(canAccessChatChannel(asChannel, undefined, undefined, 'astronaut')).toBe(false);
+  });
+
+  it('derives memberIds (the unread listener and push roster) from solar roles plus admins only', async () => {
+    firestore.users.set('fiber-rep', { status: 'active', fieldRole: 'entry_rep' });
+    firestore.users.set('solar-rep', { status: 'active', solarRole: 'entry_canvasser' });
+    firestore.users.set('both', { status: 'active', fieldRole: 'entry_rep', solarRole: 'virtual_closer' });
+    firestore.users.set('admin', { status: 'active', role: 'admin' });
+
+    expect((await getMemberIdsForAudience('solar')).sort()).toEqual(['admin', 'both', 'solar-rep']);
+  });
+});
