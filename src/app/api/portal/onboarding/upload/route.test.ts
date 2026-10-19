@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server';
 
 const gateMock = vi.hoisted(() => vi.fn());
 const userDocGetMock = vi.hoisted(() => vi.fn());
+const itemDocGetMock = vi.hoisted(() => vi.fn());
+const docIdMock = vi.hoisted(() => vi.fn());
 const validateUploadMock = vi.hoisted(() => vi.fn());
 const buildFolderPathMock = vi.hoisted(() => vi.fn());
 const saveMock = vi.hoisted(() => vi.fn(async () => undefined));
@@ -17,7 +19,14 @@ vi.mock('@/lib/onboarding/uploads', () => ({
 }));
 vi.mock('@/lib/firebase/admin', () => ({
   getOnboardingBucket: vi.fn(() => bucketMock),
-  adminDb: { collection: vi.fn(() => ({ doc: vi.fn(() => ({ get: userDocGetMock })) })) },
+  adminDb: {
+    collection: vi.fn((name: string) => ({
+      doc: vi.fn((id: string) => {
+        docIdMock(name, id);
+        return { get: name === 'userOnboarding' ? itemDocGetMock : userDocGetMock };
+      }),
+    })),
+  },
 }));
 
 import { POST } from './route';
@@ -40,6 +49,9 @@ beforeEach(() => {
   bucketMock.file.mockClear();
   userDocGetMock.mockReset();
   userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'pending' }) });
+  itemDocGetMock.mockReset();
+  itemDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
+  docIdMock.mockClear();
 });
 
 describe('POST /api/portal/onboarding/upload', () => {
@@ -102,5 +114,39 @@ describe('POST /api/portal/onboarding/upload', () => {
     });
     expect(formData).not.toHaveBeenCalled();
     expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['submitted', 'Item is already under review'],
+    ['approved', 'Item is already approved'],
+  ])('refuses to overwrite the files of a %s item', async (status, error) => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'verified-user', name: 'User', email: 'u@example.com' });
+    validateUploadMock.mockReturnValue({ ok: true, fileBase: 'front', ext: 'jpg' });
+    buildFolderPathMock.mockReturnValue('onboarding/users/verified-user/dl_photos/');
+    itemDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status }) });
+
+    const response = await POST(
+      requestWithForm({ userId: 'verified-user', itemId: 'dl_photos', slot: 'front' })
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error });
+    expect(docIdMock).toHaveBeenCalledWith('userOnboarding', 'verified-user_dl_photos');
+    expect(bucketMock.file).not.toHaveBeenCalled();
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['rejected', 'not_started'])('still accepts a replacement file for a %s item', async (status) => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'verified-user', name: 'User', email: 'u@example.com' });
+    validateUploadMock.mockReturnValue({ ok: true, fileBase: 'front', ext: 'jpg' });
+    buildFolderPathMock.mockReturnValue('onboarding/users/verified-user/dl_photos/');
+    itemDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status }) });
+
+    const response = await POST(
+      requestWithForm({ userId: 'verified-user', itemId: 'dl_photos', slot: 'front' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(saveMock).toHaveBeenCalled();
   });
 });

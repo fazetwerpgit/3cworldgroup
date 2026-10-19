@@ -52,6 +52,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: check.error }, { status: 400 });
     }
 
+    // A submitted or approved item's files are what the reviewer sees (the
+    // review and files routes sign the folder at view time), so they are
+    // frozen until an admin rejects the item. Mirrors the submit route.
+    const itemDoc = await adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`).get();
+    const itemStatus = itemDoc.exists ? itemDoc.data()?.status : 'not_started';
+    if (itemStatus === 'submitted' || itemStatus === 'approved') {
+      return NextResponse.json(
+        { error: `Item is already ${itemStatus === 'submitted' ? 'under review' : 'approved'}` },
+        { status: 409 }
+      );
+    }
+
     const folder = buildFolderPath({ kind: 'user', userId }, itemId);
     const objectPath = `${folder}${check.fileBase}.${check.ext}`;
 
