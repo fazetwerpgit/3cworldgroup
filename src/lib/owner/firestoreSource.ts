@@ -59,6 +59,50 @@ function db() {
   return adminDb;
 }
 
+/**
+ * The book of the last request, reused for a short while across requests: a
+ * single-section Retry (or a second section asked for right after the first)
+ * then does not re-read every sale since launch. Keyed on the carrier report's
+ * lastReportAt, so a new report always reads fresh. Server memory only; the
+ * owner summary route is owner-gated.
+ */
+const BOOK_CACHE_MS = 60_000;
+let recentBook: { reportAt: string | null; at: number; book: Promise<OwnerBook> } | null = null;
+
+/** Tests: forget the cross-request book. */
+export function clearOwnerBookCache() {
+  recentBook = null;
+}
+
+async function readBook(statusDoc: FirebaseFirestore.DocumentSnapshot): Promise<OwnerBook> {
+  const lastReportAt = statusDoc.exists ? ((statusDoc.data()?.lastReportAt as string | undefined) ?? null) : null;
+  const asOf = statusDoc.exists ? statusDoc.data()?.lastReportAsOf : null;
+  const reportAsOf = typeof asOf === 'string' ? asOf : null;
+  const [salesSnap, orders] = await Promise.all([
+    db().collection('sales').where('saleDate', '>=', loggingStart()).select(...SALE_FIELDS).get(),
+    getAllFiberOrders(lastReportAt),
+  ]);
+  // The owner never sees a demo account's sales (nor do they join carrier orders).
+  const sales = salesSnap.docs.filter((doc) => !isDemoSale(doc.data())).map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      salesRepId: data.salesRepId ?? '',
+      salesRepName: data.salesRepName ?? '',
+      // The carrier join reads the order number first, as the board does.
+      customerAddress: data.customerAddress ?? '',
+      orderNumberOrBtn: data.orderNumberOrBtn ?? '',
+      products: Array.isArray(data.products) ? data.products : [],
+      status: data.status,
+      saleDate: toDate(data.saleDate),
+      installDate: toDate(data.installDate),
+      totalValue: typeof data.totalValue === 'number' ? data.totalValue : 0,
+      createdAt: toDate(data.createdAt),
+    } as Sale;
+  });
+  return { sales, orders, reportAt: lastReportAt, reportAsOf };
+}
+
 /** One source per request: the book is read once however many sections ask for it. */
 export function createFirestoreOwnerSource(): OwnerSummarySource {
   let book: Promise<OwnerBook> | null = null;
@@ -66,33 +110,20 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
   return {
     loadBook() {
       book ??= (async () => {
-        const [salesSnap, statusDoc] = await Promise.all([
-          db().collection('sales').where('saleDate', '>=', loggingStart()).select(...SALE_FIELDS).get(),
-          db().collection('config').doc('fiberReportStatus').get(),
-        ]);
-        const lastReportAt = statusDoc.exists ? ((statusDoc.data()?.lastReportAt as string | undefined) ?? null) : null;
-        const asOf = statusDoc.exists ? statusDoc.data()?.lastReportAsOf : null;
-        const reportAsOf = typeof asOf === 'string' ? asOf : null;
-        const orders = await getAllFiberOrders(lastReportAt);
-        // The owner never sees a demo account's sales (nor do they join carrier orders).
-        const sales = salesSnap.docs.filter((doc) => !isDemoSale(doc.data())).map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            salesRepId: data.salesRepId ?? '',
-            salesRepName: data.salesRepName ?? '',
-            // The carrier join reads the order number first, as the board does.
-            customerAddress: data.customerAddress ?? '',
-            orderNumberOrBtn: data.orderNumberOrBtn ?? '',
-            products: Array.isArray(data.products) ? data.products : [],
-            status: data.status,
-            saleDate: toDate(data.saleDate),
-            installDate: toDate(data.installDate),
-            totalValue: typeof data.totalValue === 'number' ? data.totalValue : 0,
-            createdAt: toDate(data.createdAt),
-          } as Sale;
+        const statusDoc = await db().collection('config').doc('fiberReportStatus').get();
+        const reportAt = statusDoc.exists ? ((statusDoc.data()?.lastReportAt as string | undefined) ?? null) : null;
+        const now = Date.now();
+        if (recentBook && recentBook.reportAt === reportAt && now - recentBook.at < BOOK_CACHE_MS) {
+          return recentBook.book;
+        }
+        const read = readBook(statusDoc);
+        const entry = { reportAt, at: now, book: read };
+        recentBook = entry;
+        // A failed read is never served to the next request.
+        read.catch(() => {
+          if (recentBook === entry) recentBook = null;
         });
-        return { sales, orders, reportAt: lastReportAt, reportAsOf };
+        return read;
       })();
       return book;
     },

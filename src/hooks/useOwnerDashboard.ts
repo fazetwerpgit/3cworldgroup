@@ -21,17 +21,31 @@ export interface OwnerDashboardState {
 }
 
 const SECTIONS: OwnerSection[] = ['money', 'markets', 'problems', 'recruiting'];
+/** A request that hangs (a cellular handoff) shows the sections' Try again instead of skeletons forever. */
+export const OWNER_SUMMARY_TIMEOUT_MS = 15_000;
 const LOADING = { status: 'loading' } as const;
 
 async function loadSummary(sections: OwnerSection[], token: string | null, signal: AbortSignal) {
   const query = sections.length === 1 ? `?section=${sections[0]}` : '';
-  const response = await fetch(`/api/portal/owner/summary${query}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    signal,
-  });
-  const data = (await response.json().catch(() => null)) as (OwnerSummary & { error?: string }) | null;
-  if (!response.ok || !data) throw new Error(data?.error || `Request failed (${response.status})`);
-  return data;
+  // The caller's signal (a newer request, unmount) or the timeout ends the
+  // request. Wired by hand: AbortSignal.any is missing before iOS 17.4.
+  const request = new AbortController();
+  const stop = () => request.abort();
+  if (signal.aborted) stop();
+  signal.addEventListener('abort', stop, { once: true });
+  const timer = setTimeout(stop, OWNER_SUMMARY_TIMEOUT_MS);
+  try {
+    const response = await fetch(`/api/portal/owner/summary${query}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      signal: request.signal,
+    });
+    const data = (await response.json().catch(() => null)) as (OwnerSummary & { error?: string }) | null;
+    if (!response.ok || !data) throw new Error(data?.error || `Request failed (${response.status})`);
+    return data;
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', stop);
+  }
 }
 
 export function useOwnerDashboard(enabled = true) {

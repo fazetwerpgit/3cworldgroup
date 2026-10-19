@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'tok') }));
 
-import { useOwnerDashboard } from './useOwnerDashboard';
+import { OWNER_SUMMARY_TIMEOUT_MS, useOwnerDashboard } from './useOwnerDashboard';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -74,5 +74,30 @@ describe('useOwnerDashboard', () => {
     expect(latest.current!.money.status).toBe('error');
     expect(latest.current!.problems.status).toBe('error');
     expect(latest.current!.recruiting.status).toBe('error');
+  });
+
+  it('gives up after the timeout and shows Try again, not skeletons forever', async () => {
+    vi.useFakeTimers();
+    try {
+      // A request that never answers until it is aborted.
+      fetchMock.mockImplementationOnce(
+        (_url: string, init: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+          })
+      );
+      act(() => root.render(<Harness />));
+      await flush();
+      expect(latest.current!.money.status).toBe('loading');
+
+      await act(async () => {
+        vi.advanceTimersByTime(OWNER_SUMMARY_TIMEOUT_MS);
+      });
+      await flush();
+      expect(latest.current!.money.status).toBe('error');
+      expect(latest.current!.markets.status).toBe('error');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

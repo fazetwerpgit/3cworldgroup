@@ -53,7 +53,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 }));
 vi.mock('@/lib/fiberReport/ordersCache', () => ({ getAllFiberOrders: vi.fn(async () => orders) }));
 
-import { createFirestoreOwnerSource } from './firestoreSource';
+import { clearOwnerBookCache, createFirestoreOwnerSource } from './firestoreSource';
 import { companyBook } from './companySummary';
 import { buildMergedBook } from '@/lib/sales/mergeBook';
 
@@ -73,6 +73,25 @@ beforeEach(() => {
   saleDocs.length = 0;
   orders.length = 0;
   userRows.clear();
+  selectMock.mockClear();
+  clearOwnerBookCache();
+});
+
+describe('owner book is not re-read for a retry right after a load', () => {
+  it('reuses the last book for a minute across requests, then reads again', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-18T12:00:00Z'));
+      await createFirestoreOwnerSource().loadBook();
+      await createFirestoreOwnerSource().loadBook();
+      expect(selectMock).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(new Date('2026-10-18T12:01:01Z'));
+      await createFirestoreOwnerSource().loadBook();
+      expect(selectMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('owner home reads the order number, so it joins as the board does', () => {
