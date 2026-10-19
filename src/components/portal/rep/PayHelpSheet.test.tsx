@@ -19,7 +19,7 @@ describe('PayHelpSheet', () => {
   });
 
   it('covers claims, chargebacks and funds timing, and links the escalation form', () => {
-    expect(html).toContain('25th of the next month');
+    expect(html).toContain('Claims usually settle by the <strong>25th of the following month</strong>.');
     expect(html).toContain('120 days');
     expect(html).toContain('3C receives funds');
     expect(html).toContain(`href="${PAY_DISPUTE_HREF}"`);

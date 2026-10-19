@@ -98,8 +98,8 @@ export function PayHelpSheet({ onClose }: { onClose: () => void }) {
               <div>
                 <h3>Missed installs</h3>
                 <p>
-                  Anything the weekly checks missed shows up on your pay sheet as a <strong>Claim</strong>. The
-                  month&apos;s All Check settles claims by the <strong>25th of the next month</strong>.
+                  Anything the weekly checks missed shows up on your pay sheet as a <strong>Claim</strong>.
+                  Claims usually settle by the <strong>25th of the following month</strong>.
                 </p>
               </div>
 
