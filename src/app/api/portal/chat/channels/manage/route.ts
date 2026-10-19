@@ -1,14 +1,18 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
-import { adminDb } from '@/lib/firebase/admin';
+import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import {
   createChannelId,
   isDemoSandboxChannel,
+  isEligibleChatMember,
   getMemberIdsForAudience,
   isChatChannelAudience,
+  readExtraMemberIds,
   toChatChannel,
 } from '@/lib/chat/channels';
+import { deletableChatObjectPaths, preserveReportedEvidence, storageErrorCode } from '@/lib/chat/evidence';
+import { getChatStorageBucketName } from '@/lib/chat/media';
 import { ChatChannelAudience } from '@/types';
 
 function cleanString(value: unknown): string {
@@ -148,7 +152,20 @@ export async function PATCH(request: NextRequest) {
       if (isDemoSandboxChannel(snap.data())) {
         return NextResponse.json({ error: 'The demo sandbox has no audience to change' }, { status: 400 });
       }
-      updates.memberIds = await getMemberIdsForAudience(updates.audience as ChatChannelAudience);
+      // Manual additions (extraMemberIds) survive an audience change, like
+      // syncChatChannels: an eligible extra stays in memberIds so the Firestore
+      // realtime rules and chat pushes keep reaching them.
+      const [activeUsersSnap, pendingUsersSnap] = await Promise.all([
+        adminDb.collection('users').where('status', '==', 'active').get(),
+        adminDb.collection('users').where('status', '==', 'pending').get(),
+      ]);
+      const users = [...activeUsersSnap.docs, ...pendingUsersSnap.docs];
+      const audienceMemberIds = await getMemberIdsForAudience(updates.audience as ChatChannelAudience, users);
+      const extras = new Set(readExtraMemberIds(snap.data() ?? {}));
+      const eligibleExtras = users
+        .filter((doc) => extras.has(doc.id) && isEligibleChatMember(doc.data()))
+        .map((doc) => doc.id);
+      updates.memberIds = Array.from(new Set([...audienceMemberIds, ...eligibleExtras]));
     }
 
     await ref.set(updates, { merge: true });
@@ -173,10 +190,23 @@ export async function DELETE(request: NextRequest) {
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
 
+    // Uploads (photo, or PDF and its preview) go with the channel: their tokened
+    // URLs would otherwise keep them reachable. A reported upload is copied to
+    // the moderation folder first; when that fails it stays (new token, queued
+    // for the cron sweep), as on a single message delete.
+    const objectPaths = new Set<string>();
+    const heldPaths = new Set<string>();
     let deletedMessages = 0;
     while (true) {
       const messagesSnap = await ref.collection('messages').limit(400).get();
       if (messagesSnap.empty) break;
+      for (const doc of messagesSnap.docs) {
+        const attachment = doc.data()?.attachment;
+        const paths = deletableChatObjectPaths(attachment, id);
+        if (paths.length === 0) continue;
+        const target = (await preserveReportedEvidence(id, doc.id, attachment)) ? objectPaths : heldPaths;
+        paths.forEach((path) => target.add(path));
+      }
       const batch = adminDb.batch();
       messagesSnap.docs.forEach((doc) => batch.delete(doc.ref));
       await batch.commit();
@@ -184,6 +214,18 @@ export async function DELETE(request: NextRequest) {
     }
 
     await ref.delete();
+
+    if (getChatStorageBucketName()) {
+      for (const objectPath of objectPaths) {
+        if (heldPaths.has(objectPath)) continue;
+        try {
+          await getOnboardingBucket().file(objectPath).delete({ ignoreNotFound: true });
+        } catch (storageError) {
+          if (storageErrorCode(storageError) === '404') continue;
+          console.error(`Error deleting chat upload (channel ${id}): code ${storageErrorCode(storageError)}`);
+        }
+      }
+    }
     return NextResponse.json({ success: true, deletedMessages });
   } catch (error) {
     console.error('Error deleting chat channel:', error);

@@ -110,8 +110,29 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedAdmin: vi.fn(),
 }));
 
+const storage = vi.hoisted(() => {
+  const deleted: string[] = [];
+  const getOnboardingBucket = vi.fn(() => ({
+    file: (path: string) => ({
+      delete: vi.fn(async () => {
+        deleted.push(path);
+      }),
+    }),
+  }));
+  return { deleted, getOnboardingBucket };
+});
+
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: firestore.adminDb,
+  getOnboardingBucket: storage.getOnboardingBucket,
+}));
+
+const preserveReportedEvidence = vi.hoisted(() =>
+  vi.fn(async (_channelId: string, _messageId: string, _attachment: unknown): Promise<boolean> => true)
+);
+vi.mock('@/lib/chat/evidence', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/chat/evidence')>()),
+  preserveReportedEvidence,
 }));
 
 import { DELETE, PATCH, POST } from './route';
@@ -128,9 +149,18 @@ function req(method: string, body: unknown) {
 
 const ADMIN = { ok: true, uid: 'admin-1', name: 'Admin One' };
 
+const BUCKET = 'test-bucket';
+function chatUrl(channelId: string, name: string) {
+  return `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/${encodeURIComponent(`chat/${channelId}/${name}`)}?alt=media&token=t`;
+}
+
 beforeEach(() => {
   firestore.reset();
   mockGate.mockReset();
+  storage.deleted.length = 0;
+  preserveReportedEvidence.mockReset();
+  preserveReportedEvidence.mockResolvedValue(true);
+  process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = BUCKET;
 });
 
 describe('/api/portal/chat/channels/manage', () => {
@@ -213,5 +243,56 @@ describe('/api/portal/chat/channels/manage', () => {
     expect(json).toMatchObject({ success: true, deletedMessages: 2 });
     expect(firestore.channels.has('old-channel')).toBe(false);
     expect(firestore.messages.get('old-channel')?.size).toBe(0);
+  });
+
+  it('PATCH keeps eligible manually added members in memberIds when the audience changes', async () => {
+    mockGate.mockResolvedValue(ADMIN);
+    firestore.channels.set('managers', {
+      id: 'managers', name: 'Managers', description: '', audience: 'managers', order: 1, active: true,
+      extraMemberIds: ['rep-1', 'inactive-1'],
+      memberIds: ['admin-1', 'ops-1', 'manager-1', 'rep-1'],
+    });
+
+    const res = await PATCH(req('PATCH', { id: 'managers', audience: 'platform' }));
+
+    expect(res.status).toBe(200);
+    const memberIds = firestore.channels.get('managers')?.memberIds as string[];
+    expect([...memberIds].sort()).toEqual(['admin-1', 'ops-1', 'rep-1']);
+  });
+
+  it('DELETE removes the channel uploads from Storage so their tokened URLs stop working', async () => {
+    mockGate.mockResolvedValue(ADMIN);
+    firestore.channels.set('old-channel', { id: 'old-channel', name: 'Old', audience: 'all', order: 1, active: true });
+    firestore.messages.set('old-channel', new Map<string, Record<string, unknown>>([
+      ['m1', { text: '', attachment: { type: 'image', url: chatUrl('old-channel', 'photo.jpg') } }],
+      ['m2', { text: '', attachment: { type: 'file', url: chatUrl('old-channel', 'doc.pdf'), previewUrl: chatUrl('old-channel', 'doc.png') } }],
+      ['m3', { text: '', attachment: { type: 'gif', url: 'https://media.giphy.com/x.gif' } }],
+      ['m4', { text: 'plain' }],
+    ]));
+
+    const res = await DELETE(req('DELETE', { id: 'old-channel' }));
+
+    expect(res.status).toBe(200);
+    expect([...storage.deleted].sort()).toEqual([
+      'chat/old-channel/doc.pdf',
+      'chat/old-channel/doc.png',
+      'chat/old-channel/photo.jpg',
+    ]);
+    expect(preserveReportedEvidence).toHaveBeenCalledTimes(2);
+  });
+
+  it('DELETE keeps a reported upload whose evidence copy failed', async () => {
+    mockGate.mockResolvedValue(ADMIN);
+    preserveReportedEvidence.mockImplementation(async (_c: string, messageId: string) => messageId !== 'm1');
+    firestore.channels.set('old-channel', { id: 'old-channel', name: 'Old', audience: 'all', order: 1, active: true });
+    firestore.messages.set('old-channel', new Map<string, Record<string, unknown>>([
+      ['m1', { text: '', attachment: { type: 'image', url: chatUrl('old-channel', 'reported.jpg') } }],
+      ['m2', { text: '', attachment: { type: 'image', url: chatUrl('old-channel', 'fine.jpg') } }],
+    ]));
+
+    const res = await DELETE(req('DELETE', { id: 'old-channel' }));
+
+    expect(res.status).toBe(200);
+    expect(storage.deleted).toEqual(['chat/old-channel/fine.jpg']);
   });
 });
