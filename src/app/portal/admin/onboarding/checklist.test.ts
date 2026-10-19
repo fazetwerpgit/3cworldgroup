@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isWaitingOnYou, signedWithoutCopy, type ChecklistItem } from './checklist';
+import { canCheck, isWaitingOnYou, itemLine, oldestUpload, signedWithoutCopy, type ChecklistItem } from './checklist';
 
 function item(overrides: Partial<ChecklistItem> = {}): ChecklistItem {
   return {
@@ -51,5 +51,38 @@ describe('isWaitingOnYou', () => {
     expect(isWaitingOnYou(item({ status: 'submitted' }))).toBe(false);
     expect(isWaitingOnYou(item({ itemId: 'dl_photos', status: 'submitted', onHold: true }))).toBe(false);
     expect(isWaitingOnYou(item({ itemId: 'dl_photos', status: 'approved' }))).toBe(false);
+  });
+});
+
+describe('a sensitive upload the caller cannot approve (operations)', () => {
+  const license = (overrides: Partial<ChecklistItem> = {}) =>
+    item({
+      itemId: 'dl_photos',
+      itemLabel: "Driver's License",
+      referenceKind: 'storage',
+      sensitive: true,
+      status: 'submitted',
+      submittedAt: '2026-07-26T00:00:00.000Z',
+      esignEnvelopeId: null,
+      ...overrides,
+    });
+
+  it('is not waiting on them and cannot be checked by them', () => {
+    expect(canCheck(license({ adminOnly: true }))).toBe(false);
+    expect(isWaitingOnYou(license({ adminOnly: true }))).toBe(false);
+    expect(canCheck(license())).toBe(true);
+    expect(isWaitingOnYou(license())).toBe(true);
+  });
+
+  it('does not age their To do row', () => {
+    const person = { userId: 'u1', userName: 'One', toReview: 0, items: [license({ adminOnly: true })] };
+    expect(oldestUpload(person)).toBeNull();
+    expect(oldestUpload({ ...person, items: [license()] })).toBe('2026-07-26T00:00:00.000Z');
+  });
+
+  it('says it is waiting on an admin', () => {
+    const now = new Date('2026-07-26T00:00:00.000Z').getTime();
+    expect(itemLine(license({ adminOnly: true }), now)).toBe('Uploaded just now · waiting on an admin');
+    expect(itemLine(license(), now)).toBe('Uploaded just now');
   });
 });

@@ -15,6 +15,7 @@ import { isEsignItem } from '@/lib/onboarding/esign';
 import { isOwner } from '@/types';
 import { ONBOARDING_FILE_LINK_TTL_MS, openSignedLink, signedLinksStale } from '@/lib/signedLinks';
 import {
+  canCheck,
   isWaitingOnYou,
   itemLine,
   needsCheck,
@@ -334,7 +335,7 @@ export function CheckDocumentsSheet({
         {!formOpen && (check || send || fixable || showPdf || canOpenFiles || markable) ? (
           <div className={u.btnRow}>
             {/* Approving a sensitive item takes the same admin right as opening it. */}
-            {check && !item.adminOnly && !item.ownerOnly ? (
+            {canCheck(item) ? (
               <button
                 type="button"
                 className={`${s.btnPrimary} ${u.primarySm}`}

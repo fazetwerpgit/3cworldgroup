@@ -18,7 +18,7 @@ import { onboardingFrom } from '@/lib/email/sendEmail';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
-import { canOpenOnboardingItem, isOwnerOnlyOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
+import { canApproveOnboardingItem, canOpenOnboardingItem, isOwnerOnlyOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
 import { isHeldOnboardingItem } from '@/types/onboardingHold';
 
 type ProgressData = FirebaseFirestore.DocumentData;
@@ -56,6 +56,8 @@ export async function GET(request: NextRequest) {
         const data = doc.data();
         const known = ONBOARDING_ITEMS.some((item) => item.id === data.itemId);
         if (!data.userId || !known || isEsignItem(data.itemId)) return [];
+        // Operations cannot approve a sensitive item, so it is not waiting on them.
+        if (!canApproveOnboardingItem(data.itemId, gate)) return [];
         return [{ userId: String(data.userId), submittedAt: data.submittedAt?.toDate?.() ?? null }];
       });
       // Same rule as the full queue: a deleted or inactive (rejected,
@@ -216,8 +218,11 @@ export async function GET(request: NextRequest) {
           items,
           done: items.filter((item) => item.status === 'approved').length,
           total: owed.length,
-          // Submitted and waiting on management.
-          toReview: waitingItems.filter((item) => !isEsignItem(item.itemId)).length,
+          // Submitted and waiting on this caller: operations cannot approve a
+          // sensitive item, so it waits on an admin and is not counted here.
+          toReview: waitingItems.filter(
+            (item) => !isEsignItem(item.itemId) && canApproveOnboardingItem(item.itemId, gate)
+          ).length,
           // Out for signature and waiting on the rep.
           unsigned: waitingItems.filter((item) => isEsignItem(item.itemId)).length,
           waitingSince: Number.isFinite(waitingSince) ? new Date(waitingSince) : null,
@@ -238,7 +243,10 @@ export async function GET(request: NextRequest) {
 
     const submissions = people
       .flatMap((person) => person.items)
-      .filter((item) => item.status === 'submitted' && !isEsignItem(item.itemId))
+      .filter(
+        (item) =>
+          item.status === 'submitted' && !isEsignItem(item.itemId) && canApproveOnboardingItem(item.itemId, gate)
+      )
       .sort((a, b) => (a.submittedAt?.getTime() ?? 0) - (b.submittedAt?.getTime() ?? 0));
 
     return NextResponse.json({ people, submissions });

@@ -23,6 +23,17 @@ export function canOpenOnboardingItem(
   return true;
 }
 
+// May this caller approve this onboarding item? Approving takes the same
+// right as opening the files (see the review POST): owner-only items need the
+// owner role, other sensitive items need admin or owner. Items a caller cannot approve are not "waiting on" them, so
+// they stay out of that caller's To do count and Hiring badge.
+export function canApproveOnboardingItem(
+  itemId: unknown,
+  caller: { isAdmin: boolean; isOwner: boolean }
+): boolean {
+  return canOpenOnboardingItem(itemId, caller);
+}
+
 export type SensitiveFileAccessSource =
   | 'onboarding-review'
   | 'onboarding-files'

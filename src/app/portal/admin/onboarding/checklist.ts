@@ -75,6 +75,15 @@ export function needsCheck(item: ChecklistItem): boolean {
   return item.status === 'submitted' && !item.onHold && !isEsignItem(item.itemId);
 }
 
+/**
+ * An upload waiting on management that this caller can approve. A sensitive
+ * upload (driver's license, ...) takes an admin to approve, so for operations
+ * it waits on an admin: not on their To do list, not in their Hiring badge.
+ */
+export function canCheck(item: ChecklistItem): boolean {
+  return needsCheck(item) && !item.adminOnly && !item.ownerOnly;
+}
+
 /** A document to sign that never went out: Send for signature. */
 export function needsSending(item: ChecklistItem): boolean {
   return item.status === 'submitted' && !item.onHold && isEsignItem(item.itemId) && !item.esignEnvelopeId;
@@ -82,13 +91,13 @@ export function needsSending(item: ChecklistItem): boolean {
 
 /** What the Check sheet lists first: the items someone on staff has to act on. */
 export function isWaitingOnYou(item: ChecklistItem): boolean {
-  return needsCheck(item) || needsSending(item);
+  return canCheck(item) || needsSending(item);
 }
 
 /** When the person's oldest upload to check came in (ISO), or null. */
 export function oldestUpload(person: ChecklistPerson): string | null {
   return person.items
-    .filter(needsCheck)
+    .filter(canCheck)
     .map((item) => item.submittedAt)
     .reduce<string | null>((oldest, time) => (time && (!oldest || time < oldest) ? time : oldest), null);
 }
@@ -126,7 +135,8 @@ export function itemLine(item: ChecklistItem, now = Date.now()): string {
       const ago = timeAgo(item.submittedAt, now);
       if (needsSending(item)) return 'Not sent to them for signature yet';
       if (isEsignItem(item.itemId)) return `Sent to sign${ago ? ` ${ago}` : ''} · waiting for them to sign`;
-      return `Uploaded${ago ? ` ${ago}` : ''}`;
+      const upload = `Uploaded${ago ? ` ${ago}` : ''}`;
+      return needsCheck(item) && !canCheck(item) ? `${upload} · waiting on an admin` : upload;
     }
     default:
       return 'Not started';

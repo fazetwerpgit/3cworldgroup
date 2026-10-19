@@ -345,11 +345,23 @@ describe('GET /api/portal/onboarding/review', () => {
 
       const json = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
 
-      expect(json.submissions).toEqual([
-        expect.objectContaining({ itemId: 'dl_photos', sensitive: true, adminOnly: true, files: [] }),
-      ]);
+      expect(json.people[0].items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ itemId: 'dl_photos', sensitive: true, adminOnly: true, files: [] }),
+        ])
+      );
+      // Operations cannot approve it, so it waits on an admin, not on them.
+      expect(json.people[0].toReview).toBe(0);
+      expect(json.submissions).toEqual([]);
       expect(getSignedUrlMock).not.toHaveBeenCalled();
       expect(logAddMock).not.toHaveBeenCalled();
+    });
+
+    it('counts the item as waiting on an admin', async () => {
+      const json = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
+
+      expect(json.people[0].toReview).toBe(1);
+      expect(json.submissions).toEqual([expect.objectContaining({ itemId: 'dl_photos' })]);
     });
 
     it('signs the files for an admin and writes a sensitiveAccessLog row', async () => {
@@ -448,6 +460,22 @@ describe('GET /api/portal/onboarding/review?summary=1', () => {
         { userId: 'u2', submittedAt: '2026-07-26T00:00:00.000Z' },
       ],
     });
+  });
+
+  it('leaves out sensitive items for operations, who cannot approve them', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+    accounts({ u1: { fieldRole: 'entry_level_rep' }, u2: { fieldRole: 'entry_level_rep' } });
+    queryGetMock.mockResolvedValueOnce({
+      docs: [
+        waiting('u1', 'onboarding_submission', '2026-07-27T00:00:00.000Z'),
+        waiting('u2', 'dl_photos', '2026-07-26T00:00:00.000Z'),
+        waiting('u2', 'background_check', '2026-07-25T00:00:00.000Z'),
+      ],
+    });
+
+    const json = await (await summary()).json();
+
+    expect(json.submissions).toEqual([{ userId: 'u1', submittedAt: '2026-07-27T00:00:00.000Z' }]);
   });
 
   it('does not count items of an account that has been deleted', async () => {
