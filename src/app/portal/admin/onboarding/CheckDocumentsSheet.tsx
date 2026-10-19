@@ -136,6 +136,7 @@ export function CheckDocumentsSheet({
         'Failed to send for signature'
       );
       await afterChange();
+      if (json.reason === 'already_approved') return `${item.itemLabel} is already complete.`;
       return json.reason === 'envelope_exists'
         ? `${item.itemLabel} was already sent to ${name}.`
         : `Sent ${item.itemLabel} to ${name}. They can sign it in their portal.`;

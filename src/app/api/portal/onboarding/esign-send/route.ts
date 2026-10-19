@@ -39,9 +39,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This item does not apply to the user onboarding checklist' }, { status: 400 });
     }
 
+    // Mirrors sendPendingEsignDocs: only a pending or active hire may be sent
+    // documents, so an item is never reset for a send that cannot happen.
+    if (!['pending', 'active'].includes(userData.status as string)) {
+      return NextResponse.json({ error: 'Only pending or active hires can be sent documents' }, { status: 409 });
+    }
+
     const itemRef = adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`);
     const itemDoc = await itemRef.get();
     const envelopeId = itemDoc.get('esignEnvelopeId') as string | undefined;
+    // An approved item is done, signed or marked complete by an owner (which
+    // leaves no envelope id): never reset it or send a new envelope.
+    if (itemDoc.get('status') === 'approved' && !envelopeId) {
+      return NextResponse.json({ sent: false, reason: 'already_approved' });
+    }
     // An id with no envelope record was sent before signing moved in-house and
     // can no longer be signed: unless the item is signed, it counts as no
     // envelope, and the send below replaces it. A failed read throws (500).

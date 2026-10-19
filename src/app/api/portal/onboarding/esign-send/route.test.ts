@@ -97,6 +97,33 @@ describe('POST /api/portal/onboarding/esign-send', () => {
     expect(sendMock).not.toHaveBeenCalled();
   });
 
+  it('never resets or resends an item an owner marked complete without an envelope', async () => {
+    itemGetMock.mockResolvedValue({
+      exists: true,
+      get: vi.fn((field: string) => ({ status: 'approved', manualCompletion: { note: 'paper' } } as Record<string, unknown>)[field]),
+    });
+
+    const response = await POST(request({ userId: 'user-1', itemId: 'w9' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ sent: false, reason: 'already_approved' });
+    expect(itemSetMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it('does not reset an item for a hire who is not pending or active', async () => {
+    userGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ fieldRole: 'entry_rep', isIBO: false, status: 'decommissioned' }),
+    });
+
+    const response = await POST(request({ userId: 'user-1', itemId: 'w9' }));
+
+    expect(response.status).toBe(409);
+    expect(itemSetMock).not.toHaveBeenCalled();
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
   it('does not send when the envelope read fails', async () => {
     itemGetMock.mockResolvedValue({
       exists: true,
