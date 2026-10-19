@@ -29,8 +29,16 @@ export default function SiteHeader() {
     still covering the hero, and Back brought the reader home with it still
     open. The route changing is the one signal that is true for every way out
     of the sheet: a sheet link, the header row Apply, the logo, Back, Forward.
+    The memory is also dropped on any route change (adjusted during render, not
+    in an effect), otherwise leaving by the logo or Back and then returning to
+    the route it was opened on would bring the sheet back up.
   */
   const [openedOn, setOpenedOn] = useState<string | null>(null);
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (lastPathname !== pathname) {
+    setLastPathname(pathname);
+    if (openedOn !== null) setOpenedOn(null);
+  }
   const menuOpen = openedOn === pathname;
   const setMenuOpen = (next: boolean | ((open: boolean) => boolean)) => {
     const resolved = typeof next === "function" ? next(menuOpen) : next;

@@ -5,7 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import SiteHeader from './SiteHeader';
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
+let pathname = '/';
+vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
 vi.mock('next/link', () => ({
   default: ({ href, children, prefetch: _prefetch, ...rest }: { href: string; children: ReactNode; prefetch?: boolean }) => (
     <a href={href} {...rest}>
@@ -23,11 +24,7 @@ Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 let container: HTMLDivElement;
 let root: Root;
 
-beforeEach(() => {
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-  // The layout's shape: the header beside the page content it overlays.
+function renderHeader() {
   act(() =>
     root.render(
       <>
@@ -39,6 +36,15 @@ beforeEach(() => {
       </>,
     ),
   );
+}
+
+beforeEach(() => {
+  pathname = '/';
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  // The layout's shape: the header beside the page content it overlays.
+  renderHeader();
 });
 
 afterEach(() => {
@@ -84,5 +90,20 @@ describe('SiteHeader mobile menu', () => {
     expect(header().hasAttribute('inert')).toBe(false);
     act(() => toggle().click());
     expect(main().hasAttribute('inert')).toBe(false);
+  });
+
+  it('stays closed on returning to the route it was opened on after leaving without closing', () => {
+    pathname = '/about';
+    renderHeader();
+    openMenu();
+    // The logo and Back/Forward change the route without calling the close handler.
+    pathname = '/';
+    renderHeader();
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    pathname = '/about';
+    renderHeader();
+    expect(toggle().getAttribute('aria-expanded')).toBe('false');
+    expect(main().hasAttribute('inert')).toBe(false);
+    expect(document.body.style.overflow).toBe('');
   });
 });
