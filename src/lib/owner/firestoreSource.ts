@@ -36,6 +36,9 @@ const SALE_FIELDS = [
   'saleDate',
   'installDate',
   'totalValue',
+  // The board ranks by points: without them every rep ties at 0 and the top
+  // rep falls to the name first A to Z.
+  'totalPoints',
   'createdAt',
 ];
 
@@ -98,6 +101,7 @@ async function readBook(statusDoc: FirebaseFirestore.DocumentSnapshot): Promise<
       saleDate: toDate(data.saleDate),
       installDate: toDate(data.installDate),
       totalValue: typeof data.totalValue === 'number' ? data.totalValue : 0,
+      totalPoints: typeof data.totalPoints === 'number' ? data.totalPoints : 0,
       createdAt: toDate(data.createdAt),
     } as Sale;
   });

@@ -42,7 +42,13 @@ vi.mock('@/lib/firebase/admin', () => ({
             where: () => ({
               select: (...fields: string[]) => {
                 selectMock(...fields);
-                return { get: async () => ({ docs: saleDocs }) };
+                // Projected to the selected fields, as Firestore does, so a
+                // field the source forgets to select really is missing.
+                const project = (data: Record<string, unknown>) =>
+                  Object.fromEntries(fields.filter((f) => f in data).map((f) => [f, data[f]]));
+                return {
+                  get: async () => ({ docs: saleDocs.map((doc) => ({ id: doc.id, data: () => project(doc.data()) })) }),
+                };
               },
             }),
           }
@@ -60,6 +66,9 @@ vi.mock('@/lib/fiberReport/ordersCache', async (importOriginal) => ({
 import { clearOwnerBookCache, createFirestoreOwnerSource } from './firestoreSource';
 import { companyBook } from './companySummary';
 import { buildMergedBook } from '@/lib/sales/mergeBook';
+import { summarizeMarkets } from './markets';
+import { buildOwnerWidgetData } from '@/lib/app/shellExtras';
+import { rankedBoard, topRepOf } from '@/lib/leaderboard/board';
 
 const NOW = new Date('2026-10-09T17:00:00Z');
 
@@ -162,5 +171,33 @@ describe('owner book leaves demo-account sales out', () => {
 
     expect(selectMock.mock.calls.at(-1)).toContain('demoAccount');
     expect(book.sales.map((sale) => sale.id)).toEqual(['real']);
+  });
+});
+
+describe('owner top rep is the points leader, read through the real projection', () => {
+  it('ranks by totalPoints, not the name, so Markets and the widget match the board', async () => {
+    const base = { products: [], status: 'approved', totalValue: 60, saleDate: new Date('2026-10-05T17:00:00Z') };
+    // Aaron A. sorts first by name; Zoe Z. has the points.
+    const raw = [
+      { id: 'a1', data: () => ({ ...base, salesRepId: 'aaron', salesRepName: 'Aaron Abbott', totalPoints: 1 }) },
+      { id: 'a2', data: () => ({ ...base, salesRepId: 'aaron', salesRepName: 'Aaron Abbott', totalPoints: 1 }) },
+      { id: 'z1', data: () => ({ ...base, salesRepId: 'zoe', salesRepName: 'Zoe Zimmer', totalPoints: 5 }) },
+    ];
+    saleDocs.push(...raw);
+
+    const book = await createFirestoreOwnerSource().loadBook();
+    expect(selectMock.mock.calls.at(-1)).toContain('totalPoints');
+    expect(book.sales.map((sale) => sale.totalPoints)).toEqual([1, 1, 5]);
+
+    const window = { start: new Date('2026-10-01T05:00:00Z'), end: new Date('2026-11-01T05:00:00Z') };
+    // The leaderboard (and tape) rank the full sale docs.
+    const fullSales = raw.map((doc) => ({ id: doc.id, ...doc.data() })) as unknown as Sale[];
+    const leader = topRepOf(rankedBoard(fullSales, new Map(), window))!;
+    expect(leader.salesRepId).toBe('zoe');
+
+    const markets = summarizeMarkets(book.sales as Sale[], window, new Map());
+    expect(markets.topRep).toEqual({ name: 'Zoe Z.', sales: 1 });
+    const widget = buildOwnerWidgetData({ uidHash: 'h', money: null, markets, now: NOW });
+    expect(widget.topRepName).toBe('Zoe Z.');
   });
 });
