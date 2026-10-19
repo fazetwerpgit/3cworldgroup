@@ -488,7 +488,9 @@ export function RepPractice({
     if ('speechSynthesis' in window) window.speechSynthesis.getVoices();
     return () => {
       stopSpeaking();
-      playerRef.current?.quiet();
+      // Each Knock tap after coming back makes a new player; the old context must not stay open.
+      playerRef.current?.close();
+      playerRef.current = null;
       recognitionRef.current?.abort();
     };
   }, [stopSpeaking]);

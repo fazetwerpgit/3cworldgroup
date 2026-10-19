@@ -65,6 +65,10 @@ class FakeAudioContext {
   resume() {
     return Promise.resolve();
   }
+  close() {
+    this.state = 'closed';
+    return Promise.resolve();
+  }
   createBuffer(_channels: number, length: number, rate: number) {
     const data = new Float32Array(length);
     return { duration: length / rate, getChannelData: () => data };

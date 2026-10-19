@@ -52,6 +52,8 @@ export interface VoicePlayer {
   setRing(on: boolean): void;
   /** Everything quiet: voices, porch sounds and background. */
   quiet(): void;
+  /** Leaving Practice: everything quiet and the context closed, so iOS lets go of the audio. */
+  close(): void;
   /** Hands-free: the rep talked over the homeowner, whose voice fades out fast. */
   fadeOut(): void;
   /** Seconds of the voice still to play (0 when it's done). */
@@ -125,7 +127,8 @@ export function unlockVoicePlayer(): VoicePlayer | null {
   unlock.connect(context.destination);
   unlock.start();
 
-  // Voices go through their own bus, so the Ring filter can be put in and taken out.
+  // Voices go through their own bus, so the Ring filter can be put in and taken out;
+  // the Ring chain ends in the bus too, so talking over a Ring voice fades it like any other.
   const voiceBus = context.createGain();
   const ringIn = context.createBiquadFilter();
   ringIn.type = 'highpass';
@@ -141,7 +144,7 @@ export function unlockVoicePlayer(): VoicePlayer | null {
     curve[i] = Math.tanh(2.5 * x) / Math.tanh(2.5);
   }
   ringDrive.curve = curve;
-  ringIn.connect(ringOut).connect(ringDrive).connect(context.destination);
+  ringIn.connect(ringOut).connect(ringDrive).connect(voiceBus);
   voiceBus.connect(context.destination);
   let ring = false;
 
@@ -317,6 +320,11 @@ export function unlockVoicePlayer(): VoicePlayer | null {
     bed = null;
   };
 
+  const close = () => {
+    quiet();
+    if (context.state !== 'closed') void context.close().catch(() => {});
+  };
+
   return {
     play,
     queue,
@@ -328,6 +336,7 @@ export function unlockVoicePlayer(): VoicePlayer | null {
       ring = on;
     },
     quiet,
+    close,
     fadeOut: fadeVoice,
     voiceLeft: () => Math.max(0, voiceEnd - context.currentTime),
     context,

@@ -190,7 +190,7 @@ describe('RepPractice', () => {
 
   it("with Talk on: unlocks Web Audio on the knock, streams the session's voice through it, and sends a dictated line", async () => {
     // A Web Audio stand-in that records what was scheduled, when.
-    const contexts: { started: { at: number; samples: number[] }[] }[] = [];
+    const contexts: { started: { at: number; samples: number[] }[]; state: string }[] = [];
     class FakeAudioContext {
       sampleRate = 48_000;
       currentTime = 0;
@@ -201,6 +201,10 @@ describe('RepPractice', () => {
         contexts.push(this);
       }
       resume() {
+        return Promise.resolve();
+      }
+      close() {
+        this.state = 'closed';
         return Promise.resolve();
       }
       createBuffer(_channels: number, length: number, rate: number) {
@@ -359,8 +363,9 @@ describe('RepPractice', () => {
     expect(text()).toMatch(/500 words a minute · no fillers heard/);
     expect(button('Redo that moment')).toBeUndefined();
 
-    // Talk off sticks on this phone across visits.
+    // Talk off sticks on this phone across visits; leaving closes the audio context.
     act(() => root.unmount());
+    expect(contexts[0].state).toBe('closed');
     root = createRoot(container);
     await render();
     expect(button('Talk off')?.getAttribute('aria-pressed')).toBe('false');
