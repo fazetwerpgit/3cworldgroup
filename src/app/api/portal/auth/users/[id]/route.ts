@@ -389,9 +389,18 @@ export async function PUT(
       updateData.deactivatedFromStatus = previousStatus ?? null;
     }
 
-    // Update displayName in Firebase Auth if changed
+    // Update displayName in Firebase Auth if changed. A profile whose Auth
+    // account is already gone (a DELETE that left deleteIncomplete) must still
+    // be editable, so only that one Auth error is tolerated; any other stays fatal.
     if (trimmedDisplayName) {
-      await adminAuth.updateUser(id, { displayName: trimmedDisplayName });
+      try {
+        await adminAuth.updateUser(id, { displayName: trimmedDisplayName });
+      } catch (error) {
+        const authGone =
+          typeof error === 'object' && error !== null && 'code' in error && error.code === 'auth/user-not-found';
+        if (!authGone) throw error;
+        console.warn('[users] Auth account missing; saving profile only', id);
+      }
     }
 
     await docRef.update(updateData);
@@ -471,10 +480,10 @@ export async function PUT(
     }
 
     // Open alert tasks re-nag every admin daily until resolved. Deactivating
-    // someone ends all of theirs; a manual Accept (pending -> active with a
-    // field role) closes the onboarding ones activateUser would have closed.
-    const acceptedManually =
-      status === 'active' && fieldRole !== undefined && doc.get('status') === 'pending';
+    // someone ends all of theirs; a manual activation (pending -> active, via
+    // Accept or a plain status change) closes the onboarding ones activateUser
+    // would have closed.
+    const acceptedManually = updateData.status === 'active' && previousStatus === 'pending';
     if (updateData.status === 'inactive' || acceptedManually) {
       try {
         await resolveAlertTasks(

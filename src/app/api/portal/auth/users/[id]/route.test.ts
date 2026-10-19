@@ -365,6 +365,55 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(sendPendingEsignDocs).not.toHaveBeenCalled();
   });
 
+  it('closes the onboarding alert tasks when a pending hire is activated by status alone', async () => {
+    firestore.users.set('pending-user', {
+      status: 'pending',
+      fieldRole: 'entry_rep',
+      displayName: 'Pending Rep',
+    });
+
+    const response = await PUT(request({ status: 'active' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.updates[0]?.data).toMatchObject({ status: 'active', activatedAt: '__SERVER_TS__' });
+    expect(mockResolveAlertTasks).toHaveBeenCalledOnce();
+    expect(mockResolveAlertTasks).toHaveBeenCalledWith('pending-user', [
+      'pending_assignment',
+      'stalled_rep',
+      'review_needed',
+      'activation_ready',
+    ]);
+  });
+
+  it('does not close onboarding alerts when an inactive account is reactivated', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', fieldRole: 'entry_rep', displayName: 'Rep' });
+
+    const response = await PUT(request({ status: 'active' }), params());
+
+    expect(response.status).toBe(200);
+    expect(mockResolveAlertTasks).not.toHaveBeenCalled();
+  });
+
+  it('still saves the profile when its Auth account is already gone', async () => {
+    firestore.users.set('pending-user', { status: 'inactive', displayName: 'Old Name', deleteIncomplete: true });
+    firestore.adminAuth.updateUser.mockRejectedValueOnce({ code: 'auth/user-not-found' });
+
+    const response = await PUT(request({ displayName: 'New Name' }), params());
+
+    expect(response.status).toBe(200);
+    expect(firestore.users.get('pending-user')?.displayName).toBe('New Name');
+  });
+
+  it('keeps any other Auth name-update failure fatal and writes nothing', async () => {
+    firestore.users.set('pending-user', { status: 'active', displayName: 'Old Name' });
+    firestore.adminAuth.updateUser.mockRejectedValueOnce({ code: 'auth/internal-error' });
+
+    const response = await PUT(request({ displayName: 'New Name' }), params());
+
+    expect(response.status).toBe(500);
+    expect(firestore.updates).toHaveLength(0);
+  });
+
   it('resolves every open alert task when the user is set inactive', async () => {
     firestore.users.set('pending-user', { status: 'pending', displayName: 'Spam Signup' });
 
