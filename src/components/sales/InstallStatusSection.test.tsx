@@ -221,7 +221,7 @@ describe("a rep's carrier rows (Pending install, Cancelled, Needs attention)", (
     expect(row.textContent).toContain('Dana Ruiz');
     const phone = row.querySelector<HTMLAnchorElement>('a[href^="tel:"]');
     expect(phone?.textContent).toBe('(515) 555-0123');
-    expect(phone?.getAttribute('href')).toBe('tel:5155550123');
+    expect(phone?.getAttribute('href')).toBe('tel:+15155550123');
 
     await act(async () => { phone?.click(); });
     expect(onOpenSale).not.toHaveBeenCalled();
