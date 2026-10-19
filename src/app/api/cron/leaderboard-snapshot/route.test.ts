@@ -1,8 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const rebuild = vi.hoisted(() => vi.fn());
+const bearerSpy = vi.hoisted(() => ({ calls: [] as Array<[unknown, unknown]> }));
 const recorded = vi.hoisted(() => [] as Array<Record<string, unknown>>);
 
+vi.mock('@/lib/auth/secretCompare', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/auth/secretCompare')>();
+  return {
+    ...actual,
+    bearerMatches: (header: string | null | undefined, secret: string | null | undefined) => {
+      bearerSpy.calls.push([header, secret]);
+      return actual.bearerMatches(header, secret);
+    },
+  };
+});
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: { marker: true } }));
 vi.mock('@/lib/leaderboard/snapshotStore', () => ({ rebuildLeaderboardSnapshot: rebuild }));
 vi.mock('@/lib/cron/runLog', () => ({
@@ -28,11 +39,22 @@ beforeEach(() => {
   process.env.CRON_SECRET = 's3cret';
   rebuild.mockReset();
   recorded.length = 0;
+  bearerSpy.calls.length = 0;
 });
 
 describe('GET /api/cron/leaderboard-snapshot', () => {
   it('refuses without the cron secret', async () => {
     expect((await call('Bearer nope')).status).toBe(401);
+    expect(rebuild).not.toHaveBeenCalled();
+  });
+
+  it('checks the bearer with the constant-time comparison', async () => {
+    expect((await call('Bearer s3cretX')).status).toBe(401);
+    expect((await call('s3cret')).status).toBe(401);
+    expect(bearerSpy.calls).toEqual([
+      ['Bearer s3cretX', 's3cret'],
+      ['s3cret', 's3cret'],
+    ]);
     expect(rebuild).not.toHaveBeenCalled();
   });
 

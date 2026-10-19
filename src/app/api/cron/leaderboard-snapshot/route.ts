@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { withCronRun } from '@/lib/cron/runLog';
+import { bearerMatches } from '@/lib/auth/secretCompare';
 import { rebuildLeaderboardSnapshot } from '@/lib/leaderboard/snapshotStore';
 
 // The leaderboard snapshot's safety net (lib/leaderboard/snapshotStore). Board
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'cron secret is not configured' }, { status: 500 });
   }
 
-  if (request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
+  if (!bearerMatches(request.headers.get('authorization'), cronSecret)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
