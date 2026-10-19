@@ -7,6 +7,7 @@ import {
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
+import { sendAppleAuthorizationCode } from './appleAuthorizationCode';
 import { NativeBridgeError, requestNative, type NativeSignInProvider, type NativeSignInResult } from './bridge';
 
 // Native Google + Sign in with Apple for the 3C Portal app (SPEC A2).
@@ -72,6 +73,8 @@ export interface NativeCredential {
   credential: AuthCredential;
   /** Apple's name on first authorization (Google's comes on the Firebase user). */
   displayName?: string;
+  /** Apple's one-time authorization code, sent to the server after sign-in (token revoke on delete). */
+  appleAuthorizationCode?: string;
 }
 
 let nativeSignInPending = false;
@@ -111,6 +114,8 @@ async function runNativeSignIn(provider: NativeSignInProvider): Promise<NativeCr
       provider,
       credential: credentialFromNativeResult(result, rawNonce),
       displayName: displayNameFromAppleName(result.fullName),
+      appleAuthorizationCode:
+        typeof result.authorizationCode === 'string' && result.authorizationCode ? result.authorizationCode : undefined,
     };
   }
   const result = await requestNative<'nativeSignIn'>({ type: 'nativeSignIn', provider });
@@ -183,6 +188,8 @@ export interface PendingLink {
   provider: NativeSignInProvider;
   credential: AuthCredential;
   email: string | null;
+  /** Apple's one-time code from the held sign-in, sent once the link lands. */
+  appleAuthorizationCode?: string;
 }
 
 let pendingLink: PendingLink | null = null;
@@ -209,6 +216,7 @@ export async function completePendingLink(
   pendingLink = null;
   try {
     await link(user, held.credential);
+    if (held.provider === 'apple') void sendAppleAuthorizationCode(user, held.appleAuthorizationCode);
     return { status: 'linked', provider: held.provider };
   } catch (err) {
     if (codeOf(err) === 'auth/provider-already-linked') return { status: 'linked', provider: held.provider };

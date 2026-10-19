@@ -84,6 +84,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Server-only per-user secrets, e.g. users/{uid}/private/appleAuth (the
+    // Sign in with Apple refresh token, revoked on account deletion). Admin SDK
+    // only. Explicit for clarity; the default deny below already covers it.
+    match /users/{userId}/private/{docId} {
+      allow read, write: if false;
+    }
+
     // Per-user "I've been paid for this sale" marks (client-written). Private to
     // the rep: their own reconciliation against a paycheck, never a payroll
     // record, so nobody — manager, admin or owner — can read another user's.

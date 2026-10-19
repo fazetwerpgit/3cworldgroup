@@ -74,7 +74,7 @@ describe('getNativeCredential (Apple)', () => {
               type: 'reply',
               id: msg.id,
               ok: true,
-              result: { provider: 'apple', idToken: 'apple-id-token', fullName: { givenName: 'Ana', familyName: 'Ruiz' } },
+              result: { provider: 'apple', idToken: 'apple-id-token', fullName: { givenName: 'Ana', familyName: 'Ruiz' }, authorizationCode: 'apple-code' },
             })
           );
         },
@@ -94,6 +94,7 @@ describe('getNativeCredential (Apple)', () => {
     expect(sent.nonce).toBe(await sha256Hex(rawNonce));
     expect(sent.nonce).not.toBe(rawNonce);
     expect(native.displayName).toBe('Ana Ruiz');
+    expect(native.appleAuthorizationCode).toBe('apple-code');
   });
 
   it('drops a second call while one is pending with a silent canceled', async () => {

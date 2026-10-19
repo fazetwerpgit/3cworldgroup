@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const fake = vi.hoisted(() => {
   const users = new Map<string, Record<string, unknown>>();
   const updates: Array<{ userId: string; data: Record<string, unknown> }> = [];
+  /** Server-only subcollection docs (users/{uid}/private/appleAuth), keyed by path. */
+  const privateDocs = new Map<string, Record<string, unknown>>();
   const adminDb = {
     runTransaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
@@ -34,6 +37,18 @@ const fake = vi.hoisted(() => {
           delete: vi.fn(async () => {
             throw new Error('self-delete must never hard-delete the profile');
           }),
+          collection: (sub: string) => ({
+            doc: (id: string) => {
+              const path = `users/${userId}/${sub}/${id}`;
+              return {
+                get: vi.fn(async () => {
+                  const data = privateDocs.get(path);
+                  return { exists: !!data, get: (field: string) => data?.[field] };
+                }),
+                delete: vi.fn(async () => void privateDocs.delete(path)),
+              };
+            },
+          }),
         }),
       };
     }),
@@ -54,6 +69,7 @@ const fake = vi.hoisted(() => {
   return {
     users,
     updates,
+    privateDocs,
     adminDb,
     adminAuth,
     purge: vi.fn(),
@@ -96,10 +112,28 @@ function anonymizeUpdate(uid = caller) {
   return mine[mine.length - 1]?.data;
 }
 
+const APPLE_ENV = {
+  APPLE_TEAM_ID: 'TEAM123456',
+  APPLE_KEY_ID: 'KEY1234567',
+  APPLE_PRIVATE_KEY: generateKeyPairSync('ec', { namedCurve: 'P-256' })
+    .privateKey.export({ type: 'pkcs8', format: 'pem' })
+    .toString(),
+  APPLE_CLIENT_ID: 'com.threecworldgroup.portal',
+};
+const APPLE_PATH = 'users/rep1/private/appleAuth';
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   fake.users.clear();
   fake.updates.length = 0;
+  fake.privateDocs.clear();
+  // No Apple key unless a test sets one.
+  for (const name of Object.keys(APPLE_ENV)) vi.stubEnv(name, '');
   fake.purge.mockResolvedValue({ userSensitive: 1, files: 2, failures: [] });
   fake.users.set('rep1', {
     displayName: 'Ana Ruiz',
@@ -278,5 +312,61 @@ describe('DELETE /api/portal/auth/me', () => {
     signedInAs('hire1');
     expect((await DELETE(request())).status).toBe(200);
     expect(fake.updates[0].data).toMatchObject({ status: 'inactive', deactivatedFromStatus: 'pending' });
+  });
+  describe('Sign in with Apple revoke (guideline 5.1.1(v))', () => {
+    function withAppleKey() {
+      for (const [name, value] of Object.entries(APPLE_ENV)) vi.stubEnv(name, value);
+    }
+
+    it('revokes the stored Apple refresh token before closing the sign-in, then drops it', async () => {
+      withAppleKey();
+      fake.privateDocs.set(APPLE_PATH, { refreshToken: 'r-123', clientId: 'com.threecworldgroup.portal' });
+      const fetchMock = vi.fn(async () => new Response('', { status: 200 }));
+      vi.stubGlobal('fetch', fetchMock);
+
+      expect((await DELETE(request())).status).toBe(200);
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe('https://appleid.apple.com/auth/revoke');
+      const form = new URLSearchParams(String(init.body));
+      expect(form.get('token')).toBe('r-123');
+      expect(form.get('token_type_hint')).toBe('refresh_token');
+      expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(fake.adminAuth.updateUser.mock.invocationCallOrder[0]);
+      expect(fake.privateDocs.has(APPLE_PATH)).toBe(false);
+    });
+
+    it('a failed Apple revoke never blocks the delete', async () => {
+      withAppleKey();
+      fake.privateDocs.set(APPLE_PATH, { refreshToken: 'r-123' });
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('apple down'); }));
+
+      expect((await DELETE(request())).status).toBe(200);
+      expect(fake.adminAuth.updateUser).toHaveBeenCalledWith('rep1', expect.objectContaining({ disabled: true }));
+      expect(anonymizeUpdate()).toMatchObject({ displayName: 'Deleted user' });
+      expect(fake.privateDocs.has(APPLE_PATH)).toBe(false);
+    });
+
+    it('skips the revoke with a warning when the Apple key env vars are missing', async () => {
+      fake.privateDocs.set(APPLE_PATH, { refreshToken: 'r-123' });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+
+      expect((await DELETE(request())).status).toBe(200);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('APPLE_TEAM_ID'));
+      expect(fake.adminAuth.updateUser).toHaveBeenCalled();
+    });
+
+    it('calls nothing at Apple for an account with no stored Apple token', async () => {
+      withAppleKey();
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      expect((await DELETE(request())).status).toBe(200);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
   });
 });

@@ -17,6 +17,7 @@ import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { warmPopupResolver } from '@/lib/firebase/warmPopupResolver';
 import type { NativeSignInProvider } from '@/lib/app/bridge';
+import { sendAppleAuthorizationCode } from '@/lib/app/appleAuthorizationCode';
 import {
   completePendingLink,
   emailFromAuthError,
@@ -164,10 +165,16 @@ export function LoginForm() {
       const native = await getNativeCredential(provider);
       rememberPendingDisplayName(native.displayName);
       try {
-        await signInWithCredential(auth, native.credential);
+        const signedIn = await signInWithCredential(auth, native.credential);
+        if (provider === 'apple') void sendAppleAuthorizationCode(signedIn.user, native.appleAuthorizationCode);
       } catch (err) {
         if (!isAccountExistsError(err)) throw err;
-        rememberPendingLink({ provider, credential: native.credential, email: emailFromAuthError(err) });
+        rememberPendingLink({
+          provider,
+          credential: native.credential,
+          email: emailFromAuthError(err),
+          appleAuthorizationCode: native.appleAuthorizationCode,
+        });
         rememberPendingDisplayName(undefined);
         const who = emailFromAuthError(err);
         setLinkPrompt(

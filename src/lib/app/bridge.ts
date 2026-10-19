@@ -212,6 +212,11 @@ export type NativeSignInResult =
       /** Apple shares the name only on the very first authorization. */
       fullName?: { givenName?: string | null; familyName?: string | null } | null;
       email?: string | null;
+      /**
+       * Apple's one-time authorization code (newer shells). The web posts it to
+       * /api/portal/auth/apple-token so account deletion can revoke Apple access.
+       */
+      authorizationCode?: string | null;
     };
 
 export interface BridgeResultMap {

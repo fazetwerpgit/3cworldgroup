@@ -13,6 +13,7 @@ import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { restampAuthor, scrubDeletedChatAuthor } from '@/lib/chat/restampAuthor';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
 import { anonymizeAskHistory } from '@/lib/ask/anonymizeHistory';
+import { revokeAppleSignIn } from '@/lib/auth/appleSignIn';
 
 const FEDERATED_PROVIDERS = ['google.com', 'apple.com'];
 
@@ -104,7 +105,19 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    // 3. Close the sign-in: disable, strip what identifies the person, free
+    // 3a. Revoke Sign in with Apple (guideline 5.1.1(v)) with the refresh
+    //     token stored at sign-in, then drop the stored token. Best effort:
+    //     a missing key config or an Apple error is logged, never blocking.
+    try {
+      const apple = await revokeAppleSignIn(adminDb, uid);
+      if (apple.status !== 'none' && apple.status !== 'revoked') {
+        console.warn('[auth/me] Apple token not revoked', uid, apple.status);
+      }
+    } catch (error) {
+      console.error('[auth/me] Apple token revoke threw', uid, error);
+    }
+
+    // 3b. Close the sign-in: disable, strip what identifies the person, free
     //    their Google / Apple identity, and revoke issued refresh tokens.
     try {
       const authUser = await adminAuth.getUser(uid);

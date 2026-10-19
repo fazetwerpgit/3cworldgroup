@@ -14,6 +14,7 @@ import { auth } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { warmPopupResolver } from '@/lib/firebase/warmPopupResolver';
+import { sendAppleAuthorizationCode } from '@/lib/app/appleAuthorizationCode';
 import {
   APPLE_PROVIDER_ID,
   GOOGLE_PROVIDER_ID,
@@ -87,6 +88,7 @@ export default function LinkedSignInMethods() {
       if (inApp) {
         const native = await getNativeCredential(provider);
         await linkWithCredential(user, native.credential);
+        if (provider === 'apple') void sendAppleAuthorizationCode(user, native.appleAuthorizationCode);
       } else if (id === GOOGLE_PROVIDER_ID) {
         await linkWithPopup(user, new GoogleAuthProvider(), browserPopupRedirectResolver);
       }
