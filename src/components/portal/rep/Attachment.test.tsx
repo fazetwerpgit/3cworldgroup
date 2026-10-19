@@ -91,6 +91,29 @@ describe('Attachment upload cancel and retry', () => {
     expect(container.textContent).toContain('Attached');
   });
 
+  it('a failed Replace keeps showing the file the form still submits', async () => {
+    const upload = vi
+      .fn<(file: File, signal: AbortSignal) => Promise<string>>()
+      .mockResolvedValueOnce('forms/proof')
+      .mockRejectedValueOnce(new FormUploadError('Upload timed out'))
+      .mockResolvedValueOnce('forms/other');
+    await render(upload);
+    await choose(photo);
+    const other = new File(['y'], 'other.png', { type: 'image/png' });
+    await choose(other); // through the Replace input
+
+    expect(container.textContent).toContain('proof.png');
+    expect(container.textContent).toContain('Attached');
+    expect(container.textContent).not.toContain('Not attached');
+    expect(container.textContent).toContain('Upload timed out');
+
+    await act(async () => button('Try again')!.click());
+
+    expect(upload.mock.calls[2][0]).toBe(other);
+    expect(container.textContent).toContain('other.png');
+    expect(container.textContent).not.toContain('Upload timed out');
+  });
+
   it('leaving the page mid-upload aborts it and unblocks Send', async () => {
     let seen: AbortSignal | null = null;
     const busy = await render((_file, signal) => {

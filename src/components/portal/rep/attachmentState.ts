@@ -15,8 +15,12 @@ export type AttachState =
   /** `prev` is the file already attached when this one is a Replace. */
   | { kind: 'uploading'; name: string; run: number; prev: AttachDone | null }
   | AttachDone
-  /** `retry`: the same file can be sent again (timeout, no signal, server hiccup). */
-  | { kind: 'error'; message: string; retry: boolean; name: string };
+  /**
+   * `retry`: the same file can be sent again (timeout, no signal, server hiccup).
+   * `prev`: a failed Replace leaves the earlier file attached; the form still
+   * holds its path, so the tile keeps showing it.
+   */
+  | { kind: 'error'; message: string; retry: boolean; name: string; prev: AttachDone | null };
 
 export type AttachAction =
   | { type: 'start'; run: number; name: string }
@@ -30,10 +34,17 @@ export function fileView(file: Pick<File, 'type' | 'name'>): FileView {
   return null;
 }
 
+/** The file that is attached (and whose path the form holds), if any. */
+export function attachedFile(state: AttachState): AttachDone | null {
+  if (state.kind === 'done') return state;
+  if (state.kind === 'uploading' || state.kind === 'error') return state.prev;
+  return null;
+}
+
 export function attachReducer(state: AttachState, action: AttachAction): AttachState {
   switch (action.type) {
     case 'start': {
-      const prev = state.kind === 'done' ? state : state.kind === 'uploading' ? state.prev : null;
+      const prev = state.kind === 'done' ? state : attachedFile(state);
       return { kind: 'uploading', name: action.name, run: action.run, prev };
     }
     case 'done':
@@ -41,7 +52,7 @@ export function attachReducer(state: AttachState, action: AttachAction): AttachS
       return { kind: 'done', name: action.name, localUrl: action.localUrl, view: action.view };
     case 'fail':
       if (state.kind !== 'uploading' || state.run !== action.run) return state;
-      return { kind: 'error', message: action.message, retry: action.retry, name: state.name };
+      return { kind: 'error', message: action.message, retry: action.retry, name: state.name, prev: state.prev };
     case 'cancel':
       // A cancelled Replace keeps the file that was already attached.
       if (state.kind !== 'uploading') return state;

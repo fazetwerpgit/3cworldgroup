@@ -26,7 +26,7 @@ import {
 import { PdfPages } from '@/components/esign/PdfPages';
 import { friendlyError } from '@/lib/forms/friendlyError';
 import { isEmailShaped } from '@/lib/forms/managerInterview';
-import { attachReducer, fileView, uploadFailure, type FileView } from './attachmentState';
+import { attachReducer, attachedFile, fileView, uploadFailure, type FileView } from './attachmentState';
 import { BodyLayer } from './BodyLayer';
 import { useHideRepTabBar } from './RepShell';
 import s from './rep.module.css';
@@ -650,31 +650,39 @@ export function Attachment({
   );
 
   const shownError = error ?? (state.kind === 'error' ? state.message : undefined);
+  // A failed Replace keeps the earlier file attached (the form still holds its
+  // path), so the tile shows that file with the error below it.
+  const attached = state.kind === 'uploading' ? null : attachedFile(state);
 
   return (
     <div className={`${f.field} ${f.wide} ${shownError ? f.fieldInvalid : ''}`}>
       <label htmlFor={id} className={f.label}>
         {label}
       </label>
-      {state.kind === 'done' ? (
+      {attached ? (
         <div className={f.fileRow}>
-          {preview && state.view === 'image' && state.localUrl ? (
+          {preview && attached.view === 'image' && attached.localUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={state.localUrl} alt="" className={f.fileThumb} />
+            <img src={attached.localUrl} alt="" className={f.fileThumb} />
           ) : (
             <span className={f.fileIcon} aria-hidden="true">
               <FileText size={20} />
             </span>
           )}
           <span className={f.fileMeta}>
-            <span className={f.fileName}>{state.name}</span>
+            <span className={f.fileName}>{attached.name}</span>
             <span className={f.fileOk}>
               <Check size={14} strokeWidth={3} aria-hidden="true" />
               Attached
             </span>
           </span>
           <span className={f.fileActions}>
-            {state.localUrl && state.view ? (
+            {state.kind === 'error' && state.retry ? (
+              <button type="button" className={f.fileBtn} onClick={() => void pick(fileRef.current)}>
+                Try again
+              </button>
+            ) : null}
+            {attached.localUrl && attached.view ? (
               <button ref={viewRef} type="button" className={f.fileBtn} onClick={() => setViewing(true)}>
                 View
               </button>
@@ -734,11 +742,11 @@ export function Attachment({
         </label>
       )}
       <FieldNote id={id} error={shownError} hint={hint} />
-      {viewing && state.kind === 'done' && state.localUrl && state.view ? (
+      {viewing && attached?.localUrl && attached.view ? (
         <FileViewer
-          src={state.localUrl}
-          view={state.view}
-          name={state.name}
+          src={attached.localUrl}
+          view={attached.view}
+          name={attached.name}
           onClose={() => {
             setViewing(false);
             viewRef.current?.focus();

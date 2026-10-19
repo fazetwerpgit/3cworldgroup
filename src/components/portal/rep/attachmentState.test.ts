@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FormUploadError } from '@/lib/forms/uploadFormAttachment';
-import { attachReducer, fileView, uploadFailure, type AttachDone, type AttachState } from './attachmentState';
+import { attachReducer, attachedFile, fileView, uploadFailure, type AttachDone, type AttachState } from './attachmentState';
 
 const idle: AttachState = { kind: 'idle' };
 const attached: AttachDone = { kind: 'done', name: 'old.png', localUrl: 'blob:old', view: 'image' };
@@ -39,7 +39,19 @@ describe('attachReducer', () => {
       message: 'Upload timed out',
       retry: true,
     });
-    expect(state).toEqual({ kind: 'error', message: 'Upload timed out', retry: true, name: 'a.png' });
+    expect(state).toEqual({ kind: 'error', message: 'Upload timed out', retry: true, name: 'a.png', prev: null });
+    expect(attachedFile(state)).toBeNull();
+  });
+
+  it('a failed Replace keeps the file already attached, which the form still submits', () => {
+    const uploading = attachReducer(attached, { type: 'start', run: 2, name: 'new.png' });
+    const failed = attachReducer(uploading, { type: 'fail', run: 2, message: 'Upload timed out', retry: true });
+    expect(failed).toMatchObject({ kind: 'error', name: 'new.png', retry: true, prev: attached });
+    expect(attachedFile(failed)).toBe(attached);
+    // Try again, then Cancel, still lands back on the earlier file.
+    const retrying = attachReducer(failed, { type: 'start', run: 3, name: 'new.png' });
+    expect(attachedFile(retrying)).toBe(attached);
+    expect(attachReducer(retrying, { type: 'cancel' })).toBe(attached);
   });
 });
 
