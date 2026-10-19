@@ -17,6 +17,11 @@ import type { SaleStatus } from '@/types';
 
 const MAX_REASON = 300;
 
+// Legacy statuses a cancellation may restore to. A 'rejected' sale is already
+// dead (isLiveSale/isPayableSale exclude it) and can't be cancelled, so undo
+// never turns it into a live, payable sale.
+const RESTORABLE_STATUSES = new Set<SaleStatus>(['pending', 'approved']);
+
 async function loadSale(id: string) {
   const docRef = adminDb!.collection('sales').doc(id);
   const doc = await docRef.get();
@@ -48,12 +53,18 @@ export async function POST(
     if (!doc.exists) {
       return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
     }
-    if (doc.data()?.status === 'cancelled') {
+    const priorStatus = doc.data()?.status;
+    if (priorStatus === 'cancelled') {
       return NextResponse.json({ error: 'Sale is already cancelled' }, { status: 409 });
+    }
+    if (priorStatus === 'rejected') {
+      return NextResponse.json({ error: 'Sale is rejected and cannot be cancelled' }, { status: 409 });
     }
 
     await docRef.update({
       status: 'cancelled' as SaleStatus,
+      // Kept so undo restores what the sale was, not a blanket 'approved'.
+      statusBeforeCancel: RESTORABLE_STATUSES.has(priorStatus) ? priorStatus : 'approved',
       cancelledAt: new Date(),
       cancelledBy: gate.uid,
       cancellerName: gate.name,
@@ -90,15 +101,19 @@ export async function DELETE(
     if (!doc.exists) {
       return NextResponse.json({ error: 'Sale not found' }, { status: 404 });
     }
-    if (doc.data()?.status !== 'cancelled') {
+    const data = doc.data();
+    if (data?.status !== 'cancelled') {
       return NextResponse.json({ error: 'Sale is not cancelled' }, { status: 409 });
     }
 
-    // Restoring returns the sale to the only live status the portal writes now.
+    // Restoring returns the sale to the live status it held before cancelling
+    // (legacy 'pending' stays pending); older cancellations without that stamp
+    // fall back to 'approved', the only live status the portal writes now.
     // The cancellation stamps are cleared rather than kept: a restored sale is
     // live again, and a stale "cancelled by" on it would read as still cancelled.
     await docRef.update({
-      status: 'approved' as SaleStatus,
+      status: (RESTORABLE_STATUSES.has(data.statusBeforeCancel) ? data.statusBeforeCancel : 'approved') as SaleStatus,
+      statusBeforeCancel: null,
       cancelledAt: null,
       cancelledBy: null,
       cancellerName: null,

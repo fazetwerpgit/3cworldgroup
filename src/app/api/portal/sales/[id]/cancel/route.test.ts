@@ -102,6 +102,21 @@ describe('POST /api/portal/sales/[id]/cancel', () => {
     expect((await POST(post(), { params })).status).toBe(409);
     expect(update).not.toHaveBeenCalled();
   });
+
+  it('refuses to cancel a legacy rejected sale, so undo cannot make it payable', async () => {
+    state.data = { status: 'rejected' };
+
+    expect((await POST(post(), { params })).status).toBe(409);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('remembers the status the sale held before cancelling', async () => {
+    state.data = { status: 'pending' };
+
+    await POST(post(), { params });
+
+    expect(state.updates[0]).toMatchObject({ status: 'cancelled', statusBeforeCancel: 'pending' });
+  });
 });
 
 describe('DELETE /api/portal/sales/[id]/cancel', () => {
@@ -118,6 +133,21 @@ describe('DELETE /api/portal/sales/[id]/cancel', () => {
       cancellerName: null,
       cancelReason: '',
     });
+  });
+
+  it('restores a legacy pending sale to pending, not approved', async () => {
+    state.data = { status: 'cancelled', statusBeforeCancel: 'pending' };
+
+    expect((await DELETE(del(), { params })).status).toBe(200);
+    expect(state.updates[0]).toMatchObject({ status: 'pending', statusBeforeCancel: null });
+  });
+
+  it('never restores to a dead status even if one was stored', async () => {
+    state.data = { status: 'cancelled', statusBeforeCancel: 'rejected' };
+
+    await DELETE(del(), { params });
+
+    expect(state.updates[0].status).toBe('approved');
   });
 
   it('refuses to restore a sale that was never cancelled', async () => {
