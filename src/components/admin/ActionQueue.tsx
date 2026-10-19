@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
@@ -66,14 +66,20 @@ export default function ActionQueue({ onCount }: { onCount?: (count: number | nu
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [loadFailed, setLoadFailed] = useState(false);
+  // The 30s poll and each action's reload can overlap; only the most recently
+  // started load may write, so a slower stale snapshot can't bring back a task
+  // that was just claimed or dismissed.
+  const loadSeq = useRef(0);
 
   const load = useCallback(async () => {
     if (!user) return;
+    const seq = ++loadSeq.current;
     try {
       const response = await fetch('/api/portal/alerts', {
         headers: await authHeaders(),
       });
       const json = await readJson(response);
+      if (seq !== loadSeq.current) return;
       if (!response.ok) {
         throw new Error(
           typeof json.error === 'string' ? json.error : 'Failed to load action queue'
@@ -82,10 +88,11 @@ export default function ActionQueue({ onCount }: { onCount?: (count: number | nu
       setTasks(Array.isArray(json.tasks) ? (json.tasks as AlertTaskRow[]) : []);
       setLoadFailed(false);
     } catch {
+      if (seq !== loadSeq.current) return;
       // A failed load says so (with a retry) rather than showing an empty queue.
       setLoadFailed(true);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [user]);
 
