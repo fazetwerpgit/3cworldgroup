@@ -9,6 +9,11 @@ service cloud.firestore {
         in ['admin', 'operations', 'owner'];
     }
 
+    // The owner role only (the finance tier, above admin).
+    function isOwnerRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', null) == 'owner';
+    }
+
     // Is the signed-in caller an APPROVED (active) user? Self-signups are
     // status 'pending' and fail this until an admin flips them to 'active'
     // (Admin SDK / Console, which bypass rules).
@@ -143,9 +148,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Tax and banking items (W-9, direct deposit; OWNER_ONLY_ONBOARDING_ITEM_IDS
+    // in src/types/onboarding.ts) are the person's own or an owner's to read;
+    // admins and operations read every other item.
     match /userOnboarding/{docId} {
       allow read: if isApproved() &&
-        (resource.data.userId == request.auth.uid || isPlatformManagement());
+        (resource.data.userId == request.auth.uid
+          || isOwnerRole()
+          || (isPlatformManagement()
+            && !(resource.data.get('itemId', '') in ['w9', 'direct_deposit'])));
       allow write: if false;
     }
 
