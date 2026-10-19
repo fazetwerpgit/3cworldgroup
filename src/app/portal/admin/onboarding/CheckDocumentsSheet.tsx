@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { isOwner } from '@/types';
+import { ONBOARDING_FILE_LINK_TTL_MS, openSignedLink, signedLinksStale } from '@/lib/signedLinks';
 import {
   isWaitingOnYou,
   itemLine,
@@ -69,6 +70,8 @@ export function CheckDocumentsSheet({
   const [markingId, setMarkingId] = useState<string | null>(null);
   // Files of an item already reviewed, fetched on demand (each sensitive opening is audited).
   const [openedFiles, setOpenedFiles] = useState<Record<string, Files>>({});
+  // When each item's opened (or re-signed) links were signed.
+  const [openedAt, setOpenedAt] = useState<Record<string, number>>({});
   const [handled, setHandled] = useState(false);
 
   const waiting = person.items.filter(isWaitingOnYou);
@@ -138,14 +141,57 @@ export function CheckDocumentsSheet({
         : `Sent ${item.itemLabel} to ${name}. They can sign it in their portal.`;
     });
 
+  const fetchFiles = async (item: ChecklistItem): Promise<Files> => {
+    const params = new URLSearchParams({ userId: item.userId, itemId: item.itemId });
+    const response = await fetch(`/api/portal/onboarding/files?${params}`, { headers: await authHeaders() });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : "Couldn't open the files");
+    const files: Files = Array.isArray(json.files) ? json.files : [];
+    setOpenedFiles((prev) => ({ ...prev, [item.id]: files }));
+    setOpenedAt((prev) => ({ ...prev, [item.id]: Date.now() }));
+    return files;
+  };
+
   const openFiles = (item: ChecklistItem) =>
     act(item, async () => {
-      const params = new URLSearchParams({ userId: item.userId, itemId: item.itemId });
-      const response = await fetch(`/api/portal/onboarding/files?${params}`, { headers: await authHeaders() });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : "Couldn't open the files");
-      setOpenedFiles((prev) => ({ ...prev, [item.id]: Array.isArray(json.files) ? json.files : [] }));
+      await fetchFiles(item);
     });
+
+  /** The newest links for an item (re-signed ones win over the list's) and when they were signed. */
+  const currentFiles = (item: ChecklistItem): { files: Files | undefined; signedAt: number } => {
+    const listAt = person.filesSignedAt ?? 0;
+    const opened = openedFiles[item.id];
+    const at = openedAt[item.id] ?? 0;
+    if (opened && (at >= listAt || !needsCheck(item))) return { files: opened, signedAt: at };
+    return needsCheck(item) ? { files: item.files, signedAt: listAt } : { files: undefined, signedAt: 0 };
+  };
+
+  // Opens one file, re-signing the item's links first when they have run out
+  // (links last 15 minutes; the sheet and the list behind it can sit open longer).
+  const openFile = (item: ChecklistItem, file: Files[number], event: React.MouseEvent<HTMLElement>, inViewer: boolean) => {
+    const label = `${item.itemLabel}: ${file.name}`;
+    if (!signedLinksStale(currentFiles(item).signedAt, ONBOARDING_FILE_LINK_TTL_MS)) {
+      if (inViewer) viewer.show(file.url, label, event.currentTarget);
+      return;
+    }
+    event.preventDefault();
+    const fresh = async () => {
+      try {
+        return (await fetchFiles(item)).find((f) => f.name === file.name)?.url ?? null;
+      } catch (err) {
+        setFailure({ itemId: item.id, text: err instanceof Error ? err.message : "Couldn't open the files" });
+        return null;
+      }
+    };
+    if (inViewer) {
+      viewer.open(fresh, label, event.currentTarget);
+      return;
+    }
+    // If the late open is blocked, the list now holds the fresh link for a second tap.
+    void fresh().then((url) => {
+      if (url) openSignedLink(url);
+    });
+  };
 
   const renderFiles = (item: ChecklistItem, files: Files) => {
     if (item.referenceKind === 'storage' && item.adminOnly) {
@@ -173,13 +219,20 @@ export function CheckDocumentsSheet({
                 key={file.name}
                 type="button"
                 className={`${o.file} ${o.fileBtn}`}
-                onClick={(event) => viewer.show(file.url, `${item.itemLabel}: ${file.name}`, event.currentTarget)}
+                onClick={(event) => openFile(item, file, event, true)}
               >
                 <FileText size={16} aria-hidden="true" />
                 <span>{file.name}</span>
               </button>
             ) : (
-              <a key={file.name} href={file.url} target="_blank" rel="noopener noreferrer" className={o.file}>
+              <a
+                key={file.name}
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={o.file}
+                onClick={(event) => openFile(item, file, event, false)}
+              >
                 <FileText size={16} aria-hidden="true" />
                 <span>{file.name}</span>
               </a>
@@ -200,7 +253,7 @@ export function CheckDocumentsSheet({
     const fixable = item.status === 'submitted' && !item.onHold;
     const showPdf = esign && item.status === 'approved' && item.hasSignedPdf;
     // Files of an upload under review come with the list; older ones on request.
-    const files = check ? item.files : openedFiles[item.id];
+    const files = currentFiles(item).files;
     const canOpenFiles =
       !check && !files && !esign && item.referenceKind === 'storage' && Boolean(item.reference) && !item.adminOnly;
     const markable = canMarkComplete && item.status !== 'approved';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
 import {
@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import type { ChatReportView } from '@/app/api/portal/admin/chat-reports/route';
 import { REPORT_REASON_LABELS, isReportReason, reportLinkExpired } from '@/lib/chat/moderationShared';
+import { openSignedLink } from '@/lib/signedLinks';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './chat-reports.module.css';
@@ -43,14 +44,33 @@ async function authedFetch(url: string, init?: RequestInit) {
   });
 }
 
-// The upload link is signed and works for 10 minutes. Opening it after that
-// reloads the queue for fresh links instead of landing on an error page.
-function ReportedMessage({ report, onLinkExpired }: { report: ChatReportView; onLinkExpired: () => void }) {
+// The upload link is signed and works for 10 minutes. A tap on it after that
+// (or a thumbnail that fails to load, e.g. one scrolled to late) re-signs just
+// that report and keeps the rest of the list, "Load more" pages included.
+function ReportedMessage({
+  report,
+  onRefresh,
+}: {
+  report: ChatReportView;
+  onRefresh: () => Promise<ChatReportView | null>;
+}) {
   const isImage = report.attachmentUrl && (report.attachmentType === 'image' || report.attachmentType === 'gif');
+  // One re-sign per link: a fresh link that still fails is not retried forever.
+  const retried = useRef(new Set<string>());
   const openLink = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (!reportLinkExpired(report.attachmentExpiresAt)) return;
     event.preventDefault();
-    onLinkExpired();
+    void onRefresh().then((fresh) => {
+      // If the browser blocks the late open, the row now holds the fresh link
+      // and the next tap opens it directly.
+      if (fresh?.attachmentUrl) openSignedLink(fresh.attachmentUrl);
+    });
+  };
+  const thumbFailed = () => {
+    const url = report.attachmentUrl;
+    if (!url || retried.current.has(url) || !report.attachmentExpiresAt) return;
+    retried.current.add(url);
+    void onRefresh();
   };
   return (
     <blockquote className={r.quote}>
@@ -63,7 +83,7 @@ function ReportedMessage({ report, onLinkExpired }: { report: ChatReportView; on
         isImage ? (
           <a href={report.attachmentUrl} target="_blank" rel="noreferrer" aria-label="Open the reported image" onClick={openLink}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={report.attachmentUrl} alt="" className={r.thumb} loading="lazy" />
+            <img src={report.attachmentUrl} alt="" className={r.thumb} loading="lazy" onError={thumbFailed} />
           </a>
         ) : (
           <a href={report.attachmentUrl} target="_blank" rel="noreferrer" className={r.file} onClick={openLink}>
@@ -134,6 +154,22 @@ function ChatReports() {
   useEffect(() => {
     if (user) void load(view);
   }, [user, view, load]);
+
+  // Re-signs one report's links in place (null when it could not be read).
+  const refreshReport = useCallback(async (id: string): Promise<ChatReportView | null> => {
+    try {
+      const res = await authedFetch(`/api/portal/admin/chat-reports?id=${encodeURIComponent(id)}`);
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.report) return null;
+      const fresh = json.report as ChatReportView;
+      setRows((prev) =>
+        prev ? { ...prev, reports: prev.reports.map((row) => (row.id === id ? { ...row, ...fresh } : row)) } : prev
+      );
+      return fresh;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const shown = rows?.view === view ? rows.reports : null;
   const hasMore = rows?.view === view && !!rows.nextCursor;
@@ -232,7 +268,7 @@ function ChatReports() {
                     )}
                   </div>
 
-                  <ReportedMessage report={report} onLinkExpired={() => void load(view)} />
+                  <ReportedMessage report={report} onRefresh={() => refreshReport(report.id)} />
 
                   <dl className={r.facts}>
                     <dt>Posted by</dt>

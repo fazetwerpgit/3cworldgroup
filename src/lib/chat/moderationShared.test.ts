@@ -3,8 +3,9 @@ import { reportLinkExpired } from './moderationShared';
 
 describe('reportLinkExpired', () => {
   const at = '2026-10-17T12:10:00.000Z';
-  it('is false before the signed link expires and true from then on', () => {
-    expect(reportLinkExpired(at, Date.parse('2026-10-17T12:09:59Z'))).toBe(false);
+  it('is false until a minute before the signed link expires and true from then on', () => {
+    expect(reportLinkExpired(at, Date.parse('2026-10-17T12:08:59Z'))).toBe(false);
+    expect(reportLinkExpired(at, Date.parse('2026-10-17T12:09:00Z'))).toBe(true);
     expect(reportLinkExpired(at, Date.parse('2026-10-17T12:10:00Z'))).toBe(true);
   });
 

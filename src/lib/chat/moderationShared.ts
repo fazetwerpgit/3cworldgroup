@@ -32,6 +32,9 @@ export function chatReportId(messageId: string, reporterUid: string): string {
 /** Where the back office reviews reports. */
 export const CHAT_REPORTS_PATH = '/portal/admin/chat-reports';
 
+/** How long before its stated expiry a signed report link is treated as expired. */
+export const REPORT_LINK_MARGIN_MS = 60_000;
+
 /**
  * Whether a report's signed upload link (attachmentExpiresAt from the queue
  * API) has stopped working. A null expiry is a link that is not signed.
@@ -39,5 +42,7 @@ export const CHAT_REPORTS_PATH = '/portal/admin/chat-reports';
 export function reportLinkExpired(expiresAt: string | null, now = Date.now()): boolean {
   if (!expiresAt) return false;
   const at = Date.parse(expiresAt);
-  return !Number.isNaN(at) && now >= at;
+  // A minute early: a phone whose clock runs slow would otherwise open GCS's
+  // "Request has expired" page.
+  return !Number.isNaN(at) && now >= at - REPORT_LINK_MARGIN_MS;
 }

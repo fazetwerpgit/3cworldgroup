@@ -282,6 +282,27 @@ describe('GET /api/portal/admin/chat-reports', () => {
     }
   });
 
+  it('re-signs one report on ?id= for a link that ran out', async () => {
+    fake.reports.set('m2_rep-a', {
+      ...fake.reports.get('m2_rep-a'),
+      attachmentType: 'image',
+      evidencePath: 'moderation/chat-reports/new-reps/m2/x.png',
+    });
+    const res = await GET(req('GET', { query: '?id=m2_rep-a' }));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.report).toMatchObject({
+      id: 'm2_rep-a',
+      attachmentUrl: 'https://signed.example/moderation/chat-reports/new-reps/m2/x.png?X-Goog-Expires=600',
+    });
+    expect(typeof json.report.attachmentExpiresAt).toBe('string');
+  });
+
+  it('answers 404 for an unknown ?id= and 400 for a malformed one', async () => {
+    expect((await GET(req('GET', { query: '?id=nope_none' }))).status).toBe(404);
+    expect((await GET(req('GET', { query: '?id=../x' }))).status).toBe(400);
+  });
+
   it('rejects an unknown status filter', async () => {
     const res = await GET(req('GET', { query: '?status=everything' }));
     expect(res.status).toBe(400);

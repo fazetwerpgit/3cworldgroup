@@ -14,6 +14,7 @@ import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { downloadBlob } from '@/lib/export/csv';
 import { saveBlobViaApp, shouldSaveViaApp } from '@/lib/app/saveFile';
+import { ONBOARDING_FILE_LINK_TTL_MS, openSignedLink, signedLinksStale } from '@/lib/signedLinks';
 import type { OnboardingFileItem, OnboardingFileSummary } from '@/lib/onboarding/onboardingFile';
 import { isAppleMobile, onboardingFileItemStatus, opensInViewer } from '@/lib/onboarding/onboardingFileStatus';
 import { OnboardingCategoryLabels } from '@/types';
@@ -89,6 +90,8 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
   const [openedFiles, setOpenedFiles] = useState<Record<string, UploadedFile[]>>({});
+  // When each item's links were signed: a tap after they expire re-signs first.
+  const [openedAt, setOpenedAt] = useState<Record<string, number>>({});
   const [filesLoadingId, setFilesLoadingId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -120,7 +123,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
     void load();
   }, [load]);
 
-  const openFiles = async (item: OnboardingFileItem) => {
+  const openFiles = async (item: OnboardingFileItem): Promise<UploadedFile[] | null> => {
     setFilesLoadingId(item.itemId);
     setError('');
     try {
@@ -130,12 +133,45 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
       });
       const json = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : "Couldn't open the files");
-      setOpenedFiles((prev) => ({ ...prev, [item.itemId]: Array.isArray(json.files) ? json.files : [] }));
+      const files: UploadedFile[] = Array.isArray(json.files) ? json.files : [];
+      setOpenedFiles((prev) => ({ ...prev, [item.itemId]: files }));
+      setOpenedAt((prev) => ({ ...prev, [item.itemId]: Date.now() }));
+      return files;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't open the files");
+      return null;
     } finally {
       setFilesLoadingId(null);
     }
+  };
+
+  const linksStale = (item: OnboardingFileItem) =>
+    signedLinksStale(openedAt[item.itemId] ?? 0, ONBOARDING_FILE_LINK_TTL_MS);
+
+  // Opens one upload, re-signing the item's links first if they have expired
+  // (the page says links last 15 minutes, but it can stay open for hours).
+  const openUpload = (
+    item: OnboardingFileItem,
+    upload: UploadedFile,
+    event: React.MouseEvent<HTMLElement>,
+    inViewer: boolean
+  ) => {
+    const label = `${item.label}: ${upload.name}`;
+    if (!linksStale(item)) {
+      if (inViewer) viewer.show(upload.url, label, event.currentTarget);
+      return;
+    }
+    event.preventDefault();
+    const fresh = async () => (await openFiles(item))?.find((file) => file.name === upload.name)?.url ?? null;
+    if (inViewer) {
+      viewer.open(fresh, label, event.currentTarget);
+      return;
+    }
+    // A link opened after the re-sign may be blocked; the list now holds the
+    // fresh link, so a second tap opens it.
+    void fresh().then((url) => {
+      if (url) openSignedLink(url);
+    });
   };
 
   const openSignedPdf = (item: OnboardingFileItem, opener: HTMLElement) =>
@@ -411,9 +447,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
                                     key={upload.name}
                                     type="button"
                                     className={`${o.file} ${o.fileBtn}`}
-                                    onClick={(event) =>
-                                      viewer.show(upload.url, `${item.label}: ${upload.name}`, event.currentTarget)
-                                    }
+                                    onClick={(event) => openUpload(item, upload, event, true)}
                                   >
                                     <FileText size={16} aria-hidden="true" />
                                     <span>{upload.name}</span>
@@ -425,6 +459,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className={o.file}
+                                    onClick={(event) => openUpload(item, upload, event, false)}
                                   >
                                     <FileText size={16} aria-hidden="true" />
                                     <span>{upload.name}</span>

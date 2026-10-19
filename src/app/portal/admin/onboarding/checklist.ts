@@ -35,6 +35,8 @@ export interface ChecklistPerson {
   items: ChecklistItem[];
   /** Uploads waiting on management: what the Hiring badge counts per person. */
   toReview: number;
+  /** Client stamp: when this list (and its signed file links) was fetched. */
+  filesSignedAt?: number;
 }
 
 const HOUR_MS = 1000 * 60 * 60;

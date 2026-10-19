@@ -104,7 +104,13 @@ function useChecklists() {
         const response = await fetch('/api/portal/onboarding/review', { headers: await authHeaders() });
         const json = await response.json();
         if (!response.ok) throw new Error(json.error || 'Failed to load documents');
-        setPeople(Array.isArray(json.people) ? json.people : []);
+        // Stamped so the documents sheet knows when the signed file links run out.
+        const signedAt = Date.now();
+        setPeople(
+          Array.isArray(json.people)
+            ? (json.people as ChecklistPerson[]).map((person) => ({ ...person, filesSignedAt: signedAt }))
+            : []
+        );
         return true;
       } catch {
         if (!background) setPeople(null);

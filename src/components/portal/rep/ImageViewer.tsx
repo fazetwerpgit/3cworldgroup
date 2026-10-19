@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ExternalLink, FileText, Loader2, X } from 'lucide-react';
 import { isPdfUrl } from '@/lib/forms/openAttachment';
+import { ONBOARDING_FILE_LINK_TTL_MS, signedLinksStale } from '@/lib/signedLinks';
 import PdfPages from '@/components/esign/PdfPages';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
@@ -125,7 +126,17 @@ export function ImageViewer({
     };
   }, []);
 
-  const failed = content.status === 'error' || (content.status === 'image' && broken);
+  // A signed PDF link is shown as a button; left open past its life (about 15
+  // minutes) it would land on GCS's AccessDenied page, so say so instead.
+  const pdfShownAt = useRef(0);
+  const [expiredPdfUrl, setExpiredPdfUrl] = useState<string | null>(null);
+  const pdfUrl = content.status === 'pdf' ? content.url : null;
+  const pdfExpired = pdfUrl !== null && expiredPdfUrl === pdfUrl;
+  useEffect(() => {
+    pdfShownAt.current = Date.now();
+  }, [pdfUrl]);
+
+  const failed = content.status === 'error' || (content.status === 'image' && broken) || pdfExpired;
 
   return (
     <BodyLayer>
@@ -148,7 +159,11 @@ export function ImageViewer({
             <div className={v.panel}>
               <AlertTriangle size={28} aria-hidden="true" />
               <p role="alert">
-                {content.status === 'error' ? content.message : "Couldn't load the image. Close and try again."}
+                {content.status === 'error'
+                  ? content.message
+                  : pdfExpired
+                    ? 'This link has expired. Close and open the file again.'
+                    : "Couldn't load the image. Close and try again."}
               </p>
             </div>
           ) : content.status === 'loading' ? (
@@ -160,7 +175,17 @@ export function ImageViewer({
             <div className={v.panel}>
               <FileText size={28} aria-hidden="true" />
               <p>This file is a PDF. It opens in a new tab.</p>
-              <a className={s.btnSecondary} href={content.url} target="_blank" rel="noopener noreferrer">
+              <a
+                className={s.btnSecondary}
+                href={content.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(event) => {
+                  if (!signedLinksStale(pdfShownAt.current, ONBOARDING_FILE_LINK_TTL_MS)) return;
+                  event.preventDefault();
+                  setExpiredPdfUrl(content.url);
+                }}
+              >
                 <ExternalLink size={18} aria-hidden="true" />
                 Open PDF
               </a>

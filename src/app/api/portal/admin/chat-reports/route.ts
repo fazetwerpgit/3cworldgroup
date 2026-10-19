@@ -128,6 +128,21 @@ export async function GET(request: NextRequest) {
   if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 
   const params = request.nextUrl.searchParams;
+  // ?id=<report>: that one report with freshly signed links, for a thumbnail
+  // or link whose signature ran out while the page stayed open.
+  const one = params.get('id');
+  if (one !== null) {
+    if (!isReportId(one)) return NextResponse.json({ error: 'A valid report id is required' }, { status: 400 });
+    try {
+      const snap = await adminDb.collection('chatReports').doc(one).get();
+      if (!snap.exists) return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+      const data = snap.data() ?? {};
+      return NextResponse.json({ report: toReport(snap.id, data, await attachmentLink(data)) });
+    } catch (error) {
+      console.error('[chat reports] read failed', error);
+      return NextResponse.json({ error: 'Failed to load the chat report' }, { status: 500 });
+    }
+  }
   const status = params.get('status') ?? 'open';
   if (status !== 'open' && status !== 'resolved') {
     return NextResponse.json({ error: 'status must be open or resolved' }, { status: 400 });
