@@ -193,9 +193,14 @@ export default function AppBridgeHost() {
     };
   }, [signedIn, user]);
 
-  // Signed out (or the session ended): clear the icon badge and the widget.
+  // Signed out (or the session ended): clear the icon badge and the widget,
+  // and forget the silent sync. Sign-out removes this phone's push token
+  // without a reload, so the next sign-in (even as the same user) must
+  // register it again.
   useEffect(() => {
-    if (isNativeApp() && !loading && !user) clearNativeExtras();
+    if (loading || user) return;
+    syncedFor.current = null;
+    if (isNativeApp()) clearNativeExtras();
   }, [loading, user]);
 
   // Splash: the login page and the dashboard send `ready` once their content

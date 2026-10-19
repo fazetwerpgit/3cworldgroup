@@ -6,10 +6,16 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const env = vi.hoisted(() => ({ native: false }));
+const env = vi.hoisted(() => ({
+  native: false,
+  auth: { user: null as { uid: string } | null, loading: true },
+  firebase: { currentUser: null as { uid: string } | null },
+}));
 vi.mock('@/lib/app/isNativeApp', () => ({ isNativeApp: () => env.native, useIsNativeApp: () => env.native }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/portal/sales', useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null, loading: true }) }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => env.auth }));
+vi.mock('@/lib/firebase/config', () => ({ auth: env.firebase }));
+vi.mock('@/lib/cache/pageData', () => ({ PAGE_DATA_FALLBACK_MS: 0, waitForPageData: () => Promise.resolve() }));
 vi.mock('@/lib/app/bridge', () => ({
   installNativeReceiver: vi.fn(),
   onNativeMessage: vi.fn(() => () => {}),
@@ -37,6 +43,7 @@ vi.mock('./AppNotice', () => ({ default: () => null }));
 vi.mock('./NativeBadgeSync', () => ({ default: () => null }));
 
 import AppBridgeHost from './AppBridgeHost';
+import { syncNativePush } from '@/lib/app/nativePush';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -50,6 +57,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  env.auth = { user: null, loading: true };
+  env.firebase.currentUser = null;
+  vi.mocked(syncNativePush).mockClear();
   container.remove();
   document.documentElement.removeAttribute('data-app');
 });
@@ -67,6 +77,39 @@ describe('AppBridgeHost html[data-app]', () => {
     env.native = false;
     act(() => root.render(<AppBridgeHost />));
     expect(document.documentElement.hasAttribute('data-app')).toBe(false);
+    act(() => root.unmount());
+  });
+});
+
+describe('AppBridgeHost silent push sync', () => {
+  const signIn = async (uid: string) => {
+    env.auth = { user: { uid }, loading: false };
+    env.firebase.currentUser = { uid };
+    await act(async () => root.render(<AppBridgeHost />));
+  };
+  const signOut = async () => {
+    env.auth = { user: null, loading: false };
+    env.firebase.currentUser = null;
+    await act(async () => root.render(<AppBridgeHost />));
+  };
+
+  it('registers the push token again when the same user signs back in', async () => {
+    env.native = true;
+    await signIn('rep-1');
+    expect(syncNativePush).toHaveBeenCalledTimes(1);
+    // Sign-out deletes this phone's token without reloading the page.
+    await signOut();
+    await signIn('rep-1');
+    expect(syncNativePush).toHaveBeenCalledTimes(2);
+    expect(syncNativePush).toHaveBeenLastCalledWith({ prompt: false });
+    act(() => root.unmount());
+  });
+
+  it('syncs once per signed-in user while the session lasts', async () => {
+    env.native = true;
+    await signIn('rep-1');
+    await act(async () => root.render(<AppBridgeHost />));
+    expect(syncNativePush).toHaveBeenCalledTimes(1);
     act(() => root.unmount());
   });
 });
