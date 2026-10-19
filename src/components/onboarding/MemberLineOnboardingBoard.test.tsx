@@ -134,6 +134,31 @@ describe('MemberLineOnboardingBoard row status', () => {
     expect(row().button?.className).toMatch(/rowBtnPrimary/);
   });
 
+  it('says Sign now and leads only when an unsent document has a signing page', async () => {
+    await renderBoard(makeItem({ status: 'not_started', signPath: '/portal/onboarding/sign/env-1' }));
+
+    expect(row().button?.textContent).toBe('Sign now');
+    expect(row().button?.className).toMatch(/rowBtnPrimary/);
+  });
+
+  it.each([
+    ['not_started, dispatch pending', { status: 'not_started', esignDispatch: { state: 'pending', attempts: 0 } }],
+    ['not_started, no dispatch', { status: 'not_started', esignDispatch: null }],
+    ['rejected, no envelope', { status: 'rejected', esignDispatch: null }],
+  ] as const)('never offers Sign now without a signing page (%s)', async (_label, overrides) => {
+    await renderBoard(makeItem({ ...overrides, signPath: null } as Partial<WizardItem>));
+
+    expect(row().button?.textContent).toBe('Preparing');
+    expect(row().button?.className).not.toMatch(/rowBtnPrimary/);
+  });
+
+  it('shows View, not Sign now, for a sent document with no signing page (manager view-as)', async () => {
+    await renderBoard(makeItem({ status: 'submitted', signPath: null }));
+
+    expect(row().button?.textContent).toBe('View');
+    expect(row().button?.className).not.toMatch(/rowBtnPrimary/);
+  });
+
   it('keeps a submitted upload in review with a plain button', async () => {
     await renderBoard(
       makeItem({ id: 'orientation', label: 'Orientation', referenceKind: 'manual', status: 'submitted' }),

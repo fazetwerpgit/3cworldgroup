@@ -20,7 +20,10 @@ const STATUS_LABEL: Record<OnboardingStatus, string> = {
 function nextActionLabel(item: WizardItem) {
   if (item.status === 'approved') return 'View';
   if (isEsignItem(item.id)) {
-    return item.esignDispatch?.state === 'failed' ? 'Preparing' : 'Sign now';
+    // Only promise signing when there is a signing page to open: the sheet
+    // renders EsignSignAction only for item.signPath.
+    if (item.signPath) return 'Sign now';
+    return item.status === 'submitted' ? 'View' : 'Preparing';
   }
   if (item.status === 'rejected') return 'Resubmit';
   if (item.status === 'submitted') return 'View';
@@ -33,7 +36,7 @@ function nextActionLabel(item: WizardItem) {
 function isRepsMove(item: WizardItem) {
   if (awaitsSignature(item)) return true;
   if (item.status === 'approved' || item.status === 'submitted') return false;
-  if (isEsignItem(item.id)) return item.esignDispatch?.state !== 'failed';
+  if (isEsignItem(item.id)) return !!item.signPath;
   return true;
 }
 
