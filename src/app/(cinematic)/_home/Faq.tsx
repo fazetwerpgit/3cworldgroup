@@ -71,6 +71,9 @@ export default function Faq() {
     const running = new WeakMap<HTMLDetailsElement, Animation>();
     const intent = new WeakMap<HTMLDetailsElement, boolean>();
     const target = (row: HTMLDetailsElement) => intent.get(row) ?? row.open;
+    // Seeded, so a row the browser opens before any click still reads as a
+    // change in onToggle below rather than as the state we already knew.
+    for (const row of rows()) intent.set(row, row.open);
 
     const settle = (row: HTMLDetailsElement, open: boolean) => {
       row.open = open;
@@ -150,9 +153,33 @@ export default function Faq() {
       toggle(row, next);
     };
 
+    // The browser can also open a row on its own — find-in-page expanding a
+    // match, a #fragment, an extension — without a click reaching us. Adopt
+    // that state so the mark, the next click and one-open-at-a-time all agree
+    // with what is on screen. Our own animations flip `open` mid-flight, so a
+    // row with one running is left to it; `toggle` does not bubble, hence
+    // capture.
+    const onToggle = (event: Event) => {
+      const row = event.target;
+      if (!(row instanceof HTMLDetailsElement) || !list.contains(row)) return;
+      if (running.has(row) || target(row) === row.open) {
+        row.dataset.open = String(target(row));
+        return;
+      }
+      intent.set(row, row.open);
+      row.dataset.open = String(row.open);
+      if (row.open) {
+        for (const other of rows()) {
+          if (other !== row && target(other)) toggle(other, false);
+        }
+      }
+    };
+
     list.addEventListener("click", onClick);
+    list.addEventListener("toggle", onToggle, true);
     return () => {
       list.removeEventListener("click", onClick);
+      list.removeEventListener("toggle", onToggle, true);
       for (const row of rows()) {
         running.get(row)?.cancel();
         row.style.height = "";
