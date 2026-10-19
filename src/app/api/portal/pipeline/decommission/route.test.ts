@@ -111,6 +111,27 @@ describe('pipeline decommission audit', () => {
   });
 });
 
+describe('reinstate refuses self-deleted accounts', () => {
+  it('returns 409 and leaves the account closed', async () => {
+    const updateUser = vi.spyOn(store.adminAuth, 'updateUser');
+    store.users.set('gone', {
+      displayName: '[Deleted user]',
+      fieldRole: 'entry_rep',
+      status: 'inactive',
+      selfDeleted: true,
+    });
+
+    const res = await DELETE(call('DELETE', { userId: 'gone' }));
+
+    expect(res.status).toBe(409);
+    expect(store.users.get('gone')?.status).toBe('inactive');
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(reconcileChatMembershipForUser).not.toHaveBeenCalled();
+    expect(writeAdminAudit).not.toHaveBeenCalled();
+    updateUser.mockRestore();
+  });
+});
+
 describe('reinstate restores the prior status', () => {
   it('returns a decommissioned pending hire to pending, not active', async () => {
     store.users.set('hire', { fieldRole: 'entry_level_rep', status: 'pending' });

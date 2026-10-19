@@ -194,6 +194,15 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+    // The person deleted their own account (DELETE /api/portal/auth/me): the
+    // profile is anonymized and the sign-in closed. It cannot be brought back,
+    // same as People.
+    if (data?.selfDeleted === true) {
+      return NextResponse.json(
+        { error: 'This person deleted their own account, so it cannot be reactivated.' },
+        { status: 409 }
+      );
+    }
     // Read before the update: this is the state being undone, and the audit row needs it.
     const previousReason = data?.decommission?.reason ?? null;
     const targetName = data?.displayName;
