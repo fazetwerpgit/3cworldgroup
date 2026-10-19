@@ -31,6 +31,8 @@ export const metadata: Metadata = {
  * PDFs are emailed to the owners and can be viewed and exported by them;
  * customer information from sales; support forms; analytics on public pages
  * only.
+ * Amended 2026-10-18 (owner decision): tax and banking documents and numbers
+ * (W-9, SSN, direct deposit) are visible to the owners only, not administrators.
  */
 const LAST_UPDATED = "October 18, 2026";
 
@@ -93,10 +95,12 @@ export default function PrivacyPolicyPage() {
                   Security Number and driver&apos;s license number are stored encrypted in our database.
                   Your signed W-9 (which shows your full Social Security Number) and your signed
                   direct-deposit form are saved as PDFs in our secure file storage, and a copy is emailed
-                  to 3C&apos;s owners when you finish onboarding. In the portal, only the owners and a
-                  small number of administrators can open these documents and numbers, and the owners
-                  can view and export them. We log each time someone opens them in the portal; copies
-                  sent by email are not tracked.
+                  to 3C&apos;s owners when you finish onboarding. In the portal, only 3C&apos;s owners
+                  can open your tax and banking documents and numbers: your W-9, your Social Security
+                  Number, and your direct-deposit form. The owners and a small number of administrators
+                  can open your driver&apos;s license number and photo, and the owners can view and
+                  export all of it. We log each time someone opens them in the portal; copies sent by
+                  email are not tracked.
                 </li>
                 <li>
                   <strong>Electronic signatures.</strong> When you sign a document in the portal, we keep
