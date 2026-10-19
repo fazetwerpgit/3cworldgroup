@@ -126,4 +126,20 @@ describe('relativeSaleTime', () => {
     expect(relativeSaleTime(Date.parse('2026-09-20T18:00:00Z'), now, 'America/Chicago')).toBe('Sun');
     expect(relativeSaleTime(Date.parse('2026-09-03T18:00:00Z'), now, 'America/Chicago')).toBe('Sep 3');
   });
+
+  it("reads the weekday and date in Chicago, not the device's zone", () => {
+    const tz = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+    try {
+      // Tue Oct 13 2026, 11:30pm CDT = Wed 12:30am EDT.
+      const at = Date.parse('2026-10-14T04:30:00Z');
+      expect(relativeSaleTime(at, at + 2 * 86_400_000)).toBe('Tue');
+      // Sep 30 11:30pm CDT = Oct 1 on an Eastern phone.
+      const late = Date.parse('2026-10-01T04:30:00Z');
+      expect(relativeSaleTime(late, late + 10 * 86_400_000)).toBe('Sep 30');
+    } finally {
+      if (tz === undefined) delete process.env.TZ;
+      else process.env.TZ = tz;
+    }
+  });
 });

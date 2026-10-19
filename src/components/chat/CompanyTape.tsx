@@ -58,7 +58,7 @@ export function CompanyTape({ stats }: { stats: CompanyStats }) {
           {Number.isFinite(lastAt) && (
             <>
               <span aria-hidden="true">·</span>
-              <span>{relativeSaleTime(lastAt, now)}</span>
+              <span>{relativeSaleTime(lastAt, now, 'America/Chicago')}</span>
             </>
           )}
         </>

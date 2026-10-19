@@ -40,8 +40,12 @@ const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
 
-/** "just now", "12m ago", "3h ago", then the weekday ("Tue"), then "Sep 3". */
-export function relativeSaleTime(atMs: number, nowMs: number, timeZone?: string): string {
+/**
+ * "just now", "12m ago", "3h ago", then the weekday ("Tue"), then "Sep 3".
+ * The weekday and date are Chicago's (business days are Chicago days), not the
+ * phone's: a Tuesday 11:30pm sale must not read "Wed" on an Eastern phone.
+ */
+export function relativeSaleTime(atMs: number, nowMs: number, timeZone = 'America/Chicago'): string {
   const ago = Math.max(0, nowMs - atMs);
   if (ago < MINUTE_MS) return 'just now';
   if (ago < HOUR_MS) return `${Math.floor(ago / MINUTE_MS)}m ago`;
