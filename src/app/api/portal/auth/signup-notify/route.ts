@@ -2,14 +2,28 @@ import { NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { createAlertTask } from '@/lib/alerts/alertTasks';
 import { looksLikeBotSignup } from '@/lib/auth/botDetection';
+import { verifyCaptchaPass } from '@/lib/auth/captchaPass';
 import { isValidTeamCode, signupNotifyLimiter } from '@/lib/auth/teamCode';
 import { clientIp } from '@/lib/rateLimit';
 import { getInviteByToken, inviteSignupState } from '@/lib/recruiting/inviteLookup';
 
 const INVITE_TOKEN_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
 
+type GateBody = { code?: unknown; inviteToken?: unknown; captchaPass?: unknown } | null;
+
+/**
+ * The signup form's reCAPTCHA, enforced here: the pass /api/portal/auth/captcha
+ * issued for this account's email. Without a secret, production fails closed
+ * (like the captcha route) and local dev and tests skip the check.
+ */
+function passesCaptcha(body: GateBody, email: string | undefined): boolean {
+  const secret = process.env.RECAPTCHA_SECRET_KEY;
+  if (!secret) return process.env.NODE_ENV !== 'production';
+  return verifyCaptchaPass(body?.captchaPass, email, secret);
+}
+
 /** A password signup passes the gate with the team code or an open 3C invite. */
-async function passesSignupGate(body: { code?: unknown; inviteToken?: unknown } | null): Promise<boolean> {
+async function passesSignupGate(body: GateBody): Promise<boolean> {
   if (isValidTeamCode(body?.code, process.env.PORTAL_TEAM_CODE)) return true;
   const token = body?.inviteToken;
   if (typeof token !== 'string' || !INVITE_TOKEN_SHAPE.test(token)) return false;
@@ -44,28 +58,31 @@ export async function POST(request: Request) {
   if (!token) return NextResponse.json({ error: 'Missing authentication token' }, { status: 401 });
   let uid: string;
   let signInProvider: string | undefined;
+  let tokenEmail: string | undefined;
   try {
     const decoded = await adminAuth.verifyIdToken(token);
     uid = decoded.uid;
     signInProvider = decoded.firebase?.sign_in_provider;
+    tokenEmail = decoded.email;
   } catch {
     return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 });
   }
 
   // A first sign-in with Google, or Sign in with Apple in the 3C iOS app,
   // creates the pending profile itself with no signup form and no team code.
-  // A password signup must carry the team code (or its open 3C invite token):
-  // the client form checks it first, but the server is the gate. One that
+  // A password signup must carry the team code (or its open 3C invite token)
+  // and the captcha pass for its email: the client form checks both first,
+  // but the server is the gate. One that
   // fails is flagged suspectedBot, which keeps it out of the admin pending
   // queue and raises no alert, so skipping the form's check gets nowhere.
   if (signInProvider !== 'google.com' && signInProvider !== 'apple.com') {
-    let body: { code?: unknown; inviteToken?: unknown } | null;
+    let body: GateBody;
     try {
-      body = (await request.json()) as { code?: unknown; inviteToken?: unknown } | null;
+      body = (await request.json()) as GateBody;
     } catch {
       body = null;
     }
-    if (!(await passesSignupGate(body))) {
+    if (!passesCaptcha(body, tokenEmail) || !(await passesSignupGate(body))) {
       try {
         const snap = await adminDb.doc(`users/${uid}`).get();
         if (snap.exists && snap.get('status') === 'pending' && !snap.get('fieldRole')) {

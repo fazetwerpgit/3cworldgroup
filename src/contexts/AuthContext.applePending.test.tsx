@@ -267,6 +267,18 @@ describe('team-code signup', () => {
     expect(pendingIdTokenForDelete()).toBe('id-signup');
     expect(ctx.current).toMatchObject({ pendingApproval: true, loading: false });
   });
+
+  it('forwards the captcha pass from the signup form to the owner alert', async () => {
+    const created = session({ uid: 'u-signup', email: 'sam@x.com', getIdToken: vi.fn(async () => 'id-signup') });
+    vi.mocked(createUserWithEmailAndPassword).mockResolvedValueOnce({ user: created } as never);
+    await mount();
+    await act(async () => ctx.current!.signUp('Sam@X.com', 'pw-123456', 'Sam', '3cteam', undefined, 'pass-1'));
+    expect(fetchMock).toHaveBeenCalledWith('/api/portal/auth/signup-notify', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer id-signup', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: '3cteam', captchaPass: 'pass-1' }),
+    });
+  });
 });
 
 describe('avatar sync on an active sign-in', () => {

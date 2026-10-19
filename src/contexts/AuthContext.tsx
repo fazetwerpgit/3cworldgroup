@@ -35,7 +35,7 @@ import { preloadOwnerDashboard } from '@/components/portal/owner/preloadOwnerDas
 
 export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string, teamCode: string, inviteToken?: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName: string, teamCode: string, inviteToken?: string, captchaPass?: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -100,9 +100,10 @@ function syncAvatarFromAuth(firebaseUser: FirebaseUser) {
 // Fire-and-forget owner alert for a new pending self-signup. The route reads
 // the uid from the ID token, never from the body. A team-code signup sends its
 // code (checked server-side); the Google first sign-in sends none and is
-// accepted by its google.com sign-in provider. The token is fetched before the
+// accepted by its google.com sign-in provider. A password signup also sends the
+// captcha pass the signup form earned. The token is fetched before the
 // caller signs out.
-async function notifyPendingSignup(firebaseUser: FirebaseUser, gate?: { code: string; inviteToken?: string }) {
+async function notifyPendingSignup(firebaseUser: FirebaseUser, gate?: { code: string; inviteToken?: string; captchaPass?: string }) {
   try {
     const idToken = await firebaseUser.getIdToken();
     void fetch('/api/portal/auth/signup-notify', {
@@ -524,7 +525,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, displayName: string, teamCode: string, inviteToken?: string) => {
+  const signUp = async (email: string, password: string, displayName: string, teamCode: string, inviteToken?: string, captchaPass?: string) => {
     if (!auth || !db) throw new Error('auth/not-configured');
     signingUp.current = true;
     setState((prev) => ({ ...prev, loading: true, error: null }));
@@ -546,7 +547,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           status: 'pending',
           createdAt: serverTimestamp(),
         });
-        await notifyPendingSignup(cred.user, inviteToken ? { code: teamCode, inviteToken } : { code: teamCode });
+        await notifyPendingSignup(cred.user, {
+          code: teamCode,
+          ...(inviteToken ? { inviteToken } : {}),
+          ...(captchaPass ? { captchaPass } : {}),
+        });
       } catch (docError) {
         // Roll back the just-created auth account so the profile write can be
         // retried cleanly instead of failing with email-already-in-use.

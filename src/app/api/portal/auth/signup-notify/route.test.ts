@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { verifyIdTokenMock, userGetMock, userUpdateMock, createAlertTaskMock, getInviteMock } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
@@ -20,6 +20,7 @@ vi.mock('@/lib/recruiting/inviteLookup', () => ({
 
 import { POST } from './route';
 import { signupNotifyLimiter } from '@/lib/auth/teamCode';
+import { issueCaptchaPass } from '@/lib/auth/captchaPass';
 
 const TEAM_CODE = '3cteam';
 
@@ -41,8 +42,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   signupNotifyLimiter.reset();
   vi.stubEnv('PORTAL_TEAM_CODE', TEAM_CODE);
+  vi.stubEnv('RECAPTCHA_SECRET_KEY', '');
   verifyIdTokenMock.mockImplementation(async (token: string) => {
-    if (token === 'token-new-user') return { uid: 'new-user', firebase: { sign_in_provider: 'password' } };
+    if (token === 'token-new-user') return { uid: 'new-user', email: 'new.hire@gmail.com', firebase: { sign_in_provider: 'password' } };
     if (token === 'token-google-user') return { uid: 'new-user', firebase: { sign_in_provider: 'google.com' } };
     if (token === 'token-apple-user') return { uid: 'new-user', firebase: { sign_in_provider: 'apple.com' } };
     throw new Error('bad token');
@@ -52,6 +54,8 @@ beforeEach(() => {
   );
   createAlertTaskMock.mockResolvedValue('task-1');
 });
+
+afterEach(() => vi.unstubAllEnvs());
 
 describe('POST /api/portal/auth/signup-notify', () => {
   it('refuses a body-supplied uid with no token', async () => {
@@ -119,6 +123,52 @@ describe('POST /api/portal/auth/signup-notify', () => {
 
   it('fails closed when PORTAL_TEAM_CODE is unset', async () => {
     vi.stubEnv('PORTAL_TEAM_CODE', '');
+    const response = await POST(request({ token: 'token-new-user', body: { code: TEAM_CODE } }));
+
+    expect(response.status).toBe(403);
+    expect(createAlertTaskMock).not.toHaveBeenCalled();
+  });
+
+  describe('with reCAPTCHA configured', () => {
+    beforeEach(() => vi.stubEnv('RECAPTCHA_SECRET_KEY', 'captcha-secret'));
+
+    it('refuses and flags a password signup that never passed the captcha', async () => {
+      const response = await POST(request({ token: 'token-new-user', body: { code: TEAM_CODE } }));
+
+      expect(response.status).toBe(403);
+      expect(userUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ suspectedBot: true, signupGateFailed: true }));
+      expect(createAlertTaskMock).not.toHaveBeenCalled();
+    });
+
+    it('refuses a pass issued for another email, signed with another key, or expired', async () => {
+      for (const captchaPass of [
+        issueCaptchaPass('someone.else@gmail.com', 'captcha-secret'),
+        issueCaptchaPass('new.hire@gmail.com', 'other-secret'),
+        issueCaptchaPass('new.hire@gmail.com', 'captcha-secret', Date.now() - 11 * 60 * 1000),
+        'garbage',
+      ]) {
+        const response = await POST(request({ token: 'token-new-user', body: { code: TEAM_CODE, captchaPass } }));
+        expect(response.status).toBe(403);
+      }
+      expect(createAlertTaskMock).not.toHaveBeenCalled();
+    });
+
+    it('raises the alert for a password signup with the team code and its captcha pass', async () => {
+      const captchaPass = issueCaptchaPass('New.Hire@gmail.com', 'captcha-secret');
+      const response = await POST(request({ token: 'token-new-user', body: { code: TEAM_CODE, captchaPass } }));
+
+      expect(response.status).toBe(200);
+      expect(createAlertTaskMock).toHaveBeenCalledWith(expect.objectContaining({ subjectUserId: 'new-user' }));
+    });
+
+    it('still accepts a Google first sign-in, which never sees the captcha', async () => {
+      expect((await POST(request({ token: 'token-google-user' }))).status).toBe(200);
+      expect(createAlertTaskMock).toHaveBeenCalled();
+    });
+  });
+
+  it('fails closed in production when the reCAPTCHA secret is unset', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
     const response = await POST(request({ token: 'token-new-user', body: { code: TEAM_CODE } }));
 
     expect(response.status).toBe(403);

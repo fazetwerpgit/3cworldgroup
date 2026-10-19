@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { issueCaptchaPass } from '@/lib/auth/captchaPass';
 
 interface RecaptchaVerifyResponse {
   success?: unknown;
@@ -24,8 +25,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json() as { token?: unknown };
+    const body = await request.json() as { token?: unknown; email?: unknown };
     const token = typeof body.token === 'string' ? body.token : '';
+    const email = typeof body.email === 'string' ? body.email.trim() : '';
     const params = new URLSearchParams({ secret, response: token });
     const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
       method: 'POST',
@@ -37,7 +39,9 @@ export async function POST(request: Request) {
       && (data.score === undefined || (typeof data.score === 'number' && data.score >= 0.5))
       && (data.action === undefined || data.action === 'signup');
 
-    return NextResponse.json({ ok });
+    // The verdict alone is advisory to the form; the pass is what
+    // signup-notify checks server-side before it alerts management.
+    return NextResponse.json(ok && email ? { ok, pass: issueCaptchaPass(email, secret) } : { ok });
   } catch {
     return NextResponse.json({ ok: false });
   }

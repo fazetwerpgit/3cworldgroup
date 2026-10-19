@@ -157,6 +157,8 @@ export function SignupForm() {
     setLoading(true);
     try {
       const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+      // signup-notify checks this pass server-side before alerting management.
+      let captchaPass: string | undefined;
       if (siteKey) {
         try {
           await loadRecaptchaScript();
@@ -185,10 +187,11 @@ export function SignupForm() {
           const captchaResponse = await fetch("/api/portal/auth/captcha", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token }),
+            body: JSON.stringify({ token, email: email.trim() }),
           });
           const captchaData = (await captchaResponse.json()) as {
             ok?: unknown;
+            pass?: unknown;
           };
           if (!captchaResponse.ok || captchaData.ok !== true) {
             setError(
@@ -196,6 +199,7 @@ export function SignupForm() {
             );
             return;
           }
+          if (typeof captchaData.pass === "string") captchaPass = captchaData.pass;
         } catch {
           setError(
             "Verification failed. Please try again — if this keeps happening, ask your manager to set up your account.",
@@ -228,7 +232,7 @@ export function SignupForm() {
         setError(gateError);
         return;
       }
-      await signUp(email.trim(), password, displayName.trim(), teamCode, invited ? invite.token : undefined);
+      await signUp(email.trim(), password, displayName.trim(), teamCode, invited ? invite.token : undefined, captchaPass);
       // AuthContext set pendingApproval; go to /portal, which renders the
       // real PendingApproval component (this page only knows how to show the form).
       router.replace("/portal");
