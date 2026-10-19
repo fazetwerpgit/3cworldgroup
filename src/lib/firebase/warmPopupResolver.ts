@@ -15,7 +15,7 @@ export function warmPopupResolver(): void {
   // The app signs in natively: no popup there, so nothing to warm.
   if (typeof window === 'undefined' || !auth || isNativeApp()) return;
   const target = auth;
-  void import('@firebase/auth/internal')
+  void import('./authInternal')
     .then(({ _getInstance }) => {
       const resolver = _getInstance<{ _initialize: (a: unknown) => Promise<unknown> }>(browserPopupRedirectResolver);
       return resolver._initialize(target);
