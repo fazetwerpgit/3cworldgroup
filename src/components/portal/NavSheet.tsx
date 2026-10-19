@@ -32,6 +32,7 @@ export function useNavAccess() {
   const canAccess = useCallback(
     (item: PortalNavItem) => {
       if (item.openTo && !item.openTo(user?.role, user?.uid)) return false;
+      if (item.visibleTo && !item.visibleTo(user)) return false;
       if (item.onboardingOnly && !isOnboardingUser(user)) return false;
       if (item.roles && item.roles.length > 0 && !isRole(...item.roles)) return false;
       if (isOnboardingUser(user) && !isOnboardingAllowedPage(item.href)) return false;

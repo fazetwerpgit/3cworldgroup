@@ -29,6 +29,7 @@ const EXACT: Record<string, string> = {
   '/portal/links': 'Links',
   '/portal/pay-structure': 'Pay structure',
   '/portal/onboarding': 'Onboarding',
+  '/portal/solar/present': 'Solar deck',
   '/portal/admin/announcements': 'Announcements · Admin',
   '/portal/admin/chat-reports': 'Chat reports · Admin',
   '/portal/admin/onboarding': 'Onboarding · Admin',
