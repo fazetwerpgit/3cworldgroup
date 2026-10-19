@@ -34,11 +34,14 @@ export function tomorrowKey(now: Date): DayKey {
 
 /**
  * The Vercel cron fires at 23:00 AND 00:00 UTC every day, because 6 PM in
- * Chicago is 23:00 UTC in summer (CDT) and 00:00 UTC in winter (CST). Exactly
- * one of the two lands on 6 PM local; this is the gate that picks it.
+ * Chicago is 23:00 UTC in summer (CDT) and 00:00 UTC in winter (CST). 6 PM is
+ * the send; 7 PM (the summer 00:00 slot) is a RESUME pass that reminds only
+ * what the first run did not finish (the per-sale claim skips the rest). In
+ * winter the 23:00 slot is 5 PM and skips.
  */
 export function isReminderHour(now: Date): boolean {
-  return chicagoHour(now) === REMINDER_HOUR;
+  const hour = chicagoHour(now);
+  return hour === REMINDER_HOUR || hour === REMINDER_HOUR + 1;
 }
 
 function toInstall(sale: Sale, order: FiberOrder | undefined, day: DayKey): EveInstall {

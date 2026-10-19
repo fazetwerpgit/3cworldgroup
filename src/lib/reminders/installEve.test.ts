@@ -75,7 +75,8 @@ describe('tomorrowInstalls', () => {
 describe('the 6 PM gate', () => {
   it('passes exactly one of the two UTC runs, summer and winter', () => {
     expect(isReminderHour(new Date('2026-09-23T23:00:00Z'))).toBe(true); // CDT slot
-    expect(isReminderHour(new Date('2026-09-24T00:00:00Z'))).toBe(false);
+    expect(isReminderHour(new Date('2026-09-24T00:00:00Z'))).toBe(true); // 7 PM CDT: the resume pass
+    expect(isReminderHour(new Date('2026-09-24T01:00:00Z'))).toBe(false);
     expect(isReminderHour(new Date('2026-01-15T00:00:00Z'))).toBe(true); // CST slot
     expect(isReminderHour(new Date('2026-01-14T23:00:00Z'))).toBe(false);
   });

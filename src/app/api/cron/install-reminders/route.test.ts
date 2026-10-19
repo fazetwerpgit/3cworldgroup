@@ -17,8 +17,10 @@ import { GET } from './route';
 const SECRET = 'test-cron-secret';
 /** 6 PM CDT Wed Sep 23: the 23:00 UTC run. */
 const WED_6PM = new Date('2026-09-23T23:00:00Z');
-/** The 00:00 UTC run the same evening: 7 PM, not the send hour. */
+/** The 00:00 UTC run the same evening: 7 PM, the resume pass. */
 const WED_7PM = new Date('2026-09-24T00:00:00Z');
+/** 5 PM CDT: neither the send nor the resume hour. */
+const WED_5PM = new Date('2026-09-23T22:00:00Z');
 const THU_6PM = new Date('2026-09-24T23:00:00Z');
 
 /** fixtureSale's default product, as the push labels it. */
@@ -85,8 +87,8 @@ describe('GET /api/cron/install-reminders', () => {
     expect(dispatchToUser).not.toHaveBeenCalled();
   });
 
-  it('does nothing outside 6 PM Chicago', async () => {
-    vi.setSystemTime(WED_7PM);
+  it('does nothing outside 6–7 PM Chicago', async () => {
+    vi.setSystemTime(WED_5PM);
     expect(await (await GET(request('?slot=cst'))).json()).toMatchObject({ skipped: 'not_send_hour' });
     expect(dispatchToUser).not.toHaveBeenCalled();
     expect(fake.writes).toHaveLength(0);
@@ -113,7 +115,7 @@ describe('GET /api/cron/install-reminders', () => {
       const body = await (await GET(request())).json();
       expect(body).toMatchObject({ enabled: false, onlyTo: null, sent: 0 });
       expect(body.configError).toContain('INSTALL_REMINDERS_ONLY_TO');
-      vi.setSystemTime(WED_7PM);
+      vi.setSystemTime(WED_5PM);
       expect(await (await GET(request('?force=1'))).json()).toMatchObject({ skipped: 'not_send_hour' });
       vi.setSystemTime(WED_6PM);
     }
@@ -146,7 +148,12 @@ describe('GET /api/cron/install-reminders', () => {
       link: '/portal/sales/s1',
       metadata: { forDate: '2026-09-24', saleIds: ['s1'] },
     });
-    expect(fake.docs('sales').get('s1')?.installReminder).toEqual({ forDate: '2026-09-24', at: WED_6PM.toISOString() });
+    expect(fake.docs('sales').get('s1')?.installReminder).toEqual({
+      forDate: '2026-09-24',
+      at: WED_6PM.toISOString(),
+      state: 'sent',
+      attempts: 1,
+    });
 
     // A retry the same night: every sale is claimed, nothing goes out.
     dispatchToUser.mockClear();
@@ -157,6 +164,39 @@ describe('GET /api/cron/install-reminders', () => {
     fake.docs('sales').set('s1', { ...fake.docs('sales').get('s1'), installDate: chicagoNoon('2026-09-25') });
     vi.setSystemTime(THU_6PM);
     expect(await (await GET(request('?slot=cdt'))).json()).toMatchObject({ forDate: '2026-09-25', sent: 1 });
+    expect(dispatchToUser).toHaveBeenCalledWith(expect.objectContaining({ userId: 'rep-one' }));
+  });
+
+  it('the 7 PM resume pass reminds what a failed 6 PM push left behind, and nothing else', async () => {
+    dispatchToUser.mockImplementationOnce(async () => {
+      throw new Error('push down');
+    });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const first = await (await GET(request('?slot=cdt'))).json();
+    error.mockRestore();
+    expect(first).toMatchObject({ sent: 1, failed: 1 });
+    expect(fake.docs('sales').get('s1')?.installReminder).toMatchObject({ state: 'failed' });
+
+    dispatchToUser.mockClear();
+    vi.setSystemTime(WED_7PM);
+    const resume = await (await GET(request('?slot=cst'))).json();
+    expect(resume).toMatchObject({ sent: 1, alreadySent: 1 });
+    expect(dispatchToUser).toHaveBeenCalledTimes(1);
+    expect(dispatchToUser).toHaveBeenCalledWith(expect.objectContaining({ userId: 'rep-one' }));
+    expect(fake.docs('sales').get('s1')?.installReminder).toMatchObject({ state: 'sent', attempts: 2 });
+  });
+
+  it('a claim stuck at `claimed` (run died mid-send) is retried only once it is stale', async () => {
+    fake.docs('sales').set('s1', {
+      ...fake.docs('sales').get('s1'),
+      installReminder: { forDate: '2026-09-24', at: new Date(WED_6PM.getTime() - 60_000).toISOString(), state: 'claimed', attempts: 1 },
+    });
+    await GET(request('?slot=cdt'));
+    expect(dispatchToUser).not.toHaveBeenCalledWith(expect.objectContaining({ userId: 'rep-one' }));
+    dispatchToUser.mockClear();
+    vi.setSystemTime(WED_7PM);
+    await GET(request('?slot=cst'));
+    expect(dispatchToUser).toHaveBeenCalledTimes(1);
     expect(dispatchToUser).toHaveBeenCalledWith(expect.objectContaining({ userId: 'rep-one' }));
   });
 });

@@ -6,6 +6,8 @@ import { reminderPush, tomorrowInstalls, tomorrowKey, type EveInstall } from './
 
 // The 6 PM send. Per rep: tomorrow's installs, a claim on each sale, one push
 // (bell + push, no email) for what was claimed. On by default (Jacob: automatic).
+// Resumable: the 7 PM slot re-runs and reminds only sales whose claim never
+// finished (failed, or stuck `claimed` past STALE_REMINDER_MS).
 //
 //   INSTALL_REMINDERS_OFF      "true" stops every send; the run becomes a dry
 //                              run that reports what WOULD go out.
@@ -69,20 +71,75 @@ export interface ReminderRunDeps {
   dispatch?: (input: DispatchInput) => Promise<void>;
 }
 
+/** A claim whose push never landed is retried after this long (the run died mid-send). */
+export const STALE_REMINDER_MS = 15 * 60 * 1000;
+export const MAX_REMINDER_ATTEMPTS = 3;
+
+interface ReminderMark {
+  forDate?: unknown;
+  at?: unknown;
+  /** 'claimed' until the push is dispatched, then 'sent'; 'failed' when it threw. Absent on old marks = sent. */
+  state?: unknown;
+  attempts?: unknown;
+}
+
 /**
- * Marks the sale reminded for `forDate`, unless a run already did. The
+ * Whether a sale may be claimed for `forDate`: never reminded for that day, or
+ * a claim for it that never finished (failed, or `claimed` for longer than
+ * STALE_REMINDER_MS), under the attempt cap. Pure, for the tests.
+ */
+export function reminderClaimable(mark: ReminderMark | undefined, forDate: string, now: Date): boolean {
+  if (!mark || mark.forDate !== forDate) return true;
+  const attempts = typeof mark.attempts === 'number' ? mark.attempts : 1;
+  if (attempts >= MAX_REMINDER_ATTEMPTS) return false;
+  if (mark.state === 'failed') return true;
+  if (mark.state === 'claimed') {
+    const at = typeof mark.at === 'string' ? Date.parse(mark.at) : NaN;
+    return Number.isFinite(at) && now.getTime() - at >= STALE_REMINDER_MS;
+  }
+  return false;
+}
+
+/**
+ * Marks the sale claimed for `forDate`, unless a run already reminded it. The
  * transaction makes two overlapping runs remind once; keying on the day means
- * a reschedule to a new day is reminded again.
+ * a reschedule to a new day is reminded again. A claim left unfinished by a
+ * dead run is taken over by the resume pass (reminderClaimable).
  */
 async function claimReminder(db: FirebaseFirestore.Firestore, saleId: string, forDate: string, now: Date) {
   const ref = db.collection('sales').doc(saleId);
   return db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists) return false;
-    if (snapshot.get('installReminder')?.forDate === forDate) return false;
-    transaction.update(ref, { installReminder: { forDate, at: now.toISOString() } });
+    const mark = snapshot.get('installReminder') as ReminderMark | undefined;
+    if (!reminderClaimable(mark, forDate, now)) return false;
+    const attempts = mark?.forDate === forDate ? (typeof mark.attempts === 'number' ? mark.attempts : 1) + 1 : 1;
+    transaction.update(ref, { installReminder: { forDate, at: now.toISOString(), state: 'claimed', attempts } });
     return true;
   });
+}
+
+/** Records how the push for claimed sales ended. Fail-soft: a lost mark only means a stale-claim retry. */
+async function markReminders(
+  db: FirebaseFirestore.Firestore,
+  saleIds: string[],
+  forDate: string,
+  claimedAt: Date,
+  state: 'sent' | 'failed'
+) {
+  await Promise.all(
+    saleIds.map(async (saleId) => {
+      const ref = db.collection('sales').doc(saleId);
+      try {
+        const snapshot = await ref.get();
+        const mark = snapshot.get('installReminder') as ReminderMark | undefined;
+        if (mark?.forDate !== forDate || mark.at !== claimedAt.toISOString()) return; // another run owns it now
+        await ref.update({ installReminder: { ...mark, state } });
+      } catch (error) {
+        console.error(`[install-reminders] failed to mark sale ${saleId} ${state}`, error);
+      }
+    })
+  );
 }
 
 export async function runInstallReminders(deps: ReminderRunDeps): Promise<ReminderRunSummary> {
@@ -155,9 +212,11 @@ export async function runInstallReminders(deps: ReminderRunDeps): Promise<Remind
       });
       summary.pushes.push(push);
       summary.sent += 1;
+      await markReminders(db, claimed.map((install) => install.saleId), forDate, now, 'sent');
     } catch (error) {
       console.error(`[install-reminders] failed to notify ${rep.uid}`, error);
       summary.failed += 1;
+      await markReminders(db, claimed.map((install) => install.saleId), forDate, now, 'failed');
     }
   }
 
