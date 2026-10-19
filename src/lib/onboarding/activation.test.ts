@@ -14,8 +14,24 @@ const { store, updates, sets, db, dispatchMock, resolveMock, sendPacketMock } = 
     exists: store.has(path),
     get: (field: string) => store.get(path)?.[field],
   });
+  // Transactions run one at a time, like Firestore retrying on contention.
+  let txChain: Promise<unknown> = Promise.resolve();
   const db = {
+    runTransaction: vi.fn(<T,>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
+      const run = txChain.then(() =>
+        fn({
+          get: async (ref: { path: string }) => get(ref.path),
+          update: (ref: { path: string }, data: Record<string, unknown>) => {
+            updates.push({ path: ref.path, data });
+            store.set(ref.path, { ...(store.get(ref.path) ?? {}), ...data });
+          },
+        })
+      );
+      txChain = run.catch(() => undefined);
+      return run;
+    }),
     doc: vi.fn((path: string) => ({
+      path,
       get: async () => get(path),
       update: async (data: Record<string, unknown>) => {
         updates.push({ path, data });
@@ -330,5 +346,64 @@ describe('computeReadiness', () => {
     await maybeFlagActivationReady('no-field-role');
 
     expect(store.get('users/no-field-role')).toEqual({ status: 'pending' });
+  });
+});
+
+describe('activation side effects', () => {
+  function seedReady(userId: string) {
+    store.set(`users/${userId}`, { status: 'pending', fieldRole: 'entry_level_rep', displayName: 'Rep' });
+    for (const item of getOnboardingItemsForUser('entry_level_rep', false)) {
+      store.set(`userOnboarding/${userId}_${item.id}`, { userId, itemId: item.id, status: 'approved' });
+    }
+  }
+
+  it('activates once and sends one packet when two approval paths race', async () => {
+    seedReady('race-rep');
+
+    await Promise.all([maybeFlagActivationReady('race-rep'), maybeFlagActivationReady('race-rep')]);
+
+    expect(store.get('users/race-rep')?.status).toBe('active');
+    expect(updates.filter((u) => u.path === 'users/race-rep')).toHaveLength(1);
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(sendPacketMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the owner packet when the user was already activated by another path', async () => {
+    seedReady('late-rep');
+    // Another path activates the user after the pending check, before the flip.
+    const original = db.runTransaction.getMockImplementation()!;
+    db.runTransaction.mockImplementationOnce(async (fn) => {
+      store.set('users/late-rep', { ...(store.get('users/late-rep') ?? {}), status: 'active' });
+      return original(fn);
+    });
+
+    await maybeFlagActivationReady('late-rep');
+
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(sendPacketMock).not.toHaveBeenCalled();
+  });
+
+  it('still sends the activation notice and owner packet when alert resolve throws', async () => {
+    seedReady('flaky-rep');
+    resolveMock.mockRejectedValueOnce(new Error('firestore unavailable'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await maybeFlagActivationReady('flaky-rep');
+
+    expect(store.get('users/flaky-rep')?.status).toBe('active');
+    expect(dispatchMock).toHaveBeenCalledTimes(1);
+    expect(sendPacketMock).toHaveBeenCalledWith({ userId: 'flaky-rep' });
+    errSpy.mockRestore();
+  });
+
+  it('still sends the owner packet when the activation notice fails', async () => {
+    seedReady('nopush-rep');
+    dispatchMock.mockRejectedValueOnce(new Error('push down'));
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await maybeFlagActivationReady('nopush-rep');
+
+    expect(sendPacketMock).toHaveBeenCalledWith({ userId: 'nopush-rep' });
+    errSpy.mockRestore();
   });
 });

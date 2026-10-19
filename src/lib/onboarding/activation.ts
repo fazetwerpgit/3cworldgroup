@@ -103,24 +103,35 @@ export async function activateUser(
 ): Promise<{ alreadyActive: boolean } | null> {
   if (!adminDb) throw new Error('Database not configured');
 
-  const userRef = adminDb.doc(`users/${userId}`);
-  const userSnap = await userRef.get();
-  if (!userSnap.exists) return null;
-  if (userSnap.get('status') === 'active') return { alreadyActive: true };
-
-  const fieldRole = userSnap.get('fieldRole') as FieldRole | undefined;
+  const db = adminDb;
+  const userRef = db.doc(`users/${userId}`);
   const now = new Date();
-  await userRef.update({
-    status: 'active',
-    ...(fieldRole && roleRequiresOnboarding(fieldRole)
-      ? { fieldRole: graduatedFieldRole(fieldRole) }
-      : {}),
-    hireDate: now,
-    // When the account went active; the owner "Activated" tile counts by this.
-    activatedAt: FieldValue.serverTimestamp(),
-    atRisk: FieldValue.delete(),
-    updatedAt: now,
+  // Flip pending -> active in a transaction so concurrent approval paths
+  // (e-sign completion, review approvals, mark-complete) activate once and
+  // only the winning call sends the notification and owner packet.
+  const flip = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    if (!snap.exists) return null;
+    if (snap.get('status') === 'active') return { alreadyActive: true as const };
+    const role = snap.get('fieldRole') as FieldRole | undefined;
+    tx.update(userRef, {
+      status: 'active',
+      ...(role && roleRequiresOnboarding(role) ? { fieldRole: graduatedFieldRole(role) } : {}),
+      hireDate: now,
+      // When the account went active; the owner "Activated" tile counts by this.
+      activatedAt: FieldValue.serverTimestamp(),
+      atRisk: FieldValue.delete(),
+      updatedAt: now,
+    });
+    return {
+      alreadyActive: false as const,
+      fieldRole: role,
+      name: (snap.get('displayName') as string | undefined) ?? 'Rep',
+    };
   });
+  if (!flip) return null;
+  if (flip.alreadyActive) return { alreadyActive: true };
+  const { fieldRole, name } = flip;
 
   // The graduated role can reach different chat channels than the onboarding one.
   try {
@@ -129,7 +140,13 @@ export async function activateUser(
     console.error('[onboarding] chat membership reconcile failed', { userId, error });
   }
 
-  await resolveAlertTasks(userId);
+  // The status flip is committed; a failure here must not skip the rep's
+  // notice or the owner packet, and a retry would see 'active' and stop.
+  try {
+    await resolveAlertTasks(userId);
+  } catch (error) {
+    console.error('[onboarding] alert task resolve failed', { userId, error });
+  }
 
   try {
     await closeOutInvitesForUser(userId, now);
@@ -137,18 +154,21 @@ export async function activateUser(
     console.error('[onboarding] invite close-out failed', { userId, error });
   }
 
-  const name = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
-  await dispatchToUser({
-    userId,
-    type: 'rep_activated',
-    title: fieldRole
-      ? `Onboarding complete — your new role: ${RoleDisplayNames[graduatedFieldRole(fieldRole)]}`
-      : 'Welcome aboard - you are active',
-    message: 'Your onboarding is complete.',
-    link: '/portal',
-    email: activationEmail({ name }),
-    emailFrom: onboardingFrom(),
-  });
+  try {
+    await dispatchToUser({
+      userId,
+      type: 'rep_activated',
+      title: fieldRole
+        ? `Onboarding complete — your new role: ${RoleDisplayNames[graduatedFieldRole(fieldRole)]}`
+        : 'Welcome aboard - you are active',
+      message: 'Your onboarding is complete.',
+      link: '/portal',
+      email: activationEmail({ name }),
+      emailFrom: onboardingFrom(),
+    });
+  } catch (error) {
+    console.error('[onboarding] activation notice failed', { userId, error });
+  }
 
   return { alreadyActive: false };
 }
@@ -167,7 +187,9 @@ export async function maybeFlagActivationReady(userId: string): Promise<void> {
   const { ready } = await getActivationReadiness(userId);
   if (!ready) return;
 
-  await activateUser(userId);
+  const activation = await activateUser(userId);
+  // Another approval path already activated this user and sent the packet.
+  if (!activation || activation.alreadyActive) return;
   try {
     await sendOnboardingPacket({ userId });
   } catch (error) {
