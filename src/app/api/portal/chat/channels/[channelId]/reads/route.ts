@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { getVerifiedChatUser } from '@/lib/chat/access';
 import { belongsInChannelDoc, toChatChannel, userCanAccessChannelDoc } from '@/lib/chat/channels';
 import { memberAvatarUrl, memberName } from '@/lib/chat/memberDisplay';
+import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
 
 // Same bound as the members route: never fan out over an unbounded member list.
 const MAX_MEMBERS = 200;
@@ -119,8 +120,11 @@ export async function GET(
         };
       })
       .sort((a, b) => a.readAt.localeCompare(b.readAt) || a.name.localeCompare(b.name));
+    // A demo caller (App Review) reads the sandbox alongside admins/owners and
+    // must never see their real names, photos or uids.
+    const visibleReaders = redactPeople(readers, createDemoRedactor(user), { idKey: 'uid', nameKey: 'name' });
 
-    return NextResponse.json({ readers, count: readers.length });
+    return NextResponse.json({ readers: visibleReaders, count: visibleReaders.length });
   } catch (error) {
     console.error('Error loading chat read receipts:', error);
     return NextResponse.json({ error: 'Failed to load read receipts' }, { status: 500 });

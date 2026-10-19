@@ -11,6 +11,7 @@ import {
   isDemoSandboxChannel,
 } from '@/lib/chat/channels';
 import { memberAvatarUrl, memberName } from '@/lib/chat/memberDisplay';
+import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
 
 // Never resolve an unbounded member list — cap the fan-out of user reads.
 const MAX_MEMBERS = 200;
@@ -97,6 +98,9 @@ export async function GET(
           };
         })
         .sort((a, b) => a.name.localeCompare(b.name));
+      // The demo sandbox lists every admin/owner; a demo caller (App Review)
+      // must never see their real names, photos or uids.
+      members = redactPeople(members, createDemoRedactor(user), { idKey: 'uid', nameKey: 'name' });
     }
 
     // Admins get a pick-list of people they can add (active users not already members).
@@ -107,12 +111,11 @@ export async function GET(
       return NextResponse.json({ members, memberCount: members.length, ...(isAdmin ? { addable: [] } : {}) });
     }
 
+    // Active users only: members/manage refuses anyone not active, so a
+    // pending hire offered here could never actually be added.
     const memberIdSet = new Set(memberIds);
-    const [activeUsersSnap, pendingUsersSnap] = await Promise.all([
-      adminDb.collection('users').where('status', '==', 'active').get(),
-      adminDb.collection('users').where('status', '==', 'pending').get(),
-    ]);
-    const addable: AddableUser[] = [...activeUsersSnap.docs, ...pendingUsersSnap.docs]
+    const activeUsersSnap = await adminDb.collection('users').where('status', '==', 'active').get();
+    const addable: AddableUser[] = activeUsersSnap.docs
       .filter((doc) => isEligibleChatMember(doc.data() ?? {}))
       .filter((doc) => !memberIdSet.has(doc.id))
       .map((doc) => {

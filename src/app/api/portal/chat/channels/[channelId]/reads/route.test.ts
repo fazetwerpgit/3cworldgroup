@@ -227,4 +227,36 @@ describe('GET /api/portal/chat/channels/[channelId]/reads', () => {
     expect(json).toEqual({ readers: [], count: 0 });
     expect(firestore.adminDb.getAll).toHaveBeenCalledTimes(1);
   });
+
+  it('never shows a demo caller the real names, photos or uids of sandbox readers', async () => {
+    mockGetUser.mockResolvedValue({
+      ok: true as const,
+      user: {
+        uid: 'demo-1', displayName: 'App Review', role: undefined, fieldRole: undefined,
+        effectiveRole: undefined, canModerate: false, demoAccount: true,
+      },
+    });
+    firestore.channels.set('demo-team', {
+      id: 'demo-team', name: 'Demo Team', description: 'Demo', audience: 'all', order: 9,
+      active: true, demoSandbox: true, memberIds: ['demo-1', 'owner-1'],
+    });
+    firestore.users.set('demo-1', { status: 'active', demoAccount: true, displayName: 'App Review' });
+    firestore.users.set('owner-1', {
+      status: 'active', role: 'owner', displayName: 'Jacob Myers', avatarUrl: 'https://example.com/jacob.png',
+    });
+    firestore.messages.set('demo-team/m1', { authorId: 'demo-1', createdAt: ts('2026-10-09T15:00:00Z') });
+    firestore.reads.set('owner-1/demo-team', { lastReadAt: ts('2026-10-09T16:00:00Z') });
+
+    const res = await GET(req('demo-team', 'm1'), ctx('demo-team'));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.count).toBe(1);
+    expect(json.readers[0].name).toBe('Rep 1');
+    expect(json.readers[0].readAt).toBe('2026-10-09T16:00:00.000Z');
+    expect(json.readers[0]).not.toHaveProperty('avatarUrl');
+    const body = JSON.stringify(json);
+    expect(body).not.toContain('Jacob Myers');
+    expect(body).not.toContain('owner-1');
+  });
 });

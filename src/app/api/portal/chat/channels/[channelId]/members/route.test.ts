@@ -104,6 +104,19 @@ const REP = {
   },
 };
 
+const DEMO = {
+  ok: true as const,
+  user: {
+    uid: 'demo-1',
+    displayName: 'App Review',
+    role: undefined,
+    fieldRole: undefined,
+    effectiveRole: undefined,
+    canModerate: false,
+    demoAccount: true,
+  },
+};
+
 beforeEach(() => {
   firestore.reset();
   mockGetUser.mockReset();
@@ -353,5 +366,54 @@ describe('GET /api/portal/chat/channels/[channelId]/members', () => {
 
     expect(res.status).toBe(403);
     expect(firestore.adminDb.getAll).not.toHaveBeenCalled();
+  });
+
+  it('never shows a demo caller the real names, photos or uids of sandbox admins/owners', async () => {
+    mockGetUser.mockResolvedValue(DEMO);
+    firestore.users.set('demo-1', { status: 'active', demoAccount: true, displayName: 'App Review' });
+    firestore.users.set('owner-1', {
+      status: 'active', role: 'owner', displayName: 'Jacob Myers', avatarUrl: 'https://example.com/jacob.png',
+    });
+    firestore.users.set('admin-1', { status: 'active', role: 'admin', displayName: 'Admin One' });
+    firestore.channels.set('demo-team', {
+      id: 'demo-team', name: 'Demo Team', description: 'Demo', audience: 'all', order: 9,
+      active: true, demoSandbox: true, memberIds: ['demo-1', 'owner-1', 'admin-1'],
+    });
+
+    const res = await GET(req('demo-team'), ctx('demo-team'));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.memberCount).toBe(3);
+    const body = JSON.stringify(json);
+    expect(body).not.toContain('Jacob Myers');
+    expect(body).not.toContain('Admin One');
+    expect(body).not.toContain('jacob.png');
+    expect(body).not.toContain('owner-1');
+    expect(body).not.toContain('admin-1');
+    // The caller's own row is left as is.
+    expect(json.members).toContainEqual({ uid: 'demo-1', name: 'App Review', role: '', isExtra: false });
+    const others = json.members.filter((m: { uid: string }) => m.uid !== 'demo-1');
+    expect(others.map((m: { name: string }) => m.name).sort()).toEqual(['Rep 1', 'Rep 2']);
+    for (const member of others) expect(member).not.toHaveProperty('avatarUrl');
+  });
+
+  it('offers only active users as addable (members/manage refuses pending hires)', async () => {
+    mockGetUser.mockResolvedValue(ADMIN);
+    firestore.users.set('admin-1', { status: 'active', role: 'admin', displayName: 'Admin One' });
+    firestore.users.set('rep-3', { status: 'active', fieldRole: 'entry_rep', displayName: 'Rep Three' });
+    firestore.users.set('pending-hire', {
+      status: 'pending', fieldRole: 'entry_level_rep', displayName: 'Pending Hire',
+    });
+    firestore.channels.set('all-company', {
+      id: 'all-company', name: 'All Company', description: 'Company-wide', audience: 'all', order: 1,
+      active: true, memberIds: ['admin-1'],
+    });
+
+    const res = await GET(req('all-company'), ctx('all-company'));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.addable.map((u: { uid: string }) => u.uid)).toEqual(['rep-3']);
   });
 });
