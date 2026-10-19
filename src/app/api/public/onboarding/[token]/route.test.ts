@@ -238,6 +238,33 @@ describe('GET /api/public/onboarding/[token]', () => {
     await expect(response.json()).resolves.toMatchObject({ items: [], locked: true, closed: true });
   });
 
+  it('marks a lapsed open invite expired', async () => {
+    inviteData.expiresAt = { toDate: () => new Date('2020-01-01T00:00:00.000Z') };
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+    expect(response.status).toBe(410);
+    expect(inviteRef.set).toHaveBeenCalledWith(expect.objectContaining({ status: 'expired' }), { merge: true });
+  });
+
+  it.each(['submitted', 'approved', 'converted'])(
+    'keeps a %s invite locked past its expiry and never rewrites it to expired',
+    async (status) => {
+      inviteData.status = status;
+      inviteData.expiresAt = { toDate: () => new Date('2020-01-01T00:00:00.000Z') };
+      const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ items: [], locked: true, invite: { status } });
+      expect(inviteRef.set).not.toHaveBeenCalled();
+    }
+  );
+
+  it('keeps a rejected invite closed past its expiry without rewriting it', async () => {
+    inviteData.status = 'rejected';
+    inviteData.expiresAt = { toDate: () => new Date('2020-01-01T00:00:00.000Z') };
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+    await expect(response.json()).resolves.toMatchObject({ locked: true, closed: true });
+    expect(inviteRef.set).not.toHaveBeenCalled();
+  });
+
   it('locks the invite before any data entry when the email is onboarding through another invite', async () => {
     getUserByEmailMock.mockResolvedValue({ uid: 'pending-user' });
     userDocGetMock.mockResolvedValue({
@@ -331,6 +358,18 @@ describe('POST /api/public/onboarding/[token]', () => {
 
     expect(response.status).toBe(400);
   });
+
+  it.each(['submitted', 'approved', 'converted'])(
+    'refuses a %s invite past its expiry without rewriting it to expired',
+    async (status) => {
+      inviteData.status = status;
+      inviteData.expiresAt = { toDate: () => new Date('2020-01-01T00:00:00.000Z') };
+      const response = await POST(request({ onboarding_submission: 'completed' }), params());
+      expect(response.status).toBe(400);
+      expect(inviteRef.set).not.toHaveBeenCalled();
+      expect(batchSetMock).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(['rejected', 'expired'])('refuses a %s invite without touching the account', async (status) => {
     inviteData.status = status;

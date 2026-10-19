@@ -18,6 +18,15 @@ import { isEsignItem } from '@/lib/onboarding/esign';
 import { findActivePortalAccount, findAuthAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
 import { issueSigningSession } from '@/lib/onboarding/inviteSigning';
 
+/**
+ * Only a packet still being filled in can lapse. A submitted, approved,
+ * converted or rejected invite keeps its status past expiresAt, so a late tap
+ * on the old email can't flip it to 'expired' (which reopens it for Resend).
+ */
+function lapsedOpenInvite(data: { status?: unknown; expiresAt?: FirebaseFirestore.Timestamp }) {
+  return (data.status === 'invited' || data.status === 'in_progress') && isInviteExpired(data.expiresAt);
+}
+
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
@@ -50,7 +59,10 @@ export async function GET(
     }
 
     const data = invite.data;
-    if (isInviteExpired(data.expiresAt) || data.status === 'expired') {
+    if (data.status === 'expired') {
+      return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
+    }
+    if (lapsedOpenInvite(data)) {
       await invite.ref.set({ status: 'expired', updatedAt: new Date() }, { merge: true });
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
     }
@@ -145,7 +157,7 @@ export async function POST(
     }
 
     const data = invite.data;
-    if (isInviteExpired(data.expiresAt)) {
+    if (lapsedOpenInvite(data)) {
       await invite.ref.set({ status: 'expired', updatedAt: new Date() }, { merge: true });
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
     }
