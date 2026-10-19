@@ -115,8 +115,6 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
   // resize repaints these, scaled to fit, instead of losing the signature.
   const strokes = useRef<{ x: number; y: number }[][]>([]);
   const inkBox = useRef<{ width: number; height: number } | null>(null);
-  // Typing is faster than rendering; only the newest render may report back.
-  const typeRequest = useRef(0);
   // Set on the first keystroke so an empty Type tab never clears a signature
   // carried over from an earlier document in the set.
   const typedTouched = useRef(false);
@@ -190,13 +188,19 @@ export function SignaturePad({ value, signerName = '', onChange }: Props) {
   useEffect(() => {
     if (tab !== 'type') return;
     if (!typedName.trim() && !typedTouched.current) return;
-    const request = typeRequest.current + 1;
-    typeRequest.current = request;
+    // Rendering waits on the script font, which can take seconds on a cold
+    // cellular load. A newer keystroke, a switch to Draw or leaving the page
+    // all cancel this render, so a late typed PNG can never replace ink the
+    // rep drew in the meantime.
+    let cancelled = false;
 
     void renderTypedSignature(typedName).then((png) => {
-      if (typeRequest.current !== request) return; // A newer keystroke won.
+      if (cancelled) return;
       onChange(png, 'type');
     });
+    return () => {
+      cancelled = true;
+    };
   }, [tab, typedName, onChange]);
 
   const pointIn = (event: React.PointerEvent<HTMLCanvasElement>) => {

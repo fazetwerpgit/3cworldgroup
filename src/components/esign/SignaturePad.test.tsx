@@ -189,3 +189,93 @@ describe('SignaturePad drawing through a rotation', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('SignaturePad typed render racing a switch to Draw', () => {
+  function pointer(type: string, x: number, y: number, pointerId = 1) {
+    const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
+    Object.assign(event, { pointerId, pointerType: 'touch' });
+    return event;
+  }
+
+  it('drops a typed render that finishes after the rep switches to Draw and signs', async () => {
+    let releaseFont = () => {};
+    const fontLoaded = new Promise<void>((resolve) => {
+      releaseFont = resolve;
+    });
+    Object.defineProperty(document, 'fonts', {
+      configurable: true,
+      value: { load: () => fontLoaded },
+    });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      width: 400,
+      height: 160,
+    } as DOMRect);
+    const ctx = {
+      scale: vi.fn(),
+      beginPath: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      stroke: vi.fn(),
+      clearRect: vi.fn(),
+      fillText: vi.fn(),
+      measureText: () => ({ width: 200, actualBoundingBoxAscent: 70, actualBoundingBoxDescent: 20 }),
+      getImageData: (_x: number, _y: number, w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4).fill(255) }),
+      drawImage: vi.fn(),
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,SIG');
+    HTMLCanvasElement.prototype.setPointerCapture = vi.fn();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      }
+    );
+    const onChange = vi.fn();
+
+    try {
+      // Opens on Type with the name seeded, which starts a render that waits on the font.
+      await act(async () => {
+        root.render(
+          <SignaturePad
+            value={{ png: 'data:image/png;base64,OLD', method: 'type' }}
+            signerName="Sam Rep"
+            onChange={onChange}
+          />
+        );
+      });
+      expect(onChange).not.toHaveBeenCalled();
+
+      const drawTab = [...container.querySelectorAll<HTMLButtonElement>('button[role="tab"]')].find(
+        (button) => button.textContent === 'Draw'
+      );
+      if (!drawTab) throw new Error('Draw tab did not render');
+      await act(async () => {
+        drawTab.click();
+      });
+      const canvas = container.querySelector('canvas');
+      if (!canvas) throw new Error('pad did not render');
+      await act(async () => {
+        canvas.dispatchEvent(pointer('pointerdown', 100, 40));
+        canvas.dispatchEvent(pointer('pointerup', 100, 40));
+      });
+      expect(onChange).toHaveBeenLastCalledWith('data:image/png;base64,SIG', 'draw');
+
+      // The font finally arrives: the stale typed render must not report back.
+      await act(async () => {
+        releaseFont();
+        await fontLoaded;
+      });
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).not.toHaveBeenCalledWith(expect.anything(), 'type');
+    } finally {
+      delete (document as unknown as { fonts?: unknown }).fonts;
+      vi.unstubAllGlobals();
+    }
+  });
+});
