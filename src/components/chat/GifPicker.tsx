@@ -21,7 +21,8 @@ type AuthedFetch = (url: string, init?: RequestInit) => Promise<Response>;
  * Anchored GIF search popover. Mount it inside a `relative` wrapper in the
  * composer; it positions itself above the trigger. Fetches GIPHY trending GIFs
  * on open, then debounced search (300ms) as the query changes. Tapping a GIF
- * fires `onSelect` and closes. Closes on Esc or an outside click. The parent
+ * fires `onSelect` and closes. Closes on Esc or a click outside the wrapper
+ * (so the trigger in the same wrapper can toggle it shut). The parent
  * only renders this when the GIF feature probed as enabled.
  */
 export function GifPicker({
@@ -42,8 +43,12 @@ export function GifPicker({
 
   // Outside-click + Esc to dismiss; focus the search box on open (browser only).
   useEffect(() => {
+    // Presses inside the composer wrapper (the panel plus its GIF trigger) don't
+    // count as outside: otherwise tapping GIF to close would close here on
+    // mousedown and the trigger's toggle would reopen it on click.
     const onDown = (event: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) onClose();
+      const anchor = panelRef.current?.parentElement ?? panelRef.current;
+      if (anchor && !anchor.contains(event.target as Node)) onClose();
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
