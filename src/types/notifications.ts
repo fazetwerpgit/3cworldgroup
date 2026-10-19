@@ -21,7 +21,9 @@ export type NotificationType =
   | 'activation_ready'
   | 'rep_activated'
   | 'pending_assignment'
-  | 'alert_task';
+  | 'alert_task'
+  | 'solar_lead'
+  | 'solar_booking';
 
 export interface Notification {
   id: string;
@@ -66,4 +68,6 @@ export const NOTIFICATION_COLORS: Record<NotificationType, string> = {
   rep_activated: 'bg-blue-50 text-blue-700',
   pending_assignment: 'bg-blue-50 text-blue-700',
   alert_task: 'bg-orange-50 text-orange-700',
+  solar_lead: 'bg-amber-50 text-amber-700',
+  solar_booking: 'bg-amber-50 text-amber-700',
 };

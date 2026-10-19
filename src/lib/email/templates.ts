@@ -252,3 +252,54 @@ export function formSubmissionEmail(p: { formName: string; submittedBy: string; 
     htmlBody: layout(subject, `<p>${esc(submittedBy)} submitted a <strong>${esc(p.formName)}</strong>.</p><p><a href="${esc(p.link)}">Review submission</a></p>`),
   };
 }
+
+export function solarLeadAlertEmail(p: {
+  repName: string;
+  customerName: string;
+  address: string;
+  phone: string;
+  email: string;
+  monthlyBill: string;
+  link: string;
+}): EmailContent {
+  const subject = `New solar lead: ${p.customerName}`;
+  const rows: [string, string][] = [
+    ['Customer', p.customerName],
+    ['Address', p.address],
+    ['Phone', p.phone],
+    ['Email', p.email],
+    ['Monthly bill', p.monthlyBill],
+    ['Submitted by', p.repName || 'A team member'],
+  ];
+  const filled = rows.filter(([, v]) => v);
+  return {
+    subject,
+    textBody: `${filled.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nOpen the portal: ${p.link}\n`,
+    htmlBody: layout(
+      subject,
+      `<table style="border-collapse:collapse">${filled
+        .map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#5a5f68">${esc(k)}</td><td style="padding:4px 0"><strong>${esc(v)}</strong></td></tr>`)
+        .join('')}</table><p><a href="${esc(p.link)}">Open in portal</a></p>`
+    ),
+  };
+}
+
+export function solarBookingConfirmationEmail(p: {
+  customerName: string;
+  when: string;
+  mode: 'virtual' | 'in_person';
+  consultantName: string;
+}): EmailContent {
+  const subject = 'Your solar consultation is booked';
+  const how = p.mode === 'virtual' ? 'a virtual consultation' : 'an in-person consultation';
+  const line = `You are booked for ${how} with ${p.consultantName} on ${p.when} (Pacific Time).`;
+  const greeting = p.customerName ? `Hi ${p.customerName},` : 'Hi,';
+  return {
+    subject,
+    textBody: `${greeting}\n\n${line}\n\nIf you need to change the time, reply to this email.\n\n3C World Group\n`,
+    htmlBody: layout(
+      subject,
+      `<p>${esc(greeting)}</p><p>You are booked for <strong>${esc(how)}</strong> with <strong>${esc(p.consultantName)}</strong> on <strong>${esc(p.when)}</strong> (Pacific Time).</p><p>If you need to change the time, reply to this email.</p>`
+    ),
+  };
+}
