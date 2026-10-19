@@ -13,6 +13,7 @@ import {
 import { auth } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
+import { warmPopupResolver } from '@/lib/firebase/warmPopupResolver';
 import {
   APPLE_PROVIDER_ID,
   GOOGLE_PROVIDER_ID,
@@ -56,6 +57,11 @@ export default function LinkedSignInMethods() {
   useEffect(() => {
     setProviders(providerIdsOf(auth?.currentUser));
   }, []);
+
+  // Web only: the Google link popup must open inside the tap (see warmPopupResolver).
+  useEffect(() => {
+    if (!inApp) warmPopupResolver();
+  }, [inApp]);
 
   const refresh = async (user: FirebaseUser) => {
     try {

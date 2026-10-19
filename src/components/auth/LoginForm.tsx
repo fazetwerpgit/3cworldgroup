@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertCircle, CircleCheck, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import {
@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
+import { warmPopupResolver } from '@/lib/firebase/warmPopupResolver';
 import type { NativeSignInProvider } from '@/lib/app/bridge';
 import {
   completePendingLink,
@@ -98,6 +99,12 @@ export function LoginForm() {
   // person signs in with that method and the native one is linked to it.
   const [linkPrompt, setLinkPrompt] = useState<string | null>(null);
   const [linkNotice, setLinkNotice] = useState('');
+
+  // Web only: get Google's popup iframe loading now, so the button's popup
+  // opens inside the tap on iPhone/Safari (see warmPopupResolver).
+  useEffect(() => {
+    if (!inApp) warmPopupResolver();
+  }, [inApp]);
 
   // After any successful sign-in in the app, attach a held native credential.
   const finishPendingLink = async () => {
