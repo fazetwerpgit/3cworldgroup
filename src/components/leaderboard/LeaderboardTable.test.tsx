@@ -137,6 +137,23 @@ describe('plan mix', () => {
     expect(gold.querySelector('[data-testid="plan-mix"]')?.textContent).toContain('10× 1 Gig');
   });
 
+  it('names the solar line by consult type for screen readers, on the rows and the podium', () => {
+    const modes = [{ tier: 'Virtual', count: 3 }, { tier: 'In person', count: 1 }];
+    act(() => {
+      root.render(
+        <LeaderboardTable
+          entries={[entry(1, { planMix: modes }), entry(2), entry(3), entry(4, { planMix: modes })]}
+          currentUser={null}
+          metric="bookedConsults"
+          period="week"
+        />
+      );
+    });
+    const lines = [...container.querySelectorAll<HTMLElement>('[data-testid="plan-mix"] [class*="srOnly"]')].map((el) => el.textContent);
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+    for (const line of lines) expect(line).toBe('Consults by type: 3× Virtual · 1× In person');
+  });
+
   it('prints nothing for a rep without a mix', () => {
     renderBoard([entry(1), entry(2), entry(3), entry(4)]);
     expect(container.querySelector('[data-testid="plan-mix"]')).toBeNull();

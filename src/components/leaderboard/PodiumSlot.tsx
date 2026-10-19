@@ -1,7 +1,7 @@
 import { Avatar } from './Avatar';
 import { MetricValue } from './MetricValue';
 import { PlanMixLine } from './PlanMixLine';
-import type { LeaderboardEntry, LeaderboardMetric } from './LeaderboardTable';
+import { leaderboardMixLabel, type LeaderboardEntry, type LeaderboardMetric } from './LeaderboardTable';
 import styles from './leaderboard.module.css';
 
 /** The winner's crown. Solid gold rather than the outline icon this replaced:
@@ -106,7 +106,7 @@ export function PodiumSlot({ entry, rank, metric, currentUser }: PodiumSlotProps
         {rank === 1 ? <Crown /> : null}
         <Avatar entry={entry} size={rank === 1 ? 'center' : 'side'} tone={avatarTone} />
         <strong className={styles.podiumName}>{entry?.salesRepName ?? 'Open'}</strong>
-        <PlanMixLine mix={entry?.planMix} className={styles.podiumMix} />
+        <PlanMixLine mix={entry?.planMix} className={styles.podiumMix} label={leaderboardMixLabel(metric)} />
         {entry ? <MetricValue entry={entry} metric={metric} size="podium" /> : null}
       </div>
       <div className={styles.block}>

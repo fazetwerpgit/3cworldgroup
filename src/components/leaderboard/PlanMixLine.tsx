@@ -13,7 +13,16 @@ import styles from './leaderboard.module.css';
  *  counts as much as on the width, so the forms are measured (a hidden copy of
  *  each) rather than guessed from a CSS breakpoint. Screen readers always get
  *  the full line. Counts only, nothing when empty. */
-export function PlanMixLine({ mix, className }: { mix?: PlanMixEntry[] | null; className?: string }) {
+export function PlanMixLine({
+  mix,
+  className,
+  label = 'Plan mix',
+}: {
+  mix?: PlanMixEntry[] | null;
+  className?: string;
+  /** What screen readers hear before the line: the solar board's mix is consult modes, not plans. */
+  label?: string;
+}) {
   const forms = planMixForms(mix);
   const key = forms.join('|');
   const boxRef = useRef<HTMLSpanElement>(null);
@@ -52,7 +61,7 @@ export function PlanMixLine({ mix, className }: { mix?: PlanMixEntry[] | null; c
 
   return (
     <span ref={boxRef} className={`${styles.mix} ${className ?? ''}`} data-testid="plan-mix" data-form={index}>
-      <span className={styles.srOnly}>Plan mix: {formatPlanMix(mix)}</span>
+      <span className={styles.srOnly}>{label}: {formatPlanMix(mix)}</span>
       <span className={styles.mixText} aria-hidden="true">
         {forms[index]}
       </span>

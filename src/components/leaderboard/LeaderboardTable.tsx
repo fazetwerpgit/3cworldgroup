@@ -64,6 +64,11 @@ export function leaderboardNoun(metric: LeaderboardMetric, count: number) {
   return count === 1 ? one : `${one}s`;
 }
 
+/** The screen-reader name of the line under a rep: plans on fiber, consult modes on solar. */
+export function leaderboardMixLabel(metric: LeaderboardMetric) {
+  return metric === 'bookedConsults' ? 'Consults by type' : 'Plan mix';
+}
+
 export function formatLeaderboardValue(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
 }

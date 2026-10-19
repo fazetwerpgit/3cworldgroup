@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import { Avatar } from './Avatar';
 import { MetricValue } from './MetricValue';
 import { PlanMixLine } from './PlanMixLine';
-import type { LeaderboardEntry, LeaderboardMetric } from './LeaderboardTable';
+import { leaderboardMixLabel, type LeaderboardEntry, type LeaderboardMetric } from './LeaderboardTable';
 import styles from './leaderboard.module.css';
 
 interface LeaderboardRowsProps {
@@ -52,7 +52,7 @@ export function LeaderboardRows({ entries, metric, currentUser, zeros = [] }: Le
                 <span>{entry.salesRepName}</span>
                 {isCurrentUser ? <em>You</em> : null}
               </strong>
-              <PlanMixLine mix={entry.planMix} className={styles.rowMix} />
+              <PlanMixLine mix={entry.planMix} className={styles.rowMix} label={leaderboardMixLabel(metric)} />
             </span>
             <MetricValue entry={entry} metric={metric} />
           </div>
