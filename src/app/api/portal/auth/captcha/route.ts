@@ -11,11 +11,16 @@ let warnedUnconfigured = false;
 export async function POST(request: Request) {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
   if (!secret) {
+    // Production fails closed: a deploy that lost its secret must not wave
+    // every signup through. Local dev and tests keep working without one.
+    const production = process.env.NODE_ENV === 'production';
     if (!warnedUnconfigured) {
-      console.warn('reCAPTCHA is unconfigured; portal signup captcha is disabled.');
+      console.warn(production
+        ? 'RECAPTCHA_SECRET_KEY is unset in production; portal signup captcha fails closed.'
+        : 'reCAPTCHA is unconfigured; portal signup captcha is disabled.');
       warnedUnconfigured = true;
     }
-    return NextResponse.json({ ok: true, unconfigured: true });
+    return NextResponse.json(production ? { ok: false, unconfigured: true } : { ok: true, unconfigured: true });
   }
 
   try {

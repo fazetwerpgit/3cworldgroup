@@ -4,6 +4,23 @@ import { createAlertTask } from '@/lib/alerts/alertTasks';
 import { looksLikeBotSignup } from '@/lib/auth/botDetection';
 import { isValidTeamCode, signupNotifyLimiter } from '@/lib/auth/teamCode';
 import { clientIp } from '@/lib/rateLimit';
+import { getInviteByToken, inviteSignupState } from '@/lib/recruiting/inviteLookup';
+
+const INVITE_TOKEN_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
+
+/** A password signup passes the gate with the team code or an open 3C invite. */
+async function passesSignupGate(body: { code?: unknown; inviteToken?: unknown } | null): Promise<boolean> {
+  if (isValidTeamCode(body?.code, process.env.PORTAL_TEAM_CODE)) return true;
+  const token = body?.inviteToken;
+  if (typeof token !== 'string' || !INVITE_TOKEN_SHAPE.test(token)) return false;
+  try {
+    const invite = await getInviteByToken(token);
+    return invite ? inviteSignupState(invite.data) === 'open' : false;
+  } catch (error) {
+    console.error('[signup-notify] Invite check failed:', error);
+    return false;
+  }
+}
 
 // Called right after a self-signup writes its pending users doc: by
 // AuthContext.signUp with the team code in the body, and by the Google (web
@@ -37,14 +54,26 @@ export async function POST(request: Request) {
 
   // A first sign-in with Google, or Sign in with Apple in the 3C iOS app,
   // creates the pending profile itself with no signup form and no team code.
+  // A password signup must carry the team code (or its open 3C invite token):
+  // the client form checks it first, but the server is the gate. One that
+  // fails is flagged suspectedBot, which keeps it out of the admin pending
+  // queue and raises no alert, so skipping the form's check gets nowhere.
   if (signInProvider !== 'google.com' && signInProvider !== 'apple.com') {
-    let code: unknown;
+    let body: { code?: unknown; inviteToken?: unknown } | null;
     try {
-      code = ((await request.json()) as { code?: unknown } | null)?.code;
+      body = (await request.json()) as { code?: unknown; inviteToken?: unknown } | null;
     } catch {
-      code = undefined;
+      body = null;
     }
-    if (!isValidTeamCode(code, process.env.PORTAL_TEAM_CODE)) {
+    if (!(await passesSignupGate(body))) {
+      try {
+        const snap = await adminDb.doc(`users/${uid}`).get();
+        if (snap.exists && snap.get('status') === 'pending' && !snap.get('fieldRole')) {
+          await adminDb.doc(`users/${uid}`).update({ suspectedBot: true, signupGateFailed: true, updatedAt: new Date() });
+        }
+      } catch (error) {
+        console.error('[signup-notify] Failed to flag ungated signup:', error);
+      }
       return NextResponse.json({ error: 'A valid team code is required' }, { status: 403 });
     }
   }

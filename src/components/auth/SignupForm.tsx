@@ -228,7 +228,7 @@ export function SignupForm() {
         setError(gateError);
         return;
       }
-      await signUp(email.trim(), password, displayName.trim(), teamCode);
+      await signUp(email.trim(), password, displayName.trim(), teamCode, invited ? invite.token : undefined);
       // AuthContext set pendingApproval; go to /portal, which renders the
       // real PendingApproval component (this page only knows how to show the form).
       router.replace("/portal");

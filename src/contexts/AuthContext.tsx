@@ -34,7 +34,7 @@ import { preloadOwnerDashboard } from '@/components/portal/owner/preloadOwnerDas
 
 export interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string, teamCode: string) => Promise<void>;
+  signUp: (email: string, password: string, displayName: string, teamCode: string, inviteToken?: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -101,16 +101,16 @@ function syncAvatarFromAuth(firebaseUser: FirebaseUser) {
 // code (checked server-side); the Google first sign-in sends none and is
 // accepted by its google.com sign-in provider. The token is fetched before the
 // caller signs out.
-async function notifyPendingSignup(firebaseUser: FirebaseUser, teamCode?: string) {
+async function notifyPendingSignup(firebaseUser: FirebaseUser, gate?: { code: string; inviteToken?: string }) {
   try {
     const idToken = await firebaseUser.getIdToken();
     void fetch('/api/portal/auth/signup-notify', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${idToken}`,
-        ...(teamCode !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(gate !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
-      ...(teamCode !== undefined ? { body: JSON.stringify({ code: teamCode }) } : {}),
+      ...(gate !== undefined ? { body: JSON.stringify(gate) } : {}),
     }).catch(() => {});
   } catch {
     // Best-effort: a missed alert must never fail the signup.
@@ -505,7 +505,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, displayName: string, teamCode: string) => {
+  const signUp = async (email: string, password: string, displayName: string, teamCode: string, inviteToken?: string) => {
     if (!auth || !db) throw new Error('auth/not-configured');
     signingUp.current = true;
     setState((prev) => ({ ...prev, loading: true, error: null }));
@@ -527,7 +527,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           status: 'pending',
           createdAt: serverTimestamp(),
         });
-        await notifyPendingSignup(cred.user, teamCode);
+        await notifyPendingSignup(cred.user, inviteToken ? { code: teamCode, inviteToken } : { code: teamCode });
       } catch (docError) {
         // Roll back the just-created auth account so the profile write can be
         // retried cleanly instead of failing with email-already-in-use.

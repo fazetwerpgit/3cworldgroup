@@ -3,9 +3,9 @@ import { NextRequest } from 'next/server';
 
 const fake = vi.hoisted(() => ({
   doc: { exists: true, data: {} as Record<string, unknown> },
-  update: vi.fn(async (_data: Record<string, unknown>) => undefined),
+  update: vi.fn<(data: Record<string, unknown>) => Promise<undefined>>(async () => undefined),
   remove: vi.fn(async () => undefined),
-  deleteFiles: vi.fn(async (_opts: { prefix: string }) => undefined),
+  deleteFiles: vi.fn<(opts: { prefix: string; force: boolean }) => Promise<undefined>>(async () => undefined),
 }));
 
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({

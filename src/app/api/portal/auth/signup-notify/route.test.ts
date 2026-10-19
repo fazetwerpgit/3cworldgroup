@@ -1,16 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { verifyIdTokenMock, userGetMock, createAlertTaskMock } = vi.hoisted(() => ({
+const { verifyIdTokenMock, userGetMock, userUpdateMock, createAlertTaskMock, getInviteMock } = vi.hoisted(() => ({
   verifyIdTokenMock: vi.fn(),
   userGetMock: vi.fn(),
+  userUpdateMock: vi.fn(),
   createAlertTaskMock: vi.fn(),
+  getInviteMock: vi.fn(),
 }));
 
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: { verifyIdToken: verifyIdTokenMock },
-  adminDb: { doc: vi.fn((path: string) => ({ get: () => userGetMock(path), update: vi.fn() })) },
+  adminDb: { doc: vi.fn((path: string) => ({ get: () => userGetMock(path), update: userUpdateMock })) },
 }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ createAlertTask: createAlertTaskMock }));
+vi.mock('@/lib/recruiting/inviteLookup', () => ({
+  getInviteByToken: getInviteMock,
+  inviteSignupState: (data: { status?: string }) => (data.status === 'open' ? 'open' : data.status === 'submitted' ? 'submitted' : null),
+}));
 
 import { POST } from './route';
 import { signupNotifyLimiter } from '@/lib/auth/teamCode';
@@ -80,6 +86,34 @@ describe('POST /api/portal/auth/signup-notify', () => {
       const response = await POST(request({ token: 'token-new-user', body }));
       expect(response.status).toBe(403);
     }
+    expect(createAlertTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('flags a password signup that skipped the team code check, keeping it out of the pending queue', async () => {
+    const response = await POST(request({ token: 'token-new-user', body: { code: 'guess' } }));
+
+    expect(response.status).toBe(403);
+    expect(userUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ suspectedBot: true, signupGateFailed: true }));
+    expect(createAlertTaskMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a password signup from an open 3C invite without the team code', async () => {
+    getInviteMock.mockResolvedValue({ data: { status: 'open' } });
+    const response = await POST(
+      request({ token: 'token-new-user', body: { code: '', inviteToken: 'a'.repeat(43) } })
+    );
+
+    expect(response.status).toBe(200);
+    expect(userUpdateMock).not.toHaveBeenCalled();
+    expect(createAlertTaskMock).toHaveBeenCalledWith(expect.objectContaining({ subjectUserId: 'new-user' }));
+  });
+
+  it('refuses an invite that is no longer open, or a malformed token', async () => {
+    getInviteMock.mockResolvedValue({ data: { status: 'submitted' } });
+    expect((await POST(request({ token: 'token-new-user', body: { inviteToken: 'a'.repeat(43) } }))).status).toBe(403);
+    getInviteMock.mockClear();
+    expect((await POST(request({ token: 'token-new-user', body: { inviteToken: '../x' } }))).status).toBe(403);
+    expect(getInviteMock).not.toHaveBeenCalled();
     expect(createAlertTaskMock).not.toHaveBeenCalled();
   });
 
