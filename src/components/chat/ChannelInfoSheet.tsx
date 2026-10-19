@@ -19,6 +19,7 @@ const audienceCopy: Record<ChatChannel['audience'], string> = {
   field: 'Field users',
   managers: 'Managers',
   platform: 'Admin/Ops',
+  solar: 'Solar team',
 };
 
 interface ChannelMember {
