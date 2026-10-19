@@ -21,7 +21,13 @@ export async function saveInstallDate(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const token = await getIdToken();
+    // A stale token refreshes over the network, so the same timer covers it.
+    const token = await Promise.race([
+      getIdToken(),
+      new Promise<never>((_, reject) => {
+        controller.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      }),
+    ]);
     const response = await fetch(`/api/portal/sales/${encodeURIComponent(saleId)}/install-date`, {
       method: 'PATCH',
       headers: {

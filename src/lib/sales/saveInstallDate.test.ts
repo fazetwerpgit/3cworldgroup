@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'tok') }));
 
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import {
   INSTALL_SAVE_FAILED_MESSAGE,
   NO_SIGNAL_INSTALL_MESSAGE,
@@ -73,5 +74,16 @@ describe('saveInstallDate', () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(await pending).toEqual({ ok: false, error: NO_SIGNAL_INSTALL_MESSAGE });
+  });
+
+  it('gives up when the token refresh itself hangs on no signal', async () => {
+    vi.useFakeTimers();
+    vi.mocked(getIdToken).mockImplementationOnce(() => new Promise(() => {}));
+
+    const pending = saveInstallDate('s1', '2026-10-01', { timeoutMs: 1000 });
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(await pending).toEqual({ ok: false, error: NO_SIGNAL_INSTALL_MESSAGE });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
