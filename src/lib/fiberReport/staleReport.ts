@@ -42,9 +42,19 @@ export function newestStamp(incoming: ReportStamp, loaded: Partial<ReportStamp> 
   return { sentAt: later(incoming.sentAt, loaded?.sentAt), asOf: later(incoming.asOf, loaded?.asOf) };
 }
 
-/** An RFC 2822 mail Date header as ISO, or null. */
-export function mailSentAt(header: unknown): string | null {
+/** How far a mail Date header may run ahead of our receipt (sender clock skew). */
+export const MAIL_DATE_MAX_SKEW_MS = 15 * 60 * 1000;
+
+/**
+ * An RFC 2822 mail Date header as ISO, or null. With `receivedAt`, a date
+ * further in the future than the clock skew allows is ignored: the stamp only
+ * moves forward, so one future-dated mail would otherwise skip every real
+ * report after it as "older".
+ */
+export function mailSentAt(header: unknown, receivedAt?: string): string | null {
   if (typeof header !== 'string' || !header.trim()) return null;
   const time = Date.parse(header);
-  return Number.isNaN(time) ? null : new Date(time).toISOString();
+  if (Number.isNaN(time)) return null;
+  if (receivedAt && time > Date.parse(receivedAt) + MAIL_DATE_MAX_SKEW_MS) return null;
+  return new Date(time).toISOString();
 }

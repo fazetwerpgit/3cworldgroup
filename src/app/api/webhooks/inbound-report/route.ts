@@ -26,6 +26,8 @@ type InboundAttachment = {
 
 type InboundPayload = {
   From?: string;
+  /** Postmark's parsed From: the bare address lives in Email. */
+  FromFull?: { Email?: string };
   Subject?: string;
   /** The mail's own Date header (RFC 2822). */
   Date?: string;
@@ -59,6 +61,30 @@ function importLog(
 async function writeImportLog(entry: FiberReportImport): Promise<void> {
   if (!adminDb) throw new Error('Database not configured');
   await adminDb.collection('fiberReportImports').add(entry);
+}
+
+/** The sender's bare address, lowercased: Postmark's FromFull.Email, else the <addr> in From. */
+function senderAddress(body: InboundPayload): string {
+  const full = typeof body.FromFull?.Email === 'string' ? body.FromFull.Email : '';
+  const from = typeof body.From === 'string' ? body.From : '';
+  const address = full || from.match(/<([^>]+)>/)?.[1] || from;
+  return address.trim().toLowerCase();
+}
+
+/**
+ * Whether the carrier report may come from this sender. FIBER_REPORT_SENDERS
+ * lists the allowed addresses and/or @domains, comma-separated. Unset, every
+ * sender is accepted (the Postmark token is then the only gate).
+ */
+function senderAllowed(address: string): boolean {
+  const allowed = (process.env.FIBER_REPORT_SENDERS ?? '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowed.length) return true;
+  if (!address) return false;
+  const domain = address.slice(address.lastIndexOf('@'));
+  return allowed.some((entry) => (entry.startsWith('@') ? entry === domain : entry === address));
 }
 
 /** The newest report stamp loaded so far, as config/fiberReportStatus records it. */
@@ -162,6 +188,15 @@ export async function POST(request: NextRequest) {
     }
 
     filename = attachment.Name!;
+    // The token proves Postmark made the call, not who sent the mail: a
+    // workbook from anyone else must not rewrite orders or notify reps.
+    if (!senderAllowed(senderAddress(body))) {
+      console.log(`[inbound-report] refused a report from a sender not on FIBER_REPORT_SENDERS: ${fromEmail}`);
+      await writeImportLog(
+        importLog(receivedAt, filename, fromEmail, subject, { error: 'refused: sender not allowed' })
+      );
+      return NextResponse.json({ ok: true, skipped: 'sender_not_allowed' });
+    }
     if (typeof attachment.Content !== 'string' || !attachment.Content) {
       throw new Error('xlsx attachment has no base64 content');
     }
@@ -174,7 +209,7 @@ export async function POST(request: NextRequest) {
     // written: two overlapping deliveries can't both pass on the same old stamp,
     // and the stamp only ever moves forward.
     const stamp: ReportStamp = {
-      sentAt: mailSentAt(body.Date),
+      sentAt: mailSentAt(body.Date, receivedAt),
       asOf: reportAsOf(parsed.orders, receivedAt.slice(0, 10)),
     };
     const statusRef = adminDb.collection('config').doc('fiberReportStatus');
@@ -267,30 +302,37 @@ export async function POST(request: NextRequest) {
     // newer report has claimed, its rows must not be overwritten by this one's.
     const fiberOrders = adminDb.collection('fiberOrders');
     let superseded = false;
+    let upserted = 0;
     for (let offset = 0; offset < orders.length && !superseded; offset += 450) {
+      const chunk = orders.slice(offset, offset + 450);
       superseded = await adminDb.runTransaction(async (transaction) => {
         if (isOlderReport(stamp, loadedStamp((await transaction.get(statusRef)).data()))) return true;
-        for (const order of orders.slice(offset, offset + 450)) {
+        for (const order of chunk) {
           transaction.set(fiberOrders.doc(order.id), order, { merge: true });
         }
         return false;
       });
+      if (!superseded) upserted += chunk.length;
     }
 
     // The orders are stored, so the report is safe: record it NOW, before the
     // follow-ups, so freshness and the orders cache key move even if a
-    // follow-up runs past the time limit.
-    await statusRef.set(
-      {
-        lastReportAt: receivedAt,
-        lastFilename: filename,
-        lastUpserted: orders.length,
-      },
-      { merge: true }
-    );
+    // follow-up runs past the time limit. Only while this report still holds
+    // the claim: a newer report's freshness must not move back to this one's.
+    if (!superseded) {
+      superseded = await adminDb.runTransaction(async (transaction) => {
+        if (isOlderReport(stamp, loadedStamp((await transaction.get(statusRef)).data()))) return true;
+        transaction.set(
+          statusRef,
+          { lastReportAt: receivedAt, lastFilename: filename, lastUpserted: upserted },
+          { merge: true }
+        );
+        return false;
+      });
+    }
     // Every instance's orders cache misses on the next read; the board rebuilds.
-    await invalidateFiberOrdersCache();
-    await stageLog('stored', { upserted: orders.length, matchedReps, unmatchedRepNames: [...unmatchedRepNames] });
+    if (upserted) await invalidateFiberOrdersCache();
+    await stageLog('stored', { upserted, matchedReps, unmatchedRepNames: [...unmatchedRepNames] });
 
     // Everything below is a follow-up: the carrier's date is pushed onto the
     // matching sales and the reps are told (lib/fiberReport/reportFollowUps).
@@ -309,7 +351,7 @@ export async function POST(request: NextRequest) {
       followUps = await runReportFollowUps({ db: adminDb, orders, storedOrders, progress: stageLog });
     }
 
-    return NextResponse.json({ ok: true, upserted: orders.length, installDateSync: followUps?.installDateSync ?? null });
+    return NextResponse.json({ ok: true, upserted, installDateSync: followUps?.installDateSync ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[inbound-report]', message);

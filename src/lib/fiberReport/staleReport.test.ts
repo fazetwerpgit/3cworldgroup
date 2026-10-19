@@ -28,4 +28,12 @@ describe('stale carrier reports', () => {
     expect(mailSentAt('garbage')).toBeNull();
     expect(mailSentAt(undefined)).toBeNull();
   });
+
+  it('ignores a mail Date header from the future, so it cannot freeze later reports', () => {
+    const receivedAt = '2026-10-13T10:00:00.000Z';
+    expect(mailSentAt('Fri, 01 Jan 2027 00:00:00 +0000', receivedAt)).toBeNull();
+    // A few minutes of sender clock skew still counts.
+    expect(mailSentAt('Tue, 13 Oct 2026 10:05:00 +0000', receivedAt)).toBe('2026-10-13T10:05:00.000Z');
+    expect(mailSentAt('Tue, 13 Oct 2026 09:00:00 +0000', receivedAt)).toBe('2026-10-13T09:00:00.000Z');
+  });
 });

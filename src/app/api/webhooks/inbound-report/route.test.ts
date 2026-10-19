@@ -56,8 +56,9 @@ vi.mock('@/lib/fiberReport/assignDealer', () => ({ assignDealerToUser: vi.fn() }
 vi.mock('@/lib/fiberReport/rematch', () => ({ rematchUnmatchedOrders: vi.fn() }));
 
 import { POST } from './route';
+import { readStoredOrders } from '@/lib/fiberReport/carrierNotices';
 
-function post() {
+function post(overrides: Data = {}) {
   process.env.POSTMARK_INBOUND_TOKEN = 't';
   return POST(
     new NextRequest('http://localhost/api/webhooks/inbound-report?token=t', {
@@ -67,6 +68,7 @@ function post() {
         Subject: 'Daily',
         Date: 'Tue, 13 Oct 2026 10:00:00 +0000',
         Attachments: [{ Name: 'r.xlsx', Content: Buffer.from('x').toString('base64') }],
+        ...overrides,
       }),
     })
   );
@@ -82,6 +84,7 @@ beforeEach(() => {
   h.autoId = 0;
   h.followUps.mockReset();
   h.invalidate.mockClear();
+  delete process.env.FIBER_REPORT_SENDERS;
 });
 
 describe('POST /api/webhooks/inbound-report', () => {
@@ -118,5 +121,46 @@ describe('POST /api/webhooks/inbound-report', () => {
     const res = await post();
     expect(await res.json()).toEqual({ ok: false });
     expect(importLogs()).toEqual([expect.objectContaining({ error: 'boom', stage: 'stored' })]);
+  });
+
+  it('a report superseded mid-run leaves the newer report\'s freshness alone and logs what it really wrote', async () => {
+    const newer = { lastReportSentAt: '2026-10-14T10:00:00.000Z', lastReportAsOf: '2026-10-14', lastReportAt: 'newer', lastFilename: 'new.xlsx', lastUpserted: 9 };
+    vi.mocked(readStoredOrders).mockImplementationOnce(async () => {
+      // A newer report claims and finishes while this one is matching reps.
+      h.docs.set('config/fiberReportStatus', { ...newer });
+      return new Map();
+    });
+    const res = await post();
+    expect(await res.json()).toMatchObject({ ok: true, upserted: 0 });
+    expect(h.docs.get('config/fiberReportStatus')).toEqual(newer);
+    expect(h.docs.has('fiberOrders/o1')).toBe(false);
+    expect(importLogs()).toEqual([expect.objectContaining({ upserted: 0, stage: 'done' })]);
+    expect(h.followUps).not.toHaveBeenCalled();
+  });
+
+  it('a future-dated mail does not freeze the reports after it', async () => {
+    h.followUps.mockResolvedValue({ installDateSync: null });
+    await post({ Date: 'Fri, 01 Jan 2027 00:00:00 +0000' });
+    expect(h.docs.get('config/fiberReportStatus')?.lastReportSentAt ?? null).not.toBe('2027-01-01T00:00:00.000Z');
+    const res = await post({ Date: new Date().toUTCString() });
+    expect(await res.json()).toMatchObject({ ok: true, upserted: 1 });
+  });
+
+  it('refuses a report from a sender not on FIBER_REPORT_SENDERS', async () => {
+    process.env.FIBER_REPORT_SENDERS = 'reports@carrier.com, @carrier-mail.com';
+    const res = await post({ From: 'Someone <someone@evil.com>' });
+    expect(await res.json()).toEqual({ ok: true, skipped: 'sender_not_allowed' });
+    expect(h.docs.has('fiberOrders/o1')).toBe(false);
+    expect(h.docs.get('config/fiberReportStatus')).toBeUndefined();
+    expect(importLogs()).toEqual([expect.objectContaining({ error: 'refused: sender not allowed' })]);
+    expect(h.followUps).not.toHaveBeenCalled();
+  });
+
+  it('accepts a listed sender address or domain', async () => {
+    process.env.FIBER_REPORT_SENDERS = 'reports@carrier.com, @carrier-mail.com';
+    h.followUps.mockResolvedValue({ installDateSync: null });
+    expect(await (await post({ From: 'Carrier <Reports@Carrier.com>' })).json()).toMatchObject({ ok: true, upserted: 1 });
+    h.docs.clear();
+    expect(await (await post({ From: 'x', FromFull: { Email: 'daily@carrier-mail.com' } })).json()).toMatchObject({ ok: true, upserted: 1 });
   });
 });
