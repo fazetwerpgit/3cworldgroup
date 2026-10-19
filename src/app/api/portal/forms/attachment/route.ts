@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOnboardingBucket } from '@/lib/firebase/admin';
+import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { ATTACHMENT_ROOT, isCleanAttachmentPath } from '@/lib/forms/attachmentPath';
+import { saleProofPaths } from '@/lib/sales/proofPaths';
 
 const SIGNED_URL_TTL_MS = 15 * 60 * 1000;
 
 // GET /api/portal/forms/attachment?path=form-attachments/... - management, or
 // a user reading their OWN uploads (form-attachments/{their uid}/...) such as a
-// rep's sale-proof thumbnails.
+// rep's sale-proof thumbnails. A rep may also read proof stored on a sale they
+// own (`saleId`), whoever uploaded it: an admin's edit stores its uploads under
+// the admin's prefix.
 // Mints a 15-min signed URL for the file in the folder. Never exposes the raw
 // path back as a usable storage URL. `path` is the folder stored on the record:
 // new submissions store their own per-submission folder
@@ -25,7 +28,10 @@ export async function GET(request: NextRequest) {
     // Everyone else's uploads (onboarding documents, disputes, other reps'
     // proof) stay management-only. The uid comes from the token, never the query.
     if (!gate.isManagement && !path.startsWith(`${ATTACHMENT_ROOT}${gate.uid}/`)) {
-      return NextResponse.json({ error: 'Forbidden: you can only view your own uploads' }, { status: 403 });
+      const saleId = request.nextUrl.searchParams.get('saleId') ?? '';
+      if (!(await isProofOnOwnSale(saleId, path, gate.uid))) {
+        return NextResponse.json({ error: 'Forbidden: you can only view your own uploads' }, { status: 403 });
+      }
     }
 
     const bucket = getOnboardingBucket();
@@ -46,4 +52,12 @@ export async function GET(request: NextRequest) {
     console.error('Error signing form attachment:', error);
     return NextResponse.json({ error: 'Failed to load attachment' }, { status: 500 });
   }
+}
+
+/** The path is a proof screenshot stored on a sale the caller owns. */
+async function isProofOnOwnSale(saleId: string, path: string, uid: string): Promise<boolean> {
+  if (!saleId || saleId.includes('/') || !adminDb || !path.includes('/sale-proof/')) return false;
+  const snap = await adminDb.collection('sales').doc(saleId).get();
+  const sale = snap.exists ? snap.data() : undefined;
+  return !!sale && sale.salesRepId === uid && saleProofPaths(sale).includes(path);
 }

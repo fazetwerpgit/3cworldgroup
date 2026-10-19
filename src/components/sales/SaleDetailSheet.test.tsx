@@ -31,7 +31,13 @@ vi.mock('@/lib/firebase/config', () => ({ auth: null }));
 vi.mock('@/lib/sales/saveInstallDate', () => ({
   saveInstallDate: (...args: [string, string]) => own.save(...args),
 }));
-vi.mock('@/components/chat/ChatLightbox', () => ({ ChatLightbox: () => null }));
+const lightbox = vi.hoisted(() => ({ image: null as { url: string } | null }));
+vi.mock('@/components/chat/ChatLightbox', () => ({
+  ChatLightbox: ({ image }: { image: { url: string } | null }) => {
+    lightbox.image = image;
+    return null;
+  },
+}));
 vi.mock('next/link', () => ({
   default: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
 }));
@@ -204,9 +210,37 @@ describe('SaleDetailSheet install date', () => {
       buttonByText('Save')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(api.updateSale).toHaveBeenCalledWith('sale1', { installDate: '2026-09-20' });
+    expect(api.updateSale).toHaveBeenCalledWith('sale1', { installDate: '2026-09-20' }, expect.anything());
     expect(own.save).not.toHaveBeenCalled();
     expect(document.body.textContent).toContain("Couldn't save the install date. Try again.");
+  });
+
+  it("shows the server's reason when an admin's save on someone else's sale is refused", async () => {
+    viewer.uid = 'admin1';
+    api.updateSale = vi.fn(async (_id: string, _updates: unknown, options?: { onError?: (m: string, s?: number) => void }) => {
+      options?.onError?.('Install date cannot be before the sale date', 400);
+      return false;
+    }) as unknown as typeof api.updateSale;
+    render(SALE, true);
+    click(buttonByText('Change'));
+    await save();
+
+    expect(document.body.textContent).toContain('Install date cannot be before the sale date');
+    expect(document.body.textContent).not.toContain("Couldn't save the install date. Try again.");
+  });
+
+  it("keeps the generic line when an admin's save fails without a reason", async () => {
+    viewer.uid = 'admin1';
+    api.updateSale = vi.fn(async (_id: string, _updates: unknown, options?: { onError?: (m: string, s?: number) => void }) => {
+      options?.onError?.('Failed to fetch', undefined);
+      return false;
+    }) as unknown as typeof api.updateSale;
+    render(SALE, true);
+    click(buttonByText('Change'));
+    await save();
+
+    expect(document.body.textContent).toContain("Couldn't save the install date. Try again.");
+    expect(document.body.textContent).not.toContain('Failed to fetch');
   });
   it("moves a missed install only past the carrier's missed day", async () => {
     render(SALE, false, breakage('2026-09-22'));
@@ -281,6 +315,63 @@ describe('SaleDetailSheet proof screenshots', () => {
   it('renders a single control for a legacy single-path sale', () => {
     render({ ...SALE, proofScreenshotPath: A });
     expect(proofButtons()).toEqual(['View proof screenshot']);
+  });
+
+  function deferredFetch() {
+    const pending: Array<(value: unknown) => void> = [];
+    const fetchMock = vi.fn(
+      () => new Promise((resolve) => pending.push(resolve))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const respond = async (i: number, ok: boolean, body: unknown) => {
+      await act(async () => {
+        pending[i]({ ok, json: async () => body });
+      });
+    };
+    return { fetchMock, respond };
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    lightbox.image = null;
+  });
+
+  it('asks for the screenshot with the sale it belongs to', async () => {
+    const { fetchMock, respond } = deferredFetch();
+    render({ ...SALE, proofScreenshotPath: A });
+    click(buttonByText('View proof screenshot'));
+    await act(async () => {});
+
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toContain('&saleId=sale1');
+    await respond(0, true, { url: 'https://signed.example/a' });
+    expect(lightbox.image?.url).toBe('https://signed.example/a');
+  });
+
+  it("never opens the previous sale's screenshot over the next sale", async () => {
+    const { respond } = deferredFetch();
+    render({ ...SALE, proofScreenshotPath: A });
+    click(buttonByText('View proof screenshot'));
+    await act(async () => {});
+
+    // Next tapped before the signed URL comes back.
+    render({ ...SALE, id: 'sale2', customerName: 'Other Customer', proofScreenshotPath: B });
+    await respond(0, true, { url: 'https://signed.example/a' });
+
+    expect(lightbox.image).toBeNull();
+    expect(buttonByText('View proof screenshot')).toBeTruthy();
+  });
+
+  it("drops the previous sale's screenshot error on the next sale", async () => {
+    const { respond } = deferredFetch();
+    render({ ...SALE, proofScreenshotPath: A });
+    click(buttonByText('View proof screenshot'));
+    await act(async () => {});
+    await respond(0, false, { error: 'Forbidden' });
+    expect(document.body.textContent).toContain("Couldn't load the screenshot. Try again.");
+
+    render({ ...SALE, id: 'sale2', proofScreenshotPath: B });
+
+    expect(document.body.textContent).not.toContain("Couldn't load the screenshot. Try again.");
   });
 
   it('renders no control and the empty copy when there is no proof', () => {

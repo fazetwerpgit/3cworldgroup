@@ -166,10 +166,17 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
   const [installSaved, setInstallSaved] = useState<{ saleId: string; date: Date } | null>(null);
 
   const currentSaleId = sale?.id || '';
+  // The sale on screen right now, so a screenshot fetched for the previous sale
+  // (Next tapped mid-request) never opens over this one.
+  const currentSaleIdRef = useRef(currentSaleId);
   useEffect(() => {
+    currentSaleIdRef.current = currentSaleId;
     setInstallDraft(null);
     setInstallError(null);
     setSavingInstall(false);
+    setProofImage(null);
+    setProofError(null);
+    setProofLoading(null);
   }, [currentSaleId]);
 
   // Ref keeps the effects below on [open] only: callers pass an inline
@@ -280,8 +287,16 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
     if (ownSale) {
       const result = await saveOwnInstallDate(saleId, installDraft);
       if (!result.ok) failure = result.error;
-    } else if (!(await updateSale(saleId, { installDate: installDraft }))) {
-      failure = INSTALL_DATE_ERROR;
+    } else {
+      // The route's 400/409 lines say what is wrong with the date ("before
+      // the sale date"); a retry would fail the same way, so show them.
+      let serverReason: string | null = null;
+      const saved = await updateSale(saleId, { installDate: installDraft }, {
+        onError: (message, status) => {
+          if (status === 400 || status === 409) serverReason = message;
+        },
+      });
+      if (!saved) failure = serverReason ?? INSTALL_DATE_ERROR;
     }
     setSavingInstall(false);
     if (failure) {
@@ -298,24 +313,27 @@ export function SaleDetailSheet(props: SaleDetailSheetProps) {
   const openScreenshot = async (index: number) => {
     const path = proofPaths[index];
     if (!path) return;
+    const requestSaleId = saleId;
+    const stale = () => currentSaleIdRef.current !== requestSaleId;
     setProofLoading(index);
     setProofError(null);
     try {
       const token = await auth?.currentUser?.getIdToken();
       const response = await fetch(
-        `/api/portal/forms/attachment?path=${encodeURIComponent(path)}`,
+        `/api/portal/forms/attachment?path=${encodeURIComponent(path)}&saleId=${encodeURIComponent(saleId)}`,
         { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
       );
       const data = await response.json();
       if (!response.ok || !data.url) throw new Error("Couldn't load the screenshot. Try again.");
+      if (stale()) return;
       setProofImage({
         url: data.url,
         alt: proofPaths.length > 1 ? `Sale proof screenshot ${index + 1}` : 'Sale proof screenshot',
       });
     } catch {
-      setProofError("Couldn't load the screenshot. Try again.");
+      if (!stale()) setProofError("Couldn't load the screenshot. Try again.");
     } finally {
-      setProofLoading(null);
+      if (!stale()) setProofLoading(null);
     }
   };
 

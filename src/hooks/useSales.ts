@@ -276,10 +276,15 @@ export function useSales(seed?: SalesFilters | null) {
   const updateSale = useCallback(async (
     id: string,
     // saleDate/installDate are sent as YYYY-MM-DD strings; the API parses them server-side.
-    updates: Partial<Omit<Sale, 'saleDate' | 'installDate'>> & { saleDate?: string; installDate?: string }
+    updates: Partial<Omit<Sale, 'saleDate' | 'installDate'>> & { saleDate?: string; installDate?: string },
+    // The hook's `error` state lands after the await returns, too late for a
+    // caller that shows the server's reason inline (status is unset on a
+    // network failure).
+    options: { onError?: (message: string, status?: number) => void } = {}
   ): Promise<boolean> => {
     setLoading(true);
     setError(null);
+    let status: number | undefined;
 
     try {
       const token = await getIdToken();
@@ -291,6 +296,7 @@ export function useSales(seed?: SalesFilters | null) {
         },
         body: JSON.stringify({ ...updates, clientToday: todaySaleDateInput() }),
       });
+      status = response.status;
       const data = await response.json();
 
       if (!response.ok) {
@@ -302,6 +308,7 @@ export function useSales(seed?: SalesFilters | null) {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update sale';
       setError(message);
+      options.onError?.(message, status);
       return false;
     } finally {
       setLoading(false);
