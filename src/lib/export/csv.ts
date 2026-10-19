@@ -26,11 +26,11 @@ export function toCsv(columns: CsvColumn[], rows: Record<string, unknown>[]): st
 // Safari (which starts the download asynchronously) can still read it.
 // Inside the 3C iOS app the file goes to the native share sheet instead
 // (SPEC A5); everywhere else this is the plain <a download>.
-export function downloadBlob(filename: string, blob: Blob): void {
-  if (shouldSaveViaApp()) {
-    void saveBlobViaApp(filename, blob).catch((error) => console.error('Failed to save file in the app:', error));
-    return;
-  }
+// Resolves true once the file is saved (or handed to the browser's download),
+// false if the person cancelled the share sheet, and rejects when the save
+// fails, so callers only say "Downloaded" after it really happened.
+export async function downloadBlob(filename: string, blob: Blob): Promise<boolean> {
+  if (shouldSaveViaApp()) return saveBlobViaApp(filename, blob);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -39,9 +39,10 @@ export function downloadBlob(filename: string, blob: Blob): void {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return true;
 }
 
 // Browser-only: trigger a client-side download of the given CSV text.
-export function downloadCsv(filename: string, csv: string): void {
-  downloadBlob(filename, new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+export function downloadCsv(filename: string, csv: string): Promise<boolean> {
+  return downloadBlob(filename, new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
 }

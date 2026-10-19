@@ -164,7 +164,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
       const zip = new File([await response.blob()], filename, { type: 'application/zip' });
       if (shouldSaveViaApp()) {
         // In the app the shell saves it; a failure is shown here, not lost
-        // in the console (downloadBlob's fire-and-forget path).
+        // in the console.
         try {
           if (await saveBlobViaApp(filename, zip)) setDownloaded(true);
         } catch {
@@ -173,8 +173,7 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
       } else if (canShareFile(zip)) {
         setReady(zip);
       } else {
-        downloadBlob(filename, zip);
-        setDownloaded(true);
+        if (await downloadBlob(filename, zip)) setDownloaded(true);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The download failed');
@@ -196,9 +195,11 @@ export function OnboardingFile({ userId, vault }: { userId: string; vault?: Reac
       (err: unknown) => {
         // Closing the share sheet is not a failure; the file stays ready.
         if (err instanceof DOMException && err.name === 'AbortError') return;
-        downloadBlob(zip.name, zip);
         setReady(null);
-        setDownloaded(true);
+        downloadBlob(zip.name, zip).then(
+          (saved) => setDownloaded(saved),
+          () => setError("Couldn't save the file. Try again.")
+        );
       }
     );
   };

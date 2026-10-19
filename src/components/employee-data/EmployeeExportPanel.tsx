@@ -34,8 +34,14 @@ export function EmployeeExportPanel() {
         throw new Error(json.error || 'The export failed');
       }
       const filename = FILENAME.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? '3C-employee-data.xlsx';
-      downloadBlob(filename, await res.blob());
-      setDone(true);
+      const blob = await res.blob();
+      let saved: boolean;
+      try {
+        saved = await downloadBlob(filename, blob);
+      } catch {
+        throw new Error("Couldn't save the file on this device. Try again.");
+      }
+      if (saved) setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The export failed');
     } finally {

@@ -152,6 +152,7 @@ export function Invites({
   const [form, setForm] = useState(emptyForm);
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const clearNotices = () => {
     setError('');
@@ -770,7 +771,20 @@ export function Invites({
         <button
           type="button"
           className={r.exportLink}
-          onClick={() => downloadCsv('recruits.csv', toCsv(EXPORT_COLUMNS, visible.map(exportRow)))}
+          disabled={exporting}
+          aria-busy={exporting || undefined}
+          onClick={async () => {
+            if (exporting) return;
+            setExporting(true);
+            setError('');
+            try {
+              await downloadCsv('recruits.csv', toCsv(EXPORT_COLUMNS, visible.map(exportRow)));
+            } catch {
+              setError("Couldn't save the CSV. Try again.");
+            } finally {
+              setExporting(false);
+            }
+          }}
         >
           Export list
         </button>

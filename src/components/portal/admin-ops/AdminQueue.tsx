@@ -17,6 +17,7 @@ import {
   StatusDot,
   cx,
 } from './AdminKit';
+import { AdminNotice } from '@/components/portal/admin-d/AdminUi';
 import s from './admin-ops.module.css';
 import k from './admin-kit.module.css';
 
@@ -148,6 +149,8 @@ export function AdminQueue({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(DEFAULT_STATUS);
   const [filter, setFilter] = useState('all');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
   // Handled from the sheet on this visit: the row holds its place (now marked
   // Handled) while the sheet is open, then folds out of the list on close.
   const [kept, setKept] = useState<ReadonlySet<string>>(NO_IDS);
@@ -262,6 +265,19 @@ export function AdminQueue({
       </>
     );
 
+  const exportCsv = async () => {
+    if (exporting || !csvRows || !csvColumns) return;
+    setExporting(true);
+    setExportError('');
+    try {
+      await downloadCsv(downloadFilename!, toCsv(csvColumns, csvRows));
+    } catch {
+      setExportError("Couldn't save the CSV. Try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className={s.page}>
       <AdminHead
@@ -270,6 +286,11 @@ export function AdminQueue({
         count={loading || failed ? null : openCount}
         countLabel="open"
       />
+      {exportError ? (
+        <AdminNotice tone="error" onDismiss={() => setExportError('')}>
+          {exportError}
+        </AdminNotice>
+      ) : null}
 
       <div className={s.toolbar}>
         <AdminSearch value={search} onChange={setSearch} placeholder={searchPlaceholder} label={`Search ${title.toLowerCase()}`} />
@@ -300,8 +321,9 @@ export function AdminQueue({
             <button
               type="button"
               className={cx(s.btn, s.iconOnlyPhone)}
-              disabled={!csvRows || csvRows.length === 0}
-              onClick={() => downloadCsv(downloadFilename!, toCsv(csvColumns!, csvRows!))}
+              disabled={!csvRows || csvRows.length === 0 || exporting}
+              aria-busy={exporting || undefined}
+              onClick={() => void exportCsv()}
               aria-label="Export CSV"
             >
               <Download size={18} aria-hidden="true" />
