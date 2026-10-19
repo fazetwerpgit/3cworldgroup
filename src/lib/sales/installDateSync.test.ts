@@ -221,14 +221,14 @@ describe('syncInstallDatesFromOrders', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it('skips a cancelled sale', async () => {
+  it.each(['cancelled', 'rejected'])('skips a %s sale', async (status) => {
     setSales([
       {
         id: 'sale-1',
         salesRepId: 'rep-1',
         customerAddress: '123 Main St',
         installDate: noon(2),
-        status: 'cancelled',
+        status,
       },
     ]);
 

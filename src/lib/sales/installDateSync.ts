@@ -416,9 +416,11 @@ type Decision =
   | { write: false; count: 'skippedCancelled' | 'unchanged' };
 
 function decide(sale: SyncSale, order: FiberOrder): Decision {
-  // A cancelled sale is history. Moving its date would put a dead row back
-  // into the pipeline and ping a rep about a customer who backed out.
-  if (sale.status === 'cancelled') return { write: false, count: 'skippedCancelled' };
+  // A cancelled (or legacy rejected) sale is history. Moving its date would put
+  // a dead row back into the pipeline and ping a rep about a closed customer.
+  if (sale.status === 'cancelled' || sale.status === 'rejected') {
+    return { write: false, count: 'skippedCancelled' };
+  }
 
   const parsed = parseInstallDateInput(order.estInstallDate);
   if (!parsed.ok) {
