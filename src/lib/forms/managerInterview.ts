@@ -1,4 +1,4 @@
-import type { UserRole } from '@/types';
+import { isOwner, type UserRole } from '@/types';
 
 // The only non-promotion job position; everything else (manager tiers and any
 // future GM/Director/etc.) is treated as a promotion, which reveals the three
@@ -53,4 +53,17 @@ export const MANAGER_INTERVIEW_ROLES = [
 /** `isRole` is AuthContext's (it lets the owner through wherever admin is). */
 export function canOpenManagerInterview(isRole: (...roles: UserRole[]) => boolean): boolean {
   return isRole(...MANAGER_INTERVIEW_ROLES);
+}
+
+/**
+ * Server twin of canOpenManagerInterview for routes that hold the caller's
+ * resolved role and fieldRole (requireVerifiedRequester). Same rule as
+ * AuthContext's isRole: either role on the list passes, and the owner counts as
+ * admin. The submit route checks this so a general or office manager the page
+ * turns away cannot POST a hire decision directly.
+ */
+export function rolesMayOpenManagerInterview(role?: string, fieldRole?: string): boolean {
+  const allowed = MANAGER_INTERVIEW_ROLES as readonly string[];
+  if (role && (allowed.includes(role) || isOwner(role as UserRole))) return true;
+  return !!fieldRole && allowed.includes(fieldRole);
 }

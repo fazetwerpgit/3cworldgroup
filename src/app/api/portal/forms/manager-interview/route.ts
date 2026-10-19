@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireVerifiedFieldManagerOrManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { isValidOption } from '@/lib/forms/formOptions';
 import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
-import { isPromotionRole, validateSignatureDataUrl, isEmailShaped } from '@/lib/forms/managerInterview';
+import { isPromotionRole, validateSignatureDataUrl, isEmailShaped, rolesMayOpenManagerInterview } from '@/lib/forms/managerInterview';
 import { userRateLimited } from '@/lib/userRateLimits';
 
 function s(v: unknown, max = 200) {
@@ -23,8 +23,13 @@ function requiredYesNo(v: unknown): boolean | null {
 // POST /api/portal/forms/manager-interview - a manager records a hire decision.
 export async function POST(request: NextRequest) {
   try {
-    const gate = await requireVerifiedFieldManagerOrManagement(request);
+    const gate = await requireVerifiedRequester(request);
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+    // Same role list as the page and forms hub (MANAGER_INTERVIEW_ROLES): general
+    // and office managers are management but may not record a hire decision.
+    if (!rolesMayOpenManagerInterview(gate.role, gate.fieldRole)) {
+      return NextResponse.json({ error: 'Forbidden: manager access required' }, { status: 403 });
+    }
     // Each submission emails the managers: cap a looping client.
     const limited = userRateLimited('formSubmit', gate.uid);
     if (limited) return limited;

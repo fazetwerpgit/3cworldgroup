@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 
 // Mock the verified-auth gate so we control who the caller is.
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
-  requireVerifiedFieldManagerOrManagement: vi.fn(),
+  requireVerifiedRequester: vi.fn(),
 }));
 // Mock the shared writer so we can assert WHICH collection + fields a submission lands in.
 vi.mock('@/lib/forms/submitForm', () => ({
@@ -21,11 +21,11 @@ vi.mock('@/lib/forms/resolveFormOptions', () => ({
 
 import { POST } from './route';
 import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
-import { requireVerifiedFieldManagerOrManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 
-const mockGate = requireVerifiedFieldManagerOrManagement as unknown as ReturnType<typeof vi.fn>;
+const mockGate = requireVerifiedRequester as unknown as ReturnType<typeof vi.fn>;
 const mockSubmit = submitFormRecord as unknown as ReturnType<typeof vi.fn>;
 const mockOptions = getResolvedFormOptions as unknown as ReturnType<typeof vi.fn>;
 
@@ -36,7 +36,7 @@ function req(body: unknown) {
   });
 }
 
-const VERIFIED = { ok: true, uid: 'u1', name: 'Rep One', email: 'rep@x.com' };
+const VERIFIED = { ok: true, uid: 'u1', name: 'Rep One', email: 'rep@x.com', fieldRole: 'l1_manager' };
 const VALID = {
   provider: 'T-Fiber',
   jobPosition: 'Account Executive',
@@ -64,6 +64,28 @@ describe('POST /api/portal/forms/manager-interview', () => {
     const res = await POST(req(VALID));
     expect(res.status).toBe(401);
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: 'general manager', role: undefined, fieldRole: 'general_manager' },
+    { label: 'office manager', role: undefined, fieldRole: 'office_manager' },
+    { label: 'rep', role: undefined, fieldRole: 'entry_rep' },
+  ])('turns away a $label (the page and forms hub hide the form from them)', async ({ role, fieldRole }) => {
+    mockGate.mockResolvedValue({ ...VERIFIED, role, fieldRole });
+    const res = await POST(req(VALID));
+    expect(res.status).toBe(403);
+    expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { label: 'owner', role: 'owner', fieldRole: undefined },
+    { label: 'operations', role: 'operations', fieldRole: undefined },
+    { label: 'director', role: undefined, fieldRole: 'director' },
+  ])('admits a $label', async ({ role, fieldRole }) => {
+    mockGate.mockResolvedValue({ ...VERIFIED, role, fieldRole });
+    const res = await POST(req(VALID));
+    expect(res.status).toBe(200);
+    expect(mockSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('writes a valid submission to the managerInterviews collection, stamped with the verified caller', async () => {

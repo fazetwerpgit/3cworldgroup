@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { UserRole } from '@/types';
-import { canOpenManagerInterview, isPromotionRole, validateSignatureDataUrl, isEmailShaped } from './managerInterview';
+import { canOpenManagerInterview, rolesMayOpenManagerInterview, isPromotionRole, validateSignatureDataUrl, isEmailShaped } from './managerInterview';
 
 describe('isPromotionRole', () => {
   it('Account Executive is not a promotion', () => {
@@ -69,5 +69,20 @@ describe('canOpenManagerInterview (forms hub row and page gate)', () => {
 
   it('hides it from reps', () => {
     expect(canOpenManagerInterview(as('entry_rep'))).toBe(false);
+  });
+});
+
+describe('rolesMayOpenManagerInterview (submit route gate)', () => {
+  it('matches the page: general and office managers are turned away', () => {
+    expect(rolesMayOpenManagerInterview(undefined, 'general_manager')).toBe(false);
+    expect(rolesMayOpenManagerInterview(undefined, 'office_manager')).toBe(false);
+    expect(rolesMayOpenManagerInterview(undefined, 'entry_rep')).toBe(false);
+    expect(rolesMayOpenManagerInterview(undefined, undefined)).toBe(false);
+  });
+  it('admits listed roles, and the owner as admin', () => {
+    expect(rolesMayOpenManagerInterview('owner')).toBe(true);
+    expect(rolesMayOpenManagerInterview('admin')).toBe(true);
+    expect(rolesMayOpenManagerInterview('operations', 'general_manager')).toBe(true);
+    expect(rolesMayOpenManagerInterview(undefined, 'l2_manager')).toBe(true);
   });
 });
