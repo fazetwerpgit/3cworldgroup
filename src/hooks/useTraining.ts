@@ -86,6 +86,9 @@ export function useTraining() {
   // list was loaded, for the quiet "Couldn't refresh · as of" note.
   const [staleAt, setStaleAt] = useState<number | null>(null);
   const lastGoodAt = useRef<number | null>(null);
+  // Bumped by every list request: only the newest one may change the list,
+  // so a slower answer for an older filter can't replace the current one.
+  const listRequest = useRef(0);
 
   /**
    * Loads the list for `filters`. `quiet` (pull to refresh) keeps whatever is
@@ -98,6 +101,8 @@ export function useTraining() {
   ): Promise<TrainingResource[] | null> => {
     const query = trainingQuery(filters);
     const gen = dataCacheGeneration();
+    const request = ++listRequest.current;
+    const isLatest = () => request === listRequest.current;
     // Seen before: show it now and refresh in the background (no skeleton, and
     // a failed refresh keeps the list rather than an error).
     const entry = readDataCacheEntry<TrainingResource[]>(uid, listKey(query));
@@ -121,12 +126,16 @@ export function useTraining() {
       }
 
       writeDataCache(uid, listKey(query), data.resources, gen);
+      // Still the right list for its own query (cached above), but a newer
+      // request owns the screen now.
+      if (!isLatest()) return data.resources as TrainingResource[];
       lastGoodAt.current = Date.now();
       setStaleAt(null);
       setResources(data.resources);
       return data.resources as TrainingResource[];
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to fetch training resources';
+      if (!isLatest()) return null;
       if (cached || quiet) {
         console.error('Background training refresh failed:', message);
         if (lastGoodAt.current !== null) setStaleAt(lastGoodAt.current);
@@ -135,7 +144,9 @@ export function useTraining() {
       }
       return null;
     } finally {
-      if (!quiet) setLoading(false);
+      // The newest request ends the loading state, even a quiet one that
+      // superseded a loud one; an older answer leaves it to the newer request.
+      if (isLatest()) setLoading(false);
     }
   }, [uid]);
 

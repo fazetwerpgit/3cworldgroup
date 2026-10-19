@@ -124,4 +124,68 @@ describe('useTraining fetchResources (pull to refresh)', () => {
     expect(latest.current!.loading).toBe(false);
     expect(typeof latest.current!.staleAt).toBe('number');
   });
+
+  it("keeps the newest filter's list when an older request answers last", async () => {
+    // Carrier chip A, then quickly "All": A's slower answer must not replace All's list.
+    const answers: Array<(r: Response) => void> = [];
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => answers.push(resolve))));
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root.render(<Harness />));
+
+    let older!: Promise<unknown>;
+    let newer!: Promise<unknown>;
+    await act(async () => {
+      older = latest.current!.fetchResources({ category: 'att' });
+      newer = latest.current!.fetchResources();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+
+    await act(async () => {
+      answers[1](new Response(JSON.stringify({ resources: [mod('ALL', false)] }), { status: 200 }));
+      await newer;
+    });
+    expect(latest.current!.resources.map((r) => r.id)).toEqual(['ALL']);
+
+    await act(async () => {
+      answers[0](new Response(JSON.stringify({ resources: [mod('A', false)] }), { status: 200 }));
+      await older;
+    });
+    expect(latest.current!.resources.map((r) => r.id)).toEqual(['ALL']);
+    expect(latest.current!.loading).toBe(false);
+  });
+
+  it('an older answer does not end the newer request\'s loading state', async () => {
+    const answers: Array<(r: Response) => void> = [];
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => answers.push(resolve))));
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    await act(async () => root.render(<Harness />));
+
+    let older!: Promise<unknown>;
+    let newer!: Promise<unknown>;
+    await act(async () => {
+      older = latest.current!.fetchResources({ category: 'att' });
+      newer = latest.current!.fetchResources({ type: 'video' });
+    });
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+
+    await act(async () => {
+      answers[0](new Response(JSON.stringify({ resources: [mod('A', false)] }), { status: 200 }));
+      await older;
+    });
+    expect(latest.current!.loading).toBe(true);
+    expect(latest.current!.resources).toEqual([]);
+
+    await act(async () => {
+      answers[1](new Response(JSON.stringify({ resources: [mod('V', false)] }), { status: 200 }));
+      await newer;
+    });
+    expect(latest.current!.loading).toBe(false);
+    expect(latest.current!.resources.map((r) => r.id)).toEqual(['V']);
+  });
 });
