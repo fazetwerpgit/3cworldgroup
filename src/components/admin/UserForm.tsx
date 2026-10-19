@@ -20,6 +20,8 @@ import {
   isPlatformRole,
   MANAGEMENT_FIELD_ROLES,
   graduatedFieldRole,
+  SOLAR_ROLES,
+  SolarRoleDisplayNames,
 } from '@/types';
 import type { FieldRole, PlatformRole } from '@/types';
 
@@ -129,7 +131,9 @@ export function UserForm({ user }: UserFormProps) {
     zip: user.zip || '',
     managerId: user.reportsToId || '',
     status: (user.status || 'active') as 'pending' | 'active' | 'inactive',
+    solarRole: (user.solarRole ?? '') as string,
   });
+  const loadedSolarRole = user.solarRole ?? '';
 
   const [managerSearch, setManagerSearch] = useState('');
   const [managerCandidates, setManagerCandidates] = useState<ManagerCandidate[]>([]);
@@ -216,6 +220,7 @@ export function UserForm({ user }: UserFormProps) {
           zip: formData.zip,
           ...(formData.managerId !== loadedManagerId ? { managerId: formData.managerId || null } : {}),
           ...(formData.status !== loadedStatus ? { status: formData.status } : {}),
+          ...(formData.solarRole !== loadedSolarRole ? { solarRole: formData.solarRole || null } : {}),
         }),
       });
 
@@ -481,6 +486,28 @@ export function UserForm({ user }: UserFormProps) {
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className={u.field}>
+            <label className={u.label} htmlFor="person-solar-role">
+              Solar role
+            </label>
+            <span className={u.selectWrap}>
+              <select
+                id="person-solar-role"
+                className={u.input}
+                value={formData.solarRole}
+                onChange={(e) => handleChange('solarRole', e.target.value)}
+              >
+                <option value="">None</option>
+                {SOLAR_ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {SolarRoleDisplayNames[r]}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={18} aria-hidden="true" />
+            </span>
           </div>
 
           <div className={u.field}>

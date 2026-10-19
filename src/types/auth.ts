@@ -344,6 +344,35 @@ export function isShirtSize(value: unknown): value is ShirtSize {
   return typeof value === 'string' && (SHIRT_SIZES as readonly string[]).includes(value);
 }
 
+// Solar sales roles. A separate axis from FieldRole (which stays fiber-only):
+// see docs/solar/PLAN.md. Access rule lives in lib/solar/access.ts.
+export const SOLAR_ROLES = [
+  'entry_canvasser',
+  'ae_canvasser',
+  'canvass_manager',
+  'canvass_closer',
+  'in_person_closer',
+  'virtual_closer',
+  'marketing_director',
+  'sales_director',
+] as const;
+export type SolarRole = (typeof SOLAR_ROLES)[number];
+
+export const SolarRoleDisplayNames: Record<SolarRole, string> = {
+  entry_canvasser: 'Entry Canvasser',
+  ae_canvasser: 'AE Canvasser',
+  canvass_manager: 'Canvass Manager',
+  canvass_closer: 'Canvass Closer',
+  in_person_closer: 'In-Person Closer',
+  virtual_closer: 'Virtual Closer',
+  marketing_director: 'Marketing Director',
+  sales_director: 'Sales Director',
+};
+
+export function isSolarRole(value: unknown): value is SolarRole {
+  return typeof value === 'string' && (SOLAR_ROLES as readonly string[]).includes(value);
+}
+
 // User document type
 export interface User {
   uid: string;
@@ -351,6 +380,8 @@ export interface User {
   displayName: string;
   role?: PlatformRole;       // Back-office users only
   fieldRole?: FieldRole;     // Field sales users only
+  // Solar sales role, independent of the fiber FieldRole. Null/absent = no solar access.
+  solarRole?: SolarRole | null;
   // Set by signup-notify's bot heuristic; the admin pending queue hides these
   // from the "needs a decision" list (they remain findable via status filters).
   suspectedBot?: boolean;

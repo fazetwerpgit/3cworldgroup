@@ -27,7 +27,7 @@ import { takePendingDisplayName } from '@/lib/app/nativeAuth';
 import { clearPendingIdToken, rememberPendingIdToken } from '@/lib/auth/pendingSession';
 import { unregisterNativePush } from '@/lib/app/nativePush';
 import { clearViewAs } from '@/lib/viewAs/storage';
-import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
+import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles, isSolarRole } from '@/types';
 import { setDataCacheOwner } from '@/lib/cache/dataCache';
 import { clearDashboardSnapshots } from '@/lib/cache/dashboardSnapshot';
 import { clearSessionProfile, readSessionProfile, writeSessionProfile } from '@/lib/auth/sessionProfile';
@@ -163,6 +163,7 @@ function toUser(uid: string, userData: DocumentData): User {
     email: userData.email,
     displayName: userData.displayName,
     ...resolveRoles(userData.role, userData.fieldRole),
+    solarRole: isSolarRole(userData.solarRole) ? userData.solarRole : null,
     isIBO: userData.isIBO ?? false,
     // TODO: migrate Firestore managerId -> reportsToId
     reportsToId: userData.reportsToId ?? userData.managerId,

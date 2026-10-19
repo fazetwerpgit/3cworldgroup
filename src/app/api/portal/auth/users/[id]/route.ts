@@ -12,6 +12,7 @@ import {
   MANAGEMENT_PLATFORM_ROLES,
   roleRequiresOnboarding,
   resolveRoles,
+  isSolarRole,
 } from '@/types';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { validateAddress } from '@/lib/validation/address';
@@ -91,6 +92,7 @@ export async function GET(
       state: data?.state,
       zip: data?.zip,
       shirtSize: data?.shirtSize,
+      solarRole: isSolarRole(data?.solarRole) ? data?.solarRole : null,
       avatarUrl: data?.avatarUrl,
       status: data?.status,
       hireDate: data?.hireDate?.toDate(),
@@ -131,6 +133,11 @@ export async function PUT(
 
     const body = await request.json();
     const { displayName, role, fieldRole, managerId, territoryId, phone, status, address, city, state, zip } = body;
+    // solarRole: a SolarRole sets it, null or '' clears it, absent leaves it.
+    const solarRole: unknown = body?.solarRole;
+    if (solarRole !== undefined && solarRole !== null && solarRole !== '' && !isSolarRole(solarRole)) {
+      return NextResponse.json({ error: 'Invalid solarRole' }, { status: 400 });
+    }
 
     const docRef = adminDb.collection('users').doc(id);
     const doc = await docRef.get();
@@ -308,6 +315,9 @@ export async function PUT(
     if (managerId !== undefined) {
       updateData.reportsToId = managerId ?? FieldValue.delete();
       updateData.managerId = managerId ?? FieldValue.delete();
+    }
+    if (solarRole !== undefined) {
+      updateData.solarRole = isSolarRole(solarRole) ? solarRole : FieldValue.delete();
     }
     if (territoryId !== undefined) updateData.territoryId = territoryId;
     if (phone !== undefined) updateData.phone = phone;
