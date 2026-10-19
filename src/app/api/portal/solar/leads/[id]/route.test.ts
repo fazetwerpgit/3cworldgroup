@@ -67,4 +67,42 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
     expect((await patch('rep1_c1', { creditTier: 'gold' })).status).toBe(400);
     expect((await patch('nope', { creditTier: 'purchase_600' })).status).toBe(404);
   });
+
+  describe('status', () => {
+    const ADMIN = { ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null };
+    const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;
+
+    it('lets an admin mark a lead sold or lost', async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      const res = await patch('rep1_c1', { status: 'sold' });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true, id: 'rep1_c1', status: 'sold' });
+      expect(lead()).toMatchObject({ status: 'sold', statusChangedBy: 'adm' });
+      expect((await patch('rep1_c1', { status: 'lost' })).status).toBe(200);
+      expect(lead().status).toBe('lost');
+    });
+
+    it('reopens to booked while a live booking holds the slot, else to new', async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      db.store.set('solarBookings', new Map([['b1', { status: 'booked' }]]));
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'lost', bookingId: 'b1' });
+      expect(await (await patch('rep1_c1', { status: 'new' })).json()).toMatchObject({ status: 'booked' });
+
+      db.store.get('solarBookings')!.set('b1', { status: 'cancelled' });
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold', bookingId: 'b1' });
+      expect(await (await patch('rep1_c1', { status: 'booked' })).json()).toMatchObject({ status: 'new' });
+      expect(lead().status).toBe('new');
+    });
+
+    it('403s anyone but an admin, even the rep who created it', async () => {
+      expect((await patch('rep1_c1', { status: 'sold' })).status).toBe(403);
+      expect(lead().status).toBeUndefined();
+    });
+
+    it('400s an unknown status and 404s a missing lead', async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      expect((await patch('rep1_c1', { status: 'won' })).status).toBe(400);
+      expect((await patch('nope', { status: 'sold' })).status).toBe(404);
+    });
+  });
 });

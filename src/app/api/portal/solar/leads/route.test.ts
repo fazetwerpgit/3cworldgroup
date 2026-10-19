@@ -13,7 +13,7 @@ vi.mock('@/lib/notifications/createNotification', () => ({
 vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: vi.fn(async () => {}) }));
 vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: vi.fn(async () => ({ ok: true })) }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { userRateLimited } from '@/lib/userRateLimits';
@@ -159,5 +159,58 @@ describe('POST /api/portal/solar/leads', () => {
   it('marks 3C Doors leads as source knock', async () => {
     const { id } = await (await POST(req({ ...VALID, doorId: 'door9', creditTier: 'purchase_600' }))).json();
     expect(db.store.get('solarLeads')!.get(id)).toMatchObject({ source: 'knock', doorId: 'door9', creditTier: 'purchase_600' });
+  });
+});
+
+describe('GET /api/portal/solar/leads', () => {
+  const ADMIN = { ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null };
+  const get = () => GET(new NextRequest('http://localhost/api/portal/solar/leads'));
+  const BOOKED = 'jac_2026-10-26T15:00:00.000Z';
+
+  beforeEach(() => {
+    seed(USERS, {
+      solarLeads: {
+        rep1_a: { repUid: 'rep1', repName: 'Rep One', first: 'Ana', last: 'Lopez', status: 'booked', bookingId: BOOKED,
+          monthlyBill: 212.5, creditTier: 'purchase_600', photos: { panel: 'p/', bogus: 'x' }, createdAt: new Date('2026-10-18T10:00:00Z') },
+        rep1_b: { repUid: 'rep1', repName: 'Rep One', first: 'Bo', last: 'Kim', status: 'booked', bookingId: 'gone',
+          createdAt: new Date('2026-10-19T10:00:00Z') },
+        rep2_a: { repUid: 'rep2', repName: 'Rep Two', first: 'Cy', last: 'Ng', status: 'sold', source: 'knock',
+          createdAt: new Date('2026-10-17T10:00:00Z') },
+        demo_a: { repUid: 'demo', first: 'Demo', last: 'Lead', status: 'demo', demoAccount: true, createdAt: new Date('2026-10-19T12:00:00Z') },
+      },
+      solarBookings: {
+        [BOOKED]: { leadId: 'rep1_a', consultantUid: 'jac', consultantName: 'Jacob', mode: 'virtual',
+          start: '2026-10-26T15:00:00.000Z', end: '2026-10-26T16:00:00.000Z', status: 'booked' },
+        gone: { leadId: 'rep1_b', consultantUid: 'jac', start: '2026-10-27T15:00:00.000Z', status: 'cancelled' },
+      },
+    });
+  });
+
+  it('gives a rep only their own leads, newest first, each with its live booking', async () => {
+    const res = await get();
+    expect(res.status).toBe(200);
+    const { leads } = await res.json();
+    expect(leads.map((l: { id: string }) => l.id)).toEqual(['rep1_b', 'rep1_a']);
+    expect(leads[1]).toMatchObject({
+      status: 'booked', first: 'Ana', monthlyBill: 212.5, creditTier: 'purchase_600', photos: { panel: 'p/' },
+      createdAt: '2026-10-18T10:00:00.000Z',
+      booking: { id: BOOKED, consultantName: 'Jacob', mode: 'virtual', start: '2026-10-26T15:00:00.000Z', tz: 'America/Chicago' },
+    });
+    // A cancelled booking is no booking, and the lead reads new.
+    expect(leads[0]).toMatchObject({ status: 'new', booking: null });
+  });
+
+  it("gives an admin every lead but demo accounts'", async () => {
+    mockGate.mockResolvedValue(ADMIN);
+    const { leads } = await (await get()).json();
+    expect(leads.map((l: { id: string }) => l.id)).toEqual(['rep1_b', 'rep1_a', 'rep2_a']);
+    expect(leads[2]).toMatchObject({ status: 'sold', source: 'knock', repName: 'Rep Two' });
+  });
+
+  it('403s a caller without solar access, 401s without a token', async () => {
+    mockGate.mockResolvedValue({ ...REP, uid: 'fiber', fieldRole: 'ae_tier_1', solarRole: null });
+    expect((await get()).status).toBe(403);
+    mockGate.mockResolvedValue({ ok: false, error: 'Missing authentication token', status: 401 });
+    expect((await get()).status).toBe(401);
   });
 });
