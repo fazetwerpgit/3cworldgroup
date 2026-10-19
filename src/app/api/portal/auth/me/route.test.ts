@@ -74,6 +74,7 @@ const fake = vi.hoisted(() => {
     adminAuth,
     purge: vi.fn(),
     resolveAlertTasks: vi.fn(async () => undefined),
+    anonymizeAlertTasks: vi.fn(async () => undefined),
     reconcile: vi.fn(async () => []),
     restampAuthor: vi.fn(async () => undefined),
     scrubDeletedChatAuthor: vi.fn(async () => undefined),
@@ -85,7 +86,10 @@ const fake = vi.hoisted(() => {
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: fake.adminDb, adminAuth: fake.adminAuth }));
 vi.mock('firebase-admin/firestore', () => ({ FieldValue: { delete: () => '__DELETE__' } }));
 vi.mock('@/lib/users/purgeSensitiveUserData', () => ({ purgeSensitiveUserData: fake.purge }));
-vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: fake.resolveAlertTasks }));
+vi.mock('@/lib/alerts/alertTasks', () => ({
+  resolveAlertTasks: fake.resolveAlertTasks,
+  anonymizeAlertTasks: fake.anonymizeAlertTasks,
+}));
 vi.mock('@/lib/chat/channels', () => ({ reconcileChatMembershipForUser: fake.reconcile }));
 vi.mock('@/lib/chat/restampAuthor', () => ({ restampAuthor: fake.restampAuthor, scrubDeletedChatAuthor: fake.scrubDeletedChatAuthor }));
 vi.mock('@/lib/audit/adminAudit', () => ({ writeAdminAudit: fake.audit }));
@@ -231,6 +235,7 @@ describe('DELETE /api/portal/auth/me', () => {
     expect(fake.anonymizeAskHistory).toHaveBeenCalledWith(fake.adminDb, 'rep1', 'Deleted user');
     expect(fake.reconcile).toHaveBeenCalledWith('rep1');
     expect(fake.resolveAlertTasks).toHaveBeenCalledWith('rep1');
+    expect(fake.anonymizeAlertTasks).toHaveBeenCalledWith('rep1', 'Deleted user');
     expect(fake.audit).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'user.self_delete',
@@ -302,6 +307,7 @@ describe('DELETE /api/portal/auth/me', () => {
     fake.restampAuthor.mockRejectedValueOnce(new Error('x'));
     fake.reconcile.mockRejectedValueOnce(new Error('x'));
     fake.resolveAlertTasks.mockRejectedValueOnce(new Error('x'));
+    fake.anonymizeAlertTasks.mockRejectedValueOnce(new Error('x'));
     fake.scrubDeletedChatAuthor.mockRejectedValueOnce(new Error('x'));
     fake.anonymizeAskHistory.mockRejectedValueOnce(new Error('x'));
     expect((await DELETE(request())).status).toBe(200);

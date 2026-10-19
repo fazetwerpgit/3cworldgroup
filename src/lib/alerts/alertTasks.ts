@@ -225,6 +225,54 @@ export async function resolveAlertTasks(
   );
 }
 
+/** title/message with every occurrence of `name` replaced; non-string fields are left out. */
+function scrubbedText(doc: FieldReader, name: string, replacement: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const field of ['title', 'message']) {
+    const text = doc.get(field);
+    if (typeof text === 'string') out[field] = name ? text.split(name).join(replacement) : text;
+  }
+  return out;
+}
+
+/**
+ * After an account is deleted: re-stamps every alert task about the person
+ * (any status) and every management notification copied from those tasks,
+ * so the person's name (kept as subjectName and written into titles such as
+ * "<name> self-registered…") no longer appears. The name stripped is each
+ * task's own subjectName, so a retry after the profile is already anonymized
+ * still works.
+ */
+export async function anonymizeAlertTasks(subjectUserId: string, replacement: string): Promise<void> {
+  const db = requireDb();
+  const snap = await db.collection('alertTasks').where('subjectUserId', '==', subjectUserId).get();
+
+  const names = new Map<string, string>();
+  await Promise.all(
+    snap.docs.map((doc) => {
+      const raw = doc.get('subjectName');
+      const name = typeof raw === 'string' && raw !== replacement ? raw : '';
+      if (name) names.set(doc.id, name);
+      return doc.ref.update({ subjectName: replacement, ...scrubbedText(doc, name, replacement) });
+    })
+  );
+
+  // Firestore 'in' takes at most 30 values.
+  const taskIds = [...names.keys()];
+  for (let i = 0; i < taskIds.length; i += 30) {
+    const copies = await db
+      .collection('notifications')
+      .where('metadata.alertTaskId', 'in', taskIds.slice(i, i + 30))
+      .get();
+    await Promise.all(
+      copies.docs.map((doc) => {
+        const name = names.get(doc.get('metadata.alertTaskId') as string) ?? '';
+        return doc.ref.update(scrubbedText(doc, name, replacement));
+      })
+    );
+  }
+}
+
 /**
  * True while the rep has an e-sign document that is not signed: any e-sign row
  * on file that is not approved, or, while they are still onboarding, any e-sign

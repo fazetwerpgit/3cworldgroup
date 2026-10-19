@@ -8,7 +8,7 @@ import {
   beginSelfDelete,
   hasOtherActiveOwner,
 } from '@/lib/users/accountClosure';
-import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
+import { anonymizeAlertTasks, resolveAlertTasks } from '@/lib/alerts/alertTasks';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { restampAuthor, scrubDeletedChatAuthor } from '@/lib/chat/restampAuthor';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
@@ -180,6 +180,11 @@ export async function DELETE(request: NextRequest) {
       await resolveAlertTasks(uid);
     } catch (error) {
       console.error('[auth/me] failed to resolve open alerts', uid, error);
+    }
+    try {
+      await anonymizeAlertTasks(uid, DELETED_USER_NAME);
+    } catch (error) {
+      console.error('[auth/me] failed to anonymize alert tasks', uid, error);
     }
 
     await audit(true, { purge: { userSensitive: purge.userSensitive, files: purge.files } });
