@@ -236,6 +236,29 @@ const TALK_PREF_KEY = 'ask3c-practice-talk';
 /** Hands-free is off unless the rep turned it on, on this phone. */
 const HANDS_FREE_PREF_KEY = 'ask3c-practice-hands-free';
 
+/**
+ * "Not now" on the Practice voice ask, remembered on this phone so the sheet
+ * doesn't come back on every visit. Turning Talk back on, or Hands-free, asks again.
+ */
+const VOICE_DECLINED_KEY = 'ask3c-practice-voice-declined';
+
+function readVoiceDeclined(): boolean {
+  try {
+    return window.localStorage.getItem(VOICE_DECLINED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeVoiceDeclined(declined: boolean) {
+  try {
+    if (declined) window.localStorage.setItem(VOICE_DECLINED_KEY, '1');
+    else window.localStorage.removeItem(VOICE_DECLINED_KEY);
+  } catch {
+    // Storage blocked: the choice holds for this visit only.
+  }
+}
+
 function readHandsFree(): boolean {
   try {
     return window.localStorage.getItem(HANDS_FREE_PREF_KEY) === 'on';
@@ -304,8 +327,12 @@ export function RepPractice({
   const [voiceConsent, setVoiceConsent] = useState<boolean | null>(null);
   const voiceConsentRef = useRef(false);
   const [voiceSheet, setVoiceSheet] = useState<null | 'handsFree'>(null);
-  /** "Not now" on the once-a-visit Practice voice ask. */
-  const [voiceDeclined, setVoiceDeclined] = useState(false);
+  /** "Not now" on the Practice voice ask, kept on this phone (VOICE_DECLINED_KEY). */
+  const [voiceDeclined, setVoiceDeclinedState] = useState(() => typeof window !== 'undefined' && readVoiceDeclined());
+  const setVoiceDeclined = useCallback((declined: boolean) => {
+    setVoiceDeclinedState(declined);
+    writeVoiceDeclined(declined);
+  }, []);
   const reducedMotion = usePrefersReducedMotion();
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<Recognition | null>(null);
@@ -359,7 +386,8 @@ export function RepPractice({
     };
   }, [uid]);
 
-  // Talk on and no Practice voice consent yet: ask once per visit. "Not now" keeps the phone's voice.
+  // Talk on and no Practice voice consent yet: ask, unless the rep said "Not now" on
+  // this phone. "Not now" keeps the phone's voice; turning Talk back on asks again.
   const voiceSheetMode = voiceSheet ?? (active && talk && voiceConsent === false && !voiceDeclined ? 'ask' : null);
   const hands = useHandsFree<PreparedCut>({
     onLine: (text, ms) => {
@@ -1118,6 +1146,8 @@ export function RepPractice({
             hands.stop();
           }
           setTalkOff(talk);
+          // Turning Talk on is asking for voice: offer Practice voice again after a "Not now".
+          if (!talk) setVoiceDeclined(false);
           try {
             if (talk) window.localStorage.setItem(TALK_PREF_KEY, 'off');
             else window.localStorage.removeItem(TALK_PREF_KEY);
@@ -1177,6 +1207,7 @@ export function RepPractice({
       onAgreed={() => {
         const wanted = voiceSheetMode;
         setVoiceSheet(null);
+        setVoiceDeclined(false);
         voiceConsentRef.current = true;
         setVoiceConsent(true);
         if (wanted === 'handsFree') {

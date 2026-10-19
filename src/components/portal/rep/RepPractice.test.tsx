@@ -211,6 +211,39 @@ describe('RepPractice', () => {
     }
   });
 
+  it('remembers Not now on this phone, and asks again when Talk is turned back on', async () => {
+    voiceConsent.agreed = false;
+    Object.assign(window, { speechSynthesis: { speak: vi.fn(), cancel: vi.fn(), getVoices: () => [] } });
+    const ASK = 'Practice voice sends your mic audio';
+    const settle = () => act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
+    try {
+      await render();
+      await act(async () => {});
+      expect(document.body.textContent).toContain(ASK);
+      const notNow = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Not now')!;
+      await act(async () => notNow.click());
+      await settle();
+      expect(window.localStorage.getItem('ask3c-practice-voice-declined')).toBe('1');
+
+      // The next Practice visit on this phone: no sheet.
+      act(() => root.unmount());
+      root = createRoot(container);
+      await render();
+      await act(async () => {});
+      await settle();
+      expect(document.body.textContent).not.toContain(ASK);
+
+      // Talk off, then on again: that asks for voice, so the sheet is offered again.
+      await click('Talk on');
+      await click('Talk off');
+      await act(async () => {});
+      expect(document.body.textContent).toContain(ASK);
+      expect(window.localStorage.getItem('ask3c-practice-voice-declined')).toBeNull();
+    } finally {
+      voiceConsent.agreed = true;
+    }
+  });
+
   it("with Talk on: unlocks Web Audio on the knock, streams the session's voice through it, and sends a dictated line", async () => {
     // A Web Audio stand-in that records what was scheduled, when.
     const contexts: { started: { at: number; samples: number[] }[]; state: string }[] = [];
