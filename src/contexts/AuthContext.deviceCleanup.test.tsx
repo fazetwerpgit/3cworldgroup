@@ -74,14 +74,14 @@ const SESSION = { uid: 'rep-a', photoURL: null, providerData: [] };
 const ACTIVE = { email: 'a@x.com', displayName: 'Rep A', status: 'active', fieldRole: 'rep' };
 
 function seedDeviceState() {
-  saveSignature({ png: 'data:image/png;base64,AAAA', method: 'draw' });
+  saveSignature({ png: 'data:image/png;base64,AAAA', method: 'draw' }, 'rep-a');
   window.sessionStorage.setItem(ASK_CONVERSATION_KEY, '{"uid":"rep-a"}');
   window.sessionStorage.setItem(PRACTICE_SESSION_KEY, '{"uid":"rep-a"}');
   window.sessionStorage.setItem(VIEW_AS_STORAGE_KEY, '{"uid":"rep-b"}');
 }
 
 function expectDeviceStateCleared() {
-  expect(loadSignature()).toBeNull();
+  expect(loadSignature('rep-a')).toBeNull();
   expect(window.sessionStorage.getItem(ASK_CONVERSATION_KEY)).toBeNull();
   expect(window.sessionStorage.getItem(PRACTICE_SESSION_KEY)).toBeNull();
   expect(window.sessionStorage.getItem(VIEW_AS_STORAGE_KEY)).toBeNull();
@@ -152,8 +152,8 @@ describe('AuthProvider device cleanup on implicit sign-outs', () => {
 
   it('keeps a signed-out visitor’s signature on a cold open with no session (onboard link)', async () => {
     await mount();
-    saveSignature({ png: 'data:image/png;base64,BBBB', method: 'type' });
+    saveSignature({ png: 'data:image/png;base64,BBBB', method: 'type' }, 'invite-token');
     await act(async () => fb.authListener?.(null));
-    expect(loadSignature()?.png).toBe('data:image/png;base64,BBBB');
+    expect(loadSignature('invite-token')?.png).toBe('data:image/png;base64,BBBB');
   });
 });
