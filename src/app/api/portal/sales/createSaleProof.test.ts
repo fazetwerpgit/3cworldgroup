@@ -139,6 +139,22 @@ describe('POST /api/portal/sales proof screenshots', () => {
     expect(state.added).toHaveLength(0);
   });
 
+  it('accepts a numeric order number and stores it as text', async () => {
+    const response = await POST(post({ ...baseBody, orderNumberOrBtn: 1001 }));
+
+    expect(response.status).toBe(200);
+    expect(state.added[0].orderNumberOrBtn).toBe('1001');
+    expect(state.added[0].orderNumberKey).toBe('1001');
+  });
+
+  it('rejects a non-string, non-number order number with a 400, not a 500', async () => {
+    const response = await POST(post({ ...baseBody, orderNumberOrBtn: { value: 'ORD-1' } }));
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/orderNumberOrBtn/);
+    expect(state.added).toHaveLength(0);
+  });
+
   it('accepts a screenshot with no order number', async () => {
     const response = await POST(
       post({ ...baseBody, orderNumberOrBtn: '', proofScreenshotPaths: [SHOT_A] })

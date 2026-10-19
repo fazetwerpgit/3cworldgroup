@@ -325,13 +325,27 @@ export async function POST(request: NextRequest) {
       saleType,
       products: clientProducts,
       notes,
-      orderNumberOrBtn,
+      orderNumberOrBtn: rawOrderNumberOrBtn,
       productSold,
       saleDate,
       installDate,
       clientSaleId: rawClientSaleId,
       allowDuplicate,
     } = body;
+
+    // The order number / BTN is text, but a scripted or older client may send it
+    // as a number. Store it as a string (as the PATCH route does) and reject any
+    // other shape with a 400 instead of failing deeper in with a 500.
+    if (
+      rawOrderNumberOrBtn !== undefined &&
+      rawOrderNumberOrBtn !== null &&
+      typeof rawOrderNumberOrBtn !== 'string' &&
+      typeof rawOrderNumberOrBtn !== 'number'
+    ) {
+      return NextResponse.json({ error: 'Invalid orderNumberOrBtn' }, { status: 400 });
+    }
+    const orderNumberOrBtn: string =
+      rawOrderNumberOrBtn === undefined || rawOrderNumberOrBtn === null ? '' : String(rawOrderNumberOrBtn);
 
     // Idempotency key: the form's per-sale proofUploadId. A retried submit (weak
     // signal, a lost response, a double tap) lands on the same document id, so it

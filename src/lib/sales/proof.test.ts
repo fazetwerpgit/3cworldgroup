@@ -26,4 +26,12 @@ describe('hasSaleProof', () => {
   it('false for an empty list and no order number', () => {
     expect(hasSaleProof({ proofScreenshotPaths: [] })).toBe(false);
   });
+  it('true for a numeric order number from the raw JSON body', () => {
+    expect(hasSaleProof({ orderNumberOrBtn: 1001 })).toBe(true);
+  });
+  it('does not throw on a non-string order number shape', () => {
+    expect(() => hasSaleProof({ orderNumberOrBtn: { x: 1 } as unknown as string })).not.toThrow();
+    expect(hasSaleProof({ orderNumberOrBtn: { x: 1 } as unknown as string })).toBe(false);
+    expect(hasSaleProof({ orderNumberOrBtn: null })).toBe(false);
+  });
 });
