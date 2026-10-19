@@ -198,11 +198,13 @@ export async function sendAnnouncement(
   const data = await claim(db, id, now);
   if (!data) return { status: 'skipped' };
   const ref = db.collection(ANNOUNCEMENTS).doc(id);
+  let pushing = false;
   try {
     const list = await (recipients ?? (() => announcementRecipients(db)))();
     // From here pushes go out. A failure after this point may have reached
     // people, so the owner's retry must not send it again.
     await ref.update({ fanOutStarted: true });
+    pushing = true;
     const result = await sendToRecipients(list, {
       title: String(data.title),
       body: String(data.body),
@@ -213,8 +215,13 @@ export async function sendAnnouncement(
   } catch (err) {
     console.error('Announcement send failed', id, err);
     const error = err instanceof Error ? err.message.slice(0, 240) : 'Send failed';
-    // Never back to 'scheduled': a partial send retried would double-notify.
-    await ref.update({ status: 'failed', error }).catch(() => undefined);
+    // Once pushes started, never back to 'scheduled': a partial send retried
+    // would double-notify. Before that nobody was pushed, so a cron-scheduled
+    // one goes back to 'scheduled' for the next run (as recoverStaleSending
+    // does). A Send-now one stays 'failed': the owner retries it with the same
+    // requestId, and it must not go out later on its own.
+    const status = !pushing && !data.sendNow ? 'scheduled' : 'failed';
+    await ref.update({ status, error }).catch(() => undefined);
     return { status: 'failed', error };
   }
 }
@@ -238,7 +245,12 @@ export async function runDueAnnouncements({ db, now }: { db: Firestore; now: Dat
 
   // One recipients read per run, however many announcements are due.
   let cached: Promise<Recipients> | null = null;
-  const recipients = () => (cached ??= announcementRecipients(db));
+  // A failed read is not reused: the next due announcement reads again.
+  const recipients = () =>
+    (cached ??= announcementRecipients(db).catch((err) => {
+      cached = null;
+      throw err;
+    }));
   for (const doc of due) {
     const outcome = await sendAnnouncement(db, doc.id, now, recipients);
     summary[outcome.status].push(doc.id);

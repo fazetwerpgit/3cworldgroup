@@ -191,6 +191,46 @@ describe('runDueAnnouncements', () => {
     expect(store.get('announcements')!.get('due')).toMatchObject({ status: 'failed', fanOutStarted: true });
   });
 
+  it('puts a scheduled send that fails before any push back to scheduled, and rereads recipients per send', async () => {
+    const { db, store } = seed({
+      first: { title: 'A', body: 'b', status: 'scheduled', sendAt: past },
+      second: { title: 'B', body: 'b', status: 'scheduled', sendAt: NOW },
+    });
+    // The users query fails once (a transient Firestore error), then works.
+    const users = db.collection('users');
+    const where = users.where.bind(users);
+    let calls = 0;
+    const realCollection = db.collection.bind(db);
+    (db as unknown as { collection: (n: string) => unknown }).collection = (name: string) =>
+      name === 'users'
+        ? {
+            ...realCollection(name),
+            where: (...args: Parameters<typeof where>) => {
+              calls += 1;
+              if (calls === 1) return { get: async () => Promise.reject(new Error('UNAVAILABLE')) };
+              return where(...args);
+            },
+          }
+        : realCollection(name);
+    const summary = await runDueAnnouncements({ db, now: NOW });
+    expect(summary.failed).toEqual(['first']);
+    expect(summary.sent).toEqual(['second']);
+    const docs = store.get('announcements')!;
+    // Nobody was pushed, so the next cron run retries it.
+    expect(docs.get('first')).toMatchObject({ status: 'scheduled', error: 'UNAVAILABLE' });
+    expect(docs.get('first')?.fanOutStarted).toBeUndefined();
+    expect(docs.get('second')?.status).toBe('sent');
+    expect((await runDueAnnouncements({ db, now: NOW })).sent).toEqual(['first']);
+  });
+
+  it('keeps a Send-now that fails before any push failed, for the owner to retry', async () => {
+    const { db, store } = seed({ now1: { title: 't', body: 'b', status: 'scheduled', sendAt: NOW, sendNow: true } });
+    const outcome = await sendAnnouncement(db, 'now1', NOW, () => Promise.reject(new Error('UNAVAILABLE')));
+    expect(outcome).toEqual({ status: 'failed', error: 'UNAVAILABLE' });
+    expect(store.get('announcements')!.get('now1')).toMatchObject({ status: 'failed' });
+    expect(store.get('announcements')!.get('now1')?.fanOutStarted).toBeUndefined();
+  });
+
   it('reads Firestore Timestamps for sendAt', async () => {
     const { db } = seed({
       due: { title: 't', body: 'b', status: 'scheduled', sendAt: { toDate: () => past } },
