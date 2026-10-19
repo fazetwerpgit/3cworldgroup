@@ -23,7 +23,10 @@ const {
   gateMock,
   stampDocumentMock,
   completeEsignItemMock,
+  onboardingItem,
 } = vi.hoisted(() => {
+    // The rep's checklist item (userOnboarding), read inside the claim transaction.
+    const item: { data: Record<string, unknown> | null } = { data: null };
     const docGet = vi.fn<() => Promise<DocSnapshot>>();
     const docSet = vi.fn<(record: Record<string, unknown>, options: { merge: boolean }) => Promise<void>>();
     // Transaction writes land in the envelope the next read returns, and
@@ -36,7 +39,11 @@ const {
       let read: Record<string, unknown> = {};
       const run = queue.then(() =>
         body({
-          get: async () => {
+          get: async (ref: { onboardingItem?: boolean } | undefined) => {
+            if (ref?.onboardingItem) {
+              const data = item.data;
+              return { exists: data !== null, data: () => data ?? undefined, get: (field: string) => data?.[field] };
+            }
             read = (await docGet()).data() ?? {};
             return { get: (field: string) => read[field] };
           },
@@ -62,11 +69,16 @@ const {
       gateMock: vi.fn(),
       stampDocumentMock: vi.fn<(input: StampInput) => Promise<StampResult>>(),
       completeEsignItemMock: vi.fn<CompleteEsignItem>(),
+      onboardingItem: item,
     };
   });
 
 vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: { collection: collectionMock, runTransaction: runTransactionMock },
+  adminDb: {
+    collection: collectionMock,
+    runTransaction: runTransactionMock,
+    doc: vi.fn(() => ({ onboardingItem: true })),
+  },
   getOnboardingBucket: vi.fn(),
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: gateMock }));
@@ -142,6 +154,7 @@ function signRequest(body: unknown, headers: Record<string, string> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  onboardingItem.data = { status: 'submitted', esignEnvelopeId: ENVELOPE_ID };
   gateMock.mockResolvedValue({ ok: true, uid: 'user-1', name: 'Test Rep', email: 'rep@example.com' });
   docGetMock.mockResolvedValue(envelope());
   docSetMock.mockResolvedValue(undefined);
@@ -229,7 +242,7 @@ describe('request rejection', () => {
     docGetMock.mockResolvedValue(envelope({ status: 'completed' }));
     const res = await POST(signRequest(signBody()));
     expect(res.status).toBe(409);
-    await expect(res.json()).resolves.toEqual({ error: 'already completed' });
+    await expect(res.json()).resolves.toEqual({ error: 'already completed', code: 'already_signed' });
     expect(completeEsignItemMock).not.toHaveBeenCalled();
   });
 
@@ -368,6 +381,33 @@ describe('failure after the rep pressed sign', () => {
   });
 });
 
+describe('superseded envelopes', () => {
+  it('refuses an envelope a reviewer rejected (in supersededEnvelopeIds), so it cannot approve the item', async () => {
+    onboardingItem.data = { status: 'rejected', supersededEnvelopeIds: [ENVELOPE_ID] };
+    const res = await POST(signRequest(signBody()));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'superseded' });
+    expect(stampDocumentMock).not.toHaveBeenCalled();
+    expect(completeEsignItemMock).not.toHaveBeenCalled();
+    expect(txSetMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses an older envelope once a newer one was sent for the item', async () => {
+    onboardingItem.data = { status: 'submitted', esignEnvelopeId: 'env-2', supersededEnvelopeIds: [] };
+    const res = await POST(signRequest(signBody()));
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ code: 'superseded' });
+    expect(completeEsignItemMock).not.toHaveBeenCalled();
+  });
+
+  it('still signs the current envelope', async () => {
+    onboardingItem.data = { status: 'submitted', esignEnvelopeId: ENVELOPE_ID, supersededEnvelopeIds: ['env-0'] };
+    const res = await POST(signRequest(signBody()));
+    expect(res.status).toBe(200);
+    expect(completeEsignItemMock).toHaveBeenCalledOnce();
+  });
+});
+
 describe('concurrent signing', () => {
   it('claims the envelope in a transaction before stamping', async () => {
     const res = await POST(signRequest(signBody()));
@@ -377,12 +417,12 @@ describe('concurrent signing', () => {
     expect(txSetMock.mock.invocationCallOrder[0]).toBeLessThan(stampDocumentMock.mock.invocationCallOrder[0]);
   });
 
-  it('lets only one of two simultaneous signs through; the other sees already completed', async () => {
+  it('lets only one of two simultaneous signs through; the other is told it is being signed', async () => {
     const [a, b] = await Promise.all([POST(signRequest(signBody())), POST(signRequest(signBody()))]);
 
     expect([a.status, b.status].sort()).toEqual([200, 409]);
     const loser = a.status === 409 ? a : b;
-    await expect(loser.json()).resolves.toEqual({ error: 'already completed' });
+    await expect(loser.json()).resolves.toMatchObject({ code: 'in_progress' });
     expect(stampDocumentMock).toHaveBeenCalledTimes(1);
     expect(completeEsignItemMock).toHaveBeenCalledTimes(1);
   });
@@ -391,7 +431,7 @@ describe('concurrent signing', () => {
     docGetMock.mockResolvedValue(envelope({ status: 'signing', signingClaimedAt: new Date(Date.now() - 30_000) }));
     const res = await POST(signRequest(signBody()));
     expect(res.status).toBe(409);
-    await expect(res.json()).resolves.toEqual({ error: 'already completed' });
+    await expect(res.json()).resolves.toMatchObject({ code: 'in_progress' });
     expect(stampDocumentMock).not.toHaveBeenCalled();
   });
 

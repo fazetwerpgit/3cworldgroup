@@ -67,9 +67,15 @@ export interface ParsedSignRequest {
   signatureMethod: SignatureMethod;
 }
 
+/**
+ * Why a 409 refused the signature. Only 'already_signed' means the document is
+ * done; the sign page shows "Signed" for that alone.
+ */
+export type SignConflict = 'already_signed' | 'in_progress' | 'superseded' | 'on_hold';
+
 export type SignOutcome =
   | { ok: true }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; code?: SignConflict };
 
 /** Validates a sign request body. The caller still has to check who owns the envelope. */
 export function parseSignRequest(
@@ -119,18 +125,41 @@ function claimTime(value: unknown): number | undefined {
  * item. Only the winner continues; the loser sees the same outcome as signing
  * an already signed document.
  */
-async function claimEnvelopeForSigning(envelopeId: string, now: Date): Promise<boolean> {
+type ClaimResult = 'claimed' | 'already_signed' | 'in_progress' | 'superseded';
+
+/**
+ * Whether the checklist item now points at a different envelope: a reviewer
+ * rejected it (its id went to supersededEnvelopeIds) or a newer one was sent.
+ * Such an envelope still says 'sent' but must not approve the item.
+ */
+export function envelopeSuperseded(item: Record<string, unknown> | undefined, envelopeId: string): boolean {
+  if (!item) return false;
+  const superseded = item.supersededEnvelopeIds;
+  if (Array.isArray(superseded) && superseded.includes(envelopeId)) return true;
+  const current = item.esignEnvelopeId;
+  return typeof current === 'string' && current !== '' && current !== envelopeId;
+}
+
+async function claimEnvelopeForSigning(
+  envelopeId: string,
+  item: { userId: string; itemId: string },
+  now: Date
+): Promise<ClaimResult> {
   const ref = envelopeRef(envelopeId);
+  const itemRef = adminDb!.doc(`userOnboarding/${item.userId}_${item.itemId}`);
   return adminDb!.runTransaction(async (transaction) => {
-    const fresh = await transaction.get(ref);
+    const [fresh, itemSnap] = await Promise.all([transaction.get(ref), transaction.get(itemRef)]);
     const status = fresh.get('status');
-    if (status === 'completed') return false;
+    if (status === 'completed') return 'already_signed';
+    // Read in the same transaction as the claim, so a rejection that lands
+    // while the rep is signing cannot slip through.
+    if (envelopeSuperseded(itemSnap.exists ? itemSnap.data() : undefined, envelopeId)) return 'superseded';
     if (status === 'signing') {
       const claimedAt = claimTime(fresh.get('signingClaimedAt'));
-      if (claimedAt !== undefined && now.getTime() - claimedAt < SIGNING_CLAIM_STALE_MS) return false;
+      if (claimedAt !== undefined && now.getTime() - claimedAt < SIGNING_CLAIM_STALE_MS) return 'in_progress';
     }
     transaction.set(ref, { status: 'signing', signingClaimedAt: now }, { merge: true });
-    return true;
+    return 'claimed';
   });
 }
 
@@ -158,12 +187,12 @@ export async function signInhouseEnvelope(input: {
   const { envelopeId, signaturePng, signatureMethod } = input.request;
 
   if (envelope.status === 'completed') {
-    return { ok: false, status: 409, error: 'already completed' };
+    return { ok: false, status: 409, error: 'already completed', code: 'already_signed' };
   }
   // A placeholder document on hold is not signable, even from a link sent
   // before the hold (see onboardingHold).
   if (isHeldOnboardingItem(envelope.itemId)) {
-    return { ok: false, status: 409, error: 'document on hold' };
+    return { ok: false, status: 409, error: "This document is on hold. You don't need to sign it yet.", code: 'on_hold' };
   }
   if (!DOCUMENTS[envelope.docKey]) {
     return { ok: false, status: 404, error: 'unknown document' };
@@ -182,8 +211,15 @@ export async function signInhouseEnvelope(input: {
   }
 
   const now = new Date();
-  if (!(await claimEnvelopeForSigning(envelopeId, now))) {
-    return { ok: false, status: 409, error: 'already completed' };
+  const claim = await claimEnvelopeForSigning(envelopeId, { userId, itemId: envelope.itemId }, now);
+  if (claim === 'already_signed') {
+    return { ok: false, status: 409, error: 'already completed', code: 'already_signed' };
+  }
+  if (claim === 'superseded') {
+    return { ok: false, status: 409, error: 'This document was replaced. Sign the newest copy.', code: 'superseded' };
+  }
+  if (claim === 'in_progress') {
+    return { ok: false, status: 409, error: 'This document is being signed. Try again in a moment.', code: 'in_progress' };
   }
 
   let pdf: Buffer;

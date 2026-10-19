@@ -177,12 +177,18 @@ function EsignSign() {
           consent: true,
         }),
       });
-      // 409 means this envelope was already signed - the rep is done either way.
-      if (response.ok || response.status === 409) {
+      if (response.ok) {
         setCompleted(true);
         return;
       }
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
+      // Only the server's "already signed" means the rep is done. Other 409s
+      // (being signed elsewhere right now, replaced by a newer copy, on hold)
+      // are shown as they are.
+      if (response.status === 409 && payload?.code === 'already_signed') {
+        setCompleted(true);
+        return;
+      }
       const fallback = response.status >= 500 ? 'Server hiccup, try again.' : 'Try again.';
       throw new Error(payload?.error || fallback);
     } catch (cause: unknown) {

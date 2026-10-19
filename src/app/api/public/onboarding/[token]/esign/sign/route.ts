@@ -42,7 +42,12 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ token:
       ip: clientIp(request),
       userAgent: request.headers.get('user-agent') ?? '',
     });
-    if (!outcome.ok) return NextResponse.json({ error: outcome.error }, { status: outcome.status });
+    if (!outcome.ok) {
+      return NextResponse.json(
+        { error: outcome.error, ...(outcome.code ? { code: outcome.code } : {}) },
+        { status: outcome.status }
+      );
+    }
 
     const allSigned = await allEsignItemsSigned(auth.userId, auth.items);
     if (allSigned) await closeSigningSession(auth.inviteRef);
