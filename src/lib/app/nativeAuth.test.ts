@@ -159,7 +159,7 @@ describe('nativeAuthErrorMessage', () => {
 
 describe('account-exists linking', () => {
   const credential = { providerId: 'apple.com' } as AuthCredential;
-  const user = { uid: 'u1' } as FirebaseUser;
+  const user = { uid: 'u1', email: 'Rep@X.com' } as FirebaseUser;
 
   beforeEach(() => clearPendingLink());
 
@@ -182,17 +182,36 @@ describe('account-exists linking', () => {
   });
 
   it('treats provider-already-linked as linked', async () => {
-    rememberPendingLink({ provider: 'apple', credential, email: null });
+    rememberPendingLink({ provider: 'apple', credential, email: 'rep@x.com' });
     const link = vi.fn().mockRejectedValue({ code: 'auth/provider-already-linked' });
     expect(await completePendingLink(user, link)).toEqual({ status: 'linked', provider: 'apple' });
   });
 
   it('reports a failed link and still clears it', async () => {
-    rememberPendingLink({ provider: 'apple', credential, email: null });
+    rememberPendingLink({ provider: 'apple', credential, email: 'rep@x.com' });
     const link = vi.fn().mockRejectedValue({ code: 'auth/credential-already-in-use' });
     const outcome = await completePendingLink(user, link);
     expect(outcome.status).toBe('failed');
     expect(peekPendingLink()).toBeNull();
+  });
+
+  it('refuses to link a held credential to a different account and drops it', async () => {
+    rememberPendingLink({ provider: 'google', credential, email: 'a@x.com' });
+    const link = vi.fn().mockResolvedValue({});
+    const other = { uid: 'u2', email: 'b@x.com' } as FirebaseUser;
+    const outcome = await completePendingLink(other, link);
+    expect(outcome.status).toBe('failed');
+    expect(link).not.toHaveBeenCalled();
+    expect(peekPendingLink()).toBeNull();
+  });
+
+  it('refuses to link when either email is missing', async () => {
+    const link = vi.fn().mockResolvedValue({});
+    rememberPendingLink({ provider: 'apple', credential, email: null });
+    expect((await completePendingLink(user, link)).status).toBe('failed');
+    rememberPendingLink({ provider: 'apple', credential, email: 'rep@x.com' });
+    expect((await completePendingLink({ uid: 'u3', email: null } as FirebaseUser, link)).status).toBe('failed');
+    expect(link).not.toHaveBeenCalled();
   });
 });
 

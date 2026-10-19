@@ -206,7 +206,10 @@ export function clearPendingLink(): void {
 
 export type LinkOutcome = { status: 'none' } | { status: 'linked'; provider: NativeSignInProvider } | { status: 'failed'; message: string };
 
-/** Links a held credential to the account just signed in to. Clears it either way. */
+/**
+ * Links a held credential to the account just signed in to, only when that
+ * account's email matches the held sign-in's email. Clears it either way.
+ */
 export async function completePendingLink(
   user: FirebaseUser,
   link: (user: FirebaseUser, credential: AuthCredential) => Promise<unknown> = linkWithCredential
@@ -214,6 +217,17 @@ export async function completePendingLink(
   const held = pendingLink;
   if (!held) return { status: 'none' };
   pendingLink = null;
+  // Only link to the account the held sign-in was for. On a shared phone the
+  // next sign-in in this tab can be a different person; linking there would
+  // hand them the held Google/Apple identity.
+  const heldEmail = held.email?.trim().toLowerCase();
+  const userEmail = user.email?.trim().toLowerCase();
+  if (!heldEmail || heldEmail !== userEmail) {
+    return {
+      status: 'failed',
+      message: `${providerLabel(held.provider)} was not linked because it belongs to a different email. Sign in with ${providerLabel(held.provider)} again to link it.`,
+    };
+  }
   try {
     await link(user, held.credential);
     if (held.provider === 'apple') void sendAppleAuthorizationCode(user, held.appleAuthorizationCode);
