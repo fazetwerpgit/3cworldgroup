@@ -94,12 +94,26 @@ export async function loadDaySales(db: Db, day: string): Promise<LoggedSale[]> {
   return [...byId.values()];
 }
 
-/** Today's count for one rep: their callouts against their own sales (read by rep, so no index). */
+/**
+ * Today's count for one rep: their callouts against their own sales. Runs on
+ * every rep Home mount, so it reads only the rep's sales dated a day either
+ * side of today (the window loadDaySales uses), not their whole history. The
+ * existing sales(salesRepId, saleDate) composite serves it. Every sale carries
+ * a saleDate (POST always writes one; verified in production 2026-09-03), so
+ * the createdAt fallback loadDaySales keeps is not needed for the rep's own.
+ */
 export async function repCalloutDay(db: Db, uid: string, now: Date = new Date()): Promise<CalloutDay> {
   const day = chicagoDayKey(now);
+  const { start, end } = chicagoDayBounds(day);
   const [messages, salesSnap] = await Promise.all([
     loadDayMessages(db, day),
-    db.collection('sales').where('salesRepId', '==', uid).select('salesRepId', 'saleDate', 'createdAt').get(),
+    db
+      .collection('sales')
+      .where('salesRepId', '==', uid)
+      .where('saleDate', '>=', new Date(start.getTime() - DAY_MS))
+      .where('saleDate', '<', new Date(end.getTime() + DAY_MS))
+      .select('salesRepId', 'saleDate', 'createdAt')
+      .get(),
   ]);
   const own = calloutDays(
     messages.filter((message) => message.authorId === uid),

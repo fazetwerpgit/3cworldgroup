@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 
 const db = vi.hoisted(() => {
   const users = new Map<string, Record<string, unknown>>();
+  const limits: number[] = [];
   const calls = [
     { id: 'all-call', title: 'Monday Team Call', day: 'monday', time: '19:00', audience: 'all', active: true },
     { id: 'mgr-call', title: 'Managers Sync', day: 'tuesday', time: '18:00', audience: 'managers', active: true },
@@ -12,10 +13,16 @@ const db = vi.hoisted(() => {
       if (name === 'users') {
         return { doc: (id: string) => ({ get: async () => ({ exists: users.has(id), data: () => users.get(id) }) }) };
       }
-      return { get: async () => ({ docs: calls.map((c) => ({ id: c.id, data: () => c })) }) };
+      // Only a bounded read is served (no whole-collection get()).
+      return {
+        limit: (n: number) => {
+          limits.push(n);
+          return { get: async () => ({ docs: calls.slice(0, n).map((c) => ({ id: c.id, data: () => c })) }) };
+        },
+      };
     },
   };
-  return { adminDb, users };
+  return { adminDb, users, limits };
 });
 
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: db.adminDb }));
@@ -26,6 +33,7 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
 vi.mock('@/lib/auth/viewAs', async () => (await import('@/lib/auth/viewAsTestStub')).viewAsStubModule());
 
 import { DELETE, GET } from './route';
+import { MAX_SCHEDULED_CALLS } from '@/types';
 import { requireVerifiedManagement, requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';
 
@@ -77,5 +85,13 @@ describe('GET /api/portal/calls — owner viewing as a rep', () => {
     db.users.set('caller', { fieldRole: 'entry_rep', status: 'active' });
     const res = await GET(new NextRequest('http://localhost/api/portal/calls', { headers: viewAsHeaders() }));
     expect(res.status).toBe(403);
+  });
+});
+
+describe('GET /api/portal/calls read bound', () => {
+  it('reads scheduledCalls with a cap, not the whole collection', async () => {
+    db.limits.length = 0;
+    await titlesFor({ role: 'admin', status: 'active' });
+    expect(db.limits).toEqual([MAX_SCHEDULED_CALLS]);
   });
 });

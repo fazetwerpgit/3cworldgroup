@@ -10,6 +10,7 @@ import {
   CallAudience,
   CallDay,
   MANAGEMENT_FIELD_ROLES,
+  MAX_SCHEDULED_CALLS,
   isManagementRole,
   PlatformRole,
   resolveRoles,
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
     // IBO levels, general / office / regional managers and directors.
     const seesManagerCalls = !!role || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false);
 
-    const snapshot = await adminDb.collection('scheduledCalls').get();
+    const snapshot = await adminDb.collection('scheduledCalls').limit(MAX_SCHEDULED_CALLS).get();
     const calls = snapshot.docs
       .map((doc) => {
         const d = doc.data();

@@ -39,6 +39,11 @@ export const CallAudienceLabels: Record<CallAudience, string> = {
   managers: 'Managers only',
 };
 
+// Upper bound on one scheduledCalls read. The schedule is a handful of
+// recurring weekly calls that ops add and delete by hand, so this never trims a
+// real schedule; it only keeps a per-request read (dashboard, Ask) bounded.
+export const MAX_SCHEDULED_CALLS = 100;
+
 // Firestore: scheduledCalls collection
 export interface ScheduledCall {
   id: string;

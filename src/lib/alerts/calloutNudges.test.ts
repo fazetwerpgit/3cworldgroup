@@ -228,6 +228,38 @@ describe('repCalloutDay', () => {
     expect(await repCalloutDay(db, 'noah', chicago('2026-10-09', '18:00'))).toMatchObject({ callouts: 0, gap: 0 });
   });
 
+  it("reads only the rep's sales dated around today, not their whole history", async () => {
+    const data = seed();
+    (data.sales as Record<string, Data>).old = { salesRepId: 'miles', saleDate: saleNoon('2026-08-01'), createdAt: chicago('2026-08-01', '12:00') };
+    const { db } = fakeDb(data);
+    const wheres: string[] = [];
+    const salesReturned: string[] = [];
+    const spyDb = {
+      ...db,
+      collection: (path: string) => {
+        const real = (db as unknown as { collection: (p: string) => Record<string, unknown> }).collection(path);
+        if (path !== 'sales') return real;
+        const wrap = (q: Record<string, unknown>): Record<string, unknown> => ({
+          ...q,
+          where: (field: string, op: string, value: unknown) => {
+            wheres.push(`${field} ${op}`);
+            return wrap((q.where as (f: string, o: string, v: unknown) => Record<string, unknown>)(field, op, value));
+          },
+          select: (...fields: string[]) => wrap((q.select as (...f: string[]) => Record<string, unknown>)(...fields)),
+          get: async () => {
+            const result = await (q.get as () => Promise<{ docs: Array<{ id: string }> }>)();
+            salesReturned.push(...result.docs.map((d) => d.id));
+            return result;
+          },
+        });
+        return wrap(real);
+      },
+    };
+    expect(await repCalloutDay(spyDb as never, 'miles', chicago('2026-10-09', '18:00'))).toMatchObject({ logged: 1, gap: 3 });
+    expect(wheres).toEqual(['salesRepId ==', 'saleDate >=', 'saleDate <']);
+    expect(salesReturned).toEqual(['s2']);
+  });
+
   it('starts fresh after Chicago midnight', async () => {
     const { db } = fakeDb(seed());
     expect(await repCalloutDay(db, 'miles', chicago('2026-10-10', '00:05'))).toMatchObject({

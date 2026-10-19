@@ -50,8 +50,14 @@ export function isoTime(value: unknown): string | null {
   return stamp && typeof stamp.toDate === 'function' ? stamp.toDate().toISOString() : null;
 }
 
+// Upper bound on one knowledge-notes read (every Ask question loads them). The
+// notes are a hand-curated library — dozens, not thousands — and they all go
+// into one prompt, so this never trims a real library; it bounds the read.
+export const MAX_KNOWLEDGE_NOTES = 500;
+
 export async function loadNotes(db: FirebaseFirestore.Firestore): Promise<KnowledgeNote[]> {
-  const snap = await db.collection(KNOWLEDGE_NOTES).get();
+  const snap = await db.collection(KNOWLEDGE_NOTES).limit(MAX_KNOWLEDGE_NOTES).get();
+  if (snap.size >= MAX_KNOWLEDGE_NOTES) console.warn(`knowledgeNotes: read capped at ${MAX_KNOWLEDGE_NOTES}`);
   return sortNotes(
     snap.docs.map((doc) => {
       const data = doc.data();

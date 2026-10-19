@@ -2,6 +2,7 @@ import {
   CALL_DAY_ORDER,
   CallDayLabels,
   MANAGEMENT_FIELD_ROLES,
+  MAX_SCHEDULED_CALLS,
   getOnboardingItemsForUser,
   resolveRoles,
   type CallDay,
@@ -482,7 +483,7 @@ async function callsSection(db: Db, user: Data, now: Date, zone: Zone): Promise<
   const { role, fieldRole } = resolveRoles(str(user.role) || undefined, str(user.fieldRole) || undefined);
   // Same rule as GET /api/portal/calls.
   const seesManagerCalls = !!role || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false);
-  const snap = await db.collection('scheduledCalls').get();
+  const snap = await db.collection('scheduledCalls').limit(MAX_SCHEDULED_CALLS).get();
   const upcoming = snap.docs
     .map((doc) => doc.data() as Data)
     .filter((call) => (call.active ?? true) !== false)
