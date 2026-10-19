@@ -294,3 +294,74 @@ export function formatSlotPT(startISO: string): string {
     minute: '2-digit',
   }).format(new Date(startISO));
 }
+
+/** The time zones a consultant's hours can be set in (Admin > Solar > Setup). */
+export const SOLAR_TIMEZONES = [
+  { value: 'America/Los_Angeles', label: 'Pacific' },
+  { value: 'America/Denver', label: 'Mountain' },
+  { value: 'America/Chicago', label: 'Central' },
+  { value: 'America/New_York', label: 'Eastern' },
+] as const;
+
+/** Slot lengths a consultant can offer, in minutes. */
+export const SOLAR_SLOT_LENGTHS = [30, 60, 90] as const;
+
+/** A consultant's editable hours: everything in SolarAvailability but who they are. */
+export type SolarHours = Pick<SolarAvailability, 'tz' | 'slotMin'> & { modes: Record<SolarMode, WeeklyWindow[]> };
+
+export type ParsedHours = { ok: true; value: SolarHours } | { ok: false; error: string };
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * Validates a PUT body's hours: {tz, slotMin, modes: {virtual?, in_person?}}.
+ * tz is one of SOLAR_TIMEZONES, slotMin one of SOLAR_SLOT_LENGTHS, and each mode
+ * has at most one window per day that fits at least one slot. Windows come back
+ * sorted by day, with "H:MM" padded to "HH:MM". Missing modes are empty.
+ */
+export function parseAvailability(input: unknown): ParsedHours {
+  if (!input || typeof input !== 'object') return { ok: false, error: 'Invalid hours' };
+  const body = input as Record<string, unknown>;
+  const tz = body.tz;
+  if (typeof tz !== 'string' || !SOLAR_TIMEZONES.some((z) => z.value === tz)) {
+    return { ok: false, error: 'Pick a time zone' };
+  }
+  const slotMin = body.slotMin;
+  if (typeof slotMin !== 'number' || !(SOLAR_SLOT_LENGTHS as readonly number[]).includes(slotMin)) {
+    return { ok: false, error: 'Slot length must be 30, 60 or 90 minutes' };
+  }
+  const rawModes = body.modes;
+  if (rawModes !== undefined && (!rawModes || typeof rawModes !== 'object' || Array.isArray(rawModes))) {
+    return { ok: false, error: 'Invalid hours' };
+  }
+  const modes = {} as Record<SolarMode, WeeklyWindow[]>;
+  for (const mode of SOLAR_MODES) {
+    const raw = (rawModes as Record<string, unknown> | undefined)?.[mode];
+    if (raw === undefined) {
+      modes[mode] = [];
+      continue;
+    }
+    if (!Array.isArray(raw) || raw.length > 7) return { ok: false, error: 'Invalid hours' };
+    const seen = new Set<number>();
+    const windows: WeeklyWindow[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') return { ok: false, error: 'Invalid hours' };
+      const { day, start, end } = item as Record<string, unknown>;
+      if (typeof day !== 'number' || !Number.isInteger(day) || day < 0 || day > 6) {
+        return { ok: false, error: 'Invalid day' };
+      }
+      if (seen.has(day)) return { ok: false, error: `${DAY_NAMES[day]} is listed twice` };
+      seen.add(day);
+      const startMin = typeof start === 'string' ? parseHm(start) : null;
+      const endMin = typeof end === 'string' ? parseHm(end) : null;
+      if (startMin === null || endMin === null) return { ok: false, error: `${DAY_NAMES[day]} has an invalid time` };
+      if (endMin - startMin < slotMin) {
+        return { ok: false, error: `${DAY_NAMES[day]} ends before one ${slotMin}-minute slot fits` };
+      }
+      const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+      windows.push({ day, start: hm(startMin), end: hm(endMin) });
+    }
+    modes[mode] = windows.sort((a, b) => a.day - b.day);
+  }
+  return { ok: true, value: { tz, slotMin, modes } };
+}
