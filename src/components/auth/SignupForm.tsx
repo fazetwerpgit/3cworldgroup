@@ -15,6 +15,7 @@ import {
   validateSignup,
   passwordStrength,
   PASSWORD_STRENGTH_LABEL,
+  teamCodeGateError,
 } from "@/lib/auth/signupValidation";
 import { friendlyAuthError } from "@/lib/auth/friendlyAuthError";
 import { looksLikeBotSignup } from "@/lib/auth/botDetection";
@@ -216,16 +217,19 @@ export function SignupForm() {
             invited ? { inviteToken: invite.token } : { code: teamCode },
           ),
         });
-        const codeData = (await codeResponse.json()) as {
+        const codeData = (await codeResponse.json().catch(() => ({}))) as {
           ok?: unknown;
           state?: unknown;
+          error?: unknown;
         };
-        if (
-          !codeResponse.ok ||
-          codeData.ok !== true ||
-          (invited && codeData.state !== "open")
-        ) {
-          setError(gateError);
+        const codeError = teamCodeGateError(
+          codeResponse.status,
+          codeData,
+          invited,
+          gateError,
+        );
+        if (codeError) {
+          setError(codeError);
           return;
         }
       } catch {
