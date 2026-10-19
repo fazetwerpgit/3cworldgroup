@@ -23,6 +23,8 @@ const FIRST_BOARD = FIRST_LEADERBOARD_BOARD;
 
 export function LeaderboardRoute() {
   const { user } = useAuth();
+  // The board depends on who is signed in, not on every profile refresh.
+  const uid = user?.uid ?? null;
   // Seeded with the board fetched first below (week, points, team), so a revisit paints it at once.
   const { leaderboard, currentUser, unranked, recent, firstMonth, loading, error, staleAt, fetchLeaderboard } =
     useLeaderboard(FIRST_BOARD);
@@ -37,8 +39,8 @@ export function LeaderboardRoute() {
   const pastMonth = monthParam ? month : null;
 
   useEffect(() => {
-    if (user) fetchLeaderboard(period, metric, 100, 'approved', { team: true, ...(monthParam ? { month: monthParam } : {}) });
-  }, [user, period, metric, monthParam, fetchLeaderboard]);
+    if (uid) fetchLeaderboard(period, metric, 100, 'approved', { team: true, ...(monthParam ? { month: monthParam } : {}) });
+  }, [uid, period, metric, monthParam, fetchLeaderboard]);
 
   // Reopened after a while: the same board, reloaded in place. A load already
   // under way (a filter tap) is left to land on its own.

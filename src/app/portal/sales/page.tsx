@@ -115,8 +115,10 @@ function SalesContent() {
   // This replaced sales:approve, which used to carry the visibility switch as a
   // side effect of the approval permission.
   const canViewAll = hasPermission('sales:read:all');
+  // Keyed on the uid, not the user object: a profile refresh must not refetch the book.
+  const uid = user?.uid ?? null;
   const salesFilters = useMemo(() => {
-    if (!user) return null;
+    if (!uid) return null;
     // Both books are fetched WHOLE and sliced by month in the browser.
     //
     // A rep's pay list is keyed on the INSTALL date, so a month-bounded fetch on
@@ -129,8 +131,8 @@ function SalesContent() {
     // nothing to join to, and the order rendered red as "never logged" — the
     // board accusing somebody of not logging a sale they had logged. The month
     // is applied to the merged book instead, where both sides see it.
-    return canViewAll ? { limit: 500 } : { limit: 500, salesRepId: user.uid };
-  }, [canViewAll, user]);
+    return canViewAll ? { limit: 500 } : { limit: 500, salesRepId: uid };
+  }, [canViewAll, uid]);
   // A revisit shows the last copy of the book at once and refreshes it in the
   // background. Not straight after Log Sale: the new sale must be in the list
   // the banner names, so that lands on a fresh read as before.

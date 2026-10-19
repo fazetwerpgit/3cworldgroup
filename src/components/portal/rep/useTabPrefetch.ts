@@ -5,9 +5,24 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useViewAs } from '@/contexts/ViewAsContext';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import type { TabPrefetchContext } from '@/lib/cache/tabPrefetch';
+import { waitForPageData } from '@/lib/cache/pageData';
 
-/** After a page opens, wait this long (its own reads go first) before warming the other tabs. */
+/**
+ * The other tabs are warmed once the page's own data has landed (a page that
+ * loads on open holds pageData until it settles), then on the next idle frame.
+ * A page that never holds gets this long to itself first.
+ */
 export const TAB_PREFETCH_IDLE_MS = 2000;
+
+/** Runs `fn` when the main thread is idle (or soon, where requestIdleCallback is missing: iOS WebKit). */
+function whenIdle(fn: () => void): () => void {
+  if (typeof window.requestIdleCallback === 'function') {
+    const handle = window.requestIdleCallback(fn, { timeout: 1000 });
+    return () => window.cancelIdleCallback(handle);
+  }
+  const timer = setTimeout(fn, 200);
+  return () => clearTimeout(timer);
+}
 
 // Its own chunk, fetched on first use: the shell's first load stays as it was.
 const loadPrefetch = () => import('@/lib/cache/tabPrefetch');
@@ -36,16 +51,22 @@ export function useTabPrefetch(pathname: string | null) {
   useEffect(() => {
     if (!ctx) return;
     let cancelled = false;
-    const timer = setTimeout(() => {
-      void loadPrefetch()
-        .then((m) => {
-          if (!cancelled) m.prefetchTabs(pathname, ctx);
-        })
-        .catch(() => undefined);
-    }, TAB_PREFETCH_IDLE_MS);
+    let cancelIdle: (() => void) | null = null;
+    const controller = new AbortController();
+    void waitForPageData({ fallbackMs: TAB_PREFETCH_IDLE_MS, signal: controller.signal }).then(() => {
+      if (cancelled) return;
+      cancelIdle = whenIdle(() => {
+        void loadPrefetch()
+          .then((m) => {
+            if (!cancelled) m.prefetchTabs(pathname, ctx);
+          })
+          .catch(() => undefined);
+      });
+    });
     return () => {
       cancelled = true;
-      clearTimeout(timer);
+      controller.abort();
+      cancelIdle?.();
     };
   }, [ctx, pathname]);
 }

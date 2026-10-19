@@ -351,7 +351,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userDataResult.status === 'found') {
         const userData = userDataResult.user;
         if (userData.status === 'active') {
-          setState({ user: userData, loading: false, error: null, pendingApproval: false });
+          // The confirmed profile usually equals the remembered one already on
+          // screen: keep that object so effects keyed on `user` don't re-run
+          // (Sales and Leaderboard used to fetch twice on every cold open).
+          setState((prev) => ({
+            user: prev.user && sameUser(prev.user, userData) ? prev.user : userData,
+            loading: false,
+            error: null,
+            pendingApproval: false,
+          }));
           watchProfile(firebaseUser.uid);
           // Only fires when the client already sees the Auth photo differs from
           // the stored one, so a normal login makes zero extra calls once synced.
@@ -363,7 +371,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (auth) await firebaseSignOut(auth);
           setState({ user: null, loading: false, error: null, pendingApproval: true });
         } else if (userData.status === 'pending') {
-          setState({ user: userData, loading: false, error: null, pendingApproval: false });
+          // The confirmed profile usually equals the remembered one already on
+          // screen: keep that object so effects keyed on `user` don't re-run
+          // (Sales and Leaderboard used to fetch twice on every cold open).
+          setState((prev) => ({
+            user: prev.user && sameUser(prev.user, userData) ? prev.user : userData,
+            loading: false,
+            error: null,
+            pendingApproval: false,
+          }));
           watchProfile(firebaseUser.uid);
         } else {
           if (auth) await firebaseSignOut(auth);

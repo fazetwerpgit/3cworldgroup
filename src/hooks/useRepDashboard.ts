@@ -3,16 +3,30 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { dataCacheGeneration, readDataCacheEntry, writeDataCache } from '@/lib/cache/dataCache';
+import {
+  awaitPendingDataCacheRead,
+  dataCacheGeneration,
+  readDataCacheEntry,
+  trackDataCacheRead,
+  writeDataCache,
+} from '@/lib/cache/dataCache';
+import { holdPageData } from '@/lib/cache/pageData';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import type { DashboardCall, LeaderboardRow } from '@/lib/dashboard/repSummary';
 import type { CompPlanCompanyRates, CompPlanResponse, FiberOrder, FiberStatusResponse, Sale } from '@/types';
-import { salesListCacheKey } from '@/hooks/useSales';
+import { salesListCacheKey, type CachedSales } from '@/hooks/useSales';
 import { FIBER_CACHE_KEY } from '@/hooks/useFiberStatus';
-import { COMP_PLAN_CACHE_KEY, compPlanState } from '@/hooks/useCompPlan';
+import { COMP_PLAN_CACHE_KEY, compPlanState, type PlanState } from '@/hooks/useCompPlan';
+import {
+  boardFromResponse,
+  FIRST_LEADERBOARD_BOARD,
+  leaderboardCacheKey,
+  leaderboardQuery,
+  type CachedBoard,
+} from '@/hooks/useLeaderboard';
 
 // The D dashboard's data, one independent section per source. Every section
 // loads in parallel (Promise.allSettled) and renders as it lands, so a slow or
@@ -101,23 +115,28 @@ export async function fetchRepBook(
   uid: string,
   token: string | null,
   signal: AbortSignal,
-  /** Handed the raw answers (the same requests the Sales tab makes), to seed its cache. */
-  onRaw?: (sales: { sales: Sale[]; truncated?: boolean }, fiber: FiberStatusResponse | null) => void
+  /**
+   * Runs each read under its data-cache key (the same requests, keys and
+   * shapes the Sales tab uses), so the dashboard and the tab share one request
+   * and its answer. Default: just read.
+   */
+  share: ShareRead = (_key, read) => read()
 ): Promise<RepBook> {
   const own = encodeURIComponent(uid);
   const [salesResult, fiberResult] = await Promise.allSettled([
-    getJson<{ sales: Sale[]; truncated?: boolean }>(`/api/portal/sales?salesRepId=${own}&limit=500`, token, signal),
-    getJson<{
-      scope?: 'own' | 'all';
-      orders?: FiberOrder[];
-      lastReportAt?: string | null;
-      lastReportAsOf?: string | null;
-    }>('/api/portal/sales/status', token, signal),
+    share<CachedSales>(salesListCacheKey({ limit: 500, salesRepId: uid }), async () => {
+      const data = await getJson<{ sales?: Sale[]; truncated?: boolean }>(
+        `/api/portal/sales?salesRepId=${own}&limit=500`,
+        token,
+        signal
+      );
+      return { sales: data.sales ?? [], truncated: data.truncated === true };
+    }),
+    share<FiberStatusResponse>(FIBER_CACHE_KEY, () =>
+      getJson<FiberStatusResponse>('/api/portal/sales/status', token, signal)
+    ),
   ]);
   if (salesResult.status === 'rejected') throw salesResult.reason;
-  if (onRaw && !signal.aborted) {
-    onRaw(salesResult.value, fiberResult.status === 'fulfilled' ? (fiberResult.value as FiberStatusResponse) : null);
-  }
   const logged = salesResult.value.sales ?? [];
   const carrierFailed = fiberResult.status === 'rejected';
   if (carrierFailed && !signal.aborted) console.error('Carrier report failed:', fiberResult.reason);
@@ -141,6 +160,28 @@ export function withSaleInstallDate(book: RepBook, saleId: string, installDate: 
   return {
     ...book,
     sales: book.sales.map((sale) => (sale.id === saleId ? { ...sale, installDate: new Date(installDate) } : sale)),
+  };
+}
+
+/** Runs `read` as the data-cache read for `key` (see fetchRepBook). */
+export type ShareRead = <T>(key: string, read: () => Promise<T>) => Promise<T>;
+
+/**
+ * One read shared with the other screens through the data cache: if a read for
+ * the same key is under way (the tab prefetch), its answer is used; otherwise
+ * this read runs, is registered as under way (so a screen or the prefetch
+ * waits for it instead of asking again), and lands in the cache.
+ */
+function sharedRead(uid: string, gen: number, signal: AbortSignal): ShareRead {
+  return async <T,>(key: string, read: () => Promise<T>): Promise<T> => {
+    const pending = await awaitPendingDataCacheRead<T>(uid, key);
+    if (pending) return pending.value;
+    const run = read().then((value) => {
+      if (!signal.aborted) writeDataCache(uid, key, value, gen);
+      return value;
+    });
+    void trackDataCacheRead(uid, key, run).catch(() => undefined);
+    return run;
   };
 }
 
@@ -217,35 +258,38 @@ export function useRepDashboard() {
       // The carrier report sharpens install dates and drops carrier
       // cancellations; see fetchRepBook for what happens without it.
       // The dashboard reads exactly what the Sales tab reads for a rep's own
-      // book (the list and the carrier report): seed that tab's cache with it,
-      // so opening Sales next paints at once without asking again.
-      book: (token, signal) =>
-        fetchRepBook(uid, token, signal, (sales, fiber) => {
-          writeDataCache(uid, salesListCacheKey({ limit: 500, salesRepId: uid }), { sales: sales.sales ?? [], truncated: sales.truncated === true }, gen);
-          if (fiber) writeDataCache(uid, FIBER_CACHE_KEY, fiber, gen);
-        }),
+      // book (the list and the carrier report), under the same cache keys, so
+      // opening Sales next paints at once and neither asks twice.
+      book: (token, signal) => fetchRepBook(uid, token, signal, sharedRead(uid, gen, signal)),
       plan: async (token, signal) => {
         // Pending accounts are refused by the route; they have no plan yet.
         if (!active) return { rates: null };
-        const data = await getJson<CompPlanResponse>('/api/portal/comp-plan', token, signal);
-        // Same answer the Sales tab's pay view reads: seed it.
-        if (!signal.aborted) writeDataCache(uid, COMP_PLAN_CACHE_KEY, compPlanState(uid, data), gen);
-        const rates =
-          data.scope === 'all'
-            ? ((data.ownRates as CompPlanCompanyRates | null) ?? null)
-            : ((data.rates as CompPlanCompanyRates | null) ?? null);
-        return { rates };
+        // Same answer the Sales tab's pay view reads (compPlanState picks the
+        // caller's own slice): shared with it, and with the tab prefetch.
+        const state = await sharedRead(uid, gen, signal)<PlanState>(COMP_PLAN_CACHE_KEY, async () =>
+          compPlanState(uid, await getJson<CompPlanResponse>('/api/portal/comp-plan', token, signal))
+        );
+        return { rates: state.rates ?? null };
       },
       standing: async (token, signal) => {
-        const data = await getJson<{ leaderboard?: LeaderboardRow[]; currentUser?: LeaderboardRow | null; totalRanked?: number }>(
-          '/api/portal/leaderboard?period=week&metric=totalPoints&limit=100',
-          token,
-          signal
+        // The Leaderboard tab's first board (week, points, top 100, with the
+        // team extras) answers this too: one request for both, shared through
+        // the cache, instead of a dashboard read plus a prefetch read.
+        const board = await sharedRead(uid, gen, signal)<CachedBoard>(
+          leaderboardCacheKey(FIRST_LEADERBOARD_BOARD),
+          async () =>
+            boardFromResponse(
+              await getJson<Parameters<typeof boardFromResponse>[0]>(
+                `/api/portal/leaderboard?${leaderboardQuery(FIRST_LEADERBOARD_BOARD)}`,
+                token,
+                signal
+              )
+            )
         );
         return {
-          entries: data.leaderboard ?? [],
-          me: data.currentUser ?? null,
-          totalRanked: data.totalRanked ?? 0,
+          entries: board.leaderboard as unknown as LeaderboardRow[],
+          me: (board.currentUser as unknown as LeaderboardRow | null) ?? null,
+          totalRanked: board.totalRanked ?? board.leaderboard.length,
         } satisfies RepStanding;
       },
       challenge: async (token, signal) => {
@@ -339,8 +383,11 @@ export function useRepDashboard() {
     // From cache: a quiet refresh keeps each section on screen if its reload fails.
     const quiet = showedCached.current;
     showedCached.current = false;
-    void run(undefined, { quiet });
+    // Background traffic (tab prefetch, presence, push health) waits for this.
+    const release = holdPageData();
+    void run(undefined, { quiet }).finally(release);
     return () => {
+      release();
       for (const controller of running.values()) controller.abort();
       running.clear();
     };

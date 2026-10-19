@@ -5,6 +5,8 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'token') }));
 
 import { fetchRepBook, withSaleInstallDate } from './useRepDashboard';
+import { salesListCacheKey } from './useSales';
+import { FIBER_CACHE_KEY } from './useFiberStatus';
 
 const SALE = { id: 's1', salesRepId: 'r1', status: 'approved', customerName: 'A', products: [] };
 
@@ -73,5 +75,29 @@ describe('withSaleInstallDate', () => {
     expect(next.sales[1].installDate).toEqual(new Date('2026-09-29T17:00:00.000Z'));
     expect(next.fiberBySale).toBe(fiberBySale);
     expect(book.sales[1].installDate).toBeUndefined();
+  });
+});
+
+describe('fetchRepBook sharing', () => {
+  it('reads the book and the carrier report under the Sales tab cache keys', async () => {
+    const fetchMock = stubFetch({ ok: true, body: { scope: 'own', orders: [], lastReportAt: null } });
+    const keys: string[] = [];
+    const book = await fetchRepBook('r1', 'token', new AbortController().signal, (key, read) => {
+      keys.push(key);
+      return read();
+    });
+    expect(keys).toEqual([salesListCacheKey({ limit: 500, salesRepId: 'r1' }), FIBER_CACHE_KEY]);
+    expect(book.sales).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses a shared answer instead of fetching', async () => {
+    const fetchMock = stubFetch({ ok: true, body: {} });
+    const book = await fetchRepBook('r1', 'token', new AbortController().signal, async <T,>(key: string) =>
+      (key.startsWith('sales') ? { sales: [SALE], truncated: false } : { scope: 'own', orders: [], lastReportAt: null }) as T
+    );
+    expect(book.sales).toHaveLength(1);
+    expect(book.carrierFailed).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

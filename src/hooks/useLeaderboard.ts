@@ -62,6 +62,8 @@ export type CachedBoard = {
   recent: RecentSale[];
   /** Undefined when the answer did not carry it (not the month board). */
   firstMonth?: string | null;
+  /** How many reps are ranked in all (the dashboard's standing reads it). */
+  totalRanked?: number;
 };
 
 const boardCacheKey = (query: string) => `leaderboard?${query}`;
@@ -87,8 +89,10 @@ export function boardFromResponse(data: {
   unranked?: unknown;
   recent?: unknown;
   firstMonth?: unknown;
+  totalRanked?: unknown;
 }): CachedBoard {
   return {
+    ...(typeof data.totalRanked === 'number' ? { totalRanked: data.totalRanked } : {}),
     leaderboard: data.leaderboard ?? [],
     currentUser: data.currentUser ?? null,
     unranked: Array.isArray(data.unranked) ? (data.unranked as UnrankedRep[]) : [],
