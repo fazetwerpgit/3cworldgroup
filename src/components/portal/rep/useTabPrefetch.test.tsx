@@ -17,7 +17,11 @@ vi.mock('@/contexts/AuthContext', () => ({
 vi.mock('@/contexts/ViewAsContext', () => ({ useViewAs: () => ({ viewing: fake.viewing }) }));
 vi.mock('@/lib/cache/tabPrefetch', () => ({ prefetchTabs: fake.prefetchTabs, prefetchTab: fake.prefetchTab }));
 
+import { holdPageData, resetPageData } from '@/lib/cache/pageData';
 import { TAB_PREFETCH_IDLE_MS, usePrefetchTabOnTouch, useTabPrefetch } from './useTabPrefetch';
+
+/** The idle-frame stand-in where requestIdleCallback is missing (iOS WebKit; removed below). */
+const IDLE_FRAME_MS = 200;
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -49,8 +53,21 @@ async function flush() {
 
 const rep = { uid: 'r1', status: 'active', fieldRole: 'entry_rep' };
 
+/** A page that never holds: the fallback runs out, then the idle frame. */
+async function waitOutFallback() {
+  await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS));
+  await act(async () => vi.advanceTimersByTime(IDLE_FRAME_MS));
+  await flush();
+}
+
+const win = window as { requestIdleCallback?: unknown };
+const realIdle = win.requestIdleCallback;
+
 beforeEach(() => {
   vi.useFakeTimers();
+  // Take the setTimeout path so the idle frame runs on the fake clock.
+  win.requestIdleCallback = undefined;
+  resetPageData();
   fake.user = { ...rep };
   fake.perms = new Set(['sales:read', 'leaderboard:read']);
   fake.viewing = null;
@@ -64,16 +81,22 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  win.requestIdleCallback = realIdle;
+  resetPageData();
   vi.useRealTimers();
 });
 
 describe('useTabPrefetch', () => {
-  it("warms the other tabs once the page has had its turn, with the rep's context", async () => {
+  it("on a page that never holds, warms the other tabs after the fallback and an idle frame, with the rep's context", async () => {
     await render('/portal/rep');
     await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS - 1));
     await flush();
     expect(fake.prefetchTabs).not.toHaveBeenCalled();
     await act(async () => vi.advanceTimersByTime(1));
+    await flush();
+    // The fallback is up; the warm still waits for the idle frame.
+    expect(fake.prefetchTabs).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTime(IDLE_FRAME_MS));
     await flush();
     expect(fake.prefetchTabs).toHaveBeenCalledTimes(1);
     expect(fake.prefetchTabs).toHaveBeenCalledWith('/portal/rep', {
@@ -86,19 +109,57 @@ describe('useTabPrefetch', () => {
     });
   });
 
+  it("warms as soon as the page's data lands, without waiting out the fallback", async () => {
+    const release = holdPageData();
+    await render('/portal/rep');
+    await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS / 4));
+    await flush();
+    expect(fake.prefetchTabs).not.toHaveBeenCalled();
+    await act(async () => release());
+    await act(async () => vi.advanceTimersByTime(IDLE_FRAME_MS));
+    await flush();
+    expect(fake.prefetchTabs).toHaveBeenCalledTimes(1);
+    expect(fake.prefetchTabs).toHaveBeenCalledWith('/portal/rep', expect.objectContaining({ uid: 'r1', active: true }));
+  });
+
+  it("keeps waiting past the fallback while the page's own data is still loading", async () => {
+    const release = holdPageData();
+    await render('/portal/rep');
+    await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS * 2));
+    await act(async () => vi.advanceTimersByTime(IDLE_FRAME_MS));
+    await flush();
+    expect(fake.prefetchTabs).not.toHaveBeenCalled();
+    await act(async () => release());
+    await act(async () => vi.advanceTimersByTime(IDLE_FRAME_MS));
+    await flush();
+    expect(fake.prefetchTabs).toHaveBeenCalledTimes(1);
+  });
+
   it('starts the wait over on a new page and never warms for the page left behind', async () => {
     await render('/portal/rep');
     await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS / 2));
     await render('/portal/rep/sales');
-    await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS));
+    // The first page's fallback would have run out by now; its wait is gone.
+    await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS / 2 + IDLE_FRAME_MS));
     await flush();
+    expect(fake.prefetchTabs).not.toHaveBeenCalled();
+    await waitOutFallback();
+    expect(fake.prefetchTabs.mock.calls.map((c) => c[0])).toEqual(['/portal/rep/sales']);
+  });
+
+  it('a page change after the wait but before the idle frame drops the old warm', async () => {
+    await render('/portal/rep');
+    await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS));
+    await render('/portal/rep/sales');
+    await waitOutFallback();
     expect(fake.prefetchTabs.mock.calls.map((c) => c[0])).toEqual(['/portal/rep/sales']);
   });
 
   it('does not warm after unmount, even if the chunk lands late', async () => {
     await render('/portal/rep');
-    // The timer fires and the chunk is requested; unmount lands before it resolves.
-    vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS);
+    // The wait ends and the idle frame requests the chunk; unmount lands before it resolves.
+    await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS));
+    vi.advanceTimersByTime(IDLE_FRAME_MS);
     act(() => root.unmount());
     root = createRoot(host);
     await flush();
@@ -109,9 +170,16 @@ describe('useTabPrefetch', () => {
     fake.user = { uid: 'm1', status: 'active', role: 'admin' };
     fake.perms = new Set(['sales:read', 'sales:read:all', 'leaderboard:read']);
     await render('/portal/admin');
-    await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS));
-    await flush();
+    await waitOutFallback();
     expect(fake.prefetchTabs).toHaveBeenCalledWith('/portal/admin', expect.objectContaining({ uid: 'm1', canViewAll: true, management: true }));
+  });
+
+  it('marks operations as management without view-all', async () => {
+    fake.user = { uid: 'o1', status: 'active', role: 'operations' };
+    fake.perms = new Set(['sales:read', 'leaderboard:read']);
+    await render('/portal/admin');
+    await waitOutFallback();
+    expect(fake.prefetchTabs).toHaveBeenCalledWith('/portal/admin', expect.objectContaining({ uid: 'o1', canViewAll: false, management: true }));
   });
 
   it.each([
@@ -122,6 +190,7 @@ describe('useTabPrefetch', () => {
     setup();
     await render('/portal/rep');
     await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS * 2));
+    await act(async () => vi.advanceTimersByTime(IDLE_FRAME_MS));
     await flush();
     onTouch('/portal/rep/sales');
     await flush();
@@ -132,8 +201,7 @@ describe('useTabPrefetch', () => {
   it('passes an inactive account on as not active', async () => {
     fake.user = { uid: 'r3', status: 'inactive', fieldRole: 'entry_rep' };
     await render('/portal/rep');
-    await act(async () => vi.advanceTimersByTime(TAB_PREFETCH_IDLE_MS));
-    await flush();
+    await waitOutFallback();
     expect(fake.prefetchTabs).toHaveBeenCalledWith('/portal/rep', expect.objectContaining({ active: false }));
   });
 });
