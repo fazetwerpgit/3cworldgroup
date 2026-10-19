@@ -213,7 +213,23 @@ export function sandboxMemberIds(users: readonly ChatUserSnapshot[]): string[] {
   return users.filter((doc) => isEligibleSandboxMember(doc.data(), doc.id)).map((doc) => doc.id);
 }
 
-export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
+/** One channel's memberIds as a sync would leave them. */
+export interface ChatChannelSyncItem {
+  channelId: string;
+  ref: FirebaseFirestore.DocumentReference;
+  /** The App Review demo sandbox (fixed membership: demo accounts plus Jacob). */
+  sandbox: boolean;
+  /** memberIds on the doc now. */
+  before: readonly string[];
+  /** memberIds after the sync. */
+  memberIds: string[];
+}
+
+/**
+ * What syncChatChannels would write, read-only: every channel's current and
+ * recomputed memberIds. scripts/sync-chat-channels.mjs prints this as a dry run.
+ */
+export async function planChatChannelSync(): Promise<ChatChannelSyncItem[]> {
   if (!adminDb) throw new Error('Database not configured');
 
   const channelsSnap = await adminDb.collection('chatChannels').get();
@@ -222,8 +238,7 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
     adminDb.collection('users').where('status', '==', 'pending').get(),
   ]);
   const users = [...activeUsersSnap.docs, ...pendingUsersSnap.docs];
-  const batch = adminDb.batch();
-  let channelsSynced = 0;
+  const plan: ChatChannelSyncItem[] = [];
 
   // Sync every Firestore channel, including archived ones. Archived channels remain
   // hidden by active:false, but keeping role-derived memberIds fresh makes reactivation immediate.
@@ -231,13 +246,14 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
     const data = doc.data();
     const channel = toChatChannel(doc.id, data);
     if (!channel) continue;
+    const before = Array.isArray(data.memberIds)
+      ? data.memberIds.filter((id: unknown): id is string => typeof id === 'string')
+      : [];
 
     // The demo sandbox: demo accounts plus Jacob, nothing else (anyone else in
     // its memberIds is dropped here).
     if (isDemoSandboxChannel(data)) {
-      const memberIds = sandboxMemberIds(users);
-      batch.set(doc.ref, { id: channel.id, memberIds, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      channelsSynced += 1;
+      plan.push({ channelId: channel.id, ref: doc.ref, sandbox: true, before, memberIds: sandboxMemberIds(users) });
       continue;
     }
 
@@ -258,20 +274,29 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
     }
 
     const memberIds = Array.from(new Set([...audienceMemberIds, ...existingExtras]));
-    batch.set(
-      doc.ref,
-      {
-        id: channel.id,
-        memberIds,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-    channelsSynced += 1;
+    plan.push({ channelId: channel.id, ref: doc.ref, sandbox: false, before, memberIds });
   }
 
+  return plan;
+}
+
+/** Writes a planned sync in one batch. */
+export async function applyChatChannelSync(plan: readonly ChatChannelSyncItem[]): Promise<{ channelsSynced: number }> {
+  if (!adminDb) throw new Error('Database not configured');
+  const batch = adminDb.batch();
+  for (const item of plan) {
+    batch.set(
+      item.ref,
+      { id: item.channelId, memberIds: item.memberIds, updatedAt: FieldValue.serverTimestamp() },
+      { merge: true }
+    );
+  }
   await batch.commit();
-  return { channelsSynced };
+  return { channelsSynced: plan.length };
+}
+
+export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
+  return applyChatChannelSync(await planChatChannelSync());
 }
 
 export async function ensureChatChannelMember(channelId: string, uid: string): Promise<void> {

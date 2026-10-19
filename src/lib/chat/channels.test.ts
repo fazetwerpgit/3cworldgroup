@@ -79,6 +79,7 @@ import {
   getMemberIdsForAudience,
   isEligibleChatMember,
   isEligibleSandboxMember,
+  planChatChannelSync,
   reconcileChatMembershipForUser,
   syncChatChannels,
   userCanAccessChannelDoc,
@@ -351,6 +352,26 @@ describe('demo sandbox channel', () => {
     expect([...(byId.get('app-review') ?? [])].sort()).toEqual(['bQWKezQmd1P9Yf3GzOdXXBkDzj93', 'demo']);
     expect(byId.get('general')).not.toContain('demo');
     expect(byId.get('general')).toContain('rep');
+  });
+
+  it('plan (the dry run) reports before and after memberIds and writes nothing', async () => {
+    firestore.reset();
+    firestore.channelDocs.push({ id: 'app-review', data: { ...sandbox, memberIds: ['adm', 'own', 'demo'] } }, { id: 'general', data: general });
+    firestore.users.set('bQWKezQmd1P9Yf3GzOdXXBkDzj93', { status: 'active', role: 'owner', email: 'jmyers@3cworldgroup.com' });
+    firestore.users.set('demo', { status: 'active', demoAccount: true });
+    firestore.users.set('adm', { status: 'active', role: 'admin' });
+    firestore.users.set('own', { status: 'active', role: 'owner' });
+
+    const plan = await planChatChannelSync();
+
+    expect(firestore.adminDb.batch).not.toHaveBeenCalled();
+    const sandboxItem = plan.find((item) => item.channelId === 'app-review')!;
+    expect(sandboxItem.sandbox).toBe(true);
+    expect(sandboxItem.before).toEqual(['adm', 'own', 'demo']);
+    expect([...sandboxItem.memberIds].sort()).toEqual(['bQWKezQmd1P9Yf3GzOdXXBkDzj93', 'demo']);
+    const generalItem = plan.find((item) => item.channelId === 'general')!;
+    expect(generalItem.sandbox).toBe(false);
+    expect(generalItem.memberIds).not.toContain('demo');
   });
 
   it('reconcile removes an owner other than Jacob from the sandbox', async () => {
