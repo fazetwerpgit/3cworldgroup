@@ -9,6 +9,12 @@ describe('getInitials', () => {
     expect(getInitials('Jane Doe')).toBe('JD');
   });
 
+  it('keeps a leading emoji whole instead of a lone surrogate', () => {
+    expect(getInitials('🔥')).toBe('🔥');
+    expect(getInitials('🔥 Doe')).toBe('🔥D');
+    expect(getInitials('Jane 🔥')).toBe('J🔥');
+  });
+
   it('uses only the first letter for a single-word name', () => {
     expect(getInitials('Cher')).toBe('C');
   });

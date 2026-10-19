@@ -123,6 +123,15 @@ describe('sanitizeAttachmentFileName — content filter', () => {
   });
 });
 
+describe('sanitizeAttachmentFileName — truncation', () => {
+  it('never leaves a lone surrogate when the cut lands inside an emoji', () => {
+    // 120 - '.pdf'(4) - 1 = 115 code units kept; unit 115 is the high half of 🔥.
+    const name = sanitizeAttachmentFileName(`${'a'.repeat(114)}${'🔥'.repeat(10)}.pdf`);
+    expect(name).toBe(`${'a'.repeat(114)}….pdf`);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(name)).toBe(false);
+  });
+});
+
 describe('chat pending paths (direct uploads)', () => {
   const ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
 

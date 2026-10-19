@@ -13,6 +13,13 @@ describe('lastMessageSnippet', () => {
     expect(lastMessageSnippet('b'.repeat(120))).toBe('b'.repeat(120));
   });
 
+  it('never cuts an emoji in half at the cap', () => {
+    // 118 letters + emojis: code unit 119 is the high half of the first 🔥.
+    const snippet = lastMessageSnippet(`${'a'.repeat(118)}🔥🔥🔥`);
+    expect(snippet).toBe(`${'a'.repeat(118)}…`);
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(snippet)).toBe(false);
+  });
+
   it('names attachment-only messages by kind', () => {
     expect(lastMessageSnippet('', { type: 'image', url: 'x' })).toBe('Photo');
     expect(lastMessageSnippet('   ', { type: 'gif', url: 'x' })).toBe('GIF');

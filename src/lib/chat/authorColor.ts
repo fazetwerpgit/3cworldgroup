@@ -43,8 +43,10 @@ const AUTHOR_COLOR_PALETTE: AuthorColor[] = [
 export function getInitials(name: string): string {
   const words = name.split(/\s+/).filter(Boolean);
   if (words.length === 0) return '?';
-  if (words.length === 1) return words[0][0].toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  // By code point, so a name starting with an emoji keeps the whole character.
+  const first = (word: string) => String.fromCodePoint(word.codePointAt(0) ?? 63);
+  if (words.length === 1) return first(words[0]).toUpperCase();
+  return (first(words[0]) + first(words[words.length - 1])).toUpperCase();
 }
 
 /** Simple FNV-1a string hash. */

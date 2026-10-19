@@ -21,7 +21,7 @@ export interface ChatLastMessage {
 export function lastMessageSnippet(text: unknown, attachment?: unknown): string {
   const line = typeof text === 'string' ? text.replace(/\s+/g, ' ').trim() : '';
   if (line) {
-    return line.length > LAST_MESSAGE_SNIPPET_MAX ? `${line.slice(0, LAST_MESSAGE_SNIPPET_MAX - 1).trimEnd()}…` : line;
+    return line.length > LAST_MESSAGE_SNIPPET_MAX ? `${line.slice(0, LAST_MESSAGE_SNIPPET_MAX - 1).replace(/[\uD800-\uDBFF]$/, '').trimEnd()}…` : line;
   }
   if (attachment && typeof attachment === 'object') {
     const type = (attachment as { type?: unknown }).type;

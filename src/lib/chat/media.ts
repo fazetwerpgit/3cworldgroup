@@ -63,7 +63,7 @@ export function sanitizeAttachmentFileName(raw: unknown, fallback = 'document.pd
   if (isFilteredLabel(name)) return fallback;
   if (name.length > MAX_ATTACHMENT_NAME_LENGTH) {
     const ext = name.match(/\.[A-Za-z0-9]{1,8}$/)?.[0] ?? '';
-    name = `${name.slice(0, MAX_ATTACHMENT_NAME_LENGTH - ext.length - 1).trimEnd()}…${ext}`;
+    name = `${name.slice(0, MAX_ATTACHMENT_NAME_LENGTH - ext.length - 1).replace(/[\uD800-\uDBFF]$/, '').trimEnd()}…${ext}`;
   }
   return name;
 }
