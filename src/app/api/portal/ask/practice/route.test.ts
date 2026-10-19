@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createFakeAskDb } from '@/lib/ask/fakeAskDb';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
-import { ABUSE_CLOSES, LINE_JUDGE_PROMPT, PERSONAS, PRACTICE_REGION, practiceCustomer } from '@/lib/ask/practice';
+import { ABUSE_CLOSES, LINE_JUDGE_PROMPT, MAX_PRACTICE_TURNS, PERSONAS, PRACTICE_REGION, practiceCustomer } from '@/lib/ask/practice';
 import { drawDoor, drawDoorKind } from '@/lib/ask/practiceDoor';
 
 // POST /api/portal/ask/practice: the Ask 3C gate, its own daily count, the
@@ -544,6 +544,24 @@ describe('POST /api/portal/ask/practice', () => {
       /This is a redo[\s\S]*Rep: Hi, I'm with 3C\.\nHomeowner: Answer 1\.\n--- The rep redoes the moment from here ---\nRep: Who do you have for internet now\?\nHomeowner: Spectrum\./
     );
     expect(fake.docs('practiceLog').get(second.id)).toMatchObject({ redoOf: graded.id, redoFrom: 3 });
+  });
+
+  it('redoes a practice whose stored transcript ran past the turn cap', async () => {
+    let history: Array<{ role: string; text: string; speaker?: string }> = [PITCH[0]];
+    verdicts = ['WEAK'];
+    history = [...history, { role: 'rep', text: 'So yeah, internet.' }];
+    modelAnswers('Answer 1.');
+    await POST(req({ action: 'turn', ...SESSION, history }));
+    history = [...history, { role: 'customer', text: 'Answer 1.' }];
+    modelAnswers(coach(4));
+    const graded = await (await POST(req({ action: 'feedback', ...SESSION, history, endedBy: 'rep' }))).json();
+    expect(graded).toMatchObject({ canRedo: true });
+    // A spouse's reply on the last allowed line takes the stored transcript past the cap.
+    const logged = fake.docs('practiceLog').get(graded.id)!;
+    const filler = Array.from({ length: MAX_PRACTICE_TURNS }, (_, i) => ({ role: i % 2 ? 'customer' : 'rep', text: `Line ${i}.` }));
+    logged.turns = [...(logged.turns as unknown[]), ...filler, { role: 'customer', text: 'Ask him.', speaker: 'spouse' }];
+    const res = await POST(req({ action: 'redo', logId: graded.id }));
+    expect(res.status).toBe(200);
   });
 
   it('logs the skill scores and the delivery talk mode sent, and teaches the coach the owner\'s corrections', async () => {

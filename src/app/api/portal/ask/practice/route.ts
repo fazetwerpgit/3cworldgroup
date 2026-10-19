@@ -783,7 +783,8 @@ async function startRedo(
     return fail('That practice is gone. Knock again to start a new one.', 404);
   }
   const point = redoPoint(parseSteps(logged.steps));
-  const history = parsePracticeHistory(logged.turns);
+  // The server's own stored transcript: it can run past a page's limits.
+  const history = parseStoredTurns(logged.turns);
   const kept = history?.slice(0, point?.keep ?? 0) ?? [];
   if (!point || kept.at(-1)?.role !== 'customer') return fail('Nothing in that one to redo. Knock again.', 409);
   const now = new Date();

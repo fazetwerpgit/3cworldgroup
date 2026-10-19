@@ -1462,8 +1462,12 @@ export function transcriptProblem(feedback: string, turns: PracticeTurn[], lieLi
  * lines only name real dates ("Tuesday the 14th" when no Tuesday was).
  */
 export function calendarNote(now: Date): string {
-  const format = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric' });
-  const days = Array.from({ length: 15 }, (_, i) => format.format(new Date(now.getTime() + i * 86_400_000)));
+  // Today's Chicago date, then calendar days from it: a fixed 24h step would
+  // repeat a date at fall-back and skip one at spring-forward.
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now);
+  const part = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  const format = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' });
+  const days = Array.from({ length: 15 }, (_, i) => format.format(new Date(Date.UTC(part('year'), part('month') - 1, part('day') + i, 12))));
   return `Today is ${days[0]}. The next two weeks: ${days.slice(1).join('; ')}. If a line names a date, it must be one of these, with its right weekday; a weekday alone ("Saturday") is fine.`;
 }
 

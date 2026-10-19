@@ -493,6 +493,16 @@ describe('the coach held to the transcript and the rules', () => {
     expect(note).not.toContain('October 20');
   });
 
+  it('steps calendar days across a DST change: no date repeated, none skipped', () => {
+    const fallBack = calendarNote(new Date('2026-10-25T05:30:00Z')); // 00:30 CDT
+    expect(fallBack).toMatch(/^Today is Sunday, October 25\./);
+    expect(fallBack.match(/November 1\b/g)).toHaveLength(1);
+    expect(fallBack).toContain('Sunday, November 8');
+    const springForward = calendarNote(new Date('2027-03-01T05:30:00Z')); // 23:30 CST Feb 28
+    expect(springForward).toMatch(/^Today is Sunday, February 28\./);
+    expect(springForward).toContain('Saturday, March 13; Sunday, March 14');
+  });
+
   it("caps a kid door's skills: no objection or close above the opener, and 3 at most when the kid got pitched", () => {
     const kid = 'Score: 8/10\nResult: Walked away the right way\nSkills: Opener 7/10, Discovery 8/10, Objections 8/10, Close 9/10\nWhat worked:\n- "Is your mom home?"';
     const polite = enforceScore(kid, { lies: 0, abuse: false, pitchedNoSaleDoor: false, kidDoor: true });
