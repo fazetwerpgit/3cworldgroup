@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase-admin/firestore';
-import { anonymizeAskHistory } from './anonymizeHistory';
+import { anonymizeAskHistory, scrubName } from './anonymizeHistory';
 
 vi.mock('./store', () => ({
   ASK_LOG: 'askLog',
   PRACTICE_LOG: 'practiceLog',
   PRACTICE_CORRECTIONS: 'practiceCorrections',
   PRACTICE_ASSIGNMENTS: 'practiceAssignments',
+  PRACTICE_SESSIONS: 'practiceSessions',
 }));
 
 type Row = { id: string; repName: string } & Record<string, unknown>;
@@ -24,6 +25,7 @@ function matches(row: Row, f: Filter): boolean {
 
 function fakeDb(rows: Record<string, Row[]>) {
   const updates: Array<{ collection: string; id: string; data: Record<string, unknown> }> = [];
+  const deleted: string[] = [];
   let commits = 0;
   const db = {
     collection(name: string) {
@@ -33,11 +35,18 @@ function fakeDb(rows: Record<string, Row[]>) {
         async get() {
           const all = (rows[name] ?? []).filter((r) => matches(r, filter)).sort((a, b) => a.id.localeCompare(b.id));
           const start = after ? all.findIndex((r) => r.id === after) + 1 : 0;
-          const docs = all.slice(start, start + limit).map((r) => ({ id: r.id, ref: { collection: name, id: r.id } }));
+          const docs = all.slice(start, start + limit).map((r) => ({ id: r.id, ref: { collection: name, id: r.id }, data: () => ({ ...r }) }));
           return { empty: docs.length === 0, docs };
         },
       });
-      return { where: (field: string, op: string, value: unknown) => make({ field, op, value }, Infinity) };
+      return {
+        where: (field: string, op: string, value: unknown) => make({ field, op, value }, Infinity),
+        doc: (id: string) => ({
+          async delete() {
+            deleted.push(`${name}/${id}`);
+          },
+        }),
+      };
     },
     batch() {
       const pending: typeof updates = [];
@@ -52,7 +61,7 @@ function fakeDb(rows: Record<string, Row[]>) {
       };
     },
   };
-  return { db: db as unknown as Firestore, updates, commits: () => commits };
+  return { db: db as unknown as Firestore, updates, deleted, commits: () => commits };
 }
 
 describe('anonymizeAskHistory', () => {
@@ -117,5 +126,61 @@ describe('anonymizeAskHistory', () => {
     const { db, updates } = fakeDb({});
     expect(await anonymizeAskHistory(db, 'rep1', 'Deleted user')).toBe(0);
     expect(updates).toEqual([]);
+  });
+
+  it("takes the rep's name out of kept Practice feedback, transcripts and corrections, and deletes the live session", async () => {
+    const { db, updates, deleted } = fakeDb({
+      practiceLog: [
+        {
+          id: 'p1',
+          uid: 'rep1',
+          repName: 'Mason Reed',
+          feedback: 'Try this line: "Hi, I\'m Mason with 3C." Mason will close more doors.',
+          turns: [
+            { role: 'rep', text: "Hi, I'm Mason Reed with 3C" },
+            { role: 'customer', text: 'What do you want, masonry?' },
+          ],
+        },
+        { id: 'p2', uid: 'rep2', repName: 'Sam', feedback: 'Hi, I\'m Sam', turns: [{ role: 'rep', text: "I'm Sam" }] },
+      ],
+      practiceCorrections: [
+        { id: 'c1', logId: 'p1', repName: 'Mason Reed', original: 'Try this line: "Hi, I\'m Mason."', take: 'Mason should ask first.' },
+        { id: 'c2', logId: 'p2', repName: 'Sam', original: "Hi, I'm Sam", take: '' },
+      ],
+    });
+    await anonymizeAskHistory(db, 'rep1', 'Deleted user');
+    const p1 = updates.find((u) => u.id === 'p1')!.data;
+    expect(p1).toEqual({
+      repName: 'Deleted user',
+      feedback: 'Try this line: "Hi, I\'m [rep] with 3C." [rep] will close more doors.',
+      turns: [
+        { role: 'rep', text: "Hi, I'm [rep] [rep] with 3C" },
+        { role: 'customer', text: 'What do you want, masonry?' },
+      ],
+    });
+    expect(updates.find((u) => u.id === 'c1')!.data).toEqual({
+      repName: 'Deleted user',
+      original: 'Try this line: "Hi, I\'m [rep]."',
+      take: '[rep] should ask first.',
+    });
+    expect(updates.some((u) => u.id === 'p2' || u.id === 'c2')).toBe(false);
+    expect(deleted).toEqual(['practiceSessions/rep1']);
+    expect(JSON.stringify(updates)).not.toContain('Mason');
+  });
+
+  it('leaves text alone on a row that was already re-stamped (a retried delete)', async () => {
+    const { db, updates } = fakeDb({
+      practiceLog: [{ id: 'p1', uid: 'rep1', repName: 'Deleted user', feedback: 'Deleted user did fine.' }],
+    });
+    await anonymizeAskHistory(db, 'rep1', 'Deleted user');
+    expect(updates).toEqual([{ collection: 'practiceLog', id: 'p1', data: { repName: 'Deleted user' } }]);
+  });
+});
+
+describe('scrubName', () => {
+  it('replaces whole, same-case words only', () => {
+    expect(scrubName('Will will go. Willow. Will.', ['Will'])).toBe('[rep] will go. Willow. [rep].');
+    expect(scrubName('José, José!', ['José'])).toBe('[rep], [rep]!');
+    expect(scrubName('a.b a+b', ['a.b'])).toBe('[rep] a+b');
   });
 });
