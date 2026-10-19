@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { create, sendAnnouncement, docIds, stored, txUpdate } = vi.hoisted(() => ({
+const { create, sendAnnouncement, docIds, stored, txUpdate, runTransaction } = vi.hoisted(() => ({
   create: vi.fn(),
+  runTransaction: vi.fn(),
   sendAnnouncement: vi.fn(),
   docIds: [] as string[],
   // Status of the doc an ALREADY_EXISTS retry reads.
@@ -22,8 +23,7 @@ vi.mock('@/lib/firebase/admin', () => ({
         },
       };
     },
-    runTransaction: async (fn: (tx: unknown) => Promise<unknown>) =>
-      fn({ get: async () => ({ get: (field: string) => stored[field] }), update: txUpdate }),
+    runTransaction,
   },
 }));
 vi.mock('@/lib/announcements/send', () => ({ ANNOUNCEMENTS: 'announcements', sendAnnouncement }));
@@ -47,6 +47,11 @@ beforeEach(() => {
   sendAnnouncement.mockReset();
   sendAnnouncement.mockResolvedValue({ status: 'sent', sentCount: 42, failedCount: 1 });
   docIds.length = 0;
+  txUpdate.mockReset();
+  runTransaction.mockReset();
+  runTransaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+    fn({ get: async () => ({ get: (field: string) => stored[field] }), update: txUpdate })
+  );
 });
 
 describe('POST /api/portal/announcements/send-now', () => {
@@ -132,5 +137,49 @@ describe('POST /api/portal/announcements/send-now', () => {
     gate.mockResolvedValue(OWNER);
     sendAnnouncement.mockResolvedValue({ status: 'failed', error: 'FCM down' });
     expect((await post(valid)).status).toBe(500);
+  });
+
+  it('parks the doc as failed when the claim throws, so the cron skips it and a retry re-sends', async () => {
+    gate.mockResolvedValue(OWNER);
+    stored.status = 'scheduled';
+    sendAnnouncement.mockRejectedValue(new Error('ABORTED: contention'));
+    const res = await post(valid);
+    expect(res.status).toBe(500);
+    expect(txUpdate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: 'failed' }));
+    expect(txUpdate.mock.calls[0][1]).not.toHaveProperty('fanOutStarted');
+
+    // The parked doc is re-armed by a retry with the same requestId, not 409'd.
+    stored.status = 'failed';
+    txUpdate.mockClear();
+    sendAnnouncement.mockResolvedValue({ status: 'sent', sentCount: 3, failedCount: 0 });
+    create.mockRejectedValue(Object.assign(new Error('ALREADY_EXISTS'), { code: 6 }));
+    const retry = await post(valid);
+    expect(retry.status).toBe(200);
+    expect(txUpdate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: 'scheduled' }));
+  });
+
+  it('leaves a doc another run already claimed alone when the claim throws', async () => {
+    gate.mockResolvedValue(OWNER);
+    stored.status = 'sending';
+    sendAnnouncement.mockRejectedValue(new Error('UNAVAILABLE'));
+    expect((await post(valid)).status).toBe(500);
+    expect(txUpdate).not.toHaveBeenCalled();
+  });
+
+  it('still answers 500 when parking the doc fails too', async () => {
+    gate.mockResolvedValue(OWNER);
+    sendAnnouncement.mockRejectedValue(new Error('UNAVAILABLE'));
+    runTransaction.mockRejectedValue(new Error('UNAVAILABLE'));
+    expect((await post(valid)).status).toBe(500);
+  });
+
+  it('500s, not a crash, when the retry transaction throws', async () => {
+    gate.mockResolvedValue(OWNER);
+    create.mockRejectedValue(Object.assign(new Error('ALREADY_EXISTS'), { code: 6 }));
+    runTransaction.mockRejectedValue(new Error('UNAVAILABLE'));
+    const res = await post(valid);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toHaveProperty('error');
+    expect(sendAnnouncement).not.toHaveBeenCalled();
   });
 });
