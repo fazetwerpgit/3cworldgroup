@@ -216,25 +216,58 @@ function safeSegment(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && !value.includes('/');
 }
 
-// The cron sweep: for each chatEvidencePending doc, copies the upload again,
-// points the reports at the copy, deletes the chat objects and drops the doc.
-// A message with no reports left just has its objects deleted. A failed retry
-// keeps the doc (attempts + last error code) for the next run.
-export async function retryPendingChatEvidence(): Promise<{ checked: number; saved: number; failed: number }> {
-  const snap = await adminDb!.collection(CHAT_EVIDENCE_PENDING).limit(SWEEP_LIMIT).get();
+/**
+ * A pending doc that has failed this many retries leaves the queue for
+ * chatEvidenceDead (status 'failed-permanent'), so docs that fail every time
+ * cannot fill every run's 50 slots and starve newer evidence.
+ */
+export const MAX_EVIDENCE_ATTEMPTS = 5;
+export const CHAT_EVIDENCE_DEAD = 'chatEvidenceDead';
+
+function attemptsOf(data: Record<string, unknown>): number {
+  return typeof data.attempts === 'number' && Number.isFinite(data.attempts) ? data.attempts : 0;
+}
+
+async function moveToDead(
+  ref: FirebaseFirestore.DocumentReference,
+  data: Record<string, unknown>,
+  patch: Record<string, unknown>
+): Promise<void> {
+  await adminDb!
+    .collection(CHAT_EVIDENCE_DEAD)
+    .doc(ref.id)
+    .set({ ...data, ...patch, status: 'failed-permanent', deadAt: FieldValue.serverTimestamp() });
+  await ref.delete();
+}
+
+// The cron sweep: for each chatEvidencePending doc, oldest first, copies the
+// upload again, points the reports at the copy, deletes the chat objects and
+// drops the doc. A message with no reports left just has its objects deleted.
+// A failed retry keeps the doc (attempts + last error code) for the next run,
+// until MAX_EVIDENCE_ATTEMPTS, when it moves to chatEvidenceDead. One doc's
+// error (even on its own delete) never fails the sweep.
+export async function retryPendingChatEvidence(): Promise<{ checked: number; saved: number; failed: number; dead: number }> {
+  const snap = await adminDb!.collection(CHAT_EVIDENCE_PENDING).orderBy('createdAt').limit(SWEEP_LIMIT).get();
   let saved = 0;
   let failed = 0;
+  let dead = 0;
   for (const doc of snap.docs) {
     const data = doc.data();
     const { channelId, messageId, path } = data;
     const deletePaths: string[] = Array.isArray(data.deletePaths)
       ? data.deletePaths.filter((p: unknown): p is string => typeof p === 'string')
       : [];
-    if (!safeSegment(channelId) || !safeSegment(messageId) || typeof path !== 'string' || !path.startsWith(`chat/${channelId}/`)) {
-      await doc.ref.delete();
-      continue;
-    }
+    const prior = attemptsOf(data);
     try {
+      if (!safeSegment(channelId) || !safeSegment(messageId) || typeof path !== 'string' || !path.startsWith(`chat/${channelId}/`)) {
+        await doc.ref.delete();
+        continue;
+      }
+      if (prior >= MAX_EVIDENCE_ATTEMPTS) {
+        await moveToDead(doc.ref, data, {});
+        dead += 1;
+        continue;
+      }
       const reports = await reportsOnMessage(channelId, messageId);
       if (reports.length > 0) await saveEvidence(channelId, messageId, path, reports);
       const toDelete = [...new Set([path, ...deletePaths])].filter((p) => p.startsWith(`chat/${channelId}/`));
@@ -243,13 +276,20 @@ export async function retryPendingChatEvidence(): Promise<{ checked: number; sav
       saved += 1;
     } catch (error) {
       failed += 1;
-      console.error(
-        `Chat evidence retry failed (channel ${channelId}, message ${messageId}): code ${storageErrorCode(error)}`
-      );
-      await doc.ref
-        .set({ attempts: FieldValue.increment(1), lastErrorCode: storageErrorCode(error) }, { merge: true })
-        .catch(() => undefined);
+      const lastErrorCode = storageErrorCode(error);
+      console.error(`Chat evidence retry failed (channel ${channelId}, message ${messageId}): code ${lastErrorCode}`);
+      const attempts = prior + 1;
+      if (attempts >= MAX_EVIDENCE_ATTEMPTS) {
+        try {
+          await moveToDead(doc.ref, data, { attempts, lastErrorCode });
+          dead += 1;
+        } catch {
+          // Left in the queue; the next run moves it.
+        }
+      } else {
+        await doc.ref.set({ attempts: FieldValue.increment(1), lastErrorCode }, { merge: true }).catch(() => undefined);
+      }
     }
   }
-  return { checked: snap.docs.length, saved, failed };
+  return { checked: snap.docs.length, saved, failed, dead };
 }

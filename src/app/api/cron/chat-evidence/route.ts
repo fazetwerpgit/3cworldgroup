@@ -7,7 +7,8 @@ import { sweepAbandonedChatUploads, type PendingSweepResult } from '@/lib/chat/p
 // Once a day, retries the moderation copies that failed when a reported chat
 // message was deleted (chatEvidencePending, written by lib/chat/evidence): copy
 // the upload again, point the reports at it, delete the chat objects, drop the
-// doc. Up to 50 per run; a failed retry stays for the next one.
+// doc. Up to 50 per run, oldest first; a failed retry stays for the next one,
+// and after 5 failures moves to chatEvidenceDead (failed-permanent).
 //
 // Then deletes abandoned direct uploads: chat-pending/ objects older than an
 // hour (up to 500 per run, lib/chat/pendingSweep). That step failing does not
