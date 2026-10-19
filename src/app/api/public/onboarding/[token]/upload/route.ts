@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
-import { getInviteByToken, isInviteExpired, SUBMITTED_INVITE_STATUSES } from '@/lib/recruiting/inviteLookup';
+import {
+  CLOSED_INVITE_STATUSES,
+  getInviteByToken,
+  isInviteExpired,
+  SUBMITTED_INVITE_STATUSES,
+} from '@/lib/recruiting/inviteLookup';
 import { validateUpload, buildFolderPath, replacedSlotFiles } from '@/lib/onboarding/uploads';
-import { resolveUploadMime } from '@/lib/forms/formUploads';
+import { resolveUploadMime, sniffUploadMime } from '@/lib/forms/formUploads';
 
 // POST /api/public/onboarding/[token]/upload - A candidate holding a valid
 // invite token uploads a file for a storage-kind item before account creation.
@@ -24,6 +29,13 @@ export async function POST(
     }
     if (isInviteExpired(invite.data.expiresAt) || invite.data.status === 'expired') {
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
+    }
+    // Same rule as the packet POST: a rejected invite takes no more files.
+    if (CLOSED_INVITE_STATUSES.includes(invite.data.status)) {
+      return NextResponse.json(
+        { error: 'This onboarding link is closed. Contact your manager if you think this is a mistake.' },
+        { status: 409 }
+      );
     }
     if (SUBMITTED_INVITE_STATUSES.includes(invite.data.status)) {
       return NextResponse.json(
@@ -51,20 +63,28 @@ export async function POST(
       return NextResponse.json({ error: check.error }, { status: 400 });
     }
 
+    // The declared type is only a hint: store what the bytes really are, and
+    // refuse a file that is none of this item's accepted types.
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const realMime = sniffUploadMime(buffer);
+    const real = realMime ? validateUpload({ itemId, slot, mime: realMime, size: file.size }) : null;
+    if (!realMime || !real?.ok) {
+      return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
+    }
+
     const folder = buildFolderPath({ kind: 'invite', inviteId: invite.id }, itemId);
-    const objectPath = `${folder}${check.fileBase}.${check.ext}`;
+    const objectPath = `${folder}${real.fileBase}.${real.ext}`;
 
     const bucket = getOnboardingBucket();
-    const buffer = Buffer.from(await file.arrayBuffer());
     await bucket.file(objectPath).save(buffer, {
-      contentType: mime,
+      contentType: realMime,
       resumable: false,
     });
     // A replaced photo with a different extension (png -> jpg) is removed.
     try {
       const [existing] = await bucket.getFiles({ prefix: folder });
       await Promise.all(
-        replacedSlotFiles(existing.map((f) => f.name), folder, check.fileBase, check.ext).map((name) =>
+        replacedSlotFiles(existing.map((f) => f.name), folder, real.fileBase, real.ext).map((name) =>
           bucket.file(name).delete({ ignoreNotFound: true })
         )
       );
