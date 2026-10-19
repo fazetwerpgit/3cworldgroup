@@ -138,12 +138,40 @@ it('ignores events from an email sent before the latest resend', async () => {
   expect(state.invites['inv-1'].emailStatus).toBe('delivered');
 });
 
-it('leaves failed and older invites alone', async () => {
+it('leaves the status of failed and older invites alone', async () => {
   state.invites['inv-1'] = { status: 'invited', emailStatus: 'failed', emailError: 'postmark_422' };
-  await post(delivery({ MessageID: 'pm-x' }));
+  expect((await (await post(delivery({ MessageID: 'pm-x' }))).json()).applied).toBe(false);
+  expect(state.invites['inv-1'].emailStatus).toBe('failed');
   state.invites['inv-1'] = { status: 'invited' };
+  expect((await (await post(bounce())).json()).applied).toBe(false);
+  expect(state.invites['inv-1']).not.toHaveProperty('emailStatus');
+});
+
+it('holds an event that arrives before the send result is saved, instead of dropping it', async () => {
+  // A new invite: the Delivery webhook beats the write after sendInviteEmail.
+  state.invites['inv-1'] = { status: 'invited' };
+  const response = await post(delivery());
+  expect(response.status).toBe(200);
+  expect(state.invites['inv-1'].heldEmailEvent).toEqual({
+    kind: 'delivered',
+    messageId: 'pm-1',
+    at: new Date('2026-10-15T14:00:05Z'),
+  });
+
+  // A resend: the doc still holds the previous message id.
+  state.invites['inv-1'] = { status: 'invited', emailStatus: 'sent', postmarkMessageId: 'pm-old' };
   await post(bounce());
-  expect(state.updates).toBe(0);
+  expect(state.invites['inv-1'].emailStatus).toBe('sent');
+  expect(state.invites['inv-1'].heldEmailEvent).toMatchObject({ kind: 'bounced', messageId: 'pm-1' });
+  // A later, lesser event for the same message keeps the bounce.
+  await post(delivery());
+  expect(state.invites['inv-1'].heldEmailEvent).toMatchObject({ kind: 'bounced', messageId: 'pm-1' });
+});
+
+it('does not hold events for the saved send', async () => {
+  await post(delivery());
+  await post(delivery());
+  expect(state.invites['inv-1']).not.toHaveProperty('heldEmailEvent');
 });
 
 it('does not treat a delay notice as a bounce', async () => {

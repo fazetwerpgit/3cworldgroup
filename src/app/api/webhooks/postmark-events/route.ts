@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { inviteEmailEventPatch, parseInviteEmailEvent } from '@/lib/recruiting/inviteEmailStatus';
+import { heldInviteEmailEventPatch, inviteEmailEventPatch, parseInviteEmailEvent } from '@/lib/recruiting/inviteEmailStatus';
 
 export const runtime = 'nodejs';
 
@@ -9,7 +9,8 @@ export const runtime = 'nodejs';
 // Gated like inbound-report: a shared secret in the ?token= query string, here
 // POSTMARK_EVENTS_TOKEN. Anything that is not an invite email, or no longer
 // matches the invite's latest send, is acknowledged and ignored (a 2xx stops
-// Postmark retrying it).
+// Postmark retrying it). An invite event that may belong to a send not saved
+// yet is held on the invite until that send's result is written.
 
 function authorized(request: NextRequest): boolean {
   const expected = process.env.POSTMARK_EVENTS_TOKEN;
@@ -50,10 +51,17 @@ export async function POST(request: NextRequest) {
     const applied = await db.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(target);
       if (!snapshot.exists) return false;
-      const patch = inviteEmailEventPatch(snapshot.data() ?? {}, event);
-      if (!patch) return false;
-      transaction.update(target, patch);
-      return true;
+      const data = snapshot.data() ?? {};
+      const patch = inviteEmailEventPatch(data, event);
+      if (patch) {
+        transaction.update(target, patch);
+        return true;
+      }
+      // Possibly from a send whose result is not saved yet: keep it on the
+      // invite for saveInviteEmailStatus rather than dropping it.
+      const held = heldInviteEmailEventPatch(data, event);
+      if (held) transaction.update(target, held);
+      return false;
     });
     return NextResponse.json({ ok: true, applied });
   } catch (error) {

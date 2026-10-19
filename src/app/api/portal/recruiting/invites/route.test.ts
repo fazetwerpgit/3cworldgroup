@@ -43,12 +43,23 @@ vi.mock('@/lib/firebase/admin', () => {
             ...query(() => state.invites),
             add: async (data: Record<string, unknown>) => {
               state.created = { ...data };
-              return {
+              const ref: Record<string, unknown> = {
                 id: 'inv-new',
                 update: async (patch: Record<string, unknown>) => {
                   state.created = { ...state.created, ...patch };
                 },
               };
+              // saveInviteEmailStatus writes the send result in a transaction.
+              ref.firestore = {
+                runTransaction: async <T,>(run: (transaction: unknown) => Promise<T>) =>
+                  run({
+                    get: async () => ({ exists: state.created !== null, data: () => state.created }),
+                    update: (_ref: unknown, patch: Record<string, unknown>) => {
+                      state.created = { ...state.created, ...patch };
+                    },
+                  }),
+              };
+              return ref;
             },
           };
         }

@@ -10,16 +10,56 @@ import { INVITE_EMAIL_TAG } from './inviteLink';
  * Saves the send result on the invite. Never throws: the invite exists and the
  * email already went (or didn't), so a failed status write must not turn the
  * response into an error the manager would retry.
+ *
+ * Runs as a transaction so a delivery/bounce the webhook held because it
+ * arrived before this write (see heldInviteEmailEventPatch) is applied here
+ * instead of being lost.
  */
 export async function saveInviteEmailStatus(
   ref: FirebaseFirestore.DocumentReference,
   fields: Record<string, unknown>
 ): Promise<void> {
   try {
-    await ref.update(fields);
+    await ref.firestore.runTransaction(async (transaction) => {
+      const snapshot = await transaction.get(ref);
+      transaction.update(ref, withHeldInviteEmailEvent(snapshot.data() ?? {}, fields));
+    });
   } catch (error) {
     console.error('[invites] could not save the invite email status', error);
   }
+}
+
+interface HeldInviteEmailEvent {
+  kind: InviteEmailEvent['kind'];
+  messageId: string;
+  at: unknown;
+}
+
+function heldEventOf(invite: FirebaseFirestore.DocumentData): HeldInviteEmailEvent | null {
+  const held = invite.heldEmailEvent as Partial<HeldInviteEmailEvent> | null | undefined;
+  if (!held || (held.kind !== 'delivered' && held.kind !== 'bounced')) return null;
+  const messageId = text(held.messageId);
+  return messageId ? { kind: held.kind, messageId, at: held.at ?? null } : null;
+}
+
+/**
+ * The send-result patch, plus the held webhook event when it belongs to this
+ * send. Any held event is cleared: one for another message is from an older
+ * send and no longer matters.
+ */
+export function withHeldInviteEmailEvent(
+  invite: FirebaseFirestore.DocumentData,
+  fields: Record<string, unknown>
+): Record<string, unknown> {
+  if (!('heldEmailEvent' in invite)) return fields;
+  const patch: Record<string, unknown> = { ...fields, heldEmailEvent: FieldValue.delete() };
+  const held = heldEventOf(invite);
+  const sentId = text(fields.postmarkMessageId);
+  if (!held || fields.emailStatus !== 'sent' || !sentId || held.messageId !== sentId) return patch;
+  const at = held.at ?? FieldValue.serverTimestamp();
+  return held.kind === 'delivered'
+    ? { ...patch, emailStatus: 'delivered', deliveredAt: at }
+    : { ...patch, emailStatus: 'bounced', bouncedAt: at };
 }
 
 export interface InviteEmailEvent {
@@ -114,4 +154,26 @@ export function inviteEmailEventPatch(
   return event.kind === 'delivered'
     ? { emailStatus: 'delivered', deliveredAt: at }
     : { emailStatus: 'bounced', bouncedAt: at };
+}
+
+/**
+ * When inviteEmailEventPatch has nothing to apply because the send that
+ * produced this event is not saved on the invite yet (Postmark's webhook can
+ * beat the write after sendInviteEmail returns), the patch that holds the
+ * event on the invite so saveInviteEmailStatus applies it. Null when the event
+ * matches the saved send (then it was a repeat or a step backwards) or carries
+ * no message id to match later.
+ */
+export function heldInviteEmailEventPatch(
+  invite: FirebaseFirestore.DocumentData,
+  event: InviteEmailEvent
+): Record<string, unknown> | null {
+  if (!event.messageId) return null;
+  const current = invite.emailStatus as InviteEmailStatus | undefined;
+  const recorded = current === 'sent' || current === 'delivered' || current === 'bounced';
+  const savedId = text(invite.postmarkMessageId);
+  if (recorded && (!savedId || savedId === event.messageId)) return null;
+  const held = heldEventOf(invite);
+  if (held && held.messageId === event.messageId && RANK[held.kind] >= RANK[event.kind]) return null;
+  return { heldEmailEvent: { kind: event.kind, messageId: event.messageId, at: event.at ?? null } };
 }

@@ -14,26 +14,34 @@ const state = vi.hoisted(() => ({
 }));
 
 // users/{uid} for the caller, onboardingInvites/{id} as one mutable doc.
-vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: {
-    collection: (name: string) => ({
-      doc: () =>
-        name === 'users'
-          ? { get: async () => ({ exists: state.requester !== null, data: () => state.requester }) }
-          : {
-              get: async () => ({ exists: state.invite !== null, data: () => state.invite }),
-              update: async (patch: Record<string, unknown>) => {
-                // FieldValue.delete() removes the field, as Firestore does.
-                const next: Record<string, unknown> = { ...state.invite, ...patch };
-                for (const [key, value] of Object.entries(patch)) {
-                  if ((value as { methodName?: string } | null)?.methodName === 'FieldValue.delete') delete next[key];
-                }
-                state.invite = next;
+vi.mock('@/lib/firebase/admin', () => {
+  const read = async () => ({ exists: state.invite !== null, data: () => state.invite });
+  const write = (patch: Record<string, unknown>) => {
+    // FieldValue.delete() removes the field, as Firestore does.
+    const next: Record<string, unknown> = { ...state.invite, ...patch };
+    for (const [key, value] of Object.entries(patch)) {
+      if ((value as { methodName?: string } | null)?.methodName === 'FieldValue.delete') delete next[key];
+    }
+    state.invite = next;
+  };
+  return {
+    adminDb: {
+      collection: (name: string) => ({
+        doc: () =>
+          name === 'users'
+            ? { get: async () => ({ exists: state.requester !== null, data: () => state.requester }) }
+            : {
+                get: read,
+                update: async (patch: Record<string, unknown>) => write(patch),
+                firestore: {
+                  runTransaction: async <T,>(run: (transaction: unknown) => Promise<T>) =>
+                    run({ get: read, update: (_ref: unknown, patch: Record<string, unknown>) => write(patch) }),
+                },
               },
-            },
-    }),
-  },
-}));
+      }),
+    },
+  };
+});
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: state.gate }));
 vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: state.sendEmail, onboardingFrom: () => 'onboarding@test' }));
 
@@ -163,6 +171,25 @@ it('saves the resend on the invite: sent, when, and the Postmark message id, tag
   expect(state.sendEmail).toHaveBeenCalledWith(
     expect.objectContaining({ tag: 'onboarding-invite', metadata: { inviteId: 'inv-1' } })
   );
+});
+
+it('applies a delivery the webhook held because it beat the resend write', async () => {
+  state.invite = { ...state.invite, emailStatus: 'sent', postmarkMessageId: 'pm-old' };
+  state.sendEmail.mockImplementation(async () => {
+    // Postmark's Delivery webhook lands before the route saves the send.
+    state.invite = {
+      ...state.invite,
+      heldEmailEvent: { kind: 'delivered', messageId: 'pm-new', at: new Date('2026-10-15T14:00:05Z') },
+    };
+    return { ok: true, messageId: 'pm-new' };
+  });
+  await POST(request('POST'), params);
+  expect(state.invite).toMatchObject({
+    emailStatus: 'delivered',
+    postmarkMessageId: 'pm-new',
+    deliveredAt: new Date('2026-10-15T14:00:05Z'),
+  });
+  expect(state.invite).not.toHaveProperty('heldEmailEvent');
 });
 
 it('overwrites the last send, including a bounce, when re-sent', async () => {
