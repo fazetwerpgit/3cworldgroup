@@ -10,8 +10,17 @@ import { isEsignItem } from '@/lib/onboarding/esign';
 import { uploadFormAttachment } from '@/lib/forms/uploadFormAttachment';
 import { US_STATES, isValidZip } from '@/lib/validation/address';
 import { forgetInvite, rememberInvite } from '@/lib/onboarding/rememberedInvite';
+import { existingAccountToken } from '@/lib/onboarding/existingAccountToken';
 import { AuthShell } from '@/components/auth/AuthShell';
-import { Attachment, Field, FormAlert, FormSection, describe } from '@/components/portal/rep/RepForm';
+import {
+  Attachment,
+  Field,
+  FormAlert,
+  FormSection,
+  UPLOADING_MESSAGE,
+  describe,
+  useUploadsInFlight,
+} from '@/components/portal/rep/RepForm';
 import s from '@/components/portal/rep/rep.module.css';
 import f from '@/components/portal/rep/rep-forms.module.css';
 import a from '@/components/auth/auth.module.css';
@@ -44,35 +53,10 @@ interface OnboardingResponse {
   signInRequired?: boolean;
 }
 
-const WRONG_PASSWORD_CODES = [
-  'auth/invalid-credential',
-  'auth/invalid-login-credentials',
-  'auth/wrong-password',
-  'auth/user-not-found',
-];
-
-// Signs in to the hire's existing account just long enough to prove it is
-// theirs: the ID token goes with the packet, then this browser signs out. The
-// link never sets an existing account's password. Null on a wrong password.
-async function existingAccountToken(email: string, password: string): Promise<string | null> {
-  const [{ auth }, { signInWithEmailAndPassword, signOut }] = await Promise.all([
-    import('@/lib/firebase/config'),
-    import('firebase/auth'),
-  ]);
-  if (!auth) throw new Error('Sign-in is not available right now. Try again later.');
-  try {
-    const credential = await signInWithEmailAndPassword(auth, email, password);
-    const idToken = await credential.user.getIdToken();
-    await signOut(auth).catch(() => undefined);
-    return idToken;
-  } catch (error) {
-    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
-    if (WRONG_PASSWORD_CODES.includes(code)) return null;
-    if (code === 'auth/too-many-requests') {
-      throw new Error('Too many tries. Wait a few minutes, or email yourself a reset link.');
-    }
-    throw new Error("Couldn't sign in. Try again.");
-  }
+// A gateway timeout or body-size refusal answers with an HTML page: read it as
+// an empty body so the candidate sees the friendly fallback, not a JSON parse error.
+function readJson(response: Response): ReturnType<Response['json']> {
+  return response.json().catch(() => ({}));
 }
 
 // The signing key from the packet submit, kept for this tab only so a reload
@@ -160,6 +144,7 @@ export default function PublicOnboardingPage() {
   // Keyed by PacketField, or `ref:<itemId>` for an item's reference box.
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
   const [references, setReferences] = useState<Record<string, string>>({});
+  const { uploading, onBusyChange } = useUploadsInFlight();
   // dl_photos requires both slots before the reference (shared folder path) is
   // set. We only read the slots inside the setter's updater, so the value
   // binding itself is intentionally unused.
@@ -181,7 +166,7 @@ export default function PublicOnboardingPage() {
     async function loadInvite() {
       try {
         const response = await fetch(`/api/public/onboarding/${token}`);
-        const json = await response.json();
+        const json = await readJson(response);
         if (!response.ok) {
           // Unknown or expired: nothing for Sign in / Sign up to send them back to.
           if (response.status === 404 || response.status === 410) forgetInvite(token);
@@ -229,7 +214,7 @@ export default function PublicOnboardingPage() {
       setSubmitting(false);
       void fetch(`/api/public/onboarding/${token}`, { cache: 'no-store' })
         .then(async (response) => {
-          const json = await response.json();
+          const json = await readJson(response);
           if (response.ok && json.locked) setData(json);
         })
         .catch(() => {});
@@ -298,6 +283,11 @@ export default function PublicOnboardingPage() {
     }
 
     if (sendRef.current) return;
+    // The packet carries each upload's storage path: wait for every file to land.
+    if (uploading) {
+      setError(UPLOADING_MESSAGE);
+      return;
+    }
     const send = new AbortController();
     sendRef.current = send;
     setSubmitting(true);
@@ -334,7 +324,7 @@ export default function PublicOnboardingPage() {
           ...(taxClassification ? { taxClassification } : {}),
         }),
       });
-      const json = await response.json();
+      const json = await readJson(response);
       if (!response.ok && json.code === 'sign_in_required') {
         // A login exists for this email after all: ask for its password.
         setData((prev) => (prev ? { ...prev, signInRequired: true } : prev));
@@ -844,6 +834,7 @@ export default function PublicOnboardingPage() {
                               kinds="Photo"
                               preview={false}
                               upload={upload('dl_photos', IMAGE_TYPES, 'front')}
+                              onBusyChange={onBusyChange}
                               onUploaded={(path) => markDlSlot('front', path)}
                             />
                             <Attachment
@@ -853,6 +844,7 @@ export default function PublicOnboardingPage() {
                               kinds="Photo"
                               preview={false}
                               upload={upload('dl_photos', IMAGE_TYPES, 'back')}
+                              onBusyChange={onBusyChange}
                               onUploaded={(path) => markDlSlot('back', path)}
                             />
                           </div>
@@ -864,6 +856,7 @@ export default function PublicOnboardingPage() {
                           accept="image/*,application/pdf"
                           preview={!item.sensitive}
                           upload={upload(item.id, DOC_TYPES)}
+                          onBusyChange={onBusyChange}
                           onUploaded={(path) => updateReference(item.id, path)}
                         />
                       )
