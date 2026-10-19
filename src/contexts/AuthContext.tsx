@@ -179,6 +179,7 @@ function toUser(uid: string, userData: DocumentData): User {
     createdAt: userData.createdAt?.toDate(),
     updatedAt: userData.updatedAt?.toDate(),
     pushRequired: userData.pushRequired === true,
+    demoAccount: userData.demoAccount === true,
   } as User;
 }
 

@@ -5,6 +5,7 @@ import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import {
   createChannelId,
   isDemoSandboxChannel,
+  isSandboxStaff,
   isEligibleChatMember,
   getMemberIdsForAudience,
   isChatChannelAudience,
@@ -43,7 +44,10 @@ export async function GET(request: NextRequest) {
     if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
 
     const snapshot = await getExistingChannelDocs();
+    // The demo sandbox is listed for Jacob only: other admins and owners never see it.
+    const seesSandbox = isSandboxStaff(gate.uid);
     const channels = snapshot.docs
+      .filter((doc) => seesSandbox || !isDemoSandboxChannel(doc.data()))
       .map((doc) => {
         const data = doc.data();
         const channel = toChatChannel(doc.id, data);
@@ -146,9 +150,13 @@ export async function PATCH(request: NextRequest) {
     const ref = adminDb.collection('chatChannels').doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
+    // Only Jacob may see (so edit or delete) the demo sandbox.
+    if (isDemoSandboxChannel(snap.data()) && !isSandboxStaff(gate.uid)) {
+      return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
+    }
     if ('audience' in updates) {
       // The demo sandbox's memberIds never follow an audience (demo accounts plus
-      // admins/owners only); an audience edit there must not put real people in.
+      // Jacob only); an audience edit there must not put real people in.
       if (isDemoSandboxChannel(snap.data())) {
         return NextResponse.json({ error: 'The demo sandbox has no audience to change' }, { status: 400 });
       }
@@ -189,6 +197,10 @@ export async function DELETE(request: NextRequest) {
     const ref = adminDb.collection('chatChannels').doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
+    // Only Jacob may see (so edit or delete) the demo sandbox.
+    if (isDemoSandboxChannel(snap.data()) && !isSandboxStaff(gate.uid)) {
+      return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
+    }
 
     // Uploads (photo, or PDF and its preview) go with the channel: their tokened
     // URLs would otherwise keep them reachable. A reported upload is copied to

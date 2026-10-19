@@ -497,7 +497,7 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
   it('stores a real author as "3C Team" in the demo sandbox (message and preview); demo accounts keep their name', async () => {
     mockGate.mockResolvedValue({
       ok: true,
-      user: { ...VERIFIED.user, uid: 'admin-uid', displayName: 'Jacob Real', role: 'admin', fieldRole: undefined, demoAccount: false },
+      user: { ...VERIFIED.user, uid: 'bQWKezQmd1P9Yf3GzOdXXBkDzj93', displayName: 'Jacob Real', role: 'owner', fieldRole: undefined, demoAccount: false },
     });
     const res = await POST(req({ channelId: 'sandbox', text: 'welcome' }));
     expect(res.status).toBe(200);
@@ -516,6 +516,16 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     });
     expect((await POST(req({ channelId: 'sandbox', text: 'hi' }))).status).toBe(200);
     expect((addMock.mock.calls[0][0] as unknown as { authorName: string }).authorName).toBe('Sam Demo');
+  });
+
+  it('refuses a real admin who is not Jacob in the demo sandbox', async () => {
+    mockGate.mockResolvedValue({
+      ok: true,
+      user: { ...VERIFIED.user, uid: 'admin-uid', displayName: 'Jeremy Real', role: 'admin', fieldRole: undefined, demoAccount: false },
+    });
+    const res = await POST(req({ channelId: 'sandbox', text: 'hi' }));
+    expect(res.status).toBe(403);
+    expect(addMock).not.toHaveBeenCalled();
   });
 
   it('merges lastMessageAt onto the channel doc when a message is sent', async () => {

@@ -293,25 +293,33 @@ describe('demo sandbox channel', () => {
     expect(userCanAccessChannelDoc(general, { uid: 'demo', demoAccount: true })).toBe(false);
   });
 
-  it('keeps real users out of the sandbox whatever their audience or extras, admins/owners excepted', () => {
+  it('keeps every real user out of the sandbox, admins and owners included, except Jacob', () => {
     expect(userCanAccessChannelDoc(sandbox, { uid: 'rep', fieldRole: 'entry_level_rep', demoAccount: false })).toBe(false);
     expect(userCanAccessChannelDoc(sandbox, { uid: 'mgr', fieldRole: 'l1_manager', demoAccount: false })).toBe(false);
     expect(userCanAccessChannelDoc(sandbox, { uid: 'ops', role: 'operations', demoAccount: false })).toBe(false);
-    expect(userCanAccessChannelDoc(sandbox, { uid: 'adm', role: 'admin', demoAccount: false })).toBe(true);
-    expect(userCanAccessChannelDoc(sandbox, { uid: 'own', role: 'owner', demoAccount: false })).toBe(true);
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'adm', role: 'admin', demoAccount: false })).toBe(false);
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'own', role: 'owner', demoAccount: false })).toBe(false);
+    // Being in memberIds or extraMemberIds changes nothing.
+    const stale = { ...sandbox, memberIds: ['own'], extraMemberIds: ['own'] };
+    expect(userCanAccessChannelDoc(stale, { uid: 'own', role: 'owner', demoAccount: false })).toBe(false);
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'bQWKezQmd1P9Yf3GzOdXXBkDzj93', role: 'owner', demoAccount: false })).toBe(true);
+    expect(userCanAccessChannelDoc(sandbox, { uid: 'x', role: 'owner', demoAccount: false, email: 'JMyers@3cworldgroup.com' })).toBe(true);
   });
 
   it('closes an archived sandbox to everyone, the demo account included', () => {
     const archived = { ...sandbox, active: false };
     expect(userCanAccessChannelDoc(archived, { uid: 'demo', demoAccount: true })).toBe(false);
-    expect(userCanAccessChannelDoc(archived, { uid: 'adm', role: 'admin', demoAccount: false })).toBe(false);
+    expect(userCanAccessChannelDoc(archived, { uid: 'bQWKezQmd1P9Yf3GzOdXXBkDzj93', role: 'owner', demoAccount: false })).toBe(false);
   });
 
-  it('limits sandbox eligibility to active demo accounts and admins/owners', () => {
+  it('limits sandbox eligibility to active demo accounts and Jacob', () => {
     expect(isEligibleSandboxMember({ status: 'active', demoAccount: true })).toBe(true);
     expect(isEligibleSandboxMember({ status: 'inactive', demoAccount: true })).toBe(false);
-    expect(isEligibleSandboxMember({ status: 'active', role: 'admin' })).toBe(true);
-    expect(isEligibleSandboxMember({ status: 'active', role: 'owner' })).toBe(true);
+    expect(isEligibleSandboxMember({ status: 'active', role: 'admin' }, 'adm')).toBe(false);
+    expect(isEligibleSandboxMember({ status: 'active', role: 'owner' }, 'own')).toBe(false);
+    expect(isEligibleSandboxMember({ status: 'active', role: 'owner' }, 'bQWKezQmd1P9Yf3GzOdXXBkDzj93')).toBe(true);
+    expect(isEligibleSandboxMember({ status: 'active', role: 'owner', Email: 'jmyers@3cworldgroup.com' }, 'other-uid')).toBe(true);
+    expect(isEligibleSandboxMember({ status: 'inactive', role: 'owner' }, 'bQWKezQmd1P9Yf3GzOdXXBkDzj93')).toBe(false);
     expect(isEligibleSandboxMember({ status: 'active', role: 'operations' })).toBe(false);
     expect(isEligibleSandboxMember({ status: 'active', fieldRole: 'l1_manager' })).toBe(false);
     expect(isEligibleChatMember({ status: 'active', demoAccount: true }, sandbox)).toBe(true);
@@ -321,13 +329,15 @@ describe('demo sandbox channel', () => {
 
   it('belongsInChannelDoc ignores audience and extras for the sandbox', () => {
     expect(belongsInChannelDoc(sandbox, 'demo', { status: 'active', demoAccount: true })).toBe(true);
-    expect(belongsInChannelDoc(sandbox, 'adm', { status: 'active', role: 'admin' })).toBe(true);
+    expect(belongsInChannelDoc(sandbox, 'adm', { status: 'active', role: 'admin' })).toBe(false);
+    expect(belongsInChannelDoc(sandbox, 'bQWKezQmd1P9Yf3GzOdXXBkDzj93', { status: 'active', role: 'owner' })).toBe(true);
     expect(belongsInChannelDoc(sandbox, 'rep', { status: 'active', fieldRole: 'entry_level_rep' })).toBe(false);
   });
 
-  it('sync sets sandbox memberIds to demo accounts plus admins/owners only, and keeps demo out of the rest', async () => {
+  it('sync sets sandbox memberIds to demo accounts plus Jacob only (dropping other admins/owners), and keeps demo out of the rest', async () => {
     firestore.reset();
-    firestore.channelDocs.push({ id: 'app-review', data: sandbox }, { id: 'general', data: general });
+    firestore.channelDocs.push({ id: 'app-review', data: { ...sandbox, memberIds: ['adm', 'own', 'demo'] } }, { id: 'general', data: general });
+    firestore.users.set('bQWKezQmd1P9Yf3GzOdXXBkDzj93', { status: 'active', role: 'owner', email: 'jmyers@3cworldgroup.com' });
     firestore.users.set('demo', { status: 'active', demoAccount: true });
     firestore.users.set('adm', { status: 'active', role: 'admin' });
     firestore.users.set('own', { status: 'active', role: 'owner' });
@@ -338,9 +348,17 @@ describe('demo sandbox channel', () => {
     await syncChatChannels();
 
     const byId = new Map(firestore.batchSets.map((set) => [set.ref.__id, set.data.memberIds as string[]]));
-    expect([...(byId.get('app-review') ?? [])].sort()).toEqual(['adm', 'demo', 'own']);
+    expect([...(byId.get('app-review') ?? [])].sort()).toEqual(['bQWKezQmd1P9Yf3GzOdXXBkDzj93', 'demo']);
     expect(byId.get('general')).not.toContain('demo');
     expect(byId.get('general')).toContain('rep');
+  });
+
+  it('reconcile removes an owner other than Jacob from the sandbox', async () => {
+    firestore.reset();
+    firestore.channelDocs.push({ id: 'app-review', data: { ...sandbox, memberIds: ['own'] } });
+    const channels = await reconcileChatMembershipForUser('own', { status: 'active', role: 'owner' });
+    expect(channels.map((c) => c.id)).toEqual([]);
+    expect(firestore.batchSets.some((set) => set.ref.__id === 'app-review')).toBe(true);
   });
 
   it('reconcile adds the demo account to the sandbox only', async () => {

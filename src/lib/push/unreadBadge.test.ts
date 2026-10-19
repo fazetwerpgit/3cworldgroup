@@ -25,7 +25,7 @@ describe('countUnreadChannels', () => {
   });
 });
 
-function fakeDb(opts: { channels?: Array<Record<string, unknown> & { _id: string }>; reads?: Record<string, unknown>; fail?: boolean }) {
+function fakeDb(opts: { channels?: Array<Record<string, unknown> & { _id: string }>; reads?: Record<string, unknown>; fail?: boolean; me?: Record<string, unknown> }) {
   const limits: number[] = [];
   const orderBys: number[] = [];
   const receiptIds: string[][] = [];
@@ -51,7 +51,12 @@ function fakeDb(opts: { channels?: Array<Record<string, unknown> & { _id: string
     collection: (name: string) =>
       name === 'chatChannels'
         ? q
-        : { doc: () => ({ collection: () => ({ doc: (id: string) => ({ __id: id }) }) }) },
+        : {
+            doc: () => ({
+              get: async () => ({ exists: !!opts.me, data: () => opts.me, get: (f: string) => opts.me?.[f] }),
+              collection: () => ({ doc: (id: string) => ({ __id: id }) }),
+            }),
+          },
     getAll: vi.fn(async (...args: unknown[]) => {
       const refs = args.filter((a): a is { __id: string } => !!a && typeof a === 'object' && '__id' in a);
       receiptIds.push(refs.map((r) => r.__id));
@@ -95,5 +100,24 @@ describe('unreadChatBadge', () => {
     const { db } = fakeDb({ fail: true });
     await expect(unreadChatBadge(db, 'u1')).resolves.toBeNull();
     err.mockRestore();
+  });
+
+  it('never counts the demo sandbox for a real user who is not Jacob, even as a stale member', async () => {
+    const channels = [
+      { _id: 'general', lastMessageAt: ts(300) },
+      { _id: 'demo-team', lastMessageAt: ts(300), demoSandbox: true },
+    ];
+    const admin = fakeDb({ channels, me: { status: 'active', role: 'admin', email: 'jeremy@example.com' } });
+    await expect(unreadChatBadge(admin.db, 'jeremy')).resolves.toBe(1);
+    expect(admin.receiptIds).toEqual([['general']]);
+
+    const demo = fakeDb({ channels, me: { status: 'active', demoAccount: true } });
+    await expect(unreadChatBadge(demo.db, 'demo-1')).resolves.toBe(2);
+
+    const jacobByEmail = fakeDb({ channels, me: { status: 'active', role: 'owner', Email: 'JMyers@3cworldgroup.com' } });
+    await expect(unreadChatBadge(jacobByEmail.db, 'other-uid')).resolves.toBe(2);
+
+    const jacob = fakeDb({ channels });
+    await expect(unreadChatBadge(jacob.db, 'bQWKezQmd1P9Yf3GzOdXXBkDzj93')).resolves.toBe(2);
   });
 });

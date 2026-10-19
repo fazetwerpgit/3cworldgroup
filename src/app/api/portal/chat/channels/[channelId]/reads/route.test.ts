@@ -238,14 +238,14 @@ describe('GET /api/portal/chat/channels/[channelId]/reads', () => {
     });
     firestore.channels.set('demo-team', {
       id: 'demo-team', name: 'Demo Team', description: 'Demo', audience: 'all', order: 9,
-      active: true, demoSandbox: true, memberIds: ['demo-1', 'owner-1'],
+      active: true, demoSandbox: true, memberIds: ['demo-1', 'bQWKezQmd1P9Yf3GzOdXXBkDzj93'],
     });
     firestore.users.set('demo-1', { status: 'active', demoAccount: true, displayName: 'App Review' });
-    firestore.users.set('owner-1', {
+    firestore.users.set('bQWKezQmd1P9Yf3GzOdXXBkDzj93', {
       status: 'active', role: 'owner', displayName: 'Jacob Myers', avatarUrl: 'https://example.com/jacob.png',
     });
     firestore.messages.set('demo-team/m1', { authorId: 'demo-1', createdAt: ts('2026-10-09T15:00:00Z') });
-    firestore.reads.set('owner-1/demo-team', { lastReadAt: ts('2026-10-09T16:00:00Z') });
+    firestore.reads.set('bQWKezQmd1P9Yf3GzOdXXBkDzj93/demo-team', { lastReadAt: ts('2026-10-09T16:00:00Z') });
 
     const res = await GET(req('demo-team', 'm1'), ctx('demo-team'));
     const json = await res.json();
@@ -257,6 +257,6 @@ describe('GET /api/portal/chat/channels/[channelId]/reads', () => {
     expect(json.readers[0]).not.toHaveProperty('avatarUrl');
     const body = JSON.stringify(json);
     expect(body).not.toContain('Jacob Myers');
-    expect(body).not.toContain('owner-1');
+    expect(body).not.toContain('bQWKezQmd1P9Yf3GzOdXXBkDzj93');
   });
 });

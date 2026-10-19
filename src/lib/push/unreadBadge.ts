@@ -1,4 +1,7 @@
 import { FieldPath, type Firestore } from 'firebase-admin/firestore';
+import { canSeeDemoSandbox, isSandboxStaff } from '@/lib/chat/sandboxStaff';
+import { isDemoAccount } from '@/lib/users/demoAccount';
+import { emailFromUserDoc } from '@/lib/email/userEmail';
 
 // The app icon badge a native push carries: the recipient's unread chat
 // channels, counted the way the portal's unread dot counts them
@@ -55,10 +58,19 @@ export async function unreadChatBadge(db: Firestore, uid: string): Promise<numbe
       .where('memberIds', 'array-contains', uid)
       .where('active', '==', true)
       .orderBy(FieldPath.documentId())
-      .select('id', 'lastMessageAt')
+      .select('id', 'lastMessageAt', 'demoSandbox')
       .limit(MAX_BADGE_CHANNELS)
       .get();
-    const channels = channelsSnap.docs.map((d) => ({
+    // The demo sandbox counts only for demo accounts and Jacob, even when a
+    // stale memberIds entry still lists someone else. The user doc is read only
+    // when a sandbox channel actually turns up.
+    let docs = channelsSnap.docs;
+    if (docs.some((d) => d.get('demoSandbox') === true) && !isSandboxStaff(uid)) {
+      const me = await db.collection('users').doc(uid).get();
+      const sees = canSeeDemoSandbox({ uid, email: emailFromUserDoc(me), demoAccount: isDemoAccount(me.data() ?? {}) });
+      if (!sees) docs = docs.filter((d) => d.get('demoSandbox') !== true);
+    }
+    const channels = docs.map((d) => ({
       id: (d.get('id') as string | undefined) || d.id,
       lastMessageAt: d.get('lastMessageAt'),
     }));

@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     if (!found) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
+    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     await ensureChatChannelMember(channelId, user.uid);
@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
     if (!found) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
+    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -434,7 +434,7 @@ export async function PATCH(request: NextRequest) {
     const found = await getFirestoreChatChannel(channelId);
     if (
       !found ||
-      !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })
+      !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email })
     ) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -506,7 +506,7 @@ export async function DELETE(request: NextRequest) {
     const found = await getFirestoreChatChannel(channelId);
     const canAccess =
       !!found &&
-      userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount });
+      userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email });
     // A moderator removing a reported message from the Chat reports queue may
     // not reach the channel itself (operations on a demo sandbox, anyone on a
     // channel archived after the report): the open report on this exact

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { canAccessChatChannel, isAdminLevel, resolveRoles } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { isEligibleChatMember, readExtraMemberIds, toChatChannel } from '@/lib/chat/channels';
+import { isEligibleChatMember, isSandboxStaff, readExtraMemberIds, toChatChannel } from '@/lib/chat/channels';
 import { isDemoAccount } from '@/lib/users/demoAccount';
 
 // Manage a channel's manually-added members. PLATFORM ADMINS ONLY (client decision:
@@ -65,7 +65,8 @@ export async function POST(
     const ref = adminDb.collection('chatChannels').doc(channelId);
     const snap = await ref.get();
     const channel = snap.exists ? toChatChannel(snap.id, snap.data() ?? {}) : null;
-    if (!channel) {
+    // Only Jacob may see the demo sandbox: to any other admin it does not exist.
+    if (!channel || (channel.demoSandbox && !isSandboxStaff(admin.user.uid, admin.user.email))) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
     // Adding to an archived channel is a no-op for access (the doc gate blocks inactive
@@ -73,7 +74,7 @@ export async function POST(
     if (!channel.active) {
       return NextResponse.json({ error: 'Channel is archived' }, { status: 400 });
     }
-    // The demo sandbox's membership is fixed (demo accounts plus admins/owners);
+    // The demo sandbox's membership is fixed (demo accounts plus Jacob);
     // an extra would never grant access there, so refuse rather than store one.
     if (channel.demoSandbox) {
       return NextResponse.json({ error: 'The demo sandbox takes no added members' }, { status: 400 });
@@ -140,7 +141,7 @@ export async function DELETE(
     const snap = await ref.get();
     const data = snap.data() ?? {};
     const channel = snap.exists ? toChatChannel(snap.id, data) : null;
-    if (!channel) {
+    if (!channel || (channel.demoSandbox && !isSandboxStaff(admin.user.uid, admin.user.email))) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
 

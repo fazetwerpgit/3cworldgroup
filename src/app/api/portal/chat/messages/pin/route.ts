@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     if (!found) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
+    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     // Access alone is not enough to pin — reps can read the channel but not curate it.
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
     if (!found) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
+    if (!userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

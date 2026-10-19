@@ -23,7 +23,7 @@
 // until then the client SDK can still read channels it was a member of.
 // CHAT: a demo account reaches exactly one kind of channel, the App Review
 // sandbox (chatChannels/{id}.demoSandbox === true; lib/chat/channels.ts), whose
-// members are demo accounts plus admins/owners. Its messages stay inside that
+// members are demo accounts plus Jacob only (lib/chat/sandboxStaff). Its messages stay inside that
 // channel: the real-user chat surfaces that read messages (leaderboard callouts,
 // the owner book's chat stats) read chatChannels/all-company only, the company
 // tape reads sales, and Ask reads no chat. Setup: docs/ios-app/APP-REVIEW-DEMO.md.

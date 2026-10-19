@@ -135,7 +135,7 @@ vi.mock('@/lib/chat/evidence', async (importOriginal) => ({
   preserveReportedEvidence,
 }));
 
-import { DELETE, PATCH, POST } from './route';
+import { DELETE, GET, PATCH, POST } from './route';
 import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 
 const mockGate = requireVerifiedAdmin as unknown as ReturnType<typeof vi.fn>;
@@ -148,6 +148,7 @@ function req(method: string, body: unknown) {
 }
 
 const ADMIN = { ok: true, uid: 'admin-1', name: 'Admin One' };
+const JACOB = { ok: true, uid: 'bQWKezQmd1P9Yf3GzOdXXBkDzj93', name: 'Jacob' };
 
 const BUCKET = 'test-bucket';
 function chatUrl(channelId: string, name: string) {
@@ -216,7 +217,7 @@ describe('/api/portal/chat/channels/manage', () => {
   });
 
   it('PATCH refuses an audience change on the demo sandbox so real people never land in its memberIds', async () => {
-    mockGate.mockResolvedValue(ADMIN);
+    mockGate.mockResolvedValue(JACOB);
     firestore.channels.set('app-review', {
       id: 'app-review', name: 'App Review', description: '', audience: 'all', order: 99, active: true,
       demoSandbox: true, memberIds: ['demo', 'admin-1'],
@@ -226,6 +227,34 @@ describe('/api/portal/chat/channels/manage', () => {
 
     expect(res.status).toBe(400);
     expect(firestore.channels.get('app-review')).toMatchObject({ memberIds: ['demo', 'admin-1'] });
+  });
+
+  it('GET lists the demo sandbox for Jacob only, never for another admin', async () => {
+    firestore.channels.set('all-company', { id: 'all-company', name: 'All Company', description: '', audience: 'all', order: 1, active: true, memberIds: [] });
+    firestore.channels.set('app-review', {
+      id: 'app-review', name: 'Demo Team', description: '', audience: 'all', order: 99, active: true,
+      demoSandbox: true, memberIds: ['demo', 'admin-1'],
+    });
+
+    mockGate.mockResolvedValue(ADMIN);
+    const asAdmin = await (await GET(req('GET', undefined))).json();
+    expect(asAdmin.channels.map((c: { id: string }) => c.id)).toEqual(['all-company']);
+
+    mockGate.mockResolvedValue(JACOB);
+    const asJacob = await (await GET(req('GET', undefined))).json();
+    expect(asJacob.channels.map((c: { id: string }) => c.id)).toEqual(['all-company', 'app-review']);
+  });
+
+  it('PATCH and DELETE treat the demo sandbox as missing for an admin who is not Jacob', async () => {
+    firestore.channels.set('app-review', {
+      id: 'app-review', name: 'Demo Team', description: '', audience: 'all', order: 99, active: true,
+      demoSandbox: true, memberIds: ['demo'],
+    });
+    mockGate.mockResolvedValue(ADMIN);
+
+    expect((await PATCH(req('PATCH', { id: 'app-review', name: 'Renamed' }))).status).toBe(404);
+    expect((await DELETE(req('DELETE', { id: 'app-review' }))).status).toBe(404);
+    expect(firestore.channels.get('app-review')).toMatchObject({ name: 'Demo Team' });
   });
 
   it('DELETE removes the channel doc and its messages', async () => {

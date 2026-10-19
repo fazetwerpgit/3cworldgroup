@@ -104,16 +104,18 @@ describe('sendChatPush', () => {
     expect(totals).toEqual({ recipients: 2, sent: 2, failed: 0, pruned: 0 });
   });
 
-  it('pushes a demo sandbox message only to its members (demo accounts and admins/owners)', async () => {
+  it('pushes a demo sandbox message only to demo accounts and Jacob, never other admins/owners', async () => {
     fake.users.set('demo', { status: 'active', demoAccount: true, pushTokens: ['t-demo'] });
     fake.users.set('adm', { status: 'active', role: 'admin', pushTokens: ['t-adm'] });
+    fake.users.set('own', { status: 'active', role: 'owner', pushTokens: ['t-own'] });
+    fake.users.set('jacob', { status: 'active', role: 'owner', email: 'jmyers@3cworldgroup.com', pushTokens: ['t-jacob'] });
     fake.users.set('rep', { status: 'active', fieldRole: 'entry_rep', pushTokens: ['t-rep'] });
     fake.users.set('mgr', { status: 'active', fieldRole: 'l1_manager', pushTokens: ['t-mgr'] });
     const sandbox = { id: 'app-review', name: 'App Review', audience: 'all', order: 99, active: true, demoSandbox: true };
 
     // A stale roster that somehow lists real people still never reaches them.
-    await sendChatPush({ ...sandbox, memberIds: ['demo2', 'demo', 'adm', 'rep', 'mgr'] }, 'demo2', payload);
-    expect(pushedTo()).toEqual(['adm', 'demo']);
+    await sendChatPush({ ...sandbox, memberIds: ['demo2', 'demo', 'adm', 'own', 'jacob', 'rep', 'mgr'] }, 'demo2', payload);
+    expect(pushedTo()).toEqual(['demo', 'jacob']);
   });
 
   it('never pushes a normal channel message to a demo account', async () => {

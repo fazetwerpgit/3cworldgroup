@@ -369,33 +369,34 @@ describe('GET /api/portal/chat/channels/[channelId]/members', () => {
     expect(firestore.adminDb.getAll).not.toHaveBeenCalled();
   });
 
-  it('never shows a demo caller the real names, photos or uids of sandbox admins/owners', async () => {
+  it('never shows a demo caller the real names, photos or uids of sandbox staff, and lists no other admin', async () => {
     mockGetUser.mockResolvedValue(DEMO);
     firestore.users.set('demo-1', { status: 'active', demoAccount: true, displayName: 'App Review' });
-    firestore.users.set('owner-1', {
+    firestore.users.set('bQWKezQmd1P9Yf3GzOdXXBkDzj93', {
       status: 'active', role: 'owner', displayName: 'Jacob Myers', avatarUrl: 'https://example.com/jacob.png',
     });
     firestore.users.set('admin-1', { status: 'active', role: 'admin', displayName: 'Admin One' });
     firestore.channels.set('demo-team', {
       id: 'demo-team', name: 'Demo Team', description: 'Demo', audience: 'all', order: 9,
-      active: true, demoSandbox: true, memberIds: ['demo-1', 'owner-1', 'admin-1'],
+      active: true, demoSandbox: true, memberIds: ['demo-1', 'bQWKezQmd1P9Yf3GzOdXXBkDzj93', 'admin-1'],
     });
 
     const res = await GET(req('demo-team'), ctx('demo-team'));
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.memberCount).toBe(3);
+    // admin-1 is a stale member: only demo accounts and Jacob belong in the sandbox.
+    expect(json.memberCount).toBe(2);
     const body = JSON.stringify(json);
     expect(body).not.toContain('Jacob Myers');
     expect(body).not.toContain('Admin One');
     expect(body).not.toContain('jacob.png');
-    expect(body).not.toContain('owner-1');
+    expect(body).not.toContain('bQWKezQmd1P9Yf3GzOdXXBkDzj93');
     expect(body).not.toContain('admin-1');
     // The caller's own row is left as is.
     expect(json.members).toContainEqual({ uid: 'demo-1', name: 'App Review', role: '', isExtra: false });
     const others = json.members.filter((m: { uid: string }) => m.uid !== 'demo-1');
-    expect(others.map((m: { name: string }) => m.name).sort()).toEqual(['Rep 1', 'Rep 2']);
+    expect(others.map((m: { name: string }) => m.name).sort()).toEqual(['Rep 1']);
     for (const member of others) expect(member).not.toHaveProperty('avatarUrl');
   });
 

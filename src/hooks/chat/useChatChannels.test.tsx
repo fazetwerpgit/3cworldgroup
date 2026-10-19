@@ -11,7 +11,7 @@ type SnapshotDoc = { id: string; data: () => Record<string, unknown> };
 type Listener = { next: (snapshot: { docs: SnapshotDoc[] }) => void; fail: (error: Error) => void };
 
 const listeners: Listener[] = [];
-const auth: { user: { uid: string; status: string; fieldRole?: string } | null; loading: boolean } = {
+const auth: { user: { uid: string; status: string; fieldRole?: string; email?: string; demoAccount?: boolean } | null; loading: boolean } = {
   user: { uid: 'me', status: 'active' },
   loading: false,
 };
@@ -132,5 +132,31 @@ describe('useChatChannels', () => {
     auth.user = { uid: 'signup', status: 'pending' };
     act(() => root.render(<Probe />));
     expect(listeners).toHaveLength(0);
+  });
+
+  it('hides the demo sandbox from a real user who is not Jacob, even as a stale member', async () => {
+    const sandbox: SnapshotDoc = {
+      id: 'app-review',
+      data: () => ({ name: 'Demo Team', order: 9, active: true, demoSandbox: true, memberIds: ['me'] }),
+    };
+    await act(async () => root.render(<Probe />));
+    await act(async () => listeners[0].next({ docs: [doc('general'), sandbox] }));
+    expect(read().count).toBe('1');
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    listeners.length = 0;
+    auth.user = { uid: 'demo-1', status: 'active', demoAccount: true };
+    await act(async () => root.render(<Probe />));
+    await act(async () => listeners[0].next({ docs: [sandbox] }));
+    expect(read().count).toBe('1');
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    listeners.length = 0;
+    auth.user = { uid: 'x', status: 'active', email: 'jmyers@3cworldgroup.com' };
+    await act(async () => root.render(<Probe />));
+    await act(async () => listeners[0].next({ docs: [doc('general'), sandbox] }));
+    expect(read().count).toBe('2');
   });
 });

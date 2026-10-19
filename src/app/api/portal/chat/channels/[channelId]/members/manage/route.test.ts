@@ -210,6 +210,20 @@ describe('POST /api/portal/chat/channels/[channelId]/members/manage', () => {
     expect(res.status).toBe(404);
   });
 
+  it('treats the demo sandbox as missing for an admin who is not Jacob, and refuses extras for Jacob', async () => {
+    firestore.channels.set('app-review', managersChannel({
+      id: 'app-review', name: 'Demo Team', audience: 'all', demoSandbox: true, memberIds: ['demo-1'], extraMemberIds: ['x'],
+    }));
+    firestore.users.set('rep-2', { status: 'active', fieldRole: 'entry_rep' });
+    mockGetUser.mockResolvedValue(ADMIN);
+    expect((await POST(req('app-review', { uid: 'rep-2' }, 'POST'), ctx('app-review'))).status).toBe(404);
+    expect((await DELETE(req('app-review', { uid: 'x' }, 'DELETE'), ctx('app-review'))).status).toBe(404);
+
+    mockGetUser.mockResolvedValue({ ...ADMIN, user: { ...ADMIN.user, uid: 'bQWKezQmd1P9Yf3GzOdXXBkDzj93', role: 'owner' as const } });
+    expect((await POST(req('app-review', { uid: 'rep-2' }, 'POST'), ctx('app-review'))).status).toBe(400);
+    expect(firestore.setCalls).toHaveLength(0);
+  });
+
   it('returns 400 for an unknown target user', async () => {
     mockGetUser.mockResolvedValue(ADMIN);
     firestore.channels.set('managers', managersChannel());

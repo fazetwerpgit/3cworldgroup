@@ -354,6 +354,8 @@ export interface User {
   // Set by signup-notify's bot heuristic; the admin pending queue hides these
   // from the "needs a decision" list (they remain findable via status filters).
   suspectedBot?: boolean;
+  // users/{uid}.demoAccount === true (App Review demo account; lib/users/demoAccount).
+  demoAccount?: boolean;
   // IBO fields link the user to an IBO business entity for LLC/document
   // ownership. They are independent of ibo_level_* field roles, which are sales
   // role / pay tier / team-lead levels.

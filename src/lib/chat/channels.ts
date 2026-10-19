@@ -7,16 +7,19 @@ import {
   ChatChannelAudience,
   roleRequiresOnboarding,
 } from '@/types';
-import { isAdminLevel, resolveRoles, PlatformRole, FieldRole } from '@/types';
+import { resolveRoles, PlatformRole, FieldRole } from '@/types';
 import { isDemoAccount } from '@/lib/users/demoAccount';
+import { emailFromUserDoc } from '@/lib/email/userEmail';
+import { isSandboxStaff } from '@/lib/chat/sandboxStaff';
 
 // APP REVIEW DEMO SANDBOX. A channel doc with `demoSandbox: true` is the one
 // place a demo account (users/{uid}.demoAccount === true) may chat, so App
 // Review can exercise send, report and block without ever seeing or reaching
 // a real person. Its membership is fixed, not audience-based: demo accounts
-// plus admins/owners (who moderate it). Every other user is kept out whatever
-// their role, audience or extraMemberIds, and a demo account stays out of
-// every non-sandbox channel. Setup: docs/ios-app/APP-REVIEW-DEMO.md.
+// plus Jacob (owner, who runs App Review). Owner's call: no other real user
+// sees it, admins and owners included, whatever their role, audience,
+// extraMemberIds or a stale memberIds entry; a demo account stays out of every
+// non-sandbox channel. Setup: docs/ios-app/APP-REVIEW-DEMO.md.
 
 /** The channel doc field that marks the App Review demo sandbox. */
 export const DEMO_SANDBOX_FIELD = 'demoSandbox';
@@ -25,15 +28,16 @@ export function isDemoSandboxChannel(data: FirebaseFirestore.DocumentData | null
   return data?.[DEMO_SANDBOX_FIELD] === true;
 }
 
+export { SANDBOX_STAFF_UIDS, SANDBOX_STAFF_EMAILS, isSandboxStaff } from '@/lib/chat/sandboxStaff';
+
 /**
  * Whether a users/{uid} doc belongs in a sandbox channel: an active demo
- * account, or an active admin/owner. Nobody else, ever.
+ * account, or Jacob. Nobody else, ever (other admins and owners included).
  */
-export function isEligibleSandboxMember(data: FirebaseFirestore.DocumentData): boolean {
+export function isEligibleSandboxMember(data: FirebaseFirestore.DocumentData, uid?: string): boolean {
   if (data.status !== 'active') return false;
   if (isDemoAccount(data)) return true;
-  const { role } = resolveRoles(data.role, data.fieldRole);
-  return isAdminLevel(role);
+  return isSandboxStaff(uid, emailFromUserDoc({ get: (field) => data[field] }));
 }
 
 export interface ChatChannelMembership {
@@ -109,10 +113,11 @@ export function readExtraMemberIds(data: FirebaseFirestore.DocumentData): string
 // A demo account reaches ONLY a demo sandbox channel (see the top of this file):
 // `demoAccount` is required so every caller has to carry the flag (a raw uid in
 // extraMemberIds must not let one in anywhere else). A sandbox channel admits
-// demo accounts and admins/owners only, never by audience or extraMemberIds.
+// demo accounts and Jacob only (isSandboxStaff), never by role, audience,
+// extraMemberIds or memberIds.
 export function userCanAccessChannelDoc(
   data: FirebaseFirestore.DocumentData,
-  identity: { uid: string; role?: PlatformRole; fieldRole?: FieldRole; demoAccount: boolean }
+  identity: { uid: string; role?: PlatformRole; fieldRole?: FieldRole; demoAccount: boolean; email?: string | null }
 ): boolean {
   const sandbox = isDemoSandboxChannel(data);
   if (identity.demoAccount && !sandbox) return false;
@@ -122,20 +127,21 @@ export function userCanAccessChannelDoc(
   // channel parses and is active, so archiving a channel revokes extras too (matching the
   // pre-task behavior where an inactive channel 403'd even admins).
   if (!channel || !channel.active) return false;
-  if (sandbox) return identity.demoAccount || isAdminLevel(identity.role);
+  if (sandbox) return identity.demoAccount || isSandboxStaff(identity.uid, identity.email);
   if (canAccessChatChannel(channel, identity.role, identity.fieldRole)) return true;
   return readExtraMemberIds(data).includes(identity.uid);
 }
 
 // Whether an account may be a chat member at all. Pass the channel doc when the
-// question is about one channel: a demo sandbox takes demo accounts plus
-// admins/owners only (isEligibleSandboxMember); every other channel never takes
-// a demo account.
+// question is about one channel: a demo sandbox takes demo accounts plus Jacob
+// only (isEligibleSandboxMember, which needs the uid); every other channel never
+// takes a demo account.
 export function isEligibleChatMember(
   data: FirebaseFirestore.DocumentData,
-  channelData?: FirebaseFirestore.DocumentData | null
+  channelData?: FirebaseFirestore.DocumentData | null,
+  uid?: string
 ): boolean {
-  if (isDemoSandboxChannel(channelData)) return isEligibleSandboxMember(data);
+  if (isDemoSandboxChannel(channelData)) return isEligibleSandboxMember(data, uid);
   if (isDemoAccount(data)) return false;
   const { fieldRole } = resolveRoles(data.role, data.fieldRole);
   return data.status === 'active' ||
@@ -151,7 +157,7 @@ export function belongsInChannelDoc(
   uid: string,
   userData: FirebaseFirestore.DocumentData
 ): boolean {
-  if (!isEligibleChatMember(userData, channelData)) return false;
+  if (!isEligibleChatMember(userData, channelData, uid)) return false;
   // Sandbox membership is the eligibility rule alone (no audience, no extras).
   if (isDemoSandboxChannel(channelData)) return !!toChatChannel(typeof channelData.id === 'string' ? channelData.id : '', channelData);
   const channel = toChatChannel(typeof channelData.id === 'string' ? channelData.id : '', channelData);
@@ -204,7 +210,7 @@ export async function getMemberIdsForAudience(
 
 /** The memberIds a demo sandbox channel should hold, from the prefetched users. */
 export function sandboxMemberIds(users: readonly ChatUserSnapshot[]): string[] {
-  return users.filter((doc) => isEligibleSandboxMember(doc.data())).map((doc) => doc.id);
+  return users.filter((doc) => isEligibleSandboxMember(doc.data(), doc.id)).map((doc) => doc.id);
 }
 
 export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
@@ -226,7 +232,8 @@ export async function syncChatChannels(): Promise<{ channelsSynced: number }> {
     const channel = toChatChannel(doc.id, data);
     if (!channel) continue;
 
-    // The demo sandbox: demo accounts plus admins/owners, nothing else.
+    // The demo sandbox: demo accounts plus Jacob, nothing else (anyone else in
+    // its memberIds is dropped here).
     if (isDemoSandboxChannel(data)) {
       const memberIds = sandboxMemberIds(users);
       batch.set(doc.ref, { id: channel.id, memberIds, updatedAt: FieldValue.serverTimestamp() }, { merge: true });

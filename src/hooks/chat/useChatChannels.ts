@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { readLastMessage, type ChatLastMessage } from '@/lib/chat/lastMessage';
+import { canSeeDemoSandbox } from '@/lib/chat/sandboxStaff';
 import { ChatChannel, FieldRole } from '@/types';
 
 // Who the Firestore chat rules let read channels and receipts: active users and
@@ -50,6 +51,7 @@ export function useChatChannels({ enabled = true }: { enabled?: boolean } = {}) 
   // Disabled when the rep shell already shares its live list (useSharedChatChannels).
   const uid = enabled && user && canSubscribeToChat(user) ? user.uid : undefined;
   const key = uid ? `${uid}:${attempt}` : '';
+  const seesSandbox = !!user && canSeeDemoSandbox(user);
 
   useEffect(() => {
     if (!db || !uid) return;
@@ -65,6 +67,9 @@ export function useChatChannels({ enabled = true }: { enabled?: boolean } = {}) 
       q,
       (snapshot) => {
         const next = snapshot.docs
+          // Defense in depth: the demo sandbox shows only for demo accounts and
+          // Jacob, even if a stale memberIds entry still lists someone else.
+          .filter((doc) => seesSandbox || doc.data().demoSandbox !== true)
           .map((doc) => {
             const data = doc.data();
             return {
@@ -88,7 +93,7 @@ export function useChatChannels({ enabled = true }: { enabled?: boolean } = {}) 
         setFailure({ key: listenKey, message: 'Failed to load live channels' });
       }
     );
-  }, [uid, attempt]);
+  }, [uid, attempt, seesSandbox]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 

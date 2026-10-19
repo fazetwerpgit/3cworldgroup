@@ -17,6 +17,8 @@ export interface ChatUser {
   canModerate: boolean;
   /** users/{uid}.demoAccount === true: denied every channel except a demo sandbox, extras included. */
   demoAccount: boolean;
+  /** The account email (email or the older Email field), used to recognize sandbox staff. */
+  email?: string;
   /** Whether they accepted the one-time chat agreement (users/{uid}.chatTermsAcceptedAt). */
   chatTermsAccepted?: boolean;
 }
@@ -44,8 +46,8 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
   }
 
   // A demo account has no role, so it reaches no audience: the only channel it
-  // can read or post in is a demo sandbox (userCanAccessChannelDoc), which real
-  // users other than admins/owners never see.
+  // can read or post in is a demo sandbox (userCanAccessChannelDoc), which no
+  // real user other than Jacob ever sees.
   const demoAccount = isDemoAccount(data);
   const { role, fieldRole } = demoAccount ? {} : resolveRoles(data.role, data.fieldRole);
 
@@ -62,6 +64,7 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
       effectiveRole: getEffectiveRole({ role, fieldRole }),
       canModerate: isManagementRole(role),
       demoAccount,
+      email: gate.email || undefined,
       chatTermsAccepted: !!data.chatTermsAcceptedAt,
     },
   };

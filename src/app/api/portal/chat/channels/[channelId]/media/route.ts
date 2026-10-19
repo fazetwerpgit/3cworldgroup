@@ -45,7 +45,7 @@ export async function GET(
     if (!channel) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!userCanAccessChannelDoc(data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
+    if (!userCanAccessChannelDoc(data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

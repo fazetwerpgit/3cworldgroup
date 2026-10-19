@@ -14,13 +14,16 @@ in production, done by an owner/admin. Do it before submitting a build.
   (App Store guideline 1.2) without reaching a real person:
   - A demo account can read and post ONLY in a sandbox channel. Every other
     channel denies it, even if its uid sits in `extraMemberIds`.
-  - A sandbox's `memberIds` is demo accounts plus admins/owners, set by the
+  - A sandbox's `memberIds` is demo accounts plus Jacob only
+    (`lib/chat/sandboxStaff.ts`, by uid or email), set by the
     channel sync and by each person's channel-list reconcile. Audience and
     `extraMemberIds` are ignored there; the admin "add member" and "change
     audience" actions refuse a sandbox.
-  - Reps, managers and operations never see the channel. Admins/owners do,
-    so they can moderate it, and they get its pushes. It shows in their
-    channel list as "Demo Team".
+  - No other real user ever sees the channel: not reps, managers or
+    operations, and not other admins or owners. A stale `memberIds` entry
+    does not let them in; the next sync drops it. Jacob moderates it, gets
+    its pushes, and sees it in his channel list as "Demo Team". Real authors
+    are stored as "3C Team" on its messages.
   - Its messages appear nowhere else: leaderboard callouts and the owner
     book read only `all-company`, the company tape reads sales, and Ask reads
     no chat.
@@ -56,9 +59,8 @@ in production, done by an owner/admin. Do it before submitting a build.
    `audience` must be a valid value for the channel to parse, but it is not
    used for a sandbox. `memberIds` is filled by step 5.
 
-   Note for admins and owners: "Demo Team" is the App Review demo channel.
-   Only the demo accounts and admins/owners are in it, and no real rep reads
-   it. Do not use it for team messages. Leave it alone except to moderate a
+   Note: "Demo Team" is the App Review demo channel. Only the demo accounts
+   and Jacob are in it, and no other real person reads it. Do not use it for team messages. Leave it alone except to moderate a
    report, and archive it as below when review is done.
 
 4. **Seed a few messages** from the second demo user under

@@ -65,7 +65,7 @@ export async function GET(
     if (!channel) {
       return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
     }
-    if (!userCanAccessChannelDoc(data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
+    if (!userCanAccessChannelDoc(data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email })) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -120,7 +120,7 @@ export async function GET(
         };
       })
       .sort((a, b) => a.readAt.localeCompare(b.readAt) || a.name.localeCompare(b.name));
-    // A demo caller (App Review) reads the sandbox alongside admins/owners and
+    // A demo caller (App Review) reads the sandbox alongside Jacob and
     // must never see their real names, photos or uids.
     const visibleReaders = redactPeople(readers, createDemoRedactor(user), { idKey: 'uid', nameKey: 'name' });
 

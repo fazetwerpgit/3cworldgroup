@@ -1,7 +1,7 @@
 import { isDemoSandboxChannel } from '@/lib/chat/channels';
 
 // The App Review demo sandbox (a channel doc with demoSandbox: true) holds the
-// demo accounts plus every active admin and owner. Demo accounts read message
+// demo accounts plus Jacob (lib/chat/sandboxStaff). Demo accounts read message
 // docs straight from Firestore, so a real person's name must never be STORED on
 // a sandbox message: whoever posts, a non-demo author is stamped with this
 // stand-in instead (on the message, its reply quotes, the channel preview and
