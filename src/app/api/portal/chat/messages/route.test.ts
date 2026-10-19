@@ -249,6 +249,27 @@ const CHANNEL_DOCS: Record<string, Record<string, unknown>> = {
     memberIds: ['mgr-1', 'real-uid'],
     extraMemberIds: ['real-uid'],
   },
+  // A demo sandbox (demo accounts and admins/owners only) and an archived
+  // channel (no one): reachable for removal only through an open report.
+  sandbox: {
+    id: 'sandbox',
+    name: 'Sandbox',
+    description: 'Demo sandbox',
+    audience: 'all',
+    order: 9,
+    active: true,
+    demoSandbox: true,
+    memberIds: [],
+  },
+  archived: {
+    id: 'archived',
+    name: 'Archived',
+    description: 'Archived channel',
+    audience: 'all',
+    order: 10,
+    active: false,
+    memberIds: [],
+  },
 };
 
 vi.mock('@/lib/firebase/admin', () => ({
@@ -272,6 +293,9 @@ vi.mock('@/lib/firebase/admin', () => ({
           }
         : name === 'chatReports'
         ? {
+            doc: (id: string) => ({
+              get: async () => ({ id, exists: id in CHAT_REPORTS, data: () => CHAT_REPORTS[id] }),
+            }),
             where: (_field: string, _op: string, messageId: string) => ({
               get: async () => {
                 if (reportsQueryError) throw reportsQueryError;
@@ -1043,6 +1067,56 @@ describe('DELETE /api/portal/chat/messages', () => {
     } finally {
       MESSAGE_DOCS['others-msg'].deletedAt = null;
     }
+  });
+});
+
+describe('DELETE /api/portal/chat/messages (moderator acting on a report)', () => {
+  function deleteReq(body: unknown) {
+    return new NextRequest('http://localhost/api/portal/chat/messages', {
+      method: 'DELETE',
+      body: JSON.stringify(body),
+    });
+  }
+  const OPERATIONS = { ok: true, user: { ...MODERATOR.user, uid: 'ops-uid', role: 'operations', effectiveRole: 'operations' } };
+  function report(channelId: string, status = 'open') {
+    CHAT_REPORTS['others-msg_reporter'] = { channelId, messageId: 'others-msg', status };
+  }
+
+  it('lets operations remove a reported message in a demo sandbox', async () => {
+    mockGate.mockResolvedValue(OPERATIONS);
+    report('sandbox');
+    const res = await DELETE(deleteReq({ channelId: 'sandbox', messageId: 'others-msg', reportId: 'others-msg_reporter' }));
+    expect(res.status).toBe(200);
+    expect(msgSetMock.mock.calls[0][0]).toMatchObject({ deletedBy: 'ops-uid', text: '' });
+  });
+
+  it('lets an admin remove a reported message from a channel archived since', async () => {
+    mockGate.mockResolvedValue(MODERATOR);
+    report('archived');
+    const res = await DELETE(deleteReq({ channelId: 'archived', messageId: 'others-msg', reportId: 'others-msg_reporter' }));
+    expect(res.status).toBe(200);
+  });
+
+  it('still refuses without an open report on that exact message', async () => {
+    mockGate.mockResolvedValue(OPERATIONS);
+    expect((await DELETE(deleteReq({ channelId: 'sandbox', messageId: 'others-msg' }))).status).toBe(403);
+    report('sandbox', 'dismissed');
+    expect(
+      (await DELETE(deleteReq({ channelId: 'sandbox', messageId: 'others-msg', reportId: 'others-msg_reporter' }))).status
+    ).toBe(403);
+    report('archived');
+    expect(
+      (await DELETE(deleteReq({ channelId: 'sandbox', messageId: 'others-msg', reportId: 'others-msg_reporter' }))).status
+    ).toBe(403);
+    expect(msgSetMock).not.toHaveBeenCalled();
+  });
+
+  it('never lets a non-moderator in through a report', async () => {
+    mockGate.mockResolvedValue(VERIFIED);
+    report('archived');
+    const res = await DELETE(deleteReq({ channelId: 'archived', messageId: 'others-msg', reportId: 'others-msg_reporter' }));
+    expect(res.status).toBe(403);
+    expect(msgSetMock).not.toHaveBeenCalled();
   });
 });
 

@@ -17,6 +17,7 @@ import {
   validateMessageAttachment,
 } from '@/lib/chat/media';
 import { userRateLimited } from '@/lib/userRateLimits';
+import { isSafeDocId } from '@/lib/chat/moderationShared';
 
 // What a reply quote shows once its source message is deleted.
 const DELETED_REPLY_TEXT = 'Message deleted';
@@ -475,6 +476,14 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+// Whether chatReports/{reportId} is an open report on this channel's message.
+async function isOpenReportOn(reportId: unknown, channelId: string, messageId: string): Promise<boolean> {
+  if (!isSafeDocId(reportId)) return false;
+  const snap = await adminDb!.collection('chatReports').doc(reportId).get();
+  const data = snap.exists ? snap.data() : undefined;
+  return data?.status === 'open' && data.channelId === channelId && data.messageId === messageId;
+}
+
 // DELETE — author (self) or a moderator (admin/operations) can soft-delete.
 export async function DELETE(request: NextRequest) {
   try {
@@ -491,7 +500,14 @@ export async function DELETE(request: NextRequest) {
     }
 
     const found = await getFirestoreChatChannel(channelId);
-    if (!found || !userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount })) {
+    const canAccess =
+      !!found &&
+      userCanAccessChannelDoc(found.data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount });
+    // A moderator removing a reported message from the Chat reports queue may
+    // not reach the channel itself (operations on a demo sandbox, anyone on a
+    // channel archived after the report): the open report on this exact
+    // message is what lets them act on it.
+    if (!found || (!canAccess && !(user.canModerate && (await isOpenReportOn(body.reportId, channelId, messageId))))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

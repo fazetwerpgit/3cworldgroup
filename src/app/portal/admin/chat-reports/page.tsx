@@ -23,6 +23,7 @@ import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import r from './chat-reports.module.css';
+import { loadReportList, type ReportPage } from './reportList';
 
 // Chat reports (App Store guideline 1.2): messages people reported from the
 // chat long-press menu. Remove message soft-deletes it through the chat's own
@@ -31,6 +32,17 @@ import r from './chat-reports.module.css';
 // oldest first, resolved ones most recently handled first, a page at a time.
 
 type View = 'open' | 'resolved';
+
+async function fetchReportPage(which: View, cursor: string | null): Promise<ReportPage> {
+  const query = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+  const res = await authedFetch(`/api/portal/admin/chat-reports?status=${which}${query}`);
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || 'Failed to load');
+  return {
+    reports: Array.isArray(json.reports) ? json.reports : [],
+    nextCursor: typeof json.nextCursor === 'string' ? json.nextCursor : null,
+  };
+}
 
 function when(isoValue: string | null): string {
   if (!isoValue) return '';
@@ -112,20 +124,37 @@ function ChatReports() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
+  // The tab and rows in force right now, read when a load lands: a response for
+  // a tab the admin already left is dropped instead of replacing the shown one.
+  // (Synced before the load effect below runs, which is declared after this.)
+  const viewRef = useRef(view);
+  const rowsRef = useRef(rows);
+  useEffect(() => {
+    viewRef.current = view;
+    rowsRef.current = rows;
+  }, [view, rows]);
+
   const load = useCallback(async (which: View, background = false) => {
     if (!background) {
       setLoadError('');
       setMoreError('');
     }
+    // A background refresh (resume, pull) keeps the "Load more" pages on screen.
+    const prev = rowsRef.current;
+    const atLeast = background && prev?.view === which ? prev.reports.length : 0;
     try {
-      const res = await authedFetch(`/api/portal/admin/chat-reports?status=${which}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Failed to load');
-      setRows({ view: which, reports: json.reports, nextCursor: typeof json.nextCursor === 'string' ? json.nextCursor : null });
+      const list = await loadReportList({
+        which,
+        atLeast,
+        fetchPage: (cursor) => fetchReportPage(which, cursor),
+        currentView: () => viewRef.current,
+      });
+      if (!list) return;
+      setRows({ view: which, ...list });
       setLoadError('');
     } catch (err) {
       // A background refresh that fails keeps the list on screen.
-      if (!background) setLoadError(err instanceof Error ? err.message : 'Failed to load');
+      if (!background && viewRef.current === which) setLoadError(err instanceof Error ? err.message : 'Failed to load');
     }
   }, []);
 
@@ -195,7 +224,9 @@ function ChatReports() {
         // A message the author or a moderator already deleted is gone either way.
         const del = await authedFetch('/api/portal/chat/messages', {
           method: 'DELETE',
-          body: JSON.stringify({ channelId: report.channelId, messageId: report.messageId }),
+          // The report lets a moderator remove it even from a channel they
+          // cannot open (a demo sandbox, or one archived since).
+          body: JSON.stringify({ channelId: report.channelId, messageId: report.messageId, reportId: report.id }),
         });
         if (!del.ok && del.status !== 404) {
           const json = await del.json().catch(() => ({}));
