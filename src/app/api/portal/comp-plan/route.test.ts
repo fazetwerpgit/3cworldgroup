@@ -56,10 +56,11 @@ const mockManagement = requireVerifiedManagement as unknown as ReturnType<typeof
 function get() {
   return new NextRequest('http://localhost/api/portal/comp-plan');
 }
-function put(body: unknown) {
+// The editor echoes the updatedAt it loaded; null is the pre-seed state.
+function put(body: Record<string, unknown>) {
   return new NextRequest('http://localhost/api/portal/comp-plan', {
     method: 'PUT',
-    body: JSON.stringify(body),
+    body: JSON.stringify({ baseUpdatedAt: null, ...body }),
   });
 }
 
@@ -269,6 +270,57 @@ describe('PUT /api/portal/comp-plan', () => {
     expect(details?.rates).toEqual([
       { path: 'ae_tier_1.att.att-1gig', from: COMP_PLAN_RATES.ae_tier_1!.att!['att-1gig'], to: COMP_PLAN_RATES.ae_tier_1!.att!['att-1gig'] + 10 },
     ]);
+  });
+});
+
+describe('PUT /api/portal/comp-plan — concurrent owner edits', () => {
+  const SAVED_AT = new Date('2026-10-01T15:00:00.000Z');
+  const OWNER = { ok: true, uid: 'o1', name: 'Owner', isAdmin: true, isOwner: true };
+
+  beforeEach(() => {
+    docs.set('compPlan', {
+      rates: { ae_tier_1: { att: { 'att-1gig': 150 } } },
+      updatedAt: { toDate: () => SAVED_AT },
+    });
+  });
+
+  it('refuses a save made from a copy older than the stored plan', async () => {
+    mockManagement.mockResolvedValue(OWNER);
+    const res = await PUT(put({
+      rates: { ae_tier_1: { att: { 'att-1gig': 175 } } },
+      baseUpdatedAt: '2026-09-30T12:00:00.000Z',
+    }));
+    expect(res.status).toBe(409);
+    expect(setSpy).not.toHaveBeenCalled();
+    expect(writeAdminAudit).not.toHaveBeenCalled();
+  });
+
+  it('refuses a save from an editor that never loaded the stored plan', async () => {
+    // A failed first load leaves updatedAt null and the rates empty.
+    mockManagement.mockResolvedValue(OWNER);
+    const res = await PUT(put({ rates: { ae_tier_1: { att: { 'att-1gig': 0 } } }, margin: {}, baseUpdatedAt: null }));
+    expect(res.status).toBe(409);
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it('refuses a save with no baseUpdatedAt', async () => {
+    mockManagement.mockResolvedValue(OWNER);
+    const req = new NextRequest('http://localhost/api/portal/comp-plan', {
+      method: 'PUT',
+      body: JSON.stringify({ rates: { ae_tier_1: { att: { 'att-1gig': 175 } } } }),
+    });
+    expect((await PUT(req)).status).toBe(400);
+    expect(setSpy).not.toHaveBeenCalled();
+  });
+
+  it('accepts a save made from the current copy', async () => {
+    mockManagement.mockResolvedValue(OWNER);
+    const res = await PUT(put({
+      rates: { ae_tier_1: { att: { 'att-1gig': 175 } } },
+      baseUpdatedAt: SAVED_AT.toISOString(),
+    }));
+    expect(res.status).toBe(200);
+    expect(setSpy).toHaveBeenCalledTimes(1);
   });
 });
 

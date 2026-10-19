@@ -157,7 +157,14 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { rates, margin, version } = body ?? {};
+    const { rates, margin, version, baseUpdatedAt } = body ?? {};
+
+    // Optimistic concurrency: the client echoes the updatedAt it loaded (null
+    // before the first save). Each save replaces the whole document, so a save
+    // from a stale copy would silently revert another owner's edit.
+    if (baseUpdatedAt !== null && typeof baseUpdatedAt !== 'string') {
+      return NextResponse.json({ error: 'Missing required field: baseUpdatedAt' }, { status: 400 });
+    }
 
     if (!rates || typeof rates !== 'object' || Array.isArray(rates)) {
       return NextResponse.json({ error: 'Missing required field: rates' }, { status: 400 });
@@ -176,7 +183,17 @@ export async function PUT(request: NextRequest) {
 
     // Diff against the plan that was in effect, which is the committed plan
     // until the first save; the same loaders GET uses.
-    const [{ rates: previousRates }, previousMargin] = await Promise.all([loadRates(), loadMargin()]);
+    const [{ rates: previousRates, updatedAt: storedUpdatedAt }, previousMargin] = await Promise.all([
+      loadRates(),
+      loadMargin(),
+    ]);
+    const storedIso = storedUpdatedAt ? storedUpdatedAt.toISOString() : null;
+    if (baseUpdatedAt !== storedIso) {
+      return NextResponse.json(
+        { error: 'The comp plan was changed since you opened it. Reload and make your edits again.' },
+        { status: 409 },
+      );
+    }
 
     const updatedAt = new Date();
     await adminDb.collection('config').doc(RATES_DOC).set({

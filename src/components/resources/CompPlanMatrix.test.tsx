@@ -25,7 +25,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
     new Response(
-      JSON.stringify(init?.method === 'PUT' ? { success: true } : { rates: RATES, margin: {}, version: '7.1' }),
+      JSON.stringify(init?.method === 'PUT' ? { success: true } : { rates: RATES, margin: {}, version: '7.1', updatedAt: '2026-10-01T15:00:00.000Z' }),
       { status: 200 },
     ),
   );
@@ -85,5 +85,28 @@ describe('CompPlanMatrix', () => {
     expect(body.rates.ibo_level_1).toEqual(RATES.ibo_level_1);
     expect(body.rates.ibo_level_4).toEqual(RATES.ibo_level_4);
     expect(body.rates.operations).toEqual(RATES.operations);
+  });
+
+  it('offers no Edit plan after a failed load, so empty rates can never be saved', async () => {
+    fetchMock.mockImplementation(async () => {
+      throw new TypeError('Load failed');
+    });
+    await act(async () => root.render(<CompPlanMatrix />));
+    await flush();
+    expect(container.textContent).toContain('Load failed');
+    expect(() => button('Edit plan')).toThrow();
+    expect(fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'PUT')).toBe(false);
+  });
+
+  it('sends the updatedAt it loaded so a stale save can be refused', async () => {
+    await act(async () => root.render(<CompPlanMatrix />));
+    await flush();
+    act(() => button('Edit plan').click());
+    await act(async () => button('Save plan').click());
+    await flush();
+
+    const put = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PUT');
+    const body = JSON.parse((put![1] as RequestInit).body as string);
+    expect(body.baseUpdatedAt).toBe('2026-10-01T15:00:00.000Z');
   });
 });

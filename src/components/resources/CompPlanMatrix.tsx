@@ -56,6 +56,9 @@ export function CompPlanMatrix() {
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
   const [updatedByName, setUpdatedByName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Editing starts from the loaded plan; after a failed load the rates are
+  // empty, and saving that draft would replace the whole plan with zeros.
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editing, setEditing] = useState(false);
@@ -78,6 +81,7 @@ export function CompPlanMatrix() {
       setVersion(json.version ?? '');
       setUpdatedAt(json.updatedAt ?? null);
       setUpdatedByName(json.updatedByName ?? null);
+      setLoaded(true);
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load comp plan');
@@ -91,6 +95,7 @@ export function CompPlanMatrix() {
   }, [fetchPlan]);
 
   const startEditing = () => {
+    if (!loaded) return;
     setDraft(rates);
     setMarginDraft(margin);
     setEditing(true);
@@ -116,6 +121,7 @@ export function CompPlanMatrix() {
   };
 
   const handleSave = async () => {
+    if (!loaded) return;
     setSaving(true);
     setError('');
     try {
@@ -123,7 +129,8 @@ export function CompPlanMatrix() {
       const response = await fetch('/api/portal/comp-plan', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token ?? ''}` },
-        body: JSON.stringify({ rates: draft, margin: marginDraft, version }),
+        // baseUpdatedAt lets the server refuse a save made from a stale copy.
+        body: JSON.stringify({ rates: draft, margin: marginDraft, version, baseUpdatedAt: updatedAt }),
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to save');
@@ -146,7 +153,7 @@ export function CompPlanMatrix() {
     <section aria-labelledby="comp-plan-title">
       <div className={c.head}>
         <h2 id="comp-plan-title" className={c.title}>Comp plan</h2>
-        {!editing && !loading && (
+        {!editing && !loading && loaded && (
           <button className={p.headLink} type="button" onClick={startEditing}>
             <Edit3 size={14} aria-hidden="true" /> Edit plan
           </button>
