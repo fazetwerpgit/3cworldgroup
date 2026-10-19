@@ -105,8 +105,11 @@ function preheader(digest: RepDigest): string {
   const { total } = digest;
   if (total.count) {
     parts.push(`${total.count} installed`);
-    const est = fullEstimate(digest);
-    if (est !== null) parts.push(`est. ${money(est)}`);
+    if (total.estAmount !== null) {
+      // Owner's call: a partial estimate says how many installs it covers.
+      const partial = total.estCount === total.count ? '' : ` (${total.estCount} of ${total.count})`;
+      parts.push(`est. ${money(total.estAmount)}${partial}`);
+    }
   }
   if (digest.upcoming.length) parts.push(`${digest.upcoming.length} coming up`);
   const undated = digest.needsDate.length + digest.needsDateMore;
