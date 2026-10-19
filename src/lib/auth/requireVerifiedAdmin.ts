@@ -89,6 +89,15 @@ async function verifyCaller(
   return { ok: true, uid, data };
 }
 
+// Legacy users docs store the address only under 'Email' (capital E); see
+// lib/email/userEmail.ts. Read both so a gate never stamps an empty email.
+function callerEmail(data: FirebaseFirestore.DocumentData): string {
+  for (const raw of [data.email, data.Email]) {
+    if (typeof raw === 'string' && raw.trim()) return raw.trim();
+  }
+  return '';
+}
+
 // Verifies a real token and confirms the caller is any active user (for rep
 // self-submit). Returns the verified uid + name/email — the route stamps from this,
 // never from client input. `isOwner` lets a route open a feature to the owner first.
@@ -116,8 +125,8 @@ export async function requireVerifiedUser(
   return {
     ok: true,
     uid: c.uid,
-    name: c.data.displayName || c.data.email || c.uid,
-    email: c.data.email || '',
+    name: c.data.displayName || callerEmail(c.data) || c.uid,
+    email: callerEmail(c.data),
     isOwner: isOwner(role),
     // Admin or owner: may open any sale (same rule as GET /api/portal/sales/[id]).
     isAdmin: isAdminLevel(role),
@@ -147,7 +156,7 @@ export async function requireVerifiedManagement(
   return {
     ok: true,
     uid: c.uid,
-    name: c.data.displayName || c.data.email || 'Manager',
+    name: c.data.displayName || callerEmail(c.data) || 'Manager',
     isAdmin: isAdminLevel(role),
     isOwner: isOwner(role),
   };
@@ -176,7 +185,7 @@ export async function requireVerifiedSelfOrManagement(
   return {
     ok: true,
     uid: c.uid,
-    name: c.data.displayName || c.data.email || c.uid,
+    name: c.data.displayName || callerEmail(c.data) || c.uid,
     isManagement,
     isOwner: isOwner(role),
   };
@@ -200,8 +209,8 @@ export async function requireVerifiedFieldManagerOrManagement(
   return {
     ok: true,
     uid: c.uid,
-    name: c.data.displayName || c.data.email || c.uid,
-    email: c.data.email || '',
+    name: c.data.displayName || callerEmail(c.data) || c.uid,
+    email: callerEmail(c.data),
   };
 }
 
@@ -220,7 +229,7 @@ export async function requireVerifiedAdmin(
   if (!isAdminLevel(role)) {
     return { ok: false, error: 'Forbidden: admin access required', status: 403 };
   }
-  return { ok: true, uid: c.uid, name: c.data.displayName || c.data.email || 'Admin' };
+  return { ok: true, uid: c.uid, name: c.data.displayName || callerEmail(c.data) || 'Admin' };
 }
 
 // Verifies a real token and returns the caller's full resolved identity — the
@@ -258,8 +267,8 @@ export async function requireVerifiedRequester(
   return {
     ok: true,
     uid: c.uid,
-    name: c.data.displayName || c.data.email || 'User',
-    email: c.data.email || '',
+    name: c.data.displayName || callerEmail(c.data) || 'User',
+    email: callerEmail(c.data),
     role,
     fieldRole,
     isManagement,

@@ -515,3 +515,45 @@ describe('revocation check is opt-in', () => {
     expect(res).toMatchObject({ ok: false, status: 401 });
   });
 });
+
+describe('legacy capital-E Email field', () => {
+  // Older users docs store the address only as 'Email' (lib/email/userEmail.ts);
+  // the forms routes stamp gate.email as repEmail, so it must not come back ''.
+  it('requireVerifiedUser falls back to Email for email and name', async () => {
+    userDoc({ status: 'active', fieldRole: 'entry_rep', Email: ' legacy@x.com ' });
+    const res = await requireVerifiedUser(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.email).toBe('legacy@x.com');
+      expect(res.name).toBe('legacy@x.com');
+    }
+  });
+
+  it('requireVerifiedFieldManagerOrManagement falls back to Email', async () => {
+    userDoc({ status: 'active', fieldRole: 'l1_manager', displayName: 'Mgr', Email: 'm@x.com' });
+    const res = await requireVerifiedFieldManagerOrManagement(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.email).toBe('m@x.com');
+  });
+
+  it('requireVerifiedRequester falls back to Email, preferring lowercase email', async () => {
+    userDoc({ status: 'active', fieldRole: 'entry_rep', Email: 'old@x.com' });
+    const legacy = await requireVerifiedRequester(req());
+    expect(legacy.ok && legacy.email).toBe('old@x.com');
+    userDoc({ status: 'active', fieldRole: 'entry_rep', email: 'new@x.com', Email: 'old@x.com' });
+    const both = await requireVerifiedRequester(req());
+    expect(both.ok && both.email).toBe('new@x.com');
+  });
+
+  it('a blank lowercase email still falls back to Email', async () => {
+    userDoc({ status: 'active', fieldRole: 'entry_rep', email: '', Email: 'old@x.com' });
+    const res = await requireVerifiedUser(req());
+    expect(res.ok && res.email).toBe('old@x.com');
+  });
+
+  it('returns empty email when neither field is set', async () => {
+    userDoc({ status: 'active', fieldRole: 'entry_rep', displayName: 'Rep' });
+    const res = await requireVerifiedUser(req());
+    expect(res.ok && res.email).toBe('');
+  });
+});
