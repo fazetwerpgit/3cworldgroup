@@ -45,8 +45,12 @@ export async function sendPushToUser(uid: string, payload: PushPayload): Promise
   }
 }
 
-function isDeadTokenError(code: string): boolean {
-  return code.includes('registration-token-not-registered') || code.includes('invalid-argument');
+// Only the two codes that say the TOKEN is dead. `messaging/invalid-argument`
+// is also what FCM returns when the MESSAGE is bad (too large, a bad APNs
+// field or badge), so pruning on it could strip every recipient's valid tokens
+// over one bad announcement. Logged, never pruned.
+export function isDeadTokenError(code: string): boolean {
+  return code === 'messaging/registration-token-not-registered' || code === 'messaging/invalid-registration-token';
 }
 
 // The send itself, for callers that already hold the user's tokens (the
@@ -109,7 +113,10 @@ export async function sendPushToTokens(
     const deadOf = (res: typeof webRes, list: string[]) => {
       const dead: string[] = [];
       res?.responses.forEach((r, i) => {
-        if (!r.success && isDeadTokenError(r.error?.code ?? '')) dead.push(list[i]);
+        if (r.success) return;
+        const code = r.error?.code ?? '';
+        if (isDeadTokenError(code)) dead.push(list[i]);
+        else if (code === 'messaging/invalid-argument') console.warn('Push rejected (payload, token kept)', uid, r.error?.message);
       });
       return dead;
     };

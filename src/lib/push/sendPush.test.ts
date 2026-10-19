@@ -36,7 +36,7 @@ vi.mock('firebase-admin/firestore', () => ({
 
 vi.mock('./unreadBadge', () => ({ unreadChatBadge }));
 
-import { pushTargetsOf, sendPushToTokens, sendPushToUser } from './sendPush';
+import { isDeadTokenError, pushTargetsOf, sendPushToTokens, sendPushToUser } from './sendPush';
 
 type Multicast = {
   tokens: string[];
@@ -233,13 +233,29 @@ describe('native (3C iOS app) tokens', () => {
 
   it('only touches the native list when only native tokens died', async () => {
     sendEachForMulticast.mockImplementation(async (m: Multicast) => ({
-      responses: m.tokens.map(() => ({ success: false, error: { code: 'messaging/invalid-argument' } })),
+      responses: m.tokens.map(() => ({ success: false, error: { code: 'messaging/invalid-registration-token' } })),
     }));
     await sendPushToTokens('user-1', { web: [], native: ['n1'] }, payload);
     expect(userSet).toHaveBeenCalledWith(
       { nativePushTokens: { __arrayRemove: [{ token: 'n1', platform: 'ios-native' }] } },
       { merge: true }
     );
+  });
+
+  it('never prunes on invalid-argument: the payload was bad, not the token', async () => {
+    sendEachForMulticast.mockImplementation(async (m: Multicast) => ({
+      responses: m.tokens.map(() => ({ success: false, error: { code: 'messaging/invalid-argument', message: 'too big' } })),
+    }));
+    const result = await sendPushToTokens('user-1', { web: ['w1'], native: ['n1'] }, payload);
+    expect(result).toEqual({ delivered: 0, failed: 2, pruned: 0 });
+    expect(userSet).not.toHaveBeenCalled();
+  });
+
+  it('isDeadTokenError matches only the two dead-token codes', () => {
+    expect(isDeadTokenError('messaging/registration-token-not-registered')).toBe(true);
+    expect(isDeadTokenError('messaging/invalid-registration-token')).toBe(true);
+    expect(isDeadTokenError('messaging/invalid-argument')).toBe(false);
+    expect(isDeadTokenError('messaging/internal-error')).toBe(false);
   });
 
   it('an APNs-side failure does not lose the web count', async () => {
