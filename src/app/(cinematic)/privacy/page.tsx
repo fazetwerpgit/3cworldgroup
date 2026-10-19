@@ -1,8 +1,7 @@
-import Link from "next/link";
 import type { Metadata } from "next";
-import { ArrowRight } from "lucide-react";
 import kit from "../../_cinematic/cinematic.module.css";
 import LegalSection from "../_legal/LegalSection";
+import { LegalContactButton, LegalContactFormItem } from "../_legal/LegalContact";
 import AppLegalBar from "../../_cinematic/AppLegalBar";
 import styles from "../_legal/legal.module.css";
 
@@ -447,22 +446,14 @@ export default function PrivacyPolicyPage() {
                     privacy@3cworldgroup.com
                   </a>
                 </li>
-                <li>
-                  <strong>Contact form:</strong>{" "}
-                  <Link href="/contact" className={kit.inlineLink}>
-                    3cworldgroup.com/contact
-                  </Link>
-                </li>
+                <LegalContactFormItem linkClassName={kit.inlineLink} />
               </ul>
             </LegalSection>
           </div>
 
           <div className={styles.close}>
             <p>Have questions? We&apos;re here to help.</p>
-            <Link href="/contact" className={`${kit.btn} ${kit.btnLime}`}>
-              Contact Us
-              <ArrowRight aria-hidden="true" className={kit.btnArrow} size={16} strokeWidth={2.2} />
-            </Link>
+            <LegalContactButton className={`${kit.btn} ${kit.btnLime}`} arrowClassName={kit.btnArrow} />
           </div>
         </div>
       </section>
