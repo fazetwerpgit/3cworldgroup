@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { askAndEnablePush } from '@/lib/push/enablePushOnDevice';
+import { reportPushHealth } from '@/lib/push/reportPushHealth';
 import { Check } from 'lucide-react';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -34,7 +35,10 @@ export default function PushNotificationsCard() {
   const enable = () => {
     setState('working');
     setError('');
-    void askAndEnablePush().then(({ result }) => {
+    void askAndEnablePush().then(({ result, permission, detail }) => {
+      // Same beacon PushNudge sends after its "Turn on" tap, so users/{uid}.pushHealth
+      // reflects this attempt (including token/register failures) right away.
+      void reportPushHealth({ supported: true, permission, result: `${result} / ${detail}` });
       if (result === 'enabled') {
         setState('on');
         return;
