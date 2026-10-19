@@ -76,7 +76,12 @@ export function tallyBoard(
 
   for (const sale of counted) {
     const time = saleTime(sale);
-    const record: SaleRecord = { salesRepId: sale.salesRepId, saleDate: new Date(time), totalPoints: sale.totalPoints || 0 };
+    const record: SaleRecord = {
+      salesRepId: sale.salesRepId,
+      saleDate: new Date(time),
+      totalPoints: sale.totalPoints || 0,
+      salesRepName: sale.salesRepName || 'Unknown',
+    };
     allSales.push(record);
     if (!(time >= startTime) || !(time < endTime)) continue;
     periodSales.push(record);

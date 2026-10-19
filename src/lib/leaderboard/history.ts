@@ -1,6 +1,7 @@
 // Pure rank-history helpers for the leaderboard. No Firestore imports — the
 // API route passes in plain sale records so all of this is unit-testable.
 
+import { boardOrder } from '@/lib/leaderboard/order';
 import { INSTALL_DATE_TIME_ZONE } from '@/lib/sales/saleDate';
 
 // The company's clock (US Central), the same one every leaderboard period uses
@@ -12,6 +13,8 @@ export interface SaleRecord {
   salesRepId: string;
   saleDate: Date;
   totalPoints: number;
+  /** The board's tie-break (boardOrder: name A to Z, then id). */
+  salesRepName?: string;
 }
 
 export interface HistoryEnrichment {
@@ -57,18 +60,21 @@ function ranksAsOfDay(
   cutoffKey: string,
   metric: HistoryMetric,
 ): Map<string, number> {
-  const agg = new Map<string, { totalSales: number; totalPoints: number }>();
+  const agg = new Map<string, { totalSales: number; totalPoints: number; name: string }>();
   for (const s of periodSales) {
     if (dayKey(s.saleDate) > cutoffKey) continue;
-    const cur = agg.get(s.salesRepId) ?? { totalSales: 0, totalPoints: 0 };
+    const cur = agg.get(s.salesRepId) ?? { totalSales: 0, totalPoints: 0, name: s.salesRepName ?? '' };
     cur.totalSales += 1;
     cur.totalPoints += s.totalPoints;
     agg.set(s.salesRepId, cur);
   }
+  // The board's own order (boardOrder), so a tie ranks the same here as on
+  // the row and never shows as movement or a spark jump.
   const sorted = [...agg.entries()].sort((a, b) =>
-    metric === 'totalSales'
-      ? b[1].totalSales - a[1].totalSales
-      : b[1].totalPoints - a[1].totalPoints,
+    boardOrder(
+      { score: a[1][metric], name: a[1].name, id: a[0] },
+      { score: b[1][metric], name: b[1].name, id: b[0] },
+    ),
   );
   return new Map(sorted.map(([repId], index) => [repId, index + 1]));
 }

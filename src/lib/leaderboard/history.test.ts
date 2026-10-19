@@ -155,4 +155,44 @@ describe('computeHistory', () => {
     expect(result.get('B')!.movement).toBe(0);
     expect(result.get('A')!.movement).toBe(0);
   });
+
+  it('breaks score ties the way the board does (name A-Z, then id), not by sale order', () => {
+    // Zed sold first, but tied on points the board puts Amy above Zed.
+    const periodSales: SaleRecord[] = [
+      { ...sale('z', '2026-07-08T16:00:00Z', 10), salesRepName: 'Zed' },
+      { ...sale('a', '2026-07-09T16:00:00Z', 10), salesRepName: 'Amy' },
+    ];
+    const result = computeHistory({
+      periodSales,
+      allSales: periodSales,
+      currentRanks: new Map([['a', 1], ['z', 2]]),
+      periodStartKey: '2026-07-06',
+      metric: 'totalPoints',
+      now,
+    });
+    expect(result.get('a')!.movement).toBe(0);
+    expect(result.get('z')!.movement).toBe(0);
+    // Today's spark point matches the row's rank.
+    expect(result.get('a')!.spark.at(-1)).toBe(1);
+    expect(result.get('z')!.spark.at(-1)).toBe(2);
+    // 07-08: only Zed had sold, so he led alone.
+    expect(result.get('z')!.spark[4]).toBe(1);
+  });
+
+  it('breaks a full name tie by rep id', () => {
+    const periodSales: SaleRecord[] = [
+      { ...sale('r2', '2026-07-08T16:00:00Z', 10), salesRepName: 'Sam' },
+      { ...sale('r1', '2026-07-08T17:00:00Z', 10), salesRepName: 'Sam' },
+    ];
+    const result = computeHistory({
+      periodSales,
+      allSales: periodSales,
+      currentRanks: new Map([['r1', 1], ['r2', 2]]),
+      periodStartKey: '2026-07-06',
+      metric: 'totalSales',
+      now,
+    });
+    expect(result.get('r1')!.movement).toBe(0);
+    expect(result.get('r2')!.movement).toBe(0);
+  });
 });

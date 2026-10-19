@@ -93,6 +93,12 @@ describe('leaderboard join parity', () => {
     expect(periodSales).toHaveLength(3);
   });
 
+  it('hands rank history the rep name the board breaks ties by', () => {
+    const { periodSales } = tallyBoard(boardSales(SALES, fiberBySale, 'approved'), OCT);
+    expect(periodSales.find((s) => s.salesRepId === 'wil')?.salesRepName).toBe('Wil Teasdale');
+    expect(periodSales.find((s) => s.salesRepId === 'braeden')?.salesRepName).toBe('Braeden Carter');
+  });
+
   it('stops at the end of a closed window', () => {
     const october = new Date('2026-10-01T05:00:00.000Z').getTime();
     const november = new Date('2026-11-01T05:00:00.000Z').getTime();
