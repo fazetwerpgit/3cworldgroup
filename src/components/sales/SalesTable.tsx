@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Check, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { Sale, SaleStatusConfig } from '@/types';
@@ -424,17 +424,28 @@ export function SalesTable({
     );
   };
 
+  // A tap anywhere on a row opens the sale. The row itself is a plain
+  // container, not role="button": content inside a button role is
+  // presentational, so VoiceOver could never reach the Paid checkbox or the
+  // admin edit/delete buttons in it. Screen readers and keyboards open the
+  // sale through the real button on the customer name (openButton).
   const openRow = (sale: Sale) => ({
-    role: 'button' as const,
-    tabIndex: 0,
+    'data-opens': '',
     onClick: () => setSelectedId(sale.id || null),
-    onKeyDown: (event: ReactKeyboardEvent) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        setSelectedId(sale.id || null);
-      }
-    },
   });
+
+  const openButton = (sale: Sale, label: ReactNode) => (
+    <button
+      type="button"
+      className={x.rowOpen}
+      onClick={(event) => {
+        event.stopPropagation();
+        setSelectedId(sale.id || null);
+      }}
+    >
+      <strong>{label}</strong>
+    </button>
+  );
 
   const statusCell = (sale: Sale) => {
     const order = fiberBySale.get(sale.id || '');
@@ -572,15 +583,13 @@ export function SalesTable({
                     const canTick = !readOnly && (status === 'installed' || status === 'chargeback' || paid);
                     return (
                       <div
-                        className={`${x.pRow} ${hasPlan ? '' : x.noMoney} ${status === 'cancelled' ? x.saleOff : ''} ${arriveClass(sale)}`}
+                        className={`${x.pRow} ${hasPlan ? '' : x.noMoney} ${status === 'cancelled' ? x.saleOff : ''} ${arriveClass(sale)} tap-press`}
                         data-part="pay-row"
                         key={sale.id}
                         {...openRow(sale)}
                       >
                         <DateStamp value={sale.installDate} label="Install" />
-                        <span className={x.sName}>
-                          <strong>{name}</strong>
-                        </span>
+                        <span className={x.sName}>{openButton(sale, name)}</span>
                         {hasPlan && (
                           <span className={x.sPay}>
                             <EstPay value={expected} hasPlan={hasPlan} />
@@ -655,13 +664,13 @@ export function SalesTable({
                   const mark = saleCarrier(sale);
                   return (
                     <div
-                      className={`${x.sale} ${isAdmin ? x.hasAct : ''} ${off ? x.saleOff : ''} ${arriveClass(sale)}`}
+                      className={`${x.sale} ${isAdmin ? x.hasAct : ''} ${off ? x.saleOff : ''} ${arriveClass(sale)} tap-press`}
                       data-part="sale-row"
                       key={sale.id}
                       {...openRow(sale)}
                     >
                       <span className={x.sName}>
-                        <strong>{sale.customerName || sale.customerAddress || 'Customer pending'}</strong>
+                        {openButton(sale, sale.customerName || sale.customerAddress || 'Customer pending')}
                       </span>
                       <span className={x.sPay}>
                         <EstPay value={expectedBySale[sale.id || '']} hasPlan={hasPlan} />

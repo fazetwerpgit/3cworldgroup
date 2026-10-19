@@ -151,4 +151,22 @@ describe('SalesTable', () => {
     expect(container.querySelectorAll('input[type="checkbox"]').length).toBe(0);
     expect(container.textContent).toContain('$440');
   });
+
+  it('VoiceOver can reach the Paid tick: no row is a role="button", and each row opens through a real button', () => {
+    render(true);
+    const rows = container.querySelectorAll<HTMLElement>('[data-part="pay-row"]');
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.getAttribute('role')).toBeNull();
+      expect(row.querySelector('button')).not.toBeNull();
+    }
+    for (const box of container.querySelectorAll('input[type="checkbox"]')) {
+      expect(box.closest('[role="button"]')).toBeNull();
+    }
+    render(false);
+    for (const row of container.querySelectorAll<HTMLElement>('[data-part="sale-row"]')) {
+      expect(row.getAttribute('role')).toBeNull();
+      expect(row.querySelector('button')?.textContent).toBeTruthy();
+    }
+  });
 });

@@ -13,6 +13,7 @@ import FaceIdLockCard from '@/components/app/FaceIdLockCard';
 import AppOnly from '@/components/app/AppOnly';
 import LinkedSignInMethods from '@/components/app/LinkedSignInMethods';
 import DeleteAccountCard from '@/components/portal/DeleteAccountCard';
+import { LegalLinks } from '@/components/app/LegalLinks';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { getEffectiveRole, repFacingRoleLabel, SHIRT_SIZES } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
@@ -446,6 +447,11 @@ export default function SettingsPage() {
 
           <AppOnly>
             <DeleteAccountCard />
+          </AppOnly>
+
+          {/* The privacy policy and terms, by Delete account (App Store 5.1.1). */}
+          <AppOnly>
+            <LegalLinks />
           </AppOnly>
         </div>
       </div>

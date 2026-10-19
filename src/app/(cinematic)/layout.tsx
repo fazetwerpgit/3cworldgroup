@@ -1,11 +1,11 @@
 import { Bebas_Neue } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import FirstTouch from "../_cinematic/FirstTouch";
 import JsonLdScript from "../_cinematic/JsonLdScript";
 import { SITE_JSON_LD } from "../_cinematic/jsonLd";
 import MotionRoot from "../_cinematic/MotionRoot";
 import SiteHeader from "../_cinematic/SiteHeader";
 import SiteFooter from "../_cinematic/SiteFooter";
+import SiteAnalytics from "../_cinematic/SiteAnalytics";
 import styles from "../_cinematic/cinematic.module.css";
 
 // The display face, through next/font so this group's pages preload it: from
@@ -140,7 +140,8 @@ export default function CinematicLayout({ children }: { children: React.ReactNod
 
       <JsonLdScript data={SITE_JSON_LD} />
       <FirstTouch />
-      <Analytics />
+      {/* Never inside the 3C iOS app (see SiteAnalytics). */}
+      <SiteAnalytics />
     </MotionRoot>
   );
 }

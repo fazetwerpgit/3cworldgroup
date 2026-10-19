@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
+import { LegalLinks } from '@/components/app/LegalLinks';
 import s from '@/components/portal/rep/rep.module.css';
 import c from './chat.module.css';
 
@@ -57,6 +58,7 @@ export function ChatTermsSheet({ onAccept }: { onAccept: () => Promise<void> }) 
             <p className={c.termsHelp}>
               Questions or a problem with someone? Email <a href={`mailto:${CHAT_SUPPORT_EMAIL}`}>{CHAT_SUPPORT_EMAIL}</a>.
             </p>
+            <LegalLinks />
             {error ? (
               <p className={c.termsError} role="alert">
                 {error}

@@ -91,7 +91,8 @@
 .tab {
   position: relative;
   flex: 1 1 0;
-  min-height: 40px;
+  /* 44pt: Apple's minimum tap target. */
+  min-height: var(--tap, 44px);
   padding: 0 var(--s4);
   border: 0;
   border-radius: 999px;

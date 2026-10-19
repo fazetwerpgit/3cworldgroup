@@ -1,0 +1,31 @@
+/* The in-portal Privacy Policy / Terms of Service links (LegalLinks). Rep
+   shell tokens; quiet, like the auth foot link. */
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--s4, 16px);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap, 44px);
+  color: var(--c-text-2, #a7b2c3);
+  font: 600 var(--t-ui, 15px) / 1.2 var(--f-ui, system-ui, sans-serif);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+  transition: opacity 180ms ease-out;
+}
+
+.link:active {
+  opacity: 0.6;
+  transition: opacity 0s;
+}
+
+@media (hover: hover) {
+  .link:hover {
+    color: var(--c-text, #fff);
+  }
+}

@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import s from '@/components/portal/rep/rep.module.css';
 import a from './auth.module.css';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
+import { LegalLinks } from '@/components/app/LegalLinks';
 
 /**
  * Direction D ground for the screens with no signed-in user (sign in, sign up,
@@ -26,7 +27,8 @@ export function AuthShell({
   wide?: boolean;
 }) {
   // Inside the iOS app there is no marketing site to go back to: the brand is
-  // a plain mark and the "Back to main site" link is gone.
+  // a plain mark and the "Back to main site" link gives way to the privacy
+  // policy and terms.
   const inApp = useIsNativeApp();
   const brand = (
     <>
@@ -52,7 +54,12 @@ export function AuthShell({
           {wide ? children : <div className={`${s.panel} ${a.card}`}>{children}</div>}
         </main>
 
-        {inApp ? null : (
+        {inApp ? (
+          // The app has no public footer: the privacy policy and terms live here.
+          <footer className={a.foot}>
+            <LegalLinks />
+          </footer>
+        ) : (
           <footer className={a.foot}>
             <Link href="/" className={a.footLink}>
               <ArrowLeft size={16} aria-hidden="true" />

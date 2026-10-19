@@ -3,6 +3,7 @@
 import type { CSSProperties } from 'react';
 import { Lock, RotateCw, ShieldAlert, WifiOff } from 'lucide-react';
 import { useFirstReveal } from '@/hooks/useFirstReveal';
+import { useOnline } from '@/hooks/useOnline';
 import type { ChatChannelDoc } from '@/hooks/chat/useChatChannels';
 import { formatUnreadCount } from '@/hooks/chat/useChatUnreadCounts';
 import s from '@/components/portal/rep/rep.module.css';
@@ -70,6 +71,7 @@ export function ChannelRows({
   onRetry = () => window.location.reload(),
 }: ChannelRowsProps) {
   const reveal = useFirstReveal('3c:reveal:chat-channels', !loading && channels.length > 0);
+  const online = useOnline();
   if (loading) {
     return (
       <div aria-hidden="true">
@@ -92,6 +94,17 @@ export function ChannelRows({
         <button type="button" className={s.retry} onClick={onRetry}>
           <RotateCw size={14} aria-hidden="true" /> Try again
         </button>
+      </div>
+    );
+  }
+  if (channels.length === 0 && !online) {
+    // Offline, an empty list is only an empty cache: never "No channels yet".
+    // No reload button: offline that would be a blank page. The live list
+    // fills in by itself when the connection is back.
+    return (
+      <div className={s.failed} role="status">
+        <WifiOff size={16} aria-hidden="true" />
+        You&apos;re offline. Channels load when you&apos;re back online.
       </div>
     );
   }
@@ -122,7 +135,7 @@ export function ChannelRows({
                 type="button"
                 onClick={() => onSelect(channel.id)}
                 aria-current={activeChannelId === channel.id ? 'true' : undefined}
-                className={`${c.channel} ${unread ? c.channelUnread : ''}`}
+                className={`${c.channel} ${unread ? c.channelUnread : ''} tap-press`}
               >
                 <span className={c.channelCopy}>
                   <span className={c.channelName}>
@@ -190,7 +203,12 @@ export function MobileChannelList({
         <h1 id="chat-title" className={c.title}>
           Team chat
         </h1>
-        {unreadCount > 0 ? <span className={c.listCount}>{unreadCount} unread</span> : null}
+        {/* Channels, not messages: a row's badge counts its messages. */}
+        {unreadCount > 0 ? (
+          <span className={c.listCount}>
+            {unreadCount} unread {unreadCount === 1 ? 'channel' : 'channels'}
+          </span>
+        ) : null}
       </div>
       <div className={`${s.panel} ${c.listPanel}`}>
         <ChannelRows

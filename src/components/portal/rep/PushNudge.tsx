@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { pushConfigured, pushSupported } from '@/lib/firebase/messaging';
 import { askAndEnablePush, enablePushOnDeviceDetailed } from '@/lib/push/enablePushOnDevice';
 import {
-  APP_NAME,
+  appNameFor,
   NUDGE_SNOOZE_KEY,
   REQUIRED_SNOOZE_KEY,
   devicePushState,
@@ -18,7 +18,7 @@ import {
 import { currentPermission, reportPushHealth } from '@/lib/push/reportPushHealth';
 import { isIosSafari } from '@/lib/pwa/addToHomeScreen';
 import { isStandaloneApp } from '@/lib/pwa/standalone';
-import { isNativeApp } from '@/lib/app/isNativeApp';
+import { isNativeApp, useIsNativeApp } from '@/lib/app/isNativeApp';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
 import x from './push-nudge.module.css';
@@ -207,6 +207,7 @@ function ShareIcon() {
 
 /** The in-page banner: one row under the top bar. */
 export function PushNudgeBanner({ state, phase, onTurnOn, onNotNow, ua }: NudgeProps) {
+  const appName = appNameFor(useIsNativeApp());
   const ios = isIosDevice(ua);
   const device = ios ? 'this phone' : 'this device';
   const done = phase === 'done';
@@ -220,7 +221,7 @@ export function PushNudgeBanner({ state, phase, onTurnOn, onNotNow, ua }: NudgeP
     text = (
       <>
         {isIosSafari(ua) ? 'Tap ' : 'Open this page in Safari, tap '}
-        <b>Share</b> <ShareIcon />, then <b>Add to Home Screen</b>, then open <b>{APP_NAME}</b> from the new icon.
+        <b>Share</b> <ShareIcon />, then <b>Add to Home Screen</b>, then open <b>{appName}</b> from the new icon.
       </>
     );
   } else if (state === 'ask') {
@@ -234,7 +235,7 @@ export function PushNudgeBanner({ state, phase, onTurnOn, onNotNow, ua }: NudgeP
     title = `Notifications are off for 3C on ${device}`;
     text = ios ? (
       <>
-        Open <b>Settings</b> → <b>Notifications</b> → <b>{APP_NAME}</b> and turn on <b>Allow Notifications</b>.
+        Open <b>Settings</b> → <b>Notifications</b> → <b>{appName}</b> and turn on <b>Allow Notifications</b>.
       </>
     ) : (
       'Allow notifications for this site in your browser settings, then come back.'
@@ -273,6 +274,7 @@ export function PushNudgeBanner({ state, phase, onTurnOn, onNotNow, ua }: NudgeP
 
 /** The required person's full-screen sheet, on <body> (fixed inside <main> breaks on iPhone). */
 export function PushRequiredSheet({ state, phase, onTurnOn, onNotNow, ua }: NudgeProps) {
+  const appName = appNameFor(useIsNativeApp());
   const ios = isIosDevice(ua);
   const done = phase === 'done';
   // Once on, only the confirmation shows, whichever step it came from.
@@ -315,7 +317,7 @@ export function PushRequiredSheet({ state, phase, onTurnOn, onNotNow, ua }: Nudg
                   Tap <b>Add to Home Screen</b>, then <b>Add</b>.
                 </li>
                 <li>
-                  Open <b>{APP_NAME}</b> from the new icon.
+                  Open <b>{appName}</b> from the new icon.
                 </li>
               </ol>
             )}
@@ -349,7 +351,7 @@ export function PushRequiredSheet({ state, phase, onTurnOn, onNotNow, ua }: Nudg
                       Open the iPhone <b>Settings</b> app.
                     </li>
                     <li>
-                      Tap <b>Notifications</b>, then <b>{APP_NAME}</b>.
+                      Tap <b>Notifications</b>, then <b>{appName}</b>.
                     </li>
                     <li>
                       Turn on <b>Allow Notifications</b>, then come back here.

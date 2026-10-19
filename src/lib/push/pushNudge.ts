@@ -29,6 +29,14 @@ export function isIosDevice(ua: string): boolean {
 /** The app name iOS shows in Settings > Notifications (appleWebApp.title). */
 export const APP_NAME = '3C Console';
 
+/** The App Store app's name (and the privacy policy's): what iOS shows for the 3C iOS app. */
+export const NATIVE_APP_NAME = '3C Portal';
+
+/** The name to tell this person to look for: the store app's inside it, the home-screen app's elsewhere. */
+export function appNameFor(inApp: boolean): string {
+  return inApp ? NATIVE_APP_NAME : APP_NAME;
+}
+
 /**
  * This device's push state. null when there is nothing a person can do here:
  * push is not configured, or a browser that cannot do web push at all.

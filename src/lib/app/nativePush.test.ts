@@ -26,7 +26,7 @@ vi.mock('./bridge', () => ({
 }));
 vi.mock('./isNativeApp', () => ({ isNativeApp: () => fake.isNativeApp() }));
 
-import { nativePushNotAskedYet, registerNativePushToken, syncNativePush, unregisterNativePush } from './nativePush';
+import { __resetNativePushForTests, nativePushNotAskedYet, registerNativePushToken, syncNativePush, unregisterNativePush } from './nativePush';
 
 const TOKEN_KEY = '3c-native-push-token';
 const fetchMock = vi.fn();
@@ -47,6 +47,7 @@ beforeEach(() => {
   fake.reportPushHealth.mockClear();
   fake.isNativeApp.mockReturnValue(true);
   fake.auth.currentUser = null;
+  __resetNativePushForTests();
   fetchMock.mockReset();
   fetchMock.mockResolvedValue({ ok: true, status: 200 });
   vi.stubGlobal('fetch', fetchMock);
@@ -80,6 +81,7 @@ describe('nativePushNotAskedYet', () => {
   it('is false when alerts are on or were refused', async () => {
     fake.requestNative.mockResolvedValueOnce({ permission: 'granted', token: 't' });
     await expect(nativePushNotAskedYet()).resolves.toBe(false);
+    __resetNativePushForTests();
     fake.requestNative.mockResolvedValueOnce({ permission: 'denied' });
     await expect(nativePushNotAskedYet()).resolves.toBe(false);
   });
@@ -240,5 +242,29 @@ describe('unregisterNativePush', () => {
     storageBlocked = true;
     await unregisterNativePush();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('silent push asks share one message', () => {
+  it('sends one pushToken {prompt:false} for the load-time sync, the top bar hint and a focus re-check', async () => {
+    fake.requestNative.mockResolvedValue({ permission: 'undetermined', token: null });
+    await Promise.all([syncNativePush({ prompt: false }), nativePushNotAskedYet(), syncNativePush({ prompt: false })]);
+    await nativePushNotAskedYet();
+    expect(fake.requestNative).toHaveBeenCalledTimes(1);
+  });
+
+  it('a tap always asks afresh, with prompt: true', async () => {
+    fake.requestNative.mockResolvedValue({ permission: 'undetermined', token: null });
+    await nativePushNotAskedYet();
+    await syncNativePush({ prompt: true });
+    expect(fake.requestNative).toHaveBeenCalledTimes(2);
+    expect(fake.requestNative).toHaveBeenLastCalledWith({ type: 'pushToken', prompt: true });
+  });
+
+  it('does not reuse a failed ask', async () => {
+    fake.requestNative.mockRejectedValueOnce(new Error('timeout')).mockResolvedValueOnce({ permission: 'undetermined' });
+    await expect(nativePushNotAskedYet()).resolves.toBe(false);
+    await expect(nativePushNotAskedYet()).resolves.toBe(true);
+    expect(fake.requestNative).toHaveBeenCalledTimes(2);
   });
 });

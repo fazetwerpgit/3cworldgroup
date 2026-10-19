@@ -23,7 +23,10 @@ export default function PortalError({ error, reset }: { error: Error & { digest?
         <button type="button" onClick={() => reset()} className={`${s.btnPrimary} ${a.btn}`}>
           Try again
         </button>
-        {/* Full navigation on purpose: a hard load clears whatever state broke. */}
+        {/* Full navigation on purpose: a hard load clears whatever state broke.
+            (The lint rule only sees it since portal/[...missing] matches every
+            /portal path.) */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href="/portal/dashboard" className={`${s.btnSecondary} ${a.btn}`}>
           Go to dashboard
         </a>

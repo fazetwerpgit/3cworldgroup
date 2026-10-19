@@ -11,6 +11,7 @@ import PushTokenRefresher from '@/components/portal/PushTokenRefresher';
 import PwaBottomGap from '@/components/portal/PwaBottomGap';
 import ServiceWorkerRegistrar from '@/components/portal/ServiceWorkerRegistrar';
 import AppBridgeHost from '@/components/app/AppBridgeHost';
+import PortalDocumentTitle from '@/components/portal/PortalDocumentTitle';
 import { RepShellHost } from '@/components/portal/rep/RepShell';
 import '@/styles/sweep-shell.css';
 import '@/styles/app-touch.css';
@@ -66,6 +67,8 @@ export default function PortalLayout({
           <ServiceWorkerRegistrar />
           {/* Heals iOS push-subscription rotation on every open — see component. */}
           <PushTokenRefresher />
+          {/* A document title per page, so VoiceOver announces each one. */}
+          <PortalDocumentTitle />
           {/* The 3C iOS app's bridge, links and native push; inert on the web. */}
           <AppBridgeHost />
           {/* Reconnects live data (chat, unread dot) when the app resumes. */}

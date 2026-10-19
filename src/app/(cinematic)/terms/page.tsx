@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { ArrowRight } from "lucide-react";
 import kit from "../../_cinematic/cinematic.module.css";
 import LegalSection from "../_legal/LegalSection";
+import AppLegalBar from "../../_cinematic/AppLegalBar";
 import styles from "../_legal/legal.module.css";
 
 export const metadata: Metadata = {
@@ -23,6 +24,8 @@ const LAST_UPDATED = "May 6, 2026";
 export default function TermsOfServicePage() {
   return (
     <>
+      {/* In the 3C iOS app: a back bar to the portal instead of the site header. */}
+      <AppLegalBar />
       <header className={kit.pageHeadFlat}>
         <div className={kit.shell}>
           <div className={kit.pageHeadRow}>

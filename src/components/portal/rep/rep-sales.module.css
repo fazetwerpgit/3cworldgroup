@@ -1164,9 +1164,38 @@
   border-top: 0;
 }
 
-.sale[role='button']:active,
-.pRow[role='button']:active {
+.sale[data-opens],
+.pRow[data-opens] {
+  cursor: pointer;
+}
+
+.sale[data-opens]:active,
+.pRow[data-opens]:active {
   transform: scale(0.97);
+}
+
+/* The customer name: the row's real button for VoiceOver and keyboards
+   (SalesTable openButton). It looks like the plain name it replaced. */
+.rowOpen {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.rowOpen strong {
+  display: block;
+}
+
+.rowOpen:focus-visible {
+  outline: none;
 }
 
 /* A sale just logged on this phone drops into its place once (SalesTable),
@@ -1182,20 +1211,20 @@
   }
 }
 
-.sale[role='button']:focus-visible,
-.pRow[role='button']:focus-visible {
+.sale[data-opens]:has(.rowOpen:focus-visible),
+.pRow[data-opens]:has(.rowOpen:focus-visible) {
   outline: 2px solid var(--c-lime-hi);
   outline-offset: -2px;
 }
 
 @media (hover: hover) {
-  .sale[role='button']:hover,
-  .pRow[role='button']:hover {
+  .sale[data-opens]:hover,
+  .pRow[data-opens]:hover {
     background: rgba(163, 184, 214, 0.04);
   }
 
-  .sale[role='button']:hover,
-  .ledger .pRow[role='button']:hover {
+  .sale[data-opens]:hover,
+  .ledger .pRow[data-opens]:hover {
     background: var(--c-raised);
   }
 }
