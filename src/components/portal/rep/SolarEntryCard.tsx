@@ -15,8 +15,10 @@ export const SOLAR_DECK_HREF = '/portal/solar/present';
  * sells fiber) is the compact AskEntryCard-style row to the Solar page.
  * `lead` (a solar-only rep) tops their Home: the deck's cover and Open deck,
  * which needs solar:write, so a read-only view shows the cover alone.
+ * `action={false}` drops that button where the page already leads with one
+ * (the Solar page's head).
  */
-export function SolarEntryCard({ variant = 'row' }: { variant?: 'row' | 'lead' }) {
+export function SolarEntryCard({ variant = 'row', action = true }: { variant?: 'row' | 'lead'; action?: boolean }) {
   const { hasPermission } = useAuth();
   if (!hasPermission('solar:read')) return null;
 
@@ -37,7 +39,7 @@ export function SolarEntryCard({ variant = 'row' }: { variant?: 'row' | 'lead' }
             Solar deck
           </h2>
           <p className={d.solarLeadSub}>Their bill, their savings and a consultation, all on one phone.</p>
-          {hasPermission('solar:write') ? (
+          {action && hasPermission('solar:write') ? (
             <Link href={SOLAR_DECK_HREF} className={`${s.btnPrimary} ${d.solarLeadBtn}`}>
               <Sun size={20} strokeWidth={2.5} aria-hidden="true" />
               Open deck
