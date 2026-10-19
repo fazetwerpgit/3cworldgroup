@@ -56,8 +56,15 @@ export async function activeManagementUsers(): Promise<FirebaseFirestore.QueryDo
 // Fire in-portal bell notifications to admins + operations when a form is submitted.
 // Best-effort: any failure here must NEVER fail the submission itself, so callers
 // invoke this after the record is written and do not await its errors fatally.
-export async function notifySubmission(formKey: string, submittedBy: string): Promise<void> {
+// A demo account's (App Review) submission alerts nobody: its record is hidden
+// from the queues, and its name must never reach real management.
+export async function notifySubmission(
+  formKey: string,
+  submittedBy: string,
+  options: { demoAccount?: boolean } = {}
+): Promise<void> {
   if (!adminDb) return;
+  if (options.demoAccount === true) return;
   const meta = FORM_ALERTS[formKey];
   if (!meta) return;
   try {

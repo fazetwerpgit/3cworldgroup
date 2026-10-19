@@ -197,7 +197,17 @@ export async function requireVerifiedSelfOrManagement(
 // identity for stamping.
 export async function requireVerifiedFieldManagerOrManagement(
   request: NextRequest
-): Promise<{ ok: true; uid: string; name: string; email: string } | { ok: false; error: string; status: number }> {
+): Promise<
+  | {
+      ok: true;
+      uid: string;
+      name: string;
+      email: string;
+      /** users/{uid}.demoAccount === true (its forms stay hidden; lib/forms/submitForm). */
+      demoAccount: boolean;
+    }
+  | { ok: false; error: string; status: number }
+> {
   const c = await verifyCaller(request);
   if (!c.ok) return c;
   const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
@@ -211,6 +221,7 @@ export async function requireVerifiedFieldManagerOrManagement(
     uid: c.uid,
     name: c.data.displayName || callerEmail(c.data) || c.uid,
     email: callerEmail(c.data),
+    demoAccount: isDemoAccount(c.data),
   };
 }
 

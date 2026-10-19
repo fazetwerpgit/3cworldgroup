@@ -133,6 +133,15 @@ describe('notifySubmission', () => {
     expect(sendEmailMock.mock.calls.map((c) => c[0].to)).toEqual(['a@x.com']);
   });
 
+  it('alerts nobody (no bell, no email, no reads) for a demo account submission', async () => {
+    alertDocGet.mockResolvedValue({ exists: false });
+    usersGet.mockResolvedValue(usersSnapshot([{ id: 'owner1', role: 'owner', email: 'o@x.com' }]));
+    await notifySubmission('payroll-dispute', 'Sam Demo', { demoAccount: true });
+    expect(notifAdd).not.toHaveBeenCalled();
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(usersGet).not.toHaveBeenCalled();
+  });
+
   it('does nothing for an unknown form key', async () => {
     await notifySubmission('not-a-form', 'Rep One');
     expect(notifAdd).not.toHaveBeenCalled();

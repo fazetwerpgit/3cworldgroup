@@ -22,6 +22,12 @@ const doc = (id: string, status: string, day: number | null) => ({
 });
 
 describe('mergeReviewDocs', () => {
+  it('drops a demo-account submission from the review list', () => {
+    const demo = { id: 'demo1', data: () => ({ status: 'demo', demoAccount: true, createdAt: null }) };
+    const rows = mergeReviewDocs([doc('r1', 'new', 10), demo], [doc('r1', 'new', 10)]);
+    expect(rows.map((r) => r.id)).toEqual(['r1']);
+  });
+
   it('keeps an unhandled item older than the newest-N page', () => {
     const recent = [doc('r2', 'handled', 20), doc('r1', 'new', 10)];
     const unhandled = [doc('r1', 'new', 10), doc('old', 'new', 1)];

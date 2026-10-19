@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     const { id } = await submitFormRecord(
       'managerInterviews',
-      { uid: gate.uid, name: gate.name, email: gate.email },
+      { uid: gate.uid, name: gate.name, email: gate.email, demoAccount: gate.demoAccount },
       {
         provider, jobPosition, hiringManager, hiringManagerEmail,
         candidateFirstName, candidateLastName, candidateEmail, market,
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
         signatureDataUrl: body.signatureDataUrl,
       }
     );
-    await notifySubmission('manager-interview', gate.name);
+    await notifySubmission('manager-interview', gate.name, { demoAccount: gate.demoAccount });
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting manager interview:', error);

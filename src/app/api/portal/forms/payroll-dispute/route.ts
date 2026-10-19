@@ -52,10 +52,10 @@ export async function POST(request: NextRequest) {
 
     const { id } = await submitFormRecord(
       'payrollDisputes',
-      { uid: gate.uid, name: gate.name, email: gate.email },
+      { uid: gate.uid, name: gate.name, email: gate.email, demoAccount: gate.demoAccount },
       { contractorName, contractorEmail, campaign, typeOfOrder, dateOfInstall, orderScreenshotPath, uploadId }
     );
-    await notifySubmission('payroll-dispute', gate.name);
+    await notifySubmission('payroll-dispute', gate.name, { demoAccount: gate.demoAccount });
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting payroll dispute:', error);

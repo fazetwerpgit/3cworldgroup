@@ -60,10 +60,10 @@ export async function POST(request: NextRequest) {
 
     const { id } = await submitFormRecord(
       'expediteOrders',
-      { uid: gate.uid, name: gate.name, email: gate.email },
+      { uid: gate.uid, name: gate.name, email: gate.email, demoAccount: gate.demoAccount },
       fields
     );
-    await notifySubmission('expedite-order', gate.name);
+    await notifySubmission('expedite-order', gate.name, { demoAccount: gate.demoAccount });
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting expedite order:', error);

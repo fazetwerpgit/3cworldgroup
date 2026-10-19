@@ -639,7 +639,8 @@ async function formsSection(db: Db, uid: string, now: Date, zone: Zone): Promise
         .filter((data) => data.repUid === uid)
         .map((data) => ({
           name: source.name,
-          open: data.status === 'new',
+          // A demo account's own form (status 'demo', lib/forms/submitForm) reads as open.
+          open: data.status === 'new' || data.status === 'demo',
           at: toDate(data.createdAt),
           detail: source.detail?.(data) ?? '',
         }));

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 
 // Verified-management-gated mark-handled. Uses a transaction so concurrent clicks
 // can't both flip 'new' -> 'handled'. Returns a status/error for the route.
@@ -65,7 +66,8 @@ function toSubmission(
 
 // Merges the newest-N page with every unhandled doc (deduped by id), newest first.
 // The New view and the owner "Needs attention" count (status == 'new') then agree,
-// however old an unhandled item is.
+// however old an unhandled item is. A demo account's form (stamped by
+// submitFormRecord) is dropped: the queues are real work only.
 export function mergeReviewDocs(
   recent: ReviewDoc[],
   unhandled: ReviewDoc[],
@@ -73,6 +75,7 @@ export function mergeReviewDocs(
 ): Record<string, unknown>[] {
   const byId = new Map<string, ReturnType<typeof toSubmission>>();
   for (const d of [...unhandled, ...recent]) {
+    if (isDemoAccount(d.data())) continue;
     if (!byId.has(d.id)) byId.set(d.id, toSubmission(d, omitFields));
   }
   return [...byId.values()].sort(

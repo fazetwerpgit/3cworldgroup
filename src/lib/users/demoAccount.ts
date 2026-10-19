@@ -12,6 +12,10 @@
 // still sees its own (saleVisibleTo). Sales logged BEFORE the account was
 // flagged are not stamped; stamp them by hand if any exist.
 //
+// Their FORMS carry it too: submitFormRecord stamps a demo account's form with
+// status 'demo' (never 'new'), reviewQuery drops it, and it alerts nobody
+// (notifySubmission, bug-report route).
+//
 // OPS — flagging an EXISTING account: set `demoAccount: true` on users/{uid},
 // then run POST /api/portal/chat/channels/sync (admin). The chat API denies a
 // demo account at once, but firestore.rules reads chatChannels.memberIds

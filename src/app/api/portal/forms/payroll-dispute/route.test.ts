@@ -14,15 +14,20 @@ vi.mock('@/lib/forms/resolveFormOptions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/forms/resolveFormOptions')>();
   return { ...actual, getResolvedFormOptions: vi.fn(actual.getResolvedFormOptions) };
 });
+vi.mock('@/lib/forms/notifySubmission', () => ({
+  notifySubmission: vi.fn(async () => undefined),
+}));
 
 import { POST } from './route';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
+import { notifySubmission } from '@/lib/forms/notifySubmission';
 
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 const mockSubmit = submitFormRecord as unknown as ReturnType<typeof vi.fn>;
+const mockNotify = notifySubmission as unknown as ReturnType<typeof vi.fn>;
 
 function req(body: unknown) {
   return new NextRequest('http://localhost/api/portal/forms/payroll-dispute', {
@@ -43,6 +48,7 @@ const VALID = {
 beforeEach(() => {
   mockGate.mockReset();
   mockSubmit.mockClear();
+  mockNotify.mockClear();
 });
 
 describe('POST /api/portal/forms/payroll-dispute', () => {
@@ -93,5 +99,13 @@ describe('POST /api/portal/forms/payroll-dispute', () => {
     const res = await POST(req({ ...VALID, campaign: LONG }));
     expect(res.status).toBe(200);
     expect(mockSubmit.mock.calls[0][2]).toMatchObject({ campaign: LONG });
+  });
+
+  it('passes a demo account through: stamped record, no management alert', async () => {
+    mockGate.mockResolvedValue({ ...VERIFIED, demoAccount: true });
+    const res = await POST(req(VALID));
+    expect(res.status).toBe(200);
+    expect(mockSubmit.mock.calls[0][1]).toMatchObject({ uid: 'u1', demoAccount: true });
+    expect(mockNotify).toHaveBeenCalledWith('payroll-dispute', 'Rep One', { demoAccount: true });
   });
 });

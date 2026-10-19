@@ -90,14 +90,14 @@ export async function POST(request: NextRequest) {
 
     const { id } = await submitFormRecord(
       'leadsRequests',
-      { uid: gate.uid, name: gate.name, email: gate.email },
+      { uid: gate.uid, name: gate.name, email: gate.email, demoAccount: gate.demoAccount },
       {
         campaign, managerName, managerEmail, repFirstName, repLastName, location,
         category, reason, specialRequest, leadPackCode, situationDescription,
         hostileUploadPath, blindKnockUploadPath, lassoUploadPath, newRepPhone, newRepEmail, uploadId,
       }
     );
-    await notifySubmission('leads-request', gate.name);
+    await notifySubmission('leads-request', gate.name, { demoAccount: gate.demoAccount });
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error submitting leads request:', error);

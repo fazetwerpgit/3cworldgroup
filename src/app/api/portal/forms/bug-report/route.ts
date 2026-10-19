@@ -60,14 +60,17 @@ export async function POST(request: NextRequest) {
 
     const { id } = await submitFormRecord(
       'bugReports',
-      { uid: gate.uid, name: gate.name, email: gate.email },
+      { uid: gate.uid, name: gate.name, email: gate.email, demoAccount: gate.demoAccount },
       { area: safeArea, summary, details, pageUrl }
     );
 
-    await notifyAdmins(
-      'New bug report 🐞',
-      `${gate.name} reported: ${summary.slice(0, 100)}`
-    );
+    // A demo account's (App Review) report is hidden; it alerts nobody.
+    if (!gate.demoAccount) {
+      await notifyAdmins(
+        'New bug report 🐞',
+        `${gate.name} reported: ${summary.slice(0, 100)}`
+      );
+    }
 
     return NextResponse.json({ success: true, id });
   } catch (error) {

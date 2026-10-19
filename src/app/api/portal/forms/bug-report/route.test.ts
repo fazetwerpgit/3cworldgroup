@@ -105,4 +105,12 @@ describe('POST /api/portal/forms/bug-report', () => {
     expect(add.mock.calls.map((c) => c[0].userId).sort()).toEqual(['ops1', 'owner1']);
     expect(wheres).toEqual([['role', 'in', ['admin', 'operations', 'owner']]]);
   });
+
+  it('stamps a demo account submission and alerts nobody', async () => {
+    mockGate.mockResolvedValue({ ...VERIFIED, demoAccount: true });
+    const res = await POST(req(VALID));
+    expect(res.status).toBe(200);
+    expect(mockSubmit.mock.calls[0][1]).toMatchObject({ uid: 'u1', demoAccount: true });
+    expect(mockAdminCollection).not.toHaveBeenCalled();
+  });
 });
