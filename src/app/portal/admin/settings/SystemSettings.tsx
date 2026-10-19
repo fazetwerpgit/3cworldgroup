@@ -29,6 +29,9 @@ function PanelHead({ id, title, children }: { id: string; title: string; childre
 
 function WeeklyChallengeCard() {
   const [target, setTarget] = useState<number | null>(null);
+  // The custom box keeps its own text so a partial entry ("3" on the way to "35") is not
+  // wiped when it briefly matches a preset.
+  const [customText, setCustomText] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -48,6 +51,12 @@ function WeeklyChallengeCard() {
         if (!response.ok) throw new Error(data.error || 'Failed to load weekly challenge');
         if (!cancelled) {
           setTarget(data.targetSales);
+          setCustomText(
+            typeof data.targetSales === 'number' &&
+              !WEEKLY_CHALLENGE_PRESETS.some((p) => p.value === data.targetSales)
+              ? String(data.targetSales)
+              : ''
+          );
           setLoadFailed(false);
         }
       } catch {
@@ -72,6 +81,7 @@ function WeeklyChallengeCard() {
 
   const handleCustomChange = (raw: string) => {
     setError(null);
+    setCustomText(raw);
     if (raw === '') {
       setTarget(null);
       return;
@@ -142,6 +152,7 @@ function WeeklyChallengeCard() {
                     aria-pressed={target === preset.value}
                     onClick={() => {
                       setTarget(preset.value);
+                      setCustomText('');
                       setSaved(false);
                       setError(null);
                     }}
@@ -158,13 +169,13 @@ function WeeklyChallengeCard() {
               </label>
               <input
                 id="weekly-challenge-custom"
-                className={`${u.input} ${!isPreset && target !== null ? st.customActive : ''}`}
+                className={`${u.input} ${customText !== '' ? st.customActive : ''}`}
                 type="number"
                 inputMode="numeric"
                 min={1}
                 max={99}
-                value={!isPreset && target !== null ? target : ''}
-                placeholder={isPreset ? String(target) : '—'}
+                value={customText}
+                placeholder={isPreset && customText === '' ? String(target) : '—'}
                 onChange={(e) => {
                   handleCustomChange(e.target.value);
                   setSaved(false);
