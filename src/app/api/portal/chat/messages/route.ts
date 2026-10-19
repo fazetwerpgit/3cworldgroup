@@ -18,6 +18,7 @@ import {
 } from '@/lib/chat/media';
 import { userRateLimited } from '@/lib/userRateLimits';
 import { isSafeDocId } from '@/lib/chat/moderationShared';
+import { storedAuthorName } from '@/lib/chat/sandboxAuthor';
 
 // What a reply quote shows once its source message is deleted.
 const DELETED_REPLY_TEXT = 'Message deleted';
@@ -314,12 +315,15 @@ export async function POST(request: NextRequest) {
 
     await ensureChatChannelMember(channelId, user.uid);
 
+    // In the demo sandbox a real author is stored as "3C Team": demo accounts
+    // read these docs (and the preview and push) and must never see real names.
+    const authorName = storedAuthorName(found.data, user);
     const channelRef = adminDb!.collection('chatChannels').doc(channelId);
     const messageDoc = {
       channelId,
       text: text.slice(0, 1000),
       authorId: user.uid,
-      authorName: user.displayName,
+      authorName,
       authorRole: user.effectiveRole ?? null,
       createdAt: FieldValue.serverTimestamp(),
       deletedAt: null,
@@ -376,7 +380,7 @@ export async function POST(request: NextRequest) {
           after(() =>
             pushChatMessageOnce(channelRef, messageRef.id, found.data, user.uid, {
               ...pushPayload,
-              body: buildChatPushBody(user.displayName, storedText, storedAttachment),
+              body: buildChatPushBody(authorName, storedText, storedAttachment),
             })
           );
         }
@@ -391,7 +395,7 @@ export async function POST(request: NextRequest) {
     after(() =>
       pushChatMessageOnce(channelRef, messageRef.id, found.data, user.uid, {
         ...pushPayload,
-        body: buildChatPushBody(user.displayName, text, attachment),
+        body: buildChatPushBody(authorName, text, attachment),
       })
     );
 

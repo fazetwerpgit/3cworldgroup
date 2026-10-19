@@ -1,6 +1,7 @@
 import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import type { PlatformRole, FieldRole } from '@/types';
+import { DEMO_SANDBOX_FIELD } from '@/lib/chat/channels';
 
 const BATCH_LIMIT = 400;
 // Firestore 'in' queries accept at most 30 values per clause.
@@ -23,6 +24,11 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
   if (fields.authorName === undefined && fields.authorRole === undefined) return;
 
   const authoredMessageIds: string[] = [];
+  // Demo sandbox messages carry a stand-in name, never the real one (see
+  // lib/chat/sandboxAuthor): a name change must not write it there.
+  const sandboxIds = await sandboxChannelIds();
+  // chatChannels/{channelId}/messages/{messageId}
+  const inSandbox = (doc: FirebaseFirestore.QueryDocumentSnapshot) => sandboxIds.has(doc.ref.path.split('/')[1] ?? '');
 
   // startAfter needs the DocumentSnapshot, not the bare id string: a collection-
   // group document ID isn't a valid path on its own (it throws "odd number of
@@ -40,14 +46,18 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
     if (snap.empty) break;
 
     const batch = adminDb.batch();
+    let writes = 0;
     for (const doc of snap.docs) {
-      authoredMessageIds.push(doc.id);
+      const sandbox = inSandbox(doc);
+      if (!sandbox) authoredMessageIds.push(doc.id);
       const update: Record<string, unknown> = {};
-      if (fields.authorName !== undefined) update.authorName = fields.authorName;
+      if (fields.authorName !== undefined && !sandbox) update.authorName = fields.authorName;
       if (fields.authorRole !== undefined) update.authorRole = fields.authorRole ?? FieldValue.delete();
+      if (Object.keys(update).length === 0) continue;
       batch.update(doc.ref, update);
+      writes += 1;
     }
-    await batch.commit();
+    if (writes > 0) await batch.commit();
 
     lastDoc = snap.docs[snap.docs.length - 1];
     if (snap.docs.length < BATCH_LIMIT) break;
@@ -58,7 +68,7 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
   // lastMessage.ts) — there's no role to re-stamp there.
   if (fields.authorName === undefined) return;
 
-  await restampLastMessageAuthor(uid, fields.authorName);
+  await restampLastMessageAuthor(uid, fields.authorName, sandboxIds);
 
   if (authoredMessageIds.length === 0) return;
 
@@ -77,10 +87,13 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
       if (snap.empty) break;
 
       const batch = adminDb.batch();
+      let writes = 0;
       for (const doc of snap.docs) {
+        if (inSandbox(doc)) continue;
         batch.update(doc.ref, { 'replyTo.authorName': fields.authorName });
+        writes += 1;
       }
-      await batch.commit();
+      if (writes > 0) await batch.commit();
 
       lastReplyDoc = snap.docs[snap.docs.length - 1];
       if (snap.docs.length < BATCH_LIMIT) break;
@@ -91,17 +104,24 @@ export async function restampAuthor(uid: string, fields: RestampFields): Promise
 // chatChannels/{id}.lastMessage.authorName for every channel whose preview line
 // this user wrote. chatChannels is a top-level collection of a few dozen docs,
 // so the automatic single-field index serves the query.
-async function restampLastMessageAuthor(uid: string, authorName: string): Promise<void> {
+async function restampLastMessageAuthor(uid: string, authorName: string, sandboxIds: Set<string>): Promise<void> {
   const db = adminDb!;
   const snap = await db.collection('chatChannels').where('lastMessage.authorId', '==', uid).get();
-  if (snap.empty) return;
-  for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
+  const docs = snap.docs.filter((doc) => !sandboxIds.has(doc.id));
+  if (docs.length === 0) return;
+  for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
     const batch = db.batch();
-    for (const doc of snap.docs.slice(i, i + BATCH_LIMIT)) {
+    for (const doc of docs.slice(i, i + BATCH_LIMIT)) {
       batch.update(doc.ref, { 'lastMessage.authorName': authorName });
     }
     await batch.commit();
   }
+}
+
+/** Ids of the demo sandbox channels (a handful of docs at most). */
+async function sandboxChannelIds(): Promise<Set<string>> {
+  const snap = await adminDb!.collection('chatChannels').where(DEMO_SANDBOX_FIELD, '==', true).get();
+  return new Set(snap.docs.map((doc) => doc.id));
 }
 
 // Updates every doc a query returns, page by page (documentId order), with the

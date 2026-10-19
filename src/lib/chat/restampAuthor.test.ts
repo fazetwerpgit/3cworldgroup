@@ -103,6 +103,21 @@ describe('restampAuthor', () => {
     expect((fake.docs.get('chatChannels/general')?.lastMessage as { authorName: string }).authorName).toBe('Deleted user');
   });
 
+  it('never writes the real name into the demo sandbox (messages, quotes, preview)', async () => {
+    fake.docs.set('chatChannels/demo-team', {
+      demoSandbox: true,
+      lastMessage: { messageId: 'd1', authorId: 'u1', authorName: '3C Team', text: 'welcome' },
+    });
+    fake.docs.set('chatChannels/demo-team/messages/d1', { authorId: 'u1', authorName: '3C Team', text: 'welcome' });
+    fake.docs.set('chatChannels/demo-team/messages/d2', { authorId: 'demo', authorName: 'Sam Demo', replyTo: { messageId: 'd1', authorName: '3C Team' } });
+    await restampAuthor('u1', { authorName: 'New Name', authorRole: 'owner' });
+    expect(fake.docs.get('chatChannels/demo-team/messages/d1')).toMatchObject({ authorName: '3C Team', authorRole: 'owner' });
+    expect((fake.docs.get('chatChannels/demo-team/messages/d2')?.replyTo as { authorName: string }).authorName).toBe('3C Team');
+    expect((fake.docs.get('chatChannels/demo-team')?.lastMessage as { authorName: string }).authorName).toBe('3C Team');
+    // Outside the sandbox the rename still lands.
+    expect(fake.docs.get('chatChannels/general/messages/m1')?.authorName).toBe('New Name');
+  });
+
   it('leaves the preview alone for a role-only restamp', async () => {
     await restampAuthor('u1', { authorRole: 'admin' });
     expect((fake.docs.get('chatChannels/general')?.lastMessage as { authorName: string }).authorName).toBe('Old Name');

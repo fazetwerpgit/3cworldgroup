@@ -494,6 +494,30 @@ describe('POST /api/portal/chat/messages (hardened)', () => {
     expect(written.authorName).toBe('Real User');
   });
 
+  it('stores a real author as "3C Team" in the demo sandbox (message and preview); demo accounts keep their name', async () => {
+    mockGate.mockResolvedValue({
+      ok: true,
+      user: { ...VERIFIED.user, uid: 'admin-uid', displayName: 'Jacob Real', role: 'admin', fieldRole: undefined, demoAccount: false },
+    });
+    const res = await POST(req({ channelId: 'sandbox', text: 'welcome' }));
+    expect(res.status).toBe(200);
+    const written = addMock.mock.calls[0][0] as unknown as { authorName: string };
+    expect(written.authorName).toBe('3C Team');
+    const preview = setMock.mock.calls
+      .map((call) => (call[0] as { lastMessage?: { authorName?: string } }).lastMessage)
+      .find(Boolean);
+    expect(preview?.authorName).toBe('3C Team');
+    expect(JSON.stringify(addMock.mock.calls)).not.toContain('Jacob Real');
+
+    addMock.mockClear();
+    mockGate.mockResolvedValue({
+      ok: true,
+      user: { ...VERIFIED.user, uid: 'demo-uid', displayName: 'Sam Demo', role: undefined, demoAccount: true },
+    });
+    expect((await POST(req({ channelId: 'sandbox', text: 'hi' }))).status).toBe(200);
+    expect((addMock.mock.calls[0][0] as unknown as { authorName: string }).authorName).toBe('Sam Demo');
+  });
+
   it('merges lastMessageAt onto the channel doc when a message is sent', async () => {
     mockGate.mockResolvedValue(VERIFIED);
     const res = await POST(req({ channelId: 'all-company', text: 'hi there' }));
