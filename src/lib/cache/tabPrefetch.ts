@@ -83,7 +83,7 @@ function warmSales(ctx: TabPrefetchContext): void {
     });
   }
   // Management has no rep pay plan or own carrier report worth a spec read.
-  if (ctx.management) return;
+  if (ctx.canViewAll) return;
   warm(uid, FIBER_CACHE_KEY, () => getJson('/api/portal/sales/status'));
   if (ctx.active) {
     warm(uid, COMP_PLAN_CACHE_KEY, async () => compPlanState(uid, await getJson<CompPlanResponse>('/api/portal/comp-plan')));

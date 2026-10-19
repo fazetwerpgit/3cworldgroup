@@ -91,13 +91,20 @@ describe('prefetchTabs', () => {
     expect(urls().filter((url) => url.startsWith(board))).toHaveLength(2);
   });
 
-  it('skips the plan and carrier report prefetch for management', async () => {
+  it('skips the plan and carrier report prefetch for admin and owner (company-wide view)', async () => {
     prefetchTabs('/portal/dashboard', { ...REP, canViewAll: true, management: true });
-    prefetchTab('/portal/sales', { ...REP, management: true });
+    prefetchTab('/portal/sales', { ...REP, canViewAll: true, management: true });
     await flush();
     expect(urls().some((url) => url.startsWith('/api/portal/comp-plan'))).toBe(false);
     expect(urls().some((url) => url.startsWith('/api/portal/sales/status'))).toBe(false);
     expect(urls().some((url) => url.startsWith('/api/portal/leaderboard?'))).toBe(true);
+  });
+
+  it('still warms the own carrier report and plan for operations (management without sales:read:all)', async () => {
+    prefetchTab('/portal/sales', { ...REP, canViewAll: false, management: true });
+    await flush();
+    expect(urls().some((url) => url.startsWith('/api/portal/sales/status'))).toBe(true);
+    expect(urls().some((url) => url.startsWith('/api/portal/comp-plan'))).toBe(true);
   });
 
   it("never fetches management's company book on spec", async () => {
