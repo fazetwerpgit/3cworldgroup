@@ -994,6 +994,10 @@ export function AdminSalesBoard({ sales, month, truncated, loading, onDelete, on
         fiberOrder={selectedOrder}
         reportAsOf={reportAsOf}
         revenue={pricing && selectedSale ? saleNetRevenue(selectedSale, pricing) : null}
+        // The same est. pay the My pay row shows. The Company tab rows show
+        // none, and the viewer's plan is not the rep's, so the sheet shows none
+        // there either rather than a stale stored commission.
+        estPay={activeTab === 'pay' && selectedSale ? expectedPayForSale(selectedSale, payPlan?.rates ?? null) : null}
       />
 
       <LinkOrderDialog

@@ -35,8 +35,14 @@ vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: async () => 'test-toke
 // of R2 and the select itself is not.
 const captured = vi.hoisted(() => ({
   link: null as null | { candidates: Array<{ sale: Sale; hint: string }> },
+  sheet: null as null | { sale: Sale | null; estPay?: number | null },
 }));
-vi.mock('./SaleDetailSheet', () => ({ SaleDetailSheet: () => null }));
+vi.mock('./SaleDetailSheet', () => ({
+  SaleDetailSheet: (props: { sale: Sale | null; estPay?: number | null }) => {
+    captured.sheet = props;
+    return null;
+  },
+}));
 vi.mock('./UnloggedOrders', () => ({
   UnassignedOrders: () => null,
   LinkOrderDialog: (props: { candidates: Array<{ sale: Sale; hint: string }> }) => {
@@ -531,6 +537,35 @@ describe('My pay groups by install, like the rep Pay view', () => {
     ]);
     // The headline counts only installs with a date that stands.
     expect(container.querySelector('[data-part="fig"] strong')?.textContent).toBe('est.$280');
+  });
+});
+
+describe('the detail sheet shows the est. pay its row shows', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(at(9, 20));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('passes the My pay row\'s est. pay, not the stored commission', async () => {
+    const sale = { ...mine('Installed', '11 Oak Street', at(9, 1), at(9, 4)), commission: 999 } as Sale;
+    await renderPay([sale], []);
+    const row = container.querySelector<HTMLElement>('[data-part="pay-row"]')!;
+    expect(row.textContent).toContain('$140');
+    await act(async () => row.click());
+    expect(captured.sheet?.sale?.id).toBe('Installed');
+    expect(captured.sheet?.estPay).toBe(140);
+  });
+
+  it('shows no est. pay for a rep\'s sale opened from the Company tab', async () => {
+    const sale = { ...backDatedSale, commission: 999 } as Sale;
+    await render([sale], [carrierOrder], thisMonth());
+    await openRep();
+    const customer = [...container.querySelectorAll<HTMLElement>('[role="button"]')]
+      .find((el) => el.textContent?.includes('Dana Reyes'))!;
+    await act(async () => customer.click());
+    expect(captured.sheet?.sale?.id).toBe('s1');
+    expect(captured.sheet?.estPay).toBeNull();
   });
 });
 
