@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { DeckProvider, hasLeadInProgress, useDeck } from './deckState';
 import { finishLead } from './solarClient';
+import { overrideStatusBar } from '@/lib/app/statusBar';
 import { CalculatorSlide } from './CalculatorSlide';
 import { LeadFormSlide } from './LeadFormSlide';
 import { BookingSlide, ConfirmationSlide, PrequalSlide } from './InteractiveSlides';
@@ -75,6 +76,10 @@ function Deck() {
   const { index, dir } = pos;
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+
+  // A light deck inside the dark portal: in the iOS app the status bar text
+  // goes dark (black) while it is up, or the clock vanishes into the page.
+  useEffect(() => overrideStatusBar('dark'), []);
 
   const go = useCallback((target: number) => {
     setPos((cur) => {

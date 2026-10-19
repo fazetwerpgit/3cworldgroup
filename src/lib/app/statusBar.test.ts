@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { installStatusBarSync, statusBarStyleFor } from './statusBar';
+import { installStatusBarSync, overrideStatusBar, statusBarStyleFor } from './statusBar';
 
 let posted: Array<Record<string, unknown>>;
 let uninstall: () => void = () => {};
@@ -20,6 +20,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
   document.body.className = '';
+  document.body.removeAttribute('data-status-bar');
 });
 afterEach(() => {
   uninstall();
@@ -39,6 +40,32 @@ describe('statusBarStyleFor', () => {
     document.body.className = '';
     expect(statusBarStyleFor(document.body)).toBe('light');
     expect(statusBarStyleFor(null)).toBe('light');
+  });
+});
+
+describe('overrideStatusBar', () => {
+  it('a light page pins dark text over the dark theme, and the restore hands back to the theme', () => {
+    document.body.className = 'portal-scope dark';
+    const restore = overrideStatusBar('dark');
+    expect(statusBarStyleFor(document.body)).toBe('dark');
+    restore();
+    expect(document.body.hasAttribute('data-status-bar')).toBe(false);
+    expect(statusBarStyleFor(document.body)).toBe('light');
+  });
+
+  it('in the app: sends the override and the theme style again after it is lifted', async () => {
+    enterApp(true);
+    document.body.className = 'portal-scope dark';
+    uninstall = installStatusBarSync();
+    const restore = overrideStatusBar('dark');
+    await flush();
+    restore();
+    await flush();
+    expect(posted).toEqual([
+      { type: 'statusBar', style: 'light' },
+      { type: 'statusBar', style: 'dark' },
+      { type: 'statusBar', style: 'light' },
+    ]);
   });
 });
 
