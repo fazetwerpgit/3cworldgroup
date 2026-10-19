@@ -187,3 +187,15 @@ it('overwrites the last send, including a bounce, when re-sent', async () => {
   expect(state.invite).not.toHaveProperty('postmarkMessageId');
   expect(state.invite).not.toHaveProperty('emailedAt');
 });
+
+it('never shows the link of an invite made to an existing account, not even to an owner', async () => {
+  state.invite = { ...state.invite, accountExistedAtInvite: true };
+  const copy = await GET(request('GET'), params);
+  expect(copy.status).toBe(409);
+  expect(await copy.json()).not.toHaveProperty('inviteUrl');
+
+  const resent = await (await POST(request('POST'), params)).json();
+  expect(resent).toMatchObject({ emailSent: true });
+  expect(resent).not.toHaveProperty('inviteUrl');
+  expect(state.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'hire@example.com' }));
+});

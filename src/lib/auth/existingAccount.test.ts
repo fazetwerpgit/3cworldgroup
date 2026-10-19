@@ -13,7 +13,7 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
 }));
 
-import { findActivePortalAccount } from './existingAccount';
+import { findActivePortalAccount, findAnyAccount } from './existingAccount';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -61,5 +61,32 @@ describe('findActivePortalAccount', () => {
     getUserByEmailMock.mockRejectedValue(error);
 
     await expect(findActivePortalAccount('rep@example.com')).rejects.toBe(error);
+  });
+});
+
+describe('findAnyAccount', () => {
+  const profilesWith = (ids: string[]) => {
+    const where = vi.fn(() => ({
+      limit: () => ({ get: async () => ({ docs: ids.map((id) => ({ id })) }) }),
+    }));
+    usersCollectionMock.mockReturnValue({ doc: vi.fn(() => ({ get: userDocGetMock })), where });
+    return where;
+  };
+
+  it('finds a login even with no users doc', async () => {
+    await expect(findAnyAccount('rep@example.com')).resolves.toEqual({ uid: 'user-1' });
+  });
+
+  it('finds a users doc with no login', async () => {
+    getUserByEmailMock.mockRejectedValue({ code: 'auth/user-not-found' });
+    const where = profilesWith(['profile-1']);
+    await expect(findAnyAccount('rep@example.com')).resolves.toEqual({ uid: 'profile-1' });
+    expect(where).toHaveBeenCalledWith('email', '==', 'rep@example.com');
+  });
+
+  it('returns null when neither exists', async () => {
+    getUserByEmailMock.mockRejectedValue({ code: 'auth/user-not-found' });
+    profilesWith([]);
+    await expect(findAnyAccount('new@example.com')).resolves.toBeNull();
   });
 });

@@ -9,6 +9,7 @@ const {
   userDocGetMock,
   updateUserMock,
   deleteUserMock,
+  verifyIdTokenMock,
   sendPendingEsignDocsMock,
   inviteData,
 } = vi.hoisted(() => ({
@@ -20,6 +21,7 @@ const {
   userDocGetMock: vi.fn(),
   updateUserMock: vi.fn(),
   deleteUserMock: vi.fn(),
+  verifyIdTokenMock: vi.fn(),
   sendPendingEsignDocsMock: vi.fn(),
   inviteData: {
     candidateName: 'Candidate',
@@ -31,15 +33,18 @@ const {
     status: 'in_progress',
     tokenHash: 'hashed-token-1',
     expiresAt: undefined as { toDate: () => Date } | undefined,
+    accountExistedAtInvite: undefined as boolean | undefined,
   },
 }));
 
 vi.mock('next/server', () => {
   class TestNextRequest {
     body: string;
+    headers: Headers;
 
-    constructor(_url: string, init: { body?: string }) {
+    constructor(_url: string, init: { body?: string; headers?: Record<string, string> }) {
       this.body = init.body ?? '';
+      this.headers = new Headers(init.headers ?? {});
     }
 
     async json() {
@@ -69,6 +74,7 @@ vi.mock('@/lib/firebase/admin', () => ({
     getUserByEmail: getUserByEmailMock,
     updateUser: updateUserMock,
     deleteUser: deleteUserMock,
+    verifyIdToken: verifyIdTokenMock,
   },
   adminDb: {
     collection: vi.fn((name: string) => {
@@ -131,9 +137,15 @@ import { getOnboardingItemsForUser, requiresHeavyVetting } from '@/types';
 import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 import { GET, POST } from './route';
 
-function request(references: Record<string, string>, password = 'password', extra: Record<string, unknown> = {}) {
+function request(
+  references: Record<string, string>,
+  password = 'password',
+  extra: Record<string, unknown> = {},
+  headers: Record<string, string> = {}
+) {
   return new NextRequest('http://localhost/api/public/onboarding/token-1', {
     method: 'POST',
+    headers,
     body: JSON.stringify({
       displayName: 'Candidate',
       phone: '555-0100',
@@ -159,6 +171,7 @@ beforeEach(() => {
   getUserByEmailMock.mockRejectedValue({ code: 'auth/user-not-found' });
   userDocGetMock.mockResolvedValue({ exists: false, data: () => undefined });
   deleteUserMock.mockResolvedValue(undefined);
+  verifyIdTokenMock.mockRejectedValue(new Error('no token'));
   batchCommitMock.mockResolvedValue(undefined);
   sendPendingEsignDocsMock.mockResolvedValue([]);
   Object.assign(inviteData, {
@@ -171,8 +184,18 @@ beforeEach(() => {
     status: 'in_progress',
     tokenHash: 'hashed-token-1',
     expiresAt: undefined,
+    accountExistedAtInvite: undefined,
   });
 });
+
+// The hire proved they own the existing login by signing in to it.
+const signedInAs = (uid: string) => {
+  verifyIdTokenMock.mockImplementation(async (token: string) => {
+    if (token !== `id-token-${uid}`) throw new Error('bad token');
+    return { uid };
+  });
+  return { authorization: `Bearer id-token-${uid}` };
+};
 
 describe('GET /api/public/onboarding/[token]', () => {
   it('returns the onboarding form for an email without an active portal account', async () => {
@@ -327,11 +350,12 @@ describe('POST /api/public/onboarding/[token]', () => {
     userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'inactive', fieldRole: 'entry_level_rep' }) });
 
     const response = await POST(
-      request({ onboarding_submission: 'completed' }, 'password', { accountType: 'savings' }),
+      request({ onboarding_submission: 'completed' }, '', { accountType: 'savings' }, signedInAs('rehire')),
       params()
     );
 
     expect(response.status).toBe(200);
+    expect(updateUserMock).not.toHaveBeenCalled();
     const itemWrite = (id: string) => batchSetMock.mock.calls.find(([ref]) => ref?.id === `rehire_${id}`);
     // Full replace (no merge option) drops esignEnvelopeId, approvals and stale prefill.
     expect(itemWrite('contract')).toEqual([
@@ -357,11 +381,19 @@ describe('POST /api/public/onboarding/[token]', () => {
     expect(response.status).toBe(400);
   });
 
-  it('reuses an Auth user when its users doc is missing', async () => {
+  it('reuses an Auth user with no users doc only once its owner signs in, and never sets its password', async () => {
     getUserByEmailMock.mockResolvedValue({ uid: 'existing-user' });
-    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+    const refused = await POST(request({ onboarding_submission: 'completed' }), params());
+    expect(refused.status).toBe(401);
+    await expect(refused.json()).resolves.toMatchObject({ code: 'sign_in_required' });
+    expect(batchSetMock).not.toHaveBeenCalled();
+
+    const response = await POST(
+      request({ onboarding_submission: 'completed' }, '', {}, signedInAs('existing-user')),
+      params()
+    );
     expect(response.status).toBe(200);
-    expect(updateUserMock).toHaveBeenCalledWith('existing-user', expect.any(Object));
+    expect(updateUserMock).not.toHaveBeenCalled();
     expect(createUserMock).not.toHaveBeenCalled();
   });
 
@@ -378,12 +410,107 @@ describe('POST /api/public/onboarding/[token]', () => {
     expect(createUserMock).not.toHaveBeenCalled();
   });
 
-  it('lets an invite claim a bare self-signup still waiting for a role', async () => {
+  it('lets a bare self-signup claim the invite by signing in to it', async () => {
     getUserByEmailMock.mockResolvedValue({ uid: 'self-signup' });
     userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'pending' }) });
-    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+    const response = await POST(
+      request({ onboarding_submission: 'completed' }, '', {}, signedInAs('self-signup')),
+      params()
+    );
     expect(response.status).toBe(200);
-    expect(updateUserMock).toHaveBeenCalledWith('self-signup', expect.any(Object));
+    expect(updateUserMock).not.toHaveBeenCalled();
+  });
+
+  describe('a pre-existing account is never taken over through the link', () => {
+    it.each([
+      ['an inactive former rep', { exists: true, data: () => ({ status: 'inactive', fieldRole: 'ae_tier_1' }) }],
+      ['a self-signup with no role', { exists: true, data: () => ({ status: 'pending' }) }],
+      ['a login with no users doc', { exists: false, data: () => undefined }],
+    ])('refuses %s without a sign-in and never calls updateUser with a password', async (_label, doc) => {
+      getUserByEmailMock.mockResolvedValue({ uid: 'victim' });
+      userDocGetMock.mockResolvedValue(doc);
+
+      const response = await POST(request({ onboarding_submission: 'completed' }, 'attacker-pass'), params());
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({ code: 'sign_in_required' });
+      expect(updateUserMock).not.toHaveBeenCalled();
+      expect(createUserMock).not.toHaveBeenCalled();
+      expect(batchSetMock).not.toHaveBeenCalled();
+    });
+
+    it("refuses a sign-in to some other account (the inviter's own token)", async () => {
+      getUserByEmailMock.mockResolvedValue({ uid: 'victim' });
+      userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'inactive', fieldRole: 'ae_tier_1' }) });
+
+      const response = await POST(
+        request({ onboarding_submission: 'completed' }, 'attacker-pass', {}, signedInAs('manager-1')),
+        params()
+      );
+
+      expect(response.status).toBe(401);
+      expect(updateUserMock).not.toHaveBeenCalled();
+      expect(batchSetMock).not.toHaveBeenCalled();
+    });
+
+    it('ignores any password sent with a valid sign-in: updateUser is never called', async () => {
+      getUserByEmailMock.mockResolvedValue({ uid: 'victim' });
+      userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'inactive', fieldRole: 'ae_tier_1' }) });
+
+      const response = await POST(
+        request({ onboarding_submission: 'completed' }, 'new-password', {}, signedInAs('victim')),
+        params()
+      );
+
+      expect(response.status).toBe(200);
+      expect(updateUserMock).not.toHaveBeenCalled();
+      expect(createUserMock).not.toHaveBeenCalled();
+      expect(batchSetMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ convertedUserId: 'victim', accountCreatedByInvite: false }),
+        { merge: true }
+      );
+    });
+
+    it('asks for a sign-in on the form when the invite was made to an existing account', async () => {
+      inviteData.accountExistedAtInvite = true;
+      const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+      await expect(response.json()).resolves.toMatchObject({ locked: false, signInRequired: true });
+    });
+
+    it('asks for a sign-in on the form when a login exists now', async () => {
+      getUserByEmailMock.mockResolvedValue({ uid: 'victim' });
+      userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'inactive', fieldRole: 'ae_tier_1' }) });
+      const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+      await expect(response.json()).resolves.toMatchObject({ locked: false, signInRequired: true });
+    });
+  });
+
+  it('creates a brand-new account end to end with the password the hire chose', async () => {
+    const form = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+    const formJson = await form.json();
+    expect(formJson).toMatchObject({ locked: false });
+    expect(formJson.signInRequired).toBeUndefined();
+
+    const response = await POST(request({ onboarding_submission: 'completed' }, 'hire-pass'), params());
+
+    expect(response.status).toBe(200);
+    expect(createUserMock).toHaveBeenCalledWith({
+      email: 'candidate@example.com',
+      password: 'hire-pass',
+      displayName: 'Candidate',
+    });
+    expect(updateUserMock).not.toHaveBeenCalled();
+    expect(batchSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-1' }),
+      expect.objectContaining({ status: 'pending', fieldRole: 'entry_level_rep', reportsToId: 'owner-1' })
+    );
+    expect(batchSetMock).toHaveBeenCalledWith(
+      inviteRef,
+      expect.objectContaining({ status: 'submitted', convertedUserId: 'user-1', accountCreatedByInvite: true }),
+      { merge: true }
+    );
+    expect(batchCommitMock).toHaveBeenCalled();
   });
 
   it('returns success when notification creation fails', async () => {

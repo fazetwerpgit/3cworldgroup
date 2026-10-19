@@ -92,6 +92,12 @@ export interface OnboardingInvite {
   /** The raw token, encrypted, so the link can be copied or re-sent later. Absent on older invites. */
   tokenEncrypted?: string;
   applicationId?: string;
+  /**
+   * True when the email already had an account (Auth login or users doc) when
+   * the invite was made. Such an invite never sets a password: the hire signs
+   * in with their own. Absent on older invites (the submit checks Auth live).
+   */
+  accountExistedAtInvite?: boolean;
   convertedUserId?: string;
   expiresAt: Date;
   createdAt: Date;

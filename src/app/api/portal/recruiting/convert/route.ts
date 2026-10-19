@@ -3,6 +3,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
 import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
+import { canHireAtFieldRole } from '@/lib/recruiting/roleCeiling';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
 
@@ -113,6 +114,17 @@ export async function POST(request: NextRequest) {
 
     const targetUserRef = adminDb.collection('users').doc(invite.convertedUserId);
     const targetUser = await targetUserRef.get();
+    // A field manager never activates a hire above their own tier, whether the
+    // role came from the invite or was set on the account since.
+    const hireRoles = [invite.intendedFieldRole, targetUser.get('fieldRole')].filter(
+      (role): role is string => typeof role === 'string'
+    );
+    if (hireRoles.some((role) => !canHireAtFieldRole(requester.role, role))) {
+      return NextResponse.json(
+        { error: 'Only management can activate a hire at this role.' },
+        { status: 403 }
+      );
+    }
     if (targetUser.get('status') !== 'active') {
       const readiness = await getActivationReadiness(invite.convertedUserId);
       if (!readiness.ready) {

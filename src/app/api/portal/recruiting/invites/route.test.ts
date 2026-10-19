@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const state = vi.hoisted(() => ({
@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   applications: [] as Array<Record<string, unknown>>,
   invites: [] as Array<Record<string, unknown>>,
   onboardingAccount: null as { uid: string } | null,
+  anyAccount: null as { uid: string } | null,
   sendEmail: vi.fn(),
   created: null as Record<string, unknown> | null,
 }));
@@ -61,6 +62,7 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: state.g
 vi.mock('@/lib/auth/existingAccount', () => ({
   findActivePortalAccount: vi.fn(async () => null),
   findOnboardingPortalAccount: vi.fn(async () => state.onboardingAccount),
+  findAnyAccount: vi.fn(async () => state.anyAccount),
 }));
 
 import { GET, POST } from './route';
@@ -92,6 +94,7 @@ beforeEach(() => {
   state.applications = [];
   state.invites = [];
   state.onboardingAccount = null;
+  state.anyAccount = null;
   state.sendEmail.mockReset().mockResolvedValue({ ok: true, messageId: 'pm-1' });
   state.created = null;
 });
@@ -185,14 +188,14 @@ it('refuses a new invite for an email already partway through onboarding', async
   expect(response.status).toBe(409);
 });
 
-function inviteRequest() {
+function inviteRequest(intendedFieldRole = 'entry_level_rep') {
   return new NextRequest('http://localhost/api/portal/recruiting/invites', {
     method: 'POST',
     body: JSON.stringify({
       candidateName: 'Rex',
       candidateEmail: 'rex@example.com',
       candidatePhone: '555-0100',
-      intendedFieldRole: 'entry_level_rep',
+      intendedFieldRole,
     }),
     headers: { 'content-type': 'application/json' },
   });
@@ -223,4 +226,75 @@ it('lists each invite with its email status, null on older invites', async () =>
   state.invites = [invite(1, { emailStatus: 'bounced' }), invite(2)];
   const json = await (await GET(getRequest())).json();
   expect(json.invites.map((row: { emailStatus: unknown }) => row.emailStatus)).toEqual(['bounced', null]);
+});
+
+const asFieldManager = (fieldRole = 'l1_manager') => {
+  state.requester = { role: 'rep', fieldRole, displayName: 'Mgr' };
+  state.gate.mockResolvedValue({ ok: true, uid: 'mgr-1', name: 'Mgr', email: 'm@example.com' });
+};
+
+describe('an email that already has an account', () => {
+  it.each(['l1_manager', 'l2_manager', 'ibo_level_1'])('is refused to a %s, with no invite made', async (fieldRole) => {
+    asFieldManager(fieldRole);
+    state.anyAccount = { uid: 'former-rep' };
+
+    const response = await POST(inviteRequest());
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'That email already has an account. Ask an admin to re-invite them.',
+    });
+    expect(state.created).toBeNull();
+    expect(state.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('is refused to operations (below admin)', async () => {
+    state.requester = { role: 'operations' };
+    state.anyAccount = { uid: 'former-rep' };
+    expect((await POST(inviteRequest())).status).toBe(409);
+  });
+
+  it.each(['admin', 'owner'])('may be re-invited by an %s, emailed only: no link comes back', async (role) => {
+    state.requester = { role };
+    state.anyAccount = { uid: 'former-rep' };
+
+    const response = await POST(inviteRequest());
+
+    expect(response.status).toBe(200);
+    const json = await response.json();
+    expect(json).not.toHaveProperty('inviteUrl');
+    expect(json.invite).toMatchObject({ existingAccount: true });
+    expect(state.created).toMatchObject({ accountExistedAtInvite: true });
+    expect(state.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'rex@example.com' }));
+  });
+});
+
+it("gives a field manager the copy link for a brand-new account's invite", async () => {
+  asFieldManager();
+  const json = await (await POST(inviteRequest())).json();
+  expect(json.inviteUrl).toMatch(/^http:\/\/localhost\/onboard\//);
+  expect(state.created).toMatchObject({ accountExistedAtInvite: false, ownerId: 'mgr-1' });
+});
+
+describe('role ceiling', () => {
+  it.each(['regional_manager', 'director'])('refuses a field manager inviting a %s', async (role) => {
+    asFieldManager();
+    const response = await POST(inviteRequest(role));
+    expect(response.status).toBe(403);
+    expect(state.created).toBeNull();
+  });
+
+  it.each(['ibo_level_4', 'l2_manager'])('refuses a %s inviting a director', async (fieldRole) => {
+    asFieldManager(fieldRole);
+    expect((await POST(inviteRequest('director'))).status).toBe(403);
+  });
+
+  it.each(['entry_level_rep', 'ae_tier_1', 'ae_tier_2'])('lets a field manager invite a %s', async (role) => {
+    asFieldManager();
+    expect((await POST(inviteRequest(role))).status).toBe(200);
+  });
+
+  it('lets management invite a director', async () => {
+    expect((await POST(inviteRequest('director'))).status).toBe(200);
+  });
 });

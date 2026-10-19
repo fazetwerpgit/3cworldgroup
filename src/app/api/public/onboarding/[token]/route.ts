@@ -15,11 +15,23 @@ import { validateAddress } from '@/lib/validation/address';
 import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { isEsignItem } from '@/lib/onboarding/esign';
-import { findActivePortalAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
+import { findActivePortalAccount, findAuthAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
 import { issueSigningSession } from '@/lib/onboarding/inviteSigning';
 
 function clean(value: unknown, max = 500) {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+/** The uid of a valid Firebase ID token on the request, if any. */
+async function signedInUid(request: NextRequest): Promise<string | null> {
+  if (!adminAuth) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(request.headers.get('authorization') ?? '');
+  if (!match) return null;
+  try {
+    return (await adminAuth.verifyIdToken(match[1])).uid;
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(
@@ -82,6 +94,12 @@ export async function GET(
       return lockedView({ onboardingElsewhere: true });
     }
 
+    // A login already exists for this email (a past hire, a self-signup, or
+    // one made since the invite): the hire signs in with its password rather
+    // than creating one, and the link never resets it.
+    const signInRequired =
+      data.accountExistedAtInvite === true || (await findAuthAccount(data.candidateEmail)) !== null;
+
     if (data.status === 'invited') {
       await invite.ref.set({ status: 'in_progress', updatedAt: new Date() }, { merge: true });
     }
@@ -103,6 +121,7 @@ export async function GET(
       },
       items,
       locked: false,
+      ...(signInRequired ? { signInRequired: true } : {}),
     });
   } catch (error) {
     console.error('Error loading public onboarding invite:', error);
@@ -167,7 +186,44 @@ export async function POST(
       ? (body.references as Record<string, unknown>)
       : {};
 
-    if (!password || password.length < 6) {
+    // An email that already has a login is claimed only by signing in to it.
+    // The link never sets that login's password: the invite is made by a
+    // manager, and setting it would hand them someone else's account.
+    // (accountExistedAtInvite is checked by the GET; Auth is checked live here,
+    // which also covers a login made after the invite. If the login behind
+    // such an invite is gone, a fresh one is created, so no one is displaced.)
+    const existingAuth = await findAuthAccount(data.candidateEmail);
+    let existingUserData: Record<string, unknown> | undefined;
+    if (existingAuth) {
+      const existingDoc = await adminDb.collection('users').doc(existingAuth.uid).get();
+      existingUserData = existingDoc.exists ? existingDoc.data() : undefined;
+      // Never an active account, a back-office account, or a hire midway
+      // through someone else's onboarding, even when signed in.
+      const status = existingUserData?.status;
+      const platformRole =
+        typeof existingUserData?.role === 'string' && ['owner', 'admin', 'operations'].includes(existingUserData.role);
+      const onboardingElsewhere =
+        status === 'pending' && !!existingUserData?.fieldRole && existingUserData?.onboardingInviteId !== invite.id;
+      if (existingDoc.exists && (status === 'active' || platformRole || onboardingElsewhere)) {
+        return NextResponse.json(
+          {
+            error: onboardingElsewhere
+              ? 'This email is already onboarding with 3C. Sign in at the portal to continue, or contact your manager.'
+              : 'This email already has an active portal account. Sign in at the portal instead, or contact your manager.',
+          },
+          { status: 409 }
+        );
+      }
+      if ((await signedInUid(request)) !== existingAuth.uid) {
+        return NextResponse.json(
+          {
+            error: `${data.candidateEmail} already has a portal account. Sign in with its password to continue, or reset the password from the email we send to that address.`,
+            code: 'sign_in_required',
+          },
+          { status: 401 }
+        );
+      }
+    } else if (!password || password.length < 6) {
       return NextResponse.json(
         { error: 'Create a portal password with at least 6 characters' },
         { status: 400 }
@@ -263,33 +319,10 @@ export async function POST(
     const now = new Date();
     let userRecord: { uid: string };
     let createdAuthUser = false;
-    let existingUserData: Record<string, unknown> | undefined;
-    try {
-      userRecord = await adminAuth.getUserByEmail(data.candidateEmail);
-      const existingDoc = await adminDb.collection('users').doc(userRecord.uid).get();
-      existingUserData = existingDoc.exists ? existingDoc.data() : undefined;
-      // An invite may claim an existing login only when nobody else is using
-      // it: a bare self-signup still waiting for a role, a past hire who is no
-      // longer active (re-hire), or this same invite retried. Never an active
-      // account, a back-office account, or a hire midway through someone
-      // else's onboarding: claiming resets their password and profile.
-      const status = existingUserData?.status;
-      const platformRole = typeof existingUserData?.role === 'string' && ['owner', 'admin', 'operations'].includes(existingUserData.role);
-      const onboardingElsewhere =
-        status === 'pending' && !!existingUserData?.fieldRole && existingUserData?.onboardingInviteId !== invite.id;
-      if (existingDoc.exists && (status === 'active' || platformRole || onboardingElsewhere)) {
-        return NextResponse.json(
-          {
-            error: onboardingElsewhere
-              ? 'This email is already onboarding with 3C. Sign in at the portal to continue, or contact your manager.'
-              : 'This email already has an active portal account. Sign in at the portal instead, or contact your manager.',
-          },
-          { status: 409 }
-        );
-      }
-      await adminAuth.updateUser(userRecord.uid, { password, displayName });
-    } catch (error: unknown) {
-      if (!(error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'auth/user-not-found')) throw error;
+    if (existingAuth) {
+      // Signed in above as this very account. Its password is left alone.
+      userRecord = existingAuth;
+    } else {
       userRecord = await adminAuth.createUser({ email: data.candidateEmail, password, displayName });
       createdAuthUser = true;
     }
@@ -392,6 +425,7 @@ export async function POST(
         ...(signingSession ? { esignSession: signingSession.record } : {}),
         status: 'submitted',
         convertedUserId: userRecord.uid,
+        accountCreatedByInvite: createdAuthUser,
         candidateName: displayName,
         candidatePhone: phone,
         candidateCity: city,

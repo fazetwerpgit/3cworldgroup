@@ -8,7 +8,8 @@ import { inviteEmailFields, inviteUrlFor, openInviteToken, sealInviteToken, send
 import { saveInviteEmailStatus } from '@/lib/recruiting/inviteEmailStatus';
 
 // One invite's link, for the manager who sent it (or management).
-//   GET  -> { inviteUrl }: the saved link, to copy and send by hand.
+//   GET  -> { inviteUrl }: the saved link, to copy and send by hand. Never for
+//           an invite to an email that already had an account.
 //   POST -> re-sends the invite email and gives the next 14 days. The saved
 //           link is kept, so the one already sent works again; an invite with
 //           no saved link (made before links were saved) gets a fresh one.
@@ -54,6 +55,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const invite = await loadOpenInvite(request, id);
     if (!invite.ok) return invite.response;
 
+    // The email already had an account when invited: the link is only ever
+    // emailed to that inbox, never shown to the inviter.
+    if (invite.data.accountExistedAtInvite === true) {
+      return NextResponse.json(
+        { error: 'This person already has an account, so their link only goes to their email. Use Resend email.' },
+        { status: 409 }
+      );
+    }
     const token = openInviteToken(invite.data.tokenEncrypted);
     if (!token) {
       return NextResponse.json(
@@ -118,7 +127,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const emailSent = email.sent;
     await saveInviteEmailStatus(invite.ref, inviteEmailFields(email));
     return NextResponse.json({
-      inviteUrl,
+      ...(invite.data.accountExistedAtInvite === true ? {} : { inviteUrl }),
       emailSent,
       newLink: renewed,
       linkSaved: renewed ? 'tokenEncrypted' in update : true,

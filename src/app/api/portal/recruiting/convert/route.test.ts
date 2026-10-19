@@ -190,6 +190,42 @@ describe('POST /api/portal/recruiting/convert', () => {
     expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'submitted' });
   });
 
+  describe('role ceiling', () => {
+    it.each([
+      ['an invite for a director', { intendedFieldRole: 'director' }, {}],
+      ['an invite for a regional manager', { intendedFieldRole: 'regional_manager' }, {}],
+      ['a hire whose account was moved to director', { intendedFieldRole: 'entry_level_rep' }, { fieldRole: 'director' }],
+    ])('refuses a field manager activating %s', async (_label, invitePatch, userPatch) => {
+      seedRecruit();
+      firestore.invites.set('invite-1', { ...firestore.invites.get('invite-1'), ...invitePatch });
+      firestore.users.set('recruit-1', { ...firestore.users.get('recruit-1'), ...userPatch });
+
+      const response = await POST(request({ inviteId: 'invite-1', action: 'approved' }));
+
+      expect(response.status).toBe(403);
+      expect(mockActivateUser).not.toHaveBeenCalled();
+      expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'submitted' });
+      expect(firestore.users.get('recruit-1')).toMatchObject({ status: 'pending' });
+    });
+
+    it('lets a field manager activate a hire at a rep role', async () => {
+      seedRecruit();
+      firestore.invites.set('invite-1', { ...firestore.invites.get('invite-1'), intendedFieldRole: 'ae_tier_2' });
+      firestore.users.set('recruit-1', { ...firestore.users.get('recruit-1'), fieldRole: 'ae_tier_2' });
+      expect((await POST(request({ inviteId: 'invite-1', action: 'approved' }))).status).toBe(200);
+    });
+
+    it('lets management activate a director', async () => {
+      seedRecruit();
+      firestore.users.set('owner-1', { role: 'owner', displayName: 'Owner' });
+      mockGate.mockResolvedValue({ ok: true, uid: 'owner-1' });
+      firestore.invites.set('invite-1', { ...firestore.invites.get('invite-1'), intendedFieldRole: 'director' });
+      firestore.users.set('recruit-1', { ...firestore.users.get('recruit-1'), fieldRole: 'director' });
+      expect((await POST(request({ inviteId: 'invite-1', action: 'approved' }))).status).toBe(200);
+      expect(mockActivateUser).toHaveBeenCalledWith('recruit-1');
+    });
+  });
+
   it('rejects a recruit end to end and deactivates the pending user', async () => {
     seedRecruit();
 

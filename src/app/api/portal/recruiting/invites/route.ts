@@ -11,7 +11,9 @@ import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens'
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
 import { inviteEmailFields, inviteUrlFor, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
 import { saveInviteEmailStatus } from '@/lib/recruiting/inviteEmailStatus';
-import { findActivePortalAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
+import { findActivePortalAccount, findAnyAccount, findOnboardingPortalAccount } from '@/lib/auth/existingAccount';
+import { canHireAtFieldRole } from '@/lib/recruiting/roleCeiling';
+import { isAdminLevel } from '@/types/auth';
 import { storedSource } from '@/lib/forms/applicationSource';
 
 const APPLICATION_LIMIT = 1000;
@@ -36,6 +38,7 @@ function serializeInvite(doc: FirebaseFirestore.QueryDocumentSnapshot) {
     applicationId: data.applicationId ?? null,
     convertedUserId: data.convertedUserId ?? null,
     linkSaved: typeof data.tokenEncrypted === 'string',
+    existingAccount: data.accountExistedAtInvite === true,
     emailStatus: data.emailStatus ?? null,
     expiresAt: data.expiresAt?.toDate?.()?.toISOString?.() ?? null,
     submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() ?? null,
@@ -148,6 +151,14 @@ export async function POST(request: NextRequest) {
     if (!requester?.canManage) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    // A field manager hires only below their own tier: regional manager and
+    // director hires are invited (and activated) by management.
+    if (!canHireAtFieldRole(requester.role, intendedFieldRole)) {
+      return NextResponse.json(
+        { error: 'Only management can invite a hire at that role.' },
+        { status: 403 }
+      );
+    }
     if (await findActivePortalAccount(candidateEmail)) {
       return NextResponse.json(
         { error: 'This email already has an active portal account. They can sign in with it instead.' },
@@ -157,6 +168,17 @@ export async function POST(request: NextRequest) {
     if (await findOnboardingPortalAccount(candidateEmail)) {
       return NextResponse.json(
         { error: 'This email is already partway through onboarding with 3C. Ask them to finish that invite, or contact an admin.' },
+        { status: 409 }
+      );
+    }
+    // Any other account on this email (a former rep, a self-signup with no
+    // role, a login with no profile) may only be re-invited by an admin, and
+    // even then the hire signs in with their own password: the invite link
+    // never sets it.
+    const accountExistedAtInvite = (await findAnyAccount(candidateEmail)) !== null;
+    if (accountExistedAtInvite && !isAdminLevel(requester.role)) {
+      return NextResponse.json(
+        { error: 'That email already has an account. Ask an admin to re-invite them.' },
         { status: 409 }
       );
     }
@@ -176,6 +198,7 @@ export async function POST(request: NextRequest) {
       ownerId: requestedBy,
       ownerName: requester.name,
       tokenHash,
+      accountExistedAtInvite,
       ...(tokenEncrypted ? { tokenEncrypted } : {}),
       ...(applicationId ? { applicationId } : {}),
       expiresAt,
@@ -214,12 +237,15 @@ export async function POST(request: NextRequest) {
         ownerName: requester.name,
         applicationId: applicationId || null,
         linkSaved: tokenEncrypted !== null,
+        existingAccount: accountExistedAtInvite,
         emailStatus: emailSent ? 'sent' : 'failed',
         expiresAt: expiresAt.toISOString(),
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
       },
-      inviteUrl,
+      // The copy-link fallback is only for a brand-new account. An existing
+      // account's link goes to its own inbox and nowhere else.
+      ...(accountExistedAtInvite ? {} : { inviteUrl }),
       emailSent,
     });
   } catch (error) {

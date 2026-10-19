@@ -40,6 +40,39 @@ interface OnboardingResponse {
   closed?: boolean;
   /** The email is midway through another invite's onboarding. */
   onboardingElsewhere?: boolean;
+  /** The email already has a login: the hire signs in to it instead of creating a password. */
+  signInRequired?: boolean;
+}
+
+const WRONG_PASSWORD_CODES = [
+  'auth/invalid-credential',
+  'auth/invalid-login-credentials',
+  'auth/wrong-password',
+  'auth/user-not-found',
+];
+
+// Signs in to the hire's existing account just long enough to prove it is
+// theirs: the ID token goes with the packet, then this browser signs out. The
+// link never sets an existing account's password. Null on a wrong password.
+async function existingAccountToken(email: string, password: string): Promise<string | null> {
+  const [{ auth }, { signInWithEmailAndPassword, signOut }] = await Promise.all([
+    import('@/lib/firebase/config'),
+    import('firebase/auth'),
+  ]);
+  if (!auth) throw new Error('Sign-in is not available right now. Try again later.');
+  try {
+    const credential = await signInWithEmailAndPassword(auth, email, password);
+    const idToken = await credential.user.getIdToken();
+    await signOut(auth).catch(() => undefined);
+    return idToken;
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+    if (WRONG_PASSWORD_CODES.includes(code)) return null;
+    if (code === 'auth/too-many-requests') {
+      throw new Error('Too many tries. Wait a few minutes, or email yourself a reset link.');
+    }
+    throw new Error("Couldn't sign in. Try again.");
+  }
 }
 
 // The signing key from the packet submit, kept for this tab only so a reload
@@ -104,6 +137,7 @@ export default function PublicOnboardingPage() {
   // Set once the packet is in and the documents can be signed right here.
   const [signingKey, setSigningKey] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [resetNote, setResetNote] = useState('');
   const [profile, setProfile] = useState({
     displayName: '',
     phone: '',
@@ -270,19 +304,44 @@ export default function PublicOnboardingPage() {
     setError('');
     setFieldErrors({});
 
+    const passwordError = (message: string) => {
+      setFieldErrors({ password: message });
+      const input = document.getElementById(FIELD_INPUT_ID.password);
+      input?.focus({ preventScroll: true });
+      input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    };
+
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (data.signInRequired) {
+        const idToken = await existingAccountToken(data.invite.candidateEmail, profile.password);
+        if (!idToken) {
+          passwordError("That password doesn't match this account. Try again, or email yourself a reset link.");
+          return;
+        }
+        headers.Authorization = `Bearer ${idToken}`;
+      }
       const response = await fetch(`/api/public/onboarding/${token}`, {
         method: 'POST',
         signal: send.signal,
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           ...profile,
+          // An existing account keeps its own password: it is never sent.
+          ...(data.signInRequired ? { password: '' } : {}),
           references,
           ...(accountType ? { accountType } : {}),
           ...(taxClassification ? { taxClassification } : {}),
         }),
       });
       const json = await response.json();
+      if (!response.ok && json.code === 'sign_in_required') {
+        // A login exists for this email after all: ask for its password.
+        setData((prev) => (prev ? { ...prev, signInRequired: true } : prev));
+        setProfile((prev) => ({ ...prev, password: '' }));
+        passwordError(json.error || 'This email already has a portal account. Enter its password.');
+        return;
+      }
       if (!response.ok) {
         // A named field goes red in place and takes focus: it may be far above Submit.
         const field =
@@ -313,6 +372,26 @@ export default function PublicOnboardingPage() {
         sendRef.current = null;
         setSubmitting(false);
       }
+    }
+  };
+
+  // Firebase's own reset email, sent only to the invite's address: the owner
+  // of the account sets the new password, never whoever sent the invite.
+  const sendPasswordReset = async () => {
+    if (!data) return;
+    setResetNote('');
+    try {
+      const [{ auth }, { sendPasswordResetEmail }] = await Promise.all([
+        import('@/lib/firebase/config'),
+        import('firebase/auth'),
+      ]);
+      if (!auth) throw new Error('unavailable');
+      await sendPasswordResetEmail(auth, data.invite.candidateEmail);
+      setResetNote(
+        `We emailed a reset link to ${data.invite.candidateEmail}. Set a new password there, then enter it here.`
+      );
+    } catch {
+      setResetNote("Couldn't send the reset email. Try again in a minute.");
     }
   };
 
@@ -644,8 +723,12 @@ export default function PublicOnboardingPage() {
             )}
             <Field
               id="onboard-password"
-              label="Create portal password"
-              hint="Your account stays pending until management reviews the packet."
+              label={data?.signInRequired ? 'Your portal password' : 'Create portal password'}
+              hint={
+                data?.signInRequired
+                  ? `${data.invite.candidateEmail} already has a portal account. Enter its password to send this packet.`
+                  : 'Your account stays pending until management reviews the packet.'
+              }
               error={fieldErrors.password}
               required
               wide
@@ -667,12 +750,31 @@ export default function PublicOnboardingPage() {
                 minLength={6}
                 value={profile.password}
                 onChange={setText('password')}
-                onInvalid={() => markInvalid('password', REQUIRED_MESSAGE.password)}
-                autoComplete="new-password"
+                onInvalid={() =>
+                  markInvalid(
+                    'password',
+                    data?.signInRequired ? 'Enter your portal password' : REQUIRED_MESSAGE.password
+                  )
+                }
+                autoComplete={data?.signInRequired ? 'current-password' : 'new-password'}
                 required
                 {...describe('onboard-password', fieldErrors.password, true)}
               />
             </Field>
+            {data?.signInRequired ? (
+              <div className={f.wide}>
+                <p className={a.linkRow}>
+                  <button type="button" className={`${a.link} ${a.linkLime}`} onClick={sendPasswordReset}>
+                    Forgot it? Email me a reset link
+                  </button>
+                </p>
+                {resetNote ? (
+                  <p className={a.sub} role="status">
+                    {resetNote}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </FormSection>
 
           <section className={f.section} aria-labelledby="onboard-items-h">

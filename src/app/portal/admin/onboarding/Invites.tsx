@@ -18,7 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { downloadCsv, toCsv } from '@/lib/export/csv';
 import { displayPhone, telHref } from '@/lib/phone';
-import { INVITABLE_FIELD_ROLES } from '@/types/auth';
+import { invitableFieldRolesFor } from '@/lib/recruiting/roleCeiling';
 import { AdminEmpty, AdminFailed, AdminNotice, AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
 import { hubTabHref, ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 import s from '@/components/portal/rep/rep.module.css';
@@ -59,6 +59,8 @@ export interface InviteView {
   status: OnboardingInviteStatus;
   /** The link is stored and can be copied again. False on invites made before links were saved. */
   linkSaved: boolean;
+  /** The email already had an account: its link goes only to that inbox, never to Copy link. */
+  existingAccount?: boolean;
   /** The latest invite email: sent, failed, delivered or bounced. Null on older invites. */
   emailStatus?: InviteEmailStatus | null;
   ownerName: string;
@@ -223,12 +225,16 @@ export function Invites({
       });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to create invite');
-      setLatestInviteUrl(json.inviteUrl);
+      // No link comes back for an email that already has an account: it only
+      // ever goes to that inbox.
+      setLatestInviteUrl(typeof json.inviteUrl === 'string' ? json.inviteUrl : '');
       setForm(emptyForm);
       if (json.emailSent) {
         setSuccess(`Invite emailed to ${json.invite.candidateEmail} from the onboarding department.`);
-      } else {
+      } else if (typeof json.inviteUrl === 'string') {
         setWarning("Invite created, but the email didn't go out. Copy the link below and send it yourself.");
+      } else {
+        setWarning("Invite created, but the email didn't go out. Use Resend to try again.");
       }
       await reload();
       onChanged?.();
@@ -308,6 +314,8 @@ export function Invites({
       const fresh = json.newLink ? ' This is a new link; the one sent before no longer works.' : '';
       if (json.emailSent) {
         setSuccess(`Invite re-sent to ${invite.candidateEmail}. The link works until ${until}.${fresh}`);
+      } else if (typeof json.inviteUrl !== 'string') {
+        setWarning("The email didn't go out. Try Resend again in a minute.");
       } else {
         setShownLink({ id: invite.id, url: json.inviteUrl });
         setWarning(`The email didn't go out. Copy the link under their name and send it yourself (works until ${until}).${fresh}`);
@@ -440,7 +448,7 @@ export function Invites({
     const openedLegacy = !invite.linkSaved && row.state === 'started';
     return (
       <>
-        {invite.linkSaved && row.state !== 'expired' ? (
+        {invite.linkSaved && !invite.existingAccount && row.state !== 'expired' ? (
           <button
             type="button"
             className={`${s.btnSecondary} ${u.sm}`}
@@ -681,7 +689,7 @@ export function Invites({
                         setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))
                       }
                     >
-                      {INVITABLE_FIELD_ROLES.map((role) => (
+                      {invitableFieldRolesFor(user?.role).map((role) => (
                         <option key={role} value={role}>
                           {RoleDisplayNames[role]}
                         </option>

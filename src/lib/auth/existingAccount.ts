@@ -45,3 +45,30 @@ export async function findOnboardingPortalAccount(
   const inviteId = profile.data.onboardingInviteId;
   return { uid: profile.uid, onboardingInviteId: typeof inviteId === 'string' ? inviteId : null };
 }
+
+/** The Firebase Auth login for an email, if one exists (with or without a users doc). */
+export async function findAuthAccount(email: string): Promise<{ uid: string } | null> {
+  if (!adminAuth) return null;
+  try {
+    const record = await adminAuth.getUserByEmail(email);
+    return { uid: record.uid };
+  } catch (error: unknown) {
+    const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined;
+    if (code === 'auth/user-not-found' || code === 'auth/invalid-email') return null;
+    throw error;
+  }
+}
+
+/**
+ * Any account already tied to an email: a Firebase Auth login, or a users doc
+ * whose email matches (a profile can outlive or predate its login). An invite
+ * to such an email must never let the inviter choose that account's password.
+ */
+export async function findAnyAccount(email: string): Promise<{ uid: string } | null> {
+  const auth = await findAuthAccount(email);
+  if (auth) return auth;
+  if (!adminDb) return null;
+  const profiles = await adminDb.collection('users').where('email', '==', email).limit(1).get();
+  const doc = profiles.docs[0];
+  return doc ? { uid: doc.id } : null;
+}
