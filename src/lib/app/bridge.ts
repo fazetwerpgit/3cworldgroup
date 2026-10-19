@@ -105,9 +105,14 @@ export interface RepWidgetData {
   estPayMtd: number | null;
   /** Month the estimate covers, e.g. "October". */
   periodLabel: string;
-  /** This week's leaderboard position (1 = top); null when not ranked. */
+  /** This week's leaderboard position (1 = top); null when not ranked. NOT a month figure. */
   rank: number | null;
   rankOf: number | null;
+  /**
+   * What `rank` covers: "This week". periodLabel names the month of the pay and
+   * sales figures only; the rank is weekly, so it carries its own label.
+   */
+  rankPeriodLabel?: string;
   /** Sales this month, counted as the dashboard counts them. */
   salesMtd: number | null;
   /** ISO 8601. */

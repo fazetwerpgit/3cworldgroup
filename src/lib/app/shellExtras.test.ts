@@ -83,10 +83,11 @@ describe('buildWidgetData', () => {
     const data = buildWidgetData({ uidHash: 'abc123abc123abc1', estThisMonth: 1234.6, hasPlan: true, monthCount: 9, standing: { rank: 3, of: 28 }, now });
     expect(data).toEqual({
       uidHash: 'abc123abc123abc1',
-      estPayMtd: 1235,
+      estPayMtd: 1234, // rounded down once: an estimate never overstates
       periodLabel: 'October',
       rank: 3,
       rankOf: 28,
+      rankPeriodLabel: 'This week',
       salesMtd: 9,
       updatedAt: '2026-10-17T15:00:00.000Z',
     });
@@ -99,7 +100,7 @@ describe('buildWidgetData', () => {
   });
 
   it('a month netted below zero by chargebacks sends the real negative estimate', () => {
-    expect(buildWidgetData({ uidHash: 'abc123abc123abc1', estThisMonth: -320.4, hasPlan: true, monthCount: 1, standing: null, now }).estPayMtd).toBe(-320);
+    expect(buildWidgetData({ uidHash: 'abc123abc123abc1', estThisMonth: -320.4, hasPlan: true, monthCount: 1, standing: null, now }).estPayMtd).toBe(-321);
   });
 
   it('hashUid is the first 16 hex chars of SHA-256(uid)', async () => {
@@ -112,6 +113,11 @@ describe('buildWidgetData', () => {
     expect([unranked.rank, unranked.rankOf]).toEqual([null, null]);
     const bad = buildWidgetData({ uidHash: 'abc123abc123abc1', estThisMonth: 0, hasPlan: true, monthCount: 0, standing: { rank: 5, of: 2 }, now });
     expect([bad.rank, bad.rankOf]).toEqual([null, null]);
+  });
+
+  it('labels the rank as this week, apart from the month label on pay and sales', () => {
+    const data = buildWidgetData({ uidHash: 'abc123abc123abc1', estThisMonth: 0, hasPlan: true, monthCount: 0, standing: { rank: 2, of: 9 }, now });
+    expect([data.periodLabel, data.rank, data.rankPeriodLabel]).toEqual(['October', 2, 'This week']);
   });
 
   it('reads the month in America/Chicago', () => {

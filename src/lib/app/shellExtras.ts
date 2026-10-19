@@ -4,6 +4,7 @@ import { postToNative, type OwnerWidgetData, type RepWidgetData, type WidgetData
 import type { Section } from '@/hooks/useRepDashboard';
 import type { MoneySummary } from '@/lib/owner/companySummary';
 import type { MarketsSummary } from '@/lib/owner/markets';
+import { estimateDollars } from '@/lib/pay/estimate';
 
 // The web side of the shell extras (the app repo's docs/NATIVE-EXTRAS.md):
 // splash `ready`, the icon `badge` and the home-screen `widgetData`. All three
@@ -101,6 +102,9 @@ export interface WidgetInput {
   now: Date;
 }
 
+/** The widget's rank comes from the week's leaderboard (useRepDashboard standing). */
+export const WIDGET_RANK_PERIOD_LABEL = 'This week';
+
 const periodFormat = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone: 'America/Chicago' });
 
 /**
@@ -110,7 +114,8 @@ const periodFormat = new Intl.DateTimeFormat('en-US', { month: 'long', timeZone:
  * sends the real (negative) estimate, as the dashboard shows it.
  */
 export function buildWidgetData(input: WidgetInput): RepWidgetData {
-  const pay = input.hasPlan && input.estThisMonth !== null ? Math.round(input.estThisMonth) : null;
+  // Whole dollars, rounded down once like every est. pay figure (lib/pay/estimate).
+  const pay = input.hasPlan && input.estThisMonth !== null ? estimateDollars(input.estThisMonth) : null;
   const ranked = input.standing && input.standing.rank >= 1 && input.standing.of >= input.standing.rank;
   return {
     uidHash: input.uidHash,
@@ -118,6 +123,8 @@ export function buildWidgetData(input: WidgetInput): RepWidgetData {
     periodLabel: periodFormat.format(input.now),
     rank: ranked ? input.standing!.rank : null,
     rankOf: ranked ? input.standing!.of : null,
+    // The rank is this week's (the dashboard's standing), not the month's.
+    rankPeriodLabel: WIDGET_RANK_PERIOD_LABEL,
     salesMtd: Math.max(0, Math.floor(input.monthCount)),
     updatedAt: input.now.toISOString(),
   };
