@@ -11,6 +11,8 @@
   --field: #f4f6fa;
   --rule: #dce2ec;
   --rule-strong: #c3ccdb;
+  /* A field's edge: 3.5:1 on the page, 3.8:1 on a white card (WCAG 1.4.11). */
+  --field-line: #76839e;
   --ink: #0b1a3c;
   --ink-2: #46536f;
   --ink-3: #5d6b8c;
@@ -34,7 +36,7 @@
 
   position: relative;
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   height: 100dvh;
   width: 100%;
   overflow: hidden;
@@ -272,6 +274,70 @@
 }
 .legalBrand {
   font-weight: 700;
+}
+
+/* The big Back / Next under every slide: the top-right Next alone was easy to
+   miss. Its own grid row, so it never scrolls away; the root's bottom padding
+   keeps it above the home indicator. */
+.bottomNav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: calc(var(--content) + 2 * var(--gutter));
+  margin: 0 auto;
+  padding: 10px var(--gutter) 12px;
+  border-top: 1px solid var(--rule);
+  background: var(--page);
+}
+.navBack,
+.navNext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 56px;
+  border-radius: 999px;
+  font: 700 1.0625rem var(--body);
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+.navBack {
+  flex: 0 1 160px;
+  padding: 0 20px 0 14px;
+  border: 1px solid var(--field-line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.navNext {
+  flex: 0 1 280px;
+  padding: 0 18px 0 28px;
+  border: 0;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 1px 2px rgba(10, 102, 232, 0.25), 0 6px 16px rgba(10, 102, 232, 0.18);
+}
+.navNext:not(:disabled):hover {
+  background: var(--accent-hover);
+}
+@media (hover: hover) {
+  .navBack:not(:disabled):hover {
+    border-color: var(--ink-2);
+  }
+}
+.navBack:disabled,
+.navNext:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+@media (max-width: 520px) {
+  .navBack {
+    flex: 0 0 auto;
+  }
+  .navNext {
+    flex: 1 1 auto;
+  }
 }
 
 /* ---------- slide list ---------- */
@@ -603,7 +669,10 @@
   font-weight: 800;
   color: var(--accent-text);
 }
-.billInput input {
+/* `.root` on every field rule: globals.css paints `.portal-scope input` in the
+   dark portal's light foreground with a lime caret and ring, and that outranks
+   a single class. The deck is light, so its fields set their own ink here. */
+.root .billInput input {
   flex: 1;
   width: 100%;
   min-width: 0;
@@ -612,6 +681,7 @@
   border: 0;
   outline: none;
   color: var(--ink);
+  -webkit-text-fill-color: var(--ink);
   caret-color: var(--accent);
   font-family: var(--display);
   font-weight: 800;
@@ -620,12 +690,15 @@
   font-variant-numeric: tabular-nums;
 }
 /* The field's own border and halo are the focus ring; no second outline inside it. */
-.billInput input:focus,
-.billInput input:focus-visible {
+.root .billInput input:focus,
+.root .billInput input:focus-visible {
+  border: 0;
   outline: none;
 }
-.billInput input::placeholder {
+.root .billInput input::placeholder {
   color: var(--ink-3);
+  -webkit-text-fill-color: var(--ink-3);
+  opacity: 1;
 }
 .perMonth {
   font-size: 0.9375rem;
@@ -707,15 +780,24 @@
   font-weight: 600;
   color: var(--ink-2);
 }
-.adjustFields input {
+.root .adjustFields input {
   width: 104px;
   height: 44px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--field-line);
   background: var(--field);
   color: var(--ink);
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--accent);
   font: 600 1rem var(--body);
+}
+.root .adjustFields input:focus,
+.root .adjustFields input:focus-visible {
+  outline: 2px solid transparent;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px var(--accent-wash);
 }
 .total {
   font-family: var(--display);
@@ -885,35 +967,42 @@
   margin-left: 2px;
   color: var(--accent-text);
 }
-.input {
+.root .input {
   width: 100%;
   min-width: 0;
   height: 52px;
   padding: 0 14px;
   border-radius: 10px;
-  border: 1px solid var(--rule-strong);
+  border: 1px solid var(--field-line);
   background: var(--field);
   color: var(--ink);
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--accent);
   font: 500 1.0625rem var(--body);
   transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
-.input::placeholder {
+.root .input::placeholder {
   color: var(--ink-3);
-  opacity: 0.8;
+  -webkit-text-fill-color: var(--ink-3);
+  opacity: 1;
 }
-.input:focus,
-.input:focus-visible {
+.root .input:focus,
+.root .input:focus-visible {
   outline: 2px solid transparent;
   border-color: var(--accent);
   background: var(--surface);
   box-shadow: 0 0 0 4px var(--accent-wash);
 }
-.input[aria-invalid='true'] {
+.root .input[aria-invalid='true'] {
   border-color: var(--danger);
 }
-.input:disabled {
+/* Saved fields stay readable: iOS fades disabled text unless told otherwise. */
+.root .input:disabled {
   color: var(--ink-2);
+  -webkit-text-fill-color: var(--ink-2);
+  opacity: 1;
   background: var(--surface-2);
+  border-color: var(--rule-strong);
 }
 .err {
   font-size: 0.8125rem;

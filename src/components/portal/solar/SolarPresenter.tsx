@@ -28,7 +28,8 @@ import s from './solarDeck.module.css';
 // The full-screen solar deck a rep hands to a homeowner. It sits outside the
 // rep shell (no <main> scroller), fills the viewport itself and keeps no
 // position:fixed layers, so iOS has nothing to clip. Swipe, arrow keys, the
-// Back/Next buttons or the slide list (the counter) move between slides.
+// Back/Next buttons (top bar and the big pair under the slide) or the slide
+// list (the counter) move between slides.
 
 type SlideId =
   | 'intro' | 'options' | 'partners' | 'calculator' | 'lead' | 'bill' | 'prequal' | 'steps'
@@ -335,6 +336,17 @@ function Deck() {
           </>
         ) : null}
       </div>
+
+      <nav className={s.bottomNav} aria-label="Slide navigation">
+        <button type="button" className={s.navBack} onClick={prev} disabled={index === 0}>
+          <ChevronLeft size={20} aria-hidden />
+          Back
+        </button>
+        <button type="button" className={s.navNext} onClick={next} disabled={index === ORDER.length - 1}>
+          Next
+          <ChevronRight size={20} aria-hidden />
+        </button>
+      </nav>
     </div>
   );
 }
