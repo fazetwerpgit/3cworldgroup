@@ -5,19 +5,24 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedUser: vi.fn(),
 }));
 
-// Stand-in for the approved sales the snapshot reduces (the route reads the
-// tape from the leaderboard snapshot; its Firestore flow is tested in
-// lib/leaderboard/snapshotStore.test). Docs default to approved.
-const state: { docs: Array<Record<string, unknown>> } = { docs: [] };
+// Stand-in for the sales (every sale, any status, like the leaderboard) and the
+// carrier report. The route reads the tape from the leaderboard snapshot; this
+// mock builds it with the snapshot's own builder (buildBoardSnapshot), so the
+// counting under test is the real one. The snapshot's Firestore flow is tested
+// in lib/leaderboard/snapshotStore.test. Docs with no status read as approved.
+const state: { docs: Array<Record<string, unknown>>; orders: Array<Record<string, unknown>> } = { docs: [], orders: [] };
 
 vi.mock('@/lib/firebase/admin', () => ({ adminAuth: {}, adminDb: {} }));
 
 vi.mock('@/lib/leaderboard/snapshotStore', async () => {
-  const { companyTapeFromDocs } = await import('@/lib/sales/companyTapeDocs');
+  const { buildBoardSnapshot } = await import('@/lib/leaderboard/snapshot');
   return {
-    loadCompanyTape: vi.fn(async (now: Date, viewerUid: string) =>
-      companyTapeFromDocs(state.docs.map((data) => ({ data: { status: 'approved', ...data } })), viewerUid, now)
-    ),
+    loadCompanyTape: vi.fn(async (now: Date, viewerUid: string) => {
+      const sales = state.docs.map((data, index) => ({ id: `s${index}`, data: { status: 'approved', ...data } as Record<string, unknown> }));
+      // The shared snapshot sees no demo sales; a demo owner's is built for it.
+      const demoOwner = sales.some((sale) => sale.data.demoAccount === true && sale.data.salesRepId === viewerUid);
+      return buildBoardSnapshot(sales, state.orders as never, { now, viewerUid: demoOwner ? viewerUid : null }).tape;
+    }),
   };
 });
 
@@ -40,8 +45,10 @@ function get() {
 
 beforeEach(() => {
   mockUser.mockReset();
-  mockUser.mockResolvedValue({ ok: true, uid: 'u1', name: 'Rep', email: 'r@x.com' });
+  // An owner by default (the dollar total is theirs); see the rep test below.
+  mockUser.mockResolvedValue({ ok: true, uid: 'u1', name: 'Owner', email: 'o@x.com', isOwner: true, isAdmin: true });
   state.docs = [];
+  state.orders = [];
 });
 
 describe('GET /api/portal/sales/company-stats', () => {
@@ -115,15 +122,45 @@ describe('GET /api/portal/sales/company-stats', () => {
     expect(json.lastSale).toEqual({ repName: 'Cole' });
   });
 
-  it('falls back to createdAt for older docs with no saleDate', async () => {
+  it('an older doc with no saleDate is off the month count (as on the Board) but can be the last sale', async () => {
     state.docs = [
       { salesRepName: 'Legacy', totalValue: 60, createdAt: stamp(thisMonth) },
     ];
 
     const json = await (await GET(get())).json();
 
+    expect(json.mtdCount).toBe(0);
+    expect(json.mtdMonthlyValue).toBe(0);
+    expect(json.lastSale).toEqual({ repName: 'Legacy', at: thisMonth.toISOString() });
+  });
+
+  it('never sends the company dollar total to a non-owner, and the rep tape fields are unchanged', async () => {
+    mockUser.mockResolvedValue({ ok: true, uid: 'u2', name: 'Rep', email: 'r@x.com', isOwner: false, isAdmin: false });
+    state.docs = [{ salesRepId: 'r1', salesRepName: 'Cole Hart', totalValue: 80, saleDate: stamp(thisMonth) }];
+
+    const json = await (await GET(get())).json();
+
+    expect(json).not.toHaveProperty('mtdMonthlyValue');
+    expect(json).toEqual({ mtdCount: 1, lastSale: { repName: 'Cole Hart' }, topRep: { repName: 'Cole Hart', count: 1 } });
+  });
+
+  it('counts like the leaderboard: carrier-cancelled and charged-back sales drop out', async () => {
+    const day = (offset: number) => new Date(thisMonth.getTime() + offset * 86_400_000);
+    const iso = (date: Date) => date.toISOString().slice(0, 10);
+    state.docs = [
+      { salesRepId: 'r1', salesRepName: 'Cole Hart', saleDate: stamp(day(0)), orderNumberOrBtn: 'TMO20260901AAAAA' },
+      { salesRepId: 'r1', salesRepName: 'Cole Hart', saleDate: stamp(day(0)), orderNumberOrBtn: 'TMO20260901BBBBB' },
+      { salesRepId: 'r1', salesRepName: 'Cole Hart', saleDate: stamp(day(0)), installDate: stamp(day(1)), orderNumberOrBtn: 'TMO20260901CCCCC' },
+    ];
+    state.orders = [
+      { id: 'TMO20260901BBBBB', matchedUserId: 'r1', status: 'cancelled', cancellationDate: iso(day(2)) },
+      { id: 'TMO20260901CCCCC', matchedUserId: 'r1', status: 'churned', activationDate: iso(day(1)), deactivationDate: iso(day(10)) },
+    ];
+
+    const json = await (await GET(get())).json();
+
     expect(json.mtdCount).toBe(1);
-    expect(json.mtdMonthlyValue).toBe(60);
+    expect(json.topRep).toEqual({ repName: 'Cole Hart', count: 1 });
   });
 
   it('skips a doc with no usable date rather than counting it', async () => {

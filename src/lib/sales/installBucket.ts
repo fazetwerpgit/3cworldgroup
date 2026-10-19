@@ -1,6 +1,7 @@
 import type { FiberOrder, Sale } from '@/types';
 import { isPayableSale } from '@/lib/pay/expectedPay';
 import { installDayKey } from '@/lib/sales/saleDate';
+import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
 
 // Where a sale sits in the install pipeline. With sale approval removed, this is
 // the ONLY lifecycle the Sales page shows, so it has to be derived in exactly one
@@ -268,7 +269,12 @@ export function isCarrierEnded(order: FiberOrder | null | undefined): boolean {
   return order?.status === 'cancelled' || order?.status === 'churned';
 }
 
-type SaleForCount = Pick<Sale, 'status'> & { id?: string };
+type SaleForCount = Pick<Sale, 'status'> & {
+  id?: string;
+  orderNumberOrBtn?: string;
+  createdAt?: unknown;
+  saleDate?: unknown;
+};
 
 /** The order matched to a sale, when the caller has the map to look it up. */
 function orderFor(
@@ -289,7 +295,55 @@ export function countedSales<T extends SaleForCount>(
   sales: T[],
   fiberBySale?: Map<string, FiberOrder>
 ): T[] {
-  return sales.filter((sale) => isPayableSale(sale) && !isCarrierCancelled(orderFor(sale, fiberBySale)));
+  const live = sales.filter((sale) => isPayableSale(sale) && !isCarrierCancelled(orderFor(sale, fiberBySale)));
+  const extras = duplicateOrderExtras(live);
+  return extras.size ? live.filter((sale) => !extras.has(sale)) : live;
+}
+
+/** When a sale was logged: createdAt, else its sale date; unknown sorts last. */
+function loggedTime(sale: SaleForCount): number {
+  for (const value of [sale.createdAt, sale.saleDate]) {
+    if (!value) continue;
+    const maybe = value as { toDate?: () => Date };
+    const date =
+      value instanceof Date
+        ? value
+        : typeof maybe.toDate === 'function'
+          ? maybe.toDate()
+          : new Date(value as string | number);
+    const time = date.getTime();
+    if (Number.isFinite(time)) return time;
+  }
+  return Infinity;
+}
+
+/**
+ * One order number logged more than once is ONE sale (owner, 2026-10-18): of
+ * the counted sales sharing a normalized order number, the first one logged
+ * (createdAt, then sale date, then id) counts and every other one is an
+ * "extra" left out of the board, est. pay and owner money. The extras stay on
+ * every list, flagged as a possible duplicate (mergeBook), until an admin
+ * cancels one. Pass only sales that otherwise count, so a cancelled copy never
+ * pushes out the live one.
+ */
+export function duplicateOrderExtras<T extends SaleForCount>(sales: readonly T[]): Set<T> {
+  const byNumber = new Map<string, T[]>();
+  for (const sale of sales) {
+    const key = normalizeOrderNumber(sale.orderNumberOrBtn);
+    if (!key) continue;
+    const group = byNumber.get(key);
+    if (group) group.push(sale);
+    else byNumber.set(key, [sale]);
+  }
+  const extras = new Set<T>();
+  for (const group of byNumber.values()) {
+    if (group.length < 2) continue;
+    const [, ...rest] = [...group].sort(
+      (a, b) => loggedTime(a) - loggedTime(b) || (a.id ?? '').localeCompare(b.id ?? '')
+    );
+    for (const sale of rest) extras.add(sale);
+  }
+  return extras;
 }
 
 /**

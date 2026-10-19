@@ -1,15 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { relativeSaleTime, summarizeCompanySales, tapeRepName, type TapeSale } from './companyTape';
+import type { FiberOrder, Sale } from '@/types';
+import { relativeSaleTime, tapeRepName } from './companyTape';
+import { summarizeCompanySales } from './companyTapeStats';
 
-const MONTH_START = Date.parse('2026-09-01T05:00:00Z'); // Sep 1, midnight Chicago
+// Sep 2026 in Chicago (CDT).
+const SEPTEMBER = { start: new Date('2026-09-01T05:00:00Z'), end: new Date('2026-10-01T05:00:00Z') };
+const NONE = new Map<string, FiberOrder>();
 
-function sale(repKey: string, iso: string, extra: Partial<TapeSale> = {}): TapeSale {
-  return { repKey, repName: `Rep ${repKey}`, effectiveMs: Date.parse(iso), monthlyValue: 100, ...extra };
+let n = 0;
+function sale(rep: string, iso: string, extra: Partial<Sale> = {}): Sale {
+  n += 1;
+  return {
+    id: `t${n}`,
+    salesRepId: rep,
+    salesRepName: `Rep ${rep}`,
+    status: 'approved',
+    saleDate: new Date(iso),
+    totalValue: 100,
+    totalPoints: 3,
+    ...extra,
+  } as unknown as Sale;
 }
 
 describe('summarizeCompanySales', () => {
   it('returns nulls for no sales', () => {
-    expect(summarizeCompanySales([], MONTH_START)).toEqual({
+    expect(summarizeCompanySales([], NONE, SEPTEMBER)).toEqual({
       mtdCount: 0,
       mtdMonthlyValue: 0,
       lastSale: null,
@@ -27,7 +42,8 @@ describe('summarizeCompanySales', () => {
         sale('a', '2026-09-01T03:00:00Z'),
         sale('a', '2026-08-20T15:00:00Z'),
       ],
-      MONTH_START
+      NONE,
+      SEPTEMBER
     );
     expect(stats.mtdCount).toBe(3);
     expect(stats.mtdMonthlyValue).toBe(300);
@@ -40,11 +56,12 @@ describe('summarizeCompanySales', () => {
     const noonSep4 = '2026-09-04T17:00:00Z';
     const stats = summarizeCompanySales(
       [
-        sale('a', noonSep4, { loggedMs: Date.parse('2026-09-04T14:10:00Z') }),
-        sale('b', noonSep4, { loggedMs: Date.parse('2026-09-04T21:48:00Z') }),
-        sale('c', noonSep4, { loggedMs: Date.parse('2026-09-04T16:02:00Z') }),
+        sale('a', noonSep4, { createdAt: new Date('2026-09-04T14:10:00Z') }),
+        sale('b', noonSep4, { createdAt: new Date('2026-09-04T21:48:00Z') }),
+        sale('c', noonSep4, { createdAt: new Date('2026-09-04T16:02:00Z') }),
       ],
-      MONTH_START
+      NONE,
+      SEPTEMBER
     );
     // Same sale day: the one logged last is the last sale, at its logged time.
     expect(stats.lastSale).toEqual({ repName: 'Rep b', at: '2026-09-04T21:48:00.000Z' });
@@ -52,41 +69,37 @@ describe('summarizeCompanySales', () => {
 
   it('shows no time for a sale logged on a later day than it happened', () => {
     const stats = summarizeCompanySales(
-      [sale('a', '2026-09-04T17:00:00Z', { loggedMs: Date.parse('2026-09-06T15:00:00Z') })],
-      MONTH_START
+      [sale('a', '2026-09-04T17:00:00Z', { createdAt: new Date('2026-09-06T15:00:00Z') })],
+      NONE,
+      SEPTEMBER
     );
     expect(stats.lastSale).toEqual({ repName: 'Rep a' });
   });
 
-  it('breaks a tie for the lead by who reached the count first', () => {
+  it('the top rep is the leaderboard\'s #1: most points, then the name A to Z', () => {
     const sales = [
       sale('a', '2026-09-02T15:00:00Z'),
       sale('a', '2026-09-10T15:00:00Z'),
       sale('b', '2026-09-03T15:00:00Z'),
       sale('b', '2026-09-05T15:00:00Z'),
     ];
-    expect(summarizeCompanySales(sales, MONTH_START).topRep).toEqual({ repName: 'Rep b', count: 2 });
-    // Order of the input doesn't matter.
-    expect(summarizeCompanySales([...sales].reverse(), MONTH_START).topRep).toEqual({
-      repName: 'Rep b',
-      count: 2,
-    });
+    expect(summarizeCompanySales(sales, NONE, SEPTEMBER).topRep).toEqual({ repName: 'Rep a', count: 2 });
+    expect(summarizeCompanySales([...sales].reverse(), NONE, SEPTEMBER).topRep).toEqual({ repName: 'Rep a', count: 2 });
+    // Points decide, not the count: one 10-point sale outranks two 3s.
+    const big = [...sales, sale('c', '2026-09-06T15:00:00Z', { totalPoints: 10 })];
+    expect(summarizeCompanySales(big, NONE, SEPTEMBER).topRep).toEqual({ repName: 'Rep c', count: 1 });
   });
 
-  it('falls back to the rep key when tied to the millisecond', () => {
-    const sales = [sale('z', '2026-09-02T15:00:00Z'), sale('m', '2026-09-02T15:00:00Z')];
-    expect(summarizeCompanySales(sales, MONTH_START).topRep?.repName).toBe('Rep m');
-  });
-
-  it('uses the name on the rep’s latest sale', () => {
-    const stats = summarizeCompanySales(
-      [
-        sale('a', '2026-09-02T15:00:00Z', { repName: 'Old Name' }),
-        sale('a', '2026-09-08T15:00:00Z', { repName: 'New Name' }),
-      ],
-      MONTH_START
-    );
-    expect(stats.topRep).toEqual({ repName: 'New Name', count: 2 });
+  it('leaves out carrier cancellations and 120-day chargebacks, like the Board', () => {
+    const keep = sale('a', '2026-09-05T15:00:00Z');
+    const cancelled = sale('a', '2026-09-06T15:00:00Z');
+    const churned = sale('a', '2026-09-02T15:00:00Z', { installDate: new Date('2026-09-03T12:00:00Z') });
+    const fiber = new Map<string, FiberOrder>([
+      [cancelled.id!, { id: 'o1', status: 'cancelled', cancellationDate: '2026-09-08' } as unknown as FiberOrder],
+      [churned.id!, { id: 'o2', status: 'churned', activationDate: '2026-09-03', deactivationDate: '2026-09-15' } as unknown as FiberOrder],
+    ]);
+    const stats = summarizeCompanySales([keep, cancelled, churned], fiber, SEPTEMBER);
+    expect([stats.mtdCount, stats.topRep?.count, stats.mtdMonthlyValue]).toEqual([1, 1, 100]);
   });
 });
 

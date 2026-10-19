@@ -20,7 +20,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 import type { BoardScope } from '@/lib/leaderboard/board';
 import type { RecentSale } from '@/lib/leaderboard/team';
-import type { CompanyTapeStats } from '@/lib/sales/companyTape';
+import type { KeyedCompanyTape } from '@/lib/sales/companyTapeStats';
 import {
   SNAPSHOT_VERSION,
   buildBoardSnapshot,
@@ -52,7 +52,7 @@ export interface SnapshotMeta {
   firstMonth?: Record<BoardScope, string | null>;
   recent?: string;
   demoRepIds?: string[];
-  /** JSON CompanyTapeStats for /api/portal/sales/company-stats. */
+  /** JSON KeyedCompanyTape for /api/portal/sales/company-stats (shaped per caller by tapeForViewer). */
   tape?: string;
 }
 
@@ -262,7 +262,7 @@ export async function loadBoardPeriod(req: BoardPeriodRequest): Promise<BoardPer
  * The All Company tape, from the same snapshot (one doc read). Rebuilt first
  * when due, exactly like a board read; a demo account's tape is built live.
  */
-export async function loadCompanyTape(now: Date, viewerUid: string): Promise<CompanyTapeStats> {
+export async function loadCompanyTape(now: Date, viewerUid: string): Promise<KeyedCompanyTape> {
   const database = db();
   const nowMs = now.getTime();
   const metaDoc = await database.collection(SNAPSHOT_COLLECTION).doc(META_DOC).get();
@@ -271,7 +271,7 @@ export async function loadCompanyTape(now: Date, viewerUid: string): Promise<Com
     return (await computeSnapshotFromFirestore(now, viewerUid)).tape;
   }
   const state = snapshotState(meta, nowMs, snapshotValidKey(now));
-  const stored = parseJson<CompanyTapeStats | null>(meta?.tape, null);
+  const stored = parseJson<KeyedCompanyTape | null>(meta?.tape, null);
   if (!stored || (shouldRebuild(state, meta, nowMs) && (state === 'missing' || (await takeLease(nowMs))))) {
     const snapshot = await rebuildLeaderboardSnapshot(now);
     if (snapshot.demoRepIds.includes(viewerUid)) return (await computeSnapshotFromFirestore(now, viewerUid)).tape;

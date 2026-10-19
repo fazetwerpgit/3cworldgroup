@@ -15,6 +15,7 @@ import { boardCountedSales } from '@/lib/pay/chargeback';
 import { buildMergedBook, fiberBySaleFromBook } from '@/lib/sales/mergeBook';
 import { planMix, type PlanMixEntry } from '@/lib/sales/planMix';
 import type { SaleRecord } from '@/lib/leaderboard/history';
+import { boardOrder } from '@/lib/leaderboard/order';
 
 export type BoardScope = 'approved' | 'submitted';
 
@@ -95,4 +96,75 @@ export function tallyBoard(
 
   const totals = [...byRep.values()].map(({ totals, sales }) => ({ ...totals, planMix: planMix(sales) }));
   return { totals, allSales, periodSales };
+}
+
+// ------------------------------------------------- one rule, every screen
+//
+// "Sales this month" and "top rep" mean the same thing everywhere they show:
+// the leaderboard, the owner's Markets section and home-screen widget, Ask 3C's
+// Board lines and the All Company tape. Each one goes through the helpers
+// below, so a carrier cancellation, a disconnect within 120 days or an order
+// number logged twice drops out of all of them at once.
+
+export interface BoardWindow {
+  start: Date | number;
+  /** Exclusive. Infinity (or omitted) for an open end (all time). */
+  end?: Date | number;
+}
+
+const windowTime = (value: Date | number | undefined, fallback: number) =>
+  value === undefined ? fallback : value instanceof Date ? value.getTime() : value;
+
+/**
+ * THE rule for a period's sale count: the sales the board ranks for `scope`
+ * (boardSales: in scope, not cancelled by us or the carrier, not charged back,
+ * an order number logged twice counted once), sold inside [start, end).
+ */
+export function countedSalesIn<T extends Sale>(
+  sales: T[],
+  fiberBySale: Map<string, FiberOrder>,
+  window: BoardWindow,
+  scope: BoardScope = 'approved'
+): T[] {
+  const start = windowTime(window.start, -Infinity);
+  const end = windowTime(window.end, Infinity);
+  return boardSales(sales, fiberBySale, scope).filter((sale) => {
+    const time = saleTime(sale);
+    return time >= start && time < end;
+  });
+}
+
+export type BoardMetric = 'totalPoints' | 'totalSales';
+
+/** Rows in the board's order: score high to low, then name A to Z, then rep id. */
+export function sortBoard(totals: BoardTotals[], metric: BoardMetric = 'totalPoints'): BoardTotals[] {
+  return totals.sort((a, b) =>
+    boardOrder(
+      { score: a[metric], name: a.salesRepName, id: a.salesRepId },
+      { score: b[metric], name: b.salesRepName, id: b.salesRepId }
+    )
+  );
+}
+
+/** The board's rows for a window, ranked as the leaderboard's default view (points). */
+export function rankedBoard(
+  sales: Sale[],
+  fiberBySale: Map<string, FiberOrder>,
+  window: BoardWindow,
+  scope: BoardScope = 'approved'
+): BoardTotals[] {
+  const { totals } = tallyBoard(
+    boardSales(sales, fiberBySale, scope),
+    windowTime(window.start, -Infinity),
+    windowTime(window.end, Infinity)
+  );
+  return sortBoard(totals);
+}
+
+/**
+ * THE top rep: the board's #1 in its default view (most points; a tie goes to
+ * the name first A to Z, then the rep id). null when nobody has a sale.
+ */
+export function topRepOf(ranked: BoardTotals[]): BoardTotals | null {
+  return ranked[0] ?? null;
 }

@@ -23,6 +23,10 @@ export interface RecentSale {
   /** True when the sale was logged on another day than it happened, so the
    *  logged time would misstate when it happened; show the day, not "12m ago". */
   dayOnly?: boolean;
+  /** Who logged it (salesRepId), only when asked for (withRepKey): the stored
+   *  snapshot keeps it so a demo caller's feed can alias the rep. Routes strip
+   *  it before responding. */
+  repKey?: string;
 }
 
 type Data = Record<string, unknown>;
@@ -82,7 +86,11 @@ function planOf(data: Data): string {
  * rejected sales are left out), newest logged first. `sales` should already be
  * ordered by createdAt, newest first.
  */
-export function recentSales(sales: ReadonlyArray<Data>, limit = 5): RecentSale[] {
+export function recentSales(
+  sales: ReadonlyArray<Data>,
+  limit = 5,
+  opts: { withRepKey?: boolean } = {}
+): RecentSale[] {
   const feed: RecentSale[] = [];
   for (const data of sales) {
     if (feed.length >= limit) break;
@@ -92,11 +100,11 @@ export function recentSales(sales: ReadonlyArray<Data>, limit = 5): RecentSale[]
     if (!logged || !happened) continue;
     const repName = text(data.salesRepName) || 'Unknown';
     const sameDay = installDayKey(logged) === installDayKey(happened);
-    feed.push(
-      sameDay
-        ? { repName, plan: planOf(data), at: logged.toISOString() }
-        : { repName, plan: planOf(data), at: happened.toISOString(), dayOnly: true }
-    );
+    const row: RecentSale = sameDay
+      ? { repName, plan: planOf(data), at: logged.toISOString() }
+      : { repName, plan: planOf(data), at: happened.toISOString(), dayOnly: true };
+    if (opts.withRepKey) row.repKey = text(data.salesRepId) || `\u0000sale-${text(data.id) || feed.length}`;
+    feed.push(row);
   }
   return feed;
 }

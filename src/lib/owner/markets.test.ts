@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Sale } from '@/types';
 import { periodBounds } from '@/lib/leaderboard/periods';
-import { addressState, countsForMonth, repHomeMarkets, summarizeMarkets, zipState } from './markets';
+import { countedSalesIn } from '@/lib/leaderboard/board';
+import { addressState, repHomeMarkets, summarizeMarkets, zipState } from './markets';
+
+const countsForMonth = (one: Sale, window: { start: Date; end: Date }) =>
+  countedSalesIn([one], new Map(), window).length === 1;
 
 describe('addressState', () => {
   it.each([
@@ -72,7 +76,7 @@ const sale = (over: Partial<Sale> & { saleDate?: Date | string }): Sale =>
     ...over,
   }) as unknown as Sale;
 
-describe('countsForMonth (the leaderboard rule)', () => {
+describe('countedSalesIn (the leaderboard rule the Markets count uses)', () => {
   it('counts approved sales dated inside the Chicago month', () => {
     expect(countsForMonth(sale({}), OCT)).toBe(true);
     // 11:30pm Oct 31 in Chicago is still October.
@@ -90,7 +94,7 @@ describe('countsForMonth (the leaderboard rule)', () => {
 });
 
 describe('summarizeMarkets', () => {
-  it('names the month top rep by counted sales, first name + last initial', () => {
+  it('names the month top rep as the leaderboard\'s #1 (points, ties by name), first name + last initial', () => {
     const sales = [
       sale({ salesRepId: 'wil', salesRepName: 'Wil Teasdale' }),
       sale({ salesRepId: 'wil', salesRepName: 'Wil Teasdale' }),
@@ -100,8 +104,12 @@ describe('summarizeMarkets', () => {
       sale({ salesRepId: 'zed', salesRepName: 'Zed Young' }),
       sale({ salesRepId: 'zed', salesRepName: 'Zed Young' }),
     ];
-    // Wil and Zed tie on 2: the alphabetical name wins.
-    expect(summarizeMarkets(sales, OCT).topRep).toEqual({ name: 'Wil T.', sales: 2 });
+    // Wil and Zed tie on points (2 sales each): the alphabetical name wins,
+    // as on the leaderboard.
+    expect(summarizeMarkets(sales.map((one) => ({ ...one, totalPoints: 3 })), OCT).topRep).toEqual({ name: 'Wil T.', sales: 2 });
+    // Points decide, not the sale count: one 10-point sale outranks two 3s.
+    const big = [...sales.map((one) => ({ ...one, totalPoints: 3 })), sale({ salesRepId: 'kai', salesRepName: 'Kai Lowe', totalPoints: 10 })];
+    expect(summarizeMarkets(big, OCT).topRep).toEqual({ name: 'Kai L.', sales: 1 });
     expect(summarizeMarkets([sale({ salesRepName: '' })], OCT).topRep).toBeNull();
   });
 

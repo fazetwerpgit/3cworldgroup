@@ -17,7 +17,8 @@ export function roleLabel(role: string): string {
 // topRep are optional so an older deployment's response still renders.
 export interface CompanyStats {
   mtdCount: number;
-  mtdMonthlyValue: number;
+  /** Owners only; the tape never shows it. */
+  mtdMonthlyValue?: number;
   lastSale: { repName: string; at?: string } | null;
   topRep?: { repName: string; count: number } | null;
 }

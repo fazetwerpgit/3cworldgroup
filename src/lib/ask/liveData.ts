@@ -15,12 +15,18 @@ import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
 import { periodBounds, type LeaderboardPeriod } from '@/lib/leaderboard/periods';
 import { boardOrder } from '@/lib/leaderboard/order';
+import { boardSales, companyFiberBySale, sortBoard, type BoardTotals } from '@/lib/leaderboard/board';
+import { monthPeriodId } from '@/lib/leaderboard/snapshot';
+import { loadBoardPeriod } from '@/lib/leaderboard/snapshotStore';
+import { chicagoMonthKey } from '@/lib/sales/monthWindow';
+import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
+import { adminDb } from '@/lib/firebase/admin';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { isAwaitingCarrier } from '@/lib/sales/installBucket';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { LIVE_DEFAULT_ZONE, zoneFor } from './prompt';
 import { redactContact } from './redact';
-import { DEMO_ACCOUNT_FIELD, isDemoSale } from '@/lib/users/demoAccount';
+import { isDemoSale } from '@/lib/users/demoAccount';
 
 // The asking rep's own portal data, as a short plain-text block for Ask 3C's
 // prompt: their sales and install status, their spot on the Board, the next
@@ -46,8 +52,10 @@ import { DEMO_ACCOUNT_FIELD, isDemoSale } from '@/lib/users/demoAccount';
 // which every rep already sees.
 //
 // Reads mirror the portal's own: sales by salesRepId ordered by saleDate (the
-// Sales page), fiberOrders by matchedUserId (install status), this week's and
-// month's sales with a field mask (the Board, cached for a minute), scheduledCalls (Calls), the form collections by repUid,
+// Sales page), fiberOrders by matchedUserId (install status), the Board's week
+// and month from the leaderboard snapshot (built from every sale and carrier
+// order by the leaderboard's own rule; names, counts and points are all that
+// leave it), scheduledCalls (Calls), the form collections by repUid,
 // notifications by userId, userOnboarding by {uid}_{item}. Each section fails
 // soft, and the whole load has a time budget so a slow read never holds up
 // the answer.
@@ -330,15 +338,51 @@ export interface BoardSale {
 const boardCache = new WeakMap<Db, { key: string; expires: number; sales: BoardSale[] }>();
 
 /**
+ * The Board's counted sales, exactly as GET /api/portal/leaderboard counts them
+ * (lib/leaderboard/board boardSales over the company carrier join): approved,
+ * not cancelled by the carrier, not charged back under the 120-day rule, an
+ * order number logged twice counted once. `sales` is every sale, any status,
+ * so the join resolves as it does on the leaderboard. A demo account's sales
+ * stay out of the join and are marked `demo` (rankBoard drops them per viewer).
+ */
+export function countedBoardSales(
+  sales: Sale[],
+  orders: FiberOrder[],
+  opts?: { now?: Date; reportAsOf?: string | null }
+): BoardSale[] {
+  const fiberBySale = companyFiberBySale(
+    sales.filter((sale) => !isDemoSale(sale as unknown as Data)),
+    orders,
+    opts
+  );
+  return boardSales(sales, fiberBySale, 'approved').map((sale) => ({
+    repId: str(sale.salesRepId),
+    name: str(sale.salesRepName) || 'Unknown',
+    points: typeof sale.totalPoints === 'number' ? sale.totalPoints : 0,
+    at: toDate(sale.saleDate)?.getTime() ?? 0,
+    demo: isDemoSale(sale as unknown as Data),
+  }));
+}
+
+/**
  * Each period's ranking for `viewerUid`: a demo account's sales are left out
  * unless the viewer is that demo account (it still sees its own standing).
+ * Sales are counted from each period's start up to its end (`ends`, exclusive),
+ * like the leaderboard, so a sale dated tomorrow never ranks in the week that
+ * is closing.
  */
-export function rankBoard(sales: readonly BoardSale[], starts: readonly number[], viewerUid: string): BoardRow[][] {
+export function rankBoard(
+  sales: readonly BoardSale[],
+  starts: readonly number[],
+  viewerUid: string,
+  ends: readonly number[] = []
+): BoardRow[][] {
   const counted = sales.filter((sale) => !sale.demo || sale.repId === viewerUid);
-  return starts.map((start) => {
+  return starts.map((start, i) => {
+    const end = ends[i] ?? Infinity;
     const byRep = new Map<string, BoardRow>();
     for (const sale of counted) {
-      if (sale.at < start || !sale.repId) continue;
+      if (sale.at < start || sale.at >= end || !sale.repId) continue;
       const row = byRep.get(sale.repId) ?? { id: sale.repId, name: sale.name, sales: 0, points: 0 };
       row.sales += 1;
       row.points += sale.points;
@@ -348,38 +392,92 @@ export function rankBoard(sales: readonly BoardSale[], starts: readonly number[]
   });
 }
 
+/** A snapshot period's rows as the Ask Board reads them, ranked by points (sortBoard). */
+export function boardRowsFromTotals(totals: BoardTotals[]): BoardRow[] {
+  return sortBoard([...totals], 'totalPoints').map((row) => ({
+    id: row.salesRepId,
+    name: row.salesRepName || 'Unknown',
+    sales: row.totalSales,
+    points: row.totalPoints,
+  }));
+}
+
 /**
- * The Board as GET /api/portal/leaderboard builds it: approved sales since the
- * period start, ranked by points. Only sales since the earlier of the week and
- * month starts are read, with a field mask. Filtering status in memory keeps
- * this a single-field range on saleDate (Firestore's automatic index); status
- * + saleDate in the query would need a composite index that doesn't exist.
+ * The Board's week and month from the leaderboard snapshot (loadBoardPeriod:
+ * the same counting rule, Chicago bounds closed at their end, demo sales only
+ * on their own account's board). A due rebuild happens there, as on a Board read.
+ */
+async function snapshotBoardRankings(now: Date, viewerUid: string): Promise<BoardRow[][]> {
+  return Promise.all(
+    BOARD_PERIODS.map(async ([period]) => {
+      const bounds = periodBounds(period, now);
+      const board = await loadBoardPeriod({
+        now,
+        viewerUid,
+        scope: 'approved',
+        periodId: period === 'month' ? monthPeriodId(chicagoMonthKey(now)) : period,
+        start: bounds?.start ?? new Date(0),
+        end: bounds?.end ?? null,
+        withHistory: false,
+      });
+      return boardRowsFromTotals(board.payload.totals);
+    })
+  );
+}
+
+/** Every carrier order: the shared per-instance cache on the admin db, else a plain read. */
+async function boardOrders(db: Db, lastReportAt: string | null): Promise<FiberOrder[]> {
+  if (db === (adminDb as unknown as Db)) return getAllFiberOrders(lastReportAt);
+  const snap = await db.collection('fiberOrders').get();
+  return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as FiberOrder);
+}
+
+/**
+ * The Board as GET /api/portal/leaderboard builds it: every sale (any status)
+ * and every carrier order read the same way, counted with the same rule
+ * (countedBoardSales), ranked by points. Cached for a minute per db. Without
+ * the carrier report the Board still ranks the portal's own counts, as the
+ * leaderboard does.
  */
 async function boardRankings(db: Db, now: Date, viewerUid: string): Promise<BoardRow[][]> {
-  const starts = BOARD_PERIODS.map(([period]) => periodBounds(period, now)?.start.getTime() ?? 0);
+  // Production: the leaderboard's precomputed snapshot, which is built by this
+  // same rule from every sale and carrier order. Two small doc reads per period
+  // instead of a read of every sale and order inside Ask's live-data budget.
+  if (db === (adminDb as unknown as Db)) return snapshotBoardRankings(now, viewerUid);
+  const bounds = BOARD_PERIODS.map(([period]) => periodBounds(period, now));
+  const starts = bounds.map((bound) => bound?.start.getTime() ?? 0);
+  const ends = bounds.map((bound) => bound?.end.getTime() ?? Infinity);
   const key = starts.join('|');
   const cached = boardCache.get(db);
-  if (cached && cached.key === key && cached.expires > now.getTime()) return rankBoard(cached.sales, starts, viewerUid);
+  if (cached && cached.key === key && cached.expires > now.getTime()) return rankBoard(cached.sales, starts, viewerUid, ends);
 
-  const snap = await db
-    .collection('sales')
-    .where('saleDate', '>=', new Date(Math.min(...starts)))
-    .orderBy('saleDate', 'desc')
-    .select('salesRepId', 'salesRepName', 'totalPoints', 'saleDate', 'status', DEMO_ACCOUNT_FIELD)
-    .limit(BOARD_FETCH)
-    .get();
-  const sales: BoardSale[] = snap.docs
-    .map((doc) => doc.data() as Data)
-    .filter((data) => data.status === 'approved')
-    .map((data) => ({
-      repId: str(data.salesRepId),
-      name: str(data.salesRepName) || 'Unknown',
-      points: typeof data.totalPoints === 'number' ? data.totalPoints : 0,
-      at: toDate(data.saleDate)?.getTime() ?? 0,
-      demo: isDemoSale(data),
-    }));
-  boardCache.set(db, { key, expires: now.getTime() + BOARD_CACHE_MS, sales });
-  return rankBoard(sales, starts, viewerUid);
+  const [snap, status] = await Promise.all([
+    db.collection('sales').limit(BOARD_FETCH).get(),
+    db.collection('config').doc('fiberReportStatus').get().then(
+      (doc) => (doc.exists ? (doc.data() as Data) : undefined),
+      () => undefined
+    ),
+  ]);
+  const sales = snap.docs.map((doc) => {
+    const data = doc.data() as Data;
+    return {
+      ...data,
+      id: doc.id,
+      saleDate: toDate(data.saleDate) ?? undefined,
+      installDate: toDate(data.installDate) ?? undefined,
+      createdAt: toDate(data.createdAt) ?? undefined,
+    } as unknown as Sale;
+  });
+  let orders: FiberOrder[] = [];
+  try {
+    orders = await boardOrders(db, typeof status?.lastReportAt === 'string' ? status.lastReportAt : null);
+  } catch (error) {
+    console.error('Ask Board carrier report failed:', error);
+  }
+  const reportAsOf = typeof status?.lastReportAsOf === 'string' ? status.lastReportAsOf : null;
+  const counted = countedBoardSales(sales, orders, { now, reportAsOf });
+  boardCache.set(db, { key, expires: now.getTime() + BOARD_CACHE_MS, sales: counted });
+  return rankBoard(counted, starts, viewerUid, ends);
 }
 
 const BOARD_LIST_MAX = 10;

@@ -8,6 +8,7 @@ import { calloutDays, shortRepName, type CalloutMessage } from '@/lib/sales/call
 import { unloggedOrders } from '@/lib/sales/unloggedOrders';
 import { saleCommission, saleRevenue } from '@/lib/owner/revenue';
 import { summarizeMarkets, type MarketsSummary } from '@/lib/owner/markets';
+import { companyFiberBySale } from '@/lib/leaderboard/board';
 import { chargebackFor, dayKeyDate } from '@/lib/pay/chargeback';
 import { estimateDollars } from '@/lib/pay/estimate';
 
@@ -496,13 +497,15 @@ export async function buildMoney(source: OwnerSummarySource, periods: OwnerPerio
 }
 
 /**
- * This month's sales by market (the customer address's state). Counted like the
- * leaderboard's sales: approved, by sale date, in the Chicago calendar month,
- * so the total matches the scoreboard's month.
+ * This month's sales by market (the customer address's state). Counted exactly
+ * as the leaderboard counts (lib/leaderboard/board countedSalesIn over the same
+ * company carrier join), by sale date in the Chicago calendar month, so the
+ * total and the top rep match the scoreboard's month.
  */
 export async function buildMarkets(source: OwnerSummarySource, periods: OwnerPeriods): Promise<MarketsSummary> {
-  const { sales } = await source.loadBook();
-  return summarizeMarkets(sales, periods.thisMonth);
+  const { sales, orders, reportAsOf } = await source.loadBook();
+  const fiberBySale = companyFiberBySale(sales, orders, { now: periods.now, reportAsOf });
+  return summarizeMarkets(sales, periods.thisMonth, fiberBySale);
 }
 
 export async function buildProblems(source: OwnerSummarySource, periods: OwnerPeriods): Promise<ProblemRow[]> {

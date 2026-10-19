@@ -64,7 +64,9 @@ function legacyBoard(docs: RawSale[], orders: FiberOrder[], reportAsOf: string |
   const pastMonth = monthView !== null && !monthView.current;
   const bounds = monthView ? chicagoMonthBounds(monthView.key) : periodBounds(boardPeriod, now);
   const startDate = bounds?.start ?? new Date(0);
-  const endTime = monthView && bounds ? bounds.end.getTime() : Infinity;
+  // Every dated period closes at its end (money-consistency's Chicago-clock
+  // rule); only all time is open.
+  const endTime = bounds ? bounds.end.getTime() : Infinity;
 
   const sales: Sale[] = [];
   const rawById = new Map<string, Record<string, unknown>>();
@@ -153,7 +155,7 @@ function snapshotBoard(stored: BoardSnapshot, p: Params, now: Date) {
     scope: p.scope,
     periodId: monthView ? monthPeriodId(monthView.key) : boardPeriod,
     start: startDate,
-    end: monthView && bounds ? bounds.end : null,
+    end: bounds ? bounds.end : null,
     withHistory: !pastMonth,
   });
   const served = serveBoard(board.payload, {
@@ -169,7 +171,8 @@ function snapshotBoard(stored: BoardSnapshot, p: Params, now: Date) {
     leaderboard: served.leaderboard,
     totalRanked: served.totalRanked,
     currentUser: served.currentUser,
-    recent: pastMonth ? undefined : board.recent,
+    // The route strips the rep key (kept for a demo caller's aliases).
+    recent: pastMonth ? undefined : board.recent.map(({ repKey: _repKey, ...sale }) => sale),
   });
 }
 

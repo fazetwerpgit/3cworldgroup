@@ -12,19 +12,19 @@
 // helper can replace its body without touching anything else here.
 
 import type { FiberOrder, Sale } from '@/types';
-import { boardSales, companyFiberBySale, tallyBoard, type BoardScope, type BoardTotals } from '@/lib/leaderboard/board';
+import { boardSales, companyFiberBySale, sortBoard, tallyBoard, type BoardScope, type BoardTotals } from '@/lib/leaderboard/board';
 import { computeHistory, dayKey, type HistoryEnrichment, type HistoryMetric } from '@/lib/leaderboard/history';
-import { boardOrder } from '@/lib/leaderboard/order';
 import { chicagoMonthBounds, formatMonthParam, periodBounds } from '@/lib/leaderboard/periods';
 import { recentSales, type RecentSale } from '@/lib/leaderboard/team';
 import { boardCountedSales } from '@/lib/pay/chargeback';
 import { chicagoMonthKey, type MonthKey } from '@/lib/sales/monthWindow';
 import { installDayKey } from '@/lib/sales/saleDate';
 import { isDemoSale, saleVisibleTo } from '@/lib/users/demoAccount';
-import type { CompanyTapeStats } from '@/lib/sales/companyTape';
-import { companyTapeFromDocs } from '@/lib/sales/companyTapeDocs';
+import { summarizeCompanySalesKeyed, type KeyedCompanyTape } from '@/lib/sales/companyTapeStats';
 
-export const SNAPSHOT_VERSION = 1;
+// 2: the tape is counted by the leaderboard's rule (companyTapeStats) and kept
+// keyed; the recent feed carries rep keys; week and year end at their bounds.
+export const SNAPSHOT_VERSION = 2;
 export const SNAPSHOT_SCOPES: readonly BoardScope[] = ['approved', 'submitted'];
 export const SNAPSHOT_METRICS: readonly HistoryMetric[] = ['totalPoints', 'totalSales'];
 const RECENT_SCAN = 25;
@@ -60,14 +60,17 @@ export interface BoardSnapshot {
   recent: RecentSale[];
   /** Reps owning demo sales: their own boards are built live (they see their own). */
   demoRepIds: string[];
-  /** The All Company chat tape (company-stats), over the same sales. */
-  tape: CompanyTapeStats;
+  /** The All Company chat tape (company-stats), over the same sales and carrier join. Server-side only: tapeForViewer shapes it. */
+  tape: KeyedCompanyTape;
 }
 
 /**
- * THE counting rule the snapshot ranks by. Today it is the board's own
- * (boardSales: in scope, counted like the estimate, less a 120-day chargeback).
- * Swap this body for the shared helper and every period follows.
+ * THE counting rule the snapshot ranks by: the shared one (lib/leaderboard/board,
+ * "one rule, every screen"). boardSales is exactly what countedSalesIn filters
+ * by window: in scope, not cancelled by us or the carrier, not charged back
+ * under the 120-day rule, an order number logged twice counted once. Each
+ * period's window is applied by tallyBoard over [start, end), as countedSalesIn
+ * does, so every snapshot period equals countedSalesIn for that window.
  */
 export function countSnapshotSales<T extends Sale>(
   sales: T[],
@@ -110,11 +113,9 @@ export function periodKey(scope: BoardScope, periodId: string): string {
   return `${scope}:${periodId}`;
 }
 
+// The board's own order (lib/leaderboard/board sortBoard), on a copy.
 function rankedByMetric(totals: BoardTotals[], metric: HistoryMetric): BoardTotals[] {
-  return [...totals].sort((a, b) => boardOrder(
-    { score: a[metric], name: a.salesRepName, id: a.salesRepId },
-    { score: b[metric], name: b.salesRepName, id: b.salesRepId },
-  ));
+  return sortBoard([...totals], metric);
 }
 
 function payloadFor(
@@ -236,9 +237,11 @@ export function buildBoardSnapshot(
     periods,
     months: [...months].sort(),
     firstMonth,
-    recent: recentSales(recentDocs, RECENT_COUNT),
+    recent: recentSales(recentDocs, RECENT_COUNT, { withRepKey: true }),
     demoRepIds: [...demoRepIds].sort(),
-    tape: companyTapeFromDocs(rawSales, opts.viewerUid ?? null, now),
+    // Counted exactly as the board counts (one rule): the same visible sales and
+    // carrier join, this Chicago month.
+    tape: summarizeCompanySalesKeyed(sales, fiberBySale, periodBounds('month', now)!),
   };
 }
 

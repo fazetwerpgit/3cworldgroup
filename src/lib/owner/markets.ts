@@ -1,6 +1,7 @@
-import type { Sale } from '@/types';
+import type { FiberOrder, Sale } from '@/types';
 import { US_STATES } from '@/lib/validation/address';
 import { firstNameLastInitial } from '@/lib/sales/orderNumber';
+import { countedSalesIn, rankedBoard, topRepOf } from '@/lib/leaderboard/board';
 
 // Sales by market for the owner home: a market is the US state of the sale's
 // customer address. There is no market field anywhere (users.state is the
@@ -114,9 +115,10 @@ export interface MarketsSummary {
   /** Sales whose address gave no state, placed by where that rep's other sales are. */
   placedByRep: number;
   /**
-   * The rep with the most counted sales this month ("Wil T."), for the owners'
-   * home-screen widget. A tie goes to the name first alphabetically. null: no
-   * named rep has a sale yet. Absent in responses cached before it existed.
+   * The month's top rep ("Wil T.") and their counted sales, for the owners'
+   * home-screen widget: the leaderboard's #1 (lib/leaderboard/board topRepOf:
+   * most points, ties by name). null: nobody (or no named rep) is on the board
+   * yet. Absent in responses cached before it existed.
    */
   topRep?: { name: string; sales: number } | null;
 }
@@ -134,12 +136,6 @@ function saleTime(sale: Sale): number | null {
   return Number.isNaN(time) ? null : time;
 }
 
-/** Counted the way the leaderboard counts a sale: approved, dated inside the window. */
-export function countsForMonth(sale: Sale, window: Window): boolean {
-  if (sale.status !== 'approved') return false;
-  const time = saleTime(sale);
-  return time !== null && time >= window.start.getTime() && time < window.end.getTime();
-}
 
 /**
  * Each rep's usual state: the state most of their parseable sales this month
@@ -177,22 +173,23 @@ export function repHomeMarkets(sales: Sale[], window: Window): Map<string, strin
   return result;
 }
 
-/** This month's counted sales by market (state of the customer address). */
-export function summarizeMarkets(sales: Sale[], window: Window): MarketsSummary {
+/**
+ * This month's counted sales by market (state of the customer address). The
+ * count is the leaderboard's (countedSalesIn): approved, not cancelled by the
+ * carrier, not charged back, an order number logged twice counted once. Pass
+ * the company carrier join (companyFiberBySale) so the carrier rules apply.
+ */
+export function summarizeMarkets(
+  sales: Sale[],
+  window: Window,
+  fiberBySale: Map<string, FiberOrder> = new Map()
+): MarketsSummary {
   const home = repHomeMarkets(sales, window);
   const counts = new Map<string, number>();
   let total = 0;
   let placedByRep = 0;
-  const byRep = new Map<string, { name: string; sales: number }>();
-  for (const sale of sales) {
-    if (!countsForMonth(sale, window)) continue;
+  for (const sale of countedSalesIn(sales, fiberBySale, window)) {
     total += 1;
-    const name = sale.salesRepId ? firstNameLastInitial(sale.salesRepName) : '';
-    if (name) {
-      const rep = byRep.get(sale.salesRepId) ?? { name, sales: 0 };
-      rep.sales += 1;
-      byRep.set(sale.salesRepId, rep);
-    }
     let code = addressState(sale.customerAddress);
     if (!code && sale.salesRepId && home.has(sale.salesRepId)) {
       code = home.get(sale.salesRepId)!;
@@ -207,6 +204,11 @@ export function summarizeMarkets(sales: Sale[], window: Window): MarketsSummary 
       if ((a.market === OTHER_MARKET) !== (b.market === OTHER_MARKET)) return a.market === OTHER_MARKET ? 1 : -1;
       return b.count - a.count || a.market.localeCompare(b.market);
     });
-  const topRep = [...byRep.values()].sort((a, b) => b.sales - a.sales || a.name.localeCompare(b.name))[0] ?? null;
+  const top = topRepOf(rankedBoard(sales, fiberBySale, window));
+  // The name as the rep's sales carry it (the tally fills a blank as "Unknown").
+  const topName = top && top.salesRepId
+    ? firstNameLastInitial(sales.find((sale) => sale.salesRepId === top.salesRepId && sale.salesRepName)?.salesRepName)
+    : '';
+  const topRep = top && topName ? { name: topName, sales: top.totalSales } : null;
   return { markets, total, placedByRep, topRep };
 }

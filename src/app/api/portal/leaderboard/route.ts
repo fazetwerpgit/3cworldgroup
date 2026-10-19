@@ -7,6 +7,7 @@ import { type MonthKey } from '@/lib/sales/monthWindow';
 import { unrankedReps, type RecentSale, type UnrankedRep } from '@/lib/leaderboard/team';
 import { monthPeriodId, serveBoard } from '@/lib/leaderboard/snapshot';
 import { loadBoardPeriod } from '@/lib/leaderboard/snapshotStore';
+import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
 
 // How many ranked rows a non-management caller may pull in one request. The
 // most any rep-facing view asks for is 100 (dashboard); the mini widget asks 5.
@@ -87,7 +88,12 @@ export async function GET(request: NextRequest) {
       withHistory: !pastMonth,
     });
     const served = serveBoard(board.payload, { metric: metricKey, limit, viewerUid: gate.uid });
-    const rankedLeaderboard = served.leaderboard;
+    // A demo account (App Review) sees "Rep 1", "Rep 2"... with opaque ids in
+    // place of every other rep; its own row stays. Ranked rows are aliased
+    // first, so the board's top row is Rep 1 and the team lists below agree.
+    const redact = createDemoRedactor({ uid: gate.uid, demoAccount: caller.demoAccount === true });
+    const rankedLeaderboard = redactPeople(served.leaderboard, redact, { idKey: 'salesRepId', nameKey: 'salesRepName' });
+    // The caller's own standing (null if they have no counted sales this period).
     const rawCurrentUser = served.currentUser;
 
     // Opt-in extras for the leaderboard page (fail-soft, like history):
@@ -103,13 +109,21 @@ export async function GET(request: NextRequest) {
           const usersSnapshot = await adminDb.collection('users').where('status', '==', 'active').get();
           const users: Array<{ id: string; data: Record<string, unknown> }> = [];
           usersSnapshot.forEach((doc) => users.push({ id: doc.id, data: doc.data() }));
-          team.unranked = unrankedReps(users, new Set(served.rankedIds)).slice(0, UNRANKED_CAP);
+          team.unranked = redactPeople(
+            unrankedReps(users, new Set(served.rankedIds)).slice(0, UNRANKED_CAP),
+            redact,
+            { idKey: 'salesRepId', nameKey: 'salesRepName' }
+          );
         }
       } catch (teamError) {
         console.error('Leaderboard team list failed:', teamError);
       }
-      // The newest logged sales that still stand, from the snapshot.
-      team.recent = board.recent;
+      // The newest logged sales that still stand, from the snapshot. The rep
+      // key stays server-side; a demo caller gets the same aliases as above.
+      team.recent = board.recent.map(({ repKey, ...sale }) => ({
+        ...sale,
+        repName: redact.active ? redact.name(repKey ?? null, sale.repName) : sale.repName,
+      }));
     }
 
     // The month view's range: the earliest counted sale's month bounds how far

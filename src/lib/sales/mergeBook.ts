@@ -4,7 +4,7 @@ import {
   cancelledSales,
   carrierReportCovers,
   isCarrierCancelled,
-  countedSales,
+  duplicateOrderExtras,
   emptyInstallCounts,
   installBucketForSale,
   type InstallBucket,
@@ -16,6 +16,7 @@ import {
   matchFiberOrdersToSalesDetailed,
 } from '@/lib/fiberReport/matchSales';
 import { carrierReasonLabel } from '@/lib/fiberReport/carrierNotice';
+import { isPayableSale } from '@/lib/pay/expectedPay';
 import { installDayKey } from '@/lib/sales/saleDate';
 import { displayPersonName, normalizeOrderNumber } from '@/lib/sales/orderNumber';
 import type { MonthKey } from '@/lib/sales/monthWindow';
@@ -518,10 +519,12 @@ export function buildMergedBook(
   const reportAsOf = opts?.reportAsOf;
   const names = portalNames(sales, opts?.repNames);
 
-  // countedSales is isPayableSale — the one function that decides money — and
-  // cancelledSales is its other half. Both filter the caller's own objects, so
-  // identity sets read their verdict back without restating the status rules.
-  const payable = new Set<Sale>(countedSales(sales));
+  // isPayableSale is the one function that decides money, and cancelledSales
+  // is its other half. Both filter the caller's own objects, so identity sets
+  // read their verdict back without restating the status rules. The carrier
+  // half and a duplicate order number (countedSales' other two rules) are
+  // settled once the join is done (see `extraDuplicates` below).
+  const payable = new Set<Sale>(sales.filter(isPayableSale));
   const cancelled = new Set<Sale>(cancelledSales(sales));
 
   const salesById = new Map<string, Sale>();
@@ -628,13 +631,19 @@ export function buildMergedBook(
   // it lands here rather than in the sets above: a carrier cancellation settles
   // the row like a cancellation typed in, and never the other way round.
 
+  // One order number logged twice counts once: the first logged keeps the
+  // count, the rest stay on the list flagged possibleDuplicate, uncounted.
+  const extraDuplicates = duplicateOrderExtras(
+    sales.filter((sale) => payable.has(sale) && !isCarrierCancelled(orderBySale.get(sale) ?? null))
+  );
+
   const rows: MergedRow[] = sales.map((sale, index) => {
     const order = orderBySale.get(sale) ?? null;
     const carrierCancelled = isCarrierCancelled(order);
     return saleRow(sale, order, index, {
       linkedManually: linkedManually.has(sale),
       cancelled: cancelled.has(sale) || carrierCancelled,
-      counted: payable.has(sale) && !carrierCancelled,
+      counted: payable.has(sale) && !carrierCancelled && !extraDuplicates.has(sale),
       possibleDuplicate: duplicates.has(sale),
       now,
       reportAsOf,

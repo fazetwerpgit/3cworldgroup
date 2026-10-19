@@ -185,13 +185,15 @@ describe('loadRepSnapshot', () => {
     const counting = {
       ...db,
       collection: (name: string) => {
-        const ref = db.collection(name) as unknown as { where: (...args: unknown[]) => unknown };
+        const ref = db.collection(name) as unknown as { limit: (n: number) => unknown };
+        // The Board reads the whole sales collection (like the leaderboard);
+        // the rep's own Sales section filters by salesRepId first.
         return name === 'sales'
           ? {
               ...ref,
-              where: (field: string, ...rest: unknown[]) => {
-                if (field === 'saleDate') boardReads += 1;
-                return ref.where(field, ...rest);
+              limit: (n: number) => {
+                boardReads += 1;
+                return ref.limit(n);
               },
             }
           : ref;

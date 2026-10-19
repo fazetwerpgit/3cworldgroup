@@ -15,6 +15,26 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: vi.fn() }));
+// Ask's Board reads the leaderboard snapshot on the admin db. Here it is built
+// in memory from the fake db's sales and carrier orders on every read (the
+// store's Firestore flow is covered in lib/leaderboard/snapshotStore.test).
+vi.mock('@/lib/leaderboard/snapshotStore', async () => {
+  const { buildBoardSnapshot, periodFromSnapshot } = await import('@/lib/leaderboard/snapshot');
+  type Snap = { docs: Array<{ id: string; data: () => Record<string, unknown> }> };
+  const read = async (name: string) =>
+    ((await (state.db as { collection: (n: string) => { get: () => Promise<Snap> } }).collection(name).get()) as Snap).docs;
+  return {
+    loadBoardPeriod: vi.fn(async (req: Parameters<typeof periodFromSnapshot>[1] & { now: Date; viewerUid: string }) => {
+      const raw = (await read('sales')).map((doc) => ({ id: doc.id, data: doc.data() }));
+      const orders = (await read('fiberOrders')).map((doc) => ({ id: doc.id, ...doc.data() })) as never;
+      let snapshot = buildBoardSnapshot(raw, orders, { now: req.now });
+      if (snapshot.demoRepIds.includes(req.viewerUid)) {
+        snapshot = buildBoardSnapshot(raw, orders, { now: req.now, viewerUid: req.viewerUid });
+      }
+      return { ...periodFromSnapshot(snapshot, req), source: 'live' };
+    }),
+  };
+});
 
 import { POST } from './route';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
