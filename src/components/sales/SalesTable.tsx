@@ -28,7 +28,7 @@ import { SalesDialog } from './SalesDialog';
 import { InstallStatusLine } from './InstallStatusLine';
 import { FiberRows, fiberTone, sortFiberOrders, type FiberBucket } from './InstallStatusSection';
 import { foldLeftoverOrders, matchFiberOrdersToSalesDetailed } from '@/lib/fiberReport/matchSales';
-import { formatEstimate } from '@/lib/pay/estimate';
+import { estimateDollars, formatEstimate } from '@/lib/pay/estimate';
 
 /** Sales | Pay: switches the VIEW of the page, so it is the canonical page tabs. */
 export function SalesViewTabs({ payView, onChange }: { payView: boolean; onChange: (payView: boolean) => void }) {
@@ -340,9 +340,12 @@ export function SalesTable({
     () => formatPlanMix(planMix(boardCountedSales(monthSales, fiberBySale))),
     [fiberBySale, monthSales]
   );
-  // Exact amounts summed, rounded once (down) where the total prints.
+  // The total is the sum of the rows AS SHOWN (each rounded down on its own),
+  // so the column adds up on screen: two $67.50 rows read $67 + $67 = $134,
+  // never beside a $135 total. That stays at or under the exact sum, so the
+  // estimate still never overstates pay.
   const expectedTotal = hasPlan
-    ? listSales.reduce((sum, sale) => sum + (expectedBySale[sale.id || ''] ?? 0), 0)
+    ? listSales.reduce((sum, sale) => sum + estimateDollars(expectedBySale[sale.id || ''] ?? 0), 0)
     : null;
   const fiberBucketCounts = useMemo(() => {
     const counts: Record<FiberBucket, number> = { pending: 0, active: 0, cancelled: 0, attention: 0 };

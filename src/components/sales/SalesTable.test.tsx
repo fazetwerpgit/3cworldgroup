@@ -91,14 +91,14 @@ const FIBER = {
   lastReportAsOf: '2026-09-20',
 } as unknown as FiberStatusResponse;
 
-function render(payView: boolean) {
+function render(payView: boolean, sales: Sale[] = SALES, rates: Record<string, Record<string, number>> = { tfiber: { 'tfiber-1gig': 140, 'tfiber-2gig': 160, 'tfiber-300': 70 } }) {
   act(() => {
     root.render(
       <SalesTable
-        sales={SALES}
+        sales={sales}
         payView={payView}
         month={{ year: 2026, month: 8 }}
-        payPlan={{ rates: { tfiber: { 'tfiber-1gig': 140, 'tfiber-2gig': 160, 'tfiber-300': 70 } }, payDelayDays: 0, hasPlan: true }}
+        payPlan={{ rates, payDelayDays: 0, hasPlan: true }}
         fiber={{ data: FIBER, loading: false, error: null }}
       />
     );
@@ -168,5 +168,16 @@ describe('SalesTable', () => {
       expect(row.getAttribute('role')).toBeNull();
       expect(row.querySelector('button')?.textContent).toBeTruthy();
     }
+  });
+
+  it('the ledger total is the sum of the rows as shown: $67 + $67 = $134, not $135', () => {
+    const halves = [sale('h1', '7 Elm St', 'tfiber-1gig'), sale('h2', '8 Elm St', 'tfiber-1gig')];
+    render(false, halves, { tfiber: { 'tfiber-1gig': 67.5 } });
+    const rows = container.querySelectorAll<HTMLElement>('[data-part="sale-row"]');
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row.textContent).toContain('$67');
+    const total = container.querySelector<HTMLElement>('[class*="totalsPay"]')!;
+    expect(total.textContent).toContain('$134');
+    expect(total.textContent).not.toContain('$135');
   });
 });
