@@ -55,13 +55,14 @@ export type CreateSaleResult =
 /**
  * True for a failure that never got a usable answer from the server: fetch
  * rejecting (Safari "Load failed", Chrome "Failed to fetch", Firefox
- * "NetworkError…") or a truncated/non-JSON body, which Safari reports from
+ * "NetworkError…"), a Firebase token refresh that could not reach Google
+ * ("auth/network-request-failed"), or a truncated/non-JSON body, which Safari reports from
  * response.json() as "The string did not match the expected pattern".
  */
 export function isNetworkFailure(err: unknown): boolean {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
   const message = err instanceof Error ? err.message : String(err ?? '');
-  return /load failed|failed to fetch|networkerror|network connection was lost|did not match the expected pattern|internet connection appears to be offline|unexpected end of json/i.test(
+  return /load failed|failed to fetch|networkerror|network-request-failed|network connection was lost|did not match the expected pattern|internet connection appears to be offline|unexpected end of json/i.test(
     message
   );
 }
@@ -75,6 +76,15 @@ export function salesQuery(filters?: SalesFilters): string {
   if (filters?.endDate) params.append('endDate', filters.endDate);
   if (filters?.limit) params.append('limit', filters.limit.toString());
   return params.toString();
+}
+
+/** Rejects as soon as `signal` aborts, so an untimed wait (a token refresh) honors the submit timeout. */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (signal.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+    signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+    work.then(resolve, reject);
+  });
 }
 
 export type CachedSales = { sales: Sale[]; truncated: boolean };
@@ -112,6 +122,11 @@ export function useSales(seed?: SalesFilters | null) {
   const [truncated, setTruncated] = useState(() => seeded?.truncated ?? false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The newest fetchSales call. An older one that answers later (the filters
+  // changed while it was in flight) must not overwrite the newer list.
+  const fetchSeq = useRef(0);
+  // A fetchSales call raised `loading` and no call has lowered it yet.
+  const fetchLoading = useRef(false);
 
   // Deletes and cancellations patch the list in place: keep its cached copy in step.
   // The seeded list is the cached copy itself: writing it back would only restamp it.
@@ -133,7 +148,10 @@ export function useSales(seed?: SalesFilters | null) {
     filters?: SalesFilters,
     { quiet = false, background = false }: { quiet?: boolean; background?: boolean } = {}
   ) => {
+    const seq = ++fetchSeq.current;
+    const superseded = () => seq !== fetchSeq.current;
     if (!quiet && !background) {
+      fetchLoading.current = true;
       setLoading(true);
       setError(null);
       setTruncated(false);
@@ -146,6 +164,7 @@ export function useSales(seed?: SalesFilters | null) {
 
       // The tab prefetch is already reading this list: use its answer.
       const prefetched = await awaitPendingDataCacheRead<CachedSales>(subject, listCacheKey(query));
+      if (superseded()) return;
       if (prefetched && gen === dataCacheGeneration()) {
         listKey.current = { key: listCacheKey(query), subject, gen, at: prefetched.at };
         setSales(prefetched.value.sales);
@@ -164,6 +183,7 @@ export function useSales(seed?: SalesFilters | null) {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch sales');
       }
+      if (superseded()) return;
 
       // An answer from before an account switch never becomes the cached copy.
       listKey.current =
@@ -172,11 +192,17 @@ export function useSales(seed?: SalesFilters | null) {
       setTruncated(data.truncated === true);
       setError(null);
     } catch (err) {
+      if (superseded()) return;
       const message = err instanceof Error ? err.message : 'Failed to fetch sales';
       if (quiet) console.error('Quiet sales refresh failed:', message);
       else setError(message);
     } finally {
-      if (!quiet && !background) setLoading(false);
+      // Only the newest call ends the loading state, also one an older,
+      // superseded call raised.
+      if (!superseded() && fetchLoading.current) {
+        fetchLoading.current = false;
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -221,8 +247,10 @@ export function useSales(seed?: SalesFilters | null) {
 
     try {
       // The create endpoint requires a verified token and stamps the rep from it.
-      const token = await getIdToken();
+      // The timeout covers the token refresh too: after an hour in the
+      // background it is a network call that can hang on weak signal.
       timer = setTimeout(() => controller.abort(), SALE_SUBMIT_TIMEOUT_MS);
+      const token = await untilAborted(getIdToken(), controller.signal);
       const response = await fetch('/api/portal/sales', {
         method: 'POST',
         headers: {

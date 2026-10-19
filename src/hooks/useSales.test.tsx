@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'token') }));
 
+import { getIdToken } from '@/lib/firebase/getIdToken';
 import { NO_SIGNAL_SALE_MESSAGE, SALE_SUBMIT_TIMEOUT_MS, useSales } from './useSales';
 import type { CreateSaleData } from '@/types';
 
@@ -131,5 +132,71 @@ describe('useSales.createSale', () => {
     });
     expect(result).toBeNull();
     expect(latest.current!.error).toBe('Sale id already in use');
+  });
+
+  it('shows no signal when the token refresh cannot reach Firebase', async () => {
+    vi.mocked(getIdToken).mockRejectedValueOnce(new Error('Firebase: Error (auth/network-request-failed).'));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    let result: unknown;
+    await act(async () => {
+      result = await latest.current!.createSale(saleData);
+    });
+    expect(result).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(latest.current!.error).toBe(NO_SIGNAL_SALE_MESSAGE);
+  });
+
+  it('counts a hung token refresh against the submit timeout', async () => {
+    vi.useFakeTimers();
+    vi.mocked(getIdToken).mockImplementationOnce(() => new Promise<string | null>(() => {}));
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    let result: unknown = 'pending';
+    await act(async () => {
+      const pending = latest.current!.createSale(saleData).then((value) => {
+        result = value;
+      });
+      await vi.advanceTimersByTimeAsync(SALE_SUBMIT_TIMEOUT_MS);
+      await pending;
+    });
+    expect(result).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(latest.current!.error).toBe(NO_SIGNAL_SALE_MESSAGE);
+    expect(latest.current!.loading).toBe(false);
+  });
+});
+
+describe('useSales.fetchSales', () => {
+  it('keeps the newest filters when an older request answers last', async () => {
+    const answers: Array<(sales: unknown[]) => void> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            answers.push((sales) => resolve(new Response(JSON.stringify({ sales, truncated: false }), { status: 200 })));
+          })
+      )
+    );
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    await act(async () => {
+      first = latest.current!.fetchSales({ limit: 500, salesRepId: 'me' });
+      await vi.waitFor(() => expect(answers).toHaveLength(1));
+      second = latest.current!.fetchSales({ limit: 500 });
+      await vi.waitFor(() => expect(answers).toHaveLength(2));
+    });
+    await act(async () => {
+      answers[1]([{ id: 'mine' }, { id: 'theirs' }]);
+      await second;
+    });
+    expect(latest.current!.loading).toBe(false);
+    await act(async () => {
+      answers[0]([{ id: 'mine' }]);
+      await first;
+    });
+    expect(latest.current!.sales.map((s) => s.id)).toEqual(['mine', 'theirs']);
+    expect(latest.current!.loading).toBe(false);
   });
 });
