@@ -26,6 +26,7 @@ import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
 import {
   clampMonth,
+  compareMonths,
   currentMonth,
   latestPickableMonth,
   monthLabel,
@@ -190,9 +191,8 @@ function SalesContent() {
   // The company book has no pay list: a `?view=pay&month=<next month>` link
   // (say, shared from a rep's pay view) must not open it past its picker's
   // max on an empty future month, nor keep `view=pay` in the URL.
-  useEffect(() => {
-    if (canViewAll) choosePayView(false);
-  }, [canViewAll, choosePayView]);
+  // Adjusted during render (React's "state from props" pattern), not in an effect.
+  if (canViewAll && (payView || compareMonths(month, latestPickableMonth(false)) > 0)) choosePayView(false);
   // useSales starts idle (loading false, no sales). Until the first fetch
   // settles the page shows skeletons, never a zero it has not measured.
   const [fetched, setFetched] = useState(seeded);
