@@ -5,7 +5,7 @@
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useLeaderboard } from './useLeaderboard';
+import { leaderboardCacheKey, solarBoardFromResponse, useLeaderboard } from './useLeaderboard';
 
 vi.mock('@/lib/firebase/config', () => ({ auth: null }));
 
@@ -130,5 +130,29 @@ describe('useLeaderboard', () => {
     await act(async () => void fetchLeaderboard('week', 'totalPoints', 10, 'approved', { quiet: true }));
     await answer(2, true, board('after'));
     expect(lastStaleAt).toBeNull();
+  });
+});
+
+describe('solar board answers', () => {
+  it('map onto the fiber board shape, booked consults in both counts', () => {
+    const board = solarBoardFromResponse({
+      leaderboard: [{ rank: 1, uid: 'ana', name: 'Ana R', booked: 3, mix: [{ tier: 'Virtual', count: 3 }], movement: 1, spark: [null, 1], streakDays: 2 }],
+      currentUser: { rank: 1, uid: 'ana', name: 'Ana R', booked: 3 },
+      unranked: [{ uid: 'ben', name: 'Ben C' }],
+      recent: [{ repName: 'Ana R', plan: 'Virtual', at: '2026-10-12T15:00:00.000Z' }],
+      totalRanked: 1,
+    });
+    expect(board.leaderboard[0]).toEqual({
+      rank: 1, salesRepId: 'ana', salesRepName: 'Ana R', totalSales: 3, totalPoints: 3,
+      movement: 1, spark: [null, 1], streakDays: 2, planMix: [{ tier: 'Virtual', count: 3 }],
+    });
+    expect(board.currentUser).toMatchObject({ salesRepId: 'ana', totalSales: 3 });
+    expect(board.unranked).toEqual([{ salesRepId: 'ben', salesRepName: 'Ben C' }]);
+    expect(board.totalRanked).toBe(1);
+  });
+
+  it('cache apart from the fiber board', () => {
+    const request = { period: 'week', metric: 'bookedConsults', limit: 100, team: true } as const;
+    expect(leaderboardCacheKey({ ...request, source: 'solar' })).not.toBe(leaderboardCacheKey(request));
   });
 });

@@ -25,7 +25,9 @@ export interface LeaderboardEntry {
   planMix?: PlanMixEntry[];
 }
 
-export type LeaderboardMetric = 'totalPoints' | 'totalSales';
+/** 'bookedConsults' is the solar board's one metric (GET /api/portal/solar/leaderboard):
+ *  the count rides in totalSales (and totalPoints), so every piece reads it as is. */
+export type LeaderboardMetric = 'totalPoints' | 'totalSales' | 'bookedConsults';
 export type LeaderboardPeriod = 'week' | 'month' | 'year' | 'all';
 
 export interface LeaderboardProps {
@@ -53,26 +55,33 @@ export function leaderboardValue(entry: LeaderboardEntry, metric: LeaderboardMet
 }
 
 export function leaderboardUnit(metric: LeaderboardMetric) {
-  return metric === 'totalPoints' ? 'pts' : 'sales';
+  return metric === 'totalPoints' ? 'pts' : metric === 'bookedConsults' ? 'consults' : 'sales';
+}
+
+/** What one counted unit is called in a sentence: "1 sale passes …", "1 consult passes …". */
+export function leaderboardNoun(metric: LeaderboardMetric, count: number) {
+  const one = metric === 'bookedConsults' ? 'consult' : 'sale';
+  return count === 1 ? one : `${one}s`;
 }
 
 export function formatLeaderboardValue(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
-function EmptyState({ pastMonth }: { pastMonth: MonthKey | null }) {
+function EmptyState({ pastMonth, metric }: { pastMonth: MonthKey | null; metric: LeaderboardMetric }) {
+  const solar = metric === 'bookedConsults';
   if (pastMonth) {
     return (
       <div className={styles.empty}>
-        <p className="portal-display">No approved sales</p>
-        <span>Nothing was approved in {monthLabel(pastMonth)}.</span>
+        <p className="portal-display">{solar ? 'No booked consults' : 'No approved sales'}</p>
+        <span>{solar ? 'Nothing was booked' : 'Nothing was approved'} in {monthLabel(pastMonth)}.</span>
       </div>
     );
   }
   return (
     <div className={styles.empty}>
       <p className="portal-display">The board is open</p>
-      <span>Approved activity will appear here.</span>
+      <span>{solar ? 'Booked consults will appear here.' : 'Approved activity will appear here.'}</span>
     </div>
   );
 }
@@ -152,9 +161,9 @@ export function LeaderboardTable({
         <Podium entries={podiumEntries} currentUser={effectiveCurrentUser} metric={metric} />
       </LeaderboardStage>
       {spot ? <p className={styles.spot} data-testid="spot-line"><SpotText text={spot} /></p> : null}
-      {entries.length === 0 ? <EmptyState pastMonth={pastMonth} /> : null}
+      {entries.length === 0 ? <EmptyState pastMonth={pastMonth} metric={metric} /> : null}
       <LeaderboardRows entries={rowEntries} zeros={zeros} currentUser={effectiveCurrentUser} metric={metric} />
-      <RecentSales sales={recent} />
+      <RecentSales sales={recent} title={metric === 'bookedConsults' ? 'Recent consults' : undefined} />
       {showsStandingBar ? (
         <div className={styles.standing} aria-label="Your standing">
           <Avatar entry={standingEntry} size="row" decorative={false} />

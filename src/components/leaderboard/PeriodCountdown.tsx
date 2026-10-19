@@ -14,7 +14,7 @@ export function periodLabel(
   metric: LeaderboardMetric = 'totalPoints',
   pastMonth: MonthKey | null = null,
 ) {
-  const subject = metric === 'totalPoints' ? 'points' : 'sales';
+  const subject = metric === 'totalPoints' ? 'points' : metric === 'bookedConsults' ? 'booked consults' : 'sales';
 
   if (period === 'month' && pastMonth) return `Monthly ${subject} · ${monthLabel(pastMonth)}`;
 

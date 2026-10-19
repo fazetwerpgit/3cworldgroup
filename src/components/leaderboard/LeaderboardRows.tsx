@@ -14,7 +14,7 @@ interface LeaderboardRowsProps {
 }
 
 function metricHead(metric: LeaderboardMetric) {
-  return metric === 'totalPoints' ? 'Points' : 'Sales';
+  return metric === 'totalPoints' ? 'Points' : metric === 'bookedConsults' ? 'Booked' : 'Sales';
 }
 
 /** The ranked list below the podium: rank four down, as one scoreboard panel.

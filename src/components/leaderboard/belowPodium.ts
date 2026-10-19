@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { relativeSaleTime, tapeRepName } from '@/lib/sales/companyTape';
 import { installDayKey } from '@/lib/sales/saleDate';
-import { leaderboardValue, type LeaderboardEntry, type LeaderboardMetric } from './LeaderboardTable';
+import { leaderboardNoun, leaderboardValue, type LeaderboardEntry, type LeaderboardMetric } from './LeaderboardTable';
 
 /* What sits under the podium on both boards (phone and the legacy desktop):
  * the team at 0 after the ranked reps, the viewer's one-line spot, and the
@@ -50,7 +50,7 @@ export function spotLine({
 }): string | null {
   if (!currentUser) {
     return viewerId && unranked.some((rep) => rep.salesRepId === viewerId)
-      ? '1 sale gets you on the board.'
+      ? `1 ${leaderboardNoun(metric, 1)} gets you on the board.`
       : null;
   }
   if (currentUser.rank <= 3) return null;
@@ -61,10 +61,11 @@ export function spotLine({
 
   const name = tapeRepName(above.salesRepName);
   const gap = Math.max(0, leaderboardValue(above, metric) - leaderboardValue(currentUser, metric));
-  if (gap === 0) return `${spot} 1 sale passes ${name}.`;
+  const one = leaderboardNoun(metric, 1);
+  if (gap === 0) return `${spot} 1 ${one} passes ${name}.`;
   if (metric === 'totalPoints') return `${spot} ${new Intl.NumberFormat('en-US').format(gap)} pts behind ${name}.`;
-  if (gap === 1) return `${spot} 1 sale ties ${name}.`;
-  return `${spot} ${gap + 1} sales pass ${name}.`;
+  if (gap === 1) return `${spot} 1 ${one} ties ${name}.`;
+  return `${spot} ${gap + 1} ${leaderboardNoun(metric, gap + 1)} pass ${name}.`;
 }
 
 /** "12m ago" for a sale logged the day it happened; the day alone ("Today",

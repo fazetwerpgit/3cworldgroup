@@ -11,6 +11,7 @@ import {
   writeDataCache,
 } from '@/lib/cache/dataCache';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
+import type { PlanMixEntry } from '@/lib/sales/planMix';
 
 interface LeaderboardEntry {
   rank: number;
@@ -21,10 +22,13 @@ interface LeaderboardEntry {
   movement?: number | null;
   spark?: (number | null)[];
   streakDays?: number;
+  planMix?: PlanMixEntry[];
 }
 
 type Period = 'week' | 'month' | 'year' | 'all';
-type Metric = 'totalPoints' | 'totalSales';
+type Metric = 'totalPoints' | 'totalSales' | 'bookedConsults';
+/** Which board: GET /api/portal/leaderboard (fiber) or /api/portal/solar/leaderboard. */
+export type LeaderboardSource = 'fiber' | 'solar';
 
 /** One board request: what fetchLeaderboard takes, minus `quiet`. */
 export interface LeaderboardRequest {
@@ -34,6 +38,7 @@ export interface LeaderboardRequest {
   scope?: 'approved' | 'submitted';
   team?: boolean;
   month?: string | null;
+  source?: LeaderboardSource;
 }
 
 /** The board's query string, which is also its cache key. */
@@ -66,9 +71,77 @@ export type CachedBoard = {
   totalRanked?: number;
 };
 
-const boardCacheKey = (query: string) => `leaderboard?${query}`;
+const boardCacheKey = (query: string, source: LeaderboardSource = 'fiber') =>
+  source === 'solar' ? `solar-leaderboard?${query}` : `leaderboard?${query}`;
 /** The cache key of this board (the tab prefetch fills it too). */
-export const leaderboardCacheKey = (request: LeaderboardRequest) => boardCacheKey(leaderboardQuery(request));
+export const leaderboardCacheKey = (request: LeaderboardRequest) =>
+  boardCacheKey(leaderboardQuery(request), request.source);
+
+const boardUrl = (query: string, source: LeaderboardSource = 'fiber') =>
+  source === 'solar' ? `/api/portal/solar/leaderboard?${query}` : `/api/portal/leaderboard?${query}`;
+
+/** The solar board as a phone first opens it (week, with the team). */
+export const FIRST_SOLAR_BOARD = {
+  period: 'week',
+  metric: 'bookedConsults',
+  limit: 100,
+  scope: 'approved',
+  team: true,
+  source: 'solar',
+} as const satisfies LeaderboardRequest;
+
+type SolarRow = {
+  rank?: unknown;
+  uid?: unknown;
+  name?: unknown;
+  booked?: unknown;
+  mix?: unknown;
+  movement?: unknown;
+  spark?: unknown;
+  streakDays?: unknown;
+};
+
+const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+
+/** One solar row in the fiber board's shape: booked consults ride in totalSales and totalPoints. */
+function solarEntry(row: SolarRow): LeaderboardEntry {
+  const booked = num(row.booked);
+  return {
+    rank: num(row.rank),
+    salesRepId: typeof row.uid === 'string' ? row.uid : '',
+    salesRepName: typeof row.name === 'string' ? row.name : 'Unknown',
+    totalSales: booked,
+    totalPoints: booked,
+    movement: typeof row.movement === 'number' ? row.movement : null,
+    spark: Array.isArray(row.spark) ? (row.spark as (number | null)[]) : [],
+    streakDays: num(row.streakDays),
+    planMix: Array.isArray(row.mix) ? (row.mix as PlanMixEntry[]) : [],
+  };
+}
+
+/** The cached board for a successful /api/portal/solar/leaderboard answer. */
+export function solarBoardFromResponse(data: {
+  leaderboard?: unknown;
+  currentUser?: unknown;
+  unranked?: unknown;
+  recent?: unknown;
+  firstMonth?: unknown;
+  totalRanked?: unknown;
+}): CachedBoard {
+  const rows = Array.isArray(data.leaderboard) ? (data.leaderboard as SolarRow[]) : [];
+  const unranked = Array.isArray(data.unranked) ? (data.unranked as { uid?: unknown; name?: unknown }[]) : [];
+  return {
+    ...(typeof data.totalRanked === 'number' ? { totalRanked: data.totalRanked } : {}),
+    leaderboard: rows.map(solarEntry),
+    currentUser: data.currentUser && typeof data.currentUser === 'object' ? solarEntry(data.currentUser as SolarRow) : null,
+    unranked: unranked.map((rep) => ({
+      salesRepId: typeof rep.uid === 'string' ? rep.uid : '',
+      salesRepName: typeof rep.name === 'string' ? rep.name : '',
+    })),
+    recent: Array.isArray(data.recent) ? (data.recent as RecentSale[]) : [],
+    firstMonth: 'firstMonth' in data ? (typeof data.firstMonth === 'string' ? data.firstMonth : null) : undefined,
+  };
+}
 
 /**
  * The board the Leaderboard page opens on (week, points, with the team): the
@@ -107,7 +180,7 @@ export function boardFromResponse(data: {
  */
 export function useLeaderboard(seed?: LeaderboardRequest) {
   const uid = useCacheSubject();
-  const [seeded] = useState(() => (seed ? readDataCache<CachedBoard>(uid, boardCacheKey(leaderboardQuery(seed))) : undefined));
+  const [seeded] = useState(() => (seed ? readDataCache<CachedBoard>(uid, boardCacheKey(leaderboardQuery(seed), seed.source)) : undefined));
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(() => seeded?.leaderboard ?? []);
   // The caller's own standing from the server — correct even when they rank
   // below the returned top-N.
@@ -141,12 +214,13 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
     metric: Metric = 'totalPoints',
     limit: number = 10,
     scope: 'approved' | 'submitted' = 'approved',
-    options: { team?: boolean; quiet?: boolean; month?: string | null } = {}
+    options: { team?: boolean; quiet?: boolean; month?: string | null; source?: LeaderboardSource } = {}
   ) => {
     const request = ++latest.current;
     const gen = dataCacheGeneration();
+    const source = options.source ?? 'fiber';
     const query = leaderboardQuery({ period, metric, limit, scope, team: options.team, month: options.month });
-    const key = boardCacheKey(query);
+    const key = boardCacheKey(query, source);
     // Seen before: show that board now and refresh it in place (like `quiet`).
     const entry = readDataCacheEntry<CachedBoard>(uid, key);
     const cached = entry?.value;
@@ -185,7 +259,7 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
         return;
       }
       const token = await auth?.currentUser?.getIdToken();
-      const response = await fetch(`/api/portal/leaderboard?${query}`, {
+      const response = await fetch(boardUrl(query, source), {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       const data = await response.json();
@@ -193,14 +267,15 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch leaderboard');
       }
-      writeDataCache<CachedBoard>(uid, key, boardFromResponse(data), gen);
+      const board = source === 'solar' ? solarBoardFromResponse(data) : boardFromResponse(data);
+      writeDataCache<CachedBoard>(uid, key, board, gen);
       if (request !== latest.current) return;
 
-      setLeaderboard(data.leaderboard);
-      setCurrentUser(data.currentUser ?? null);
-      setUnranked(Array.isArray(data.unranked) ? data.unranked : []);
-      setRecent(Array.isArray(data.recent) ? data.recent : []);
-      if ('firstMonth' in data) setFirstMonth(typeof data.firstMonth === 'string' ? data.firstMonth : null);
+      setLeaderboard(board.leaderboard);
+      setCurrentUser(board.currentUser);
+      setUnranked(board.unranked);
+      setRecent(board.recent);
+      if (board.firstMonth !== undefined) setFirstMonth(board.firstMonth);
       shownAt.current = Date.now();
       setStaleAt(null);
       setError(null);

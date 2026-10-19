@@ -14,13 +14,13 @@ import { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Crown, Flame } from 'lucide-react';
 import { LegacySparkline } from './LegacySparkline';
 import d from './leaderboard-desk.module.css';
-import type { LeaderboardEntry } from '../LeaderboardTable';
+import type { LeaderboardEntry, LeaderboardMetric } from '../LeaderboardTable';
 import { recentSaleLabel, recentSaleWhen, spotLine, useMinuteClock, zeroEntries } from '../belowPodium';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import { periodBounds } from '@/lib/leaderboard/periods';
 
-type Metric = 'totalPoints' | 'totalSales';
+type Metric = LeaderboardMetric;
 type Period = 'week' | 'month' | 'year' | 'all';
 
 interface LegacyLeaderboardTableProps {
@@ -51,7 +51,14 @@ function metricValue(entry: LeaderboardEntry, metric: Metric) {
 }
 
 function metricUnit(metric: Metric) {
-  return metric === 'totalPoints' ? 'pts' : 'sales';
+  return metric === 'totalPoints' ? 'pts' : metric === 'bookedConsults' ? 'consults' : 'sales';
+}
+
+/** The board's counted thing in copy: "approved sales" on fiber, "booked consults" on solar. */
+function counted(metric: Metric) {
+  return metric === 'bookedConsults'
+    ? { adj: 'booked', Adj: 'Booked', things: 'consults', thing: 'consult', head: 'Booked' }
+    : { adj: 'approved', Adj: 'Approved', things: 'sales', thing: 'sale', head: metric === 'totalPoints' ? 'Points' : 'Sales' };
 }
 
 function periodLabel(period: Period, pastMonth: MonthKey | null = null) {
@@ -135,11 +142,12 @@ function periodDaysLeft(period: Period, now = new Date()) {
   return Math.max(1, Math.ceil((bounds.end.getTime() - now.getTime()) / 86_400_000));
 }
 
-function EmptyState({ pastMonth }: { pastMonth: MonthKey | null }) {
+function EmptyState({ pastMonth, metric }: { pastMonth: MonthKey | null; metric: Metric }) {
+  const c = counted(metric);
   return (
     <div className={d.empty}>
-      <p className={d.emptyTitle}>{pastMonth ? 'No approved sales' : 'The board is wide open'}</p>
-      <p className={d.emptyText}>{pastMonth ? `Nothing was approved in ${monthLabel(pastMonth)}.` : 'First approved sale of the period takes #1.'}</p>
+      <p className={d.emptyTitle}>{pastMonth ? `No ${c.adj} ${c.things}` : 'The board is wide open'}</p>
+      <p className={d.emptyText}>{pastMonth ? `Nothing was ${c.adj} in ${monthLabel(pastMonth)}.` : `First ${c.adj} ${c.thing} of the period takes #1.`}</p>
     </div>
   );
 }
@@ -162,13 +170,14 @@ function AcrossTheBoard({ entries, currentUser, metric, period, pastMonth }: { e
   const soleLeader = currentUser?.rank === 1 && !belowUser;
   const totalPoints = entries.reduce((sum, entry) => sum + entry.totalPoints, 0);
   const daysLeft = pastMonth ? null : periodDaysLeft(period);
+  const c = counted(metric);
 
   return (
     <section className={d.pulse} aria-label="Team pulse">
       <div className={d.stat}>
-        <span className={d.statLabel}>Top closer</span>
+        <span className={d.statLabel}>{metric === 'bookedConsults' ? 'Most booked' : 'Top closer'}</span>
         <strong className={d.statValue}>{topCloser?.salesRepName ?? '--'}</strong>
-        <span className={d.statSub}>{topCloser ? `${formatNumber(topCloser.totalSales)} approved sales` : 'No approved sales yet'}</span>
+        <span className={d.statSub}>{topCloser ? `${formatNumber(topCloser.totalSales)} ${c.adj} ${c.things}` : `No ${c.adj} ${c.things} yet`}</span>
       </div>
       <div className={d.stat}>
         <span className={d.statLabel}>Closest race</span>
@@ -177,12 +186,12 @@ function AcrossTheBoard({ entries, currentUser, metric, period, pastMonth }: { e
       </div>
       <div className={d.stat}>
         <span className={d.statLabel}>Your climb</span>
-        <strong className={d.statValue}>{!currentUser ? 'First sale' : soleLeader ? 'Top of the board' : currentUser.rank === 1 ? `Leading by ${formatNumber(lead ?? 0)}` : nextGap !== null ? `${formatNumber(nextGap)} ${unit}` : 'Keep climbing'}</strong>
+        <strong className={d.statValue}>{!currentUser ? `First ${c.thing}` : soleLeader ? 'Top of the board' : currentUser.rank === 1 ? `Leading by ${formatNumber(lead ?? 0)}` : nextGap !== null ? `${formatNumber(nextGap)} ${unit}` : 'Keep climbing'}</strong>
         <span className={d.statSub}>{!currentUser ? 'puts you on the board' : soleLeader ? 'Only rep on the board' : currentUser.rank === 1 ? `over #2 in ${unit}` : nextGap !== null ? `to #${currentUser.rank - 1}` : 'next rank is outside this view'}</span>
       </div>
       <div className={d.stat}>
         <span className={d.statLabel}>Team pulse</span>
-        <strong className={d.statValue}>{formatNumber(totalPoints)} pts</strong>
+        <strong className={d.statValue}>{formatNumber(totalPoints)} {metric === 'bookedConsults' ? unit : 'pts'}</strong>
         <span className={d.statSub}>{entries.length} reps, {pastMonth ? monthLabel(pastMonth) : daysLeft ? `${daysLeft} days left` : 'all time'}</span>
       </div>
     </section>
@@ -199,7 +208,7 @@ function Podium({ entries, currentUser, metric, period, pastMonth }: { entries: 
     <section className={d.section} aria-labelledby="podium-heading">
       <div className={d.secHead}>
         <h2 id="podium-heading" className={d.secTitle}>Top performers</h2>
-        <p className={d.secMeta}>Approved {metric === 'totalPoints' ? 'points' : 'sales'} · {periodLabel(period, pastMonth)}</p>
+        <p className={d.secMeta}>{counted(metric).Adj} {metric === 'totalPoints' ? 'points' : counted(metric).things} · {periodLabel(period, pastMonth)}</p>
       </div>
       <div className={`${d.podium} ${gridColumns}`}>
         {podiumEntries.map((entry) => {
@@ -213,7 +222,7 @@ function Podium({ entries, currentUser, metric, period, pastMonth }: { entries: 
                 <span className={d.podAvatar}>{initialsOf(entry.salesRepName)}</span>
                 <div className="min-w-0">
                   <strong className={d.podName}>{entry.salesRepName}{mine && <em className={d.you}>You</em>}</strong>
-                  <span className={d.podSub}>{formatNumber(entry.totalSales)} approved sales{winner && !pastMonth ? ', current leader' : ''}</span>
+                  <span className={d.podSub}>{formatNumber(entry.totalSales)} {counted(metric).adj} {counted(metric).things}{winner && !pastMonth ? ', current leader' : ''}</span>
                 </div>
               </div>
               <div className={d.podScore}><CountUpValue value={metricValue(entry, metric)} /><small className={d.unit}>{unit}</small></div>
@@ -239,7 +248,7 @@ function ChaseTable({ entries, zeros, currentUser, metric, pastMonth = null }: {
         <p className={d.secMeta}>{pastMonth ? monthLabel(pastMonth) : 'Movement since yesterday'}</p>
       </div>
       <div className={d.table}>
-        <div className={`${d.cols} ${d.thead}`}><span>{pastMonth ? 'Rank' : 'Rank / move'}</span><span>Rep</span><span>{pastMonth ? '' : '7-day trend'}</span><span className={d.right}>{metric === 'totalPoints' ? 'Points' : 'Sales'}</span><span className={d.right}>Gap to next</span></div>
+        <div className={`${d.cols} ${d.thead}`}><span>{pastMonth ? 'Rank' : 'Rank / move'}</span><span>Rep</span><span>{pastMonth ? '' : '7-day trend'}</span><span className={d.right}>{counted(metric).head}</span><span className={d.right}>Gap to next</span></div>
         {rest.map((entry, index) => {
           const mine = entry.salesRepId === currentUser?.salesRepId;
           const above = entries.find((candidate) => candidate.rank === entry.rank - 1);
@@ -255,7 +264,7 @@ function ChaseTable({ entries, zeros, currentUser, metric, pastMonth = null }: {
                 <span className={d.avatar}>{initialsOf(entry.salesRepName)}</span>
                 <div className="min-w-0">
                   <span className={d.name}>{entry.salesRepName}{mine && <em className={d.you}>You</em>}</span>
-                  <span className={d.sub}>{formatNumber(entry.totalSales)} sales <StreakChip streakDays={entry.streakDays} /></span>
+                  <span className={d.sub}>{formatNumber(entry.totalSales)} {counted(metric).things} <StreakChip streakDays={entry.streakDays} /></span>
                 </div>
               </div>
               <span className={d.trend}>{pastMonth ? null : <LegacySparkline spark={entry.spark ?? []} mine={mine} />}</span>
@@ -286,14 +295,14 @@ function ChaseTable({ entries, zeros, currentUser, metric, pastMonth = null }: {
   );
 }
 
-function RecentSales({ sales }: { sales: RecentSale[] }) {
+function RecentSales({ sales, metric }: { sales: RecentSale[]; metric: Metric }) {
   const now = useMinuteClock();
   if (sales.length === 0) return null;
 
   return (
     <section className={d.section} aria-labelledby="recent-heading">
       <div className={d.secHead}>
-        <h2 id="recent-heading" className={d.secTitle}>Recent sales</h2>
+        <h2 id="recent-heading" className={d.secTitle}>Recent {counted(metric).things}</h2>
         <p className={d.secMeta}>Team-wide, newest first</p>
       </div>
       <ol className={d.feed}>
@@ -319,11 +328,11 @@ export function LegacyLeaderboardTable({ entries, currentUser, metric, period, u
     const spot = spotLine({ entries: ordered, currentUser, unranked, viewerId, metric });
     return (
       <div>
-        <EmptyState pastMonth={pastMonth} />
+        <EmptyState pastMonth={pastMonth} metric={metric} />
         {spot && <p data-testid="spot-line" className={d.spot}>{spot}</p>}
         <div className={d.afterEmpty}>
           <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} pastMonth={pastMonth} />
-          <RecentSales sales={recent} />
+          <RecentSales sales={recent} metric={metric} />
         </div>
       </div>
     );
@@ -334,10 +343,19 @@ export function LegacyLeaderboardTable({ entries, currentUser, metric, period, u
       <Podium entries={ordered} currentUser={currentUser} metric={metric} period={period} pastMonth={pastMonth} />
       <AcrossTheBoard entries={ordered} currentUser={currentUser} metric={metric} period={period} pastMonth={pastMonth} />
       <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} pastMonth={pastMonth} />
-      <RecentSales sales={recent} />
+      <RecentSales sales={recent} metric={metric} />
       <footer className={d.foot}>
-        <span>Rankings use approved sales for the selected period.</span>
-        <span>Point values vary by product and plan · refreshed moments ago.</span>
+        {metric === 'bookedConsults' ? (
+          <>
+            <span>Rankings count consults booked in the selected period; cancelled ones drop off.</span>
+            <span>Credited to the rep who owns the lead · refreshed moments ago.</span>
+          </>
+        ) : (
+          <>
+            <span>Rankings use approved sales for the selected period.</span>
+            <span>Point values vary by product and plan · refreshed moments ago.</span>
+          </>
+        )}
       </footer>
     </div>
   );
