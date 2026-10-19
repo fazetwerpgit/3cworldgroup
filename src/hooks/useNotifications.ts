@@ -34,6 +34,12 @@ export function useNotifications() {
     unreadRef.current = unreadCount;
   }, [unreadCount]);
   const listLoadedRef = useRef(false);
+  // Latest list, so markAsRead can tell which tapped ids were actually unread
+  // (tapping an already-read item to follow its link must not move the badge).
+  const notificationsRef = useRef<Notification[]>([]);
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
 
   /** Resolves false when the read failed (the poll then backs off). */
   const fetchNotifications = useCallback(async (limit = 20): Promise<boolean> => {
@@ -115,12 +121,15 @@ export function useNotifications() {
       });
 
       if (response.ok) {
+        const newlyRead = notificationsRef.current.filter(
+          (n) => idsToMark.includes(n.id) && !n.read
+        ).length;
         setNotifications((prev) =>
           prev.map((n) =>
             idsToMark.includes(n.id) ? { ...n, read: true } : n
           )
         );
-        setUnreadCount((prev) => Math.max(0, prev - idsToMark.length));
+        if (newlyRead > 0) setUnreadCount((prev) => Math.max(0, prev - newlyRead));
       }
     } catch (error) {
       console.error('Error marking notifications as read:', error);
