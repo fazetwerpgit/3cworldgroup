@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const db = vi.hoisted(() => {
-  const state = { missingIndex: false, orderedCalls: 0, unorderedCalls: 0 };
+  const state = { missingIndex: false, orderedCalls: 0, unorderedCalls: 0, lastLimit: 0 };
   // 60 notifications, stored oldest-first, so an unordered read of a small window returns the OLD ones.
   const docs = Array.from({ length: 60 }, (_, i) => ({
     id: `n${i}`,
@@ -18,6 +18,7 @@ const db = vi.hoisted(() => {
       limit: (n: number) => ({
         get: async () => {
           state.orderedCalls++;
+          state.lastLimit = n;
           if (state.missingIndex) throw Object.assign(new Error('The query requires an index'), { code: 9 });
           const time = (doc: (typeof docs)[number]) => {
             const value = (doc.data() as Record<string, unknown>)[field];
@@ -98,5 +99,25 @@ describe('PUT /api/portal/notifications', () => {
       })
     );
     expect(res.status).toBe(200);
+  });
+});
+
+describe('GET /api/portal/notifications read cost', () => {
+  it('countOnly returns just the unread count, without reading the list', async () => {
+    const res = await GET(new NextRequest('http://localhost/api/portal/notifications?userId=u1&countOnly=true'));
+    const body = await res.json();
+    expect(body).toEqual({ unreadCount: 60 });
+    expect(db.state.orderedCalls).toBe(0);
+    expect(db.state.unorderedCalls).toBe(0);
+  });
+
+  it('caps a huge limit at 100', async () => {
+    await get(100000);
+    expect(db.state.lastLimit).toBe(100);
+  });
+
+  it('reads only the page (not 2x) when the ordered query serves it', async () => {
+    await get(20);
+    expect(db.state.lastLimit).toBe(20);
   });
 });

@@ -6,6 +6,8 @@ import {
   requireVerifiedSelfOrManagement,
 } from '@/lib/auth/requireVerifiedAdmin';
 
+const MAX_NOTIFICATIONS_LIMIT = 100;
+
 // GET /api/portal/notifications - Get user notifications
 export async function GET(request: NextRequest) {
   try {
@@ -19,11 +21,16 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const userId = searchParams.get('userId');
     const limitParam = searchParams.get('limit');
-    const limit = limitParam === null ? 20 : Number(limitParam);
-    if (!Number.isInteger(limit) || limit < 1) {
+    const requestedLimit = limitParam === null ? 20 : Number(limitParam);
+    if (!Number.isInteger(requestedLimit) || requestedLimit < 1) {
       return NextResponse.json({ error: 'limit must be a positive integer' }, { status: 400 });
     }
+    // The bell asks for 20; cap what one request may read.
+    const limit = Math.min(requestedLimit, MAX_NOTIFICATIONS_LIMIT);
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
+    // The bell's poll asks for the count alone (one count() aggregation, about
+    // one read) and re-reads the list only when the count moved.
+    const countOnly = searchParams.get('countOnly') === 'true';
 
     if (!userId) {
       return NextResponse.json(
@@ -40,16 +47,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
 
+    const unreadCountOf = async () => {
+      const unreadSnapshot = await adminDb!
+        .collection('notifications')
+        .where('userId', '==', userId)
+        .where('read', '==', false)
+        .count()
+        .get();
+      return unreadSnapshot.data().count;
+    };
+    if (countOnly) {
+      return NextResponse.json({ unreadCount: await unreadCountOf() });
+    }
+
     // Newest first AT THE QUERY, so the window we read is the newest 2x the limit.
     // (Unordered, a user with more than that many notifications could get an
     // arbitrary slice and the bell would miss the newest ones.) Needs the
     // notifications userId + createdAt composite in firestore.indexes.json; until
     // that index is built the query fails with FAILED_PRECONDITION, so fall back
     // to the old unordered read rather than break the bell during the deploy.
+    // Ordered, the newest `limit` are exactly the page, so read only those; the
+    // 2x window is kept for unreadOnly (filtered in memory) and the unordered
+    // fallback.
     const byUser = adminDb.collection('notifications').where('userId', '==', userId);
     let snapshot;
     try {
-      snapshot = await byUser.orderBy('createdAt', 'desc').limit(limit * 2).get();
+      snapshot = await byUser.orderBy('createdAt', 'desc').limit(unreadOnly ? limit * 2 : limit).get();
     } catch (error) {
       // FAILED_PRECONDITION (gRPC 9): the composite index is not built yet.
       const indexNotBuilt = typeof error === 'object' && error !== null && 'code' in error && error.code === 9;
@@ -101,17 +124,9 @@ export async function GET(request: NextRequest) {
     // Apply limit
     notifications = notifications.slice(0, limit);
 
-    // Get unread count
-    const unreadSnapshot = await adminDb
-      .collection('notifications')
-      .where('userId', '==', userId)
-      .where('read', '==', false)
-      .count()
-      .get();
-
     return NextResponse.json({
       notifications,
-      unreadCount: unreadSnapshot.data().count,
+      unreadCount: await unreadCountOf(),
     });
   } catch (error) {
     console.error('Error fetching notifications:', error);

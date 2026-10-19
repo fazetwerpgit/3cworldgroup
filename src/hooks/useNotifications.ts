@@ -6,6 +6,7 @@ import { Notification } from '@/types/notifications';
 import { isAbortError } from '@/lib/fetch/isAbortError';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { PAGE_DATA_FALLBACK_MS, waitForPageData } from '@/lib/cache/pageData';
+import { startBellPoller } from '@/lib/notifications/bellPoll';
 
 // The notifications route verifies the caller from the ID token. userId stays on
 // the wire as the TARGET bell being read/cleared — the route allows self or
@@ -26,9 +27,17 @@ export function useNotifications() {
   const [markingRead, setMarkingRead] = useState<Set<string>>(new Set());
   const abortControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
+  // The poll compares the server's unread count with this one and only
+  // re-reads the list when they differ (lib/notifications/bellPoll).
+  const unreadRef = useRef<number | null>(null);
+  useEffect(() => {
+    unreadRef.current = unreadCount;
+  }, [unreadCount]);
+  const listLoadedRef = useRef(false);
 
-  const fetchNotifications = useCallback(async (limit = 20) => {
-    if (!user) return;
+  /** Resolves false when the read failed (the poll then backs off). */
+  const fetchNotifications = useCallback(async (limit = 20): Promise<boolean> => {
+    if (!user) return false;
 
     // Cancel any in-flight request. Some browsers report an aborted fetch as a
     // TypeError rather than an AbortError, so keep the local controller for the
@@ -47,15 +56,42 @@ export function useNotifications() {
         const data = await response.json();
         setNotifications(data.notifications);
         setUnreadCount(data.unreadCount);
+        unreadRef.current = data.unreadCount;
+        listLoadedRef.current = true;
+        return true;
       }
+      return false;
     } catch (error) {
       // Ignore abort errors
-      if (!mountedRef.current || isAbortError(error, controller.signal)) return;
+      if (!mountedRef.current || isAbortError(error, controller.signal)) return true;
       console.error('Error fetching notifications:', error);
+      return false;
     } finally {
       if (abortControllerRef.current === controller) setLoading(false);
     }
   }, [user]);
+
+  // One poll: the unread count alone (a count() aggregation, ~1 read), and the
+  // list only when that count moved or the list was never loaded.
+  const pollNotifications = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
+    if (!listLoadedRef.current) return fetchNotifications();
+    try {
+      const response = await fetch(
+        `/api/portal/notifications?userId=${user.uid}&countOnly=true`,
+        { headers: await authHeaders() }
+      );
+      if (!response.ok) return false;
+      const data = await response.json();
+      if (typeof data.unreadCount !== 'number') return false;
+      if (data.unreadCount === unreadRef.current) return true;
+      return fetchNotifications();
+    } catch (error) {
+      if (!mountedRef.current) return true;
+      console.error('Error polling notifications:', error);
+      return false;
+    }
+  }, [user, fetchNotifications]);
 
   const markAsRead = useCallback(async (notificationIds: string[]) => {
     if (!user) return;
@@ -139,32 +175,31 @@ export function useNotifications() {
     return false;
   }, [user]);
 
-  // Fetch notifications on mount and periodically
+  // Fetch on mount, then poll every 90 s while the page is visible (paused
+  // while hidden, one refresh on return). See lib/notifications/bellPoll.
   useEffect(() => {
     mountedRef.current = true;
     if (user) {
-      // The first read waits for the page's own data (a cold open on LTE).
+      listLoadedRef.current = false;
+      // The first poll waits for the page's own data (a cold open on LTE),
+      // then the bell poller takes over (90 s, paused while hidden).
       const firstRead = new AbortController();
+      let stop: (() => void) | null = null;
       void waitForPageData({ fallbackMs: PAGE_DATA_FALLBACK_MS, signal: firstRead.signal }).then(() => {
-        if (mountedRef.current) fetchNotifications();
+        if (mountedRef.current && !firstRead.signal.aborted) stop = startBellPoller({ tick: pollNotifications });
       });
-
-      // Poll for new notifications every 30 seconds
-      const interval = setInterval(() => {
-        fetchNotifications();
-      }, 30000);
 
       return () => {
         mountedRef.current = false;
         firstRead.abort();
-        clearInterval(interval);
+        stop?.();
         // Cancel any in-flight request on unmount
         if (abortControllerRef.current) {
           abortControllerRef.current.abort();
         }
       };
     }
-  }, [user, fetchNotifications]);
+  }, [user, pollNotifications]);
 
   return {
     notifications,
