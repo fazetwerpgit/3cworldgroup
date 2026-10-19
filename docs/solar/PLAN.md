@@ -63,7 +63,10 @@ Worktree ~/dev/3cwg-solar, branch solar-portal (base origin/master 8552d302).
   - Two leads racing for one slot: one 200, one 409.
 - PATCH /api/portal/solar/bookings/{id} {status:'cancelled'} -> 200 {success, id}. Admin or that booking's consultant. Frees the slot and clears the lead's bookingId in the same transaction (a 'booked' lead goes back to 'new'), so the lead can be booked again.
 
-## Open (owner/Jacob)
-- Promotion thresholds + pay table (owner is sending them).
-- Sales Director: who it is and what they see.
-- In-person hours confirmation.
+## Defaults decided (Jacob 10/19: "you determine")
+- Pay table + promotion thresholds: not built; nothing to wire until the owner writes them.
+- Sales Director: nobody holds it. When one is named, the role gets read-only access to every solar lead and booking (same view as admin Leads, without Setup). Until then the role is a plain solar rep.
+- Slide 4: keep the owner's deck wording; the math (5% APY, 25 yr) already matches his numbers.
+- Prequal: keep both cards (600+ Purchase, 680+ Lease/PPA) as the deck has them.
+- Booking: keep the seeded hours (editable in Admin > Solar > Setup). No in-person area limit in code; reps offer in-person only in the owner's area, and he can cancel any booking.
+- Speaker notes: none; reps follow training.
