@@ -193,6 +193,19 @@ describe('POST /api/portal/auth/signup-notify', () => {
     );
   });
 
+  it.each(['token-apple-user', 'token-google-user'])(
+    'skips bot scoring for a provider-verified sign-in (%s), even a gibberish address',
+    async (token) => {
+      userGetMock.mockResolvedValue(
+        pendingUser({ status: 'pending', email: 'xk7qzv9wmb2pq@gmail.com', displayName: 'xkqzvwmbrt' })
+      );
+      const response = await POST(request({ token }));
+      expect(response.status).toBe(200);
+      expect(userUpdateMock).not.toHaveBeenCalledWith(expect.objectContaining({ suspectedBot: true }));
+      expect(createAlertTaskMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'pending_assignment' }));
+    }
+  );
+
   it('rate-limits one IP', async () => {
     for (let i = 0; i < 10; i++) {
       expect((await POST(request({ token: 'token-google-user', ip: '198.51.100.7' }))).status).toBe(200);

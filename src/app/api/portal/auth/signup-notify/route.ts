@@ -75,7 +75,10 @@ export async function POST(request: Request) {
   // but the server is the gate. One that
   // fails is flagged suspectedBot, which keeps it out of the admin pending
   // queue and raises no alert, so skipping the form's check gets nowhere.
-  if (signInProvider !== 'google.com' && signInProvider !== 'apple.com') {
+  // Firebase verified this sign-in with Google or Apple (the token's own
+  // sign_in_provider claim), so it is a real account at that provider.
+  const providerVerified = signInProvider === 'google.com' || signInProvider === 'apple.com';
+  if (!providerVerified) {
     let body: GateBody;
     try {
       body = (await request.json()) as GateBody;
@@ -103,7 +106,9 @@ export async function POST(request: Request) {
 
     const email = (snap.get('email') as string | undefined) ?? '';
     const displayName = (snap.get('displayName') as string | undefined) ?? '';
-    if (looksLikeBotSignup(email, displayName)) {
+    // Owner's call: no bot scoring at all for a provider-verified Apple/Google
+    // sign-in (Hide My Email and gamer-style addresses read as gibberish).
+    if (!providerVerified && looksLikeBotSignup(email, displayName)) {
       await adminDb.doc(`users/${uid}`).update({ suspectedBot: true, updatedAt: new Date() });
       return NextResponse.json({ ok: true });
     }
