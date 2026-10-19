@@ -321,4 +321,36 @@ describe('DELETE /api/portal/chat/channels/[channelId]/members/manage', () => {
     expect(updates.extraMemberIds).toEqual({ __op: 'arrayRemove', values: ['rep-2'] });
     expect(updates).not.toHaveProperty('memberIds');
   });
+  it('keeps an audience-derived extra member in memberIds on an ARCHIVED channel', async () => {
+    mockGetUser.mockResolvedValue(ADMIN);
+    // Archived managers channel: an l1_manager still qualifies by role, so reactivation must
+    // restore their access immediately — removing the extra must not strip memberIds.
+    firestore.channels.set(
+      'managers',
+      managersChannel({ active: false, memberIds: ['manager-1', 'mgr-2'], extraMemberIds: ['mgr-2'] })
+    );
+    firestore.users.set('mgr-2', { status: 'active', fieldRole: 'l1_manager' });
+
+    const res = await DELETE(req('managers', { uid: 'mgr-2' }, 'DELETE'), ctx('managers'));
+
+    expect(res.status).toBe(200);
+    const { updates } = firestore.setCalls[0];
+    expect(updates.extraMemberIds).toEqual({ __op: 'arrayRemove', values: ['mgr-2'] });
+    expect(updates).not.toHaveProperty('memberIds');
+  });
+
+  it('still strips memberIds for a non-audience extra on an archived channel', async () => {
+    mockGetUser.mockResolvedValue(ADMIN);
+    firestore.channels.set(
+      'managers',
+      managersChannel({ active: false, memberIds: ['manager-1', 'rep-2'], extraMemberIds: ['rep-2'] })
+    );
+    firestore.users.set('rep-2', { status: 'active', fieldRole: 'entry_rep' });
+
+    const res = await DELETE(req('managers', { uid: 'rep-2' }, 'DELETE'), ctx('managers'));
+
+    expect(res.status).toBe(200);
+    const { updates } = firestore.setCalls[0];
+    expect(updates.memberIds).toEqual({ __op: 'arrayRemove', values: ['rep-2'] });
+  });
 });

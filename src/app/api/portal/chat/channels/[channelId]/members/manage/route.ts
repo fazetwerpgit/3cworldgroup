@@ -147,13 +147,15 @@ export async function DELETE(
       return NextResponse.json({ error: 'Only manually added members can be removed' }, { status: 400 });
     }
 
-    // Keep them in memberIds if they still qualify by role/audience on their own.
+    // Keep them in memberIds if they still qualify by role/audience on their own. Judge an
+    // archived channel as if active (same as belongsInChannelDoc / syncChatChannels) so an
+    // audience-derived member keeps memberIds and regains access as soon as it is reactivated.
     let audienceDerived = false;
     const userSnap = await adminDb.collection('users').doc(uid).get();
     if (userSnap.exists) {
       const userData = userSnap.data() ?? {};
       const { role, fieldRole } = resolveRoles(userData.role, userData.fieldRole);
-      audienceDerived = canAccessChatChannel(channel, role, fieldRole);
+      audienceDerived = canAccessChatChannel({ ...channel, active: true }, role, fieldRole);
     }
 
     const updates: Record<string, unknown> = {
