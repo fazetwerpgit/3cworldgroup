@@ -186,6 +186,43 @@ describe('GET /api/cron/install-reminders', () => {
     expect(fake.docs('sales').get('s1')?.installReminder).toMatchObject({ state: 'sent', attempts: 2 });
   });
 
+  it('a sent mark that fails once is retried, so the 7 PM pass does not send the reminder again', async () => {
+    const sales = fake.db.collection('sales');
+    let failNextSentMark = true;
+    holder.db = {
+      ...fake.db,
+      runTransaction: fake.db.runTransaction.bind(fake.db),
+      collection: (name: string) =>
+        name !== 'sales'
+          ? fake.db.collection(name)
+          : {
+              ...sales,
+              doc: (id: string) => {
+                const ref = sales.doc(id);
+                return {
+                  ...ref,
+                  update: async (data: Record<string, unknown>) => {
+                    const mark = data.installReminder as { state?: string } | undefined;
+                    if (id === 's1' && mark?.state === 'sent' && failNextSentMark) {
+                      failNextSentMark = false;
+                      throw new Error('DEADLINE_EXCEEDED');
+                    }
+                    return ref.update(data as never);
+                  },
+                };
+              },
+            },
+    };
+    expect(await (await GET(request('?slot=cdt'))).json()).toMatchObject({ sent: 2 });
+    expect(failNextSentMark).toBe(false);
+    expect(fake.docs('sales').get('s1')?.installReminder).toMatchObject({ state: 'sent', attempts: 1 });
+
+    dispatchToUser.mockClear();
+    vi.setSystemTime(WED_7PM);
+    expect(await (await GET(request('?slot=cst'))).json()).toMatchObject({ sent: 0, alreadySent: 2 });
+    expect(dispatchToUser).not.toHaveBeenCalled();
+  });
+
   it('a claim stuck at `claimed` (run died mid-send) is retried only once it is stale', async () => {
     fake.docs('sales').set('s1', {
       ...fake.docs('sales').get('s1'),

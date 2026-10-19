@@ -119,7 +119,15 @@ async function claimReminder(db: FirebaseFirestore.Firestore, saleId: string, fo
   });
 }
 
-/** Records how the push for claimed sales ended. Fail-soft: a lost mark only means a stale-claim retry. */
+/** Tries per mark. A lost 'sent' mark leaves a stale claim the 7 PM resume pass re-sends. */
+const MARK_TRIES = 3;
+const MARK_RETRY_MS = 250;
+
+/**
+ * Records how the push for claimed sales ended, retrying a failed read or
+ * write. Fail-soft after MARK_TRIES: a lost 'sent' mark leaves the claim to go
+ * stale, and the resume pass would send that reminder a second time.
+ */
 async function markReminders(
   db: FirebaseFirestore.Firestore,
   saleIds: string[],
@@ -130,13 +138,20 @@ async function markReminders(
   await Promise.all(
     saleIds.map(async (saleId) => {
       const ref = db.collection('sales').doc(saleId);
-      try {
-        const snapshot = await ref.get();
-        const mark = snapshot.get('installReminder') as ReminderMark | undefined;
-        if (mark?.forDate !== forDate || mark.at !== claimedAt.toISOString()) return; // another run owns it now
-        await ref.update({ installReminder: { ...mark, state } });
-      } catch (error) {
-        console.error(`[install-reminders] failed to mark sale ${saleId} ${state}`, error);
+      for (let attempt = 1; attempt <= MARK_TRIES; attempt += 1) {
+        try {
+          const snapshot = await ref.get();
+          const mark = snapshot.get('installReminder') as ReminderMark | undefined;
+          if (mark?.forDate !== forDate || mark.at !== claimedAt.toISOString()) return; // another run owns it now
+          await ref.update({ installReminder: { ...mark, state } });
+          return;
+        } catch (error) {
+          if (attempt === MARK_TRIES) {
+            console.error(`[install-reminders] failed to mark sale ${saleId} ${state}`, error);
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, MARK_RETRY_MS * attempt));
+        }
       }
     })
   );
