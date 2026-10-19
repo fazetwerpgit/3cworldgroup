@@ -89,6 +89,8 @@ export function buildFormAttachmentFolder(uid: string, formType: string, slot?: 
 export const FORM_UPLOAD_SLOTS: Record<string, string[]> = {
   'payroll-dispute': [''],
   'leads-request': ['hostile', 'blind-knock', 'lasso'],
+  // Solar lead photos (deck slide 5 / 3C Doors): one slot per photo.
+  'solar-lead': ['billPage1', 'billGraph', 'panel'],
 };
 
 // sale-proof uploads use a per-sale unique id as the slot, so one rep's sales
@@ -106,7 +108,7 @@ export function isAllowedFormUpload(formType: string, slot: string): boolean {
 // abandoned upload can never replace/delete the proof on an earlier submission.
 // Format: 32 lowercase hex (randomHex, the dash-stripped randomUUID shape).
 const FORM_UPLOAD_ID = /^[0-9a-f]{32}$/;
-const PER_SUBMISSION_FORMS = new Set(['payroll-dispute', 'leads-request']);
+const PER_SUBMISSION_FORMS = new Set(['payroll-dispute', 'leads-request', 'solar-lead']);
 
 // Where each per-submission form's records live: once a record carries an
 // uploadId, that folder is that record's proof and can no longer be replaced.

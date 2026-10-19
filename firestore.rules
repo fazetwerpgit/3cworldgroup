@@ -187,6 +187,16 @@ service cloud.firestore {
     match /fiberReports/{id} {
       allow read, write: if false;
     }
+    // Solar: admin-SDK routes only (/api/portal/solar/*), same as fiberReports.
+    match /solarLeads/{id} {
+      allow read, write: if false;
+    }
+    match /solarBookings/{id} {
+      allow read, write: if false;
+    }
+    match /solarAvailability/{id} {
+      allow read, write: if false;
+    }
     match /expediteOrders/{id} {
       allow read, write: if false;
     }
