@@ -378,8 +378,12 @@ export function isSolarRole(value: unknown): value is SolarRole {
   return typeof value === 'string' && (SOLAR_ROLES as readonly string[]).includes(value);
 }
 
-/** solar:read opens the Solar page and Home card; solar:write the deck, lead submit and booking. */
-const SOLAR_PERMISSIONS = ['solar:read', 'solar:write'];
+/**
+ * solar:read opens the Solar page and Home card; solar:write the deck, lead
+ * submit and booking. The base rep permissions ride along so a solar-only rep
+ * (no role or fieldRole) still has chat, the leaderboard and training.
+ */
+const SOLAR_PERMISSIONS = [...BASE_PERMISSIONS, 'solar:read', 'solar:write'];
 
 // Every solar role carries both today; the record keeps room for a role that
 // should only read (a future office or marketing seat).
@@ -408,6 +412,13 @@ export function permissionsFor(
   const base = (roleKey && RolePermissions[roleKey]) || [];
   if (!isSolarRole(user.solarRole)) return base;
   return [...new Set([...base, ...SolarRolePermissions[user.solarRole]])];
+}
+
+/** A solar rep with no fiber field role and no platform role: gets the solar tab set. */
+export function isSolarOnlyUser(
+  user: { role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown } | null | undefined
+): boolean {
+  return !!user && isSolarRole(user.solarRole) && !user.fieldRole && !user.role;
 }
 
 // User document type

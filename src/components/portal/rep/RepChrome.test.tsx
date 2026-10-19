@@ -5,7 +5,7 @@ import { RepTabBar } from './RepTabBar';
 import { RepTopBar, repSheetClasses } from './RepTopBar';
 import { REP_PRIMARY_HREFS, activeRepHref } from './repNav';
 
-type TestUser = { status?: string; fieldRole?: string; role?: string; uid?: string; displayName?: string; email?: string };
+type TestUser = { status?: string; fieldRole?: string; role?: string; solarRole?: string; uid?: string; displayName?: string; email?: string };
 
 const state = vi.hoisted(() => ({
   allowed: new Set<string>(),
@@ -76,6 +76,24 @@ describe('RepTabBar', () => {
     expect(html).toContain('Board</a>');
     expect(html).not.toContain('Log sale');
     expect(html).not.toContain('Chat</a>');
+  });
+
+  it('solar-only rep: Home / Solar / Board / Chat, no Sales or Log sale', () => {
+    setUser({ status: 'active', solarRole: 'entry_canvasser', uid: 'solar-1' }, ['leaderboard:read', 'chat:read', 'solar:read']);
+    const html = renderToStaticMarkup(<RepTabBar />);
+    const labels = ['Home', 'Solar', 'Board', 'Chat'].map((label) => html.indexOf(`${label}</a>`));
+    expect(labels.every((index) => index > 0)).toBe(true);
+    expect([...labels].sort((a, b) => a - b)).toEqual(labels);
+    expect(html).not.toContain('Sales</a>');
+    expect(html).not.toContain('Log sale');
+  });
+
+  it('dual fiber + solar rep keeps the fiber tabs', () => {
+    setUser({ status: 'active', fieldRole: 'entry_rep', solarRole: 'entry_canvasser', uid: 'dual-1' }, [...REP_PERMISSIONS, 'solar:read']);
+    const html = renderToStaticMarkup(<RepTabBar />);
+    expect(html).toContain('Log sale');
+    expect(html).toContain('Sales</a>');
+    expect(html).not.toContain('Solar</a>');
   });
 
   it('shows Home / Sales / Log sale / Board / Chat in that order and no Pay tab', () => {
@@ -246,6 +264,9 @@ describe('activeRepHref', () => {
     expect(activeRepHref('/portal/sales/abc')).toBe('/portal/sales');
     expect(activeRepHref('/portal/chat/general')).toBe('/portal/chat');
     expect(activeRepHref('/portal/settings')).toBeNull();
+    expect(activeRepHref('/portal/solar')).toBe('/portal/solar');
+    expect(activeRepHref('/portal/solar/present')).toBe('/portal/solar');
+    expect(activeRepHref('/portal/solarish')).toBeNull();
     expect(activeRepHref('/portal/admin/requests')).toBe('/portal/admin/onboarding');
     expect(activeRepHref('/portal/admin')).toBe('/portal/admin/onboarding');
   });

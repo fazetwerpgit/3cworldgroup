@@ -13,6 +13,7 @@ import {
   repFacingRoleLabel,
   RolePermissions,
   permissionsFor,
+  isSolarOnlyUser,
 } from './auth';
 import type { FieldRole, PlatformRole } from './auth';
 
@@ -146,7 +147,11 @@ describe('repFacingRoleLabel', () => {
 // through ADMIN_PERMISSIONS; operations and fiber-only reps never do.
 describe('permissionsFor (solar)', () => {
   it('gives any solar role solar:read and solar:write, alone or beside a fiber role', () => {
-    expect(permissionsFor({ solarRole: 'entry_canvasser' })).toEqual(['solar:read', 'solar:write']);
+    const solarOnly = permissionsFor({ solarRole: 'entry_canvasser' });
+    expect(solarOnly).toEqual(expect.arrayContaining(['solar:read', 'solar:write']));
+    // The base rep set (chat, board, training) rides along; never fiber sales or admin.
+    expect(solarOnly).toEqual(expect.arrayContaining(['chat:read', 'chat:write', 'leaderboard:read', 'training:read']));
+    expect(solarOnly.some((p) => p.startsWith('sales:') || p.startsWith('admin') || p.startsWith('pay'))).toBe(false);
     const dual = permissionsFor({ fieldRole: 'ae_tier_1', solarRole: 'sales_director' });
     expect(dual).toEqual(expect.arrayContaining([...RolePermissions.ae_tier_1, 'solar:read', 'solar:write']));
     expect(new Set(dual).size).toBe(dual.length);
@@ -165,6 +170,15 @@ describe('permissionsFor (solar)', () => {
     expect(permissionsFor({ fieldRole: 'entry_rep', solarRole: 'bogus' })).not.toContain('solar:write');
     expect(permissionsFor({})).toEqual([]);
     expect(permissionsFor(null)).toEqual([]);
+  });
+
+  it('isSolarOnlyUser: a solar role with no fiber or platform role', () => {
+    expect(isSolarOnlyUser({ solarRole: 'virtual_closer' })).toBe(true);
+    expect(isSolarOnlyUser({ solarRole: 'virtual_closer', fieldRole: 'entry_rep' })).toBe(false);
+    expect(isSolarOnlyUser({ solarRole: 'virtual_closer', role: 'admin' })).toBe(false);
+    expect(isSolarOnlyUser({ fieldRole: 'entry_rep' })).toBe(false);
+    expect(isSolarOnlyUser({ solarRole: 'bogus' })).toBe(false);
+    expect(isSolarOnlyUser(null)).toBe(false);
   });
 
   it('keeps solar off every field role', () => {

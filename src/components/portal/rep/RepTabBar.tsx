@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAs } from '@/contexts/ViewAsContext';
 import { useNavAccess } from '@/components/portal/NavSheet';
-import { isOwner } from '@/types';
+import { isOwner, isSolarOnlyUser } from '@/types';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { nativeHaptic } from '@/lib/app/bridge';
 import { scrollPageToTop } from '@/lib/app/scrollToTop';
@@ -20,7 +20,8 @@ import t from './rep-tabbar.module.css';
 /**
  * Phone bottom bar: Home / Sales / Log sale / Board / Chat, each gated by the
  * portal's canAccess. Owners do not sell, so theirs is Home / Sales / Board /
- * Chat / Admin, the Admin tab carrying the open-items count. Portaled to
+ * Chat / Admin, the Admin tab carrying the open-items count. A solar-only rep
+ * gets Home / Solar / Board / Chat. Portaled to
  * <body> (see BodyLayer); hidden ≥1024px.
  *
  * Inside the 3C iOS app it behaves like a UITabBar: a tap gives a selection
@@ -42,7 +43,7 @@ export function RepTabBar({
   const active = activeRepHref(pathname);
   // Viewing as a rep (read only): just the rep screens the owner can see.
   const { viewing } = useViewAs();
-  const tabs = (viewing ? viewAsTabs() : repTabsFor(isOwner(user?.role ?? undefined))).filter(canAccess);
+  const tabs = (viewing ? viewAsTabs() : repTabsFor(isOwner(user?.role ?? undefined), isSolarOnlyUser(user))).filter(canAccess);
   const waiting = Object.values(navCounts).reduce((sum, n) => sum + n, 0);
   // A finger on a tab starts its data read before the tap lands.
   const prefetchTab = usePrefetchTabOnTouch();

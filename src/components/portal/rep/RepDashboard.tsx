@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAsReadOnly } from '@/contexts/ViewAsContext';
-import { isSolarRole } from '@/types';
+import { isSolarOnlyUser } from '@/types';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import { useCountUp } from '@/hooks/useCountUp';
 import { useRepDashboard, type RepChallenge, type RepSectionKey, type Section } from '@/hooks/useRepDashboard';
@@ -799,7 +799,7 @@ export function RepDashboard() {
   const showQueues = !readOnly && isRole('admin', 'operations');
   // A solar rep with no fiber role (and no platform role): Home is about
   // solar, and the fiber sections are neither fetched nor shown.
-  const solarOnly = isSolarRole(user?.solarRole) && !user?.fieldRole && !user?.role;
+  const solarOnly = isSolarOnlyUser(user);
   const data = useRepDashboard({ fiber: !solarOnly });
   const { retry } = data;
   const [helpOpen, setHelpOpen] = useState(false);

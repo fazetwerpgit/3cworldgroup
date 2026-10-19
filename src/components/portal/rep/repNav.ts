@@ -1,4 +1,4 @@
-import { House, MessageSquare, Plus, ReceiptText, Shield, Trophy } from 'lucide-react';
+import { House, MessageSquare, Plus, ReceiptText, Shield, Sun, Trophy } from 'lucide-react';
 import type { PortalNavItem } from '@/components/portal/CommandPalette';
 import { ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 
@@ -35,9 +35,32 @@ export const ADMIN_TAB: RepTab = {
   waiting: true,
 };
 
-/** The phone tab bar's destinations for this viewer (before the permission gate). */
-export function repTabsFor(owner: boolean): RepTab[] {
-  return owner ? [...REP_TABS.filter((tab) => !tab.log), ADMIN_TAB] : REP_TABS;
+export const SOLAR_HREF = '/portal/solar';
+
+/** A solar-only rep's center tab, where a fiber rep has Log sale: the Solar page, which opens the deck. */
+export const SOLAR_TAB: RepTab = {
+  label: 'Solar',
+  short: 'Solar',
+  href: SOLAR_HREF,
+  icon: Sun,
+  permissions: ['solar:read'],
+};
+
+/** Home / Solar / Board / Chat: a solar-only rep sells no fiber, so Sales and Log sale give way to Solar. */
+export const SOLAR_REP_TABS: RepTab[] = [
+  REP_TABS[0],
+  SOLAR_TAB,
+  ...REP_TABS.filter((tab) => tab.href === '/portal/leaderboard' || tab.href === '/portal/chat'),
+];
+
+/**
+ * The phone tab bar's destinations for this viewer (before the permission
+ * gate). `solarOnly` is isSolarOnlyUser: a solar role and no fiber or platform
+ * role. Fiber and dual (fiber + solar) reps keep the fiber set.
+ */
+export function repTabsFor(owner: boolean, solarOnly = false): RepTab[] {
+  if (owner) return [...REP_TABS.filter((tab) => !tab.log), ADMIN_TAB];
+  return solarOnly ? SOLAR_REP_TABS : REP_TABS;
 }
 
 /** The owner viewing as a rep (read only): Home, Sales and Board only. */
@@ -50,9 +73,13 @@ export function activeRepHref(pathname: string): string | null {
   if (pathname.startsWith(LOG_SALE_HREF)) return LOG_SALE_HREF;
   if (pathname === '/portal/dashboard') return '/portal/dashboard';
   if (pathname === '/portal/admin' || pathname.startsWith('/portal/admin/')) return ADMIN_TAB.href;
+  if (pathname === SOLAR_HREF || pathname.startsWith(`${SOLAR_HREF}/`)) return SOLAR_HREF;
   const match = REP_TABS.find((tab) => tab.href !== '/portal/dashboard' && pathname.startsWith(tab.href));
   return match?.href ?? null;
 }
 
 /** Hrefs already on screen as tabs / top links, so the menu does not repeat them. */
 export const REP_PRIMARY_HREFS = new Set(REP_TABS.map((tab) => tab.href));
+
+/** The same for a solar-only rep, whose Solar is a tab (a dual rep finds it in the menu). */
+export const SOLAR_REP_PRIMARY_HREFS = new Set([...REP_PRIMARY_HREFS, SOLAR_HREF]);

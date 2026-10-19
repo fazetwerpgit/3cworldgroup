@@ -15,8 +15,8 @@ import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { NavGroupsList, NavSheet, useNavAccess, type NavSheetClasses } from '@/components/portal/NavSheet';
 import { BodyLayer } from './BodyLayer';
 import { ClearNotes } from './ClearNotes';
-import { ASK_HREF, LOG_SALE_HREF, REP_PRIMARY_HREFS, REP_TABS, activeRepHref } from './repNav';
-import { isOwner } from '@/types';
+import { ASK_HREF, LOG_SALE_HREF, REP_PRIMARY_HREFS, REP_TABS, SOLAR_REP_PRIMARY_HREFS, activeRepHref, repTabsFor } from './repNav';
+import { isOwner, isSolarOnlyUser } from '@/types';
 import type { PortalNavGroup, PortalNavItem } from '@/components/portal/CommandPalette';
 import s from './rep.module.css';
 
@@ -218,10 +218,11 @@ export function RepTopBar({
 
   const active = activeRepHref(pathname);
   const owner = isOwner(user?.role ?? undefined);
-  const deskLinks = REP_TABS.filter((tab) => !tab.log && canAccess(tab));
+  const solarOnly = !owner && isSolarOnlyUser(user);
+  const deskLinks = (solarOnly ? repTabsFor(false, true) : REP_TABS).filter((tab) => !tab.log && canAccess(tab));
   // Owners do not sell: no primary Log sale button, just a menu entry for the rare case.
   const canLog = !owner && REP_TABS.some((tab) => tab.log && canAccess(tab));
-  const baseGroups = sheetGroups(REP_PRIMARY_HREFS);
+  const baseGroups = sheetGroups(solarOnly ? SOLAR_REP_PRIMARY_HREFS : REP_PRIMARY_HREFS);
   const groups: PortalNavGroup[] = owner
     ? baseGroups.length
       ? [{ ...baseGroups[0], items: [OWNER_LOG_SALE, ...baseGroups[0].items] }, ...baseGroups.slice(1)]
