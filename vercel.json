@@ -43,6 +43,10 @@
     {
       "path": "/api/cron/chat-evidence",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/leaderboard-snapshot",
+      "schedule": "10 6 * * *"
     }
   ]
 }

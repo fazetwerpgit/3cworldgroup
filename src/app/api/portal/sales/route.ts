@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { markLeaderboardDirty } from '@/lib/leaderboard/snapshotStore';
 import { adminDb, initError } from '@/lib/firebase/admin';
 import { requireVerifiedUser, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveSubject } from '@/lib/auth/viewAs';
@@ -501,6 +502,8 @@ export async function POST(request: NextRequest) {
     } else {
       docRef = await adminDb.collection('sales').add(newSale);
     }
+    // The board snapshot rebuilds on its next read (debounced).
+    await markLeaderboardDirty();
 
     await createNotification(
       salesRepId,

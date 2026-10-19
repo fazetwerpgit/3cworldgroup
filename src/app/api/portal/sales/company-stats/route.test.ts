@@ -5,24 +5,21 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedUser: vi.fn(),
 }));
 
-// Stand-in for the approved-sales query. The tape reduces in memory, so the
-// tests only need the docs the query hands back.
+// Stand-in for the approved sales the snapshot reduces (the route reads the
+// tape from the leaderboard snapshot; its Firestore flow is tested in
+// lib/leaderboard/snapshotStore.test). Docs default to approved.
 const state: { docs: Array<Record<string, unknown>> } = { docs: [] };
 
-vi.mock('@/lib/firebase/admin', () => ({
-  adminAuth: {},
-  adminDb: {
-    collection: vi.fn(() => ({
-      where: vi.fn(() => ({
-        get: vi.fn(async () => ({
-          forEach: (fn: (doc: { id: string; data: () => Record<string, unknown> }) => void) => {
-            state.docs.forEach((data, index) => fn({ id: `s${index}`, data: () => data }));
-          },
-        })),
-      })),
-    })),
-  },
-}));
+vi.mock('@/lib/firebase/admin', () => ({ adminAuth: {}, adminDb: {} }));
+
+vi.mock('@/lib/leaderboard/snapshotStore', async () => {
+  const { companyTapeFromDocs } = await import('@/lib/sales/companyTapeDocs');
+  return {
+    loadCompanyTape: vi.fn(async (now: Date, viewerUid: string) =>
+      companyTapeFromDocs(state.docs.map((data) => ({ data: { status: 'approved', ...data } })), viewerUid, now)
+    ),
+  };
+});
 
 import { GET } from './route';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { markLeaderboardDirty } from '@/lib/leaderboard/snapshotStore';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 import type { SaleStatus } from '@/types';
@@ -59,6 +60,7 @@ export async function POST(
       cancelReason: reason,
       updatedAt: new Date(),
     });
+    await markLeaderboardDirty();
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -103,6 +105,7 @@ export async function DELETE(
       cancelReason: '',
       updatedAt: new Date(),
     });
+    await markLeaderboardDirty();
 
     return NextResponse.json({ success: true });
   } catch (error) {

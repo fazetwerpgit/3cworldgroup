@@ -18,13 +18,21 @@ export interface HistoryEnrichment {
 export type HistoryMetric = 'totalPoints' | 'totalSales';
 
 // YYYY-MM-DD in the company timezone. en-CA locale formats as YYYY-MM-DD.
+// One formatter per zone: building an Intl.DateTimeFormat costs far more than
+// formatting with it, and history formats every sale several times.
+const DAY_KEY_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
 export function dayKey(date: Date, tz: string = LEADERBOARD_TZ): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: tz,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
+  let formatter = DAY_KEY_FORMATTERS.get(tz);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    DAY_KEY_FORMATTERS.set(tz, formatter);
+  }
+  return formatter.format(date);
 }
 
 // Calendar-day arithmetic on keys via UTC noon, immune to DST edges.

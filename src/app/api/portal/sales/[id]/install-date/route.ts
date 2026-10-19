@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { markLeaderboardDirty } from '@/lib/leaderboard/snapshotStore';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { installDayKey, parseInstallDateInput } from '@/lib/sales/saleDate';
@@ -105,6 +106,8 @@ export async function PATCH(
     if (refusal) {
       return NextResponse.json({ error: refusal.error }, { status: refusal.status });
     }
+    // The install date feeds the 120-day chargeback the board applies.
+    await markLeaderboardDirty();
 
     return NextResponse.json({ success: true, installDate: parsed.date.toISOString() });
   } catch (error) {

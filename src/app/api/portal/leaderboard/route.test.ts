@@ -45,6 +45,29 @@ vi.mock('@/lib/fiberReport/ordersCache', () => ({
   getAllFiberOrders: vi.fn(async () => state.orders),
 }));
 
+// The snapshot store, rebuilt in memory on every read from the docs above (the
+// store's own Firestore flow is covered in lib/leaderboard/snapshotStore.test).
+vi.mock('@/lib/leaderboard/snapshotStore', async () => {
+  const { buildBoardSnapshot, periodFromSnapshot } = await import('@/lib/leaderboard/snapshot');
+  const { getAllFiberOrders } = await import('@/lib/fiberReport/ordersCache');
+  return {
+    loadBoardPeriod: vi.fn(async (req: Parameters<typeof periodFromSnapshot>[1] & { now: Date; viewerUid: string }) => {
+      const raw = state.docs.map((data, i) => ({ id: `s${i}`, data }));
+      let orders: Awaited<ReturnType<typeof getAllFiberOrders>> = [];
+      try {
+        orders = await getAllFiberOrders(null);
+      } catch {
+        orders = [];
+      }
+      let snapshot = buildBoardSnapshot(raw, orders, { now: req.now });
+      if (snapshot.demoRepIds.includes(req.viewerUid)) {
+        snapshot = buildBoardSnapshot(raw, orders, { now: req.now, viewerUid: req.viewerUid });
+      }
+      return { ...periodFromSnapshot(snapshot, req), source: 'live' };
+    }),
+  };
+});
+
 import { GET } from './route';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { viewAsHeaders } from '@/lib/auth/viewAsTestStub';

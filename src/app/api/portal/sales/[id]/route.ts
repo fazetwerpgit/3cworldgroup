@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { markLeaderboardDirty } from '@/lib/leaderboard/snapshotStore';
 import { adminDb } from '@/lib/firebase/admin';
 import { FieldValue } from 'firebase-admin/firestore';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
@@ -343,6 +344,8 @@ export async function PUT(
       }
       throw error;
     }
+    // Status, date, points or products may have moved the board.
+    await markLeaderboardDirty();
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -400,10 +403,11 @@ export async function DELETE(
         batch.update(order.ref, { saleLink: FieldValue.delete(), updatedAt });
       }
       await batch.commit();
-      invalidateFiberOrdersCache();
+      await invalidateFiberOrdersCache();
     }
 
     await docRef.delete();
+    await markLeaderboardDirty();
 
     return NextResponse.json({ success: true, clearedLinks: linked.size });
   } catch (error) {
