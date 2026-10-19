@@ -20,7 +20,7 @@ const INVITE_TOKEN_SHAPE = /^[A-Za-z0-9_-]{16,128}$/;
  * all answer the same { ok: false }. The team code itself is never returned.
  * Responds 200 so the client can branch on `ok` alone, mirroring
  * /api/portal/auth/captcha, except that code guesses past the per-IP limit get
- * 429 { ok: false }. The code check fails closed when the env var is missing.
+ * 429 { ok: false } and an invite lookup that fails gets 503 { ok: false }. The code check fails closed when the env var is missing.
  */
 export async function POST(request: Request) {
   let body: { code?: unknown; inviteToken?: unknown };
@@ -41,7 +41,9 @@ export async function POST(request: Request) {
       return NextResponse.json(state ? { ok: true, state } : { ok: false });
     } catch (error) {
       console.error('Error checking signup invite token:', error);
-      return NextResponse.json({ ok: false });
+      // 503, not the 200 { ok: false } of a turned-down invite: the client keeps
+      // a remembered invite through a lookup failure.
+      return NextResponse.json({ ok: false }, { status: 503 });
     }
   }
 

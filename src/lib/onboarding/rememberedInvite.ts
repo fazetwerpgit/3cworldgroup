@@ -55,6 +55,24 @@ function readRememberedInvite(): string | null {
 }
 
 /**
+ * Asks the server whether `token` is still a good invite. Resolves to its
+ * signup state, or 'rejected' when the server definitely turned it down.
+ * Throws when there is no definite answer (offline, a server error or an
+ * unreadable reply), so a remembered invite is never forgotten over a hiccup.
+ */
+export async function checkSignupInvite(token: string): Promise<InviteSignupState | 'rejected'> {
+  const response = await fetch('/api/portal/auth/team-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inviteToken: token }),
+  });
+  if (!response.ok) throw new Error(`Invite check failed (${response.status})`);
+  const result = (await response.json()) as { ok?: unknown; state?: unknown };
+  if (result.ok === true && (result.state === 'open' || result.state === 'submitted')) return result.state;
+  return 'rejected';
+}
+
+/**
  * The invite this visitor holds — `?invite=<token>` when `fromUrl`, else the
  * one remembered on this device — once the server confirms it is still good.
  * A remembered invite the server turns down is forgotten.
@@ -67,16 +85,11 @@ export function useSignupInvite({ fromUrl = false } = {}) {
     const token = urlToken || readRememberedInvite();
     if (!token) return;
     let cancelled = false;
-    fetch('/api/portal/auth/team-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inviteToken: token }),
-    })
-      .then((response) => response.json() as Promise<{ ok?: unknown; state?: unknown }>)
-      .then((result) => {
+    checkSignupInvite(token)
+      .then((state) => {
         if (cancelled) return;
-        if (result.ok === true && (result.state === 'open' || result.state === 'submitted')) {
-          setInvite({ token, state: result.state });
+        if (state !== 'rejected') {
+          setInvite({ token, state });
         } else if (!urlToken) {
           forgetInvite(token);
         }

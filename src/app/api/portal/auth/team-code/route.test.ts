@@ -110,6 +110,18 @@ describe('POST /api/portal/auth/team-code with an invite token', () => {
     expect(inviteSet).not.toHaveBeenCalled();
   });
 
+  it('answers a failed lookup with 503, not the turned-down reply, so a remembered invite is kept', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    queryGet.mockImplementationOnce(() => {
+      throw new Error('firestore unavailable');
+    });
+    const failed = await post({ inviteToken: OPEN_TOKEN });
+    expect(failed.status).toBe(503);
+    expect(failed.json).toEqual({ ok: false });
+    expect((await post({ inviteToken: UNKNOWN_TOKEN })).status).toBe(200);
+    consoleError.mockRestore();
+  });
+
   it('does not look up values that are not shaped like a token', async () => {
     for (const inviteToken of [42, '', 'short', 'has spaces and more text in it', 'x'.repeat(300)]) {
       expect((await post({ inviteToken })).json).toEqual({ ok: false });
