@@ -45,7 +45,7 @@ export function ManagerInterviews() {
     return fetch(url, { ...init, headers: { ...(init?.headers || {}), Authorization: `Bearer ${token ?? ''}` } });
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (background = false) => {
     // ProtectedRoute only gates rendering — skip the fetch for roles that are
     // about to be redirected so unauthorized loads stay silent (no 403 noise).
     if (!user || !isRole('admin', 'operations')) return;
@@ -56,7 +56,8 @@ export function ManagerInterviews() {
       setRows(json.submissions);
       setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load');
+      // A background refresh that fails keeps the queue on screen.
+      if (!background) setError(err instanceof Error ? err.message : 'Failed to load');
     } finally {
       setLoading(false);
     }
@@ -64,7 +65,7 @@ export function ManagerInterviews() {
 
   useEffect(() => { load(); }, [load]);
   // Back from the background (throttled): the queue may have moved on.
-  useRefreshOnResume(load);
+  useRefreshOnResume(() => load(true));
 
   const retry = () => {
     setError('');

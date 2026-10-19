@@ -109,7 +109,7 @@ export function Pipeline() {
     setTimeout(() => setSuccess(''), 4000);
   };
 
-  const fetchPipeline = useCallback(async () => {
+  const fetchPipeline = useCallback(async (background = false) => {
     if (!user) return;
     try {
       const response = await fetch('/api/portal/pipeline', { headers: await authHeaders() });
@@ -119,15 +119,16 @@ export function Pipeline() {
       setLoadFailed(false);
     } catch {
       // Load failures render in place (AdminFailed); `error` is for actions only.
-      setLoadFailed(true);
+      // A background refresh that fails keeps the team on screen.
+      if (!background) setLoadFailed(true);
     } finally {
       setLoading(false);
     }
   }, [user]);
 
   useEffect(() => { fetchPipeline(); }, [fetchPipeline]);
-  // Back from the background (throttled): the stages may have moved on.
-  useRefreshOnResume(fetchPipeline);
+  // Back from the background (throttled): the stages may have moved on. A quiet reload.
+  useRefreshOnResume(() => fetchPipeline(true));
 
   const retry = () => {
     setLoading(true);
