@@ -194,6 +194,14 @@ export function CheckDocumentsSheet({
   };
 
   const renderFiles = (item: ChecklistItem, files: Files) => {
+    if (item.referenceKind === 'storage' && item.ownerOnly) {
+      return (
+        <p className={o.locked}>
+          <Lock size={16} aria-hidden="true" />
+          Owners only. Tax and banking documents are visible to owners.
+        </p>
+      );
+    }
     if (item.referenceKind === 'storage' && item.adminOnly) {
       return (
         <p className={o.locked}>
@@ -255,7 +263,7 @@ export function CheckDocumentsSheet({
     // Files of an upload under review come with the list; older ones on request.
     const files = currentFiles(item).files;
     const canOpenFiles =
-      !check && !files && !esign && item.referenceKind === 'storage' && Boolean(item.reference) && !item.adminOnly;
+      !check && !files && !esign && item.referenceKind === 'storage' && Boolean(item.reference) && !item.adminOnly && !item.ownerOnly;
     const markable = canMarkComplete && item.status !== 'approved';
     const fixing = fixingId === item.id;
     const marking = markingId === item.id;
@@ -325,7 +333,7 @@ export function CheckDocumentsSheet({
         {!formOpen && (check || send || fixable || showPdf || canOpenFiles || markable) ? (
           <div className={u.btnRow}>
             {/* Approving a sensitive item takes the same admin right as opening it. */}
-            {check && !item.adminOnly ? (
+            {check && !item.adminOnly && !item.ownerOnly ? (
               <button
                 type="button"
                 className={`${s.btnPrimary} ${u.primarySm}`}
@@ -371,7 +379,12 @@ export function CheckDocumentsSheet({
                 {working ? 'Opening…' : 'View files'}
               </button>
             ) : null}
-            {showPdf && item.adminOnly ? (
+            {showPdf && item.ownerOnly ? (
+              <span className={`${u.tag} ${u.tagAmber}`}>
+                <Lock size={12} aria-hidden="true" />
+                Owners only
+              </span>
+            ) : showPdf && item.adminOnly ? (
               <span className={`${u.tag} ${u.tagAmber}`}>
                 <Lock size={12} aria-hidden="true" />
                 Admin only

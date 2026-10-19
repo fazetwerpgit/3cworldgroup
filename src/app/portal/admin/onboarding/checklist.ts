@@ -13,6 +13,8 @@ export interface ChecklistItem {
   sensitive: boolean;
   /** Sensitive item whose files this caller (operations) may not open. */
   adminOnly: boolean;
+  /** Tax or banking item (W-9, direct deposit) and the caller is not an owner. */
+  ownerOnly?: boolean;
   referenceKind: 'vendor' | 'storage' | 'esign' | 'manual';
   reference: string | null;
   files: { name: string; url: string; contentType: string }[];
