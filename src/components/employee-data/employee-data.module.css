@@ -52,6 +52,32 @@
   font: 600 var(--t-ui) / 1.35 var(--f-ui);
 }
 
+.matchReview {
+  display: grid;
+  gap: var(--s2);
+}
+
+.matchList {
+  display: grid;
+  gap: 4px;
+  max-height: 240px;
+  margin: 0;
+  padding: 0 0 0 var(--s4);
+  overflow-y: auto;
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  overflow-wrap: anywhere;
+}
+
+.matchCheck {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  color: var(--c-text);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
 .confirmSub {
   display: block;
   margin-top: 2px;

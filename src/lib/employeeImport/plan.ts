@@ -32,17 +32,28 @@ export interface PersonPlan {
   willFill: ImportField[];
   keptExisting: ImportField[];
   issues: string[];
+  /** How the sheet row was found. Email matches are listed for the owner to confirm before apply. */
+  matchedBy: MatchedBy;
+  /** The matched sheet row's email (lowercased) when matchedBy is 'email'. */
+  matchEmail?: string;
+  /** The matched sheet row's name, so the owner can see who the row belongs to. */
+  sheetName: string;
 }
+
+export type MatchedBy = 'email' | 'name';
 
 export interface PersonView {
   name: string;
   willFill: ImportField[];
   keptExisting: ImportField[];
   issues: string[];
+  matchedBy: MatchedBy;
+  matchEmail?: string;
+  sheetName: string;
 }
 
 export interface SheetMatch {
-  pairs: { user: PortalUser; row: SheetRow }[];
+  pairs: { user: PortalUser; row: SheetRow; matchedBy: MatchedBy }[];
   skipped: { name: string; reason: string }[];
   sheetRows: number;
   /** Sheet rows no active portal user matched. Counted, never named. */
@@ -109,7 +120,13 @@ function isBlank(value: unknown): boolean {
   return value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
 }
 
-function planPerson(user: PortalUser, name: string, row: SheetRow, onFile: SensitiveOnFile): PersonPlan {
+function planPerson(
+  user: PortalUser,
+  name: string,
+  row: SheetRow,
+  onFile: SensitiveOnFile,
+  matchedBy: MatchedBy
+): PersonPlan {
   const plan: PersonPlan = {
     uid: user.uid,
     name,
@@ -118,6 +135,9 @@ function planPerson(user: PortalUser, name: string, row: SheetRow, onFile: Sensi
     willFill: [],
     keptExisting: [],
     issues: [],
+    matchedBy,
+    ...(matchedBy === 'email' ? { matchEmail: row.email } : {}),
+    sheetName: row.name.trim(),
   };
   const data = user.data;
 
@@ -188,32 +208,34 @@ function planPerson(user: PortalUser, name: string, row: SheetRow, onFile: Sensi
  * person's details can never land on someone else.
  */
 export function matchUsers(users: PortalUser[], rows: SheetRow[]): SheetMatch {
-  const candidates = new Map<string, number[]>();
+  const candidates = new Map<string, { found: number[]; matchedBy: MatchedBy }>();
   const claims = new Map<number, number>();
 
   for (const user of users) {
     // Legacy user docs keep the address under 'Email' (capital E).
     const email = emailFromUserDoc({ get: (field) => user.data[field] })?.toLowerCase() ?? '';
     let found = email ? rows.flatMap((row, index) => (row.email === email ? [index] : [])) : [];
+    let matchedBy: MatchedBy = 'email';
     if (found.length === 0) {
+      matchedBy = 'name';
       const portalName = normalizeName(String(user.data.displayName ?? ''));
       const names = new Set([portalName, NAME_ALIASES[portalName]].filter(Boolean));
       found = portalName ? rows.flatMap((row, index) => (names.has(normalizeName(row.name)) ? [index] : [])) : [];
     }
-    candidates.set(user.uid, found);
+    candidates.set(user.uid, { found, matchedBy });
     for (const index of found) claims.set(index, (claims.get(index) ?? 0) + 1);
   }
 
   const pairs: SheetMatch['pairs'] = [];
   const skipped: SheetMatch['skipped'] = [];
   for (const user of users) {
-    const found = candidates.get(user.uid) ?? [];
+    const { found, matchedBy } = candidates.get(user.uid) ?? { found: [], matchedBy: 'name' as const };
     const name = displayNameOf(user);
     if (found.length === 0) skipped.push({ name, reason: 'Not in the sheet' });
     else if (found.length > 1) skipped.push({ name, reason: `Matches ${found.length} rows in the sheet` });
     else if ((claims.get(found[0]) ?? 0) > 1) {
       skipped.push({ name, reason: 'Same sheet row as another portal user' });
-    } else pairs.push({ user, row: rows[found[0]] });
+    } else pairs.push({ user, row: rows[found[0]], matchedBy });
   }
   skipped.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -232,11 +254,29 @@ function displayNameOf(user: PortalUser): string {
 
 export function buildImportPlan(match: SheetMatch, sensitiveByUid: Map<string, SensitiveOnFile>): ImportPlan {
   const people = match.pairs
-    .map(({ user, row }) => planPerson(user, displayNameOf(user), row, sensitiveByUid.get(user.uid) ?? {}))
+    .map(({ user, row, matchedBy }) =>
+      planPerson(user, displayNameOf(user), row, sensitiveByUid.get(user.uid) ?? {}, matchedBy)
+    )
     .sort((a, b) => a.name.localeCompare(b.name));
   return { sheetRows: match.sheetRows, unmatchedRows: match.unmatchedRows, people, skipped: match.skipped };
 }
 
 export function toPersonView(plan: PersonPlan): PersonView {
-  return { name: plan.name, willFill: plan.willFill, keptExisting: plan.keptExisting, issues: plan.issues };
+  return {
+    name: plan.name,
+    willFill: plan.willFill,
+    keptExisting: plan.keptExisting,
+    issues: plan.issues,
+    matchedBy: plan.matchedBy,
+    ...(plan.matchEmail ? { matchEmail: plan.matchEmail } : {}),
+    sheetName: plan.sheetName,
+  };
+}
+
+/** Emails of the people an apply would write who were matched by email: the owner confirms these first. */
+export function emailMatchesToConfirm(people: PersonPlan[]): string[] {
+  return people
+    .filter((person) => person.willFill.length > 0 && person.matchedBy === 'email' && person.matchEmail)
+    .map((person) => person.matchEmail as string)
+    .sort();
 }

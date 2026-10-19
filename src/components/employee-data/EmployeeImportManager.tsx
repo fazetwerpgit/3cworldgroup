@@ -48,13 +48,15 @@ export function EmployeeImportManager() {
   const [result, setResult] = useState<ImportResponse | null>(null);
   const [busy, setBusy] = useState<'preview' | 'apply' | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [matchesOk, setMatchesOk] = useState(false);
   const [error, setError] = useState('');
   const [inputKey, setInputKey] = useState(0);
 
-  const send = async (mode: 'preview' | 'apply', upload: File): Promise<ImportResponse> => {
+  const send = async (mode: 'preview' | 'apply', upload: File, confirmed: string[] = []): Promise<ImportResponse> => {
     const form = new FormData();
     form.set('mode', mode);
     form.set('file', upload);
+    if (mode === 'apply') form.set('confirmedEmailMatches', JSON.stringify(confirmed));
     const token = await getIdToken();
     const res = await fetch('/api/portal/admin/employee-import', {
       method: 'POST',
@@ -70,6 +72,7 @@ export function EmployeeImportManager() {
     const picked = event.target.files?.[0] ?? null;
     setPreview(null);
     setConfirming(false);
+    setMatchesOk(false);
     setError('');
     if (picked && picked.size > MAX_BYTES) {
       setFile(null);
@@ -85,6 +88,8 @@ export function EmployeeImportManager() {
     setBusy('preview');
     setError('');
     setResult(null);
+    setConfirming(false);
+    setMatchesOk(false);
     try {
       setPreview(await send('preview', file));
     } catch (err) {
@@ -99,7 +104,11 @@ export function EmployeeImportManager() {
     setBusy('apply');
     setError('');
     try {
-      const json = await send('apply', file);
+      const json = await send(
+        'apply',
+        file,
+        emailMatches.map((person) => person.matchEmail ?? '')
+      );
       setResult(json);
       setPreview(null);
       setFile(null);
@@ -109,11 +118,17 @@ export function EmployeeImportManager() {
     } finally {
       setBusy(null);
       setConfirming(false);
+      setMatchesOk(false);
     }
   };
 
   const shown = result ?? preview;
   const toUpdate = preview ? preview.people.filter((person) => person.willFill.length > 0).length : 0;
+  // Email matches decide whose row (SSN included) lands on whom: listed for the owner to confirm first.
+  const emailMatches = preview
+    ? preview.people.filter((person) => person.willFill.length > 0 && person.matchedBy === 'email' && person.matchEmail)
+    : [];
+  const canApply = emailMatches.length === 0 || matchesOk;
   const peopleWord = (count: number) => (count === 1 ? 'person' : 'people');
 
   return (
@@ -189,6 +204,33 @@ export function EmployeeImportManager() {
                   Only empty fields are filled. Nothing already in the portal changes.
                 </span>
               </p>
+              {emailMatches.length ? (
+                <div className={e.matchReview}>
+                  <p className={e.confirmSub}>
+                    Matched by email. Check each sheet row goes to the right person:
+                  </p>
+                  <ul className={e.matchList}>
+                    {emailMatches.map((person, index) => (
+                      <li key={`${person.matchEmail}-${index}`}>
+                        <strong>{person.name}</strong>
+                        <span>
+                          {' '}
+                          ← sheet row &ldquo;{person.sheetName || 'no name'}&rdquo; ({person.matchEmail})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <label className={e.matchCheck}>
+                    <input
+                      type="checkbox"
+                      checked={matchesOk}
+                      onChange={(event) => setMatchesOk(event.target.checked)}
+                      disabled={busy === 'apply'}
+                    />{' '}
+                    These {emailMatches.length} email {emailMatches.length === 1 ? 'match is' : 'matches are'} right
+                  </label>
+                </div>
+              ) : null}
               <div className={u.btnRow}>
                 <button
                   type="button"
@@ -202,7 +244,7 @@ export function EmployeeImportManager() {
                   type="button"
                   className={`${s.btnPrimary} ${u.primarySm}`}
                   onClick={apply}
-                  disabled={busy === 'apply'}
+                  disabled={busy === 'apply' || !canApply}
                 >
                   {busy === 'apply' ? 'Importing…' : `Import ${toUpdate} ${peopleWord(toUpdate)}`}
                 </button>

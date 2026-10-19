@@ -7,6 +7,7 @@ import { decryptField, last4 } from '@/lib/security/fieldEncryption';
 import { parseEmployeeSheet, SheetReadError } from '@/lib/employeeImport/parseSheet';
 import {
   buildImportPlan,
+  emailMatchesToConfirm,
   matchUsers,
   toPersonView,
   type ImportField,
@@ -44,6 +45,17 @@ async function encryptionKeyMatches(db: Firestore): Promise<boolean> {
   }
 }
 
+function parseConfirmed(value: FormDataEntryValue | null): Set<string> {
+  if (typeof value !== 'string') return new Set();
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((item): item is string => typeof item === 'string').map((item) => item.trim().toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
 // One atomic batch per person: their profile fields and their encrypted fields
 // land together or not at all.
 async function writePerson(db: Firestore, person: PersonPlan, updatedBy: string): Promise<void> {
@@ -64,7 +76,8 @@ async function writePerson(db: Firestore, person: PersonPlan, updatedBy: string)
 // POST /api/portal/admin/employee-import — multipart { file: .xlsx, mode }.
 // OWNER ONLY. 'preview' says, per active portal user, which EMPTY profile fields
 // the owner's employee sheet would fill; 'apply' re-reads the same file and
-// writes them (SSN and DL# encrypted with the server key). The file is read in
+// writes them (SSN and DL# encrypted with the server key). Apply also needs
+// confirmedEmailMatches: the email matches the owner confirmed in the preview. The file is read in
 // memory and dropped. No response or log ever carries a phone, address, SSN or
 // DL value: people come back as field names only.
 export async function POST(request: NextRequest) {
@@ -123,6 +136,14 @@ export async function POST(request: NextRequest) {
 
     if (mode === 'preview') {
       return NextResponse.json({ ...summary, people: plan.people.map(toPersonView) }, { headers: NO_STORE });
+    }
+
+    // The owner must have seen and confirmed every email-based match before
+    // anything is written: the preview lists them, and apply sends them back.
+    const mustConfirm = emailMatchesToConfirm(plan.people);
+    const confirmed = parseConfirmed(form.get('confirmedEmailMatches'));
+    if (mustConfirm.some((email) => !confirmed.has(email))) {
+      return fail('The email matches changed or were not confirmed. Check the file again.', 409);
     }
 
     if (!(await encryptionKeyMatches(db))) return fail('Encryption key check failed', 500);

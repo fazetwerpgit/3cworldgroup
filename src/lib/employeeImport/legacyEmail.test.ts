@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildExportRows } from './exportSheet';
-import { matchUsers } from './plan';
+import { buildImportPlan, emailMatchesToConfirm, matchUsers, toPersonView } from './plan';
 import type { SheetRow } from './parseSheet';
 
 function sheetRow(name: string, email: string): SheetRow {
@@ -33,5 +33,29 @@ describe('legacy capital-E Email user docs', () => {
       ['u1', 'sam.one@example.com'],
       ['u2', 'sam.two@example.com'],
     ]);
+  });
+});
+
+describe('email matches to confirm', () => {
+  it('marks email vs name matches and lists only email matches that would write', () => {
+    const rows = [
+      { ...sheetRow('Sam Sheet', 'sam@example.com'), phone: '3195550101' },
+      { ...sheetRow('Pat Name', ''), phone: '3195550102' },
+    ];
+    const match = matchUsers(
+      [
+        { uid: 'u1', data: { displayName: 'Sam Portal', Email: 'SAM@example.com' } },
+        { uid: 'u2', data: { displayName: 'Pat Name' } },
+      ],
+      rows
+    );
+    expect(match.pairs.map((p) => [p.user.uid, p.matchedBy])).toEqual([
+      ['u1', 'email'],
+      ['u2', 'name'],
+    ]);
+    const plan = buildImportPlan(match, new Map());
+    const sam = plan.people.find((person) => person.uid === 'u1');
+    expect(sam && toPersonView(sam)).toMatchObject({ matchedBy: 'email', matchEmail: 'sam@example.com', sheetName: 'Sam Sheet' });
+    expect(emailMatchesToConfirm(plan.people)).toEqual(['sam@example.com']);
   });
 });
