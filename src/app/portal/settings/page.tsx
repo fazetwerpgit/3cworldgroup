@@ -15,6 +15,7 @@ import LinkedSignInMethods from '@/components/app/LinkedSignInMethods';
 import DeleteAccountCard from '@/components/portal/DeleteAccountCard';
 import { LegalLinks } from '@/components/app/LegalLinks';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
+import { profileSaveBody } from '@/lib/portal/profileSaveBody';
 import { getEffectiveRole, repFacingRoleLabel, SHIRT_SIZES } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -135,8 +136,9 @@ export default function SettingsPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token ?? ''}`,
         },
-        // Empty means never picked: leave it unset rather than send a blank.
-        body: JSON.stringify({ displayName, phone, ...(shirtSize ? { shirtSize } : {}) }),
+        // Phone only when changed: the remembered profile has none, and a
+        // blank would wipe the one on file. Shirt size only once picked.
+        body: JSON.stringify(profileSaveBody({ displayName, phone, shirtSize }, user)),
       });
       if (!response.ok) throw new Error("Couldn't update profile");
       await refreshUser();
