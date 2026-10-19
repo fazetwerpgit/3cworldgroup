@@ -20,6 +20,7 @@ import { PRACTICE_LOG, isoTime, loadAssignments, loadCountedSessions } from '@/l
 export const dynamic = 'force-dynamic';
 
 const DAYS = 30;
+const SHOWN = 100;
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
 
 export async function GET(request: NextRequest) {
@@ -33,7 +34,14 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const since = new Date(now.getTime() - DAYS * 86_400_000);
   const [snap, assignments] = await Promise.all([
-    adminDb.collection(PRACTICE_LOG).where('uid', '==', gate.uid).where('createdAt', '>=', since).limit(300).get(),
+    // Newest first so the cap drops the oldest sessions, not the latest ones.
+    adminDb
+      .collection(PRACTICE_LOG)
+      .where('uid', '==', gate.uid)
+      .where('createdAt', '>=', since)
+      .orderBy('createdAt', 'desc')
+      .limit(SHOWN)
+      .get(),
     loadAssignments(adminDb),
   ]);
   const sessions: MyPracticeSession[] = snap.docs
@@ -64,7 +72,7 @@ export async function GET(request: NextRequest) {
   const oldest = mine.reduce((min, assignment) => (assignment.createdAt < min ? assignment.createdAt : min), now.toISOString());
   const counted = mine.length ? await loadCountedSessions(adminDb, new Date(oldest), gate.uid) : [];
   const reply: MyPracticeReply = {
-    sessions: sessions.slice(0, 100),
+    sessions: sessions.slice(0, SHOWN),
     assignments: openAssignmentsFor(gate.uid, mine, counted, today).map(({ assignment, done }) => ({
       id: assignment.id,
       persona: assignment.persona === 'any' ? 'any homeowner' : (PERSONAS.find((p) => p.id === assignment.persona)?.label ?? ''),

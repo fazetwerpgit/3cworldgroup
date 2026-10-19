@@ -63,4 +63,18 @@ describe('GET /api/portal/ask/practice/mine', () => {
     expect(sessions[0]).toMatchObject({ redo: true, skills: { opener: 8 } });
     expect(assignments).toEqual([{ id: 'x', persona: 'Skeptic', count: 2, done: 1, due: expect.any(String) }]);
   });
+
+  it('keeps the newest sessions when a rep has more than the cap in 30 days', async () => {
+    const now = Date.now();
+    const practiceLog: Record<string, Record<string, unknown>> = {};
+    // Stored oldest first, like Firestore's natural createdAt order under the range filter.
+    for (let i = 305; i >= 1; i -= 1) {
+      practiceLog[`s${i}`] = { uid: 'r1', persona: 'skeptic', personaLabel: 'Skeptic', feedback: feedback(5), createdAt: new Date(now - i * 60_000) };
+    }
+    state.db = createFakeAskDb({ practiceLog, practiceAssignments: {} }).db;
+    const { sessions } = await (await GET(req())).json();
+    expect(sessions).toHaveLength(100);
+    expect(sessions[0].id).toBe('s1');
+    expect(sessions[99].id).toBe('s100');
+  });
 });
