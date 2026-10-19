@@ -20,6 +20,7 @@ function matches(data: Data, f: Filter): boolean {
     case '==': return v === x;
     case '>=': return v >= x;
     case '<': return v < x;
+    case 'in': return Array.isArray(x) && (x as unknown[]).includes(v);
     default: throw new Error(`fakeDb: unsupported op ${f.op}`);
   }
 }
