@@ -25,15 +25,15 @@ function isBacked(card: QueueCard): boolean {
   return !card.error && card.oldestWaitMs !== null && card.oldestWaitMs > BACKED_UP_THRESHOLD_MS;
 }
 
-/** Home's Needs attention is the hiring work: To do's kinds of row and the pipeline. */
+/** Home's Needs attention is the hiring work: To do's kinds of row. */
 const HOME_HUBS: string[] = [ONBOARDING_HUB.href];
 
 /**
  * Home's Needs attention: the hiring queues the viewer can open (documents to
- * check, ready to activate, new applicants, sign-ups for admins, the pipeline)
+ * check, ready to activate, new applicants, sign-ups for admins)
  * with open count, new today and oldest wait, each row linking to its tab. Only
  * rows with something in them (or that failed to load) show. The waiting total
- * leaves out the pipeline, which waits on no one. `extra` rows (the owner's
+ * leaves out rows marked badge: false, which wait on no one. `extra` rows (the owner's
  * stuck-onboarding check) join them and `onRefresh` reloads them with the
  * queues. The Requests queues are counted on their own nav badge and tabs instead.
  */
@@ -56,7 +56,7 @@ export function OpsQueuesPanel({
     : null;
   const shown = cards?.filter((card) => card.error || card.count > 0) ?? [];
   const loading = queues.loading || extraLoading;
-  // A column no queue has a figure for (the pipeline and signups carry no timestamps) is left out, not a column of dashes.
+  // A column no queue has a figure for (signups carry no timestamps) is left out, not a column of dashes.
   const live = shown.filter((card) => !card.error);
   const showNew = live.some((card) => card.newToday !== null);
   const showOldest = live.some((card) => card.count > 0 && card.oldestWaitMs !== null);

@@ -8,6 +8,8 @@ type TestUser = { uid: string; role?: string; fieldRole?: string };
 const state = vi.hoisted(() => ({
   user: null as TestUser | null,
   failing: new Set<string>(),
+  /** Request forms whose count the batch endpoint answers null for. */
+  nullForms: new Set<string>(),
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -58,11 +60,18 @@ function respond(url: string) {
         ],
       },
     };
-  if (path === '/api/portal/pipeline') return { ok: true, body: { counts: { processing: 2, need_logins: 1 } } };
-  if (path === '/api/portal/admin/chat-reports/count')
-    return { ok: true, body: { open: 1, newToday: 1, oldestCreatedAt: ago(3 * HOUR) } };
-  // Every request type: one open item, one handled.
-  return { ok: true, body: { submissions: [{ status: 'new', createdAt: ago(2 * HOUR) }, { status: 'handled' }] } };
+  if (path === '/api/portal/admin/queue-counts') {
+    // Every request type: one open item. Chat reports: one, filed 3h ago.
+    const forms = ['payroll-dispute', 'expedite-order', 'leads-request', 'fiber-report', 'manager-interview', 'bug-report'];
+    return {
+      ok: true,
+      body: {
+        requests: Object.fromEntries(forms.map((form) => [form, state.nullForms.has(form) ? null : 1])),
+        chatReports: { open: 1, newToday: 1, oldestCreatedAt: ago(3 * HOUR) },
+      },
+    };
+  }
+  throw new Error(`unexpected fetch ${path}`);
 }
 
 const fetchMock = vi.fn(async (url: string) => {
@@ -98,6 +107,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
   state.failing.clear();
+  state.nullForms.clear();
   container = document.createElement('div');
   root = createRoot(container);
 });
@@ -114,7 +124,6 @@ describe('useOpsQueues', () => {
       'Documents to check',
       'Ready to activate',
       'New website applicants',
-      'Onboarding pipeline',
       'Payroll disputes',
       'Expedite orders',
       'Leads requests',
@@ -131,12 +140,19 @@ describe('useOpsQueues', () => {
     expect(byKey.recruiting).toMatchObject({ href: '/portal/admin/onboarding?tab=todo', count: 1, newToday: 0 });
     expect(byKey.recruiting.oldestWaitMs).toBeGreaterThan(2 * 24 * HOUR);
     expect(byKey.applicants).toMatchObject({ href: '/portal/admin/onboarding?tab=todo', count: 2, newToday: 1 });
-    expect(byKey.pipeline).toMatchObject({ count: 3, newToday: null, oldestWaitMs: null, badge: false });
-    expect(byKey['bug-reports']).toMatchObject({ href: '/portal/admin/requests?type=bug-reports', count: 1, newToday: 1 });
+    expect(byKey['bug-reports']).toMatchObject({ href: '/portal/admin/requests?type=bug-reports', count: 1 });
+    expect(byKey['chat-reports']).toMatchObject({ count: 1, newToday: 1 });
+    expect(byKey['chat-reports'].oldestWaitMs).toBeGreaterThan(2 * HOUR);
+    // No pipeline read, and every request queue plus chat reports come from one call.
+    expect(fetchMock.mock.calls.map(([url]) => url.split('?')[0]).sort()).toEqual([
+      '/api/portal/admin/queue-counts',
+      '/api/portal/onboarding/review',
+      '/api/portal/recruiting/invites',
+    ]);
     expect(byKey.signups).toMatchObject({ href: '/portal/admin/onboarding?tab=todo', count: 4 });
     // The two invites queues share one call.
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/portal/recruiting/invites')).toHaveLength(1);
-    // Nav badge and To do tab: things waiting on you; the pipeline adds to neither.
+    // Nav badge and To do tab: things waiting on you.
     expect(counts).toEqual({
       '/portal/admin/onboarding': 2 + 1 + 2 + 4,
       '/portal/admin/requests': 6,
@@ -159,7 +175,7 @@ describe('useOpsQueues', () => {
   });
 
   it('marks a queue that fails as failed and keeps the rest', async () => {
-    state.failing.add('/api/portal/forms/leads-request/review');
+    state.nullForms.add('leads-request');
     const { queues, counts } = await renderAs({ role: 'operations' });
     const leads = queues.cards?.find((card) => card.key === 'leads-requests');
     expect(leads).toMatchObject({ error: true, count: 0 });

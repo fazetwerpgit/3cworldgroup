@@ -13,10 +13,10 @@ import {
   hubTabHref,
   type HubConfig,
 } from './adminHubs';
-import { fetchOpenRequests } from './openRequests';
 
-// The admin work queues (what Ops Home used to list): the kinds of row in Hiring's To do,
-// the pipeline and the Requests types. One loader and one cache feed Home's
+// The admin work queues (what Ops Home used to list): the kinds of row in Hiring's To do
+// and the Requests types. (The pipeline is not a queue here: its count meant
+// reading the whole roster, sales book and onboarding on every launch.) One loader and one cache feed Home's
 // Needs attention (the hiring rows), the Requests switcher counts and the nav
 // badges, so a page and its badges never disagree and a page change does not
 // refetch everything. Every To do card counts what that tab's header counts:
@@ -58,6 +58,8 @@ interface QueueSource {
 }
 
 const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+/** The Requests and chat-report badge figures, all from one aggregate-only call. */
+const QUEUE_COUNTS_URL = '/api/portal/admin/queue-counts';
 /** Cached queues older than this reload when a page that shows them mounts. */
 const STALE_MS = 60_000;
 
@@ -131,27 +133,20 @@ const SOURCES: QueueSource[] = [
       );
     },
   },
-  {
-    key: 'pipeline',
-    label: 'Onboarding pipeline',
-    hub: ONBOARDING_HUB,
-    tab: 'pipeline',
-    badge: false,
-    load: async (get) => {
-      const json = await get('/api/portal/pipeline');
-      const counts = (json.counts ?? {}) as Record<string, number>;
-      // No per-rep timestamp is fetched here, so age/newToday stay null rather than fabricated.
-      const count = (counts.processing ?? 0) + (counts.need_logins ?? 0) + (counts.cleared_to_sell ?? 0);
-      return { count, oldestWaitMs: null, newToday: null };
-    },
-  },
   ...REQUEST_TABS.map((tab) => ({
     key: tab.key,
     label: tab.label,
     hub: REQUESTS_HUB,
     tab: tab.key,
-    // Same definition as the owner's Needs-attention count: status == 'new'.
-    load: async () => figuresFrom((await fetchOpenRequests(tab.form)).map((row) => row.createdAt)),
+    // Same definition as the owner's Needs-attention count: status == 'new',
+    // counted on the server (count() aggregation); the badge never reads the
+    // submissions themselves. Only the count is shown for a Requests queue.
+    load: async (get: (url: string) => Promise<Record<string, unknown>>): Promise<QueueFigures> => {
+      const json = await get(QUEUE_COUNTS_URL);
+      const count = (json.requests as Record<string, unknown> | undefined)?.[tab.form];
+      if (typeof count !== 'number') throw new Error('count unavailable');
+      return { count, oldestWaitMs: null, newToday: null };
+    },
   })),
   {
     key: 'chat-reports',
@@ -160,13 +155,14 @@ const SOURCES: QueueSource[] = [
     tab: 'open',
     // Aggregates only: the queue page lists the reports, the badge never reads them.
     load: async (get) => {
-      const json = await get('/api/portal/admin/chat-reports/count');
-      const count = typeof json.open === 'number' ? json.open : 0;
-      const oldest = typeof json.oldestCreatedAt === 'string' ? new Date(json.oldestCreatedAt).getTime() : Number.NaN;
+      const reports = (await get(QUEUE_COUNTS_URL)).chatReports as Record<string, unknown> | null | undefined;
+      if (!reports || typeof reports.open !== 'number') throw new Error('count unavailable');
+      const oldest =
+        typeof reports.oldestCreatedAt === 'string' ? new Date(reports.oldestCreatedAt).getTime() : Number.NaN;
       return {
-        count,
+        count: reports.open,
         oldestWaitMs: Number.isNaN(oldest) ? null : Math.max(0, Date.now() - oldest),
-        newToday: typeof json.newToday === 'number' ? json.newToday : 0,
+        newToday: typeof reports.newToday === 'number' ? reports.newToday : 0,
       };
     },
   },
