@@ -126,6 +126,16 @@ export async function POST(request: NextRequest) {
       );
     }
     if (targetUser.get('status') !== 'active') {
+      // A decommissioned (or otherwise deactivated) hire keeps their submitted
+      // invite, but Activate must not flip them back on: it would leave the
+      // auth account disabled and the decommission record in place. Reinstate
+      // is the only way back.
+      if (targetUser.get('status') === 'inactive' || targetUser.get('decommission')) {
+        return NextResponse.json(
+          { error: 'This recruit was deactivated. Reinstate them from Pipeline instead.' },
+          { status: 409 }
+        );
+      }
       const readiness = await getActivationReadiness(invite.convertedUserId);
       if (!readiness.ready) {
         return NextResponse.json(

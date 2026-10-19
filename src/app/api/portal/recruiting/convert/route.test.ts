@@ -169,6 +169,36 @@ describe('POST /api/portal/recruiting/convert', () => {
     expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'converted' });
   });
 
+  it.each([
+    ['a decommissioned hire', { status: 'inactive', deactivatedFromStatus: 'pending', decommission: { reason: 'no_show' } }],
+    ['an inactive hire without a marker', { status: 'inactive' }],
+    ['a hire carrying a decommission marker', { status: 'pending', decommission: { reason: 'no_show' } }],
+  ])('refuses to activate %s and leaves the invite submitted', async (_label, userPatch) => {
+    seedRecruit();
+    firestore.users.set('recruit-1', { ...firestore.users.get('recruit-1'), ...userPatch });
+
+    const response = await POST(request({ inviteId: 'invite-1', action: 'approved' }));
+
+    expect(response.status).toBe(409);
+    expect(mockActivateUser).not.toHaveBeenCalled();
+    expect(firestore.users.get('recruit-1')).toMatchObject({ status: userPatch.status });
+    expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'submitted' });
+  });
+
+  it('still converts an active hire who carries a stale decommission marker', async () => {
+    seedRecruit();
+    firestore.users.set('recruit-1', {
+      ...firestore.users.get('recruit-1'),
+      status: 'active',
+      decommission: { reason: 'no_show' },
+    });
+
+    const response = await POST(request({ inviteId: 'invite-1', action: 'approved' }));
+
+    expect(response.status).toBe(200);
+    expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'converted' });
+  });
+
   it('rejects a caller who cannot convert recruits', async () => {
     seedRecruit();
     firestore.users.set('ibo-owner', { fieldRole: 'entry_rep', displayName: 'Rep' });
