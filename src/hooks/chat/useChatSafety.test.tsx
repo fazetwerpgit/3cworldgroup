@@ -6,7 +6,7 @@
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { blocksRetryDelay, useChatSafety, type ChatSafety } from './useChatSafety';
+import { blocksRetryDelay, MAX_BLOCKS_RETRIES, useChatSafety, type ChatSafety } from './useChatSafety';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -128,6 +128,39 @@ describe('useChatSafety', () => {
     await act(async () => {
       window.dispatchEvent(new Event('online'));
     });
+    await answer('/api/portal/chat/blocks', json({ blocked: [{ uid: 'x' }] }));
+    expect(latest.blockedUids.has('x')).toBe(true);
+  });
+
+  it.each([401, 403])('never retries the block-list load after a %i', async (status) => {
+    await answer('/api/portal/chat/blocks', json({ error: 'no' }, status));
+    await act(async () => {
+      vi.advanceTimersByTime(10 * 60_000);
+    });
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+    expect(calls.filter((c) => c === 'GET /api/portal/chat/blocks')).toHaveLength(1);
+    expect(pending['/api/portal/chat/blocks'] ?? []).toHaveLength(0);
+  });
+
+  it('stops the timed retries after MAX_BLOCKS_RETRIES, then retries again when back online', async () => {
+    for (let attempt = 0; attempt < MAX_BLOCKS_RETRIES; attempt += 1) {
+      await answer('/api/portal/chat/blocks', json({ error: 'boom' }, 500));
+      await act(async () => {
+        vi.advanceTimersByTime(blocksRetryDelay(attempt));
+      });
+    }
+    await answer('/api/portal/chat/blocks', json({ error: 'boom' }, 500));
+    await act(async () => {
+      vi.advanceTimersByTime(10 * 60_000);
+    });
+    const blockGets = () => calls.filter((c) => c === 'GET /api/portal/chat/blocks').length;
+    expect(blockGets()).toBe(MAX_BLOCKS_RETRIES + 1);
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+    expect(blockGets()).toBe(MAX_BLOCKS_RETRIES + 2);
     await answer('/api/portal/chat/blocks', json({ blocked: [{ uid: 'x' }] }));
     expect(latest.blockedUids.has('x')).toBe(true);
   });

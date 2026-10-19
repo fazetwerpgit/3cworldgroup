@@ -30,6 +30,16 @@ export function blocksRetryDelay(attempt: number): number {
   return Math.min(30_000, 2_000 * 2 ** attempt);
 }
 
+/**
+ * Timed retries after a failed block-list load (about 3.5 minutes in all with
+ * the delays above). After that only the device coming back online tries
+ * again, and that starts a fresh round.
+ */
+export const MAX_BLOCKS_RETRIES = 8;
+
+/** One block-list load: the list, an auth refusal (401/403, never retried), or a failure worth retrying. */
+type BlocksLoad = { kind: 'ok'; blocked: Set<string> } | { kind: 'denied' } | { kind: 'failed' };
+
 /** What the server said when the page loaded. blocked is null until the list loads. */
 interface ServerState {
   uid: string;
@@ -63,7 +73,8 @@ function parseBlocked(body: unknown): Set<string> | null {
  * (the Firestore rules keep blocks server-only), plus the report / block /
  * unblock / accept calls. A failed terms load leaves termsAccepted null, so
  * nobody is gated on a network hiccup. A failed block-list load is retried
- * (with backoff, and as soon as the device is back online), because the block
+ * (with capped backoff, and as soon as the device is back online; never on a
+ * 401/403), because the block
  * list is the only thing that hides blocked people's messages on this screen.
  * Blocks, unblocks and accepts made on this page win over a load that lands
  * after them.
@@ -78,30 +89,50 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let attempt = 0;
     let loading = false;
-    let blocksLoaded = false;
+    // Loaded, or refused for auth: either way this effect never asks again.
+    let blocksDone = false;
+
+    const fetchBlocks = (): Promise<BlocksLoad> =>
+      authedFetch('/api/portal/chat/blocks')
+        .then(async (res): Promise<BlocksLoad> => {
+          if (res.status === 401 || res.status === 403) return { kind: 'denied' };
+          if (!res.ok) return { kind: 'failed' };
+          const blocked = parseBlocked(await res.json().catch(() => null));
+          return blocked ? { kind: 'ok', blocked } : { kind: 'failed' };
+        })
+        .catch((): BlocksLoad => ({ kind: 'failed' }));
 
     const loadBlocks = async () => {
-      if (cancelled || blocksLoaded || loading) return;
+      if (cancelled || blocksDone || loading) return;
       loading = true;
       if (retryTimer) {
         clearTimeout(retryTimer);
         retryTimer = null;
       }
-      const body = await authedFetch('/api/portal/chat/blocks')
-        .then((res) => (res.ok ? res.json() : null))
-        .catch(() => null);
+      const result = await fetchBlocks();
       loading = false;
       if (cancelled) return;
-      const blocked = parseBlocked(body);
-      if (blocked) {
-        blocksLoaded = true;
+      if (result.kind === 'ok') {
+        blocksDone = true;
+        const { blocked } = result;
         setServer((prev) => ({ uid, termsAccepted: prev?.uid === uid ? prev.termsAccepted : null, blocked }));
         return;
       }
+      // A 401/403 will not fix itself by asking again (signed out, or no chat
+      // access): stop instead of polling the route for the life of the page.
+      if (result.kind === 'denied') {
+        blocksDone = true;
+        return;
+      }
+      if (attempt >= MAX_BLOCKS_RETRIES) return;
       retryTimer = setTimeout(() => void loadBlocks(), blocksRetryDelay(attempt));
       attempt += 1;
     };
-    const onOnline = () => void loadBlocks();
+    const onOnline = () => {
+      // Back online: a fresh round of retries.
+      attempt = 0;
+      void loadBlocks();
+    };
 
     void loadBlocks();
     void authedFetch('/api/portal/chat/terms')
