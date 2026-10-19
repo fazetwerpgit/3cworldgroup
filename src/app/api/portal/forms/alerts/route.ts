@@ -36,7 +36,8 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json();
     const key = typeof body.key === 'string' ? body.key : '';
-    if (!(key in FORM_ALERTS)) {
+    // Own keys only: `in` would accept inherited names like 'toString' or '__proto__'.
+    if (!Object.hasOwn(FORM_ALERTS, key)) {
       return NextResponse.json({ error: 'Unknown form key' }, { status: 400 });
     }
     if (typeof body.enabled !== 'boolean') {
