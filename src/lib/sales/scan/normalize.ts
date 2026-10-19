@@ -82,6 +82,23 @@ export function matchPlanId(company: string, planText: string | undefined): stri
   return plans.length === 1 ? plans[0].id : null;
 }
 
+/** Lowercase word tokens, so "Apt #2," and "apt 2" compare equal. */
+function addressTokens(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+/**
+ * True when the street already ends with the unit as whole tokens ("9 Oak St Apt 2"
+ * with "Apt 2" or "2"). A substring test would drop unit "2" from "1205 Southwood Dr".
+ */
+function endsWithUnit(street: string, unit: string): boolean {
+  const s = addressTokens(street);
+  const u = addressTokens(unit);
+  if (u.length === 0) return true;
+  if (u.length >= s.length) return false;
+  return u.every((token, i) => s[s.length - u.length + i] === token);
+}
+
 /** The form's one-line address: "123 Main St Apt 4, Austin, TX 78701". */
 export function joinAddress(address: RawAddress): string | null {
   const street = squash(address.street ?? '');
@@ -90,7 +107,7 @@ export function joinAddress(address: RawAddress): string | null {
   const city = squash(address.city ?? '');
   const state = squash(address.state ?? '').toUpperCase();
   const zip = squash(address.zip ?? '');
-  const line1 = unit && !street.toLowerCase().includes(unit.toLowerCase()) ? `${street} ${unit}` : street;
+  const line1 = unit && !endsWithUnit(street, unit) ? `${street} ${unit}` : street;
   const stateZip = [state, zip].filter(Boolean).join(' ');
   return [line1, city, stateZip].filter(Boolean).join(', ');
 }

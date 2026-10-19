@@ -62,6 +62,15 @@ describe('field cleanup', () => {
     );
   });
 
+  it('keeps a unit whose text only appears inside the street', () => {
+    const base = { city: 'Waco', state: 'TX', zip: '76701', confidence: 'high' as const };
+    expect(joinAddress({ ...base, street: '1205 Southwood Dr', unit: '2' })).toBe('1205 Southwood Dr 2, Waco, TX 76701');
+    expect(joinAddress({ ...base, street: '4521 Oak Blvd', unit: 'B' })).toBe('4521 Oak Blvd B, Waco, TX 76701');
+    expect(joinAddress({ ...base, street: '2 Main St', unit: '2' })).toBe('2 Main St 2, Waco, TX 76701');
+    expect(joinAddress({ ...base, street: '9 Oak St Apt 2', unit: '2' })).toBe('9 Oak St Apt 2, Waco, TX 76701');
+    expect(joinAddress({ ...base, street: '9 Oak St #2', unit: '#2' })).toBe('9 Oak St #2, Waco, TX 76701');
+  });
+
   it('keeps only real calendar days', () => {
     expect(cleanIsoDate('2026-10-02')).toBe('2026-10-02');
     expect(cleanIsoDate('2026-02-30')).toBeNull();
