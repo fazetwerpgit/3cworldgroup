@@ -90,6 +90,33 @@ describe('PullToRefresh', () => {
     expect(content().style.transform).toBe('');
   });
 
+  it('settles a pull when a second finger lands mid-pull', async () => {
+    await act(async () => {
+      touch('touchstart', 0);
+      touch('touchmove', 20);
+      touch('touchmove', 120);
+    });
+    expect(content().style.transform).toContain('translate3d');
+    await act(async () => {
+      // Second finger down: touchstart with two touches.
+      const event = new Event('touchstart', { bubbles: true, cancelable: true });
+      const points = [
+        { clientX: 100, clientY: 120 },
+        { clientX: 200, clientY: 40 },
+      ];
+      Object.defineProperty(event, 'touches', { value: points });
+      Object.defineProperty(event, 'changedTouches', { value: [points[1]] });
+      content().dispatchEvent(event);
+      touch('touchend', 120);
+    });
+    expect(state()).not.toBe('refreshing');
+    await act(async () => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(state()).toBe('idle');
+    expect(content().style.transform).toBe('');
+  });
+
   it('attaches the blocking touchmove only for a touch at the top', async () => {
     const scroller = document.getElementById('scroller')!;
     const add = vi.spyOn(scroller, 'addEventListener');

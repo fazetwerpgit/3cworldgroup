@@ -145,6 +145,17 @@ export function PullToRefresh({
     });
 
     const onStart = (event: TouchEvent) => {
+      // A second finger landing mid-pull ends the pull: put the content back
+      // (as touchcancel does), or it stays translated with nothing to settle it.
+      if (pulling) {
+        start = null;
+        pulling = false;
+        armed = false;
+        distance = 0;
+        listenMoves(false);
+        settle();
+        return;
+      }
       start = null;
       pulling = false;
       armed = false;
