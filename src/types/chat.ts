@@ -1,4 +1,4 @@
-import { isManagementRole, PlatformRole, FieldRole, MANAGEMENT_FIELD_ROLES } from './auth';
+import { isManagementRole, isSolarRole, PlatformRole, FieldRole, MANAGEMENT_FIELD_ROLES } from './auth';
 
 export type ChatChannelAudience = 'all' | 'field' | 'managers' | 'platform';
 
@@ -112,14 +112,18 @@ export function getChatChannel(channelId: string): ChatChannel | undefined {
   return CHAT_CHANNELS.find((channel) => channel.id === channelId);
 }
 
+// A solar role (users/{uid}.solarRole) is a third way into the company-wide
+// ('all') channels: a solar-only rep has no role or fieldRole. It never reaches
+// the fiber field, managers or platform channels.
 export function canAccessChatChannel(
   channel: ChatChannel,
   role?: PlatformRole,
-  fieldRole?: FieldRole
+  fieldRole?: FieldRole,
+  solarRole?: unknown
 ): boolean {
   if (!channel.active) return false;
   if (isManagementRole(role)) return true;
-  if (channel.audience === 'all') return !!role || !!fieldRole;
+  if (channel.audience === 'all') return !!role || !!fieldRole || isSolarRole(solarRole);
   if (channel.audience === 'field') return !!fieldRole;
   if (channel.audience === 'managers') {
     return fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false;
@@ -130,9 +134,10 @@ export function canAccessChatChannel(
 
 export function getChatChannelsForUser(
   role?: PlatformRole,
-  fieldRole?: FieldRole
+  fieldRole?: FieldRole,
+  solarRole?: unknown
 ): ChatChannel[] {
   return CHAT_CHANNELS.filter((channel) =>
-    canAccessChatChannel(channel, role, fieldRole)
+    canAccessChatChannel(channel, role, fieldRole, solarRole)
   ).sort((a, b) => a.order - b.order);
 }

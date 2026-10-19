@@ -65,7 +65,7 @@ async function checkChannel(channelId: string, user: ChatUser): Promise<NextResp
   if (!toChatChannel(snap.id, data)) {
     return NextResponse.json({ error: 'Unknown chat channel' }, { status: 404 });
   }
-  if (!userCanAccessChannelDoc(data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, demoAccount: user.demoAccount, email: user.email })) {
+  if (!userCanAccessChannelDoc(data, { uid: user.uid, role: user.role, fieldRole: user.fieldRole, solarRole: user.solarRole, demoAccount: user.demoAccount, email: user.email })) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
   return null;

@@ -270,6 +270,30 @@ describe('canAccessChatChannel', () => {
   });
 });
 
+describe('canAccessChatChannel — solar roles', () => {
+  const at = (audience: ChatChannel['audience']): ChatChannel => ({ id: audience, name: audience, description: '', audience, order: 0, active: true });
+
+  it('lets a solar-only rep into the company-wide channels and nowhere else', () => {
+    expect(canAccessChatChannel(at('all'), undefined, undefined, 'entry_canvasser')).toBe(true);
+    expect(canAccessChatChannel(at('field'), undefined, undefined, 'entry_canvasser')).toBe(false);
+    expect(canAccessChatChannel(at('managers'), undefined, undefined, 'sales_director')).toBe(false);
+    expect(canAccessChatChannel(at('platform'), undefined, undefined, 'sales_director')).toBe(false);
+  });
+
+  it('ignores an unknown solar role value', () => {
+    expect(canAccessChatChannel(at('all'), undefined, undefined, 'astronaut')).toBe(false);
+    expect(canAccessChatChannel(at('all'), undefined, undefined, undefined)).toBe(false);
+  });
+
+  it('applies through the channel doc gate, the membership sync and the demo rule', () => {
+    const general = { id: 'general', name: 'General', audience: 'all', order: 0, active: true };
+    expect(userCanAccessChannelDoc(general, { uid: 's1', solarRole: 'virtual_closer', demoAccount: false })).toBe(true);
+    expect(userCanAccessChannelDoc(general, { uid: 's1', solarRole: 'virtual_closer', demoAccount: true })).toBe(false);
+    expect(belongsInChannelDoc(general, 's1', { status: 'active', solarRole: 'virtual_closer' })).toBe(true);
+    expect(belongsInChannelDoc(general, 's1', { status: 'active' })).toBe(false);
+  });
+});
+
 describe('userCanAccessChannelDoc — demo accounts', () => {
   const custom = { id: 'leads', name: 'Leads', audience: 'managers', order: 5, active: true, extraMemberIds: ['demo', 'r1'] };
   const general = { id: 'general', name: 'General', audience: 'all', order: 0, active: true };

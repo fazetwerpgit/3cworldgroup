@@ -73,10 +73,11 @@ export function createChannelId(name: string, existingIds: Iterable<string> = []
 
 export function getChatChannelMembershipForUser(
   role?: PlatformRole,
-  fieldRole?: FieldRole
+  fieldRole?: FieldRole,
+  solarRole?: unknown
 ): ChatChannelMembership {
   const channels = CHAT_CHANNELS.filter((channel) =>
-    canAccessChatChannel(channel, role, fieldRole)
+    canAccessChatChannel(channel, role, fieldRole, solarRole)
   ).sort((a, b) => a.order - b.order);
 
   return {
@@ -117,7 +118,7 @@ export function readExtraMemberIds(data: FirebaseFirestore.DocumentData): string
 // extraMemberIds or memberIds.
 export function userCanAccessChannelDoc(
   data: FirebaseFirestore.DocumentData,
-  identity: { uid: string; role?: PlatformRole; fieldRole?: FieldRole; demoAccount: boolean; email?: string | null }
+  identity: { uid: string; role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown; demoAccount: boolean; email?: string | null }
 ): boolean {
   const sandbox = isDemoSandboxChannel(data);
   if (identity.demoAccount && !sandbox) return false;
@@ -128,7 +129,7 @@ export function userCanAccessChannelDoc(
   // pre-task behavior where an inactive channel 403'd even admins).
   if (!channel || !channel.active) return false;
   if (sandbox) return identity.demoAccount || isSandboxStaff(identity.uid, identity.email);
-  if (canAccessChatChannel(channel, identity.role, identity.fieldRole)) return true;
+  if (canAccessChatChannel(channel, identity.role, identity.fieldRole, identity.solarRole)) return true;
   return readExtraMemberIds(data).includes(identity.uid);
 }
 
@@ -164,7 +165,7 @@ export function belongsInChannelDoc(
   if (!channel) return false;
   const { role, fieldRole } = resolveRoles(userData.role, userData.fieldRole);
   return (
-    canAccessChatChannel({ ...channel, active: true }, role, fieldRole) ||
+    canAccessChatChannel({ ...channel, active: true }, role, fieldRole, userData.solarRole) ||
     readExtraMemberIds(channelData).includes(uid)
   );
 }
@@ -202,9 +203,9 @@ export async function getMemberIdsForAudience(
     .map((doc) => {
       const data = doc.data();
       const { role, fieldRole } = resolveRoles(data.role, data.fieldRole);
-      return { uid: doc.id, role, fieldRole };
+      return { uid: doc.id, role, fieldRole, solarRole: data.solarRole };
     })
-    .filter((user) => canAccessChatChannel(channel, user.role, user.fieldRole))
+    .filter((user) => canAccessChatChannel(channel, user.role, user.fieldRole, user.solarRole))
     .map((user) => user.uid);
 }
 

@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
         uid: user.uid,
         role: user.role,
         fieldRole: user.fieldRole,
+        solarRole: user.solarRole,
         demoAccount: user.demoAccount,
         email: user.email,
       })

@@ -159,7 +159,7 @@ export async function DELETE(
     if (userSnap.exists) {
       const userData = userSnap.data() ?? {};
       const { role, fieldRole } = resolveRoles(userData.role, userData.fieldRole);
-      audienceDerived = canAccessChatChannel({ ...channel, active: true }, role, fieldRole);
+      audienceDerived = canAccessChatChannel({ ...channel, active: true }, role, fieldRole, userData.solarRole);
     }
 
     const updates: Record<string, unknown> = {

@@ -43,6 +43,7 @@ export function shouldPushChatRecipient(
     uid,
     role,
     fieldRole,
+    solarRole: userData.solarRole,
     demoAccount: isDemoAccount(userData),
     email: typeof userData.email === 'string' ? userData.email : typeof userData.Email === 'string' ? userData.Email : null,
   });
