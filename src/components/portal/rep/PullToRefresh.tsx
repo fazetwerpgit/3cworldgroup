@@ -53,6 +53,8 @@ export function PullToRefresh({
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
+    // The node to reset on teardown, as it was when the effect ran (the ref may be gone by then).
+    const contentAtStart = contentRef.current;
     let start: { x: number; y: number } | null = null;
     let pulling = false;
     let armed = false;
@@ -215,10 +217,9 @@ export function PullToRefresh({
       scroller.removeEventListener('touchstart', onStart);
       scroller.removeEventListener('touchend', onEnd);
       scroller.removeEventListener('touchcancel', onEnd);
-      const content = contentRef.current;
-      if (content) {
-        content.style.transition = '';
-        content.style.transform = '';
+      if (contentAtStart) {
+        contentAtStart.style.transition = '';
+        contentAtStart.style.transform = '';
       }
     };
   }, [scrollerRef, contentRef]);
