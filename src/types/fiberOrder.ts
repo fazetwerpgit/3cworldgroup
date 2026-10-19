@@ -147,7 +147,24 @@ export interface FiberReportImport {
   carrierNotices?: CarrierNoticeCounts | null;
   overdueAlerts?: OverdueAlertCounts | null;
   unloggedOrderNudges?: UnloggedOrderNudgeCounts | null;
+  /**
+   * How far the import got. Written first as 'started', then after the upsert
+   * ('stored') and after each follow-up, so a run cut off by the time limit
+   * still says where it stopped. Absent on logs from before this field.
+   */
+  stage?: FiberReportImportStage;
+  /** ISO time the last stage was written. */
+  stageAt?: string;
 }
+
+export type FiberReportImportStage =
+  | 'started'
+  | 'stored'
+  | 'installDateSync'
+  | 'carrierNotices'
+  | 'overdueAlerts'
+  | 'unloggedOrderNudges'
+  | 'done';
 
 export interface FiberStatusResponse {
   scope: 'own' | 'all';

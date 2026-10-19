@@ -7,20 +7,15 @@ import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
 import { closeHandoffs, handoffOwner, readHandoffs } from '@/lib/fiberReport/dealerHandoff';
 import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
-import { syncInstallDatesFromOrders, type OrderSale } from '@/lib/sales/installDateSync';
-import { readStoredOrders, sendCarrierNotices } from '@/lib/fiberReport/carrierNotices';
-import { runOverdueInstallAlerts } from '@/lib/alerts/installOverdueAlerts';
-import { runUnloggedOrderNudges } from '@/lib/alerts/unloggedOrderNudges';
-import type {
-  CarrierNoticeCounts,
-  FiberOrder,
-  FiberReportImport,
-  InstallDateSyncCounts,
-  OverdueAlertCounts,
-  UnloggedOrderNudgeCounts,
-} from '@/types/fiberOrder';
+import { readStoredOrders } from '@/lib/fiberReport/carrierNotices';
+import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
+import { runReportFollowUps, type FollowUpResult } from '@/lib/fiberReport/reportFollowUps';
+import type { FiberOrder, FiberReportImport, FiberReportImportStage } from '@/types/fiberOrder';
 
-export const maxDuration = 60;
+// The orders upsert, then the follow-ups (each reads users, sales and orders).
+// Fluid compute allows 300 s; the import log is written progressively anyway
+// (stage), so a run cut off still records lastReportAt and how far it got.
+export const maxDuration = 300;
 export const runtime = 'nodejs';
 
 type InboundAttachment = {
@@ -141,6 +136,9 @@ export async function POST(request: NextRequest) {
   let filename = '';
   let fromEmail = '';
   let subject = '';
+  // The import log doc, once the report has claimed its stamp: written first
+  // as 'started' and updated as each stage lands.
+  let logRef: FirebaseFirestore.DocumentReference | null = null;
 
   try {
     body = (await request.json()) as InboundPayload;
@@ -197,6 +195,18 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json({ ok: true, skipped: 'older_report' });
     }
+
+    // Started marker: if the function is cut off anywhere below, the log
+    // still shows this report arrived and how far it got (stage).
+    logRef = adminDb.collection('fiberReportImports').doc();
+    await logRef.set({
+      ...importLog(receivedAt, filename, fromEmail, subject, { rowCounts: parsed.rowCounts }),
+      stage: 'started',
+      stageAt: new Date().toISOString(),
+    });
+    const stageLog = async (stage: FiberReportImportStage, values: Partial<FiberReportImport>) => {
+      await logRef!.set({ ...values, stage, stageAt: new Date().toISOString() }, { merge: true });
+    };
 
     const mapSnapshot = await adminDb.collection('config').doc('fiberRepMap').get();
     const mappedDealerIds: Record<string, string> = {
@@ -266,69 +276,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // The orders are stored, so the report is safe. Everything below is a
-    // follow-up: the carrier's date is pushed onto the matching sales and the
-    // reps are told. It runs AFTER the upsert and inside its own try — a
-    // failure here must not fail a report that already landed, or the next
-    // delivery would be the only way to recover data we already have.
-    let installDateSync: InstallDateSyncCounts | null = null;
-    let carrierNotices: CarrierNoticeCounts | null = null;
-    let overdueAlerts: OverdueAlertCounts | null = null;
-    let unloggedOrderNudges: UnloggedOrderNudgeCounts | null = null;
-    // A newer report may have claimed the stamp while this one was upserting.
-    // Its sync and notices are the ones that count; running this older one's
-    // after them would move dates back and tell reps twice.
-    if (!superseded) superseded = isOlderReport(stamp, loadedStamp((await statusRef.get()).data()));
-    if (superseded) {
-      console.log(`[inbound-report] a newer report landed meanwhile; skipped the sync for (sent ${stamp.sentAt}, as of ${stamp.asOf})`);
-    } else {
-      let orderSales = new Map<string, OrderSale>();
-      try {
-        const { changes, orderSales: linked, ...counts } = await syncInstallDatesFromOrders({ orders, now: new Date() });
-        installDateSync = counts;
-        orderSales = linked;
-        if (changes.length) {
-          console.log(`[inbound-report] moved ${changes.length} install date(s) from the report`);
-        }
-        if (counts.orderNumbersFilled || counts.orderNumberSkippedConflict) {
-          console.log(
-            `[inbound-report] filled ${counts.orderNumbersFilled} order number(s) from the report; ${counts.orderNumberSkippedConflict} left empty (number already on another live sale, or another rep's row)`
-          );
-        }
-      } catch (error) {
-        console.error('[inbound-report] install date sync failed', error);
-      }
-
-      // Missed installs, carrier cancels and disconnects, told to the rep once.
-      if (storedOrders) {
-        try {
-          carrierNotices = await sendCarrierNotices({ orders, stored: storedOrders, orderSales, now: new Date() });
-        } catch (error) {
-          console.error('[inbound-report] carrier notices failed', error);
-        }
-      }
-
-      // Installs still open 3+ days past their day: the rep on day 3 and then
-      // weekly, the owners once a day. Read after the date sync, so a sale it
-      // just moved to a future day is not told. Once per sale per day however
-      // many times the report is delivered (claims in installOverdueAlerts).
-      try {
-        overdueAlerts = (await runOverdueInstallAlerts({ db: adminDb, now: new Date() })).counts;
-      } catch (error) {
-        console.error('[inbound-report] overdue install alerts failed', error);
-      }
-
-      // Live carrier orders a rep never logged (the board's "Not in the
-      // portal", last 30 days): the rep is told once per order, one push per
-      // rep. Read after the date sync filled order numbers, so a sale it just
-      // joined is not told (claims in unloggedOrderNudges).
-      try {
-        unloggedOrderNudges = (await runUnloggedOrderNudges({ db: adminDb, now: new Date() })).counts;
-      } catch (error) {
-        console.error('[inbound-report] unlogged order nudges failed', error);
-      }
-    }
-
+    // The orders are stored, so the report is safe: record it NOW, before the
+    // follow-ups, so freshness and the orders cache key move even if a
+    // follow-up runs past the time limit.
     await statusRef.set(
       {
         lastReportAt: receivedAt,
@@ -337,26 +287,34 @@ export async function POST(request: NextRequest) {
       },
       { merge: true }
     );
-    await writeImportLog(
-      importLog(receivedAt, filename, fromEmail, subject, {
-        rowCounts: parsed.rowCounts,
-        upserted: orders.length,
-        matchedReps,
-        unmatchedRepNames: [...unmatchedRepNames],
-        error: null,
-        installDateSync,
-        carrierNotices,
-        overdueAlerts,
-        unloggedOrderNudges,
-      })
-    );
+    // Every instance's orders cache misses on the next read; the board rebuilds.
+    await invalidateFiberOrdersCache();
+    await stageLog('stored', { upserted: orders.length, matchedReps, unmatchedRepNames: [...unmatchedRepNames] });
 
-    return NextResponse.json({ ok: true, upserted: orders.length, installDateSync });
+    // Everything below is a follow-up: the carrier's date is pushed onto the
+    // matching sales and the reps are told (lib/fiberReport/reportFollowUps).
+    // Each step is fail-soft and logs its stage as it lands — a failure here
+    // must not fail a report that already landed, or the next delivery would
+    // be the only way to recover data we already have.
+    let followUps: FollowUpResult | null = null;
+    // A newer report may have claimed the stamp while this one was upserting.
+    // Its sync and notices are the ones that count; running this older one's
+    // after them would move dates back and tell reps twice.
+    if (!superseded) superseded = isOlderReport(stamp, loadedStamp((await statusRef.get()).data()));
+    if (superseded) {
+      console.log(`[inbound-report] a newer report landed meanwhile; skipped the sync for (sent ${stamp.sentAt}, as of ${stamp.asOf})`);
+      await stageLog('done', {});
+    } else {
+      followUps = await runReportFollowUps({ db: adminDb, orders, storedOrders, progress: stageLog });
+    }
+
+    return NextResponse.json({ ok: true, upserted: orders.length, installDateSync: followUps?.installDateSync ?? null });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[inbound-report]', message);
     try {
-      await writeImportLog(importLog(receivedAt, filename, fromEmail, subject, { error: message }));
+      if (logRef) await logRef.set({ error: message, stageAt: new Date().toISOString() }, { merge: true });
+      else await writeImportLog(importLog(receivedAt, filename, fromEmail, subject, { error: message }));
     } catch (logError) {
       console.error('[inbound-report] failed to write import log', logError);
     }

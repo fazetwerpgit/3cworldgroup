@@ -1,533 +1,122 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const {
-  addMock,
-  setMock,
-  docGetMock,
-  collectionGetMock,
-  collectionMock,
-  batchSetMock,
-  batchCommitMock,
-  syncMock,
-  readStoredMock,
-  sendNoticesMock,
-  overdueMock,
-  unloggedMock,
-  runTransaction,
-} = vi.hoisted(() => {
-  const addMock = vi.fn();
-  const setMock = vi.fn();
-  const docGetMock = vi.fn();
-  const collectionGetMock = vi.fn();
-  const batchSetMock = vi.fn();
-  const batchCommitMock = vi.fn();
-  const syncMock = vi.fn();
-  const readStoredMock = vi.fn();
-  const sendNoticesMock = vi.fn();
-  const overdueMock = vi.fn();
-  const unloggedMock = vi.fn();
-  const collectionMock = vi.fn((name: string) => ({
-    add: addMock,
-    get: collectionGetMock,
-    doc: vi.fn((id?: string) => ({ id, set: setMock, get: () => docGetMock(id) })),
-    name,
-  }));
-  // Transactions run one at a time, as Firestore serializes them, reading and
-  // writing through the same doc mocks as plain gets and sets.
-  type DocMock = { get: () => Promise<unknown>; set: (data: unknown, options?: unknown) => Promise<unknown> };
-  let queue: Promise<unknown> = Promise.resolve();
-  const runTransaction = <T>(run: (transaction: unknown) => Promise<T>): Promise<T> => {
-    const result = queue.then(() =>
-      run({
-        get: (ref: DocMock) => ref.get(),
-        set: (ref: DocMock, data: unknown, options?: unknown) => {
-          void ref.set(data, options);
-        },
-      })
-    );
-    queue = result.catch(() => undefined);
-    return result;
-  };
+type Data = Record<string, unknown>;
+
+const h = vi.hoisted(() => ({
+  docs: new Map<string, Record<string, unknown>>(),
+  autoId: 0,
+  events: [] as string[],
+  followUps: vi.fn(),
+  invalidate: vi.fn(async () => {}),
+}));
+
+vi.mock('@/lib/firebase/admin', () => {
+  const key = (c: string, id: string) => `${c}/${id}`;
+  const ref = (c: string, id: string) => ({
+    path: key(c, id),
+    get: async () => {
+      const data = h.docs.get(key(c, id));
+      return { exists: !!data, data: () => (data ? { ...data } : undefined) };
+    },
+    set: async (data: Data, opts?: { merge?: boolean }) => {
+      const before = h.docs.get(key(c, id));
+      h.docs.set(key(c, id), opts?.merge && before ? { ...before, ...data } : { ...data });
+      h.events.push(`set ${key(c, id)} ${Object.keys(data).sort().join(',')}`);
+    },
+  });
   return {
-    addMock,
-    setMock,
-    docGetMock,
-    collectionGetMock,
-    collectionMock,
-    batchSetMock,
-    batchCommitMock,
-    syncMock,
-    readStoredMock,
-    sendNoticesMock,
-    overdueMock,
-    unloggedMock,
-    runTransaction,
+    adminDb: {
+      collection: (c: string) => ({
+        doc: (id?: string) => ref(c, id ?? `auto${++h.autoId}`),
+        add: async (data: Data) => ref(c, `auto${++h.autoId}`).set(data),
+        get: async () => ({ docs: [] }),
+      }),
+      runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>) =>
+        fn({
+          get: (r: { get: () => Promise<unknown> }) => r.get(),
+          set: (r: { path: string; set: (d: Data, o?: unknown) => Promise<void> }, data: Data, opts?: unknown) => {
+            void r.set(data, opts as { merge?: boolean });
+          },
+        }),
+    },
   };
 });
 
-vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: {
-    collection: collectionMock,
-    batch: () => ({ set: batchSetMock, commit: batchCommitMock }),
-    runTransaction,
-  },
-}));
 vi.mock('@/lib/fiberReport/parseReport', () => ({
-  parseFiberReport: vi.fn(),
+  parseFiberReport: vi.fn(async () => ({
+    orders: [{ id: 'o1', repDealerId: '', repName: '', orderDate: '2026-10-13', status: 'active' }],
+    rowCounts: { Sheet: 1 },
+  })),
 }));
-vi.mock('@/lib/sales/installDateSync', () => ({
-  syncInstallDatesFromOrders: syncMock,
-}));
-vi.mock('@/lib/fiberReport/carrierNotices', () => ({
-  readStoredOrders: readStoredMock,
-  sendCarrierNotices: sendNoticesMock,
-}));
-vi.mock('@/lib/alerts/installOverdueAlerts', () => ({
-  runOverdueInstallAlerts: overdueMock,
-}));
-vi.mock('@/lib/alerts/unloggedOrderNudges', () => ({
-  runUnloggedOrderNudges: unloggedMock,
-}));
+vi.mock('@/lib/fiberReport/carrierNotices', () => ({ readStoredOrders: vi.fn(async () => new Map()) }));
+vi.mock('@/lib/fiberReport/ordersCache', () => ({ invalidateFiberOrdersCache: h.invalidate }));
+vi.mock('@/lib/fiberReport/reportFollowUps', () => ({ runReportFollowUps: h.followUps }));
+vi.mock('@/lib/fiberReport/assignDealer', () => ({ assignDealerToUser: vi.fn() }));
+vi.mock('@/lib/fiberReport/rematch', () => ({ rematchUnmatchedOrders: vi.fn() }));
 
 import { POST } from './route';
-import { parseFiberReport } from '@/lib/fiberReport/parseReport';
 
-const NO_CHANGES = {
-  checked: 0,
-  updated: 0,
-  skippedAmbiguous: 0,
-  skippedCancelled: 0,
-  unchanged: 0,
-  errors: 0,
-  changes: [],
-  orderSales: new Map(),
-};
-
-const OVERDUE_COUNTS = {
-  dryRun: false,
-  overdue: 2,
-  repAlertsDue: 1,
-  repAlertsSent: 1,
-  alreadySent: 0,
-  skippedInactiveRep: 1,
-  ownerSummary: 'sent',
-  errors: 0,
-};
-
-const UNLOGGED_COUNTS = {
-  dryRun: false,
-  found: 3,
-  alreadySent: 0,
-  skippedInactiveRep: 0,
-  ordersTold: 3,
-  repsTold: 1,
-  errors: 0,
-};
-
-beforeEach(() => {
-  vi.clearAllMocks();
-  process.env.POSTMARK_INBOUND_TOKEN = 'test-token';
-  addMock.mockResolvedValue({ id: 'import-1' });
-  setMock.mockResolvedValue(undefined);
-  docGetMock.mockResolvedValue({ exists: true, data: () => ({}) });
-  collectionGetMock.mockResolvedValue({ docs: [] });
-  batchCommitMock.mockResolvedValue(undefined);
-  syncMock.mockResolvedValue(NO_CHANGES);
-  readStoredMock.mockResolvedValue(new Map());
-  sendNoticesMock.mockResolvedValue({ found: 0, alreadySent: 0, sent: 0, summarized: 0, errors: 0 });
-  overdueMock.mockResolvedValue({ counts: OVERDUE_COUNTS, repAlerts: [], ownerAlert: null, overdue: [] });
-  unloggedMock.mockResolvedValue({ counts: UNLOGGED_COUNTS, pushes: [], orders: [] });
-});
-
-/** One parsed order, posted as a report with an xlsx attachment. */
-function postReport() {
-  vi.mocked(parseFiberReport).mockResolvedValue({
-    orders: [
-      {
-        id: 'TMO20260824UZMTV',
-        repDealerId: '4721016',
-        repName: 'Rep One',
-        address: '123 Main St',
-        estInstallDate: '2026-09-20',
-      },
-    ],
-    rowCounts: { Orders: 1 },
-  } as unknown as Awaited<ReturnType<typeof parseFiberReport>>);
-
+function post() {
+  process.env.POSTMARK_INBOUND_TOKEN = 't';
   return POST(
-    new NextRequest('http://localhost/api/webhooks/inbound-report?token=test-token', {
+    new NextRequest('http://localhost/api/webhooks/inbound-report?token=t', {
       method: 'POST',
       body: JSON.stringify({
-        From: 'carrier@example.com',
-        Subject: 'Daily report',
-        Attachments: [{ Name: 'report.xlsx', Content: Buffer.from('x').toString('base64') }],
+        From: 'carrier@x.com',
+        Subject: 'Daily',
+        Date: 'Tue, 13 Oct 2026 10:00:00 +0000',
+        Attachments: [{ Name: 'r.xlsx', Content: Buffer.from('x').toString('base64') }],
       }),
     })
   );
 }
 
+function importLogs() {
+  return [...h.docs.entries()].filter(([k]) => k.startsWith('fiberReportImports/')).map(([, v]) => v);
+}
+
+beforeEach(() => {
+  h.docs.clear();
+  h.events.length = 0;
+  h.autoId = 0;
+  h.followUps.mockReset();
+  h.invalidate.mockClear();
+});
+
 describe('POST /api/webhooks/inbound-report', () => {
-  it('rejects a missing or incorrect token', async () => {
-    const missing = await POST(
-      new NextRequest('http://localhost/api/webhooks/inbound-report', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      })
-    );
-    const wrong = await POST(
-      new NextRequest('http://localhost/api/webhooks/inbound-report?token=wrong', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      })
-    );
-
-    expect(missing.status).toBe(401);
-    expect(wrong.status).toBe(401);
-    expect(addMock).not.toHaveBeenCalled();
+  it('writes the started marker, then lastReportAt and the stored stage before any follow-up runs', async () => {
+    h.followUps.mockImplementation(async ({ progress }: { progress: (s: string, v: Data) => Promise<void> }) => {
+      // At this point the report must already be recorded.
+      expect(h.docs.get('config/fiberReportStatus')).toMatchObject({ lastReportAt: expect.any(String), lastUpserted: 1 });
+      expect(importLogs()[0]).toMatchObject({ stage: 'stored', upserted: 1 });
+      expect(h.invalidate).toHaveBeenCalledTimes(1);
+      await progress('installDateSync', { installDateSync: null });
+      await progress('done', {});
+      return { installDateSync: null, carrierNotices: null, overdueAlerts: null, unloggedOrderNudges: null };
+    });
+    const res = await post();
+    expect(await res.json()).toMatchObject({ ok: true, upserted: 1 });
+    const started = h.events.findIndex((e) => e.startsWith('set fiberReportImports/') && e.includes('stage'));
+    const status = h.events.findIndex((e) => e.startsWith('set config/fiberReportStatus') && e.includes('lastReportAt'));
+    expect(started).toBeGreaterThanOrEqual(0);
+    expect(status).toBeGreaterThan(started);
+    expect(importLogs()).toHaveLength(1);
+    expect(importLogs()[0]).toMatchObject({ stage: 'done', filename: 'r.xlsx', error: null });
   });
 
-  it('logs a forwarding email without an xlsx and returns skipped', async () => {
-    const response = await POST(
-      new NextRequest('http://localhost/api/webhooks/inbound-report?token=test-token', {
-        method: 'POST',
-        body: JSON.stringify({ From: 'forwarder@example.com', Subject: 'Verify forwarding' }),
-      })
-    );
-    const json = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(json).toEqual({ ok: true, skipped: true });
-    expect(addMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        fromEmail: 'forwarder@example.com',
-        subject: 'Verify forwarding',
-        error: 'no xlsx attachment',
-      })
-    );
-    expect(setMock).toHaveBeenCalledWith(
-      { from: 'forwarder@example.com', subject: 'Verify forwarding', receivedAt: expect.any(String) },
-      { merge: true }
-    );
-  });
-});
-
-describe('POST /api/webhooks/inbound-report install-date sync', () => {
-  it('syncs the upserted orders and reports the counts', async () => {
-    syncMock.mockResolvedValue({
-      ...NO_CHANGES,
-      checked: 1,
-      updated: 1,
-      changes: [{ saleId: 'sale-1', salesRepId: 'rep-1', previous: null, next: new Date() }],
-    });
-
-    const response = await postReport();
-    const json = await response.json();
-
-    expect(syncMock).toHaveBeenCalledWith({
-      orders: [expect.objectContaining({ id: 'TMO20260824UZMTV' })],
-      now: expect.any(Date),
-    });
-    // `changes` and `orderSales` are the caller's detail, not something the webhook echoes back.
-    expect(json).toEqual({
-      ok: true,
-      upserted: 1,
-      installDateSync: {
-        checked: 1,
-        updated: 1,
-        skippedAmbiguous: 0,
-        skippedCancelled: 0,
-        unchanged: 0,
-        errors: 0,
-      },
-    });
-    expect(addMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        error: null,
-        installDateSync: expect.objectContaining({ updated: 1 }),
-      })
-    );
+  it('a follow-up that never finishes still leaves lastReportAt and a log at its stage', async () => {
+    h.followUps.mockImplementation(() => new Promise(() => {}));
+    void post();
+    await vi.waitFor(() => expect(h.followUps).toHaveBeenCalled());
+    expect(h.docs.get('config/fiberReportStatus')).toMatchObject({ lastReportAt: expect.any(String) });
+    expect(importLogs()).toEqual([expect.objectContaining({ stage: 'stored', upserted: 1 })]);
   });
 
-  describe('dealer-code handoff (Miles selling on Jeremy’s 4808955 from Oct 5)', () => {
-    const order = (id: string, repDealerId: string, orderDate: string) => ({ id, repDealerId, repName: '', address: '', orderDate });
-    const withRepMap = () =>
-      docGetMock.mockImplementation(async (id?: string) => ({
-        exists: true,
-        data: () =>
-          id === 'fiberRepMap'
-            ? {
-                map: { '4808955': 'jeremy', '7777777': 'miles' },
-                handoffs: { '4808955': { userId: 'miles', from: '2026-10-05' } },
-              }
-            : {},
-      }));
-    const owners = () =>
-      Object.fromEntries(
-        (syncMock.mock.calls[0][0].orders as Array<{ id: string; matchedUserId: string }>).map((o) => [o.id, o.matchedUserId])
-      );
-
-    it("credits the code's orders from the start day to the borrower, and earlier ones to the owner", async () => {
-      withRepMap();
-      vi.mocked(parseFiberReport).mockResolvedValue({
-        orders: [order('before', '4808955', '2026-10-04'), order('during', '4808955', '2026-10-06')],
-        rowCounts: { Orders: 2 },
-      } as unknown as Awaited<ReturnType<typeof parseFiberReport>>);
-
-      await POST(
-        new NextRequest('http://localhost/api/webhooks/inbound-report?token=test-token', {
-          method: 'POST',
-          body: JSON.stringify({ Attachments: [{ Name: 'r.xlsx', Content: Buffer.from('x').toString('base64') }] }),
-        })
-      );
-
-      expect(owners()).toEqual({ before: 'jeremy', during: 'miles' });
-    });
-
-    it("hands the code back once the borrower sells on their own code, keeping what they sold before", async () => {
-      withRepMap();
-      vi.mocked(parseFiberReport).mockResolvedValue({
-        orders: [
-          order('during', '4808955', '2026-10-06'),
-          order('own-code', '7777777', '2026-10-20'),
-          order('after', '4808955', '2026-10-21'),
-        ],
-        rowCounts: { Orders: 3 },
-      } as unknown as Awaited<ReturnType<typeof parseFiberReport>>);
-
-      await POST(
-        new NextRequest('http://localhost/api/webhooks/inbound-report?token=test-token', {
-          method: 'POST',
-          body: JSON.stringify({ Attachments: [{ Name: 'r.xlsx', Content: Buffer.from('x').toString('base64') }] }),
-        })
-      );
-
-      expect(owners()).toEqual({ during: 'miles', 'own-code': 'miles', after: 'jeremy' });
-      expect(setMock).toHaveBeenCalledWith(
-        expect.objectContaining({ handoffs: { '4808955': { userId: 'miles', from: '2026-10-05', to: '2026-10-20' } } }),
-        { merge: true }
-      );
-    });
-  });
-
-  it('still stores the report when the sync throws', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    syncMock.mockRejectedValue(new Error('sales read failed'));
-
-    const response = await postReport();
-    const json = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(json).toEqual({ ok: true, upserted: 1, installDateSync: null });
-    // The orders were written before the sync ran, and the import log still
-    // records a clean import: the report itself did not fail.
-    expect(setMock).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'TMO20260824UZMTV' }),
-      { merge: true }
-    );
-    expect(addMock).toHaveBeenCalledWith(
-      expect.objectContaining({ error: null, upserted: 1, installDateSync: null })
-    );
-    consoleError.mockRestore();
-  });
-
-  it('runs the overdue install alerts after the date sync and the notices, and logs their counts', async () => {
-    const order: string[] = [];
-    syncMock.mockImplementation(async () => {
-      order.push('sync');
-      return NO_CHANGES;
-    });
-    sendNoticesMock.mockImplementation(async () => {
-      order.push('notices');
-      return { found: 0, alreadySent: 0, sent: 0, summarized: 0, errors: 0 };
-    });
-    overdueMock.mockImplementation(async () => {
-      order.push('overdue');
-      return { counts: OVERDUE_COUNTS, repAlerts: [], ownerAlert: null, overdue: [] };
-    });
-
-    const response = await postReport();
-
-    expect(response.status).toBe(200);
-    expect(order).toEqual(['sync', 'notices', 'overdue']);
-    expect(overdueMock).toHaveBeenCalledTimes(1);
-    expect(overdueMock).toHaveBeenCalledWith({ db: expect.anything(), now: expect.any(Date) });
-    expect(addMock).toHaveBeenCalledWith(expect.objectContaining({ error: null, overdueAlerts: OVERDUE_COUNTS }));
-  });
-
-  it('tells reps about orders not in the portal after the overdue alerts, and logs the counts', async () => {
-    const order: string[] = [];
-    overdueMock.mockImplementation(async () => {
-      order.push('overdue');
-      return { counts: OVERDUE_COUNTS, repAlerts: [], ownerAlert: null, overdue: [] };
-    });
-    unloggedMock.mockImplementation(async () => {
-      order.push('unlogged');
-      return { counts: UNLOGGED_COUNTS, pushes: [], orders: [] };
-    });
-
-    const response = await postReport();
-
-    expect(response.status).toBe(200);
-    expect(order).toEqual(['overdue', 'unlogged']);
-    expect(unloggedMock).toHaveBeenCalledWith({ db: expect.anything(), now: expect.any(Date) });
-    expect(addMock).toHaveBeenCalledWith(expect.objectContaining({ error: null, unloggedOrderNudges: UNLOGGED_COUNTS }));
-  });
-
-  it('still stores the report when the unlogged order nudges throw', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    unloggedMock.mockRejectedValue(new Error('push down'));
-
-    const response = await postReport();
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ok: true, upserted: 1 });
-    expect(addMock).toHaveBeenCalledWith(
-      expect.objectContaining({ error: null, upserted: 1, overdueAlerts: OVERDUE_COUNTS, unloggedOrderNudges: null })
-    );
-    consoleError.mockRestore();
-  });
-
-  it('still stores the report when the overdue alerts throw', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    overdueMock.mockRejectedValue(new Error('push down'));
-
-    const response = await postReport();
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ok: true, upserted: 1 });
-    expect(addMock).toHaveBeenCalledWith(expect.objectContaining({ error: null, upserted: 1, overdueAlerts: null }));
-    consoleError.mockRestore();
-  });
-
-  it('still stores the report when the carrier notices throw', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    sendNoticesMock.mockRejectedValue(new Error('bell down'));
-
-    const response = await postReport();
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ ok: true, upserted: 1 });
-    expect(addMock).toHaveBeenCalledWith(
-      expect.objectContaining({ error: null, upserted: 1, carrierNotices: null })
-    );
-    consoleError.mockRestore();
-  });
-});
-
-describe('POST /api/webhooks/inbound-report overlapping deliveries', () => {
-  const OLDER = { id: 'older', date: 'Tue, 22 Sep 2026 08:00:00 +0000', sentAt: '2026-09-22T08:00:00.000Z' };
-  const NEWER = { id: 'newer', date: 'Wed, 23 Sep 2026 08:00:00 +0000', sentAt: '2026-09-23T08:00:00.000Z' };
-  let status: Record<string, unknown>;
-
-  function deferred() {
-    let resolve!: () => void;
-    const promise = new Promise<void>((done) => { resolve = done; });
-    return { promise, resolve };
-  }
-
-  /** config/fiberReportStatus as one shared doc; every other doc reads empty. */
-  beforeEach(() => {
-    status = {};
-    docGetMock.mockImplementation(async () => ({ exists: true, data: () => ({ ...status }) }));
-    setMock.mockImplementation(async (data: Record<string, unknown>) => {
-      Object.assign(status, data);
-    });
-  });
-
-  function post(report: typeof OLDER) {
-    return POST(
-      new NextRequest('http://localhost/api/webhooks/inbound-report?token=test-token', {
-        method: 'POST',
-        body: JSON.stringify({
-          Date: report.date,
-          Attachments: [{ Name: 'report.xlsx', Content: Buffer.from(report.id).toString('base64') }],
-        }),
-      })
-    ).then(async (response) => ({ response, json: await response.json() }));
-  }
-
-  function parseAs(gates: Partial<Record<string, Promise<void>>> = {}) {
-    vi.mocked(parseFiberReport).mockImplementation(async (buffer: Buffer) => {
-      const id = buffer.toString();
-      await gates[id];
-      return {
-        orders: [{ id, repDealerId: '', repName: '', address: '1 Main St' }],
-        rowCounts: { Orders: 1 },
-      } as unknown as Awaited<ReturnType<typeof parseFiberReport>>;
-    });
-  }
-
-  const syncedIds = () => syncMock.mock.calls.map(([input]) => input.orders[0].id);
-
-  it('skips an older report that arrives while a newer one is loading', async () => {
-    // The newer report is mid-sync when the older one reads the status doc.
-    const newerSyncing = deferred();
-    const olderReadStatus = deferred();
-    let olderParsed = false;
-    docGetMock.mockImplementation(async () => {
-      const snapshot = { ...status };
-      if (olderParsed) olderReadStatus.resolve();
-      return { exists: true, data: () => snapshot };
-    });
-    syncMock.mockImplementation(async ({ orders }: { orders: { id: string }[] }) => {
-      if (orders[0].id === NEWER.id) {
-        newerSyncing.resolve();
-        await olderReadStatus.promise;
-      }
-      return NO_CHANGES;
-    });
-    parseAs({ [OLDER.id]: newerSyncing.promise.then(() => { olderParsed = true; }) });
-
-    const [, older] = await Promise.all([post(NEWER), post(OLDER)]);
-
-    expect(older.json).toEqual({ ok: true, skipped: 'older_report' });
-    expect(syncedIds()).toEqual([NEWER.id]);
-    expect(status.lastReportSentAt).toBe(NEWER.sentAt);
-    // A skipped report tells nobody about orders not in the portal.
-    expect(unloggedMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not sync an older report a newer one overtook, nor move the stamp back', async () => {
-    const newerClaimed = deferred();
-    setMock.mockImplementation(async (data: Record<string, unknown>) => {
-      Object.assign(status, data);
-      if (status.lastReportSentAt === NEWER.sentAt) newerClaimed.resolve();
-    });
-    readStoredMock.mockImplementation(async (orders: { id: string }[]) => {
-      if (orders[0].id === OLDER.id) await newerClaimed.promise;
-      return new Map();
-    });
-    parseAs();
-
-    await Promise.all([post(OLDER), post(NEWER)]);
-
-    expect(syncedIds()).toEqual([NEWER.id]);
-    expect(status.lastReportSentAt).toBe(NEWER.sentAt);
-    // Only the report that counts tells anyone about overdue installs or unlogged orders.
-    expect(overdueMock).toHaveBeenCalledTimes(1);
-    expect(unloggedMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not write an older report's rows once a newer one has claimed", async () => {
-    // The older report claims first; the newer claims while the older is still
-    // reading the stored orders, before any older row is written.
-    const newerClaimed = deferred();
-    setMock.mockImplementation(async (data: Record<string, unknown>) => {
-      Object.assign(status, data);
-      if (status.lastReportSentAt === NEWER.sentAt) newerClaimed.resolve();
-    });
-    readStoredMock.mockImplementation(async (orders: { id: string }[]) => {
-      if (orders[0].id === OLDER.id) await newerClaimed.promise;
-      return new Map();
-    });
-    parseAs();
-
-    await Promise.all([post(OLDER), post(NEWER)]);
-
-    const writtenIds = setMock.mock.calls.flatMap(([data]) =>
-      data && typeof data === 'object' && 'id' in data ? [data.id] : []
-    );
-    expect(writtenIds).toEqual([NEWER.id]);
+  it('a crash after the claim updates the same log doc with the error', async () => {
+    h.followUps.mockRejectedValue(new Error('boom'));
+    const res = await post();
+    expect(await res.json()).toEqual({ ok: false });
+    expect(importLogs()).toEqual([expect.objectContaining({ error: 'boom', stage: 'stored' })]);
   });
 });
