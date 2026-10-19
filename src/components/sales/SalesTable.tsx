@@ -295,8 +295,11 @@ export function SalesTable({
     }
     return map;
   }, [fiberBySale, rates, sales]);
-  // The dashboard's status and payout window per sale, from one frozen "now".
-  const now = useMemo(() => new Date(), []);
+  // The dashboard's status and payout window per sale, from one "now" frozen per
+  // feed: re-read whenever sales or the carrier report arrive, so a resume
+  // refetch after midnight moves a past install day on to installed or missed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the feeds are the trigger, not inputs
+  const now = useMemo(() => new Date(), [sales, fiberOrders]);
   // The day the newest carrier report covers: a later install day waits on it.
   const reportAsOf = fiber?.data?.lastReportAsOf ?? null;
   const statusBySale = useMemo(() => {

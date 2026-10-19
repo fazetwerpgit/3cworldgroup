@@ -181,3 +181,35 @@ describe('SalesTable', () => {
     expect(total.textContent).not.toContain('$135');
   });
 });
+
+describe('SalesTable clock', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('re-reads "now" when the feeds refetch, so a resume after midnight moves a past install day on', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 17, 9, 0, 0));
+    const today = [sale('t', '9 Elm St', 'tfiber-1gig', { saleDate: noon(2026, 10, 10), installDate: noon(2026, 10, 17) })];
+    const show = (sales: Sale[]) =>
+      act(() => {
+        root.render(
+          <SalesTable
+            sales={sales}
+            payView={false}
+            month={{ year: 2026, month: 9 }}
+            payPlan={{ rates: { tfiber: { 'tfiber-1gig': 140 } }, payDelayDays: 0, hasPlan: true }}
+            fiber={{ data: { ...FIBER, orders: [], lastReportAsOf: '2026-10-20' } as FiberStatusResponse, loading: false, error: null }}
+          />
+        );
+      });
+    show(today);
+    const before = container.querySelector<HTMLElement>('[data-part="sale-row"]')!.textContent;
+    // Backgrounded overnight; the resume refetch hands over a fresh sales array.
+    vi.setSystemTime(new Date(2026, 9, 18, 9, 0, 0));
+    show(today.map((s) => ({ ...s })));
+    const after = container.querySelector<HTMLElement>('[data-part="sale-row"]')!.textContent;
+    expect(before).toContain('Installs today');
+    // Moved on with the day, not stuck on a passed "Installs Oct 17".
+    expect(after).toContain('Installed Oct 17');
+    expect(after).not.toContain('Installs Oct 17');
+  });
+});
