@@ -604,3 +604,29 @@ describe('GET /api/portal/sales/[id] — owner viewing as a rep', () => {
     expect(saleGetMock).not.toHaveBeenCalled();
   });
 });
+
+describe('PUT /api/portal/sales/[id] customer text', () => {
+  it('rejects a non-string customer name and writes nothing', async () => {
+    const response = await put({ customerName: 12345 });
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an object in the notes', async () => {
+    const response = await put({ notes: { a: 1 } });
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects an address past its cap', async () => {
+    const response = await put({ customerAddress: 'x'.repeat(501) });
+    expect(response.status).toBe(400);
+    expect(saleUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('stores a cleared field as an empty string', async () => {
+    const response = await put({ customerEmail: null, customerName: 'Pat Doe' });
+    expect(response.status).toBe(200);
+    expect(saleUpdateMock.mock.calls[0][0]).toMatchObject({ customerEmail: '', customerName: 'Pat Doe' });
+  });
+});

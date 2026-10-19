@@ -9,6 +9,7 @@ import { proofPathFields, validateProofPaths } from '@/lib/sales/proofPaths';
 import { chicagoTodayKey, dayKeyAtNoon, parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 import { validateHasInternetPlan, validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { CLIENT_SALE_ID_RE, priceSaleProducts } from '@/lib/sales/pricing';
+import { validateCustomerTextFields } from '@/lib/sales/customerFields';
 import {
   firstName,
   firstNameLastInitial,
@@ -344,6 +345,14 @@ export async function POST(request: NextRequest) {
       clientSaleId = rawClientSaleId;
       const replay = await existingSaleForReplay(clientSaleId, salesRepId);
       if (replay) return replay;
+    }
+
+    // Customer text is stored as typed, but only as text of sane length: every
+    // reader calls string methods on it, so one non-string row would break the
+    // install-status view for every admin.
+    const customerText = validateCustomerTextFields(body);
+    if (!customerText.ok) {
+      return NextResponse.json({ error: customerText.error }, { status: 400 });
     }
 
     // Validate required fields - only address and products are required

@@ -14,6 +14,7 @@ import { proofPathFields, saleProofPaths, validateProofPaths } from '@/lib/sales
 import { loadCarrierOrders, loadRepSales } from '@/lib/sales/carrierSnapshot';
 import { carrierOrderForSale } from '@/lib/sales/installDateSync';
 import { normalizeOrderNumber } from '@/lib/sales/orderNumber';
+import { validateCustomerTextFields } from '@/lib/sales/customerFields';
 
 // GET /api/portal/sales/[id] - Get a single sale (owner or management)
 export async function GET(
@@ -215,10 +216,17 @@ export async function PUT(
       'productSold',
     ] as const;
 
+    // Customer text must be text of sane length, as on create.
+    const customerText = validateCustomerTextFields(body);
+    if (!customerText.ok) {
+      return NextResponse.json({ error: customerText.error }, { status: 400 });
+    }
+
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     for (const field of EDITABLE_FIELDS) {
       if (body[field] !== undefined) updateData[field] = body[field];
     }
+    Object.assign(updateData, customerText.values);
     // Keep the duplicate-check key in step with an edited order number.
     if (updateData.orderNumberOrBtn !== undefined) {
       updateData.orderNumberKey = normalizeOrderNumber(updateData.orderNumberOrBtn);

@@ -192,3 +192,30 @@ describe('POST /api/portal/sales after the write', () => {
     expect((await response.json()).success).toBe(true);
   });
 });
+
+describe('POST /api/portal/sales customer text', () => {
+  it('rejects a non-string customer name and writes nothing', async () => {
+    const response = await POST(post({ ...baseBody, customerName: 12345 }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/customerName/);
+    expect(state.added).toHaveLength(0);
+  });
+
+  it('rejects an object address', async () => {
+    const response = await POST(post({ ...baseBody, customerAddress: { street: '1 Main' } }));
+    expect(response.status).toBe(400);
+    expect(state.added).toHaveLength(0);
+  });
+
+  it('rejects notes past the cap', async () => {
+    const response = await POST(post({ ...baseBody, notes: 'x'.repeat(5001) }));
+    expect(response.status).toBe(400);
+    expect(state.added).toHaveLength(0);
+  });
+
+  it('still stores ordinary text as typed', async () => {
+    const response = await POST(post({ ...baseBody, customerName: 'Pat Doe', customerPhone: '555-0100' }));
+    expect(response.status).toBe(200);
+    expect(state.added[0]).toMatchObject({ customerName: 'Pat Doe', customerPhone: '555-0100' });
+  });
+});
