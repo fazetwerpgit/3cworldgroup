@@ -424,3 +424,40 @@ describe('GET /api/portal/leaderboard for a demo account (App Review)', () => {
     expect(json.recent.map((r: { repName: string }) => r.repName)).toEqual(['Alice Real', 'Bob Real']);
   });
 });
+
+describe('GET /api/portal/leaderboard — row limit bounds', () => {
+  beforeEach(() => vi.setSystemTime(new Date('2026-09-16T17:00:00.000Z')));
+
+  const rep = { ok: true as const, uid: 'r0', name: 'Rep', email: '', isManagement: false, isAdmin: false,
+    isManagerOrAbove: false, isOwner: false, demoAccount: false };
+
+  function seed(count: number) {
+    state.docs = Array.from({ length: count }, (_, i) => ({
+      ...sale('2026-09-15T17:00:00.000Z', `r${i}`),
+      salesRepName: `Rep ${i}`,
+      totalPoints: 1000 - i,
+    }));
+  }
+
+  async function rows(limit: string, caller = rep) {
+    vi.mocked(requireVerifiedRequester).mockResolvedValueOnce(caller);
+    const json = await (await GET(new NextRequest(`http://localhost/api/portal/leaderboard?period=week&limit=${limit}`))).json();
+    return (json.leaderboard as unknown[]).length;
+  }
+
+  it('never lets a rep pull past the 100-row cap with a negative limit', async () => {
+    seed(105);
+    expect(await rows('-1')).toBeLessThanOrEqual(100);
+    expect(await rows('-1')).toBe(1);
+    expect(await rows('500')).toBe(100);
+  });
+
+  it('treats zero, negative and junk limits as a floor of 1 or the default 10', async () => {
+    seed(20);
+    expect(await rows('0')).toBe(1);
+    expect(await rows('abc')).toBe(10);
+    expect(await rows('-5', { ...rep, isManagement: true })).toBe(1);
+    expect(await rows('abc', { ...rep, isManagement: true })).toBe(10);
+    expect(await rows('1000', { ...rep, isManagement: true })).toBe(20);
+  });
+});

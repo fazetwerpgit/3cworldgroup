@@ -46,7 +46,10 @@ export async function GET(request: NextRequest) {
     // pages legitimately ask for the whole company (limit=1000, to join sale
     // counts onto the user table); every rep-facing caller asks for 5 or 100.
     // Cap non-management callers at 100 to keep the rep-facing view bounded.
-    const requestedLimit = parseInt(searchParams.get('limit') || '10');
+    // A floor of 1 matters as much as the cap: serveBoard slices with this, and
+    // slice(0, -1) would hand back every row but the last. Junk falls back to 10.
+    const parsedLimit = parseInt(searchParams.get('limit') || '10', 10);
+    const requestedLimit = Math.max(1, Number.isFinite(parsedLimit) ? parsedLimit : 10);
     const limit = gate.isManagement
       ? requestedLimit
       : Math.min(requestedLimit, NON_MANAGEMENT_LIMIT_CAP);
