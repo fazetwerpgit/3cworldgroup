@@ -11,6 +11,7 @@ import {
   writeDataCache,
 } from '@/lib/cache/dataCache';
 import { holdPageData } from '@/lib/cache/pageData';
+import { readDashboardSnapshot, writeDashboardSnapshot } from '@/lib/cache/dashboardSnapshot';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { applyCarrierInstallDates } from '@/lib/sales/carrierInstall';
 import { matchFiberOrdersToSales } from '@/lib/fiberReport/matchSales';
@@ -92,6 +93,23 @@ export interface RepDashboardState {
 export type RepSectionKey = Exclude<keyof RepDashboardState, never>;
 
 const LOADING = { status: 'loading' } as const;
+
+const SECTION_KEYS: RepSectionKey[] = ['book', 'plan', 'standing', 'challenge', 'calls', 'paperwork'];
+
+/** The ready sections of a stored snapshot (anything else is dropped), or null when none. */
+function readySections(value: unknown): Partial<RepDashboardState> | null {
+  if (!value || typeof value !== 'object') return null;
+  const out: Partial<RepDashboardState> = {};
+  for (const key of SECTION_KEYS) {
+    const section = (value as Record<string, unknown>)[key] as { status?: unknown; data?: unknown } | undefined;
+    if (section && section.status === 'ready' && 'data' in section) (out as Record<string, unknown>)[key] = section;
+  }
+  const book = out.book as Section<RepBook> | undefined;
+  if (book && book.status === 'ready' && (!Array.isArray(book.data.sales) || !(book.data.fiberBySale instanceof Map))) {
+    delete out.book;
+  }
+  return Object.keys(out).length ? out : null;
+}
 
 /** Cache key for the dashboard's sections (a sale write drops it: see useSales). */
 const DASHBOARD_CACHE_KEY = 'dashboard';
@@ -193,9 +211,21 @@ export function useRepDashboard() {
   const active = user?.status === 'active';
 
   // Revisit: the sections loaded last time show at once (from the in-memory,
-  // per-account cache) and refresh quietly underneath.
-  const [cachedEntry] = useState(() => readDataCacheEntry<Partial<RepDashboardState>>(uid, DASHBOARD_CACHE_KEY));
+  // per-account cache) and refresh quietly underneath. A cold app open has no
+  // memory cache: it paints the snapshot this account left on the device
+  // (dashboardSnapshot.ts) with a quiet "Updating" note until the fresh
+  // sections land.
+  const [seed] = useState(() => {
+    const memory = readDataCacheEntry<Partial<RepDashboardState>>(uid, DASHBOARD_CACHE_KEY);
+    if (memory) return { entry: memory, device: false };
+    const device = readDashboardSnapshot<Partial<RepDashboardState>>(uid);
+    const sections = device ? readySections(device.value) : null;
+    return device && sections ? { entry: { value: sections, at: device.at }, device: true } : null;
+  });
+  const cachedEntry = seed?.entry;
   const cached = cachedEntry?.value;
+  // When the device snapshot on screen is from, while its refresh runs (null otherwise).
+  const [updatingFrom, setUpdatingFrom] = useState<number | null>(seed?.device ? seed.entry.at : null);
   // Writes from this mount never land in another account's cache.
   const [gen] = useState(dataCacheGeneration);
   // When the numbers on screen were last loaded in full, and — after a
@@ -241,6 +271,9 @@ export function useRepDashboard() {
       const now = Date.now();
       const at = Math.min(...keys.map((key) => sectionFetchedAt.current.get(key) ?? now));
       writeDataCache(uid, DASHBOARD_CACHE_KEY, ready, gen, at);
+      // The next cold open paints these (only for the signed-in account's own
+      // dashboard, and only while that account is still the one signed in).
+      if (gen === dataCacheGeneration()) writeDashboardSnapshot(uid, ready, at);
     }
   }, [state, initialState, uid, gen]);
   const stateRef = useRef(state);
@@ -385,7 +418,10 @@ export function useRepDashboard() {
     showedCached.current = false;
     // Background traffic (tab prefetch, presence, push health) waits for this.
     const release = holdPageData();
-    void run(undefined, { quiet }).finally(release);
+    void run(undefined, { quiet }).finally(() => {
+      release();
+      setUpdatingFrom(null);
+    });
     return () => {
       release();
       for (const controller of running.values()) controller.abort();
@@ -424,5 +460,5 @@ export function useRepDashboard() {
   const refresh = useCallback(() => run(undefined, { quiet: true }), [run]);
   useRefreshOnResume(refresh, { enabled: !!uid });
 
-  return { ...state, staleAt, retry, installDateSaved };
+  return { ...state, staleAt, updatingFrom, retry, installDateSaved };
 }

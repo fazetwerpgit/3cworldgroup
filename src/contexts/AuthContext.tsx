@@ -29,6 +29,7 @@ import { unregisterNativePush } from '@/lib/app/nativePush';
 import { clearViewAs } from '@/lib/viewAs/storage';
 import { User, AuthState, RolePermissions, UserRole, isOwner, resolveRoles } from '@/types';
 import { setDataCacheOwner } from '@/lib/cache/dataCache';
+import { clearDashboardSnapshots } from '@/lib/cache/dashboardSnapshot';
 import { clearSessionProfile, readSessionProfile, writeSessionProfile } from '@/lib/auth/sessionProfile';
 import { preloadOwnerDashboard } from '@/components/portal/owner/preloadOwnerDashboard';
 
@@ -227,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profileVerified) writeSessionProfile(state.user);
     } else {
       clearSessionProfile();
+      clearDashboardSnapshots();
     }
   }, [state.user, state.loading, profileLoadFailed, profileVerified]);
 
@@ -474,6 +476,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         markProfileVerified(false);
         cancelQuietRetry();
         clearSessionProfile();
+        clearDashboardSnapshots();
         stopWatchingProfile();
         setProfileLoadFailed(false);
         // Preserve pendingApproval so the pending screen survives the sign-out.
@@ -593,6 +596,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       markProfileVerified(false);
       cancelQuietRetry();
       clearSessionProfile();
+      // And the dashboard kept on the device for fast cold opens.
+      clearDashboardSnapshots();
       // Same for the Ask 3C conversation and practice: the next rep must not see or send them.
       try {
         window.sessionStorage.removeItem(ASK_CONVERSATION_KEY);

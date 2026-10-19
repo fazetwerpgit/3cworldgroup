@@ -805,6 +805,7 @@ export function RepDashboard() {
         ? 'error'
         : 'ready';
   const canLog = hasPermission('sales:write');
+  const updatingFrom = data.updatingFrom ?? null;
 
   // 3C iOS app only (both no-ops on the web): drop the splash once the money
   // block has its numbers, and feed the home-screen widget the same Est. pay
@@ -856,12 +857,17 @@ export function RepDashboard() {
         extraDates={Math.max(dates.length - MAX_DATE_ROWS, 0)}
         callsFailed={data.calls.status === 'error'}
         banners={
-          data.staleAt !== null || canLog ? (
+          data.staleAt !== null || updatingFrom !== null || canLog ? (
             <>
               {/* A background refresh failed: the numbers shown are the last good ones. */}
               {data.staleAt !== null ? (
                 <p className={d.staleNote} role="status">
                   Couldn&apos;t refresh · as of {cacheTimeLabel(data.staleAt)}
+                </p>
+              ) : updatingFrom !== null ? (
+                /* Cold open: the last numbers from this device, refreshing underneath. */
+                <p className={d.staleNote} role="status">
+                  Updating · as of {cacheTimeLabel(updatingFrom)}
                 </p>
               ) : null}
               {canLog ? <CalloutNudge now={now} /> : null}
