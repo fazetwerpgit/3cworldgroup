@@ -1,0 +1,72 @@
+/* UserPicker: name search plus a result list (direction D). The box and
+   rows are admin-ui's .search / .person; this file holds the list. */
+
+/* admin-ui .search is sized for a flex row; in a field column it must not grow. */
+.search.search {
+  flex: none;
+}
+
+/* Flat tiles one tone below the panel, split by space. */
+.list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  list-style: none;
+}
+
+.list > li {
+  background: var(--c-well);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--s2) var(--s3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 120ms ease-out;
+}
+
+.option[aria-pressed='true'] {
+  background: var(--c-lime-wash);
+}
+
+@media (hover: hover) {
+  .option:hover:not([aria-pressed='true']) {
+    background: var(--c-panel);
+  }
+}
+
+.option:active {
+  transform: scale(0.97);
+}
+
+.option:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.check {
+  flex: none;
+  margin-left: auto;
+  color: var(--c-lime);
+}
+
+.list .clear {
+  min-height: var(--tap);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+}

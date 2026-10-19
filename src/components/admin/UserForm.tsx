@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, ChevronDown, Lock, Search, X } from 'lucide-react';
+import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { AdminNotice } from '@/components/portal/admin-d/AdminUi';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import f from './user-form.module.css';
+import { UserPicker, pickerName, roleLabel, usePickerUsers } from './UserPicker';
 import {
   User,
   UserRole,
@@ -23,7 +24,7 @@ import {
   SOLAR_ROLES,
   SolarRoleDisplayNames,
 } from '@/types';
-import type { FieldRole, PlatformRole } from '@/types';
+import type { FieldRole } from '@/types';
 
 interface UserFormProps {
   user: User;
@@ -79,18 +80,6 @@ const statusSegments: { value: 'pending' | 'active' | 'inactive'; label: string 
   { value: 'inactive', label: 'Inactive' },
 ];
 
-interface ManagerCandidate {
-  uid: string;
-  displayName?: string;
-  email?: string;
-  role?: PlatformRole;
-  fieldRole?: FieldRole;
-  status?: string;
-}
-
-const roleLabel = (role?: string) =>
-  (role && RoleDisplayNames[role as UserRole]) || role || '—';
-
 export function UserForm({ user }: UserFormProps) {
   const router = useRouter();
   const { user: currentUser } = useAuth();
@@ -135,57 +124,23 @@ export function UserForm({ user }: UserFormProps) {
   });
   const loadedSolarRole = user.solarRole ?? '';
 
-  const [managerSearch, setManagerSearch] = useState('');
-  const [managerCandidates, setManagerCandidates] = useState<ManagerCandidate[]>([]);
-  const [selectedManagerLabel, setSelectedManagerLabel] = useState('');
-  // Candidates show only while picking; at rest the list looked like the
-  // user's assigned managers (Jacob 9/23: "Braeden and Jeremy are under my
-  // managers" when none was set).
-  const [pickingManager, setPickingManager] = useState(false);
-
   // Real name-search picker, backed by the EXISTING GET /api/portal/auth/users
   // endpoint — no new route. Filtered client-side to manager-eligible people.
-  useEffect(() => {
-    if (!currentUser) return;
-    let active = true;
-    (async () => {
-      try {
-        const res = await fetch('/api/portal/auth/users', { headers: await authHeaders() });
-        const data = await res.json();
-        if (!active || !res.ok) return;
-        const everyone = (data.users || []) as ManagerCandidate[];
-        // Same rule the PUT route enforces: an active person in a back-office
-        // role or a management field role (GMs, office managers, IBO tiers).
-        setManagerCandidates(
-          everyone.filter(
-            (c) =>
-              c.status === 'active' &&
-              (isManagementRole(c.role) || (c.fieldRole ? MANAGEMENT_FIELD_ROLES.includes(c.fieldRole) : false))
-          )
-        );
-        // The current manager is named even if no longer eligible to be picked.
-        const current = everyone.find((u) => u.uid === formData.managerId);
-        if (current) {
-          setSelectedManagerLabel(current.displayName || current.email || current.uid);
-        }
-      } catch {
-        // fail-soft: picker just shows no results
-      }
-    })();
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser]);
-
-  const managerResults = useMemo(() => {
-    const q = managerSearch.trim().toLowerCase();
-    const pool = managerCandidates.filter((c) => c.uid !== user.uid);
-    if (!q) return pool.slice(0, 8);
-    return pool
-      .filter((c) => (c.displayName || c.email || '').toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [managerCandidates, managerSearch, user.uid]);
+  const { users: everyone } = usePickerUsers(Boolean(currentUser));
+  // Same rule the PUT route enforces: an active person in a back-office role or
+  // a management field role (GMs, office managers, IBO tiers), never this user.
+  const managerCandidates = useMemo(
+    () =>
+      everyone.filter(
+        (c) =>
+          c.uid !== user.uid &&
+          c.status === 'active' &&
+          (isManagementRole(c.role) || (c.fieldRole ? MANAGEMENT_FIELD_ROLES.includes(c.fieldRole) : false))
+      ),
+    [everyone, user.uid]
+  );
+  // The current manager is named even if no longer eligible to be picked.
+  const manager = everyone.find((c) => c.uid === formData.managerId);
 
   const handleChange = (name: string, value: string, markDirty = true) => {
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -514,70 +469,21 @@ export function UserForm({ user }: UserFormProps) {
             <label className={u.label} htmlFor="manager-search">
               Manager
             </label>
-            <label className={`${u.search} ${f.managerSearch}`}>
-              <Search size={18} aria-hidden="true" />
-              <input
-                id="manager-search"
-                className={u.input}
-                type="search"
-                placeholder="Search managers"
-                autoComplete="off"
-                value={managerSearch || selectedManagerLabel}
-                onFocus={() => setPickingManager(true)}
-                onChange={(e) => {
-                  setPickingManager(true);
-                  setSelectedManagerLabel('');
-                  setManagerSearch(e.target.value);
-                }}
-              />
-            </label>
-            {!formData.managerId && !pickingManager ? <p className={u.personSub}>No manager</p> : null}
-            {(pickingManager && managerResults.length) || formData.managerId ? (
-              <ul className={f.managerList} aria-label="Managers">
-                {(pickingManager ? managerResults : []).map((m) => {
-                  const selected = formData.managerId === m.uid;
-                  return (
-                    <li key={m.uid}>
-                      <button
-                        type="button"
-                        className={f.managerOption}
-                        aria-pressed={selected}
-                        onClick={() => {
-                          handleChange('managerId', m.uid);
-                          setSelectedManagerLabel(m.displayName || m.email || m.uid);
-                          setManagerSearch('');
-                          setPickingManager(false);
-                        }}
-                      >
-                        <span className={u.personText}>
-                          <span className={u.personName}>
-                            <span>{m.displayName || m.email || 'Unnamed'}</span>
-                          </span>
-                          <span className={u.personSub}>{roleLabel(getEffectiveRole(m))}</span>
-                        </span>
-                        {selected ? <Check size={18} className={f.managerCheck} aria-hidden="true" /> : null}
-                      </button>
-                    </li>
-                  );
-                })}
-                {formData.managerId ? (
-                  <li>
-                    <button
-                      type="button"
-                      className={`${f.managerOption} ${f.managerClear}`}
-                      onClick={() => {
-                        handleChange('managerId', '');
-                        setSelectedManagerLabel('');
-                        setPickingManager(false);
-                      }}
-                    >
-                      <X size={18} aria-hidden="true" />
-                      Clear manager
-                    </button>
-                  </li>
-                ) : null}
-              </ul>
-            ) : null}
+            {/* Candidates show only while picking; at rest the list looked like the
+                user's assigned managers (Jacob 9/23: "Braeden and Jeremy are under my
+                managers" when none was set). */}
+            <UserPicker
+              id="manager-search"
+              candidates={managerCandidates}
+              value={formData.managerId}
+              valueLabel={manager ? pickerName(manager) : ''}
+              onPick={(m) => handleChange('managerId', m.uid)}
+              onClear={() => handleChange('managerId', '')}
+              clearLabel="Clear manager"
+              placeholder="Search managers"
+              listLabel="Managers"
+              emptyText="No manager"
+            />
           </div>
         </div>
       </section>
