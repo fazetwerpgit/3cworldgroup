@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { FiberOrder } from '@/types';
 
@@ -6,59 +7,94 @@ import { FiberOrder } from '@/types';
 // every row with a null orderDate, and the standing rule is that all the sales
 // stay visible. So the read is cached instead of narrowed.
 //
-// The carrier workbook lands once each morning, so the snapshot is keyed on
-// `config/fiberReportStatus.lastReportAt`: a new report changes the key and the
-// cache misses on the next read. The TTL is the backstop for writes we did not
-// see (another instance's assign, a script, the console).
-//
-// IMPORTANT: this is module state, so on serverless it warms PER INSTANCE and
-// is invalidated per instance too. It reduces the read volume; it does not
-// eliminate it, and a write on instance A does not clear instance B's copy —
-// that is what the 5 minute TTL is for.
-const TTL_MS = 5 * 60 * 1000;
+// The cache is keyed on two fields of `config/fiberReportStatus`, the doc every
+// caller already reads:
+// - `lastReportAt`: the carrier workbook lands once each morning, so a new
+//   report changes the key;
+// - `ordersRev`: bumped by invalidateFiberOrdersCache() on EVERY write that
+//   changes a fiberOrders doc (assign, rematch, link, the report upsert).
+// So a write on instance A is seen by instance B on its next read, and a warm
+// instance re-reads the collection only when the orders actually changed. It
+// used to expire every 5 minutes on every instance (about 12 full reads an
+// hour each). The TTL is now only the backstop for writes no code path stamps
+// (a script, the console).
+const TTL_MS = 60 * 60 * 1000;
+
+/** The config/fiberReportStatus fields the key is built from. */
+export type FiberStatusFields = { lastReportAt?: unknown; ordersRev?: unknown } | null | undefined;
 
 interface CacheEntry {
-  /** lastReportAt of the report the cached docs were read under. */
-  reportKey: string;
+  key: string;
   readAt: number;
   orders: FiberOrder[];
 }
 
 let cache: CacheEntry | null = null;
 
-/**
- * Drop the cached fiberOrders snapshot. Call after ANY write that changes a
- * fiberOrders doc: the dealer assign backfill, the unmatched rematch, and the
- * per-order sale link.
- */
-export function invalidateFiberOrdersCache(): void {
+/** The cache key for a fiberReportStatus doc (or a bare lastReportAt, for old callers). */
+export function fiberOrdersCacheKey(status: FiberStatusFields | string | null): string {
+  if (status === null || status === undefined) return '|0';
+  if (typeof status === 'string') return `${status}|0`;
+  const report = typeof status.lastReportAt === 'string' ? status.lastReportAt : '';
+  const rev = typeof status.ordersRev === 'number' ? status.ordersRev : 0;
+  return `${report}|${rev}`;
+}
+
+/** Test hook: forget this instance's copy without touching Firestore. */
+export function resetFiberOrdersCacheForTests(): void {
   cache = null;
 }
 
 /**
- * Every fiberOrder, cached against the current report stamp. `lastReportAt` is
- * the value already read from `config/fiberReportStatus` by the caller — this
- * helper never re-reads it, so the cache costs no extra round trip.
+ * Call after ANY write that changes a fiberOrders doc: the dealer assign
+ * backfill, the unmatched rematch, the per-order sale link, the report upsert.
+ * Drops this instance's copy and bumps `ordersRev`, so every other instance's
+ * next read misses too. The board snapshot is marked dirty as well (the
+ * carrier join decides what the board counts). Never throws: the write it
+ * follows already landed.
+ */
+export async function invalidateFiberOrdersCache(): Promise<void> {
+  cache = null;
+  if (!adminDb) return;
+  try {
+    await adminDb
+      .collection('config')
+      .doc('fiberReportStatus')
+      .set({ ordersRev: FieldValue.increment(1) }, { merge: true });
+  } catch (error) {
+    console.error('[ordersCache] failed to bump ordersRev', error);
+  }
+  try {
+    const { markLeaderboardDirty } = await import('@/lib/leaderboard/snapshotStore');
+    await markLeaderboardDirty();
+  } catch (error) {
+    console.error('[ordersCache] failed to mark the leaderboard dirty', error);
+  }
+}
+
+/**
+ * Every fiberOrder, cached against the current report stamp and orders
+ * revision. Pass the `config/fiberReportStatus` data the caller already read
+ * (or just its lastReportAt) — this helper never re-reads it, so the cache
+ * costs no extra round trip.
  */
 export async function getAllFiberOrders(
-  lastReportAt: string | null,
+  status: FiberStatusFields | string | null,
   options?: { fresh?: boolean },
 ): Promise<FiberOrder[]> {
   if (!adminDb) throw new Error('Database not configured');
 
-  const reportKey = lastReportAt ?? '';
+  const key = fiberOrdersCacheKey(status);
   const now = Date.now();
-  // `fresh` skips the cache for the refetch that follows a write. Invalidation
-  // is per-instance, so without this the client's refetch can land on a DIFFERENT
-  // warm instance and get the pre-write snapshot for up to the TTL: the linked
-  // row stays red with no error, which reads as "the button did nothing". The
-  // fresh read still repopulates this instance's cache.
-  if (!options?.fresh && cache && cache.reportKey === reportKey && now - cache.readAt < TTL_MS) {
+  // `fresh` skips the cache for the refetch that follows a write: the client's
+  // refetch can land before the ordersRev bump is visible to it. The fresh read
+  // still repopulates this instance's cache.
+  if (!options?.fresh && cache && cache.key === key && now - cache.readAt < TTL_MS) {
     return cache.orders;
   }
 
   const snapshot = await adminDb.collection('fiberOrders').get();
   const orders = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as FiberOrder);
-  cache = { reportKey, readAt: now, orders };
+  cache = { key, readAt: now, orders };
   return orders;
 }

@@ -57,6 +57,6 @@ export async function rematchUnmatchedOrders(): Promise<{ updated: number; still
   if (learnedDealerMap) await configRef.set({ map: dealerMap }, { merge: true });
 
   // Same reason as assignDealerToUser: matchedUserId moved under the cache.
-  if (updates.size > 0) invalidateFiberOrdersCache();
+  if (updates.size > 0) await invalidateFiberOrdersCache();
   return { updated: updates.size, stillUnmatched: snapshot.docs.length - updates.size };
 }

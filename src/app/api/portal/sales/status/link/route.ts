@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       saleLink: wantsClear ? FieldValue.delete() : { saleId, by: gate.uid, byName: gate.name, at },
       updatedAt: at,
     });
-    invalidateFiberOrdersCache();
+    await invalidateFiberOrdersCache();
 
     return NextResponse.json({ ok: true });
   } catch (error) {

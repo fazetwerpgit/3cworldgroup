@@ -14,7 +14,7 @@ import type { FiberOrder } from '@/types/fiberOrder';
 export async function loadCarrierOrders(): Promise<FiberOrder[] | null> {
   try {
     const status = await adminDb!.collection('config').doc('fiberReportStatus').get();
-    return await getAllFiberOrders(status.exists ? (status.data()?.lastReportAt ?? null) : null);
+    return await getAllFiberOrders(status.exists ? status.data() : null);
   } catch (error) {
     console.error('Error reading carrier orders for an install date edit:', error);
     return null;

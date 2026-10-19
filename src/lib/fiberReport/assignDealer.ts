@@ -53,6 +53,6 @@ export async function assignDealerToUser(
   }
   // The admin board reads fiberOrders from a module cache; this backfill just
   // changed matchedUserId on every order of the dealer.
-  invalidateFiberOrdersCache();
+  await invalidateFiberOrdersCache();
   return { ok: true, updated: snapshot.docs.length };
 }

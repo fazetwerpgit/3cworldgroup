@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     // link/assign/rematch write, so the answer cannot come from another
     // instance's pre-write snapshot. Ordinary loads stay cached.
     const fresh = request.nextUrl.searchParams.get('fresh') === '1';
-    const allOrders = await getAllFiberOrders(lastReportAt, { fresh });
+    const allOrders = await getAllFiberOrders(statusDoc.exists ? statusDoc.data() : null, { fresh });
     const matchedOrders = allOrders.filter((order) => order.matchedUserId !== null);
     const salesSnapshot = await adminDb.collection('sales').get();
     // A demo account's sales never name a real carrier order's customer or rep.

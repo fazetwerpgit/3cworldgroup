@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
+import { fiberOrdersCacheKey, getAllFiberOrders } from '@/lib/fiberReport/ordersCache';
 import { PORTAL_LOGGING_START } from '@/lib/sales/mergeBook';
 import { loadDayMessages } from '@/lib/alerts/calloutNudges';
 import { COMP_PLAN_MARGIN, COMP_PLAN_RATES } from '@/data/compPlan.generated';
@@ -63,7 +63,8 @@ function db() {
  * The book of the last request, reused for a short while across requests: a
  * single-section Retry (or a second section asked for right after the first)
  * then does not re-read every sale since launch. Keyed on the carrier report's
- * lastReportAt, so a new report always reads fresh. Server memory only; the
+ * lastReportAt + ordersRev (fiberOrdersCacheKey), so a new report or an order
+ * write always reads fresh. Server memory only; the
  * owner summary route is owner-gated.
  */
 const BOOK_CACHE_MS = 60_000;
@@ -80,7 +81,7 @@ async function readBook(statusDoc: FirebaseFirestore.DocumentSnapshot): Promise<
   const reportAsOf = typeof asOf === 'string' ? asOf : null;
   const [salesSnap, orders] = await Promise.all([
     db().collection('sales').where('saleDate', '>=', loggingStart()).select(...SALE_FIELDS).get(),
-    getAllFiberOrders(lastReportAt),
+    getAllFiberOrders(statusDoc.exists ? (statusDoc.data() ?? null) : null),
   ]);
   // The owner never sees a demo account's sales (nor do they join carrier orders).
   const sales = salesSnap.docs.filter((doc) => !isDemoSale(doc.data())).map((doc) => {
@@ -111,7 +112,8 @@ export function createFirestoreOwnerSource(): OwnerSummarySource {
     loadBook() {
       book ??= (async () => {
         const statusDoc = await db().collection('config').doc('fiberReportStatus').get();
-        const reportAt = statusDoc.exists ? ((statusDoc.data()?.lastReportAt as string | undefined) ?? null) : null;
+        // Keyed like the carrier orders cache: a new report or an order write misses.
+        const reportAt = fiberOrdersCacheKey(statusDoc.exists ? (statusDoc.data() ?? null) : null);
         const now = Date.now();
         if (recentBook && recentBook.reportAt === reportAt && now - recentBook.at < BOOK_CACHE_MS) {
           return recentBook.book;
