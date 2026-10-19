@@ -1,11 +1,21 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Minus, Pencil, Plus } from 'lucide-react';
 import { futureValue } from '@/lib/solar/calc';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useDeck } from './deckState';
 import { formatWholeDollars } from './solarClient';
-import { BILL_SLIDER_MAX, BILL_SLIDER_MIN, cleanBillDraft, editableBill, formatBill, parseBill, sliderPosition } from './billInput';
+import {
+  BILL_INPUT_MAX,
+  BILL_SLIDER_MAX,
+  BILL_SLIDER_MIN,
+  cleanBillDraft,
+  editableBill,
+  formatBill,
+  parseBill,
+  sliderPosition,
+} from './billInput';
 import s from './solarDeck.module.css';
 
 // Slide 4: what the monthly power bill would grow to if it were saved instead
@@ -37,6 +47,10 @@ function useTween(target: number, reduced: boolean): number {
   return reduced ? target : shown;
 }
 
+/** One-tap bills for the usual range, and the step of the - / + buttons. */
+const CHIPS = [100, 150, 200, 250, 300, 400];
+const STEP = 10;
+
 export function CalculatorSlide() {
   const { state, update } = useDeck();
   const reduced = usePrefersReducedMotion();
@@ -58,43 +72,71 @@ export function CalculatorSlide() {
     update({ monthlyBill: parseBill(clean) });
   };
 
+  const nudge = (by: number) => {
+    setDraft(null);
+    update({ monthlyBill: Math.min(BILL_INPUT_MAX, Math.max(0, Math.round((state.monthlyBill + by) / STEP) * STEP)) });
+  };
+  const rate = `${(state.apy * 100).toFixed(2)}% APY`;
+
   return (
     <>
-      <h2 className={s.title}>
-        How much do you <span className={s.accent}>currently spend?</span>
-      </h2>
+      <div className={s.head}>
+        <p className={s.eyebrow}>Savings calculator</p>
+        <h2 className={s.title}>
+          How much do you <span className={s.accent}>currently spend?</span>
+        </h2>
+        <p className={s.lede}>
+          What if that bill went into savings at {rate} instead, every month for {state.years} years?
+        </p>
+      </div>
       <div className={s.calc}>
-        <div>
+        <div className={s.card}>
           <label className={s.label} htmlFor="solar-bill">
             Monthly electric bill
           </label>
-          {/* The whole field takes the tap, the $ and "/ month" included. */}
-          <div className={s.billInput} onClick={() => billRef.current?.focus()}>
-            <span aria-hidden>$</span>
-            <input
-              ref={billRef}
-              id="solar-bill"
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              enterKeyHint="done"
-              placeholder="0"
-              value={draft ?? formatBill(state.monthlyBill)}
-              onFocus={(e) => {
-                const input = e.currentTarget;
-                setDraft(editableBill(state.monthlyBill));
-                // After React swaps in the plain digits, select them so typing replaces the amount.
-                requestAnimationFrame(() => input.select());
-              }}
-              onBlur={() => setDraft(null)}
-              onChange={(e) => setBill(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') e.currentTarget.blur();
-              }}
-              aria-describedby="solar-bill-note"
-            />
-            <span className={s.perMonth}>/ month</span>
+          <div className={s.billRow}>
+            <button type="button" className={s.stepBtn} onClick={() => nudge(-STEP)} aria-label={`Lower the bill by $${STEP}`}>
+              <Minus size={20} aria-hidden />
+            </button>
+            {/* The whole field takes the tap, the $, pencil and "/ month" included. */}
+            <div className={s.billInput} onClick={() => billRef.current?.focus()}>
+              <span className={s.billDollar} aria-hidden>
+                $
+              </span>
+              <input
+                ref={billRef}
+                id="solar-bill"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                enterKeyHint="done"
+                placeholder="0"
+                value={draft ?? formatBill(state.monthlyBill)}
+                onFocus={(e) => {
+                  const input = e.currentTarget;
+                  setDraft(editableBill(state.monthlyBill));
+                  // After React swaps in the plain digits, select them so typing replaces the amount.
+                  requestAnimationFrame(() => input.select());
+                }}
+                onBlur={() => setDraft(null)}
+                onChange={(e) => setBill(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') e.currentTarget.blur();
+                }}
+                aria-describedby="solar-bill-hint solar-bill-note"
+              />
+              <span className={s.perMonth} aria-hidden>
+                / month
+              </span>
+              <Pencil size={18} className={s.pencil} aria-hidden />
+            </div>
+            <button type="button" className={s.stepBtn} onClick={() => nudge(STEP)} aria-label={`Raise the bill by $${STEP}`}>
+              <Plus size={20} aria-hidden />
+            </button>
           </div>
+          <p className={s.hint} id="solar-bill-hint">
+            Tap the amount to enter their bill
+          </p>
           <input
             className={s.range}
             type="range"
@@ -108,6 +150,22 @@ export function CalculatorSlide() {
             }}
             aria-label="Monthly bill"
           />
+          <div className={s.chips} role="group" aria-label="Common bills">
+            {CHIPS.map((v) => (
+              <button
+                key={v}
+                type="button"
+                className={s.quick}
+                aria-pressed={state.monthlyBill === v}
+                onClick={() => {
+                  setDraft(null);
+                  update({ monthlyBill: v });
+                }}
+              >
+                ${v}
+              </button>
+            ))}
+          </div>
           <div className={s.adjustRow}>
             <button
               type="button"
@@ -115,10 +173,10 @@ export function CalculatorSlide() {
               aria-expanded={adjusting}
               onClick={() => setAdjusting((v) => !v)}
             >
-              {adjusting ? 'Done' : 'Adjust'}
+              {adjusting ? 'Done' : 'Adjust rate'}
             </button>
             <span className={s.small} id="solar-bill-note">
-              @ {(state.apy * 100).toFixed(2)}% APY · {state.years} Years ({months} mos)
+              @ {rate} · {state.years} Years ({months} mos)
             </span>
           </div>
           {adjusting ? (
@@ -151,40 +209,40 @@ export function CalculatorSlide() {
           ) : null}
         </div>
 
-        <div>
+        <div className={s.card}>
           <span className={s.label}>Maturity value</span>
           <p className={s.total} aria-live="polite" data-testid="solar-total">
             {formatWholeDollars(total)}
           </p>
           <p className={s.totalNote}>
-            @ {(state.apy * 100).toFixed(2)}% APY over {state.years} years
+            Monthly deposit ${formatBill(state.monthlyBill)} <span aria-hidden>·</span> @ {rate}
           </p>
           <div className={s.split} aria-hidden>
             <div className={s.splitPrincipal} style={{ width: `${principalPct}%` }} />
             <div className={s.splitInterest} style={{ width: `${100 - principalPct}%` }} />
           </div>
-          <div className={s.legend}>
+          <dl className={s.stats}>
             <div>
-              <span className={s.label}>
-                <i className={s.dot} style={{ background: 'var(--ink-2)' }} />
-                Total Principal
-              </span>
-              <span className={s.legendVal}>{formatWholeDollars(result.principal)}</span>
+              <dt>
+                <i className={s.dot} style={{ background: 'var(--ink-3)' }} />
+                Total principal
+              </dt>
+              <dd>{formatWholeDollars(result.principal)}</dd>
             </div>
             <div>
-              <span className={s.label}>
-                <i className={s.dot} style={{ background: 'var(--accent)' }} />
-                Interest Earned
-              </span>
-              <span className={s.legendVal}>{formatWholeDollars(result.interest)}</span>
+              <dt>
+                <i className={s.dot} style={{ background: 'var(--money)' }} />
+                Interest earned
+              </dt>
+              <dd className={s.money}>{formatWholeDollars(result.interest)}</dd>
             </div>
             <div>
-              <span className={s.label}>Time Horizon</span>
-              <span className={s.legendVal}>
-                {state.years} Years <span className={s.small}>({months} mos)</span>
-              </span>
+              <dt>Time horizon</dt>
+              <dd>
+                {state.years} years <span className={s.small}>({months} mos)</span>
+              </dd>
             </div>
-          </div>
+          </dl>
         </div>
       </div>
     </>

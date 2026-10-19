@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { DeckProvider, hasLeadInProgress, useDeck } from './deckState';
 import { finishLead } from './solarClient';
 import { CalculatorSlide } from './CalculatorSlide';
@@ -25,8 +25,8 @@ import s from './solarDeck.module.css';
 
 // The full-screen solar deck a rep hands to a homeowner. It sits outside the
 // rep shell (no <main> scroller), fills the viewport itself and keeps no
-// position:fixed layers, so iOS has nothing to clip. Swipe, arrow keys or the
-// bottom buttons move between slides.
+// position:fixed layers, so iOS has nothing to clip. Swipe, arrow keys, the
+// Back/Next buttons or the slide list (the counter) move between slides.
 
 type SlideId =
   | 'intro' | 'options' | 'partners' | 'calculator' | 'lead' | 'bill' | 'prequal' | 'steps'
@@ -36,6 +36,25 @@ const ORDER: SlideId[] = [
   'intro', 'options', 'partners', 'calculator', 'lead', 'bill', 'prequal', 'steps',
   'needs', 'booking', 'confirm', 'appendix', 'moving', 'fast', 'price',
 ];
+
+/** What the slide list calls each slide; `true` marks the ones the homeowner fills in. */
+const SLIDES: Record<SlideId, { title: string; interactive?: true }> = {
+  intro: { title: 'Giving clients the options they deserve' },
+  options: { title: 'Time to take a look at your options' },
+  partners: { title: 'We have partnered with' },
+  calculator: { title: 'How much do you currently spend?', interactive: true },
+  lead: { title: "Let's gather some info", interactive: true },
+  bill: { title: 'Evaluation of your bill' },
+  prequal: { title: 'Pre-qualification', interactive: true },
+  steps: { title: 'Make the switch in three easy steps' },
+  needs: { title: 'What we need to get started' },
+  booking: { title: 'Book your solar consultation', interactive: true },
+  confirm: { title: 'Appointment confirmation', interactive: true },
+  appendix: { title: 'Appendix' },
+  moving: { title: "You're moving!" },
+  fast: { title: 'We make the process fast' },
+  price: { title: "We will beat anybody's prices" },
+};
 
 /** Slides whose content starts at the top (long forms) instead of centering. */
 const TOP_ALIGNED: Partial<Record<SlideId, true>> = { lead: true, booking: true };
@@ -49,6 +68,9 @@ function Deck() {
   const { state, reset } = useDeck();
   const [confirming, setConfirming] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const [listOpen, setListOpen] = useState(false);
+  const counterRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ index: number; dir: 'fwd' | 'back' }>({ index: 0, dir: 'fwd' });
   const { index, dir } = pos;
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -72,9 +94,42 @@ function Deck() {
     go(0);
   }, [state.leadId, reset, go]);
   const requestNewCustomer = () => {
+    setListOpen(false);
     if (hasLeadInProgress(state)) setConfirming(true);
     else startNewCustomer();
   };
+
+  const closeList = useCallback((refocus: boolean) => {
+    setListOpen(false);
+    if (refocus) requestAnimationFrame(() => counterRef.current?.focus());
+  }, []);
+  const pickSlide = (i: number) => {
+    go(i);
+    closeList(true);
+  };
+
+  // Tab stays inside the open list.
+  const trapFocus = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return;
+    const items = e.currentTarget.querySelectorAll<HTMLElement>('button');
+    const firstItem = items[0];
+    const lastItem = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === firstItem) {
+      e.preventDefault();
+      lastItem.focus();
+    } else if (!e.shiftKey && document.activeElement === lastItem) {
+      e.preventDefault();
+      firstItem.focus();
+    }
+  };
+
+  // The list opens on the current slide, keyboard focus on it.
+  useEffect(() => {
+    if (!listOpen) return;
+    const current = listRef.current?.querySelector<HTMLElement>('[aria-current="true"]');
+    current?.focus();
+    current?.scrollIntoView({ block: 'nearest' });
+  }, [listOpen]);
 
   useEffect(() => {
     if (confirming) cancelRef.current?.focus();
@@ -87,8 +142,10 @@ function Deck() {
       if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
       if (e.key === 'Escape') {
         setConfirming(false);
+        if (listOpen) closeList(true);
         return;
       }
+      if (listOpen) return;
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault();
         next();
@@ -99,7 +156,7 @@ function Deck() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [next, prev]);
+  }, [next, prev, listOpen, closeList]);
 
   // Each slide opens at its top.
   useEffect(() => {
@@ -107,7 +164,7 @@ function Deck() {
   }, [index]);
 
   const onTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1 || isTypingTarget(e.target)) {
+    if (listOpen || e.touches.length !== 1 || isTypingTarget(e.target)) {
       touch.current = null;
       return;
     }
@@ -146,13 +203,14 @@ function Deck() {
     case 'price': content = <PriceSlide />; break;
   }
 
+  const first = state.lead.first.trim();
   return (
     <div className={s.root} data-solar-deck>
       <header className={s.top}>
         {confirming ? (
           <div className={s.topConfirm} role="group" aria-label="Start a new customer">
-            <span>Clear {state.lead.first.trim() ? `${state.lead.first.trim()}'s` : 'this'} info?</span>
-            <button type="button" ref={cancelRef} className={s.exit} onClick={() => setConfirming(false)}>
+            <span>Clear {first ? `${first}'s` : 'this'} info?</span>
+            <button type="button" ref={cancelRef} className={s.chip} onClick={() => setConfirming(false)}>
               Cancel
             </button>
             <button type="button" className={s.topConfirmGo} onClick={startNewCustomer}>
@@ -161,27 +219,58 @@ function Deck() {
           </div>
         ) : (
           <>
-            <div className={s.brand}>
-              <Image src="/solar/globe.webp" alt="" width={28} height={28} />
-              3C World Group
-            </div>
-            <div className={s.topActions}>
-              <button type="button" className={s.exit} onClick={requestNewCustomer}>
-                New customer
-              </button>
+            <div className={s.topSide}>
               <Link
-                className={s.exit}
+                className={s.iconBtn}
                 href="/portal/solar"
+                aria-label="Exit the presentation"
+                title="Exit"
                 onClick={() => {
                   // Leaving with a saved, unbooked lead: send its alert now.
                   if (state.leadId && !state.booking) void finishLead(state.leadId);
                 }}
               >
-                Exit
+                <X size={18} aria-hidden />
               </Link>
+              <button type="button" className={s.chip} onClick={prev} disabled={index === 0} aria-label="Previous slide">
+                <ChevronLeft size={18} aria-hidden />
+                <span className={s.chipText}>Back</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              ref={counterRef}
+              className={s.counter}
+              aria-haspopup="dialog"
+              aria-expanded={listOpen}
+              aria-label={`Slide ${index + 1} of ${ORDER.length}. Open the slide list`}
+              onClick={() => (listOpen ? closeList(false) : setListOpen(true))}
+            >
+              <span aria-live="polite">
+                {index + 1} / {ORDER.length}
+              </span>
+              <ChevronDown size={16} aria-hidden className={s.counterIcon} />
+            </button>
+
+            <div className={`${s.topSide} ${s.topSideEnd}`}>
+              <button
+                type="button"
+                className={s.next}
+                onClick={next}
+                disabled={index === ORDER.length - 1}
+                aria-label="Next slide"
+              >
+                <span className={s.chipText}>Next</span>
+                <ChevronRight size={18} aria-hidden />
+              </button>
+              <Image className={s.logo} src="/solar/globe.webp" alt="3C World Group" width={36} height={36} />
             </div>
           </>
         )}
+        <div className={s.track} aria-hidden>
+          <div className={s.fill} style={{ transform: `scaleX(${(index + 1) / ORDER.length})` }} />
+        </div>
       </header>
 
       <div className={s.stage} ref={stageRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
@@ -191,41 +280,51 @@ function Deck() {
           data-slide={id}
           data-dir={dir}
           aria-roledescription="slide"
-          aria-label={`Slide ${index + 1} of ${ORDER.length}`}
+          aria-label={`Slide ${index + 1} of ${ORDER.length}: ${SLIDES[id].title}`}
         >
           <div className={`${s.inner} ${TOP_ALIGNED[id] ? s.innerTop : ''}`}>{content}</div>
           <footer className={s.legal}>
-            <span>3C Companies Corporation</span>
-            <span aria-hidden>/</span>
-            <span>Confidential</span>
+            <span className={s.legalBrand}>3C World Group</span>
+            <span>3C Companies Corporation / Confidential</span>
           </footer>
         </section>
-      </div>
 
-      <nav className={s.bottom} aria-label="Slides">
-        <button type="button" className={s.navBtn} onClick={prev} disabled={index === 0} aria-label="Previous slide">
-          <ChevronLeft size={20} aria-hidden />
-          <span>Back</span>
-        </button>
-        <div className={s.progress}>
-          <span className={s.count} aria-live="polite">
-            {index + 1} / {ORDER.length}
-          </span>
-          <div className={s.track} aria-hidden>
-            <div className={s.fill} style={{ transform: `scaleX(${(index + 1) / ORDER.length})` }} />
-          </div>
-        </div>
-        <button
-          type="button"
-          className={`${s.navBtn} ${s.navNext}`}
-          onClick={next}
-          disabled={index === ORDER.length - 1}
-          aria-label="Next slide"
-        >
-          <span>Next</span>
-          <ChevronRight size={20} aria-hidden />
-        </button>
-      </nav>
+        {listOpen ? (
+          <>
+            <button type="button" className={s.scrim} aria-label="Close the slide list" tabIndex={-1} onClick={() => closeList(true)} />
+            <div className={s.sheet} ref={listRef} role="dialog" aria-modal="true" aria-label="Slides" onKeyDown={trapFocus}>
+              <div className={s.sheetHead}>
+                <span className={s.eyebrow}>Slides</span>
+                <button type="button" className={s.iconBtn} aria-label="Close the slide list" onClick={() => closeList(true)}>
+                  <X size={16} aria-hidden />
+                </button>
+              </div>
+              <ol className={s.sheetList}>
+                {ORDER.map((slideId, i) => (
+                  <li key={slideId}>
+                    <button
+                      type="button"
+                      className={s.sheetItem}
+                      aria-current={i === index ? 'true' : undefined}
+                      onClick={() => pickSlide(i)}
+                    >
+                      <span className={s.sheetNum}>{String(i + 1).padStart(2, '0')}</span>
+                      <span className={s.sheetTitle}>{SLIDES[slideId].title}</span>
+                      {SLIDES[slideId].interactive ? <span className={s.sheetTag}>Interactive</span> : null}
+                    </button>
+                  </li>
+                ))}
+              </ol>
+              <div className={s.sheetFoot}>
+                <button type="button" className={s.ghost} onClick={requestNewCustomer}>
+                  New customer
+                </button>
+                <span className={s.small}>Arrow keys move between slides.</span>
+              </div>
+            </div>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -243,7 +342,7 @@ export function SolarNoAccess() {
     <div className={s.gate}>
       <div>
         <p style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 8px' }}>Solar isn&apos;t on your account</p>
-        <p style={{ color: '#94a3b8', margin: '0 0 20px' }}>Ask your manager if you should have access.</p>
+        <p style={{ color: '#46536f', margin: '0 0 20px' }}>Ask your manager if you should have access.</p>
         <Link href="/portal/dashboard">Back to dashboard</Link>
       </div>
     </div>

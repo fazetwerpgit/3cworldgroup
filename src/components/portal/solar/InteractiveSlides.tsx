@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Check, Clock, MapPin, Video } from 'lucide-react';
 import { useDeck } from './deckState';
 import {
   bookTime,
@@ -65,33 +66,48 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
   return (
     <>
       <div className={s.head}>
+        <p className={s.eyebrow}>Program fit</p>
         <h2 className={s.title}>
           Pre-Qualification <span className={s.accent}>Requirements</span>
         </h2>
         <p className={s.lede}>Let&apos;s see what we can get you qualified for and what program would best suit your needs!</p>
       </div>
-      <div className={s.tiers}>
-        {TIERS.map((t) => (
-          <button
-            key={t.tier}
-            type="button"
-            className={s.tier}
-            aria-pressed={state.creditTier === t.tier}
-            disabled={!state.leadId || pending !== null}
-            onClick={() => void choose(t.tier)}
-          >
-            <span className={s.label}>Minimum credit score</span>
-            <span className={s.tierScore}>{t.score}</span>
-            <span className={s.tierName}>{pending === t.tier ? 'Saving...' : t.name}</span>
-            <ul className={s.tierList}>
-              {t.points.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
-          </button>
-        ))}
+      <div className={s.tiers} role="group" aria-label="Program">
+        {TIERS.map((t) => {
+          const on = state.creditTier === t.tier;
+          return (
+            <button
+              key={t.tier}
+              type="button"
+              className={s.tier}
+              aria-pressed={on}
+              disabled={!state.leadId || pending !== null}
+              onClick={() => void choose(t.tier)}
+            >
+              <span className={s.tierTop}>
+                <span className={s.label}>Minimum credit score</span>
+                <span className={s.radio} aria-hidden>
+                  {on ? <Check size={14} strokeWidth={3} /> : null}
+                </span>
+              </span>
+              <span className={s.tierScore}>{t.score}</span>
+              <span className={s.tierName}>{pending === t.tier ? 'Saving...' : t.name}</span>
+              <ul className={s.tierList}>
+                {t.points.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </button>
+          );
+        })}
       </div>
-      {!state.leadId ? <NeedsLead onBack={onNeedLead} /> : null}
+      {!state.leadId ? (
+        <NeedsLead onBack={onNeedLead} />
+      ) : (
+        <p className={`${s.small} ${s.center}`}>
+          {state.creditTier ? 'Saved with this lead. Tap the other card to change it.' : 'Tap the program that fits.'}
+        </p>
+      )}
       {error ? (
         <p className={s.alert} role="alert">
           {error}
@@ -115,6 +131,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
   const [picked, setPicked] = useState<SlotTime | null>(null);
   const [booking, setBooking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [dayKey, setDayKey] = useState<string | null>(null);
 
   const load = useCallback(async (which: SolarMode) => {
     setSlots(null);
@@ -137,6 +154,12 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
   }, [mode, load]);
 
   const days = useMemo(() => groupSlotsByDay(slots ?? []), [slots]);
+  // The day on show: the one picked, else the picked time's, else the first open day.
+  const day =
+    days.find((d) => d.key === dayKey) ??
+    days.find((d) => d.times.some((x) => x.start === picked?.start)) ??
+    days[0] ??
+    null;
 
   const book = async () => {
     if (!picked || !state.leadId || booking) return;
@@ -160,69 +183,110 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
 
   return (
     <>
-      <h2 className={s.title}>
-        Let&apos;s Book <span className={s.accent}>Solar Consultation</span>
-      </h2>
-      <div className={s.seg} role="group" aria-label="Consultation type">
-        {(['virtual', 'in_person'] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            aria-pressed={mode === m}
-            onClick={() => {
-              if (m === mode) return;
-              setPicked(null);
-              setMessage(null);
-              setMode(m);
-            }}
-          >
-            {m === 'virtual' ? 'Virtual' : 'In-Person'}
-          </button>
-        ))}
+      <div className={s.head}>
+        <p className={s.eyebrow}>Consultation</p>
+        <h2 className={s.title}>
+          Let&apos;s Book <span className={s.accent}>Solar Consultation</span>
+        </h2>
       </div>
-
-      {slots === null ? (
-        <p className={s.note}>Loading open times...</p>
-      ) : loadError ? (
-        <div className={s.formFoot}>
-          <p className={s.alert}>Could not load times. {loadError}</p>
-          <button type="button" className={s.ghost} onClick={() => void load(mode)}>
-            Try again
-          </button>
-        </div>
-      ) : days.length === 0 ? (
-        <p className={s.note}>No open {mode === 'virtual' ? 'virtual' : 'in-person'} times in the next two weeks.</p>
-      ) : (
-        <div className={s.days}>
-          {days.map((day) => (
-            <section key={day.key} className={s.day}>
-              <h3>{day.label}</h3>
-              <div className={s.times}>
-                {day.times.map((time) => (
-                  <button
-                    key={time.start}
-                    type="button"
-                    className={s.time}
-                    aria-pressed={picked?.start === time.start}
-                    onClick={() => {
-                      setPicked(time);
-                      setMessage(null);
-                    }}
-                  >
-                    {formatSlotTime(time.start)}
-                  </button>
-                ))}
+      <div className={s.book}>
+        <div className={s.bookSide}>
+          <div className={s.seg} role="group" aria-label="Consultation type">
+            {(['virtual', 'in_person'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                aria-pressed={mode === m}
+                onClick={() => {
+                  if (m === mode) return;
+                  setPicked(null);
+                  setMessage(null);
+                  setDayKey(null);
+                  setMode(m);
+                }}
+              >
+                {m === 'virtual' ? <Video size={16} aria-hidden /> : <MapPin size={16} aria-hidden />}
+                {m === 'virtual' ? 'Virtual' : 'In-Person'}
+              </button>
+            ))}
+          </div>
+          <div className={s.dayList} role="group" aria-label="Day">
+            <span className={s.label}>Day</span>
+            {slots === null ? (
+              <p className={s.note}>Loading...</p>
+            ) : days.length === 0 ? (
+              <p className={s.note}>No open days.</p>
+            ) : (
+              <div className={s.dayScroll}>
+                {days.map((d) => {
+                  const [weekday, date] = d.label.split(', ');
+                  return (
+                    <button
+                      key={d.key}
+                      type="button"
+                      className={s.dayBtn}
+                      aria-pressed={day?.key === d.key}
+                      aria-label={`${d.label}, ${d.times.length} open time${d.times.length === 1 ? '' : 's'}`}
+                      onClick={() => setDayKey(d.key)}
+                    >
+                      <span>{weekday.slice(0, 3)}</span>
+                      <strong>{date}</strong>
+                    </button>
+                  );
+                })}
               </div>
-            </section>
-          ))}
+            )}
+          </div>
         </div>
-      )}
+
+        <section className={s.timesPanel} aria-label="Times available">
+          <div className={s.timesHead}>
+            <span className={s.label}>{day ? `Times on ${day.label}` : 'Times available'}</span>
+            <span className={s.zone}>
+              <Clock size={14} aria-hidden />
+              Pacific Time (PT)
+            </span>
+          </div>
+          {slots === null ? (
+            <p className={s.note}>Loading open times...</p>
+          ) : loadError ? (
+            <div className={s.formFoot}>
+              <p className={s.alert}>Could not load times. {loadError}</p>
+              <button type="button" className={s.ghost} onClick={() => void load(mode)}>
+                Try again
+              </button>
+            </div>
+          ) : !day ? (
+            <p className={s.note}>No open {mode === 'virtual' ? 'virtual' : 'in-person'} times in the next two weeks.</p>
+          ) : (
+            <div className={s.times}>
+              {day.times.map((time) => (
+                <button
+                  key={time.start}
+                  type="button"
+                  className={s.time}
+                  aria-pressed={picked?.start === time.start}
+                  onClick={() => {
+                    setPicked(time);
+                    setMessage(null);
+                  }}
+                >
+                  {formatSlotTime(time.start)}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
       <div className={s.bookBar}>
         {!state.leadId ? (
           <NeedsLead onBack={onNeedLead} />
         ) : (
           <>
+            <p className={picked ? s.bookPicked : s.note}>
+              {picked ? formatSlotLong(picked.start) : 'Pick a day and a time.'}
+            </p>
             <button
               type="button"
               className={s.primary}
@@ -230,13 +294,8 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
               aria-busy={booking || undefined}
               onClick={() => void book()}
             >
-              {booking ? 'Booking...' : picked ? `Book ${formatSlotTime(picked.start)}` : 'Pick a time'}
+              {booking ? 'Booking...' : picked ? `Book ${formatSlotTime(picked.start)}` : 'Book consultation'}
             </button>
-            {picked ? (
-              <p className={s.note}>{formatSlotLong(picked.start)}</p>
-            ) : (
-              <p className={s.small}>All times are Pacific.</p>
-            )}
           </>
         )}
         {message ? (
@@ -256,58 +315,65 @@ export function ConfirmationSlide({ onBook, onNewCustomer }: { onBook: () => voi
   return (
     <>
       <div className={s.head}>
-        <svg className={s.check} viewBox="0 0 64 64" fill="none" aria-hidden>
-          <circle cx="32" cy="32" r="30" stroke="currentColor" strokeWidth="3" />
-          <path d="M19 33l9 9 17-19" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <p className={s.eyebrow}>Confirmed</p>
         <h2 className={s.title}>
           Appointment <span className={s.accent}>Confirmation</span>
         </h2>
         <p className={s.lede}>Important details regarding your upcoming consultation</p>
       </div>
-      {b ? (
-        <dl className={s.confirm}>
-          <dt>When</dt>
-          <dd>{formatSlotLong(b.start)}</dd>
-          <dt>Type</dt>
-          <dd>{b.mode === 'virtual' ? 'Virtual' : 'In-Person'}</dd>
-          <dt>Consultant</dt>
-          <dd>{b.consultantName}</dd>
-        </dl>
-      ) : (
-        <div className={s.formFoot}>
-          <p className={s.note}>No consultation booked yet.</p>
-          <button type="button" className={s.ghost} onClick={onBook}>
-            Pick a time
-          </button>
-        </div>
-      )}
-      <div className={s.cols}>
-        <section className={s.col}>
-          <span className={s.colNum}>STEP 01</span>
-          <h3 className={s.colTitle}>Check Email</h3>
-          <p className={s.colKicker}>Confirm Appointment</p>
-          <p className={s.colBody}>
-            Thank you! You should have received an email. Please confirm your appointment, and we are glad to be of
-            service to you.
-          </p>
+      <div className={s.confirmGrid}>
+        <section className={s.card} aria-label="Status">
+          <span className={s.checkWrap} data-on={b ? true : undefined} aria-hidden>
+            <Check size={22} strokeWidth={2.5} />
+          </span>
+          <span className={s.label}>Status</span>
+          <h3 className={s.statusTitle}>All Set!</h3>
+          <p className={s.statusKicker}>We&apos;re Ready for You</p>
+          <hr className={s.rule} />
+          {b ? (
+            <dl className={s.confirm}>
+              <dt>When</dt>
+              <dd>{formatSlotLong(b.start)}</dd>
+              <dt>Type</dt>
+              <dd>{b.mode === 'virtual' ? 'Virtual' : 'In-Person'}</dd>
+              <dt>Consultant</dt>
+              <dd>{b.consultantName}</dd>
+            </dl>
+          ) : (
+            <div className={s.noBooking}>
+              <p className={s.note}>No time booked yet</p>
+              <button type="button" className={s.textBtn} onClick={onBook}>
+                Book a consultation
+              </button>
+            </div>
+          )}
         </section>
-        <section className={s.col}>
-          <span className={s.colNum}>STEP 02</span>
-          <h3 className={s.colTitle}>Courtesy Call</h3>
-          <p className={s.colKicker}>1-2 Hours Prior</p>
-          <p className={s.colBody}>You will receive a courtesy call 1-2 hours prior to your appointment from the consultant.</p>
-        </section>
-        <section className={s.col}>
-          <span className={s.colNum}>STATUS</span>
-          <h3 className={s.colTitle}>All Set!</h3>
-          <p className={s.colKicker}>We&apos;re Ready for You</p>
-        </section>
-      </div>
-      <div className={s.formFoot}>
-        <button type="button" className={b ? s.primary : s.ghost} onClick={onNewCustomer}>
-          New customer
-        </button>
+        <ol className={s.nextSteps}>
+          <li>
+            <span className={s.stepBig}>01</span>
+            <div>
+              <h3 className={s.colTitle}>Check Email</h3>
+              <p className={s.colKicker}>Confirm Appointment</p>
+              <p className={s.colBody}>
+                Thank you! You should have received an email. Please confirm your appointment, and we are glad to be of
+                service to you.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span className={s.stepBig}>02</span>
+            <div>
+              <h3 className={s.colTitle}>Courtesy Call</h3>
+              <p className={s.colKicker}>1-2 Hours Prior</p>
+              <p className={s.colBody}>You will receive a courtesy call 1-2 hours prior to your appointment from the consultant.</p>
+            </div>
+          </li>
+          <li className={s.nextStepsFoot}>
+            <button type="button" className={b ? s.primary : s.ghost} onClick={onNewCustomer}>
+              New customer
+            </button>
+          </li>
+        </ol>
       </div>
     </>
   );
