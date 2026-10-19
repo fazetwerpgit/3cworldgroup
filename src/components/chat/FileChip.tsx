@@ -13,6 +13,7 @@ import c from './chat.module.css';
 export function messageFileInfo(message: {
   attachment?: ChatAttachment;
   pendingFile?: File;
+  pendingFileInfo?: { name: string; type: string; size?: number };
   pendingState?: 'sending' | 'failed';
 }): { name: string; size?: number; url?: string } | null {
   if (message.attachment?.type === 'file') {
@@ -24,6 +25,11 @@ export function messageFileInfo(message: {
   }
   if (!message.attachment && message.pendingFile && isPdfFile(message.pendingFile)) {
     return { name: message.pendingFile.name || 'document.pdf', size: message.pendingFile.size };
+  }
+  // A PDF restored from the device outbox, before its file has loaded back.
+  const info = message.pendingFileInfo;
+  if (!message.attachment && !message.pendingFile && info && isPdfFile(info)) {
+    return { name: info.name || 'document.pdf', size: info.size };
   }
   return null;
 }

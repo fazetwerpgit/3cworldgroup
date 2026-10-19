@@ -37,7 +37,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   pdf: PDF_MIME,
 };
 
-function selectedImageMime(file: File): string {
+function selectedImageMime(file: Pick<File, 'name' | 'type'>): string {
   const supplied = file.type.toLowerCase().split(';', 1)[0].trim();
   if (supplied === 'image/jpg') return 'image/jpeg';
   if (supplied && supplied !== 'application/octet-stream') return supplied;
@@ -50,7 +50,7 @@ function selectedImageMime(file: File): string {
  * picker supplied no useful MIME (Android content URIs give '' or
  * application/octet-stream).
  */
-export function isPdfFile(file: File): boolean {
+export function isPdfFile(file: Pick<File, 'name' | 'type'>): boolean {
   return selectedImageMime(file) === PDF_MIME;
 }
 

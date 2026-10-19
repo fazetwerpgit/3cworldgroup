@@ -156,6 +156,13 @@ export function reconcileEchoes<E extends EchoLike>(
 
 // ── Persistence ─────────────────────────────────────────────────────────────
 
+/** A pending attachment's picked file, minus its bytes (those wait in IndexedDB). */
+export interface PendingFileMeta {
+  name: string;
+  type: string;
+  size?: number;
+}
+
 export interface OutboxEntry {
   id: string;
   clientMessageId: string;
@@ -170,6 +177,8 @@ export interface OutboxEntry {
   replyToMessageId?: string;
   // A photo not uploaded yet: its file waits in IndexedDB (see pendingPhotos).
   photoPending?: boolean;
+  // That file's name/type/size, so a restored PDF shows as a file meanwhile.
+  pendingFileInfo?: PendingFileMeta;
   failed: boolean;
 }
 
@@ -191,6 +200,7 @@ interface PersistableEcho {
   attachment?: ChatAttachment;
   uploadedAttachment?: ChatAttachment;
   pendingFile?: File;
+  pendingFileInfo?: PendingFileMeta;
   photoPending?: boolean;
   replyTo?: ChatReplySnippet;
   replyToMessageId?: string;
@@ -209,6 +219,11 @@ export function toOutboxEntries(echoes: PersistableEcho[]): OutboxEntry[] {
     if (!echo.clientMessageId || echo.deliveredId || !echo.pendingState) continue;
     const attachment = echo.uploadedAttachment ?? (echo.attachment?.type === 'gif' ? echo.attachment : undefined);
     const photoPending = (!!echo.pendingFile || !!echo.photoPending) && !echo.uploadedAttachment;
+    const pendingFileInfo = !photoPending
+      ? undefined
+      : echo.pendingFile
+        ? { name: echo.pendingFile.name, type: echo.pendingFile.type, size: echo.pendingFile.size }
+        : echo.pendingFileInfo;
     entries.push({
       id: echo.id,
       clientMessageId: echo.clientMessageId,
@@ -222,6 +237,7 @@ export function toOutboxEntries(echoes: PersistableEcho[]): OutboxEntry[] {
       ...(echo.replyTo ? { replyTo: echo.replyTo } : {}),
       ...(echo.replyToMessageId ? { replyToMessageId: echo.replyToMessageId } : {}),
       ...(photoPending ? { photoPending: true } : {}),
+      ...(pendingFileInfo ? { pendingFileInfo } : {}),
       failed: echo.pendingState === 'failed',
     });
   }
@@ -253,6 +269,13 @@ function parseAttachment(value: unknown): ChatAttachment | undefined {
     if (typeof value.previewHeight === 'number' && value.previewHeight > 0) attachment.previewHeight = value.previewHeight;
   }
   return attachment;
+}
+
+function parsePendingFileInfo(value: unknown): PendingFileMeta | undefined {
+  if (!isRecord(value) || typeof value.name !== 'string' || typeof value.type !== 'string') return undefined;
+  const info: PendingFileMeta = { name: value.name, type: value.type };
+  if (typeof value.size === 'number' && Number.isFinite(value.size) && value.size > 0) info.size = value.size;
+  return info;
 }
 
 function parseReplyTo(value: unknown): ChatReplySnippet | undefined {
@@ -293,6 +316,7 @@ export function parseOutbox(raw: string | null, uid: string, now: number): Outbo
     const photoPending = row.photoPending === true && !attachment;
     if (!text && !attachment && !photoPending) continue;
     const replyTo = parseReplyTo(row.replyTo);
+    const pendingFileInfo = photoPending ? parsePendingFileInfo(row.pendingFileInfo) : undefined;
     seen.add(id);
     entries.push({
       id,
@@ -309,6 +333,7 @@ export function parseOutbox(raw: string | null, uid: string, now: number): Outbo
         ? { replyToMessageId: row.replyToMessageId }
         : {}),
       ...(photoPending ? { photoPending: true } : {}),
+      ...(pendingFileInfo ? { pendingFileInfo } : {}),
       failed: row.failed === true || now - createdAt >= AUTO_RETRY_MAX_AGE_MS,
     });
   }

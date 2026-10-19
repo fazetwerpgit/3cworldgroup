@@ -13,7 +13,14 @@ import type { MessageActionsConfig } from '@/components/chat/MessageActions';
 import { isPdfFile, validateSelectedImage, type PreparedUpload } from '@/components/chat/attachmentUpload';
 import { FileChip, PdfPreviewTile, messageFileInfo, messagePdfPreview } from '@/components/chat/FileChip';
 import { attachmentSnippet, formatFileSize } from '@/lib/chat/media';
-import { clockTime, failedStatusLabel, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import {
+  clockTime,
+  failedStatusLabel,
+  lostStatusLabel,
+  pendingStatusLabel,
+  type CompanyStats,
+  type PendingFileInfo,
+} from '@/components/chat/chatFormat';
 import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
 import { gifPickerMaxHeight, keyboardInset } from '@/lib/chat/keyboard';
@@ -77,6 +84,9 @@ export type ThreadMessage = ChatMessageView & {
   // its caption sent alone).
   photoPending?: boolean;
   photoLost?: boolean;
+  // A restored echo's picked file (name/type/size) while photoPending, so a
+  // PDF shows as a file chip, not a photo tile, before its file loads.
+  pendingFileInfo?: PendingFileInfo;
 };
 
 interface MobileThreadProps {
@@ -1146,10 +1156,10 @@ export function MobileThread({
                             message.text ? (
                               <button type="button" onClick={() => onSendTextOnly(message)} className={c.retryBtn}>
                                 <RotateCw size={14} aria-hidden="true" />
-                                Photo not sent · Send text only
+                                {lostStatusLabel(message)} · Send text only
                               </button>
                             ) : (
-                              <span className={c.retryBtn}>Photo not sent</span>
+                              <span className={c.retryBtn}>{lostStatusLabel(message)}</span>
                             )
                           ) : (
                             <button type="button" onClick={() => onRetryPending(message)} className={c.retryBtn}>

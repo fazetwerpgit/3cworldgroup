@@ -404,6 +404,7 @@ export function ChatOutboxProvider({ children }: { children: React.ReactNode }) 
         replyTo: entry.replyTo,
         replyToMessageId: entry.replyToMessageId,
         ...(entry.photoPending ? { photoPending: true } : {}),
+        ...(entry.pendingFileInfo ? { pendingFileInfo: entry.pendingFileInfo } : {}),
         pendingState: entry.failed ? 'failed' : 'sending',
       }));
     }

@@ -3,7 +3,7 @@ import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
-import { failedStatusLabel } from '@/components/chat/chatFormat';
+import { failedStatusLabel, lostStatusLabel } from '@/components/chat/chatFormat';
 import { chatMessageDocId, outboxKey } from '@/lib/chat/outbox';
 
 const fake = vi.hoisted(() => ({
@@ -305,6 +305,23 @@ describe('ChatOutboxProvider', () => {
     await settle();
     expect(posts()).toEqual([expect.objectContaining({ clientMessageId: CID, text: 'the gate code' })]);
     expect(posts()[0]).not.toHaveProperty('attachment');
+  });
+
+  it('labels a restored PDF whose file is gone as a PDF, not a photo', async () => {
+    window.localStorage.setItem(
+      outboxKey('u1'),
+      JSON.stringify([
+        {
+          id: ECHO_ID, clientMessageId: CID, channelId: 'c1', text: '', authorId: 'u1', authorName: 'Rep One',
+          createdAt: Date.now(), photoPending: true, pendingFileInfo: { name: 'a.pdf', type: 'application/pdf', size: 5 }, failed: false,
+        },
+      ])
+    );
+    render(false);
+    await settle();
+    expect(outbox.echoes[0]).toMatchObject({ pendingState: 'failed', photoLost: true, pendingFileInfo: { name: 'a.pdf' } });
+    expect(failedStatusLabel(outbox.echoes[0])).toBe('PDF not sent');
+    expect(lostStatusLabel(outbox.echoes[0])).toBe('PDF not sent');
   });
 
   it('loads a restored photo once when an online flush races the restore', async () => {

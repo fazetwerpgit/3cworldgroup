@@ -17,7 +17,7 @@ import { CompanyTape } from '@/components/chat/CompanyTape';
 import { ConnectionNotice } from '@/components/chat/ConnectionNotice';
 import { MessageActions } from '@/components/chat/MessageActions';
 import { ChannelRows, MobileChannelList } from '@/components/chat/MobileChannelList';
-import { clockTime, failedStatusLabel, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
+import { clockTime, failedStatusLabel, lostStatusLabel, pendingStatusLabel, type CompanyStats } from '@/components/chat/chatFormat';
 import c from '@/components/chat/chat.module.css';
 import s from '@/components/portal/rep/rep.module.css';
 import { MobileThread } from '@/components/chat/MobileThread';
@@ -1278,10 +1278,10 @@ export default function TeamChatPage() {
                                 {message.photoLost ? (
                                   message.text ? (
                                     <button type="button" onClick={() => outbox.sendTextOnly(message)} className={c.retryBtn}>
-                                      <RotateCw size={14} aria-hidden="true" /> Photo not sent · Send text only
+                                      <RotateCw size={14} aria-hidden="true" /> {lostStatusLabel(message)} · Send text only
                                     </button>
                                   ) : (
-                                    <span className={c.retryBtn}>Photo not sent</span>
+                                    <span className={c.retryBtn}>{lostStatusLabel(message)}</span>
                                   )
                                 ) : (
                                   <button type="button" onClick={() => retryPending(message)} className={c.retryBtn}>

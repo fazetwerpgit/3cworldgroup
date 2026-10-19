@@ -176,6 +176,20 @@ describe('outbox persistence', () => {
     expect(restored).toMatchObject({ id: base.id, photoPending: true, failed: false });
   });
 
+  it("keeps a pending PDF's file name and type, so it restores as a file", () => {
+    const file = new File(['%PDF-'], 'invoice.pdf', { type: 'application/pdf' });
+    const entries = toOutboxEntries([{ ...base, text: '', pendingFile: file }]);
+    expect(entries[0].pendingFileInfo).toEqual({ name: 'invoice.pdf', type: 'application/pdf', size: 5 });
+    const [restored] = parseOutbox(JSON.stringify(entries), UID, NOW);
+    expect(restored.pendingFileInfo).toEqual({ name: 'invoice.pdf', type: 'application/pdf', size: 5 });
+    // Persisting a restored echo again (file not back yet) keeps the info.
+    const [again] = toOutboxEntries([{ ...base, text: '', photoPending: true, pendingFileInfo: restored.pendingFileInfo }]);
+    expect(again.pendingFileInfo).toEqual(restored.pendingFileInfo);
+    // Malformed info is dropped, not trusted.
+    const [bad] = parseOutbox(JSON.stringify([{ ...entries[0], pendingFileInfo: { name: 3 } }]), UID, NOW);
+    expect(bad).not.toHaveProperty('pendingFileInfo');
+  });
+
   it('keeps an uploaded photo by its server URL', () => {
     const file = new File(['x'], 'a.jpg', { type: 'image/jpeg' });
     const uploaded = { type: 'image' as const, url: 'https://storage/x.jpg', width: 10, height: 20 };
