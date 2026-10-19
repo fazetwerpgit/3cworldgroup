@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
-import { GoogleAuthProvider, linkWithCredential, linkWithPopup, unlink, type User as FirebaseUser } from 'firebase/auth';
+import {
+  GoogleAuthProvider,
+  browserPopupRedirectResolver,
+  linkWithCredential,
+  linkWithPopup,
+  unlink,
+  type User as FirebaseUser,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { friendlyAuthError } from '@/lib/auth/friendlyAuthError';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
@@ -75,7 +82,7 @@ export default function LinkedSignInMethods() {
         const native = await getNativeCredential(provider);
         await linkWithCredential(user, native.credential);
       } else if (id === GOOGLE_PROVIDER_ID) {
-        await linkWithPopup(user, new GoogleAuthProvider());
+        await linkWithPopup(user, new GoogleAuthProvider(), browserPopupRedirectResolver);
       }
       await refresh(user);
       setMessage({ ok: true, text: `${provider === 'apple' ? 'Apple' : 'Google'} is linked.` });

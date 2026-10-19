@@ -6,6 +6,7 @@ import { AlertCircle, CircleCheck, Eye, EyeOff, LoaderCircle } from 'lucide-reac
 import {
   GoogleAuthProvider,
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   setPersistence,
   signInWithCredential,
   signInWithPopup,
@@ -130,7 +131,9 @@ export function LoginForm() {
     try {
       if (!auth) throw new Error('auth/not-configured');
       await setPersistence(auth, browserLocalPersistence);
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      // The resolver is passed here only: auth itself is created without one
+      // so cold opens skip Google's iframe (see firebase/config.ts).
+      await signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver);
       // AuthContext's onAuthStateChanged loads the profile and routes on success.
     } catch (err: unknown) {
       setError(friendlyAuthError(err));

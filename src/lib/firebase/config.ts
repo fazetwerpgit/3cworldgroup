@@ -1,5 +1,12 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  browserSessionPersistence,
+  getAuth,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  type Auth,
+} from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -19,6 +26,25 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 
+// Auth WITHOUT a popup/redirect resolver. getAuth() installs
+// browserPopupRedirectResolver, and on iPhone/Safari user agents Firebase then
+// loads Google's sign-in iframe chain (apis.google.com -> gapi iframes ->
+// firebaseapp.com/__/auth/iframe, ~135 KB over 2 new origins) BEFORE it
+// restores the saved session, so every cold open waited on it. The persistence
+// list is getAuth's own (same storage, same migration), so saved sessions load
+// as before. The web Google popups pass browserPopupRedirectResolver to the
+// call itself (LoginForm, LinkedSignInMethods); the app signs in natively.
+function createAuth(firebaseApp: FirebaseApp): Auth {
+  try {
+    return initializeAuth(firebaseApp, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
+    });
+  } catch {
+    // Already initialized (dev hot reload): reuse that instance.
+    return getAuth(firebaseApp);
+  }
+}
+
 // Only initialize Firebase if we have a valid config
 // This allows the app to build without Firebase credentials
 if (hasValidConfig) {
@@ -27,7 +53,7 @@ if (hasValidConfig) {
   } else {
     app = getApps()[0];
   }
-  auth = getAuth(app);
+  auth = createAuth(app);
   db = getFirestore(app);
 }
 
