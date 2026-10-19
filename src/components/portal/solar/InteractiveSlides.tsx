@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDeck } from './deckState';
 import {
-  createBooking,
+  bookTime,
   fetchAvailability,
   formatSlotLong,
   formatSlotTime,
   groupSlotsByDay,
-  hasSeveralConsultants,
   setCreditTier,
   type CreditTier,
+  type SlotTime,
   type SolarMode,
   type SolarSlot,
 } from './solarClient';
@@ -103,13 +103,16 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
 
 const DAYS = 14;
 
-/** Slide 10: open consultation times for the next 14 days, Pacific time. */
+/**
+ * Slide 10: open consultation times for the next 14 days, Pacific time. Each
+ * time shows once; booking picks the consultant (bookTime).
+ */
 export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; onNeedLead: () => void }) {
   const { state, update } = useDeck();
   const [mode, setMode] = useState<SolarMode>(state.booking?.mode ?? 'virtual');
   const [slots, setSlots] = useState<SolarSlot[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<SolarSlot | null>(null);
+  const [picked, setPicked] = useState<SlotTime | null>(null);
   const [booking, setBooking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -134,22 +137,15 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
   }, [mode, load]);
 
   const days = useMemo(() => groupSlotsByDay(slots ?? []), [slots]);
-  const showNames = useMemo(() => hasSeveralConsultants(slots ?? []), [slots]);
-  const key = (slot: SolarSlot) => `${slot.consultantUid}_${slot.start}`;
 
   const book = async () => {
     if (!picked || !state.leadId || booking) return;
     setBooking(true);
     setMessage(null);
-    const res = await createBooking({
-      leadId: state.leadId,
-      mode,
-      consultantUid: picked.consultantUid,
-      start: picked.start,
-    });
+    const res = await bookTime(picked, state.leadId, mode);
     setBooking(false);
     if (!res.ok) {
-      if (res.status === 409) {
+      if (res.taken) {
         setPicked(null);
         setMessage('That time was just taken. Pick another.');
         void load(mode);
@@ -158,7 +154,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
       }
       return;
     }
-    update({ booking: { id: res.data.id, start: picked.start, mode, consultantName: picked.name } });
+    update({ booking: { id: res.id, start: res.slot.start, mode, consultantName: res.slot.name } });
     onBooked();
   };
 
@@ -202,19 +198,18 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
             <section key={day.key} className={s.day}>
               <h3>{day.label}</h3>
               <div className={s.times}>
-                {day.slots.map((slot) => (
+                {day.times.map((time) => (
                   <button
-                    key={key(slot)}
+                    key={time.start}
                     type="button"
                     className={s.time}
-                    aria-pressed={picked ? key(picked) === key(slot) : false}
+                    aria-pressed={picked?.start === time.start}
                     onClick={() => {
-                      setPicked(slot);
+                      setPicked(time);
                       setMessage(null);
                     }}
                   >
-                    {formatSlotTime(slot.start)}
-                    {showNames ? <small>{slot.name}</small> : null}
+                    {formatSlotTime(time.start)}
                   </button>
                 ))}
               </div>
@@ -232,10 +227,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
               {booking ? 'Booking...' : picked ? `Book ${formatSlotTime(picked.start)}` : 'Pick a time'}
             </button>
             {picked ? (
-              <p className={s.note}>
-                {formatSlotLong(picked.start)}
-                {showNames ? ` with ${picked.name}` : ''}
-              </p>
+              <p className={s.note}>{formatSlotLong(picked.start)}</p>
             ) : (
               <p className={s.small}>All times are Pacific.</p>
             )}
@@ -251,8 +243,8 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
   );
 }
 
-/** Slide 11: what was booked, and what happens next. */
-export function ConfirmationSlide({ onBook }: { onBook: () => void }) {
+/** Slide 11: what was booked, what happens next, and the way on to the next homeowner. */
+export function ConfirmationSlide({ onBook, onNewCustomer }: { onBook: () => void; onNewCustomer: () => void }) {
   const { state } = useDeck();
   const b = state.booking;
   return (
@@ -305,6 +297,11 @@ export function ConfirmationSlide({ onBook }: { onBook: () => void }) {
           <h3 className={s.colTitle}>All Set!</h3>
           <p className={s.colKicker}>We&apos;re Ready for You</p>
         </section>
+      </div>
+      <div className={s.formFoot}>
+        <button type="button" className={b ? s.primary : s.ghost} onClick={onNewCustomer}>
+          New customer
+        </button>
       </div>
     </>
   );

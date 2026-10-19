@@ -1,12 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CLIENT_ID_PATTERN,
   EMPTY_LEAD,
   formatSlotLong,
   formatSlotTime,
+  bookTime,
   formatWholeDollars,
   groupSlotsByDay,
-  hasSeveralConsultants,
   newDeckClientId,
   validateLead,
   type SolarSlot,
@@ -35,14 +35,58 @@ describe('solar deck helpers', () => {
       slot('2026-10-20T15:00:00.000Z'),
     ]);
     expect(days.map((d) => d.key)).toEqual(['2026-10-20', '2026-10-21']);
-    expect(days[0].slots.map((s) => formatSlotTime(s.start))).toEqual(['8:00 AM', '9:00 PM']);
+    expect(days[0].times.map((t) => formatSlotTime(t.start))).toEqual(['8:00 AM', '9:00 PM']);
     expect(days[0].label).toBe('Tuesday, Oct 20');
     expect(formatSlotLong('2026-10-21T16:00:00.000Z')).toBe('Wednesday, Oct 21 at 9:00 AM PT');
   });
 
-  it('names consultants only when there is more than one', () => {
-    expect(hasSeveralConsultants([slot('2026-10-20T15:00:00Z'), slot('2026-10-20T16:00:00Z')])).toBe(false);
-    expect(hasSeveralConsultants([slot('2026-10-20T15:00:00Z'), slot('2026-10-20T15:00:00Z', 'j', 'Jacob')])).toBe(true);
+  it('shows each time once, keeping the server preference order of consultants', () => {
+    const days = groupSlotsByDay([
+      slot('2026-10-20T15:00:00.000Z', 'own', 'Owner'),
+      slot('2026-10-20T15:00:00.000Z', 'jac', 'Jacob'),
+      slot('2026-10-20T16:00:00.000Z', 'jac', 'Jacob'),
+    ]);
+    expect(days[0].times.map((t) => [t.start, t.candidates.map((c) => c.consultantUid)])).toEqual([
+      ['2026-10-20T15:00:00.000Z', ['own', 'jac']],
+      ['2026-10-20T16:00:00.000Z', ['jac']],
+    ]);
+  });
+
+  describe('bookTime', () => {
+    const time = {
+      start: '2026-10-20T15:00:00.000Z',
+      candidates: [slot('2026-10-20T15:00:00.000Z', 'own', 'Owner'), slot('2026-10-20T15:00:00.000Z', 'jac', 'Jacob')],
+    };
+    const taken = { ok: false as const, status: 409, error: 'slot_taken' };
+
+    it('books the first free consultant', async () => {
+      const book = vi.fn(async () => ({ ok: true as const, data: { id: 'b1' } }));
+      expect(await bookTime(time, 'L', 'virtual', book)).toEqual({ ok: true, id: 'b1', slot: time.candidates[0] });
+      expect(book).toHaveBeenCalledTimes(1);
+      expect(book).toHaveBeenCalledWith({ leadId: 'L', mode: 'virtual', consultantUid: 'own', start: time.start });
+    });
+
+    it('retries once with the next consultant on a 409', async () => {
+      const book = vi.fn().mockResolvedValueOnce(taken).mockResolvedValueOnce({ ok: true, data: { id: 'b2' } });
+      const res = await bookTime(time, 'L', 'virtual', book);
+      expect(res).toEqual({ ok: true, id: 'b2', slot: time.candidates[1] });
+      expect(book.mock.calls[1][0].consultantUid).toBe('jac');
+    });
+
+    it('reports taken after the retry, or right away with one consultant', async () => {
+      const book = vi.fn().mockResolvedValue(taken);
+      expect(await bookTime(time, 'L', 'virtual', book)).toEqual({ ok: false, taken: true, error: 'slot_taken' });
+      expect(book).toHaveBeenCalledTimes(2);
+      book.mockClear();
+      expect((await bookTime({ ...time, candidates: [time.candidates[0]] }, 'L', 'virtual', book)).ok).toBe(false);
+      expect(book).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry other errors', async () => {
+      const book = vi.fn().mockResolvedValue({ ok: false, status: 500, error: 'Failed to book' });
+      expect(await bookTime(time, 'L', 'virtual', book)).toEqual({ ok: false, taken: false, error: 'Failed to book' });
+      expect(book).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('makes a clientId the API accepts', () => {

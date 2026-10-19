@@ -59,9 +59,22 @@ function loadState(): DeckState {
   }
 }
 
+/**
+ * Whether this deck holds a homeowner the rep hasn't finished with: anything
+ * typed, uploaded or saved, and no booking yet. Starting a new customer then
+ * asks first.
+ */
+export function hasLeadInProgress(state: DeckState): boolean {
+  if (state.booking) return false;
+  if (state.leadId || state.creditTier) return true;
+  if (Object.values(state.photos).some(Boolean)) return true;
+  return Object.values(state.lead).some((v) => v.trim() !== '');
+}
+
 type DeckContextValue = {
   state: DeckState;
   update: (patch: Partial<DeckState> | ((prev: DeckState) => Partial<DeckState>)) => void;
+  /** Clears everything for the next homeowner: fresh clientId and uploadId, no lead, no booking. */
   reset: () => void;
 };
 

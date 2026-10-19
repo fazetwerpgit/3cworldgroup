@@ -4,7 +4,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { DeckProvider } from './deckState';
+import { DeckProvider, hasLeadInProgress, useDeck } from './deckState';
+import { finishLead } from './solarClient';
 import { CalculatorSlide } from './CalculatorSlide';
 import { LeadFormSlide } from './LeadFormSlide';
 import { BookingSlide, ConfirmationSlide, PrequalSlide } from './InteractiveSlides';
@@ -45,6 +46,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 function Deck() {
+  const { state, reset } = useDeck();
+  const [confirming, setConfirming] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const [pos, setPos] = useState<{ index: number; dir: 'fwd' | 'back' }>({ index: 0, dir: 'fwd' });
   const { index, dir } = pos;
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -58,12 +62,33 @@ function Deck() {
     });
   }, []);
   const goTo = useCallback((id: SlideId) => go(ORDER.indexOf(id)), [go]);
+
+  // Done with this homeowner: the server sends the lead alert if a booking
+  // didn't (idempotent), then every field, id and photo is cleared.
+  const startNewCustomer = useCallback(() => {
+    if (state.leadId) void finishLead(state.leadId);
+    reset();
+    setConfirming(false);
+    go(0);
+  }, [state.leadId, reset, go]);
+  const requestNewCustomer = () => {
+    if (hasLeadInProgress(state)) setConfirming(true);
+    else startNewCustomer();
+  };
+
+  useEffect(() => {
+    if (confirming) cancelRef.current?.focus();
+  }, [confirming]);
   const next = useCallback(() => setPos((cur) => (cur.index >= ORDER.length - 1 ? cur : { index: cur.index + 1, dir: 'fwd' })), []);
   const prev = useCallback(() => setPos((cur) => (cur.index <= 0 ? cur : { index: cur.index - 1, dir: 'back' })), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
+      if (e.key === 'Escape') {
+        setConfirming(false);
+        return;
+      }
       if (e.key === 'ArrowRight' || e.key === 'PageDown') {
         e.preventDefault();
         next();
@@ -114,7 +139,7 @@ function Deck() {
     case 'steps': content = <StepsSlide />; break;
     case 'needs': content = <NeedsSlide />; break;
     case 'booking': content = <BookingSlide onBooked={() => goTo('confirm')} onNeedLead={() => goTo('lead')} />; break;
-    case 'confirm': content = <ConfirmationSlide onBook={() => goTo('booking')} />; break;
+    case 'confirm': content = <ConfirmationSlide onBook={() => goTo('booking')} onNewCustomer={requestNewCustomer} />; break;
     case 'appendix': content = <AppendixSlide />; break;
     case 'moving': content = <MovingSlide />; break;
     case 'fast': content = <FastSlide />; break;
@@ -124,13 +149,39 @@ function Deck() {
   return (
     <div className={s.root} data-solar-deck>
       <header className={s.top}>
-        <div className={s.brand}>
-          <Image src="/solar/globe.webp" alt="" width={28} height={28} />
-          3C World Group
-        </div>
-        <Link className={s.exit} href="/portal/dashboard">
-          Exit
-        </Link>
+        {confirming ? (
+          <div className={s.topConfirm} role="group" aria-label="Start a new customer">
+            <span>Clear {state.lead.first.trim() ? `${state.lead.first.trim()}'s` : 'this'} info?</span>
+            <button type="button" ref={cancelRef} className={s.exit} onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+            <button type="button" className={s.topConfirmGo} onClick={startNewCustomer}>
+              New customer
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className={s.brand}>
+              <Image src="/solar/globe.webp" alt="" width={28} height={28} />
+              3C World Group
+            </div>
+            <div className={s.topActions}>
+              <button type="button" className={s.exit} onClick={requestNewCustomer}>
+                New customer
+              </button>
+              <Link
+                className={s.exit}
+                href="/portal/dashboard"
+                onClick={() => {
+                  // Leaving with a saved, unbooked lead: send its alert now.
+                  if (state.leadId && !state.booking) void finishLead(state.leadId);
+                }}
+              >
+                Exit
+              </Link>
+            </div>
+          </>
+        )}
       </header>
 
       <div className={s.stage} ref={stageRef} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>

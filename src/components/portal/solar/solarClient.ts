@@ -12,7 +12,14 @@ export type PhotoSlot = 'billPage1' | 'billGraph' | 'panel';
 
 export type SolarSlot = { consultantUid: string; name: string; start: string; end: string };
 
-export type SlotDay = { key: string; label: string; slots: SolarSlot[] };
+/**
+ * One bookable time. `candidates` are the consultants free then, in the
+ * server's booking preference order (see orderByPreference): book the first,
+ * fall back to the next on a 409.
+ */
+export type SlotTime = { start: string; candidates: SolarSlot[] };
+
+export type SlotDay = { key: string; label: string; times: SlotTime[] };
 
 export const PHOTO_SLOTS: { slot: PhotoSlot; label: string }[] = [
   { slot: 'billPage1', label: 'Bill Upload (First Page)' },
@@ -76,27 +83,26 @@ export function formatSlotLong(iso: string): string {
   return `${dayLabelFmt.format(new Date(iso))} at ${formatSlotTime(iso)} PT`;
 }
 
-/** Slots grouped by Pacific day, days and times in order. */
+/**
+ * Slots grouped by Pacific day, then by start: each time shows once. The sort
+ * is stable, so consultants that share a start keep the server's preference
+ * order.
+ */
 export function groupSlotsByDay(slots: SolarSlot[]): SlotDay[] {
-  const sorted = [...slots].sort(
-    (a, b) => Date.parse(a.start) - Date.parse(b.start) || a.name.localeCompare(b.name)
-  );
+  const sorted = [...slots].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   const days: SlotDay[] = [];
   for (const slot of sorted) {
     const key = pacificDayKey(slot.start);
     let day = days[days.length - 1];
     if (!day || day.key !== key) {
-      day = { key, label: dayLabelFmt.format(new Date(slot.start)), slots: [] };
+      day = { key, label: dayLabelFmt.format(new Date(slot.start)), times: [] };
       days.push(day);
     }
-    day.slots.push(slot);
+    const time = day.times[day.times.length - 1];
+    if (time && Date.parse(time.start) === Date.parse(slot.start)) time.candidates.push(slot);
+    else day.times.push({ start: slot.start, candidates: [slot] });
   }
   return days;
-}
-
-/** Names are worth showing only when more than one consultant has open time. */
-export function hasSeveralConsultants(slots: SolarSlot[]): boolean {
-  return new Set(slots.map((s) => s.consultantUid)).size > 1;
 }
 
 export type LeadFields = {
@@ -181,5 +187,40 @@ export function createBooking(payload: { leadId: string; mode: SolarMode; consul
   return call<{ id: string }>('/api/portal/solar/bookings', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export type BookTimeResult =
+  | { ok: true; id: string; slot: SolarSlot }
+  | { ok: false; taken: boolean; error: string };
+
+/**
+ * Books `time` with its first free consultant. When that one answers 409 (just
+ * taken), retries once with the next consultant free at that time before
+ * reporting the time as taken.
+ */
+export async function bookTime(
+  time: SlotTime,
+  leadId: string,
+  mode: SolarMode,
+  book: typeof createBooking = createBooking
+): Promise<BookTimeResult> {
+  for (const slot of time.candidates.slice(0, 2)) {
+    const res = await book({ leadId, mode, consultantUid: slot.consultantUid, start: slot.start });
+    if (res.ok) return { ok: true, id: res.data.id, slot };
+    if (res.status !== 409) return { ok: false, taken: false, error: res.error };
+  }
+  return { ok: false, taken: true, error: 'slot_taken' };
+}
+
+/**
+ * Tells the server the rep is done with this homeowner, so the lead alert goes
+ * out if a booking hasn't sent it. keepalive lets it finish while the page
+ * navigates away (Exit).
+ */
+export function finishLead(id: string) {
+  return call<{ success?: boolean; sent?: boolean }>(`/api/portal/solar/leads/${encodeURIComponent(id)}/finish`, {
+    method: 'POST',
+    keepalive: true,
   });
 }
