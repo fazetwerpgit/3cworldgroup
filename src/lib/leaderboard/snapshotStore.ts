@@ -235,9 +235,52 @@ type RebuildOutcome = { snapshot: BoardSnapshot; source: 'rebuilt' | 'live' } | 
  */
 const pendingRebuild = new Map<'missing' | 'stale', Promise<RebuildOutcome>>();
 
-/** Tests: forget an in-flight rebuild. */
+/** Tests: forget an in-flight rebuild and the demo viewers' cached boards. */
 export function resetSnapshotRebuildForTests() {
   pendingRebuild.clear();
+  demoBuilds.clear();
+}
+
+/**
+ * A demo viewer's own board (shared sales plus its demo sales) costs a full
+ * sales read, so it is cached per viewer on this instance and rebuilt by the
+ * shared snapshot's rule: when the day changes, or when a write marked the
+ * board dirty (or it is older than MAX_AGE) and the last build is at least
+ * DEBOUNCE old. Concurrent requests share the one build.
+ */
+interface DemoBuild {
+  startedMs: number;
+  validKey: string;
+  promise: Promise<BoardSnapshot>;
+}
+const demoBuilds = new Map<string, DemoBuild>();
+/** Demo accounts are a handful; this only bounds a pathological list. */
+const DEMO_CACHE_MAX = 50;
+
+function demoSnapshot(now: Date, viewerUid: string, meta: SnapshotMeta | undefined): Promise<BoardSnapshot> {
+  const nowMs = now.getTime();
+  const validKey = snapshotValidKey(now);
+  const cached = demoBuilds.get(viewerUid);
+  if (cached) {
+    const cachedMeta: SnapshotMeta = {
+      version: SNAPSHOT_VERSION,
+      builtAtMs: cached.startedMs,
+      buildStartedMs: cached.startedMs,
+      validKey: cached.validKey,
+      dirtyAtMs: meta?.dirtyAtMs,
+    };
+    const state = snapshotState(cachedMeta, nowMs, validKey);
+    if (!shouldRebuild(state, cachedMeta, nowMs)) return cached.promise;
+  }
+  if (!demoBuilds.has(viewerUid) && demoBuilds.size >= DEMO_CACHE_MAX) demoBuilds.clear();
+  const promise = computeSnapshotFromFirestore(now, viewerUid);
+  const entry: DemoBuild = { startedMs: nowMs, validKey, promise };
+  demoBuilds.set(viewerUid, entry);
+  // A failed build is not cached: the next request tries again.
+  promise.catch(() => {
+    if (demoBuilds.get(viewerUid) === entry) demoBuilds.delete(viewerUid);
+  });
+  return promise;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -279,6 +322,23 @@ function rebuildWhenDue(now: Date, state: SnapshotState): Promise<RebuildOutcome
   return run;
 }
 
+/**
+ * The due rebuild for a board or tape read. A stale snapshot is still usable,
+ * so a failed rebuild (a sales page timeout, a batch commit) serves it rather
+ * than failing the request; the lease the failed build took stays held until
+ * it expires, which keeps other requests from retrying the full read at once.
+ * With nothing stored (missing), the error goes to the caller.
+ */
+async function rebuildOrServeStored(now: Date, state: SnapshotState): Promise<RebuildOutcome> {
+  try {
+    return await rebuildWhenDue(now, state);
+  } catch (error) {
+    if (state === 'missing') throw error;
+    console.error('[leaderboard snapshot] rebuild failed; serving the stored snapshot', error);
+    return 'stored';
+  }
+}
+
 /** One period of the board: from the stored snapshot, rebuilt first when due. */
 export async function loadBoardPeriod(req: BoardPeriodRequest): Promise<BoardPeriodResult> {
   const database = db();
@@ -291,15 +351,15 @@ export async function loadBoardPeriod(req: BoardPeriodRequest): Promise<BoardPer
 
   // A demo account sees its own demo sales on its board: built live for it alone.
   if (meta?.demoRepIds?.includes(req.viewerUid)) {
-    return fromSnapshot(await computeSnapshotFromFirestore(req.now, req.viewerUid), req, 'live');
+    return fromSnapshot(await demoSnapshot(req.now, req.viewerUid, meta), req, 'live');
   }
 
   const state = snapshotState(meta, nowMs, validKey);
   if (shouldRebuild(state, meta, nowMs)) {
-    const outcome = await rebuildWhenDue(req.now, state);
+    const outcome = await rebuildOrServeStored(req.now, state);
     if (outcome !== 'stored') {
       if (outcome.snapshot.demoRepIds.includes(req.viewerUid)) {
-        return fromSnapshot(await computeSnapshotFromFirestore(req.now, req.viewerUid), req, 'live');
+        return fromSnapshot(await demoSnapshot(req.now, req.viewerUid, meta), req, 'live');
       }
       return fromSnapshot(outcome.snapshot, req, outcome.source);
     }
@@ -329,15 +389,15 @@ export async function loadCompanyTape(now: Date, viewerUid: string): Promise<Key
   const nowMs = now.getTime();
   let meta = await readMeta();
   if (meta?.demoRepIds?.includes(viewerUid)) {
-    return (await computeSnapshotFromFirestore(now, viewerUid)).tape;
+    return (await demoSnapshot(now, viewerUid, meta)).tape;
   }
   let stored = parseJson<KeyedCompanyTape | null>(meta?.tape, null);
   // A meta with no tape (written before the tape existed) counts as missing.
   const state = stored ? snapshotState(meta, nowMs, snapshotValidKey(now)) : 'missing';
   if (shouldRebuild(state, meta, nowMs)) {
-    const outcome = await rebuildWhenDue(now, state);
+    const outcome = await rebuildOrServeStored(now, state);
     if (outcome !== 'stored') {
-      if (outcome.snapshot.demoRepIds.includes(viewerUid)) return (await computeSnapshotFromFirestore(now, viewerUid)).tape;
+      if (outcome.snapshot.demoRepIds.includes(viewerUid)) return (await demoSnapshot(now, viewerUid, meta)).tape;
       return outcome.snapshot.tape;
     }
     if (!stored) {

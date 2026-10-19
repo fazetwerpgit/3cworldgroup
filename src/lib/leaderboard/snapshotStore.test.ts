@@ -5,6 +5,7 @@ type Data = Record<string, unknown>;
 const store = vi.hoisted(() => ({
   tables: new Map<string, Map<string, Record<string, unknown>>>(),
   salesPageReads: 0,
+  failSalesRead: false,
 }));
 
 function table(name: string) {
@@ -32,6 +33,7 @@ vi.mock('@/lib/firebase/admin', () => {
     startAfter: (id: string) => salesQuery(limit, id),
     get: async () => {
       store.salesPageReads += 1;
+      if (store.failSalesRead) throw new Error('sales page timed out');
       const ids = [...table('sales').keys()].sort().filter((id) => after === null || id > after).slice(0, limit);
       return { docs: ids.map((id) => ({ id, data: () => ({ ...table('sales').get(id) }) })) };
     },
@@ -88,6 +90,7 @@ function weekRequest(now: Date, viewerUid = 'r1') {
 beforeEach(() => {
   store.tables.clear();
   store.salesPageReads = 0;
+  store.failSalesRead = false;
   resetSnapshotRebuildForTests();
 });
 
@@ -188,6 +191,59 @@ describe('leaderboard snapshot store', () => {
     expect(store.salesPageReads).toBe(reads);
     // The demo account still sees its own sale on its tape (built live).
     expect((await loadCompanyTape(new Date(NOW.getTime() + 2_000), 'demo')).mtdCount).toBe(3);
+  });
+});
+
+describe('a failed rebuild of a stale snapshot', () => {
+  it('serves the stored board and tape instead of failing the request', async () => {
+    sale('a', 'r1', new Date('2026-10-13T15:00:00.000Z'));
+    const first = await loadBoardPeriod(weekRequest(NOW));
+    sale('b', 'r2', new Date('2026-10-14T15:00:00.000Z'));
+    const t = NOW.getTime() + DEBOUNCE_MS + 5_000;
+    await markLeaderboardDirty(t);
+
+    store.failSalesRead = true;
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const board = await loadBoardPeriod(weekRequest(new Date(t + 500)));
+      expect(board.source).toBe('snapshot');
+      expect(board.payload).toEqual(first.payload);
+      const tape = await loadCompanyTape(new Date(t + 1_000), 'r1');
+      expect(tape).toMatchObject({ mtdCount: 1 });
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('still fails a request with nothing stored to serve', async () => {
+    sale('a', 'r1', new Date('2026-10-13T15:00:00.000Z'));
+    store.failSalesRead = true;
+    await expect(loadBoardPeriod(weekRequest(NOW))).rejects.toThrow('sales page timed out');
+  });
+});
+
+describe('a demo viewer\'s live board is cached per viewer', () => {
+  it('reads sales once per debounce, not once per request, and picks up a new sale after it', async () => {
+    sale('a', 'r1', new Date('2026-10-13T15:00:00.000Z'));
+    sale('d', 'demo', new Date('2026-10-13T15:00:00.000Z'), { demoAccount: true });
+    await loadBoardPeriod(weekRequest(NOW, 'r1'));
+
+    const reads = store.salesPageReads;
+    const first = await loadBoardPeriod(weekRequest(new Date(NOW.getTime() + 1_000), 'demo'));
+    expect(first.payload.totals.map((t) => t.salesRepId).sort()).toEqual(['demo', 'r1']);
+    await loadBoardPeriod(weekRequest(new Date(NOW.getTime() + 2_000), 'demo'));
+    await loadCompanyTape(new Date(NOW.getTime() + 3_000), 'demo');
+    await loadBoardPeriod({ ...weekRequest(new Date(NOW.getTime() + 4_000), 'demo'), periodId: 'year', start: periodBounds('year', NOW)!.start });
+    expect(store.salesPageReads).toBe(reads + 1);
+
+    // The demo account logs another sale: shown once the debounce has passed.
+    sale('d2', 'demo', new Date('2026-10-14T15:00:00.000Z'), { demoAccount: true });
+    await markLeaderboardDirty(NOW.getTime() + 5_000);
+    const soon = await loadBoardPeriod(weekRequest(new Date(NOW.getTime() + 6_000), 'demo'));
+    expect(store.salesPageReads).toBe(reads + 1);
+    expect(soon.payload.totals.find((t) => t.salesRepId === 'demo')?.totalSales).toBe(1);
+    const later = await loadBoardPeriod(weekRequest(new Date(NOW.getTime() + 1_000 + DEBOUNCE_MS), 'demo'));
+    expect(later.payload.totals.find((t) => t.salesRepId === 'demo')?.totalSales).toBe(2);
   });
 });
 
