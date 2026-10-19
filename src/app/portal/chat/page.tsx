@@ -1,11 +1,13 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { AlertCircle, ArrowDown, Check, Clock, FileText, ImagePlus, Lock, Pin, RotateCw, Send, ShieldAlert, Users, X } from 'lucide-react';
 import { ChannelInfoSheet } from '@/components/chat/ChannelInfoSheet';
+import { ChatTermsSheet } from '@/components/chat/ChatTermsSheet';
+import { ChatLightbox } from '@/components/chat/ChatLightbox';
 import type { LightboxImage } from '@/components/chat/ChatLightbox';
+import { GifPicker } from '@/components/chat/GifPicker';
 import type { GifResult } from '@/components/chat/GifPicker';
 import { isPdfFile, validateSelectedImage } from '@/components/chat/attachmentUpload';
 import { FileChip, PdfPreviewTile, messageFileInfo, messagePdfPreview } from '@/components/chat/FileChip';
@@ -19,9 +21,8 @@ import { clockTime, failedStatusLabel, pendingStatusLabel, type CompanyStats } f
 import c from '@/components/chat/chat.module.css';
 import s from '@/components/portal/rep/rep.module.css';
 import { MobileThread } from '@/components/chat/MobileThread';
-import type { ReadByTarget } from '@/components/chat/ReadBySheet';
+import { ReadBySheet, type ReadByTarget } from '@/components/chat/ReadBySheet';
 import { isAbortError } from '@/lib/fetch/isAbortError';
-import { waitForPageData } from '@/lib/cache/pageData';
 import type { ThreadMessage } from '@/components/chat/MobileThread';
 import { ReactionBar } from '@/components/chat/ReactionBar';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,18 +47,6 @@ import { useLiveAppended } from '@/hooks/chat/useLiveAppended';
 import { auth } from '@/lib/firebase/config';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { ChatAttachment, ChatReplySnippet, getEffectiveRole, MANAGEMENT_FIELD_ROLES } from '@/types';
-
-// Sheets that open on a tap: their own chunks, so opening chat downloads less.
-// Each renders only while open (as each rendered nothing while closed), and
-// all four are fetched in the background once the page has loaded.
-const loadGifPicker = () => import('@/components/chat/GifPicker');
-const loadChatLightbox = () => import('@/components/chat/ChatLightbox');
-const loadReadBySheet = () => import('@/components/chat/ReadBySheet');
-const loadChatTermsSheet = () => import('@/components/chat/ChatTermsSheet');
-const GifPicker = dynamic(() => loadGifPicker().then((m) => m.GifPicker), { ssr: false });
-const ChatLightbox = dynamic(() => loadChatLightbox().then((m) => m.ChatLightbox), { ssr: false });
-const ReadBySheet = dynamic(() => loadReadBySheet().then((m) => m.ReadBySheet), { ssr: false });
-const ChatTermsSheet = dynamic(() => loadChatTermsSheet().then((m) => m.ChatTermsSheet), { ssr: false });
 
 function getLocalDayKey(createdAt: Date | null) {
   const date = createdAt ?? new Date();
@@ -180,14 +169,6 @@ function DesktopAttachment({
 }
 
 export default function TeamChatPage() {
-  // Fetch the tap-to-open sheets' chunks once the page has had its turn.
-  useEffect(() => {
-    const wait = new AbortController();
-    void waitForPageData({ fallbackMs: 2500, signal: wait.signal }).then(() => {
-      for (const load of [loadGifPicker, loadChatLightbox, loadReadBySheet, loadChatTermsSheet]) void load().catch(() => undefined);
-    });
-    return () => wait.abort();
-  }, []);
   const { user, hasPermission, isRole } = useAuth();
   const onboardingUser = isOnboardingUser(user);
   const [activeChannelId, setActiveChannelId] = useState('');
@@ -1554,8 +1535,8 @@ export default function TeamChatPage() {
         )}
       </div>
       <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} onUnblock={safety.unblock} />
-      {readByTarget ? <ReadBySheet target={readByTarget} authedFetch={authedFetch} onClose={closeReadBy} /> : null}
-      {lightbox ? <ChatLightbox image={lightbox} onClose={closeLightbox} /> : null}
+      <ReadBySheet target={readByTarget} authedFetch={authedFetch} onClose={closeReadBy} />
+      <ChatLightbox image={lightbox} onClose={closeLightbox} />
       {inApp && safety.termsAccepted === false ? <ChatTermsSheet onAccept={acceptTermsAndResend} /> : null}
     </div>
   );
