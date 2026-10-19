@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { isDemoAccount } from '@/lib/users/demoAccount';
+import { memberName } from '@/lib/chat/memberDisplay';
 import { getEffectiveRole, isManagementRole, resolveRoles, PlatformRole, FieldRole } from '@/types';
 
 // The verified chat identity. Everything is derived from a real Firebase ID token
@@ -52,7 +53,10 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
     ok: true,
     user: {
       uid: gate.uid,
-      displayName: gate.name || data.displayName || data.email || '3C User',
+      // Stamped as authorName on messages, previews, reply quotes and pushes, so it
+      // must never be a full email: gate.name falls back to the raw email, while
+      // memberName uses only its local-part (same rule as the member lists).
+      displayName: memberName({ displayName: data.displayName, email: data.email || gate.email }),
       role,
       fieldRole,
       effectiveRole: getEffectiveRole({ role, fieldRole }),

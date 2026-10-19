@@ -61,6 +61,25 @@ describe('getVerifiedChatUser', () => {
     expect(res.ok && res.user.demoAccount).toBe(false);
   });
 
+  it('never uses a full email as the chat display name', async () => {
+    mockVerify.mockResolvedValue({ ok: true, uid: 'u3', name: 'jdoe@gmail.com', email: 'jdoe@gmail.com' });
+    userDoc('u3', { status: 'active', fieldRole: 'entry_level_rep', email: 'jdoe@gmail.com' });
+    const res = await getVerifiedChatUser(req());
+    expect(res.ok && res.user.displayName).toBe('jdoe');
+  });
+
+  it('uses the profile displayName when set, else a neutral fallback', async () => {
+    mockVerify.mockResolvedValue({ ok: true, uid: 'u4', name: 'Jane Doe', email: 'jane@x.com' });
+    userDoc('u4', { status: 'active', fieldRole: 'entry_level_rep', displayName: 'Jane Doe', email: 'jane@x.com' });
+    const named = await getVerifiedChatUser(req());
+    expect(named.ok && named.user.displayName).toBe('Jane Doe');
+
+    mockVerify.mockResolvedValue({ ok: true, uid: 'u5', name: 'u5', email: '' });
+    userDoc('u5', { status: 'active', fieldRole: 'entry_level_rep' });
+    const blank = await getVerifiedChatUser(req());
+    expect(blank.ok && blank.user.displayName).toBe('3C User');
+  });
+
   it('rejects when the token is invalid', async () => {
     mockVerify.mockResolvedValue({ ok: false, error: 'Invalid authentication token', status: 401 });
     const res = await getVerifiedChatUser(req());
