@@ -68,7 +68,11 @@ export async function findAnyAccount(email: string): Promise<{ uid: string } | n
   const auth = await findAuthAccount(email);
   if (auth) return auth;
   if (!adminDb) return null;
-  const profiles = await adminDb.collection('users').where('email', '==', email).limit(1).get();
-  const doc = profiles.docs[0];
-  return doc ? { uid: doc.id } : null;
+  // Older users docs store the address as `Email` (capital E), newer ones as `email`.
+  for (const field of ['email', 'Email']) {
+    const profiles = await adminDb.collection('users').where(field, '==', email).limit(1).get();
+    const doc = profiles.docs[0];
+    if (doc) return { uid: doc.id };
+  }
+  return null;
 }
