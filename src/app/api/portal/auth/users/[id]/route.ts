@@ -21,6 +21,7 @@ import { restampAuthor } from '@/lib/chat/restampAuthor';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
 import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
+import { revokeAppleSignIn } from '@/lib/auth/appleSignIn';
 import { hasOtherActiveOwner } from '@/lib/users/accountClosure';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
 import { getActivationReadinessForRole } from '@/lib/onboarding/activation';
@@ -616,6 +617,19 @@ export async function DELETE(
         { error: 'Forbidden: only an owner can delete an owner account' },
         { status: 403 }
       );
+    }
+
+    // Revoke Sign in with Apple (guideline 5.1.1(v)) with the refresh token
+    // stored at sign-in, and drop users/{uid}/private/appleAuth, as the
+    // self-delete does. Best effort: a missing key config or an Apple error is
+    // logged and never blocks the delete.
+    try {
+      const apple = await revokeAppleSignIn(adminDb, id);
+      if (apple.status !== 'none' && apple.status !== 'revoked') {
+        console.warn('[users/delete] Apple token not revoked', id, apple.status);
+      }
+    } catch (error) {
+      console.error('[users/delete] Apple token revoke threw', id, error);
     }
 
     // Delete user from Firebase Auth. An account whose Auth record is already gone

@@ -94,6 +94,10 @@ vi.mock('@/lib/users/purgeSensitiveUserData', () => ({
 
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
 
+const revokeAppleMock = vi.hoisted(() =>
+  vi.fn<(db: unknown, uid: string) => Promise<{ status: string }>>(async () => ({ status: 'none' }))
+);
+vi.mock('@/lib/auth/appleSignIn', () => ({ revokeAppleSignIn: revokeAppleMock }));
 vi.mock('@/lib/audit/adminAudit', () => ({ writeAdminAudit: vi.fn(async () => undefined) }));
 const readinessMock = vi.hoisted(() =>
   vi.fn<(userId: string, fieldRole: string, isIBO: boolean) => Promise<{ ready: boolean; missing: string[] }>>(
@@ -781,6 +785,46 @@ describe('DELETE /api/portal/auth/users/[id]', () => {
       details: { completed: true, role: 'entry_rep', status: 'inactive', purge: { userSensitive: 1, files: 2, failures: [] } },
     });
     expect(JSON.stringify(entry)).not.toContain('rep@x.test');
+  });
+
+  it('revokes Sign in with Apple for the deleted account before closing its sign-in', async () => {
+    firestore.users.set('pending-user', { status: 'inactive' });
+    revokeAppleMock.mockImplementationOnce(async () => {
+      expect(firestore.adminAuth.deleteUser).not.toHaveBeenCalled();
+      return { status: 'revoked' };
+    });
+
+    const response = await DELETE(request({}), params());
+
+    expect(response.status).toBe(200);
+    expect(revokeAppleMock).toHaveBeenCalledWith(firestore.adminDb, 'pending-user');
+    expect(firestore.users.get('pending-user')).toBeUndefined();
+  });
+
+  it('still deletes the account when the Apple revoke fails or throws', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    firestore.users.set('pending-user', { status: 'inactive' });
+    revokeAppleMock.mockResolvedValueOnce({ status: 'failed' });
+    expect((await DELETE(request({}), params())).status).toBe(200);
+    expect(firestore.users.get('pending-user')).toBeUndefined();
+
+    firestore.users.set('pending-user', { status: 'inactive' });
+    revokeAppleMock.mockRejectedValueOnce(new Error('apple down'));
+    expect((await DELETE(request({}), params())).status).toBe(200);
+    expect(firestore.users.get('pending-user')).toBeUndefined();
+    expect(firestore.adminAuth.deleteUser).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
+  it('does not revoke Apple when the caller is refused', async () => {
+    firestore.users.set('pending-user', { status: 'active', role: 'operations' });
+    mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    await DELETE(request({}), params());
+
+    expect(revokeAppleMock).not.toHaveBeenCalled();
   });
 
   it('writes no audit row when the delete itself fails', async () => {
