@@ -51,6 +51,16 @@ describe('checkChatText', () => {
     expect(checkChatText('tranny!')).toEqual({ ok: true, text: 't*****!', masked: true });
     expect(checkChatText('tr4nny')).toEqual({ ok: true, text: 't*****', masked: true });
   });
+  it('sees through invisible characters and fullwidth letters', () => {
+    for (const line of ['n\u00ADigger', 'fa\u200Bggot', 're\u200Dtard', '\uFF4E\uFF49\uFF47\uFF47\uFF41', 'f\uFEFFag!']) {
+      expect(checkChatText(line)).toEqual({ ok: false, error: CHAT_FILTER_REJECT_MESSAGE });
+    }
+    expect(checkChatText('fu\u200Bck you')).toEqual({ ok: true, text: 'f**** you', masked: true });
+    expect(checkChatText('\uFF46\uFF55\uFF43\uFF4B it')).toEqual({ ok: true, text: '\uFF46*** it', masked: true });
+    expect(checkChatText('k\u00ADike')).toEqual({ ok: true, text: 'k****', masked: true });
+    // Clean text with the same characters passes through untouched.
+    expect(checkChatText('Great\u200B job \uFF01')).toEqual({ ok: true, text: 'Great\u200B job \uFF01', masked: false });
+  });
 });
 
 describe('isFilteredLabel', () => {

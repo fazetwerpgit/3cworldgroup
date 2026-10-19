@@ -14,7 +14,8 @@
 //
 // Matching is whole-word (letters on either side means no match, so place
 // names and ordinary words that contain a stem pass), case-insensitive, and
-// sees through common character swaps (0->o, 1/!->i, 3->e, 4/@->a, $/5->s, 7->t).
+// sees through common character swaps (0->o, 1/!->i, 3->e, 4/@->a, $/5->s, 7->t),
+// invisible characters (soft hyphen, zero-width space) and fullwidth letters.
 // The text is checked in three forms (all swaps; all swaps except !/1; plain
 // lowercase) and a hit in any counts: otherwise a trailing "!" or "1" ("fag!")
 // would swap into a letter and hide the word boundary.
@@ -52,19 +53,39 @@ const SWAPS_KEEP_I: Record<string, string> = Object.fromEntries(
 );
 const NO_SWAPS: Record<string, string> = {};
 
+// Characters that render as nothing (soft hyphen, zero-width space/joiners,
+// BOM, variation selectors...): dropped before matching so "f\u00ADuck" can't
+// hide a word. Fullwidth and other compatibility forms ("\uFF46\uFF55\uFF43\uFF4B") are
+// folded with NFKC for the same reason.
+const INVISIBLE_RE = /^\p{Default_Ignorable_Code_Point}$/u;
+
+type Normalized = {
+  /** The text to match against. */
+  form: string;
+  /** For each code unit of `form`: the [start, end) code-unit range in the original text it came from. */
+  origin: Array<[number, number]>;
+};
+
 /**
- * Same length as the input, so match indices map straight back onto it.
+ * Lowercased, NFKC-folded, invisible characters removed, swaps applied, with
+ * a map from each matched position back onto the original text.
  * `swaps` picks the character-swap table (NO_SWAPS gives plain lowercase).
  */
-function normalize(text: string, swaps: Record<string, string> = SWAPS): string {
-  let out = '';
+function normalize(text: string, swaps: Record<string, string> = SWAPS): Normalized {
+  let form = '';
+  const origin: Array<[number, number]> = [];
+  let index = 0;
   for (const ch of text) {
-    const lower = ch.toLowerCase();
-    // Keep a 1:1 code-unit mapping: anything that lowercases to a different length passes through.
-    const swapped = swaps[lower] ?? lower;
-    out += swapped.length === ch.length ? swapped : ch;
+    const start = index;
+    index += ch.length;
+    if (INVISIBLE_RE.test(ch)) continue;
+    for (const folded of ch.normalize('NFKC').toLowerCase()) {
+      const swapped = swaps[folded] ?? folded;
+      form += swapped;
+      for (let k = 0; k < swapped.length; k += 1) origin.push([start, index]);
+    }
   }
-  return out;
+  return { form, origin };
 }
 
 function wordPattern(stems: readonly string[], suffixes: string): RegExp {
@@ -86,18 +107,22 @@ export type ChatTextCheck = { ok: true; text: string; masked: boolean } | { ok: 
 export function checkChatText(text: string): ChatTextCheck {
   if (!text) return { ok: true, text, masked: false };
   const forms = [normalize(text), normalize(text, SWAPS_KEEP_I), normalize(text, NO_SWAPS)];
-  if (forms.some((form) => new RegExp(SLUR_RE.source).test(form))) {
+  if (forms.some(({ form }) => new RegExp(SLUR_RE.source).test(form))) {
     return { ok: false, error: CHAT_FILTER_REJECT_MESSAGE };
   }
 
   let masked = false;
   const chars = text.split('');
-  for (const form of forms) {
+  for (const { form, origin } of forms) {
     for (const re of [SEVERE_RE, MASKED_SLUR_RE]) {
       for (const match of form.matchAll(re)) {
         masked = true;
         const start = match.index ?? 0;
-        for (let i = start + 1; i < start + match[0].length; i += 1) chars[i] = '*';
+        // Keep the first original character; star everything after it up to the
+        // end of the match (invisible characters inside the word included).
+        const from = origin[start][1];
+        const to = origin[start + match[0].length - 1][1];
+        for (let i = from; i < to; i += 1) chars[i] = '*';
       }
     }
   }
