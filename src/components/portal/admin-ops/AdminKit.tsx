@@ -184,6 +184,8 @@ export function ConfirmStrip({
   sub,
   confirming,
   confirmLabel = 'Delete',
+  busyLabel = 'Deleting…',
+  cancelLabel = 'Cancel',
   onCancel,
   onConfirm,
 }: {
@@ -191,6 +193,10 @@ export function ConfirmStrip({
   sub?: string;
   confirming: boolean;
   confirmLabel?: string;
+  /** The confirm button's label while it runs. */
+  busyLabel?: string;
+  /** The back-out button ("Keep it" when the action itself is a cancel). */
+  cancelLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -202,10 +208,10 @@ export function ConfirmStrip({
       </p>
       <div className={s.confirmBtns}>
         <button type="button" className={s.btnGhost} onClick={onCancel} disabled={confirming}>
-          Cancel
+          {cancelLabel}
         </button>
         <button type="button" className={s.btnDanger} onClick={onConfirm} disabled={confirming}>
-          {confirming ? 'Deleting…' : confirmLabel}
+          {confirming ? busyLabel : confirmLabel}
         </button>
       </div>
     </div>

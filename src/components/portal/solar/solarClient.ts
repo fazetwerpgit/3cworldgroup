@@ -1,5 +1,7 @@
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { randomHex } from '@/lib/randomHex';
+import type { SolarLeadView } from '@/lib/solar/leadView';
+import type { SolarLeadStatus } from '@/lib/solar/leadFields';
 
 // Client half of the solar deck: the authed calls to /api/portal/solar/** and
 // the pure formatting helpers the slides share (tested in solarClient.test.ts).
@@ -241,4 +243,37 @@ export function finishLead(id: string) {
     method: 'POST',
     keepalive: true,
   });
+}
+
+// ---------------------------------------------------------------- leads
+
+export type { SolarLeadBooking, SolarLeadView } from '@/lib/solar/leadView';
+export type { SolarLeadStatus } from '@/lib/solar/leadFields';
+
+/** Own leads (admins: every lead, unless `mine`), newest first, each with its live booking. */
+export function fetchLeads({ mine = false }: { mine?: boolean } = {}) {
+  return call<{ leads: SolarLeadView[] }>(`/api/portal/solar/leads${mine ? '?mine=1' : ''}`);
+}
+
+/** Admin only. Reopening ('new') comes back as 'booked' while a booking holds a slot. */
+export function setLeadStatus(id: string, status: SolarLeadStatus) {
+  return call<{ success: boolean; id: string; status: SolarLeadStatus }>(
+    `/api/portal/solar/leads/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify({ status }) }
+  );
+}
+
+/** Admin or the booking's consultant: frees the slot and puts the lead back to new. */
+export function cancelBooking(id: string) {
+  return call<{ success: boolean; id: string }>(`/api/portal/solar/bookings/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status: 'cancelled' }),
+  });
+}
+
+/** A short-lived signed link to one stored photo folder (the caller's own, or any for management). */
+export async function photoUrl(path: string): Promise<string | null> {
+  const res = await call<{ url: string | null }>(`/api/portal/forms/attachment?path=${encodeURIComponent(path)}`);
+  if (!res.ok) throw new Error(res.error);
+  return res.data.url;
 }

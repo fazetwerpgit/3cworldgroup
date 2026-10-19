@@ -207,6 +207,12 @@ describe('GET /api/portal/solar/leads', () => {
     expect(leads[2]).toMatchObject({ status: 'sold', source: 'knock', repName: 'Rep Two' });
   });
 
+  it('gives an admin only their own leads with ?mine=1', async () => {
+    mockGate.mockResolvedValue({ ...ADMIN, uid: 'rep2' });
+    const res = await GET(new NextRequest('http://localhost/api/portal/solar/leads?mine=1'));
+    expect((await res.json()).leads.map((l: { id: string }) => l.id)).toEqual(['rep2_a']);
+  });
+
   it('403s a caller without solar access, 401s without a token', async () => {
     mockGate.mockResolvedValue({ ...REP, uid: 'fiber', fieldRole: 'ae_tier_1', solarRole: null });
     expect((await get()).status).toBe(403);

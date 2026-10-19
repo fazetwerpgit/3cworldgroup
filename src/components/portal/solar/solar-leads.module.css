@@ -1,0 +1,541 @@
+/* ==========================================================================
+   Solar leads: the admin Leads tab's list, the lead detail (shared with the
+   rep's read-only sheet) and the rep Solar page's My leads and next
+   consultation. D tokens from the rep shell (.root, or .layer for sheets
+   portaled to <body>); none defined here. Phone first; the admin list turns
+   into a table from 1024px.
+   ========================================================================== */
+
+/* ---------- admin list ---------- */
+.head {
+  display: none;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list > li + li {
+  border-top: 1px solid var(--c-line); /* taste-skill-ignore: data table rows */
+}
+
+/* First time the list shows this session, rows rise in a short stagger. */
+.list[data-reveal] > li {
+  animation: rowRise 280ms ease-out backwards;
+  animation-delay: calc(min(var(--i, 0), 8) * 30ms);
+}
+
+@keyframes rowRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'who status'
+    'when when'
+    'rep bill';
+  align-items: center;
+  gap: 6px var(--s3);
+  width: 100%;
+  min-height: 72px;
+  padding: 14px var(--s4);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 120ms ease-out;
+}
+
+@media (hover: hover) {
+  .row:hover {
+    background: var(--c-raised);
+  }
+}
+
+@media (max-width: 1023px) {
+  .row:active {
+    transform: scale(0.98);
+  }
+}
+
+.row:focus-visible {
+  outline-offset: -2px;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.who {
+  grid-area: who;
+}
+
+.when {
+  grid-area: when;
+}
+
+.rep {
+  grid-area: rep;
+}
+
+.bill {
+  grid-area: bill;
+  justify-self: end;
+  text-align: right;
+}
+
+.status {
+  grid-area: status;
+  justify-self: end;
+}
+
+.chev {
+  display: none;
+}
+
+.main {
+  overflow: hidden;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sub {
+  overflow: hidden;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Phone: the second and third lines are one quiet size. */
+.when .main,
+.rep .main,
+.bill .main {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+.when .sub,
+.rep .sub,
+.bill .sub {
+  display: none;
+}
+
+.unbooked {
+  color: var(--c-text-3);
+}
+
+.closed .who .main {
+  color: var(--c-text-2);
+}
+
+@media (min-width: 1024px) {
+  .head,
+  .row {
+    display: grid;
+    grid-template-columns:
+      minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.4fr) 116px 20px;
+    grid-template-areas: 'who rep bill when status chev';
+    gap: var(--s4);
+    align-items: center;
+  }
+
+  .head {
+    min-height: 40px;
+    padding: 0 var(--s5);
+    border-bottom: 1px solid var(--c-line); /* taste-skill-ignore: data table head */
+    color: var(--c-text-3);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+
+  .row {
+    min-height: 68px;
+    padding: var(--s2) var(--s5);
+  }
+
+  .bill {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .status {
+    justify-self: start;
+  }
+
+  .when .main,
+  .rep .main,
+  .bill .main {
+    color: var(--c-text);
+    font-size: var(--t-ui);
+  }
+
+  .when .sub,
+  .rep .sub,
+  .bill .sub {
+    display: block;
+  }
+
+  .when .unbooked {
+    color: var(--c-text-3);
+  }
+
+  .closed .main {
+    color: var(--c-text-2);
+  }
+
+  .chev {
+    display: block;
+    color: var(--c-text-3);
+  }
+}
+
+/* ---------- sheet footer ---------- */
+.foot {
+  display: grid;
+  gap: var(--s2);
+  width: 100%;
+}
+
+.footRow {
+  display: flex;
+  gap: var(--s2);
+}
+
+.footRow > * {
+  flex: 1 1 0;
+}
+
+.footErr {
+  margin: 0;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+.cancelBooking {
+  justify-self: center;
+  min-height: 44px;
+  padding: 0 var(--s3);
+  border: 0;
+  background: transparent;
+  color: var(--c-red);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+.cancelBooking:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- detail ---------- */
+.link {
+  color: var(--c-text);
+  text-decoration: underline;
+  text-decoration-color: var(--c-line-strong);
+  text-underline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .link:hover {
+    text-decoration-color: var(--c-text-2);
+  }
+}
+
+.quiet {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+}
+
+.photos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.photos > li {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.photo {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: var(--c-well);
+  color: var(--c-text-3);
+}
+
+button.photo {
+  cursor: zoom-in;
+  transition: transform 120ms ease-out;
+}
+
+button.photo:active {
+  transform: scale(0.97);
+}
+
+button.photo:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.photoImg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photoSkel {
+  position: absolute;
+  inset: 0;
+  background: var(--c-panel-hi);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.photoNone {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--s2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  text-align: center;
+}
+
+.photoLabel {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.3;
+}
+
+/* ---------- rep Solar page: next consultation and My leads ---------- */
+.next {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4);
+  border-radius: 16px;
+  background: var(--c-panel);
+}
+
+.nextBtn {
+  width: 100%;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    transform 120ms ease-out;
+}
+
+.nextBtn:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) {
+  .nextBtn:hover {
+    background: var(--c-panel-hi);
+  }
+}
+
+.nextBtn:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.minePad {
+  padding: 0 var(--s4) var(--s4);
+}
+
+.nextLabel {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.nextWhen {
+  margin: 0;
+  color: var(--c-text);
+  font-family: var(--f-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 0.95;
+  padding-top: 2px;
+}
+
+.nextWho {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+.mine {
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--c-panel);
+}
+
+.mineHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s4) var(--s4) var(--s2);
+}
+
+.mineTitle {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 34px;
+  font-weight: 400;
+  line-height: 0.95;
+}
+
+.mineCount {
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mineList {
+  margin: 0;
+  padding: 0 0 var(--s2);
+  list-style: none;
+}
+
+.mineRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px var(--s3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--s3) var(--s4);
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+
+.mineRow:active {
+  background: var(--c-panel-hi);
+  transition-delay: var(--press-delay, 90ms);
+}
+
+@media (hover: hover) {
+  .mineRow:hover {
+    background: var(--c-panel-hi);
+  }
+}
+
+.mineRow:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.mineText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.mineName {
+  overflow: hidden;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mineSub {
+  overflow: hidden;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mineEmpty {
+  margin: 0;
+  padding: 0 var(--s4) var(--s4);
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.mineMore {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  background: transparent;
+  color: var(--c-text-2);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list[data-reveal] > li,
+  .photoSkel {
+    animation: none;
+  }
+
+  .row,
+  button.photo {
+    transition: none;
+  }
+}

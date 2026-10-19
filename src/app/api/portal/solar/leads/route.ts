@@ -14,7 +14,8 @@ import { bookingView, leadView, type SolarLeadBooking } from '@/lib/solar/leadVi
 // GET /api/portal/solar/leads -> 200 {leads: SolarLeadView[]}, newest first,
 // each with its live booking joined (booking: null when there is none or it
 // was cancelled). An admin (or the owner) gets every lead but demo accounts';
-// anyone else with solar:read gets only their own.
+// anyone else with solar:read gets only their own. ?mine=1 asks for one's own
+// leads as an admin too (the rep Solar page's My leads).
 export async function GET(request: NextRequest) {
   try {
     const gate = await requireVerifiedUser(request);
@@ -25,13 +26,14 @@ export async function GET(request: NextRequest) {
     if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     const db = adminDb;
 
-    const leads = gate.isAdmin
+    const all = gate.isAdmin && request.nextUrl.searchParams.get('mine') !== '1';
+    const leads = all
       ? db.collection('solarLeads')
       : db.collection('solarLeads').where('repUid', '==', gate.uid);
     const snap = await leads.get();
     const docs = snap.docs
       .map((d) => ({ id: d.id, data: (d.data() ?? {}) as Record<string, unknown> }))
-      .filter(({ data }) => !gate.isAdmin || data[DEMO_ACCOUNT_FIELD] !== true);
+      .filter(({ data }) => !all || data[DEMO_ACCOUNT_FIELD] !== true);
 
     const bookingIds = [
       ...new Set(docs.map(({ data }) => (typeof data.bookingId === 'string' ? data.bookingId : '')).filter(Boolean)),
