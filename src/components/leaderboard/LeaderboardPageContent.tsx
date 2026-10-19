@@ -13,6 +13,7 @@ import {
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { periodLabel } from './PeriodCountdown';
 import type { MonthNav } from './MonthNav';
+import type { BoardSwitch } from './BoardSwitch';
 import type { MonthKey } from '@/lib/sales/monthWindow';
 import styles from './leaderboard.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -43,6 +44,8 @@ interface LeaderboardPageContentProps {
   /** False while the desktop board is the visible one. The countdown's clock
    *  stops there; nothing on this page is on screen to read it. */
   active?: boolean;
+  /** Fiber | Solar, for a viewer with both boards; null shows the one board. */
+  boardSwitch?: BoardSwitch | null;
 }
 
 /** The phone leaderboard: head, filters, the podium on its stage (with the
@@ -67,6 +70,7 @@ export function LeaderboardPageContent({
   monthNav = null,
   pastMonth = null,
   active = true,
+  boardSwitch = null,
 }: LeaderboardPageContentProps) {
   if (!active) return null;
 
@@ -82,6 +86,7 @@ export function LeaderboardPageContent({
         onPeriodChange={onPeriodChange}
         onMetricChange={onMetricChange}
         monthNav={monthNav}
+        boardSwitch={boardSwitch}
       />
       {/* A failed load: plain words and a retry, never the raw request error. */}
       {error && !loading ? (

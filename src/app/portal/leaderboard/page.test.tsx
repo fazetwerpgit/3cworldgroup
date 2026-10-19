@@ -23,16 +23,19 @@ const testState = vi.hoisted(() => ({
   unranked: [] as Array<{ salesRepId: string; salesRepName: string }>,
   recent: [] as Array<{ repName: string; plan: string; at: string; dayOnly?: boolean }>,
   firstMonth: null as string | null,
+  user: { uid: 'current', displayName: 'Ada Lovelace', avatarUrl: null } as Record<string, unknown>,
+  permissions: ['leaderboard:read'] as string[],
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { uid: 'current', displayName: 'Ada Lovelace', avatarUrl: null } }),
+  useAuth: () => ({ user: testState.user, hasPermission: (p: string) => testState.permissions.includes(p) }),
 }));
 
 vi.mock('@/lib/firebase/config', () => ({ auth: null }));
 
 vi.mock('@/hooks/useLeaderboard', () => ({
   FIRST_LEADERBOARD_BOARD: { period: 'week', metric: 'totalPoints', limit: 100, scope: 'approved', team: true },
+  FIRST_SOLAR_BOARD: { period: 'week', metric: 'bookedConsults', limit: 100, scope: 'approved', team: true, source: 'solar' },
   useLeaderboard: () => ({
     get leaderboard() {
       return testState.leaderboard;
@@ -95,6 +98,8 @@ beforeEach(() => {
   testState.unranked = [];
   testState.recent = [];
   testState.firstMonth = null;
+  testState.user = { uid: 'current', displayName: 'Ada Lovelace', avatarUrl: null };
+  testState.permissions = ['leaderboard:read'];
   setViewport(false);
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -282,5 +287,53 @@ describe('below the podium', () => {
     // Team pulse's "Your climb" covers the spot on the desktop board.
     expect(container.querySelector('[data-testid="spot-line"]')).toBeNull();
     expect(container.textContent).toContain('Rep 2 · 2 Gig');
+  });
+});
+
+describe('fiber and solar boards', () => {
+  const buttonsIn = () => [...container.querySelectorAll<HTMLButtonElement>('button')];
+
+  it('never shows anything solar to a fiber rep with no solar role', async () => {
+    testState.user = { uid: 'current', displayName: 'Ada Lovelace', fieldRole: 'entry_rep' };
+    testState.leaderboard = board();
+    await act(async () => root.render(<LeaderboardRoute />));
+    expect(buttonsIn().some((b) => b.textContent === 'Solar')).toBe(false);
+    expect(container.querySelector('[aria-label="Leaderboard"]')).toBeNull();
+    for (const call of testState.fetchLeaderboard.mock.calls) expect(call[4]).not.toHaveProperty('source');
+  });
+
+  it('gives a solar-only rep the solar board alone: booked consults, no switches', async () => {
+    testState.user = { uid: 'current', displayName: 'Ada Lovelace', solarRole: 'entry_canvasser' };
+    testState.permissions = ['leaderboard:read', 'solar:read', 'solar:write'];
+    testState.leaderboard = board();
+    await act(async () => root.render(<LeaderboardRoute />));
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'bookedConsults', 100, 'approved', { team: true, source: 'solar' });
+    expect(container.textContent).toContain('Weekly booked consults · resets Sunday');
+    expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 consults this week');
+    expect(container.querySelector('[aria-label="Leaderboard"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Leaderboard metric"]')).toBeNull();
+
+    const month = buttonsIn().find((b) => b.textContent === 'Month');
+    await act(async () => month?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'bookedConsults', 100, 'approved', { team: true, source: 'solar' });
+  });
+
+  it('gives a dual rep (and an admin) a Fiber | Solar switch, fiber first', async () => {
+    testState.user = { uid: 'current', displayName: 'Ada Lovelace', fieldRole: 'entry_rep', solarRole: 'virtual_closer' };
+    testState.permissions = ['leaderboard:read', 'sales:read', 'solar:read', 'solar:write'];
+    testState.leaderboard = board();
+    await act(async () => root.render(<LeaderboardRoute />));
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'totalPoints', 100, 'approved', { team: true });
+    const group = container.querySelector('[aria-label="Leaderboard"]');
+    expect(group?.textContent).toBe('FiberSolar');
+
+    const solar = buttonsIn().find((b) => b.textContent === 'Solar');
+    await act(async () => solar?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'bookedConsults', 100, 'approved', { team: true, source: 'solar' });
+    expect(container.querySelector('[aria-label="Leaderboard metric"]')).toBeNull();
+
+    const fiber = buttonsIn().find((b) => b.textContent === 'Fiber');
+    await act(async () => fiber?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'totalPoints', 100, 'approved', { team: true });
   });
 });

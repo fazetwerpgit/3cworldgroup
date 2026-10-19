@@ -21,13 +21,14 @@ import { weekTimeLeft } from '@/lib/dashboard/repSummary';
 import p from '@/components/portal/rep/rep-page.module.css';
 import tx from '@/components/portal/rep/rep-taste.module.css';
 import d from './leaderboard-desk.module.css';
-import type { LeaderboardEntry } from '../LeaderboardTable';
+import type { LeaderboardEntry, LeaderboardMetric } from '../LeaderboardTable';
+import { BOARD_OPTIONS, type BoardSwitch } from '../BoardSwitch';
 import type { MonthNav } from '../MonthNav';
 import { MonthPicker } from '@/components/portal/rep/MonthPicker';
 import type { MonthKey } from '@/lib/sales/monthWindow';
 
 type Period = 'week' | 'month' | 'year' | 'all';
-type Metric = 'totalPoints' | 'totalSales';
+type Metric = LeaderboardMetric;
 
 
 const periodOptions: { value: Period; label: string }[] = [
@@ -50,15 +51,32 @@ function LegacyLeaderboardFilters({
   setPeriod,
   setMetric,
   monthNav,
+  boardSwitch = null,
 }: {
   period: Period;
   metric: Metric;
   setPeriod: (period: Period) => void;
   setMetric: (metric: Metric) => void;
   monthNav?: MonthNav | null;
+  boardSwitch?: BoardSwitch | null;
 }) {
   return (
     <div className={d.filters}>
+      {boardSwitch ? (
+        <div className={tx.seg} role="group" aria-label="Leaderboard">
+          {BOARD_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={boardSwitch.board === option.value}
+              onClick={() => boardSwitch.onChange(option.value)}
+              className={tx.segBtn}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className={tx.chips} role="group" aria-label="Leaderboard period">
           {periodOptions.map((option) => (
             <button
@@ -72,7 +90,9 @@ function LegacyLeaderboardFilters({
             </button>
           ))}
       </div>
-      <div className={tx.seg} role="group" aria-label="Leaderboard metric">
+      {/* The solar board ranks by booked consults alone: no metric switch. */}
+      {metric === 'bookedConsults' ? null : (
+        <div className={tx.seg} role="group" aria-label="Leaderboard metric">
           {metricOptions.map((option) => (
             <button
               key={option.value}
@@ -84,7 +104,8 @@ function LegacyLeaderboardFilters({
               {option.label}
             </button>
           ))}
-      </div>
+        </div>
+      )}
       {/* Earlier months on This Month: the Sales page's stepper. */}
       {period === 'month' && monthNav ? (
         <MonthPicker month={monthNav.month} min={monthNav.min} max={monthNav.max} onChange={monthNav.onChange} />
@@ -175,8 +196,42 @@ function WeeklyChallenge({
   );
 }
 
+// The solar board's card in the weekly challenge's slot: there is no solar
+// target, so it is the viewer's own consults booked this week and the time left.
+function SolarWeek({ booked, loading, failed, onRetry }: { booked: number | null; loading: boolean; failed: boolean; onRetry: () => void }) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <div className={d.card}>
+      <h2 className={d.cardTitle}>This week</h2>
+      <div className={d.challengeBody}>
+        {failed ? (
+          <span className={d.retryRow} role="alert">
+            Couldn&apos;t load your consults
+            <button type="button" className={d.retry} onClick={onRetry}>
+              Retry
+            </button>
+          </span>
+        ) : (
+          <>
+            <strong className={d.challengeLine}>
+              {loading || booked === null ? 'Consults booked' : `${booked} ${booked === 1 ? 'consult' : 'consults'} booked`}
+            </strong>
+            <span className={d.challengeMeta}>{loading || booked === null ? 'Loading' : weekTimeLeft(now)}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardEntry | null; userName: string; metric: Metric }) {
-  const unit = metric === 'totalPoints' ? 'pts' : 'sales';
+  const unit = metric === 'totalPoints' ? 'pts' : metric === 'bookedConsults' ? 'consults' : 'sales';
 
   return (
     <aside className={d.card}>
@@ -187,7 +242,11 @@ function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardE
       </div>
       <div className={d.standingFoot}>
         <strong>{userName}</strong>
-        <span>{formatNumber(userRank?.totalPoints ?? 0)} pts, {userRank?.totalSales ?? 0} sales</span>
+        <span>
+          {metric === 'bookedConsults'
+            ? `${formatNumber(userRank?.totalSales ?? 0)} booked consults`
+            : `${formatNumber(userRank?.totalPoints ?? 0)} pts, ${userRank?.totalSales ?? 0} sales`}
+        </span>
       </div>
       <span className="sr-only">Metric: {unit}</span>
     </aside>
@@ -236,6 +295,8 @@ interface LegacyLeaderboardPageProps {
   unranked?: UnrankedRep[];
   recent?: RecentSale[];
   onRetry?: () => void;
+  /** Fiber | Solar, for a viewer with both boards; null shows the one board. */
+  boardSwitch?: BoardSwitch | null;
 }
 
 export function LegacyLeaderboardPage({
@@ -255,7 +316,9 @@ export function LegacyLeaderboardPage({
   unranked,
   recent,
   onRetry,
+  boardSwitch = null,
 }: LegacyLeaderboardPageProps) {
+  const solar = metric === 'bookedConsults';
   const {
     currentUser: weeklyCurrentUser,
     loading: weeklyLoading,
@@ -268,13 +331,18 @@ export function LegacyLeaderboardPage({
 
   useEffect(() => {
     if (!active) return;
+    // The solar board's slot: the viewer's consults booked this week.
+    if (solar) {
+      fetchWeeklyLeaderboard('week', 'bookedConsults', 1, 'approved', { source: 'solar' });
+      return;
+    }
     // 'submitted' scope: the challenge counts sales as reps log them,
     // not only after admin approval.
     fetchWeeklyLeaderboard('week', 'totalSales', 1, 'submitted');
-  }, [active, fetchWeeklyLeaderboard]);
+  }, [active, solar, fetchWeeklyLeaderboard]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active || solar) return;
     let cancelled = false;
     (async () => {
       try {
@@ -297,10 +365,11 @@ export function LegacyLeaderboardPage({
     return () => {
       cancelled = true;
     };
-  }, [active, challengeAttempt]);
+  }, [active, solar, challengeAttempt]);
 
   const retryWeeklySales = () => {
-    fetchWeeklyLeaderboard('week', 'totalSales', 1, 'submitted');
+    if (solar) fetchWeeklyLeaderboard('week', 'bookedConsults', 1, 'approved', { source: 'solar' });
+    else fetchWeeklyLeaderboard('week', 'totalSales', 1, 'submitted');
   };
 
   const retryChallenge = () => {
@@ -325,8 +394,16 @@ export function LegacyLeaderboardPage({
           <h1 className={`${p.title} ${d.pageTitle}`}>Leaderboard</h1>
           <p className={p.lede}>{entries.length} ranked</p>
         </header>
-        <LegacyLeaderboardFilters period={period} metric={metric} setPeriod={onPeriodChange} setMetric={onMetricChange} monthNav={monthNav} />
+        <LegacyLeaderboardFilters period={period} metric={metric} setPeriod={onPeriodChange} setMetric={onMetricChange} monthNav={monthNav} boardSwitch={boardSwitch} />
         <div className={d.summary}>
+          {solar ? (
+            <SolarWeek
+              booked={weeklySales}
+              loading={weeklyLoading}
+              failed={!weeklyLoading && weeklyError !== null}
+              onRetry={retryWeeklySales}
+            />
+          ) : (
           <WeeklyChallenge
             sales={weeklySales}
             loading={weeklyLoading}
@@ -336,6 +413,7 @@ export function LegacyLeaderboardPage({
             salesFailed={!weeklyLoading && weeklyError !== null}
             onRetrySales={retryWeeklySales}
           />
+          )}
           <ArenaStanding userRank={userRank} userName={userName} metric={metric} />
         </div>
 
