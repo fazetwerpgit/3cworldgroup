@@ -4,7 +4,7 @@ import type { Sale } from '@/types';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'token') }));
 
-import { fetchRepBook, withSaleInstallDate } from './useRepDashboard';
+import { fetchRepBook, REP_DASHBOARD_TIMEOUT_MS, withSaleInstallDate } from './useRepDashboard';
 import { salesListCacheKey } from './useSales';
 import { FIBER_CACHE_KEY } from './useFiberStatus';
 
@@ -21,12 +21,55 @@ function stubFetch(status: { ok: boolean; body: unknown }) {
   return fetchMock;
 }
 
+/** A fetch that never answers (a stalled cellular handoff) until its signal aborts. */
+function stubHungFetch() {
+  const fetchMock = vi.fn(
+    (_url: string, init?: { signal?: AbortSignal }) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      })
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe('fetchRepBook', () => {
+  it('gives up on a hung request after the timeout so the section can show Try again', async () => {
+    vi.useFakeTimers();
+    stubHungFetch();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const caller = new AbortController();
+    let settled = false;
+    const book = fetchRepBook('r1', 'token', caller.signal).finally(() => {
+      settled = true;
+    });
+    book.catch(() => undefined);
+
+    await vi.advanceTimersByTimeAsync(REP_DASHBOARD_TIMEOUT_MS - 1);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(book).rejects.toThrow();
+    // A timeout is not the caller's abort: the hook still treats it as a failure.
+    expect(caller.signal.aborted).toBe(false);
+  });
+
+  it("still ends a hung request at once when the caller aborts", async () => {
+    vi.useFakeTimers();
+    stubHungFetch();
+    const caller = new AbortController();
+    const book = fetchRepBook('r1', 'token', caller.signal);
+    book.catch(() => undefined);
+    caller.abort();
+    await expect(book).rejects.toThrow();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('flags a failed carrier report but keeps the book', async () => {
     stubFetch({ ok: false, body: { error: 'down' } });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
