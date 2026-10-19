@@ -42,10 +42,12 @@ export function leadAddress(lead: Pick<SolarLeadView, 'address' | 'city' | 'stat
 }
 
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const cents = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 });
 
-/** "$212/mo", or '' when no bill was entered. */
+/** "$212/mo" or "$212.50/mo" (the deck takes cents), or '' when no bill was entered. */
 export function billLine(monthlyBill: number | null): string {
-  return monthlyBill == null ? '' : `${money.format(monthlyBill)}/mo`;
+  if (monthlyBill == null) return '';
+  return `${(Number.isInteger(monthlyBill) ? money : cents).format(monthlyBill)}/mo`;
 }
 
 const MODE: Record<SolarLeadBooking['mode'], string> = { virtual: 'Virtual', in_person: 'In person' };

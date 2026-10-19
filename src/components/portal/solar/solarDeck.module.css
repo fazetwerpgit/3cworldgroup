@@ -503,6 +503,11 @@ button.exit {
   font-size: clamp(2.5rem, 5vw, 3.75rem);
   font-variant-numeric: tabular-nums;
 }
+/* The field's own border is the focus ring; no second outline inside it. */
+.billInput input:focus,
+.billInput input:focus-visible {
+  outline: none;
+}
 .billInput input::placeholder {
   color: var(--dim);
 }
