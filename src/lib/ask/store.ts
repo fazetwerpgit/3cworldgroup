@@ -175,7 +175,14 @@ export async function loadCountedSessions(
   uid: string | null
 ): Promise<CountedSession[]> {
   const base = db.collection(PRACTICE_LOG);
-  const query = uid ? base.where('uid', '==', uid).where('createdAt', '>=', since) : base.where('createdAt', '>=', since);
+  // A createdAt range comes back oldest first, so past the cap the newest
+  // sessions would drop. Everyone's log (the owner's view, which spans the
+  // oldest assignment) reads newest first so recent sessions always count.
+  // One rep's log stays ascending: it never nears the cap, and newest first
+  // there needs a (uid, createdAt desc) index that is not deployed.
+  const query = uid
+    ? base.where('uid', '==', uid).where('createdAt', '>=', since)
+    : base.where('createdAt', '>=', since).orderBy('createdAt', 'desc');
   const snap = await query.limit(2000).get();
   return snap.docs.flatMap((doc) => {
     const data = doc.data();
