@@ -16,6 +16,8 @@ const mic = vi.hoisted(() => ({
   close: vi.fn(),
   asked: 0,
   fail: false,
+  /** When set, the mic opens only once this settles (a slow connection). */
+  opening: null as Promise<void> | null,
 }));
 vi.mock('./handsFreeMic', () => ({
   canHandsFree: () => true,
@@ -24,12 +26,14 @@ vi.mock('./handsFreeMic', () => ({
     return Promise.resolve({});
   },
   openHandsFreeMic: async (_context: unknown, _stream: unknown, events: HandsFreeEvents) => {
+    if (mic.opening) await mic.opening;
     if (mic.fail) return null;
     mic.events = events;
     return { finish: mic.finish, close: mic.close };
   },
 }));
 
+import { MAX_PRACTICE_TURNS, PRACTICE_SESSION_KEY } from '@/lib/ask/practice';
 import { RepPractice } from './RepPractice';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -58,6 +62,7 @@ async function until(check: () => boolean, ms = 3_000) {
 }
 const say = (fn: (events: HandsFreeEvents) => void) => act(async () => fn(mic.events!));
 
+const contextClosed = vi.fn();
 class FakeAudioContext {
   currentTime = 0;
   state = 'running';
@@ -66,6 +71,7 @@ class FakeAudioContext {
     return Promise.resolve();
   }
   close() {
+    contextClosed();
     this.state = 'closed';
     return Promise.resolve();
   }
@@ -98,6 +104,8 @@ beforeEach(() => {
   mic.events = null;
   mic.asked = 0;
   mic.fail = false;
+  mic.opening = null;
+  contextClosed.mockReset();
   mic.finish.mockReset();
   mic.close.mockReset();
   fetchMock.mockImplementation(async (url: string) => {
@@ -251,5 +259,71 @@ describe('RepPractice hands-free', () => {
     });
     await act(async () => button('Send')!.click());
     await until(() => fetchMock.mock.calls.some((call) => String(call[0]) === '/sounds/practice/door-slam.mp3'));
+  });
+
+  it('closes the mic when the knock fails (daily limit, offline), even one still opening', async () => {
+    window.localStorage.setItem('ask3c-practice-hands-free', 'on');
+    await act(async () => root.render(<RepPractice uid="r1" active canPick={false} onResume={() => {}} />));
+    practiceAnswers.push(new Response(JSON.stringify({ error: 'That is today’s practice.' }), { status: 429 }));
+    await act(async () => button('Knock')!.click());
+    await until(() => !!button('Knock') && !button('Knock')!.disabled);
+    expect(mic.close).toHaveBeenCalled();
+
+    // The knock fails before the mic finishes opening: it closes as soon as it opens.
+    mic.close.mockReset();
+    let opened = () => {};
+    mic.opening = new Promise<void>((resolve) => {
+      opened = resolve;
+    });
+    await act(async () => button('Knock')!.click());
+    await until(() => !!button('Knock') && !button('Knock')!.disabled);
+    expect(mic.close).not.toHaveBeenCalled();
+    await act(async () => opened());
+    await wait(0);
+    expect(mic.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops listening at the turn cap and sends nothing more', async () => {
+    const turns = Array.from({ length: MAX_PRACTICE_TURNS - 3 }, (_, i) => ({
+      role: i % 2 ? 'rep' : 'customer',
+      text: `Line ${i + 1}.`,
+    }));
+    window.sessionStorage.setItem(
+      PRACTICE_SESSION_KEY,
+      JSON.stringify({ uid: 'r1', sessionId: 's1', pick: 'surprise', turns, ended: false, feedback: null, lastAt: Date.now() })
+    );
+    practiceAnswers.push(json({ turns, ended: false }));
+    await act(async () => root.render(<RepPractice uid="r1" active canPick={false} onResume={() => {}} />));
+    await until(() => practiceBodies().length === 1);
+    await act(async () => button('Hands-free')!.click());
+    await until(() => text().includes('Listening. Just talk.'));
+
+    // The last line the server takes: its answer reaches the cap.
+    practiceAnswers.push(json(says('Fine. Anything else?')));
+    await say((e) => e.onSpeech(true, performance.now()));
+    await say((e) => e.onFinal('One more thing.'));
+    await say((e) => e.onSpeech(false, performance.now()));
+    await until(() => text().includes('Fine. Anything else?'));
+    await until(() => mic.close.mock.calls.length > 0);
+    const sent = practiceBodies().length;
+
+    // Anything still heard goes nowhere.
+    await say((e) => e.onSpeech(true, performance.now()));
+    await say((e) => e.onFinal('And another thing.'));
+    await say((e) => e.onSpeech(false, performance.now()));
+    await wait(50);
+    expect(practiceBodies()).toHaveLength(sent);
+    expect(text()).not.toContain('Try again');
+  });
+
+  it("closes the voice player's AudioContext when Practice unmounts", async () => {
+    await act(async () => root.render(<RepPractice uid="r1" active canPick={false} onResume={() => {}} />));
+    practiceAnswers.push(json({ ...says('Hi?'), sessionId: 's1', ring: false, ambient: null }));
+    await act(async () => button('Knock')!.click());
+    await until(() => text().includes('Hi?'));
+    expect(contextClosed).not.toHaveBeenCalled();
+    act(() => root.unmount());
+    expect(contextClosed).toHaveBeenCalledTimes(1);
+    root = createRoot(container);
   });
 });

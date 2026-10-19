@@ -378,6 +378,7 @@ export function RepPractice({
     },
   });
   const pauseHands = hands.pause;
+  const stopHands = hands.stop;
 
   const scrollDown = useCallback((behavior: ScrollBehavior) => {
     window.requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end', behavior }));
@@ -482,6 +483,12 @@ export function RepPractice({
     stopListening(false);
     pauseHands();
   }, [active, stopListening, stopSpeaking, pauseHands]);
+
+  const capped = !!session && session.turns.length >= MAX_PRACTICE_TURNS - 1;
+  useEffect(() => {
+    // At the turn cap no more lines go: hands-free stops listening (its controls are hidden there too).
+    if (capped) stopHands();
+  }, [capped, stopHands]);
 
   useEffect(() => {
     // Some browsers load their voices late; asking once starts that.
@@ -678,15 +685,16 @@ export function RepPractice({
       replaced();
       return;
     }
-    hands.listen();
     const error = result.ok ? 'The homeowner went quiet. Try again.' : result.error;
     const retryable = result.ok || result.status !== 429;
     if (knocked) {
-      // No door opened: back to Knock, with why.
+      // No door opened: back to Knock, with why. The mic opened for it closes too.
+      hands.stop();
       save(null);
       setNotice(error);
       return;
     }
+    hands.listen();
     const last = current.turns.at(-1);
     if (last?.role === 'rep') {
       // Nothing to show for it: the line goes back in the composer, ready for Try again.
@@ -743,6 +751,8 @@ export function RepPractice({
   const sendLine = (typed: string) => {
     const text = typed.trim();
     if (!session || session.ended || busy || !text) return;
+    // At the cap the server takes no more lines: only End & get feedback is left.
+    if (session.turns.length >= MAX_PRACTICE_TURNS - 1) return;
     if (text.length > MAX_REP_CHARS) {
       setNotice(`Keep it under ${MAX_REP_CHARS} characters.`);
       return;
