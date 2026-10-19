@@ -48,10 +48,12 @@ describe('weekly installs week bounds', () => {
     expect(reportWeekFromStart('2026-09-16').last.from).toBe('2026-09-13');
   });
 
-  it('opens the send gate at exactly one of the two Monday UTC triggers', () => {
+  it('opens the send gate at Chicago 8 AM, and the resume pass at 9 AM', () => {
     // Summer (CDT, UTC-5): 13:00 UTC is 8 AM.
     expect(isSendHour(new Date('2026-09-21T13:00:00Z'))).toBe(true);
-    expect(isSendHour(new Date('2026-09-21T14:00:00Z'))).toBe(false);
+    // Summer 14:00 UTC is 9 AM: the resume pass for reps the 8 AM run missed.
+    expect(isSendHour(new Date('2026-09-21T14:00:00Z'))).toBe(true);
+    expect(isSendHour(new Date('2026-09-21T15:00:00Z'))).toBe(false);
     // Winter (CST, UTC-6): 14:00 UTC is 8 AM.
     expect(isSendHour(new Date('2026-11-09T13:00:00Z'))).toBe(false);
     expect(isSendHour(new Date('2026-11-09T14:00:00Z'))).toBe(true);

@@ -66,11 +66,15 @@ export function chicagoHour(now: Date): number {
 
 /**
  * The Vercel cron fires at 13:00 AND 14:00 UTC every Monday, because 8 AM in
- * Chicago is 13:00 UTC in summer (CDT) and 14:00 UTC in winter (CST). Exactly
- * one of the two lands on 8 AM local; this is the gate that picks it.
+ * Chicago is 13:00 UTC in summer (CDT) and 14:00 UTC in winter (CST). Hour 8 is
+ * the send; hour 9 (the 14:00 slot in summer) is the RESUME pass, which sends
+ * to every rep the first run did not finish (the send log makes it skip the
+ * ones already sent). In winter the 13:00 slot is 7 AM and skips. Vercel Hobby
+ * may fire a cron anywhere in its hour, so both stay inside 8–9.
  */
 export function isSendHour(now: Date): boolean {
-  return weekdayOf(chicagoDayKey(now)) === 1 && chicagoHour(now) === 8;
+  const hour = chicagoHour(now);
+  return weekdayOf(chicagoDayKey(now)) === 1 && (hour === 8 || hour === 9);
 }
 
 export interface DayRange {

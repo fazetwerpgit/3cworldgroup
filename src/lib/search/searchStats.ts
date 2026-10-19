@@ -28,6 +28,9 @@ export interface SearchStatsRun {
   figures?: SearchFigures;
 }
 
+/** One Search Console call; a hung connection must not hold the cron to its limit. */
+const SEARCH_FETCH_TIMEOUT_MS = 15_000;
+
 export async function runSearchStats(deps: {
   db: Pick<Firestore, 'collection'>;
   now?: Date;
@@ -43,7 +46,7 @@ export async function runSearchStats(deps: {
   try {
     const token = await (deps.getToken ?? getSearchConsoleToken)();
     figures = await fetchSearchFigures({
-      fetchFn: deps.fetchFn ?? ((input, init) => fetch(input, init)),
+      fetchFn: deps.fetchFn ?? ((input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(SEARCH_FETCH_TIMEOUT_MS) })),
       token,
       now,
       jobPages: jobPageTargets(),

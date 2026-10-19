@@ -33,6 +33,18 @@ export function onboardingFrom(): string | undefined {
  * Free dev tier: may be limited to own-domain recipients until the account
  * is approved for production sending.
  */
+/**
+ * Postmark answers in well under a second. Without a bound, one hung
+ * connection holds a sequential cron (weekly installs, reminders) until the
+ * function's own limit kills the whole run.
+ */
+export const EMAIL_TIMEOUT_MS = 10_000;
+
+function isTimeout(err: unknown): boolean {
+  const name = (err as { name?: unknown } | null)?.name;
+  return name === 'TimeoutError' || name === 'AbortError';
+}
+
 export async function sendEmail(input: EmailInput): Promise<SendEmailResult> {
   const token = process.env.POSTMARK_SERVER_TOKEN;
   const from = input.from ?? process.env.EMAIL_FROM;
@@ -45,6 +57,7 @@ export async function sendEmail(input: EmailInput): Promise<SendEmailResult> {
   try {
     const res = await fetch(POSTMARK_URL, {
       method: 'POST',
+      signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
@@ -78,6 +91,10 @@ export async function sendEmail(input: EmailInput): Promise<SendEmailResult> {
     const messageId = await readMessageId(res);
     return messageId ? { ok: true, messageId } : { ok: true };
   } catch (err) {
+    if (isTimeout(err)) {
+      console.error('[email] postmark send timed out after', EMAIL_TIMEOUT_MS, 'ms');
+      return { ok: false, error: 'timeout' };
+    }
     console.error('[email] postmark send threw', err);
     return { ok: false, error: 'network' };
   }

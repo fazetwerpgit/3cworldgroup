@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { sendEmail, onboardingFrom } from './sendEmail';
+import { sendEmail, onboardingFrom, EMAIL_TIMEOUT_MS } from './sendEmail';
 
 const INPUT = { to: 'a@b.c', subject: 's', htmlBody: '<p>h</p>', textBody: 't' };
 
@@ -23,6 +23,23 @@ describe('sendEmail', () => {
     const body = JSON.parse(init.body as string);
     expect(body.From).toBe('portal@example.com');
     expect(body.To).toBe('a@b.c');
+  });
+
+  it('bounds the Postmark call with a timeout signal', async () => {
+    await sendEmail(INPUT);
+    const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(EMAIL_TIMEOUT_MS).toBe(10_000);
+  });
+
+  it('returns ok:false with error "timeout" (never throws) when Postmark hangs past the bound', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+      })
+    );
+    expect(await sendEmail(INPUT)).toEqual({ ok: false, error: 'timeout' });
   });
 
   it('passes replyTo through as Postmark ReplyTo, stripping CR/LF', async () => {

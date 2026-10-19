@@ -2,11 +2,13 @@ import { sendEmail, type EmailInput } from '@/lib/email/sendEmail';
 import { buildRepDigest, isDigestEmpty } from '@/lib/weeklyInstalls/digest';
 import { gatherAllReps } from '@/lib/weeklyInstalls/gather';
 import { emailBaseUrl, renderWeeklyInstallsEmail } from '@/lib/weeklyInstalls/render';
-import { claimSend, recordSendResult, sendLogId } from '@/lib/weeklyInstalls/sendLog';
+import { claimSendOutcome, recordSendResult, sendLogId } from '@/lib/weeklyInstalls/sendLog';
 import { reportWeekFor, type ReportWeek } from '@/lib/weeklyInstalls/week';
 
 // The Monday send. Kill switch first, then one digest per active rep, then a
-// claimed, awaited send for each one that has something to say.
+// claimed, awaited send for each one that has something to say. Resumable: a
+// second run the same Monday (the backup slot) skips every rep already `sent`
+// and retries the ones a dead or failed run left behind (sendLog.canReclaim).
 //
 //   WEEKLY_INSTALLS_EMAIL_ENABLED  must be exactly "true" or nothing is sent and
 //                                  nothing is written (a dry run reports what
@@ -61,6 +63,8 @@ export interface WeeklyRunSummary {
   sent: number;
   alreadySent: number;
   failed: number;
+  /** Unfinished claims from an earlier run (failed or stale `sending`) this run retried. */
+  retried: number;
 }
 
 export interface RunDeps {
@@ -87,6 +91,7 @@ export async function runWeeklyInstallsEmail(deps: RunDeps): Promise<WeeklyRunSu
     sent: 0,
     alreadySent: 0,
     failed: 0,
+    retried: 0,
   };
   if (config.configError) {
     console.error(`[weekly-installs] ${config.configError}`);
@@ -121,31 +126,40 @@ export async function runWeeklyInstallsEmail(deps: RunDeps): Promise<WeeklyRunSu
     const subject = config.onlyTo ? `[Test: ${rep.name}] ${email.subject}` : email.subject;
     const logId = sendLogId(week.last.from, rep.uid, config.onlyTo);
 
-    const claimed = await claimSend(
-      db,
-      logId,
-      {
-        weekFrom: week.last.from,
-        weekTo: week.last.to,
-        uid: rep.uid,
-        repName: rep.name,
-        to,
-        redirected: !!config.onlyTo,
-        subject,
-        installs: digest.total.count,
-      },
-      now
-    );
-    if (!claimed) {
-      summary.alreadySent += 1;
-      continue;
-    }
+    // One rep's failure (a Firestore blip on the claim, a throw in the send)
+    // never ends the loop: the rest of the week still goes out, and the backup
+    // slot retries this rep (canReclaim).
+    try {
+      const outcome = await claimSendOutcome(
+        db,
+        logId,
+        {
+          weekFrom: week.last.from,
+          weekTo: week.last.to,
+          uid: rep.uid,
+          repName: rep.name,
+          to,
+          redirected: !!config.onlyTo,
+          subject,
+          installs: digest.total.count,
+        },
+        now
+      );
+      if (outcome === 'done') {
+        summary.alreadySent += 1;
+        continue;
+      }
+      if (outcome === 'retry') summary.retried += 1;
 
-    // ALWAYS awaited: an un-awaited send is cut off when the function returns.
-    const result = await send({ to, subject, htmlBody: email.html, textBody: email.text });
-    await recordSendResult(db, logId, result, new Date());
-    if (result.ok) summary.sent += 1;
-    else summary.failed += 1;
+      // ALWAYS awaited: an un-awaited send is cut off when the function returns.
+      const result = await send({ to, subject, htmlBody: email.html, textBody: email.text });
+      await recordSendResult(db, logId, result, new Date());
+      if (result.ok) summary.sent += 1;
+      else summary.failed += 1;
+    } catch (error) {
+      console.error('[weekly-installs] rep send failed', rep.uid, error);
+      summary.failed += 1;
+    }
   }
 
   return summary;
