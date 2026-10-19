@@ -65,6 +65,18 @@ const fake = vi.hoisted(() => {
         }),
       };
     }),
+    // Transactions: tx.get reads a doc ref or query; updates land on commit.
+    runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>) => {
+      const pending: Array<{ id: string; data: Record<string, unknown> }> = [];
+      const tx = {
+        get: (target: { get: () => Promise<unknown> }) => target.get(),
+        update: (target: { id: string }, data: Record<string, unknown>) => pending.push({ id: target.id, data }),
+      };
+      const result = await fn(tx);
+      for (const { id, data } of pending) reports.set(id, { ...(reports.get(id) ?? {}), ...data });
+      updates.push(...pending);
+      return result;
+    },
     batch: () => {
       const pending: Array<{ id: string; data: Record<string, unknown> }> = [];
       return {
@@ -338,6 +350,29 @@ describe('PATCH /api/portal/admin/chat-reports', () => {
       expect(update.data).toMatchObject({ status: 'removed', resolvedBy: 'admin-1', resolvedByName: 'Ada Admin' });
       expect(update.data.resolvedAt).toBeDefined();
     }
+  });
+
+  it('answers 409 and keeps the first outcome when the report is already resolved', async () => {
+    fake.reports.set('m3_rep-a', {
+      messageId: 'm3',
+      status: 'dismissed',
+      resolvedBy: 'mgr-a',
+      createdAt: at('2026-10-03T10:00:00Z'),
+    });
+    fake.reports.set('m3_rep-b', { messageId: 'm3', status: 'open', createdAt: at('2026-10-03T11:00:00Z') });
+    const res = await PATCH(req('PATCH', { body: { id: 'm3_rep-a', action: 'removed' } }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ status: 'dismissed' });
+    expect(fake.updates).toHaveLength(0);
+    expect(fake.reports.get('m3_rep-a')).toMatchObject({ status: 'dismissed', resolvedBy: 'mgr-a' });
+  });
+
+  it('lets only the first of two back-to-back resolutions win', async () => {
+    const first = await PATCH(req('PATCH', { body: { id: 'm1_rep-a', action: 'dismissed' } }));
+    const second = await PATCH(req('PATCH', { body: { id: 'm1_rep-a', action: 'removed' } }));
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(409);
+    expect(fake.reports.get('m1_rep-a')).toMatchObject({ status: 'dismissed' });
   });
 
   it('leaves already-resolved siblings alone', async () => {

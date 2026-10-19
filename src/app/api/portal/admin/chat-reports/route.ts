@@ -199,29 +199,42 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const reports = adminDb.collection('chatReports');
-    const snap = await reports.doc(id).get();
-    if (!snap.exists) return NextResponse.json({ error: 'Report not found' }, { status: 404 });
-    const messageId = text(snap.data()?.messageId);
+    const db = adminDb;
+    const reports = db.collection('chatReports');
+    // Read and write in one transaction so two moderators on a stale queue
+    // cannot both resolve the same report; the second one gets a 409.
+    const outcome = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(reports.doc(id));
+      if (!snap.exists) return { status: 404 as const };
+      const data = snap.data() ?? {};
+      if (data.status !== 'open') return { status: 409 as const, current: text(data.status) };
+      const messageId = text(data.messageId);
 
-    // One outcome per message: other people's open reports on it close with this one.
-    const siblings = messageId ? (await reports.where('messageId', '==', messageId).get()).docs : [];
-    const refs = new Map<string, FirebaseFirestore.DocumentReference>([[id, snap.ref]]);
-    for (const doc of siblings) {
-      if (doc.data().status === 'open') refs.set(doc.id, doc.ref);
+      // One outcome per message: other people's open reports on it close with this one.
+      const siblings = messageId ? (await tx.get(reports.where('messageId', '==', messageId))).docs : [];
+      const refs = new Map<string, FirebaseFirestore.DocumentReference>([[id, snap.ref]]);
+      for (const doc of siblings) {
+        if (doc.data().status === 'open') refs.set(doc.id, doc.ref);
+      }
+
+      const resolution = {
+        status: action,
+        resolvedBy: gate.uid,
+        resolvedByName: gate.name,
+        resolvedAt: FieldValue.serverTimestamp(),
+      };
+      for (const ref of refs.values()) tx.update(ref, resolution);
+      return { status: 200 as const, resolved: [...refs.keys()] };
+    });
+
+    if (outcome.status === 404) return NextResponse.json({ error: 'Report not found' }, { status: 404 });
+    if (outcome.status === 409) {
+      return NextResponse.json(
+        { error: 'Someone already resolved this report', status: outcome.current },
+        { status: 409 }
+      );
     }
-
-    const resolution = {
-      status: action,
-      resolvedBy: gate.uid,
-      resolvedByName: gate.name,
-      resolvedAt: FieldValue.serverTimestamp(),
-    };
-    const batch = adminDb.batch();
-    for (const ref of refs.values()) batch.update(ref, resolution);
-    await batch.commit();
-
-    return NextResponse.json({ success: true, resolved: [...refs.keys()] });
+    return NextResponse.json({ success: true, resolved: outcome.resolved });
   } catch (error) {
     console.error('[chat reports] resolve failed', error);
     return NextResponse.json({ error: 'Failed to update the report' }, { status: 500 });

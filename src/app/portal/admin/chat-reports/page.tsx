@@ -238,6 +238,12 @@ function ChatReports() {
         body: JSON.stringify({ id: report.id, action }),
       });
       const json = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        // Another moderator closed it first: drop the stale row and say so.
+        setRows((prev) => (prev ? { ...prev, reports: prev.reports.filter((row) => row.id !== report.id) } : prev));
+        setConfirmId(null);
+        refreshQueues();
+      }
       if (!res.ok) throw new Error(json.error || 'The report could not be updated');
       const closed = new Set<string>(Array.isArray(json.resolved) ? json.resolved : [report.id]);
       setRows((prev) => (prev ? { ...prev, reports: prev.reports.filter((row) => !closed.has(row.id)) } : prev));
