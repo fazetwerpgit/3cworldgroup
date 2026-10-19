@@ -25,6 +25,7 @@ import { usePresenceHeartbeat } from '@/hooks/usePresenceHeartbeat';
 import { NotificationType } from '@/types/notifications';
 import { getEffectiveRole, repFacingRoleLabel } from '@/types';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
+import { safeNotificationLink } from '@/lib/notifications/safeLink';
 
 function getInitials(name?: string | null, email?: string | null) {
   const value = name?.trim() || email?.split('@')[0] || 'User';
@@ -117,9 +118,11 @@ export function PortalHeader() {
 
   const handleNotificationClick = (notificationId: string, link?: string) => {
     markAsRead([notificationId]);
-    if (link) {
+    // Re-check stored links: older rows were written before the API validated them.
+    const safeLink = safeNotificationLink(link);
+    if (safeLink) {
       setShowNotifications(false);
-      router.push(link);
+      router.push(safeLink);
     }
   };
 

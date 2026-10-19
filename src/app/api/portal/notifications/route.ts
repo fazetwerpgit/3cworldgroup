@@ -5,6 +5,7 @@ import {
   requireVerifiedRequester,
   requireVerifiedSelfOrManagement,
 } from '@/lib/auth/requireVerifiedAdmin';
+import { safeNotificationLink } from '@/lib/notifications/safeLink';
 
 const MAX_NOTIFICATIONS_LIMIT = 100;
 
@@ -165,12 +166,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // The bell router.pushes this link, so only a same-origin portal path is allowed.
+    const safeLink = link ? safeNotificationLink(link) : null;
+    if (link && !safeLink) {
+      return NextResponse.json(
+        { error: 'link must be a portal path starting with /portal' },
+        { status: 400 }
+      );
+    }
+
     const notification = {
       userId,
       type,
       title,
       message,
-      link: link || null,
+      link: safeLink,
       metadata: metadata || {},
       read: false,
       createdAt: new Date(),

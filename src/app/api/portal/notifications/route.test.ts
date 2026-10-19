@@ -39,7 +39,12 @@ const db = vi.hoisted(() => {
     }),
     where: () => ({ count: () => ({ get: async () => ({ data: () => ({ count: 60 }) }) }) }),
   });
-  return { adminDb: { collection: () => ({ where }) }, state };
+  const added: Record<string, unknown>[] = [];
+  const add = async (doc: Record<string, unknown>) => {
+    added.push(doc);
+    return { id: `new${added.length}` };
+  };
+  return { adminDb: { collection: () => ({ where, add }) }, state, added };
 });
 
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: db.adminDb }));
@@ -49,8 +54,8 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedSelfOrManagement: vi.fn(async () => ({ ok: true, uid: 'u1' })),
 }));
 
-import { GET, PUT } from './route';
-import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
+import { GET, POST, PUT } from './route';
+import { requireVerifiedManagement, requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 
 function get(limit: number) {
   return GET(new NextRequest(`http://localhost/api/portal/notifications?userId=u1&limit=${limit}`));
@@ -119,5 +124,42 @@ describe('GET /api/portal/notifications read cost', () => {
   it('reads only the page (not 2x) when the ordered query serves it', async () => {
     await get(20);
     expect(db.state.lastLimit).toBe(20);
+  });
+});
+
+describe('POST /api/portal/notifications link', () => {
+  function post(link: unknown) {
+    vi.mocked(requireVerifiedManagement).mockResolvedValue({ ok: true, uid: 'ops1' } as never);
+    return POST(new NextRequest('http://localhost/api/portal/notifications', {
+      method: 'POST',
+      body: JSON.stringify({ userId: 'owner1', type: 'sale_approved', title: 'Sale Approved', message: 'tap', link }),
+    }));
+  }
+
+  beforeEach(() => {
+    db.added.length = 0;
+  });
+
+  it.each([
+    'javascript:fetch(`/api/portal/owner/summary`)',
+    'https://phish.example/login',
+    '//phish.example',
+    '/\\phish.example',
+  ])('rejects %s and stores nothing', async (link) => {
+    const response = await post(link);
+    expect(response.status).toBe(400);
+    expect(db.added).toHaveLength(0);
+  });
+
+  it('stores a portal path link', async () => {
+    const response = await post('/portal/sales/abc');
+    expect(response.status).toBe(200);
+    expect(db.added[0].link).toBe('/portal/sales/abc');
+  });
+
+  it('stores null when no link is given', async () => {
+    const response = await post(undefined);
+    expect(response.status).toBe(200);
+    expect(db.added[0].link).toBeNull();
   });
 });
