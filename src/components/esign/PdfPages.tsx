@@ -194,7 +194,9 @@ export function PdfPages({ src, authHeaders, onError }: Props) {
           type="button"
           onClick={() => setZoomed((current) => !current)}
           aria-pressed={zoomed}
-          disabled={state !== 'ready'}
+          // A zoomed paint can fail on iOS's canvas memory cap; Fit width must
+          // stay tappable so the rep can fall back to the lighter render.
+          disabled={state === 'loading' || (state === 'error' && !zoomed)}
           className={e.smallBtn}
         >
           {zoomed ? 'Fit width' : 'Zoom in'}
