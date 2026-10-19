@@ -211,6 +211,12 @@ export function useLeaderboard(seed?: LeaderboardRequest) {
         console.error('Quiet leaderboard refresh failed:', message);
         if (shownAt.current !== null) setStaleAt(shownAt.current);
       } else {
+        // This board never loaded: drop the previous board so its ranking is
+        // not shown under the new period's or metric's labels.
+        setLeaderboard([]);
+        setCurrentUser(null);
+        setUnranked([]);
+        setRecent([]);
         setError(message);
       }
     } finally {

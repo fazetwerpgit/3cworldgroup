@@ -107,6 +107,16 @@ describe('useLeaderboard', () => {
     expect(renders.slice(before).some((r) => r.loading)).toBe(false);
   });
 
+  it('a failed load of a new board drops the previous board instead of showing it under the new labels', async () => {
+    await act(async () => void fetchLeaderboard('week'));
+    await answer(0, true, board('week-rep'));
+    expect(renders.at(-1)).toEqual({ rep: 'week-rep', loading: false, error: null });
+
+    await act(async () => void fetchLeaderboard('month'));
+    await answer(1, false, { error: 'down' });
+    expect(renders.at(-1)).toEqual({ rep: null, loading: false, error: 'down' });
+  });
+
   it('notes when the board was loaded after a quiet refresh fails, and clears it on success', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await act(async () => void fetchLeaderboard('week'));
