@@ -94,6 +94,37 @@ describe('buildRepDigest', () => {
     expect(ids(rescheduled.upcoming)).toContain('s9');
   });
 
+  describe('judges installs against the carrier report stamp, like the Sales page', () => {
+    const REP = 'rep-stamp';
+    const pendingInput = (installDay: string, reportAsOf?: string | null) => ({
+      rep: { uid: REP, name: 'Stamp Rep' },
+      rates: FIXTURE_RATES,
+      week: FIXTURE_WEEK,
+      reportAsOf,
+      sales: [fixtureSale({ id: 'p1', salesRepId: REP, customerAddress: '77 Pending Ln, Dallas, TX 75201', installDay, soldDay: '2026-09-01' })],
+      orders: [fixtureOrder({ id: 'po1', address: '77 Pending Ln', matchedUserId: REP, estInstallDate: installDay })],
+    });
+
+    it('keeps a Friday install off the overdue list when the report only covers Thursday', () => {
+      // Send Mon Sep 21. Fri Sep 18 is 3 days back, past the no-stamp grace,
+      // but the report dated Thu Sep 17 cannot know Friday happened.
+      expect(ids(buildRepDigest(pendingInput('2026-09-18', '2026-09-17')).needsDate)).toEqual([]);
+      expect(ids(buildRepDigest(pendingInput('2026-09-18', '2026-09-18')).needsDate)).toEqual(['p1']);
+    });
+
+    it('flags a Saturday install the Sunday report still shows pending', () => {
+      // Sat Sep 19 is inside the no-stamp grace, but a report dated Sun Sep 20 covers it.
+      const digest = buildRepDigest(pendingInput('2026-09-19', '2026-09-20'));
+      expect(ids(digest.needsDate)).toEqual(['p1']);
+      expect(digest.needsDate[0].overdue).toBe(true);
+    });
+
+    it('falls back to the grace window when the stamp is unknown', () => {
+      expect(ids(buildRepDigest(pendingInput('2026-09-18')).needsDate)).toEqual(['p1']);
+      expect(ids(buildRepDigest(pendingInput('2026-09-19', null)).needsDate)).toEqual([]);
+    });
+  });
+
   it('caps the needs-a-date list and counts the rest', () => {
     const input = lightWeekInput();
     for (let i = 0; i < NEEDS_DATE_LIMIT + 3; i += 1) {

@@ -107,6 +107,7 @@ export async function runWeeklyInstallsEmail(deps: RunDeps): Promise<WeeklyRunSu
       sales: rep.sales,
       orders: rep.orders,
       rates: rep.rates,
+      reportAsOf: rep.reportAsOf,
       week,
     });
     if (isDigestEmpty(digest)) {

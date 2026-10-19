@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
       sales: rep.sales,
       orders: rep.orders,
       rates: rep.rates,
+      reportAsOf: rep.reportAsOf,
       week,
     });
     const email = renderWeeklyInstallsEmail(digest, { baseUrl: emailBaseUrl() });

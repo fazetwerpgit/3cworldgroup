@@ -20,6 +20,8 @@ export interface WeeklyRepInput {
   rates: CompPlanCompanyRates | null;
   sales: Sale[];
   orders: FiberOrder[];
+  /** config/fiberReportStatus.lastReportAsOf; null when unknown. */
+  reportAsOf: string | null;
 }
 
 const SALE_DATE_FIELDS = [
@@ -68,6 +70,17 @@ export async function loadCompRates(db: Db): Promise<Partial<CompPlanRates>> {
   return (doc.data()?.rates as Partial<CompPlanRates>) ?? COMP_PLAN_RATES;
 }
 
+/**
+ * config/fiberReportStatus.lastReportAsOf, the day the newest carrier report
+ * covers. The rep's Sales page and dashboard judge install buckets against it
+ * (carrierReportCovers), so the email must too. null when absent or malformed.
+ */
+export async function loadReportAsOf(db: Db): Promise<string | null> {
+  const doc = await db.collection('config').doc('fiberReportStatus').get();
+  const asOf = doc.exists ? doc.data()?.lastReportAsOf : null;
+  return typeof asOf === 'string' ? asOf : null;
+}
+
 /** The rep's own slice, resolved the way the comp-plan route resolves it. */
 export function ratesForUser(rates: Partial<CompPlanRates>, user: DocData): CompPlanCompanyRates | null {
   const { role, fieldRole } = resolveRoles(user.role, user.fieldRole);
@@ -87,7 +100,8 @@ function userInput(
   snap: FirebaseFirestore.DocumentSnapshot,
   rates: Partial<CompPlanRates>,
   sales: Sale[],
-  orders: FiberOrder[]
+  orders: FiberOrder[],
+  reportAsOf: string | null
 ): WeeklyRepInput {
   const data = snap.data() ?? {};
   const email = emailFromUserDoc(snap);
@@ -98,6 +112,7 @@ function userInput(
     rates: ratesForUser(rates, data),
     sales,
     orders,
+    reportAsOf,
   };
 }
 
@@ -107,11 +122,12 @@ function userInput(
  * (see fiberReport/ordersCache for why no bound is safe on orders).
  */
 export async function gatherAllReps(db: Db): Promise<WeeklyRepInput[]> {
-  const [usersSnap, salesSnap, ordersSnap, rates] = await Promise.all([
+  const [usersSnap, salesSnap, ordersSnap, rates, reportAsOf] = await Promise.all([
     db.collection('users').where('status', '==', 'active').get(),
     db.collection('sales').get(),
     db.collection('fiberOrders').get(),
     loadCompRates(db),
+    loadReportAsOf(db),
   ]);
 
   const salesByRep = new Map<string, Sale[]>();
@@ -135,17 +151,18 @@ export async function gatherAllReps(db: Db): Promise<WeeklyRepInput[]> {
   return usersSnap.docs
     .filter((doc) => !isDemoAccount(doc.data()) && (salesByRep.has(doc.id) || ordersByRep.has(doc.id)))
     .map((doc) =>
-      userInput(doc.id, doc, rates, salesByRep.get(doc.id) ?? [], ordersByRep.get(doc.id) ?? [])
+      userInput(doc.id, doc, rates, salesByRep.get(doc.id) ?? [], ordersByRep.get(doc.id) ?? [], reportAsOf)
     );
 }
 
 /** One rep, for the owner preview. null when the user doc does not exist. */
 export async function gatherRep(db: Db, uid: string): Promise<WeeklyRepInput | null> {
-  const [userSnap, salesSnap, ordersSnap, rates] = await Promise.all([
+  const [userSnap, salesSnap, ordersSnap, rates, reportAsOf] = await Promise.all([
     db.collection('users').doc(uid).get(),
     db.collection('sales').where('salesRepId', '==', uid).get(),
     db.collection('fiberOrders').where('matchedUserId', '==', uid).get(),
     loadCompRates(db),
+    loadReportAsOf(db),
   ]);
   if (!userSnap.exists) return null;
   return userInput(
@@ -153,6 +170,7 @@ export async function gatherRep(db: Db, uid: string): Promise<WeeklyRepInput | n
     userSnap,
     rates,
     salesSnap.docs.map((doc) => toSale(doc.id, doc.data())),
-    ordersSnap.docs.map((doc) => toFiberOrder(doc.id, doc.data()))
+    ordersSnap.docs.map((doc) => toFiberOrder(doc.id, doc.data())),
+    reportAsOf
   );
 }

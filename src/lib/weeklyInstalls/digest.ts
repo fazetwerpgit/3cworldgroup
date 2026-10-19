@@ -20,7 +20,8 @@ import {
 //
 // The join is the one the rep's own Sales page uses (sales/page.tsx):
 // matchFiberOrdersToSales over the rep's sales and the rep's carrier orders,
-// then applyCarrierInstallDates so a carrier activation date wins. The email
+// then applyCarrierInstallDates so a carrier activation date wins, and buckets
+// are judged against the same carrier report stamp (reportAsOf). The email
 // can therefore never disagree with the page it links to.
 //
 // T-Fiber only for now (Jacob's focus). The carrier report IS the T-Fiber
@@ -40,6 +41,12 @@ export interface RepDigestInput {
   /** The rep's own slice of the comp plan; null when their role has none. */
   rates: CompPlanCompanyRates | null;
   week: ReportWeek;
+  /**
+   * config/fiberReportStatus.lastReportAsOf, the same stamp the rep's Sales
+   * page and dashboard pass to installBucketForSale. Omitted/null = unknown
+   * (carrierReportCovers then falls back to its grace window).
+   */
+  reportAsOf?: string | null;
   /** Defaults to the send Monday morning of `week`. */
   now?: Date;
 }
@@ -177,7 +184,7 @@ export function buildRepDigest(input: RepDigestInput): RepDigest {
 
   for (const sale of live) {
     const order = orderFor(sale);
-    const bucket = installBucketForSale(sale, order, now);
+    const bucket = installBucketForSale(sale, order, now, input.reportAsOf);
     const day = installDayKey(sale.installDate);
     const base = {
       saleId: sale.id || '',
