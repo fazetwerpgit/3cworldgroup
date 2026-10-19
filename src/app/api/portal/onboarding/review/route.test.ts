@@ -174,6 +174,33 @@ describe('POST /api/portal/onboarding/review', () => {
   });
 });
 
+describe('POST /api/portal/onboarding/review: sensitive items', () => {
+  it('refuses operations approving a sensitive item it cannot view', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    const response = await POST(postRequest('dl_photos', 'approved'));
+
+    expect(response.status).toBe(403);
+    expect(docUpdateMock).not.toHaveBeenCalled();
+    expect(maybeFlagActivationReady).not.toHaveBeenCalled();
+  });
+
+  it('lets an admin approve a sensitive item', async () => {
+    const response = await POST(postRequest('dl_photos', 'approved'));
+
+    expect(response.status).toBe(200);
+    expect(docUpdateMock).toHaveBeenCalledWith(expect.objectContaining({ status: 'approved' }));
+  });
+
+  it('still lets operations approve a non-sensitive item', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });
+
+    const response = await POST(postRequest('onboarding_submission', 'approved'));
+
+    expect(response.status).toBe(200);
+  });
+});
+
 describe('GET /api/portal/onboarding/review', () => {
   const progress = (userId: string, itemId: string, fields: Record<string, unknown>) => ({
     id: `${userId}_${itemId}`,

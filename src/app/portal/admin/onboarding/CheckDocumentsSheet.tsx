@@ -271,7 +271,8 @@ export function CheckDocumentsSheet({
 
         {!formOpen && (check || send || fixable || showPdf || canOpenFiles || markable) ? (
           <div className={u.btnRow}>
-            {check ? (
+            {/* Approving a sensitive item takes the same admin right as opening it. */}
+            {check && !item.adminOnly ? (
               <button
                 type="button"
                 className={`${s.btnPrimary} ${u.primarySm}`}

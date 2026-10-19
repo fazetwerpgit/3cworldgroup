@@ -297,6 +297,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Approving needs the same right as opening the files: sensitive items
+    // (W-9, direct deposit, license photos, chargeback card) are admin/owner
+    // only, so operations cannot sign off on documents it cannot see.
+    if (status === 'approved' && item.sensitive && !gate.isAdmin) {
+      return NextResponse.json(
+        { error: 'Only an admin can approve this item' },
+        { status: 403 }
+      );
+    }
+
     if (status === 'approved' && isEsignItem(itemId)) {
       return NextResponse.json(
         { error: 'E-signature items are completed only when the rep signs them' },
