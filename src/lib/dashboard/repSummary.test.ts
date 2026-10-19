@@ -390,3 +390,23 @@ describe('an install day the carrier report has not caught up to (Noah, 2026-10-
     expect(summary.estThisMonth).toBe(130);
   });
 });
+
+describe("summarizePay month count follows the board's rule (widget salesMtd)", () => {
+  it('drops a disconnect within 120 days, counts a duplicate order once, keeps pending', () => {
+    const churned = sale({ saleDate: d(2026, 9, 3), installDate: d(2026, 9, 5) });
+    const first = sale({ saleDate: d(2026, 9, 8), orderNumberOrBtn: 'TMO20260908AAAA', createdAt: d(2026, 9, 8) });
+    const dupe = sale({ saleDate: d(2026, 9, 9), orderNumberOrBtn: 'TMO20260908AAAA', createdAt: d(2026, 9, 9) });
+    const pending = sale({ saleDate: d(2026, 9, 12), status: 'pending' });
+    const plain = sale({ saleDate: d(2026, 9, 14) });
+    const fiber = new Map<string, FiberOrder>([
+      [churned.id!, { status: 'churned', activationDate: '2026-09-05', deactivationDate: '2026-09-20' } as FiberOrder],
+    ]);
+    // 5 sales sold this month: N - 1 for the chargeback, and the duplicate once.
+    const summary = summarizePay([churned, first, dupe, pending, plain], fiber, rates, NOW);
+    expect(summary.monthCount).toBe(3);
+    const { attention, scheduled, installed } = summary.counts;
+    expect(attention + scheduled + installed).toBe(summary.monthCount);
+    // Without the disconnect the churned sale counts again.
+    expect(summarizePay([churned, first, dupe, pending, plain], noFiber, rates, NOW).monthCount).toBe(4);
+  });
+});

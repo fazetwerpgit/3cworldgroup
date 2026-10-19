@@ -31,6 +31,7 @@ import {
   type ChargebackLine,
 } from '@/lib/pay/chargeback';
 import { periodBounds } from '@/lib/leaderboard/periods';
+import { boardSales } from '@/lib/leaderboard/board';
 import { missedInstallDay } from '@/lib/sales/rescheduleDay';
 
 // Everything the rep dashboard shows, derived from the rep's OWN book. Pure, so
@@ -106,9 +107,16 @@ export function summarizePay(
   // The month's sales COUNT stays by sale date: it is activity, not money. It
   // is the same Chicago month as the estimate above, so an Eastern phone after
   // midnight on the 1st never reads "0 sales" beside last month's est. pay.
-  const soldThisMonth = countedSales(
-    sales.filter((sale) => isInChicagoMonth(sale.saleDate as Date | string | undefined, month)),
-    fiberBySale
+  //
+  // Counted by the leaderboard's rule (boardSales: no carrier cancellation, no
+  // disconnect within 120 days of install, an order number logged twice counted
+  // once, deduped over the whole book before the month is cut, as the board
+  // does), so the dashboard, the widget's salesMtd and the board agree.
+  // ONE intentional difference: scope 'submitted' keeps the rep's PENDING sales
+  // in (the default board ranks approved only), because a rep sees their own
+  // pending work here, as master always has.
+  const soldThisMonth = boardSales(sales, fiberBySale, 'submitted').filter((sale) =>
+    isInChicagoMonth(sale.saleDate as Date | string | undefined, month)
   );
   const counts = emptyInstallCounts();
   for (const sale of soldThisMonth) counts[installBucketForSale(sale, orderFor(sale, fiberBySale), now, reportAsOf)] += 1;
