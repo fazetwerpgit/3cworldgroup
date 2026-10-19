@@ -37,7 +37,17 @@ describe('queueValue', () => {
     expect(queueValue(true)).toBe('Yes');
     expect(queueValue(1240)).toBe('1,240');
     expect(queueValue('2026-09-09')).toBe('Sep 9, 2026');
-    expect(queueValue(new Date(2026, 8, 21, 18, 42).toISOString())).toMatch(/^Sep 21, 2026 · 6:42\sPM$/);
+    expect(queueValue('2026-09-21T23:42:00Z')).toBe('Sep 21, 2026 · 6:42 PM');
+  });
+
+  it('prints timestamps on the Chicago clock, not the device zone', () => {
+    // 04:30Z on Oct 17 is still 11:30 PM Oct 16 in Chicago (CDT).
+    expect(queueValue('2026-10-17T04:30:00Z')).toBe('Oct 16, 2026 · 11:30 PM');
+    expect(queueValue(new Date('2026-10-17T04:30:00Z'))).toBe('Oct 16, 2026 · 11:30 PM');
+    // Winter (CST, UTC-6): 05:05Z Jan 1 is 11:05 PM Dec 31.
+    expect(queueValue('2027-01-01T05:05:00Z')).toBe('Dec 31, 2026 · 11:05 PM');
+    expect(queueValue('2026-10-17T05:00:00Z')).toBe('Oct 17, 2026 · 12:00 AM');
+    expect(queueValue(new Date(Number.NaN))).toBe('—');
   });
 });
 

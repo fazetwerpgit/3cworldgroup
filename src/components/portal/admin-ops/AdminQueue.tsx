@@ -70,23 +70,38 @@ export interface QueueCsvColumn {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function fmtDate(d: Date, withTime: boolean): string {
-  const date = `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
-  if (!withTime) return date;
-  return `${date} · ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+/** Calendar-only dates (YYYY-MM-DD) carry no instant, so they print as-is. */
+function fmtDate(d: Date): string {
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+/** Business day + time in Chicago, whatever zone the admin's device is in. */
+const CHICAGO_STAMP = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Chicago',
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+});
+
+function fmtStamp(d: Date): string {
+  const parts = CHICAGO_STAMP.formatToParts(d);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  return `${MONTHS[Number(get('month')) - 1]} ${get('day')}, ${get('year')} · ${get('hour')}:${get('minute')} ${get('dayPeriod')}`;
 }
 
 /** Display formatter for submission values: '—' for blanks, readable dates, Yes/No. */
 export function queueValue(v: unknown): string {
   if (v == null || v === '') return '—';
-  if (v instanceof Date) return fmtDate(v, true);
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? '—' : fmtStamp(v);
   if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) {
     const d = new Date(v);
-    if (!Number.isNaN(d.getTime())) return fmtDate(d, true);
+    if (!Number.isNaN(d.getTime())) return fmtStamp(d);
   }
   if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
     const [y, m, day] = v.split('-').map(Number);
-    return fmtDate(new Date(y, m - 1, day), false);
+    return fmtDate(new Date(y, m - 1, day));
   }
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (typeof v === 'number') return v.toLocaleString('en-US');
