@@ -360,6 +360,8 @@ function LeadSheet({
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState('');
   const [confirmCancel, setConfirmCancel] = useState(false);
+  // Mark lost on a booked lead also cancels its consultation, so it asks first.
+  const [confirmLost, setConfirmLost] = useState(false);
   const closed = lead.status === 'sold' || lead.status === 'lost';
 
   const setStatus = async (status: SolarLeadStatus, which: Exclude<Busy, null | 'cancel'>) => {
@@ -371,7 +373,9 @@ function LeadSheet({
       setError(res.error || "Couldn't save. Try again.");
       return;
     }
-    onChanged(lead.id, { status: res.data.status });
+    setConfirmLost(false);
+    // Mark lost cancelled the live booking with it (the slot is open again).
+    onChanged(lead.id, { status: res.data.status, ...(res.data.cancelledBookingId ? { booking: null } : {}) });
   };
 
   const cancel = async () => {
@@ -389,11 +393,24 @@ function LeadSheet({
   };
 
   let actions: ReactNode;
-  if (confirmCancel && lead.booking) {
+  if (confirmLost && lead.booking) {
+    actions = (
+      <ConfirmStrip
+        label="Mark lost? This also frees the consultation."
+        sub={`${consultTime(lead.booking)} with ${lead.booking.consultantName} opens up again. The rep and consultant get a notice; the homeowner isn't emailed.`}
+        confirming={busy === 'lost'}
+        confirmLabel="Mark lost"
+        busyLabel="Saving…"
+        cancelLabel="Back"
+        onCancel={() => setConfirmLost(false)}
+        onConfirm={() => void setStatus('lost', 'lost')}
+      />
+    );
+  } else if (confirmCancel && lead.booking) {
     actions = (
       <ConfirmStrip
         label="Cancel this consultation?"
-        sub={`${consultTime(lead.booking)} with ${lead.booking.consultantName}. The time opens up again; nobody is emailed.`}
+        sub={`${consultTime(lead.booking)} with ${lead.booking.consultantName}. The time opens up again. The rep and consultant get a notice; the homeowner isn't emailed.`}
         confirming={busy === 'cancel'}
         confirmLabel="Cancel booking"
         busyLabel="Cancelling…"
@@ -420,7 +437,12 @@ function LeadSheet({
               type="button"
               className={cx(rep.btnSecondary, u.sm)}
               disabled={busy !== null}
-              onClick={() => void setStatus('lost', 'lost')}
+              onClick={() => {
+                if (lead.booking) {
+                  setError('');
+                  setConfirmLost(true);
+                } else void setStatus('lost', 'lost');
+              }}
             >
               {busy === 'lost' ? 'Saving…' : 'Mark lost'}
             </button>

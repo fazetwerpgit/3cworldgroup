@@ -256,8 +256,9 @@ export function fetchLeads({ mine = false }: { mine?: boolean } = {}) {
 }
 
 /** Admin only. Reopening ('new') comes back as 'booked' while a booking holds a slot. */
+/** Admin only. 'lost' also cancels the lead's live booking (answered as cancelledBookingId). */
 export function setLeadStatus(id: string, status: SolarLeadStatus) {
-  return call<{ success: boolean; id: string; status: SolarLeadStatus }>(
+  return call<{ success: boolean; id: string; status: SolarLeadStatus; cancelledBookingId?: string }>(
     `/api/portal/solar/leads/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: JSON.stringify({ status }) }
   );
