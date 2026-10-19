@@ -91,6 +91,58 @@ describe('runWeeklyInstallsEmail resumability', () => {
     expect(resend).toEqual(['c@example.com']);
   });
 
+  it('an accepted send whose result write blips once is recorded, counted sent, and never resent', async () => {
+    const fake = createFakeDb(seed());
+    // The first set() on weeklyInstallEmails throws (a Firestore blip), the retry lands.
+    let blips = 1;
+    const collection = fake.db.collection.bind(fake.db);
+    (fake.db as unknown as { collection: unknown }).collection = (name: string) => {
+      const col = collection(name);
+      if (name !== 'weeklyInstallEmails') return col;
+      return {
+        ...col,
+        doc: (id: string) => {
+          const ref = col.doc(id);
+          return {
+            ...ref,
+            set: async (...args: Parameters<typeof ref.set>) => {
+              if (blips > 0) {
+                blips -= 1;
+                throw new Error('DEADLINE_EXCEEDED');
+              }
+              return ref.set(...args);
+            },
+          };
+        },
+      };
+    };
+    const sent: string[] = [];
+    const first = await runWeeklyInstallsEmail({
+      db: fake.db,
+      now,
+      config,
+      send: async (input) => (sent.push(input.to), { ok: true }),
+      week: FIXTURE_WEEK,
+      recordRetryDelayMs: 0,
+    });
+    expect(first).toMatchObject({ sent: 3, failed: 0 });
+    for (const uid of ['a', 'b', 'c']) {
+      expect(fake.docs('weeklyInstallEmails').get(sendLogId(FIXTURE_WEEK.last.from, uid, null))?.status).toBe('sent');
+    }
+
+    // The 9 AM resume pass an hour later sends nothing.
+    const resend: string[] = [];
+    const second = await runWeeklyInstallsEmail({
+      db: fake.db,
+      now: new Date(now.getTime() + 60 * 60 * 1000),
+      config,
+      send: async (input) => (resend.push(input.to), { ok: true }),
+      week: FIXTURE_WEEK,
+    });
+    expect(resend).toEqual([]);
+    expect(second).toMatchObject({ sent: 0, retried: 0, alreadySent: 3 });
+  });
+
   it('canReclaim: failed or stale sending, under the attempt cap; never sent or fresh sending', () => {
     const t = new Date('2026-09-21T14:00:00Z');
     const old = new Date(t.getTime() - STALE_SENDING_MS).toISOString();

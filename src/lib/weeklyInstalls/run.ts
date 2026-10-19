@@ -73,6 +73,35 @@ export interface RunDeps {
   config: WeeklyRunConfig;
   send?: (input: EmailInput) => Promise<{ ok: boolean; error?: string }>;
   week?: ReportWeek;
+  /** Pause between recordSendResult retries (tests pass 0). */
+  recordRetryDelayMs?: number;
+}
+
+/** Attempts at writing a send's result before giving up (see recordWithRetry). */
+export const RECORD_RESULT_ATTEMPTS = 3;
+
+// Once Postmark has answered, the result MUST land: a log left at `sending`
+// is taken over by the resume pass after STALE_SENDING_MS (sendLog.canReclaim),
+// which would email a rep the same week twice. So a Firestore blip on this one
+// write is retried instead of dropping the result.
+async function recordWithRetry(
+  db: FirebaseFirestore.Firestore,
+  logId: string,
+  result: { ok: boolean; error?: string },
+  delayMs: number
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= RECORD_RESULT_ATTEMPTS; attempt += 1) {
+    try {
+      await recordSendResult(db, logId, result, new Date());
+      return true;
+    } catch (error) {
+      console.error('[weekly-installs] recording send result failed', logId, `attempt ${attempt}`, error);
+      if (attempt < RECORD_RESULT_ATTEMPTS && delayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+      }
+    }
+  }
+  return false;
 }
 
 export async function runWeeklyInstallsEmail(deps: RunDeps): Promise<WeeklyRunSummary> {
@@ -154,9 +183,14 @@ export async function runWeeklyInstallsEmail(deps: RunDeps): Promise<WeeklyRunSu
 
       // ALWAYS awaited: an un-awaited send is cut off when the function returns.
       const result = await send({ to, subject, htmlBody: email.html, textBody: email.text });
-      await recordSendResult(db, logId, result, new Date());
+      const recorded = await recordWithRetry(db, logId, result, deps.recordRetryDelayMs ?? 500);
+      // An accepted email counts as sent even if its result never landed: it
+      // was delivered, so the run must not report it as a failure.
       if (result.ok) summary.sent += 1;
       else summary.failed += 1;
+      if (!recorded && result.ok) {
+        console.error('[weekly-installs] send accepted but result unrecorded; log stays sending', logId);
+      }
     } catch (error) {
       console.error('[weekly-installs] rep send failed', rep.uid, error);
       summary.failed += 1;
