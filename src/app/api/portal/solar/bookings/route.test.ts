@@ -14,6 +14,7 @@ vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: vi.fn(async () => {}) })
 vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: vi.fn(async () => ({ ok: true })) }));
 
 import { POST } from './route';
+import { PATCH } from './[id]/route';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { userRateLimited } from '@/lib/userRateLimits';
@@ -67,7 +68,9 @@ describe('POST /api/portal/solar/bookings', () => {
     const res = await post(BODY);
     expect(res.status).toBe(200);
     const id = `own_${SLOT}`;
-    expect(await res.json()).toEqual({ success: true, id });
+    expect(await res.json()).toEqual({
+      success: true, id, consultantUid: 'own', consultantName: 'Owner', start: SLOT, mode: 'in_person',
+    });
     expect(db.store.get('solarBookings')!.get(id)).toMatchObject({
       leadId: 'rep1_c1', mode: 'in_person', consultantUid: 'own', consultantName: 'Owner',
       start: SLOT, end: '2026-10-26T16:00:00.000Z', repUid: 'rep1', status: 'booked',
@@ -123,11 +126,80 @@ describe('POST /api/portal/solar/bookings', () => {
     expect(mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0].replyTo).toBe('jmyers@3cworldgroup.com');
   });
 
-  it('alerts once per lead, even when the lead is booked again', async () => {
+  it('links the booking notice and the lead alert to the lead on the admin Leads tab', async () => {
     expect((await post(BODY)).status).toBe(200);
-    expect((await post({ ...BODY, start: '2026-10-26T16:00:00.000Z' })).status).toBe(200);
-    expect(mockNotifyMany).toHaveBeenCalledTimes(1);
-    expect(mockEmail.mock.calls.filter((c) => c[0].tag === 'solar-lead')).toHaveLength(1);
+    const href = '/portal/admin/solar?tab=leads&lead=rep1_c1';
+    expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({ link: href, metadata: expect.objectContaining({ leadId: 'rep1_c1' }) }));
+    expect(mockNotifyMany.mock.calls[0][1]).toMatchObject({ link: href });
+    expect(mockPush).toHaveBeenCalledWith('jac', expect.objectContaining({ url: href }));
+  });
+
+  describe('one active booking per lead', () => {
+    const emailsTo = (to: string) => mockEmail.mock.calls.filter((c) => c[0].to === to).length;
+
+    it('answers a duplicate POST for the same slot with the same booking and sends nothing again', async () => {
+      const first = await (await post(BODY)).json();
+      const res = await post(BODY);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ ...first, duplicate: true });
+      expect(emailsTo('ana@example.com')).toBe(1);
+      expect(mockNotify).toHaveBeenCalledTimes(1);
+      expect(mockNotifyMany).toHaveBeenCalledTimes(1);
+      expect(mockEmail.mock.calls.filter((c) => c[0].tag === 'solar-lead')).toHaveLength(1);
+      expect(db.store.get('solarBookings')!.size).toBe(1);
+    });
+
+    it('answers a retry on another consultant or time with the original booking', async () => {
+      const first = await (await post(BODY)).json();
+      const res = await post({ ...BODY, mode: 'virtual', consultantUid: 'jac', start: SLOT });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        success: true, id: first.id, duplicate: true, consultantUid: 'own', consultantName: 'Owner', start: SLOT, mode: 'in_person',
+      });
+      expect(db.store.get('solarBookings')!.size).toBe(1);
+      expect(db.store.get('solarLeads')!.get('rep1_c1')!.bookingId).toBe(first.id);
+      expect(emailsTo('ana@example.com')).toBe(1);
+    });
+
+    it('gives two leads racing for one slot exactly one booking and one 409', async () => {
+      const [a, b] = await Promise.all([post(BODY), post({ ...BODY, leadId: 'rep1_c2' })]);
+      expect([a.status, b.status].sort()).toEqual([200, 409]);
+      const loser = a.status === 409 ? a : b;
+      expect(await loser.json()).toEqual({ error: 'slot_taken' });
+      expect(db.store.get('solarBookings')!.size).toBe(1);
+      const booked = [...db.store.get('solarLeads')!.values()].filter((l) => l.status === 'booked');
+      expect(booked).toHaveLength(1);
+    });
+
+    it('books the lead again, even the same slot, once its booking is cancelled', async () => {
+      const first = await (await post(BODY)).json();
+      mockGate.mockResolvedValue({ ...REP, uid: 'jac', isAdmin: true, role: 'owner', solarRole: null });
+      const cancel = await PATCH(
+        new NextRequest(`http://localhost/api/portal/solar/bookings/${first.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'cancelled' }),
+        }),
+        { params: Promise.resolve({ id: first.id }) }
+      );
+      expect(cancel.status).toBe(200);
+      expect(db.store.get('solarLeads')!.get('rep1_c1')).toMatchObject({ status: 'new', bookingId: null });
+
+      mockGate.mockResolvedValue(REP);
+      const again = await post(BODY);
+      expect(again.status).toBe(200);
+      const body = await again.json();
+      expect(body.duplicate).toBeUndefined();
+      expect(body.id).toBe(first.id);
+      expect(db.store.get('solarBookings')!.get(first.id)).toMatchObject({ status: 'booked', leadId: 'rep1_c1' });
+      // The cancelled booking stays as history under its own id.
+      const history = [...db.store.get('solarBookings')!.entries()].filter(([id]) => id !== first.id);
+      expect(history).toHaveLength(1);
+      expect(history[0][1]).toMatchObject({ status: 'cancelled', leadId: 'rep1_c1' });
+      expect(db.store.get('solarLeads')!.get('rep1_c1')).toMatchObject({ status: 'booked', bookingId: first.id });
+      expect(emailsTo('ana@example.com')).toBe(2);
+      // Still one lead alert per lead.
+      expect(mockNotifyMany).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('409s slot_taken on the second booking of the same slot', async () => {

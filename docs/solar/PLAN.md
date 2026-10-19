@@ -20,7 +20,7 @@ Worktree ~/dev/3cwg-solar, branch solar-portal (base origin/master 8552d302).
 - `solarLeads/{uid_clientId}`: contact fields, monthlyBill, creditTier (purchase_600 | lease_ppa_680), photos {billPage1, billGraph, panel} (storage paths), uploadId (locks the photos, same as Leads Request), repUid, source (portal | knock), doorId?, campaignId?, status, bookingId?, alertSentAt?, createdAt.
 - `solarAvailability/{consultantUid}`: { name, modes: { virtual: weekly[], in_person: weekly[] }, tz: America/Los_Angeles, slotMin: 60 }.
   - Seeds: owner (PT) in-person Mon 8-5, Tue/Thu/Fri 8-8. Owner virtual Mon 8-5, Tue 8-8, Wed 8-5, Thu 8-8, Fri 8-8, Sat 12-8. Jacob virtual Mon-Fri 10-5, tz America/Chicago.
-- `solarBookings/{consultantUid_slotStartISO}`: created with `.create()`, so a slot that is already taken fails as already-exists and the API returns 409.
+- `solarBookings/{consultantUid_slotStartISO}`: written in one transaction with the lead's `bookingId` + status 'booked'. A slot held by a live booking answers 409; a cancelled one is kept as history (`{id}_cancelled_{ms}`) and the slot is taken over. One active booking per lead.
 - Firestore rules: all three collections are `allow read, write: if false` (admin-SDK routes only, same as fiberReports).
 
 ## Phase 1: before 1pm
@@ -54,9 +54,14 @@ Worktree ~/dev/3cwg-solar, branch solar-portal (base origin/master 8552d302).
 - POST /api/portal/solar/leads {clientId, first, last, address, city, state, zip, phone, email (required), monthlyBill, creditTier?, uploadId?, photos{billPage1,billGraph,panel}, doorId?, campaignId?}
   -> 200 {success, id}. A duplicate clientId returns 200 with the same id. All photos must sit under one uploadId folder (form-attachments/{uid}/solar-lead/{uploadId}/{slot}/).
 - POST /api/portal/solar/leads/{id}/finish -> 200 {success, id, sent}. Call it when the rep is done with the homeowner without booking; it sends the lead alert once. Idempotent; creator or admin.
-- PATCH /api/portal/solar/leads/{id} {creditTier}.
+- PATCH /api/portal/solar/leads/{id} {creditTier} (creator or admin). {status: new|booked|sold|lost} is admin only.
+- GET /api/portal/solar/leads -> {leads:[lead + booking|null]}: own leads (admins: all).
 - GET /api/portal/solar/availability?mode=virtual|in_person&from=ISO&to=ISO -> {slots:[{consultantUid, name, start, end}]}. Slots sharing a start come in booking preference order: show the time once, book the first, retry the next on 409.
-- POST /api/portal/solar/bookings {leadId, mode, consultantUid, start} -> 200 {id} | 409 slot_taken.
+- POST /api/portal/solar/bookings {leadId, mode, consultantUid, start}
+  -> 200 {success, id, consultantUid, consultantName, start, mode} | 409 slot_taken | 400 slot_unavailable.
+  - ONE active booking per lead, enforced in a transaction. While the lead's booking is live, ANY POST for that lead (same slot, another time, another consultant) answers 200 with that booking plus `duplicate: true`, and sends no email, alert or notification. Safe to retry after a lost response; show the returned booking, not the one asked for.
+  - Two leads racing for one slot: one 200, one 409.
+- PATCH /api/portal/solar/bookings/{id} {status:'cancelled'} -> 200 {success, id}. Admin or that booking's consultant. Frees the slot and clears the lead's bookingId in the same transaction (a 'booked' lead goes back to 'new'), so the lead can be booked again.
 
 ## Open (owner/Jacob)
 - Promotion thresholds + pay table (owner is sending them).

@@ -9,10 +9,10 @@ import { appBaseUrl, solarLeadAlertEmail } from '@/lib/email/templates';
 import { formatSlotPT } from '@/lib/solar/availability';
 import { CREDIT_TIER_LABELS, PHOTO_SLOTS, PHOTO_SLOT_LABELS, isCreditTier } from '@/lib/solar/leadFields';
 import { leadAlertUids, loadContacts } from '@/lib/solar/server';
+import { solarLeadHref } from '@/lib/solar/leadView';
 
 /** V4 signed URLs max out at 7 days; a minute of slack keeps the signer happy. */
 const PHOTO_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000 - 60_000;
-const ALERT_LINK = '/portal/admin';
 
 const text = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -80,6 +80,7 @@ export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
     const repName = text(lead.get('repName'));
     const city = text(lead.get('city'));
     const booking = await bookingFor(text(lead.get('bookingId')));
+    const link = solarLeadHref(leadId);
     const title = booking ? 'Solar appointment set' : 'New solar lead';
     const message = `${repName || 'A rep'} added ${customerName}${city ? ` in ${city}` : ''}${
       booking ? `: ${booking.mode}, ${booking.when} PT.` : '. No appointment booked.'
@@ -89,10 +90,10 @@ export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
       type: 'solar_lead',
       title,
       message,
-      link: ALERT_LINK,
+      link,
       metadata: { leadId },
     }).catch((error) => console.error('solar lead notification failed:', error));
-    await Promise.allSettled(uids.map((uid) => sendPushToUser(uid, { title, body: message, url: ALERT_LINK })));
+    await Promise.allSettled(uids.map((uid) => sendPushToUser(uid, { title, body: message, url: link })));
 
     const monthlyBill = lead.get('monthlyBill');
     const creditTier = lead.get('creditTier');
@@ -107,7 +108,7 @@ export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
       creditTier: isCreditTier(creditTier) ? CREDIT_TIER_LABELS[creditTier] : 'Not picked',
       booking,
       photos,
-      link: `${appBaseUrl()}${ALERT_LINK}`,
+      link: `${appBaseUrl()}${link}`,
     });
     for (const c of contacts) {
       if (!c.email) continue;

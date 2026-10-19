@@ -14,6 +14,18 @@ export function isCreditTier(value: unknown): value is CreditTier {
   return typeof value === 'string' && (CREDIT_TIERS as readonly string[]).includes(value);
 }
 
+/**
+ * A lead's life: new (saved, no consultation), booked (a consultation is set),
+ * sold or lost (an admin closed it). A demo account's lead is stored as 'demo'
+ * and never listed to admins.
+ */
+export const SOLAR_LEAD_STATUSES = ['new', 'booked', 'sold', 'lost'] as const;
+export type SolarLeadStatus = (typeof SOLAR_LEAD_STATUSES)[number];
+
+export function isSolarLeadStatus(value: unknown): value is SolarLeadStatus {
+  return typeof value === 'string' && (SOLAR_LEAD_STATUSES as readonly string[]).includes(value);
+}
+
 export const PHOTO_SLOTS = ['billPage1', 'billGraph', 'panel'] as const;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
 

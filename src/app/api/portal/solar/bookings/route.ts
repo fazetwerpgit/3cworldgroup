@@ -9,11 +9,13 @@ import { appBaseUrl, managerAlertEmail, solarBookingConfirmationEmail } from '@/
 import { bookingDocId, formatSlotPT, isSolarMode, openSlots, type SolarMode } from '@/lib/solar/availability';
 import { consultantNotice, loadAvailability, loadBookings, requireSolarUser } from '@/lib/solar/server';
 import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
+import { solarLeadHref } from '@/lib/solar/leadView';
 
 const SLOT_TAKEN = { error: 'slot_taken' };
 
 type Booking = {
   id: string;
+  leadId: string;
   mode: SolarMode;
   start: string;
   consultantUid: string;
@@ -48,14 +50,14 @@ async function announceBooking(b: Booking) {
     if (!to) return;
     const title = `${notice.titlePrefix}Solar consult booked`;
     const message = `${b.customerName || 'A customer'}: ${how}, ${when} PT with ${b.consultantName} (booked by ${b.repName}).`;
-    const link = '/portal/admin';
+    const link = solarLeadHref(b.leadId);
     await createNotification({
       userId: to.uid,
       type: 'solar_booking',
       title,
       message,
       link,
-      metadata: { bookingId: b.id },
+      metadata: { bookingId: b.id, leadId: b.leadId },
     }).catch((error) => console.error('solar booking notification failed:', error));
     await sendPushToUser(to.uid, { title, body: message, url: link }).catch(() => {});
     if (to.email) {
@@ -66,12 +68,39 @@ async function announceBooking(b: Booking) {
   }
 }
 
+/** A request that ends early with this response (inside or outside the transaction). */
+class Answer {
+  constructor(readonly body: Record<string, unknown>, readonly status: number) {}
+}
+
+const LEAD_ID_RE = /^[A-Za-z0-9_-]{1,300}$/;
+
+/** The 200 body for a booking: the real one, so a retrying app shows what was booked. */
+function bookedBody(id: string, b: Record<string, unknown>, duplicate: boolean) {
+  return {
+    success: true,
+    id,
+    ...(duplicate ? { duplicate: true } : {}),
+    consultantUid: String(b.consultantUid ?? ''),
+    consultantName: String(b.consultantName ?? ''),
+    start: String(b.start ?? ''),
+    mode: b.mode === 'virtual' ? 'virtual' : 'in_person',
+  };
+}
+
 // POST /api/portal/solar/bookings {leadId, mode, consultantUid, start}
-// -> 200 {success, id} | 409 {error: 'slot_taken'} | 400 {error: 'slot_unavailable'}.
-// The slot must start at least 2 hours out. A booking sends the lead alert
-// (once per lead, see lib/solar/leadAlert.ts).
-// The doc id is `${consultantUid}_${startISO}` written with create(), so two
-// reps racing for one slot get exactly one booking.
+// -> 200 {success, id, consultantUid, consultantName, start, mode[, duplicate]}
+//  | 409 {error: 'slot_taken'} | 400 {error: 'slot_unavailable'}.
+// ONE active booking per lead: when lead.bookingId already holds a live
+// (not cancelled) booking, any POST for that lead answers that booking with
+// duplicate: true, whatever slot or consultant it asked for, and sends nothing
+// (the 3C Doors app retries after a lost response, possibly on the next
+// consultant). Otherwise the slot must start at least 2 hours out and still be
+// open. The slot doc id is `${consultantUid}_${startISO}`, created in one
+// transaction with the lead's bookingId/status stamp, so two leads racing for
+// one slot get exactly one booking (the other 409s), and two requests for one
+// lead get one booking. A fresh booking sends the lead alert (once per lead,
+// see lib/solar/leadAlert.ts). Cancelling (PATCH bookings/{id}) frees both.
 export async function POST(request: NextRequest) {
   try {
     const gate = await requireSolarUser(request);
@@ -79,13 +108,14 @@ export async function POST(request: NextRequest) {
     const limited = userRateLimited('formSubmit', gate.uid);
     if (limited) return limited;
     if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+    const db = adminDb;
 
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const leadId = typeof body?.leadId === 'string' ? body.leadId.trim() : '';
     const consultantUid = typeof body?.consultantUid === 'string' ? body.consultantUid.trim() : '';
     const mode = body?.mode;
     const startDate = typeof body?.start === 'string' ? new Date(body.start) : null;
-    if (!/^[A-Za-z0-9_-]{1,300}$/.test(leadId) || !/^[A-Za-z0-9_-]{1,128}$/.test(consultantUid)) {
+    if (!LEAD_ID_RE.test(leadId) || !/^[A-Za-z0-9_-]{1,128}$/.test(consultantUid)) {
       return NextResponse.json({ error: 'leadId and consultantUid are required' }, { status: 400 });
     }
     if (!isSolarMode(mode)) return NextResponse.json({ error: 'mode must be virtual or in_person' }, { status: 400 });
@@ -94,11 +124,21 @@ export async function POST(request: NextRequest) {
     }
     const start = startDate.toISOString();
 
-    const leadRef = adminDb.collection('solarLeads').doc(leadId);
+    const leadRef = db.collection('solarLeads').doc(leadId);
     const lead = await leadRef.get();
     if (!lead.exists) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     if (lead.get('repUid') !== gate.uid && !gate.isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // A retry after success answers the booking it made, before the slot checks
+    // (its own booking now fills the slot it asked for).
+    const heldId = typeof lead.get('bookingId') === 'string' ? (lead.get('bookingId') as string) : '';
+    if (heldId) {
+      const held = await db.collection('solarBookings').doc(heldId).get();
+      if (held.exists && held.get('status') !== 'cancelled') {
+        return NextResponse.json(bookedBody(heldId, held.data() ?? {}, true));
+      }
     }
 
     // The slot must be one the consultant offers in this mode, and still open.
@@ -112,45 +152,71 @@ export async function POST(request: NextRequest) {
     if (!open) return NextResponse.json(SLOT_TAKEN, { status: 409 });
 
     const id = bookingDocId(consultantUid, start);
-    const customerName = `${lead.get('first') ?? ''} ${lead.get('last') ?? ''}`.trim();
-    const customerEmail = typeof lead.get('email') === 'string' ? (lead.get('email') as string) : '';
+    const slotRef = db.collection('solarBookings').doc(id);
+    let outcome: { fresh: true; booking: Record<string, unknown> } | { fresh: false; id: string; booking: Record<string, unknown> };
     try {
-      await adminDb.collection('solarBookings').doc(id).create({
-        leadId,
-        mode,
-        consultantUid,
-        consultantName: offered.name,
-        start,
-        end: offered.end,
-        startAt: startDate,
-        endAt: new Date(offered.end),
-        repUid: gate.uid,
-        repName: gate.name,
-        customerName,
-        customerEmail,
-        status: 'booked',
-        createdAt: now,
+      outcome = await db.runTransaction(async (tx) => {
+        // Every read before any write.
+        const leadNow = await tx.get(leadRef);
+        if (!leadNow.exists) throw new Answer({ error: 'Lead not found' }, 404);
+        const nowHeld = typeof leadNow.get('bookingId') === 'string' ? (leadNow.get('bookingId') as string) : '';
+        const heldSnap = nowHeld ? await tx.get(db.collection('solarBookings').doc(nowHeld)) : null;
+        const slot = await tx.get(slotRef);
+        if (heldSnap?.exists && heldSnap.get('status') !== 'cancelled') {
+          return { fresh: false as const, id: nowHeld, booking: heldSnap.data() ?? {} };
+        }
+        if (slot.exists && slot.get('status') !== 'cancelled') throw new Answer(SLOT_TAKEN, 409);
+
+        const customerName = `${leadNow.get('first') ?? ''} ${leadNow.get('last') ?? ''}`.trim();
+        const customerEmail = typeof leadNow.get('email') === 'string' ? (leadNow.get('email') as string) : '';
+        const booking: Record<string, unknown> = {
+          leadId,
+          mode,
+          consultantUid,
+          consultantName: offered.name,
+          start,
+          end: offered.end,
+          startAt: startDate,
+          endAt: new Date(offered.end),
+          repUid: gate.uid,
+          repName: gate.name,
+          customerName,
+          customerEmail,
+          status: 'booked',
+          createdAt: now,
+        };
+        if (slot.exists) {
+          // A cancelled booking held this slot: keep it as history under its
+          // own id, then take the slot.
+          tx.set(db.collection('solarBookings').doc(`${id}_cancelled_${now.getTime()}`), slot.data() ?? {});
+          tx.set(slotRef, booking);
+        } else {
+          tx.create(slotRef, booking);
+        }
+        tx.update(leadRef, { status: 'booked', bookingId: id, updatedAt: now });
+        return { fresh: true as const, booking };
       });
     } catch (error) {
+      if (error instanceof Answer) return NextResponse.json(error.body, { status: error.status });
       if (isAlreadyExists(error)) return NextResponse.json(SLOT_TAKEN, { status: 409 });
       throw error;
     }
-    await leadRef
-      .update({ status: 'booked', bookingId: id, updatedAt: now })
-      .catch((error: unknown) => console.error('solar lead booking stamp failed:', error));
+    if (!outcome.fresh) return NextResponse.json(bookedBody(outcome.id, outcome.booking, true));
 
+    const b = outcome.booking;
     await announceBooking({
       id,
+      leadId,
       mode,
       start,
       consultantUid,
       consultantName: offered.name,
-      customerName,
-      customerEmail,
+      customerName: String(b.customerName ?? ''),
+      customerEmail: String(b.customerEmail ?? ''),
       repName: gate.name,
     });
     await sendLeadAlertOnce(leadId).catch((error) => console.error('solar lead alert failed:', error));
-    return NextResponse.json({ success: true, id });
+    return NextResponse.json(bookedBody(id, b, false));
   } catch (error) {
     console.error('Error booking solar consult:', error);
     return NextResponse.json({ error: 'Failed to book' }, { status: 500 });

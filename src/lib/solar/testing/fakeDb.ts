@@ -46,18 +46,39 @@ export function createFakeDb(seed: Record<string, Record<string, Data>> = {}) {
     };
   }
 
-  type DocRef = { get: () => Promise<ReturnType<typeof snap>>; update: (data: Data) => Promise<void> };
+  type DocRef = {
+    get: () => Promise<ReturnType<typeof snap>>;
+    update: (data: Data) => Promise<void>;
+    create: (data: Data) => Promise<void>;
+    set: (data: Data) => Promise<void>;
+    delete: () => Promise<void>;
+  };
   const db = {
     store,
+    // Reads run as they are called; writes are queued and applied in order when
+    // the callback resolves (a create() that finds the doc throws code 6 then,
+    // as a real commit does). No contention retries.
     runTransaction: async <T>(fn: (tx: {
       get: (ref: DocRef) => Promise<ReturnType<typeof snap>>;
       update: (ref: DocRef, data: Data) => void;
+      create: (ref: DocRef, data: Data) => void;
+      set: (ref: DocRef, data: Data) => void;
+      delete: (ref: DocRef) => void;
     }) => Promise<T>): Promise<T> => {
       const writes: (() => Promise<void>)[] = [];
       const result = await fn({
         get: (ref) => ref.get(),
         update: (ref, data) => {
           writes.push(() => ref.update(data));
+        },
+        create: (ref, data) => {
+          writes.push(() => ref.create(data));
+        },
+        set: (ref, data) => {
+          writes.push(() => ref.set(data));
+        },
+        delete: (ref) => {
+          writes.push(() => ref.delete());
         },
       });
       for (const write of writes) await write();
@@ -79,6 +100,9 @@ export function createFakeDb(seed: Record<string, Record<string, Data>> = {}) {
           const cur = coll(name).get(id);
           if (!cur) throw Object.assign(new Error('not found'), { code: 5 });
           coll(name).set(id, { ...cur, ...data });
+        },
+        delete: async () => {
+          coll(name).delete(id);
         },
       }),
       add: async (data: Data) => {

@@ -183,8 +183,18 @@ export function fetchAvailability(mode: SolarMode, from: Date, to: Date) {
   return call<{ slots: SolarSlot[] }>(`/api/portal/solar/availability?${q}`);
 }
 
+/** The booking the server holds for the lead (on a retry, `duplicate` and possibly another slot). */
+export type BookingResponse = {
+  id: string;
+  consultantUid?: string;
+  consultantName?: string;
+  start?: string;
+  mode?: SolarMode;
+  duplicate?: boolean;
+};
+
 export function createBooking(payload: { leadId: string; mode: SolarMode; consultantUid: string; start: string }) {
-  return call<{ id: string }>('/api/portal/solar/bookings', {
+  return call<BookingResponse>('/api/portal/solar/bookings', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -207,7 +217,15 @@ export async function bookTime(
 ): Promise<BookTimeResult> {
   for (const slot of time.candidates.slice(0, 2)) {
     const res = await book({ leadId, mode, consultantUid: slot.consultantUid, start: slot.start });
-    if (res.ok) return { ok: true, id: res.data.id, slot };
+    if (res.ok) {
+      // A retry answers the lead's existing booking: show that one.
+      const d = res.data;
+      const held =
+        d.start && d.consultantUid
+          ? { consultantUid: d.consultantUid, name: d.consultantName || slot.name, start: d.start, end: d.start === slot.start ? slot.end : '' }
+          : slot;
+      return { ok: true, id: d.id, slot: held };
+    }
     if (res.status !== 409) return { ok: false, taken: false, error: res.error };
   }
   return { ok: false, taken: true, error: 'slot_taken' };
