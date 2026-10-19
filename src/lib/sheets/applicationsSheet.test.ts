@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeSheetCell } from './applicationsSheet';
+import { formatSubmitted, sanitizeSheetCell } from './applicationsSheet';
 
 /*
   The row is appended with valueInputOption=USER_ENTERED, so a cell Sheets
@@ -38,5 +38,17 @@ describe('sanitizeSheetCell', () => {
   it('does not touch a formula character that is not first', () => {
     expect(sanitizeSheetCell('Referred by A=B')).toBe('Referred by A=B');
     expect(sanitizeSheetCell('Manager (ext -4)')).toBe('Manager (ext -4)');
+  });
+});
+
+describe('formatSubmitted', () => {
+  it('stamps the submitted time in Chicago time', () => {
+    // 2026-10-06T04:30:00Z is 11:30 PM CDT on Oct 5 (and 12:30 AM EDT on Oct 6).
+    expect(formatSubmitted(new Date('2026-10-06T04:30:00Z'))).toBe('10/5/2026, 11:30:00 PM');
+  });
+
+  it('follows Central standard time in winter', () => {
+    // 2026-01-15T05:15:00Z is 11:15 PM CST on Jan 14.
+    expect(formatSubmitted(new Date('2026-01-15T05:15:00Z'))).toBe('1/14/2026, 11:15:00 PM');
   });
 });

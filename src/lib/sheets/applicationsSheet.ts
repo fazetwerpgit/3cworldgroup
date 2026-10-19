@@ -1,5 +1,6 @@
 import { JWT } from 'google-auth-library';
 import { interestLabels } from '@/lib/forms/applicationInterests';
+import { INSTALL_DATE_TIME_ZONE } from '@/lib/sales/saleDate';
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const SHEETS_APPEND_URL = (spreadsheetId: string) =>
@@ -79,9 +80,12 @@ export function sanitizeSheetCell(value: string): string {
   return FORMULA_LEAD.test(value) ? `'${value}` : value;
 }
 
-function formatSubmitted(createdAt: Date): string {
+// Business days are Chicago days across the portal, so the owners' sheet
+// stamps the submitted time in Central time too. A late-evening application
+// must not land on the next day.
+export function formatSubmitted(createdAt: Date): string {
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Detroit',
+    timeZone: INSTALL_DATE_TIME_ZONE,
     year: 'numeric',
     month: 'numeric',
     day: 'numeric',
