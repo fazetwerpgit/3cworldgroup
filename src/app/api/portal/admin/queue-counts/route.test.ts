@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 // The admin badge figures: count() aggregations only, never a listing of
@@ -10,6 +10,7 @@ const fake = vi.hoisted(() => {
     failing: new Set<string>(),
     calls: [] as string[],
     oldest: null as string | null,
+    since: null as Date | null,
   };
   const countOf = (name: string, label: string, value: () => number) => ({
     get: async () => {
@@ -26,7 +27,10 @@ const fake = vi.hoisted(() => {
           if (value !== 'open') throw new Error('unexpected status');
           return {
             count: () => countOf(name, 'count(chatReports)', () => state.counts.chatReports ?? 0),
-            where: () => ({ count: () => countOf(name, 'count(chatReports, recent)', () => state.counts.recent ?? 0) }),
+            where: (_field: string, _op: string, since: { toDate: () => Date }) => {
+              state.since = since.toDate();
+              return { count: () => countOf(name, 'count(chatReports, recent)', () => state.counts.recent ?? 0) };
+            },
             orderBy: () => ({
               limit: () => ({
                 get: async () => ({
@@ -63,6 +67,7 @@ beforeEach(() => {
     failing: new Set<string>(),
     calls: [],
     oldest: null,
+    since: null,
   });
 });
 
@@ -103,5 +108,27 @@ describe('GET /api/portal/admin/queue-counts', () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+
+  describe('chat reports new today', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('counts from Chicago midnight, not a rolling 24 hours', async () => {
+      // 9 AM Chicago (CDT) on Tue 2026-10-20: yesterday's 3 PM report is not today's.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-20T14:00:00.000Z'));
+      await GET(req());
+      expect(fake.state.since?.toISOString()).toBe('2026-10-20T05:00:00.000Z');
+    });
+
+    it('uses the Chicago day, not the UTC day, late in the evening', async () => {
+      // 8 PM Chicago (CST) on Mon 2026-12-07 is already Tuesday in UTC.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-12-08T02:00:00.000Z'));
+      await GET(req());
+      expect(fake.state.since?.toISOString()).toBe('2026-12-07T06:00:00.000Z');
+    });
   });
 });

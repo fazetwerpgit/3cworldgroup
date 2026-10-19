@@ -2,14 +2,15 @@ import { Timestamp } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { chicagoDayBounds } from '@/lib/leaderboard/periods';
+import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 
 // GET /api/portal/admin/chat-reports/count — the chat-report figures behind the
 // admin nav badge, without reading the reports: open count and how many came in
-// over the last 24 hours (count() aggregations), plus when the oldest open one
+// since Chicago midnight, the office's business day (count() aggregations),
+// plus when the oldest open one
 // was filed. Uses the same chatReports (status, createdAt) index as the open
 // queue.
-
-const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
 function iso(value: unknown): string | null {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const open = adminDb.collection('chatReports').where('status', '==', 'open');
-    const since = Timestamp.fromMillis(Date.now() - ONE_DAY_MS);
+    const since = Timestamp.fromDate(chicagoDayBounds(chicagoDayKey(new Date())).start);
     const [total, recent, oldest] = await Promise.all([
       open.count().get(),
       open.where('createdAt', '>=', since).count().get(),

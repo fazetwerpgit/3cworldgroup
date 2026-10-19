@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 // The nav-badge figures come from count() aggregations and a one-doc read of
@@ -11,6 +11,7 @@ const fake = vi.hoisted(() => {
     oldest: null as string | null,
     fail: false,
     calls: [] as string[],
+    since: null as Date | null,
   };
   const openQuery = {
     count: () => ({
@@ -20,14 +21,17 @@ const fake = vi.hoisted(() => {
         return { data: () => ({ count: state.open }) };
       },
     }),
-    where: (field: string, op: string) => ({
-      count: () => ({
-        get: async () => {
-          state.calls.push(`count(open, ${field} ${op})`);
-          return { data: () => ({ count: state.recent }) };
-        },
-      }),
-    }),
+    where: (field: string, op: string, value: { toDate: () => Date }) => {
+      state.since = value.toDate();
+      return {
+        count: () => ({
+          get: async () => {
+            state.calls.push(`count(open, ${field} ${op})`);
+            return { data: () => ({ count: state.recent }) };
+          },
+        }),
+      };
+    },
     orderBy: (field: string, dir: string) => ({
       limit: (n: number) => ({
         get: async () => {
@@ -71,6 +75,7 @@ beforeEach(() => {
     oldest: null,
     fail: false,
     calls: [],
+    since: null,
   });
 });
 
@@ -81,7 +86,7 @@ describe('GET /api/portal/admin/chat-reports/count', () => {
     expect(fake.state.calls).toEqual([]);
   });
 
-  it('answers the open count, the last-24h count and the oldest open time', async () => {
+  it('answers the open count, the new-today count and the oldest open time', async () => {
     Object.assign(fake.state, { open: 7, recent: 2, oldest: '2026-10-10T08:00:00.000Z' });
     const res = await GET(req());
     expect(res.status).toBe(200);
@@ -101,5 +106,27 @@ describe('GET /api/portal/admin/chat-reports/count', () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+
+  describe('new today', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('counts from Chicago midnight, not a rolling 24 hours', async () => {
+      // 9 AM Chicago (CDT) on Tue 2026-10-20: yesterday's 3 PM report is not today's.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-20T14:00:00.000Z'));
+      await GET(req());
+      expect(fake.state.since?.toISOString()).toBe('2026-10-20T05:00:00.000Z');
+    });
+
+    it('uses the Chicago day, not the UTC day, late in the evening', async () => {
+      // 8 PM Chicago (CST) on Mon 2026-12-07 is already Tuesday in UTC.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-12-08T02:00:00.000Z'));
+      await GET(req());
+      expect(fake.state.since?.toISOString()).toBe('2026-12-07T06:00:00.000Z');
+    });
   });
 });
