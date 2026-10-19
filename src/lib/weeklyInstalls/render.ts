@@ -105,7 +105,8 @@ function preheader(digest: RepDigest): string {
   const { total } = digest;
   if (total.count) {
     parts.push(`${total.count} installed`);
-    if (total.estAmount !== null) parts.push(`est. ${money(total.estAmount)}`);
+    const est = fullEstimate(digest);
+    if (est !== null) parts.push(`est. ${money(est)}`);
   }
   if (digest.upcoming.length) parts.push(`${digest.upcoming.length} coming up`);
   const undated = digest.needsDate.length + digest.needsDateMore;

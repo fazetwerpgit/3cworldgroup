@@ -84,6 +84,21 @@ describe('renderWeeklyInstallsEmail', () => {
     expect(email.html).toContain('Est. payout Sep 28–Oct 3');
   });
 
+  it('keeps a partial estimate out of the preheader, like the subject', () => {
+    const preheaderOf = (html: string) =>
+      html.match(/<div style="display:none;[^"]*">([^<]*)/)?.[1] ?? '';
+    expect(preheaderOf(busy.html)).toContain('4 installed · est. $471');
+
+    const input = busyWeekInput();
+    input.rates = { tfiber: { 'tfiber-1gig': 138 } };
+    const email = renderWeeklyInstallsEmail(buildRepDigest(input), { baseUrl: BASE });
+    expect(email.subject).toBe('Your installs last week: 4 installed');
+    expect(email.html).toContain(escapeHtml('from 1 of 4 installs'));
+    const pre = preheaderOf(email.html);
+    expect(pre).toMatch(/^4 installed/);
+    expect(pre).not.toMatch(/\$\d/);
+  });
+
   it('writes a subject for a week with no installs', () => {
     const input = lightWeekInput();
     input.sales = input.sales.filter((sale) => sale.id === 'j2');
