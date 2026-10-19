@@ -5,10 +5,15 @@ vi.mock('@/lib/firebase/admin', async () => ({
   adminDb: (await import('@/lib/solar/testing/fakeDb')).createFakeDb(),
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: vi.fn() }));
+// View as rep: no header is the caller themself (the real resolver's no-header path).
+vi.mock('@/lib/auth/viewAs', () => ({
+  resolveSubject: vi.fn(async (_request: unknown, caller: { uid: string }) => ({ ok: true, viewing: false, uid: caller.uid })),
+}));
 
 import { GET } from './route';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
 
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
@@ -135,6 +140,29 @@ describe('GET /api/portal/solar/leaderboard — counting', () => {
     expect(body.recent).toEqual([{ repName: 'Ana Rivera', plan: 'Virtual', at: '2026-10-12T15:00:00.000Z' }]);
     expect(JSON.stringify(body)).not.toContain('Pat Customer');
     expect(JSON.stringify(body)).not.toContain('pat@example.com');
+  });
+
+  it('counts a rebooked lead once (the cancelled booking plus its replacement)', async () => {
+    db.store.set('solarBookings', new Map(Object.entries({
+      b1: booking('ana', '2026-10-12T15:00:00Z', { leadId: 'L1', status: 'cancelled' }),
+      b2: booking('ana', '2026-10-13T15:00:00Z', { leadId: 'L1' }),
+    })));
+    const body = await (await get('?period=week')).json();
+    expect(body.leaderboard.map((r: { uid: string; booked: number }) => [r.uid, r.booked])).toEqual([['ana', 1]]);
+  });
+
+  it('view as rep: "you" is the viewed rep, not the owner', async () => {
+    const owner = { ok: true, uid: 'own', name: 'Owner', role: 'owner', solarRole: null, demoAccount: false, isAdmin: true, isOwner: true };
+    mockGate.mockResolvedValue(owner);
+    vi.mocked(resolveSubject).mockResolvedValueOnce({ ok: true, viewing: true, uid: 'ben', ownerUid: 'own', target: {} as never });
+    db.store.set('solarBookings', new Map(Object.entries({ b1: booking('ben', '2026-10-13T15:00:00Z') })));
+    const body = await (await get('?period=week')).json();
+    expect(body.currentUser).toMatchObject({ uid: 'ben', booked: 1 });
+  });
+
+  it('passes a refused view-as through', async () => {
+    vi.mocked(resolveSubject).mockResolvedValueOnce({ ok: false, error: 'Forbidden: owner access required', status: 403 });
+    expect((await get()).status).toBe(403);
   });
 
   it('fails with 500 instead of an empty board', async () => {

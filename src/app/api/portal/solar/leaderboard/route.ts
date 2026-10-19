@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { resolveSubject } from '@/lib/auth/viewAs';
 import { permissionsFor } from '@/types/auth';
 import { chicagoMonthBounds, formatMonthParam, parseLeaderboardMonth, periodBounds } from '@/lib/leaderboard/periods';
 import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
@@ -35,6 +36,10 @@ export async function GET(request: NextRequest) {
     if (!permissionsFor(gate).includes('solar:read')) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+    // View as rep (owner only, a dual-role rep): "you" is the rep, as on the fiber board.
+    const subject = await resolveSubject(request, gate);
+    if (!subject.ok) return NextResponse.json({ error: subject.error }, { status: subject.status });
+    const youUid = subject.uid;
     if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     const db = adminDb;
 
@@ -90,9 +95,9 @@ export async function GET(request: NextRequest) {
     );
 
     // A demo account (App Review) sees aliases for everyone but itself.
-    const redact = createDemoRedactor({ uid: gate.uid, demoAccount: gate.demoAccount === true });
+    const redact = createDemoRedactor({ uid: youUid, demoAccount: gate.demoAccount === true });
     const leaderboard = redactPeople(ranked.slice(0, limit), redact, { idKey: 'uid', nameKey: 'name' });
-    const mine = ranked.find((row) => row.uid === gate.uid) ?? null;
+    const mine = ranked.find((row) => row.uid === youUid) ?? null;
 
     let team: { unranked: { uid: string; name: string }[]; recent: { repName: string; plan: string; at: string }[] } | null = null;
     if (params.get('include') === 'team' && !pastMonth) {

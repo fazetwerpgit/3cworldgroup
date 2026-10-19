@@ -18,6 +18,7 @@ const VIEW_AS_READS: readonly RegExp[] = [
   /^\/api\/portal\/sales\/(?!status$|callouts$|company-stats$|scan$)[^/]+$/,
   /^\/api\/portal\/comp-plan$/,
   /^\/api\/portal\/leaderboard$/,
+  /^\/api\/portal\/solar\/leaderboard$/,
   /^\/api\/portal\/calls$/,
   /^\/api\/portal\/onboarding$/,
 ];
@@ -27,6 +28,7 @@ const VIEW_AS_WRITE_GUARD: readonly RegExp[] = [
   /^\/api\/portal\/sales(\/|$)/,
   /^\/api\/portal\/comp-plan(\/|$)/,
   /^\/api\/portal\/leaderboard(\/|$)/,
+  /^\/api\/portal\/solar\/leaderboard(\/|$)/,
   /^\/api\/portal\/calls(\/|$)/,
   /^\/api\/portal\/onboarding(\/|$)/,
 ];

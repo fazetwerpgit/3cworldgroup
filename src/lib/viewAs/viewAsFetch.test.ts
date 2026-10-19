@@ -19,6 +19,7 @@ describe('viewAsDecision', () => {
       '/api/portal/sales/sale-123',
       '/api/portal/comp-plan',
       '/api/portal/leaderboard?period=week&metric=totalPoints&limit=100',
+      '/api/portal/solar/leaderboard?period=week&metric=bookedConsults&limit=100',
       '/api/portal/calls',
       '/api/portal/onboarding?userId=rep-noah',
       `${ORIGIN}/api/portal/sales`,
