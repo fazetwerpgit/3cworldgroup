@@ -16,6 +16,21 @@ interface StoredPhoto {
 }
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
+let openedDb: IDBDatabase | null = null;
+
+// Drops the cached handle so the next call opens a fresh connection. iOS WebKit
+// closes IndexedDB connections behind a backgrounded app, and a dead handle
+// would otherwise make every later call a silent no-op until reload.
+function forgetDb(db: IDBDatabase): void {
+  if (openedDb !== db) return;
+  openedDb = null;
+  dbPromise = null;
+  try {
+    db.close();
+  } catch {
+    // already closed
+  }
+}
 
 function openDb(): Promise<IDBDatabase | null> {
   if (dbPromise) return dbPromise;
@@ -26,7 +41,13 @@ function openDb(): Promise<IDBDatabase | null> {
       request.onupgradeneeded = () => {
         if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE, { keyPath: 'id' });
       };
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => {
+        const db = request.result;
+        db.onclose = () => forgetDb(db);
+        db.onversionchange = () => forgetDb(db);
+        openedDb = db;
+        resolve(db);
+      };
       request.onerror = () => resolve(null);
       request.onblocked = () => resolve(null);
     } catch {
@@ -39,22 +60,33 @@ function openDb(): Promise<IDBDatabase | null> {
   return dbPromise;
 }
 
-function run<T>(mode: IDBTransactionMode, work: (store: IDBObjectStore) => IDBRequest<T> | void): Promise<T | null> {
-  return openDb().then(
-    (db) =>
-      new Promise<T | null>((resolve) => {
-        if (!db) return resolve(null);
-        try {
-          const tx = db.transaction(STORE, mode);
-          const request = work(tx.objectStore(STORE));
-          tx.oncomplete = () => resolve(request ? (request.result ?? null) : null);
-          tx.onerror = () => resolve(null);
-          tx.onabort = () => resolve(null);
-        } catch {
-          resolve(null);
-        }
-      })
-  );
+function run<T>(
+  mode: IDBTransactionMode,
+  work: (store: IDBObjectStore) => IDBRequest<T> | void,
+  retried = false
+): Promise<T | null> {
+  return openDb().then((db) => {
+    if (!db) return null;
+    let tx: IDBTransaction;
+    try {
+      tx = db.transaction(STORE, mode);
+    } catch {
+      // The connection is gone (e.g. InvalidStateError after iOS closed it):
+      // reopen once and try again.
+      forgetDb(db);
+      return retried ? null : run(mode, work, true);
+    }
+    return new Promise<T | null>((resolve) => {
+      try {
+        const request = work(tx.objectStore(STORE));
+        tx.oncomplete = () => resolve(request ? (request.result ?? null) : null);
+        tx.onerror = () => resolve(null);
+        tx.onabort = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+  });
 }
 
 export async function savePendingPhoto(id: string, file: File): Promise<void> {

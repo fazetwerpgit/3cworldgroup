@@ -14,16 +14,24 @@ interface FakeIdb {
   openOutcome: 'success' | 'error' | 'blocked' | 'throw';
   /** How the next transaction ends. */
   txOutcome: 'complete' | 'error' | 'abort' | 'throw';
+  /** Connection lost: transaction() throws until the database is reopened. */
+  dead: boolean;
+  closes: number;
+  db: { onclose?: (() => void) | null; onversionchange?: (() => void) | null };
 }
 
 function installFakeIndexedDb(): FakeIdb {
-  const fake: FakeIdb = { stores: new Map(), opens: 0, writes: 0, openOutcome: 'success', txOutcome: 'complete' };
-  const db = {
+  const fake = { stores: new Map(), opens: 0, writes: 0, openOutcome: 'success', txOutcome: 'complete', dead: false, closes: 0 } as Omit<FakeIdb, 'db'> as FakeIdb;
+  const db: FakeIdb['db'] & Record<string, unknown> = {
+    close: () => {
+      fake.closes += 1;
+    },
     objectStoreNames: { contains: (name: string) => fake.stores.has(name) },
     createObjectStore: (name: string) => {
       fake.stores.set(name, new Map());
     },
     transaction: (name: string, mode: IDBTransactionMode) => {
+      if (fake.dead) throw new DOMException('Connection to Indexed Database server lost', 'InvalidStateError');
       if (fake.txOutcome === 'throw') throw new DOMException('closing', 'InvalidStateError');
       const outcome = fake.txOutcome;
       if (mode === 'readwrite') fake.writes += 1;
@@ -61,6 +69,7 @@ function installFakeIndexedDb(): FakeIdb {
     open: (name: string, version: number) => {
       expect([name, version]).toEqual(['3c-chat-outbox', 1]);
       fake.opens += 1;
+      fake.dead = false;
       if (fake.openOutcome === 'throw') throw new DOMException('denied', 'SecurityError');
       const outcome = fake.openOutcome;
       const request: Req = { result: db };
@@ -74,6 +83,7 @@ function installFakeIndexedDb(): FakeIdb {
       return request;
     },
   });
+  fake.db = db;
   return fake;
 }
 
@@ -179,5 +189,34 @@ describe('best-effort when storage is missing, blocked or failing', () => {
     await expect(mod.prunePendingPhotos('u1', new Set())).resolves.toBeUndefined();
     idb.txOutcome = 'complete';
     expect(idb.stores.get('photos')!.has('u1_a')).toBe(false);
+  });
+});
+
+describe('lost connection (iOS closes IndexedDB behind a backgrounded app)', () => {
+  it('reopens and still saves when the cached handle has gone dead', async () => {
+    await mod.loadPendingPhoto('warm-up');
+    expect(idb.opens).toBe(1);
+    idb.dead = true;
+    await mod.savePendingPhoto('u1_a', photo());
+    expect(idb.opens).toBe(2);
+    expect(idb.closes).toBe(1);
+    expect(idb.stores.get('photos')!.has('u1_a')).toBe(true);
+    expect(await mod.loadPendingPhoto('u1_a')).not.toBeNull();
+    expect(idb.opens).toBe(2);
+  });
+
+  it.each(['onclose', 'onversionchange'] as const)('opens a fresh connection after %s fires', async (event) => {
+    await mod.savePendingPhoto('u1_a', photo());
+    expect(idb.opens).toBe(1);
+    idb.db[event]!();
+    expect(await mod.loadPendingPhoto('u1_a')).not.toBeNull();
+    expect(idb.opens).toBe(2);
+  });
+
+  it('gives up after one reopen when transactions keep throwing', async () => {
+    await mod.loadPendingPhoto('warm-up');
+    idb.txOutcome = 'throw';
+    await expect(mod.savePendingPhoto('u1_a', photo())).resolves.toBeUndefined();
+    expect(idb.opens).toBe(2);
   });
 });
