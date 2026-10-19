@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DIRECT_UPLOAD_THRESHOLD,
   MAX_SELECTED_IMAGE_BYTES,
+  UPLOAD_STALL_TIMEOUT_MS,
   isPdfFile,
   prepareImageForUpload,
   storageUploadFailure,
@@ -50,6 +51,13 @@ describe('validateSelectedImage', () => {
     expect(validateSelectedImage(imageFile('Contract.PDF', 'application/octet-stream'))).toBeNull();
     expect(isPdfFile(imageFile('contract.pdf', ''))).toBe(true);
     expect(isPdfFile(imageFile('photo.jpg', ''))).toBe(false);
+  });
+
+  it('rejects a GIF over the 10 MB server cap at pick time, since GIFs upload uncompressed', () => {
+    expect(validateSelectedImage(imageFile('big.gif', 'image/gif', 15 * 1024 * 1024))).toBe(
+      'GIF too large — GIFs up to 10 MB.'
+    );
+    expect(validateSelectedImage(imageFile('ok.gif', 'image/gif', 10 * 1024 * 1024))).toBeNull();
   });
 
   it('rejects an 11 MB PDF with the PDF size message', () => {
@@ -249,6 +257,15 @@ describe('uploadChatFileDirect (straight to Storage, then attach by path)', () =
     expect(lost.failure).toEqual({ kind: 'network' });
   });
 
+  it('treats a connection dropped while reading the attach response as retryable', async () => {
+    const dropped = new Response('{}', { status: 200 });
+    vi.spyOn(dropped, 'text').mockRejectedValue(new TypeError('network error'));
+    const { d } = deps(dropped);
+    const error = await uploadChatFileDirect(d, 't', 'c', imageFile('a.pdf', 'application/pdf'), undefined, undefined, () => {}).catch((e) => e);
+    expect(error).toBeInstanceOf(SendRequestError);
+    expect(error.failure).toEqual({ kind: 'network' });
+  });
+
   it('maps a rules refusal to a permanent error and anything else to a retry', () => {
     expect(storageUploadFailure({ code: 'storage/unauthorized' }).failure).toEqual({ kind: 'http', status: 403 });
     expect(storageUploadFailure({ code: 'storage/canceled' }).failure).toEqual({ kind: 'network' });
@@ -286,5 +303,49 @@ describe('uploadChatFileDirect (straight to Storage, then attach by path)', () =
     await uploadChatImageWithProgress('t', 'c', imageFile('a.png', 'image/png', 1024), 10, 10, () => {}, d);
     expect(sent).toHaveLength(1);
     expect(d.putFile).not.toHaveBeenCalled();
+  });
+
+  it('uploadChatImageWithProgress gives up on a stalled upload, not a slow but moving one', async () => {
+    vi.useFakeTimers();
+    try {
+      const { d } = deps();
+      const xhrs: StallXhr[] = [];
+      class StallXhr {
+        upload: { onprogress: ((e: { lengthComputable: boolean; loaded: number; total: number }) => void) | null } = { onprogress: null };
+        onload = null;
+        onerror: (() => void) | null = null;
+        ontimeout: (() => void) | null = null;
+        onabort: (() => void) | null = null;
+        aborted = false;
+        constructor() {
+          xhrs.push(this);
+        }
+        open() {}
+        setRequestHeader() {}
+        send() {}
+        abort() {
+          this.aborted = true;
+          this.onabort?.();
+        }
+      }
+      vi.stubGlobal('XMLHttpRequest', StallXhr);
+      const pending = uploadChatImageWithProgress('t', 'c', imageFile('a.png', 'image/png', 1024), 10, 10, () => {}, d);
+      const settled = pending.catch((e) => e);
+      const xhr = xhrs[0];
+      // Bytes keep trickling in for well past 120 s in total: no cut-off.
+      for (let i = 0; i < 5; i++) {
+        vi.advanceTimersByTime(100_000);
+        xhr.upload.onprogress?.({ lengthComputable: true, loaded: i + 1, total: 10 });
+      }
+      expect(xhr.aborted).toBe(false);
+      // Then nothing moves for the stall limit: abort as a retryable failure.
+      vi.advanceTimersByTime(UPLOAD_STALL_TIMEOUT_MS);
+      expect(xhr.aborted).toBe(true);
+      const error = await settled;
+      expect(error).toBeInstanceOf(SendRequestError);
+      expect(error.failure).toEqual({ kind: 'network' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

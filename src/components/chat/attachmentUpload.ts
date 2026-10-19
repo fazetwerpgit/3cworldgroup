@@ -149,6 +149,11 @@ export function validateSelectedImage(file: File): string | null {
   if (file.size > MAX_SELECTED_IMAGE_BYTES) {
     return 'Image must be 30 MB or smaller.';
   }
+  // GIFs upload as-is (compressing would flatten the animation), so they must
+  // already fit the server's 10 MB cap.
+  if (mime === 'image/gif' && file.size > MAX_UPLOAD_BYTES) {
+    return 'GIF too large — GIFs up to 10 MB.';
+  }
   return null;
 }
 
@@ -285,8 +290,24 @@ function toUploadedAttachment(
 }
 
 // A photo upload on bad signal can stall for minutes; give up and let the retry
-// policy take over instead.
-const UPLOAD_TIMEOUT_MS = 120_000;
+// policy take over instead. This is an inactivity limit, reset whenever bytes
+// move, so a big file on a slow but steady uplink is never cut off mid-upload.
+export const UPLOAD_STALL_TIMEOUT_MS = 120_000;
+
+/** Calls `onStall` once no `bump()` has happened for UPLOAD_STALL_TIMEOUT_MS. */
+function stallTimer(onStall: () => void): { bump: () => void; clear: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const clear = () => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = undefined;
+  };
+  const bump = () => {
+    clear();
+    timer = setTimeout(onStall, UPLOAD_STALL_TIMEOUT_MS);
+  };
+  bump();
+  return { bump, clear };
+}
 
 // Above this, a file goes straight to Firebase Storage instead of through the
 // API body: Vercel refuses request bodies over about 4.5 MB, and a multipart
@@ -321,28 +342,39 @@ export function storageUploadFailure(error: unknown): SendRequestError {
   return new SendRequestError('Upload failed. Check your connection.', { kind: 'network' });
 }
 
-async function firebasePutFile(path: string, file: File, onProgress: (fraction: number) => void): Promise<void> {
-  const [{ ref, uploadBytesResumable }, { storage }] = await Promise.all([
-    import('firebase/storage'),
-    import('@/lib/firebase/storage'),
-  ]);
+/** Exported for tests; the app reaches it through firebaseDirectDeps. */
+export async function firebasePutFile(
+  path: string,
+  file: File,
+  onProgress: (fraction: number) => void
+): Promise<void> {
+  let modules: [typeof import('firebase/storage'), typeof import('@/lib/firebase/storage')];
+  try {
+    modules = await Promise.all([import('firebase/storage'), import('@/lib/firebase/storage')]);
+  } catch {
+    // The lazy Storage chunk failed to load: on flaky signal that is a network
+    // failure the outbox should retry, not a permanent "Not sent".
+    throw new SendRequestError('Upload failed. Check your connection.', { kind: 'network' });
+  }
+  const [{ ref, uploadBytesResumable }, { storage }] = modules;
   if (!storage) throw new Error('Storage is not configured');
   const bucket = storage;
   await new Promise<void>((resolve, reject) => {
     const task = uploadBytesResumable(ref(bucket, path), file, { contentType: file.type });
-    // Same give-up point as the XHR path; a cancelled task rejects as retryable.
-    const timer = setTimeout(() => task.cancel(), UPLOAD_TIMEOUT_MS);
+    // Same give-up rule as the XHR path; a cancelled task rejects as retryable.
+    const stall = stallTimer(() => task.cancel());
     task.on(
       'state_changed',
       (snap) => {
+        stall.bump();
         if (snap.totalBytes > 0) onProgress(Math.min(1, snap.bytesTransferred / snap.totalBytes));
       },
       (error) => {
-        clearTimeout(timer);
+        stall.clear();
         reject(storageUploadFailure(error));
       },
       () => {
-        clearTimeout(timer);
+        stall.clear();
         resolve();
       }
     );
@@ -380,6 +412,7 @@ export async function uploadChatFileDirect(
   // The bytes are nearly all of the work; the attach call is the last 5%.
   await deps.putFile(pendingPath, file, (fraction) => onProgress(fraction * 0.95));
   let response: Response;
+  let responseText: string;
   try {
     response = await deps.fetch('/api/portal/chat/media', {
       method: 'POST',
@@ -390,10 +423,12 @@ export async function uploadChatFileDirect(
         ...(file.type === PDF_MIME ? { name: file.name } : {}),
       }),
     });
+    // A connection dropped mid-body rejects here; that is retryable too.
+    responseText = await response.text();
   } catch {
     throw new SendRequestError('Upload failed. Check your connection.', { kind: 'network' });
   }
-  const attachment = toUploadedAttachment(response.status, await response.text(), width, height);
+  const attachment = toUploadedAttachment(response.status, responseText, width, height);
   onProgress(1);
   return attachment;
 }
@@ -424,16 +459,21 @@ export function uploadChatImageWithProgress(
     const xhr = new XMLHttpRequest();
     xhr.open('POST', '/api/portal/chat/media');
     xhr.setRequestHeader('Authorization', `Bearer ${idToken}`);
-    xhr.timeout = UPLOAD_TIMEOUT_MS;
+    // Give up only when the upload stops moving, not after a fixed total time.
+    const stall = stallTimer(() => xhr.abort());
     xhr.upload.onprogress = (event) => {
+      stall.bump();
       if (event.lengthComputable && event.total > 0) onProgress(Math.min(1, event.loaded / event.total));
     };
-    const networkFailure = () =>
+    const networkFailure = () => {
+      stall.clear();
       reject(new SendRequestError('Photo upload failed. Check your connection.', { kind: 'network' }));
+    };
     xhr.onerror = networkFailure;
     xhr.ontimeout = networkFailure;
     xhr.onabort = networkFailure;
     xhr.onload = () => {
+      stall.clear();
       try {
         resolve(toUploadedAttachment(xhr.status, xhr.responseText, width, height));
       } catch (error) {
