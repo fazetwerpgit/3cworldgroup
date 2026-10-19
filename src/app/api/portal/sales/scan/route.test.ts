@@ -61,7 +61,8 @@ const GOOD = {
 beforeEach(() => {
   vi.stubEnv('SALE_SCAN_ENABLED', 'true');
   vi.stubEnv('GEMINI_API_KEY', 'test-key');
-  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Rep', email: 'r@x.com' });
+  mockUser.mockClear();
+  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Rep', email: 'r@x.com', aiConsent: { deepseek: false, gemini: true } });
   generateContent.mockReset();
   getFiles.mockClear();
   download.mockClear();
@@ -75,6 +76,15 @@ afterEach(() => {
 });
 
 describe('POST /api/portal/sales/scan', () => {
+  it("403s with code 'ai_consent' and reads nothing until the rep agrees to Gemini", async () => {
+    mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Rep', email: 'r@x.com', aiConsent: { deepseek: true, gemini: false } });
+    const res = await POST(req({ paths: [OWN] }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'ai_consent', provider: 'gemini' });
+    expect(getFiles).not.toHaveBeenCalled();
+    expect(generateContent).not.toHaveBeenCalled();
+  });
+
   it('404s unless SALE_SCAN_ENABLED is exactly "true"', async () => {
     vi.stubEnv('SALE_SCAN_ENABLED', '1');
     const res = await POST(req({ paths: [OWN] }));

@@ -4,6 +4,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isAllowedImageMime } from '@/lib/chat/media';
 import { MAX_FORM_FILE_BYTES, resolveUploadMime } from '@/lib/forms/formUploads';
 import { MAX_QUESTION_CHARS, parseHistory, type AskReply, type AskTurnMessage } from '@/lib/ask/chat';
+import { aiConsentRefusal } from '@/lib/ai/consent';
 import { askAudience, askEarlyUids } from '@/lib/ask/flag';
 import { loadRepSnapshot } from '@/lib/ask/liveData';
 import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
@@ -14,6 +15,8 @@ import { ownDealerCodes } from '@/lib/fiberReport/dealerCodes';
 
 // POST /api/portal/ask (multipart: question, history JSON, optional photo) —
 // Ask 3C: answers a rep's question from the owner's knowledge notes only.
+// Refused with code 'ai_consent' until the rep has agreed to DeepSeek. The
+// rep's own portal data goes without customer or teammate names (liveData).
 // Typed emails and phone numbers are redacted before the model or the log sees
 // them; the photo goes to the model as it is and is never stored. Logs carry
 // outcome, status and timings only, never the question or the answer.
@@ -41,6 +44,9 @@ export async function POST(request: NextRequest) {
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return fail(gate.error, gate.status);
   if (audience === 'owners' && !gate.isOwner && !askEarlyUids().includes(gate.uid)) return fail('Ask 3C is not turned on yet.', 404);
+  // One-time AI consent (lib/ai/consent): nothing goes to DeepSeek until the
+  // user has agreed on the sheet; the client shows it on this code.
+  if (!gate.aiConsent?.deepseek) return NextResponse.json(aiConsentRefusal('deepseek'), { status: 403 });
   if (!adminDb) return fail('Database not configured', 500);
   const db = adminDb;
 

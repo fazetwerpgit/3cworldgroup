@@ -1,0 +1,28 @@
+/* The one-time AI consent sheet (AiConsentSheet): the pay-help sheet's body,
+   with two equal buttons at the foot. */
+.actions {
+  display: flex;
+  gap: var(--s3);
+  padding-top: var(--s2);
+}
+
+.actions > button {
+  flex: 1 1 0;
+  min-height: 56px;
+}
+
+.actions > button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.link {
+  color: var(--c-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.error {
+  color: var(--c-red);
+}

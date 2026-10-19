@@ -27,6 +27,7 @@ import {
 } from '@/lib/sales/bulk/batch';
 import { SALE_CHANGED_MESSAGE, canCombine } from '@/lib/sales/bulk/group';
 import { isExtraPlanId } from '@/lib/sales/planSelection';
+import { AiConsentSheet } from './AiConsentSheet';
 import { BodyLayer } from './BodyLayer';
 import { BulkSaleSheet, type BulkSheetEdits } from './BulkSaleSheet';
 import { orderDuplicateHeadline } from './RepLogSale';
@@ -357,6 +358,10 @@ export function RepBulkLog() {
 
   return (
     <div className={`${l.main} ${hasRows ? l.mainDetails : ''} ${b.page}`}>
+      {/* The one-time Gemini consent (lib/ai/consent), before any screenshot is read. */}
+      {bulk.consentNeeded ? (
+        <AiConsentSheet provider="gemini" onAgreed={bulk.consentAgreed} onClose={bulk.consentRefused} />
+      ) : null}
       <header className={b.head}>
         <h1 className={l.title}>Log several sales</h1>
         <p className={l.lede}>

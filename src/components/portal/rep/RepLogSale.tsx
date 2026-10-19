@@ -28,6 +28,7 @@ import { isExtraPlanId } from '@/lib/sales/planSelection';
 import { MAX_PROOF_SCREENSHOTS } from '@/lib/sales/proofPaths';
 import { saleScanEnabled } from '@/lib/sales/scan/flag';
 import { BULK_MAX_FILES } from '@/lib/sales/bulk/batch';
+import { AiConsentSheet } from './AiConsentSheet';
 import { BodyLayer } from './BodyLayer';
 import { PROOF_ACCEPT, ProofCapture, useProofUploads } from './ProofCapture';
 import { useSoftKeyboardOpen } from './RepForm';
@@ -303,9 +304,15 @@ export function RepLogSale() {
     </div>
   );
 
+  // The one-time Gemini consent (lib/ai/consent), before the first screenshot is read.
+  const consentSheet = scan.consentNeeded ? (
+    <AiConsentSheet provider="gemini" onAgreed={scan.consentAgreed} onClose={scan.consentDeclined} />
+  ) : null;
+
   if (!onDetails) {
     return (
       <div className={`${l.main} ${l.mainEntry}`} data-step-move={stepMove ?? undefined}>
+        {consentSheet}
         <Steps onDetails={false} />
         <div className={l.defaultGrid}>
           <section className={l.entry} aria-labelledby="entry-h">
@@ -380,6 +387,7 @@ export function RepLogSale() {
 
   return (
     <div className={`${l.main} ${l.mainDetails}`} data-step-move={stepMove ?? undefined}>
+      {consentSheet}
       <Steps onDetails />
       {form.fromDraft ? (
         confirmClear ? (

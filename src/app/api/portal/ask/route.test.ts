@@ -20,6 +20,7 @@ import { POST } from './route';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 
 const mockUser = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
+const AGREED = { deepseek: true, gemini: false };
 const fetchMock = vi.fn();
 let fake: ReturnType<typeof createFakeAskDb>;
 
@@ -75,7 +76,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
   mockUser.mockReset();
-  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: 'dana@x.test', isOwner: false });
+  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: 'dana@x.test', isOwner: false, aiConsent: AGREED });
   vi.spyOn(console, 'info').mockImplementation(() => {});
   seed();
 });
@@ -103,7 +104,7 @@ describe('POST /api/portal/ask', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     expect(fake.docs('askUsage').size).toBe(0);
 
-    mockUser.mockResolvedValue({ ok: true, uid: 'o1', name: 'Jacob Owner', email: '', isOwner: true });
+    mockUser.mockResolvedValue({ ok: true, uid: 'o1', name: 'Jacob Owner', email: '', isOwner: true, aiConsent: AGREED });
     modelAnswers();
     expect((await POST(req({ question: 'Hi' }))).status).toBe(200);
   });
@@ -144,6 +145,16 @@ describe('POST /api/portal/ask', () => {
     expect(system.indexOf('- Customer A;')).toBeGreaterThan(live);
     expect(system).not.toMatch(/Oakley|Birch|Not Yours/);
     expect(system).not.toContain('4321');
+  });
+
+  it("403s with code 'ai_consent' before the daily count or any call until the rep agrees to DeepSeek", async () => {
+    mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: '', isOwner: false, aiConsent: { deepseek: false, gemini: true } });
+    const res = await POST(req({ question: 'When is my next install?' }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'ai_consent', provider: 'deepseek' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fake.docs('askUsage').size).toBe(0);
+    expect(logs()).toHaveLength(0);
   });
 
   it("sends DeepSeek no customer's name, street, phone or email and no teammate's name, yet still the install dates", async () => {
@@ -196,7 +207,7 @@ describe('POST /api/portal/ask', () => {
   });
 
   it("tells the model the code is unknown when the rep isn't mapped", async () => {
-    mockUser.mockResolvedValue({ ok: true, uid: 'r9', name: 'Pat New', email: '', isOwner: false });
+    mockUser.mockResolvedValue({ ok: true, uid: 'r9', name: 'Pat New', email: '', isOwner: false, aiConsent: AGREED });
     modelAnswers();
     await POST(req({ question: 'What is my dealer code?' }));
     const system: string = sentBody().messages[0].content;
@@ -277,7 +288,7 @@ describe('POST /api/portal/ask', () => {
     expect((await res.json()).error).toMatch(/Call Jeremy or Jacob/);
     expect(fetchMock).toHaveBeenCalledTimes(callsBefore);
     // Another rep's count is their own.
-    mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false });
+    mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false, aiConsent: AGREED });
     modelAnswers();
     expect((await POST(req({ question: 'Mine' }))).status).toBe(200);
   });

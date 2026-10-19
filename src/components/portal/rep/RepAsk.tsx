@@ -20,10 +20,13 @@ import {
   type AskTurnMessage,
 } from '@/lib/ask/chat';
 import { FormUploadError, prepareFormFile } from '@/lib/forms/uploadFormAttachment';
+import { isAiConsentRefusal } from '@/lib/ai/consent';
+import { fetchAiConsent } from '@/lib/ai/consentClient';
 import s from './rep.module.css';
 import p from './rep-page.module.css';
 import a from './rep-ask.module.css';
 import { RepPractice } from './RepPractice';
+import { AiConsentSheet } from './AiConsentSheet';
 import { isComposerSend } from './composerKeys';
 
 // Ask 3C: a rep at a customer's door asks what to do; the answer comes from
@@ -208,6 +211,9 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
   // retry: false at the daily limit, where Try again would only hit it again.
   const [failed, setFailed] = useState<{ message: string; retry: boolean } | null>(null);
   const [fileKey, setFileKey] = useState(0);
+  /** DeepSeek consent (lib/ai/consent): null until read. The route enforces it either way. */
+  const [consented, setConsented] = useState<boolean | null>(null);
+  const [consentOpen, setConsentOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLFormElement>(null);
   // After the keyboard spacer: scrolling to it shows the composer and the room the keyboard takes.
@@ -221,6 +227,18 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
   const showComposer = useCallback((behavior: ScrollBehavior) => {
     window.requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ block: 'end', behavior }));
   }, []);
+
+  useEffect(() => {
+    // Read once, so the consent sheet shows before the first question goes out.
+    if (!uid) return;
+    let live = true;
+    void fetchAiConsent().then((state) => {
+      if (live && state) setConsented(state.deepseek);
+    });
+    return () => {
+      live = false;
+    };
+  }, [uid]);
 
   useEffect(() => {
     // Restored after mount (the server render has no sessionStorage), and
@@ -276,12 +294,17 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
     }
   };
 
-  const send = async (event?: FormEvent) => {
+  const send = async (event?: FormEvent, agreed = false) => {
     event?.preventDefault();
     const text = question.trim();
     if (sending || preparing || (!text && !photo)) return;
     if (text.length > MAX_QUESTION_CHARS) {
       setNotice(`Keep the question under ${MAX_QUESTION_CHARS} characters.`);
+      return;
+    }
+    // Not agreed to DeepSeek yet: the sheet first; the question waits in the composer.
+    if (consented === false && !agreed) {
+      setConsentOpen(true);
       return;
     }
     const key = `${Date.now()}`;
@@ -299,6 +322,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
     const fallback = owner ? '' : ', or call Jeremy or Jacob';
     let error = `No answer came back. Check your signal and try again${fallback}.`;
     let retry = true;
+    let needsConsent = false;
     try {
       const form = new FormData();
       form.set('question', text);
@@ -313,6 +337,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
       });
       const json = (await res.json().catch(() => ({}))) as Partial<AskReply> & { error?: string };
       if (res.ok && json.answer && json.id) reply = { id: json.id, answer: json.answer };
+      else if (isAiConsentRefusal(res.status, json)) needsConsent = true;
       else {
         error = json.error || `Ask 3C couldn't answer right now. Try again${fallback}.`;
         retry = res.status !== 429;
@@ -329,7 +354,12 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
       update((current) => current.filter((turn) => turn.key !== key));
       setQuestion(text);
       setPhoto(sentPhoto);
-      setFailed({ message: error, retry });
+      if (needsConsent) {
+        setConsented(false);
+        setConsentOpen(true);
+      } else {
+        setFailed({ message: error, retry });
+      }
     }
     setSending(false);
     showComposer('smooth');
@@ -528,6 +558,18 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
           </div>
         </form>
       </BorderBeam>
+      {consentOpen ? (
+        <AiConsentSheet
+          provider="deepseek"
+          onClose={() => setConsentOpen(false)}
+          onAgreed={() => {
+            setConsentOpen(false);
+            setConsented(true);
+            // The question that was waiting goes now.
+            void send(undefined, true);
+          }}
+        />
+      ) : null}
       {keyboardInset > 0 ? <div aria-hidden="true" style={{ height: keyboardInset }} /> : null}
       <div ref={bottomRef} className={a.anchor} aria-hidden="true" />
     </>

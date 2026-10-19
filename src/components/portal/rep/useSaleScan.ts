@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { isAiConsentRefusal } from '@/lib/ai/consent';
 import { markScanIntroUsed } from '@/lib/sales/scan/intro';
 import type { SaleScanResponse, ScanConfidence } from '@/lib/sales/scan/types';
 import {
@@ -38,6 +39,9 @@ const CLIENT_TIMEOUT_MS = 30_000;
 
 export type ScanStatus = 'idle' | 'reading' | 'filled' | 'failed';
 
+/** requestScan's reason when the rep has not agreed to Gemini yet. */
+export const AI_CONSENT_REASON = 'ai_consent';
+
 /** Ask the reader about these proof paths. Null when the reader is switched off (404). */
 export async function requestScan(paths: string[], signal: AbortSignal): Promise<SaleScanResponse | null> {
   const token = await getIdToken();
@@ -51,6 +55,8 @@ export async function requestScan(paths: string[], signal: AbortSignal): Promise
   // Turned away by a rate limit in front of the route: the same answer as the route's own limit.
   if (response.status === 429) return { fields: null, reason: 'rate_limited' };
   const data = (await response.json().catch(() => null)) as SaleScanResponse | null;
+  // Not agreed to Gemini yet (lib/ai/consent): the caller shows the consent sheet.
+  if (isAiConsentRefusal(response.status, data)) return { fields: null, reason: AI_CONSENT_REASON };
   return response.ok && data && 'fields' in data ? data : { fields: null, reason: `http_${response.status}` };
 }
 
@@ -71,6 +77,10 @@ export function useSaleScan({
 }) {
   const [status, setStatus] = useState<ScanStatus>('idle');
   const [flags, setFlags] = useState<Partial<Record<ScanTarget, Flag>>>({});
+  /** The reader needs the rep's Gemini consent first: the screen shows the sheet. */
+  const [consentNeeded, setConsentNeeded] = useState(false);
+  // "Not now" on the sheet: no reads while this screen is open, new sales included.
+  const declined = useRef(false);
 
   // Read at call time, from async upload callbacks: always the latest render.
   const latest = useRef({ enabled, paths, isEmpty, apply });
@@ -108,7 +118,7 @@ export function useSaleScan({
 
   const run = useCallback(
     async (extraPath?: string) => {
-      if (stopped.current || !latest.current.enabled) return;
+      if (stopped.current || declined.current || !latest.current.enabled) return;
       const all = [...new Set([...latest.current.paths, ...(extraPath ? [extraPath] : [])])];
       const fresh = all.filter((p) => !scanned.current.has(p));
       if (fresh.length === 0) return;
@@ -145,6 +155,14 @@ export function useSaleScan({
         setStatus('idle');
         return;
       }
+      if (result.reason === AI_CONSENT_REASON) {
+        // Nothing was sent. Forget these paths so Agree reads them again.
+        for (const p of all) scanned.current.delete(p);
+        queued.current = false;
+        setStatus('idle');
+        setConsentNeeded(true);
+        return;
+      }
       const { fills, flags: newFlags } = result.fields
         ? planScanFills(result.fields, canFill)
         : { fills: [], flags: {} };
@@ -177,6 +195,18 @@ export function useSaleScan({
 
   /** A proof upload finished (called from the upload queue, so it may be stale-bound). */
   const proofAdded = useCallback((path: string) => void run(path), [run]);
+
+  /** "Agree" on the consent sheet was saved: read the screenshots now. */
+  const consentAgreed = useCallback(() => {
+    setConsentNeeded(false);
+    void run();
+  }, [run]);
+
+  /** "Not now" on the consent sheet: the rep types the sale in; no reads on this screen. */
+  const consentDeclined = useCallback(() => {
+    setConsentNeeded(false);
+    declined.current = true;
+  }, []);
 
   /** The rep cancels the read: the form is theirs, no more reads for this sale. */
   const skip = useCallback(() => {
@@ -235,6 +265,9 @@ export function useSaleScan({
     pending: (target: ScanTarget) =>
       reading && SCAN_SKELETON_TARGETS.includes(target) && !touched.has(target) && isEmpty(target),
     proofAdded,
+    consentNeeded,
+    consentAgreed,
+    consentDeclined,
     skip,
     edited,
     seen,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOnboardingBucket } from '@/lib/firebase/admin';
+import { aiConsentRefusal } from '@/lib/ai/consent';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { ATTACHMENT_ROOT, isCleanAttachmentPath } from '@/lib/forms/attachmentPath';
 import { MAX_FORM_FILE_BYTES } from '@/lib/forms/formUploads';
@@ -10,7 +11,8 @@ import { scanLimiter } from '@/lib/sales/scan/limiter';
 import type { SaleScanResponse } from '@/lib/sales/scan/types';
 
 // POST /api/portal/sales/scan { paths } - read the rep's own proof screenshots
-// with Gemini and answer with Log Sale form values to prefill. The rep still
+// with Gemini and answer with Log Sale form values to prefill. Refused with
+// 403 code 'ai_consent' until the rep has agreed to Gemini (lib/ai/consent). The rep still
 // checks every field and presses Submit; nothing is written here.
 //
 // Every failure after the auth and path checks answers 200 { fields: null,
@@ -60,6 +62,9 @@ export async function POST(request: NextRequest) {
   // Same gate as creating a sale: a verified, active user acting as themselves.
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+  // One-time AI consent (lib/ai/consent): no screenshot goes to Gemini until
+  // the rep has agreed on the sheet; the client shows it on this code.
+  if (!gate.aiConsent?.gemini) return NextResponse.json(aiConsentRefusal('gemini'), { status: 403 });
 
   const body = (await request.json().catch(() => null)) as { paths?: unknown } | null;
   const paths = body?.paths;

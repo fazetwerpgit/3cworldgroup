@@ -34,7 +34,7 @@ import {
 import { submitBulkRows } from '@/lib/sales/bulk/submit';
 import { markScanIntroUsed } from '@/lib/sales/scan/intro';
 import { proofUploadMessage, uploadProofFile } from './ProofCapture';
-import { requestScan } from './useSaleScan';
+import { AI_CONSENT_REASON, requestScan } from './useSaleScan';
 
 // The bulk uploader's state: the batch's sales and their screenshots, the
 // upload-and-read queue (three screenshots at a time), the saved copy in
@@ -78,6 +78,12 @@ export function useBulkLog() {
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
   /** Thumbnails by screenshot. */
   const [previews, setPreviews] = useState<Record<string, string>>({});
+  /** The reader needs the rep's Gemini consent first (lib/ai/consent): the page shows the sheet. */
+  const [consentNeeded, setConsentNeeded] = useState(false);
+  // Screenshots turned away for want of consent, read again on Agree.
+  const awaitingConsent = useRef(new Set<string>());
+  // "Not now": no screenshot is sent to the reader while this page is open.
+  const consentDeclined = useRef(false);
 
   const rowsRef = useRef(rows);
   useEffect(() => {
@@ -125,6 +131,11 @@ export function useBulkLog() {
 
   const readShot = useCallback(
     async (shotId: string, path: string, signal: AbortSignal) => {
+      if (consentDeclined.current) {
+        // The rep said Not now to the reader: the sale is filled in by hand.
+        patchShot(shotId, { phase: 'read_failed', readError: false, readBusy: false });
+        return;
+      }
       patchShot(shotId, { phase: 'reading' });
       const timeout = new AbortController();
       const timer = setTimeout(() => timeout.abort(), SCAN_TIMEOUT_MS);
@@ -135,8 +146,10 @@ export function useBulkLog() {
       // The read itself failed (not a read that found nothing, nor the reader
       // switched off): the sale waits for "Read again".
       let failed = false;
+      let needsConsent = false;
       try {
         const reply = await requestScan([path], timeout.signal);
+        needsConsent = reply?.reason === AI_CONSENT_REASON;
         fields = reply?.fields ?? null;
         busy = reply?.reason === 'rate_limited';
         failed = reply !== null && !fields && reply.reason !== 'nothing_found';
@@ -148,6 +161,13 @@ export function useBulkLog() {
         signal.removeEventListener('abort', onAbort);
       }
       if (signal.aborted) return;
+      if (needsConsent) {
+        // Nothing was sent; it is read again once the rep agrees.
+        awaitingConsent.current.add(shotId);
+        patchShot(shotId, { phase: 'read_failed', readError: false, readBusy: false });
+        setConsentNeeded(true);
+        return;
+      }
       const read = fields && Object.keys(fields).length > 0 ? fields : null;
       if (read) markScanIntroUsed();
       patchShot(shotId, (shot) => ({
@@ -336,6 +356,21 @@ export function useBulkLog() {
     enqueue(failed.map((shot) => ({ id: shot.id, kind: 'read' })));
   };
 
+  /** "Agree" on the consent sheet was saved: read the screenshots that waited for it. */
+  const consentAgreed = () => {
+    setConsentNeeded(false);
+    const waiting = [...awaitingConsent.current];
+    awaitingConsent.current.clear();
+    rereadShots(waiting.map(findShot).filter((shot): shot is BulkShot => !!shot));
+  };
+
+  /** "Not now" on the consent sheet: every sale is filled in by hand. */
+  const consentRefused = () => {
+    setConsentNeeded(false);
+    consentDeclined.current = true;
+    awaitingConsent.current.clear();
+  };
+
   /** Remove a whole sale and its screenshots. */
   const remove = (id: string) => {
     for (const shot of shotsOf(id)) forgetShot(shot.id);
@@ -512,6 +547,9 @@ export function useBulkLog() {
     retryUpload,
     readAgain,
     readShotAgain,
+    consentNeeded,
+    consentAgreed,
+    consentRefused,
     remove,
     removeShot,
     splitShot,
