@@ -57,6 +57,8 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
   });
   const micRef = useRef<HandsFreeMic | null>(null);
   const wakeRef = useRef<{ release(): Promise<void> } | null>(null);
+  /** Bumped by every stop: a start still opening the mic when it changes is stale and closes what it opened. */
+  const session = useRef(0);
   const state = useRef({
     status: 'off' as HandsFreeStatus,
     finals: [] as string[],
@@ -231,6 +233,7 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
   });
 
   const stop = useCallback(() => {
+    session.current += 1;
     clearLine();
     micRef.current?.close();
     micRef.current = null;
@@ -243,6 +246,7 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
   const start = useCallback(
     async (context: AudioContext, mic: Promise<MediaStream>, first: 'listening' | 'thinking') => {
       stop();
+      const mine = session.current;
       set('starting');
       const opened = await openHandsFreeMic(context, mic, {
         onInterim: (words) => onInterimRef.current(words),
@@ -254,6 +258,11 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
           handlersRef.current.onLost();
         },
       });
+      // Stopped, paused, started again or unmounted while the mic was opening: it isn't wanted any more.
+      if (session.current !== mine) {
+        opened?.close();
+        return false;
+      }
       if (!opened) {
         set('off');
         handlersRef.current.onLost();
@@ -271,6 +280,10 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
       wakeLock
         ?.request('screen')
         .then((lock) => {
+          if (session.current !== mine) {
+            void lock.release().catch(() => {});
+            return;
+          }
           wakeRef.current = lock;
         })
         .catch(() => {});
@@ -288,7 +301,7 @@ export function useHandsFree<Prepared>(handlers: HandsFreeHandlers<Prepared>) {
       stop,
       /** Paused (the app went to the background): the mic is closed until a tap resumes it. */
       pause: () => {
-        if (!micRef.current) return;
+        if (!micRef.current && state.current.status !== 'starting') return;
         stop();
         set('paused');
       },
