@@ -1,0 +1,284 @@
+/* Admin > Solar > Setup (direction D). Panels, fields, Seg, switch and notices
+   are the shared admin pieces; this file holds the hours editor and the alert
+   chips. Surfaces step in tone (panel > well > panel), never lines or shadows. */
+
+.setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  min-width: 0;
+}
+
+.stack {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+/* Consultant panels: one column on phones, two side by side on a wide desktop. */
+.grid {
+  display: grid;
+  gap: var(--s4);
+  align-items: start;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .day {
+    gap: 6px var(--s3);
+  }
+}
+
+@media (min-width: 1200px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s5);
+  }
+}
+
+.consultant {
+  min-width: 0;
+  scroll-margin-top: var(--s4);
+}
+
+.settings {
+  display: grid;
+  gap: var(--s4);
+}
+
+@media (min-width: 560px) {
+  .settings {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    align-items: end;
+  }
+}
+
+/* Seg sits on the panel here, so its track drops one tone to the well. */
+.well > [role='group'] {
+  background: var(--c-well);
+}
+
+.week {
+  display: grid;
+  gap: var(--s3);
+}
+
+/* ---------- the week ---------- */
+.days {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  list-style: none;
+}
+
+.day {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px var(--s2);
+  min-height: 60px;
+  padding: 8px var(--s2) 8px var(--s3);
+  background: var(--c-well);
+}
+
+.dayName {
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 650;
+}
+
+.dayClosed .dayName {
+  color: var(--c-text-3);
+}
+
+.closed {
+  color: var(--c-text-3);
+  font-size: var(--t-ui);
+}
+
+.times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 340px;
+}
+
+/* A compact select that reads as a time, not a form row: centred figures,
+   no chevron, one tone up from the row. */
+.time.time {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--tap);
+  padding: 0 6px;
+  border-color: transparent;
+  background: var(--c-panel-hi);
+  /* 16px: iOS zooms the page into any smaller field it focuses. */
+  font-size: var(--t-body);
+  font-weight: 600;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+}
+
+.time.time:focus {
+  border-color: var(--c-lime);
+}
+
+@media (hover: hover) {
+  .time.time:hover {
+    border-color: var(--c-line-strong);
+  }
+}
+
+.to {
+  flex: none;
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+}
+
+.dayError {
+  grid-column: 2 / -1;
+  color: var(--c-red);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+/* ---------- preview ---------- */
+.preview {
+  display: grid;
+  gap: 4px;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-control);
+  background: var(--c-well);
+}
+
+.previewLabel {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.preview strong {
+  font-size: var(--t-body);
+  font-weight: 650;
+}
+
+.previewDay {
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-variant-numeric: tabular-nums;
+}
+
+.actions {
+  justify-content: space-between;
+}
+
+/* ---------- add ---------- */
+.add {
+  min-width: 0;
+}
+
+/* ---------- alerts ---------- */
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .alerts {
+    max-width: 760px;
+  }
+}
+
+.ownerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: var(--s3) var(--s2) var(--s3) var(--s4);
+  border-radius: var(--r-control);
+  background: var(--c-well);
+}
+
+.ownerText {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.ownerLabel {
+  font-size: var(--t-body);
+  font-weight: 650;
+}
+
+.help {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+}
+
+.recipients {
+  gap: var(--s3);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unused {
+  opacity: 0.55;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: var(--tap);
+  padding: 0 4px 0 16px;
+  border-radius: 999px;
+  background: var(--c-well);
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.chipMissing {
+  color: var(--c-text-3);
+}
+
+.chipRemove {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-text-2);
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 120ms ease-out;
+}
+
+.chipRemove:active {
+  transform: scale(0.94);
+}
+
+.chipRemove:focus-visible {
+  outline: 2px solid var(--c-lime);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .chipRemove:hover:not(:disabled) {
+    background: var(--c-panel-hi);
+    color: var(--c-text);
+  }
+}
