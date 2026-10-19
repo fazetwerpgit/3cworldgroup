@@ -38,7 +38,7 @@ export const SALES_PATH = '/portal/sales';
 export const DISPUTE_PATH = '/portal/payroll-dispute';
 
 export const DISCLAIMER =
-  "Estimates only. You're paid when 3C receives funds from the carrier; missed installs are settled as claims by the 25th of the next month.";
+  "Estimates only. You're paid when 3C receives funds from the carrier; missed installs are claims, which usually settle by the 25th of the following month.";
 
 const NAVY = '#061735';
 const LIME = '#8dc63f';
