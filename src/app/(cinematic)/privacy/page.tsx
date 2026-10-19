@@ -25,8 +25,13 @@ export const metadata: Metadata = {
  * Amended 2026-10-17 with the owner's answers: DeepSeek named, Gemini on a
  * paid plan, no carrier sharing, a stated retention period, anonymized
  * Ask/Practice history after self-deletion, and a minimum age of 18.
+ * Amended 2026-10-18 to match the code: Ask 3C no longer sends customer or
+ * teammate names; the one-time AI consent sheet; signed W-9 and direct-deposit
+ * PDFs are emailed to the owners and can be viewed and exported by them;
+ * customer information from sales; support forms; analytics on public pages
+ * only.
  */
-const LAST_UPDATED = "October 17, 2026";
+const LAST_UPDATED = "October 18, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -81,9 +86,14 @@ export default function PrivacyPolicyPage() {
                   Security Number, driver&apos;s license number, a photo of your driver&apos;s license,
                   your background-check authorization, tax form details (such as your legal or business
                   name and tax classification), and the bank name, routing number, and account number you
-                  enter on the direct-deposit form. Bank details are used only to pay you. Your Social Security Number and driver&apos;s license
-                  number are stored encrypted, only a small number of authorized staff can view them,
-                  and each time they are viewed it is logged.
+                  enter on the direct-deposit form. Bank details are used only to pay you. Your Social
+                  Security Number and driver&apos;s license number are stored encrypted in our database.
+                  Your signed W-9 (which shows your full Social Security Number) and your signed
+                  direct-deposit form are saved as PDFs in our secure file storage, and a copy is emailed
+                  to 3C&apos;s owners when you finish onboarding. In the portal, only the owners and a
+                  small number of administrators can open these documents and numbers, and the owners
+                  can view and export them. We log each time someone opens them in the portal; copies
+                  sent by email are not tracked.
                 </li>
                 <li>
                   <strong>Electronic signatures.</strong> When you sign a document in the portal, we keep
@@ -98,12 +108,23 @@ export default function PrivacyPolicyPage() {
                 </li>
                 <li>
                   <strong>Photos and files.</strong> Photos and screenshots you upload or take with your
-                  camera, such as sale confirmation screenshots, your profile photo, onboarding documents,
-                  and images and PDFs you attach in team chat.
+                  camera, such as sale confirmation screenshots, onboarding documents, and images and PDFs
+                  you attach in team chat. If you sign in with Google, we also show your Google profile
+                  photo.
                 </li>
                 <li>
                   <strong>Messages.</strong> Messages, reactions, and attachments you send in the
                   portal&apos;s team chat, and questions you ask Ask 3C (see AI Features below).
+                </li>
+                <li>
+                  <strong>Customer information.</strong> When you log a sale, you enter details about the
+                  customer. See Customer Information below.
+                </li>
+                <li>
+                  <strong>Support and request forms.</strong> When you report a bug in the portal, we keep
+                  what you write, the area and page you were on, and your name and email. When you send a
+                  request form (such as an expedite order, a payroll dispute, or a leads request), we
+                  keep what you enter in it. Our office staff use these to help you.
                 </li>
                 <li>
                   <strong>Voice.</strong> If you use voice sales practice, the app uses your microphone to
@@ -125,8 +146,8 @@ export default function PrivacyPolicyPage() {
                 </li>
                 <li>
                   <strong>Automatically collected information.</strong> IP address, browser type, device
-                  type, pages visited, referring URL, and similar usage data collected through cookies
-                  and standard web analytics.
+                  type, pages visited, referring URL, and similar usage data, collected through cookies
+                  and, on our public website pages, cookieless page analytics.
                 </li>
               </ul>
               <p>We do not collect your precise location, and we do not read your contacts.</p>
@@ -156,22 +177,30 @@ export default function PrivacyPolicyPage() {
             <LegalSection id="privacy-4" title="4. AI Features">
               <p>
                 Some portal features use artificial intelligence services from other companies. We send
-                them only what the feature needs, and only when you use the feature.
+                them only what the feature needs, and only when you use the feature. Before you use
+                Ask 3C or screenshot auto-fill for the first time, the portal names the AI provider,
+                says what will be sent, and asks for your permission. If you choose &ldquo;Not now,&rdquo;
+                nothing is sent, and you can still log sales by typing them in.
               </p>
               <ul>
                 <li>
                   <strong>Sale screenshot auto-fill.</strong> When you log a sale, you can have the portal
-                  read your sale confirmation screenshot and fill in the form for you. The screenshot is
-                  sent to Google&apos;s Gemini service to read it. You review every field before you
-                  submit. The screenshot itself is saved with your sale as proof of the order.
+                  read your sale confirmation screenshot and fill in the form for you. The screenshot you
+                  choose is sent to Google&apos;s Gemini service to read it. It usually shows the
+                  customer&apos;s name, address, phone number, and order number. You review every field
+                  before you submit. The screenshot itself is saved with your sale as proof of the order.
                 </li>
                 <li>
                   <strong>Ask 3C.</strong> Ask 3C answers questions about the portal and selling. Your
-                  question, the earlier messages in that conversation, any photo you attach, and some
-                  portal information about you (your first name, city and state, dealer codes, and a
-                  summary of your recent sales) are sent to DeepSeek, an AI provider, to generate the
-                  answer. Email addresses and phone numbers you type are removed before your question is
-                  sent or saved. We keep a record of each question and answer so we can improve Ask 3C.
+                  question, the earlier messages in that conversation, any photo you attach, and some of
+                  your own portal information (your first name, city and state, dealer code, and your
+                  recent sales and installs, Board standing, team call times, forms, and notification
+                  types) are sent to DeepSeek, an AI provider, to generate the answer. Customer names,
+                  street addresses, phone numbers, and emails are not sent: each sale is described by a
+                  letter (&ldquo;Customer A&rdquo;), its city, and at most the last four characters of
+                  its order number. Other reps on the Board appear as &ldquo;Teammate 1,&rdquo;
+                  &ldquo;Teammate 2,&rdquo; and so on, never by name. Email addresses and phone numbers
+                  you type are removed before your question is sent or saved. We keep a record of each question and answer so we can improve Ask 3C.
                   Photos you attach are not saved.
                 </li>
                 <li>
@@ -192,7 +221,23 @@ export default function PrivacyPolicyPage() {
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-5" title="5. Team Chat">
+            <LegalSection id="privacy-5" title="5. Customer Information">
+              <p>
+                When you log a sale, you enter the customer&apos;s name, phone number, email address,
+                and service address, the plan, and the order number, and you attach a screenshot of the
+                order confirmation. We use this to track the sale and its install, to match it with the
+                install reports the carrier sends us, and to work out pay.
+              </p>
+              <p>
+                You, your managers, and authorized 3C office staff can see these details in the portal.
+                If you get our weekly installs email, it lists your own customers&apos; names and short addresses. If
+                you use screenshot auto-fill, the screenshot you choose is sent to Google Gemini to read
+                it (see AI Features above). Ask 3C does not send customer names, addresses, phone
+                numbers, or emails. We do not send customer information to the carriers or sell it.
+              </p>
+            </LegalSection>
+
+            <LegalSection id="privacy-6" title="6. Team Chat">
               <p>
                 Messages, reactions, and attachments you send in team chat are stored with your name and
                 can be seen by the other members of that channel. You can delete your
@@ -205,7 +250,7 @@ export default function PrivacyPolicyPage() {
               </p>
               <p>
                 In the 3C app, before you first post in team chat, you agree to the team chat rules, and we record
-                when you agreed. Chat has an automatic filter: a message containing a slur is not sent,
+                when you agreed. Chat has an automatic filter that applies to everyone, administrators included: a message containing a slur is not sent,
                 and a small set of severe profanity is replaced with asterisks before the message is
                 saved.
               </p>
@@ -235,7 +280,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-6" title="6. How We Share Your Information">
+            <LegalSection id="privacy-7" title="7. How We Share Your Information">
               <p>
                 We do not sell your personal information. We may share information in the following
                 limited circumstances:
@@ -247,9 +292,9 @@ export default function PrivacyPolicyPage() {
                   include:
                   <ul>
                     <li>Google Firebase and Google Cloud, for sign-in, our database, file storage, and push notifications.</li>
-                    <li>Vercel, which hosts our website and portal and provides our cookieless page analytics.</li>
-                    <li>Postmark, which sends our email.</li>
-                    <li>Google Gemini, for sale screenshot auto-fill and for speech in hands-free voice practice.</li>
+                    <li>Vercel, which hosts our website and portal and provides cookieless page analytics on our public website pages.</li>
+                    <li>Postmark, which sends our email, including the signed onboarding documents sent to the owners.</li>
+                    <li>Google Gemini, for sale screenshot auto-fill (the screenshots you choose) and for speech in hands-free voice practice.</li>
                     <li>
                       DeepSeek, which generates Ask 3C answers and the practice homeowner&apos;s
                       replies and coaching feedback.
@@ -262,8 +307,8 @@ export default function PrivacyPolicyPage() {
                 </li>
                 <li>
                   <strong>Within 3C World Group.</strong> Your managers and authorized staff see the
-                  portal information they need to do their jobs, such as your sales records and onboarding
-                  status. Your name and sales results may appear on team leaderboards that other portal
+                  portal information they need to do their jobs, such as your sales records (including the
+                  customer details in them) and onboarding status. Your name and sales results may appear on team leaderboards that other portal
                   users can see.
                 </li>
                 <li>
@@ -279,28 +324,31 @@ export default function PrivacyPolicyPage() {
               </ul>
             </LegalSection>
 
-            <LegalSection id="privacy-7" title="7. Cookies and Analytics">
+            <LegalSection id="privacy-8" title="8. Cookies and Analytics">
               <p>
                 We use cookies and similar technologies to keep you signed in to the portal, remember
                 preferences, and understand how visitors use our site. You can control cookies through
                 your browser settings. Disabling cookies may limit some functionality of the portal.
-                Our public pages use cookieless page analytics, and when you submit a contractor
-                application we record how you found our website, such as the referring site or campaign.
-                The portal and the 3C Portal app do not use advertising or third-party analytics tools.
+                Our public website pages use Vercel&apos;s cookieless page analytics, and when you submit
+                a contractor application we record how you found our website, such as the referring site
+                or campaign. The portal and the 3C Portal app do not use page analytics, advertising, or
+                other third-party analytics tools.
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-8" title="8. Data Security">
+            <LegalSection id="privacy-9" title="9. Data Security">
               <p>
                 We use reasonable administrative, technical, and physical safeguards to protect your
                 information, including encrypted connections, access controls on portal data, and
-                additional encryption for Social Security and driver&apos;s license numbers. However, no
+                additional encryption for Social Security and driver&apos;s license numbers in our
+                database. Signed tax and direct-deposit forms are kept in access-controlled file storage
+                and are also sent to the owners by email (see Information We Collect). However, no
                 method of transmission or storage is 100% secure, and we cannot guarantee absolute
                 security.
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-9" title="9. Data Retention and Account Deletion">
+            <LegalSection id="privacy-10" title="10. Data Retention and Account Deletion">
               <p>
                 We keep your personal information while you work with 3C World Group. We aim to delete
                 or anonymize it within 3 years after you stop working with 3C. Your pay and sales
@@ -330,7 +378,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-10" title="10. Your Rights and Choices">
+            <LegalSection id="privacy-11" title="11. Your Rights and Choices">
               <p>Depending on where you live, you may have the right to:</p>
               <ul>
                 <li>Access the personal information we hold about you.</li>
@@ -349,14 +397,14 @@ export default function PrivacyPolicyPage() {
               </p>
               <p>
                 To exercise any of these rights, email us or use the contact form listed under{" "}
-                <a href="#privacy-14" className={kit.inlineLink}>
+                <a href="#privacy-15" className={kit.inlineLink}>
                   Contact Us
                 </a>{" "}
                 below. We may need to verify your identity before fulfilling a request.
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-11" title="11. Children's Privacy">
+            <LegalSection id="privacy-12" title="12. Children's Privacy">
               <p>
                 Our website and services are not directed to anyone under 18, and we do not knowingly
                 collect personal information from anyone under 18. If you believe someone under 18 has
@@ -364,7 +412,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-12" title="12. Third-Party Links">
+            <LegalSection id="privacy-13" title="13. Third-Party Links">
               <p>
                 Our site may contain links to third-party websites that we do not control. This Privacy
                 Policy does not apply to those sites, and we encourage you to read their privacy
@@ -372,7 +420,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-13" title="13. Changes to This Policy">
+            <LegalSection id="privacy-14" title="14. Changes to This Policy">
               <p>
                 We may update this Privacy Policy from time to time. When we do, we will revise the
                 &ldquo;Last updated&rdquo; date at the top of this page. Material changes will be
@@ -380,7 +428,7 @@ export default function PrivacyPolicyPage() {
               </p>
             </LegalSection>
 
-            <LegalSection id="privacy-14" title="14. Contact Us">
+            <LegalSection id="privacy-15" title="15. Contact Us">
               <p>
                 If you have questions about this Privacy Policy or how we handle your information,
                 please reach out:
