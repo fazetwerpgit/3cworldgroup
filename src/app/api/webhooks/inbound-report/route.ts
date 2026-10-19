@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
 import { isOlderReport, mailSentAt, newestStamp, reportAsOf, type ReportStamp } from '@/lib/fiberReport/staleReport';
-import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
+import { buildNameIndex, matchOrder, nameMatchUsers } from '@/lib/fiberReport/matchReps';
 import { closeHandoffs, handoffOwner, readHandoffs, saleDays } from '@/lib/fiberReport/dealerHandoff';
 import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
@@ -248,10 +248,7 @@ export async function POST(request: NextRequest) {
       ...((mapSnapshot.data()?.map ?? {}) as Record<string, string>),
     };
     const usersSnapshot = await adminDb.collection('users').get();
-    const userEntries = usersSnapshot.docs.map((user) => ({
-      uid: user.id,
-      displayName: user.data()?.displayName,
-    }));
+    const userEntries = nameMatchUsers(usersSnapshot.docs);
     const usersByName = buildNameIndex(userEntries);
 
     const newlyMapped: Record<string, string> = {};

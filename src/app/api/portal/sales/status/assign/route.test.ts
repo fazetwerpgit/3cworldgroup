@@ -61,7 +61,7 @@ beforeEach(() => {
   callerGetMock.mockResolvedValue({ exists: true, data: () => ({ role: 'admin' }) });
   targetGetMock.mockResolvedValue({ exists: true, data: () => ({ role: 'rep' }) });
   usersGetMock.mockResolvedValue({
-    docs: [doc('rep-1', { displayName: "Cooper O'Tool" })],
+    docs: [doc('rep-1', { displayName: "Cooper O'Tool", status: 'active' })],
   });
   configGetMock.mockResolvedValue({
     exists: true,

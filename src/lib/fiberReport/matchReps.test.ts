@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildNameIndex, fuzzyMatchName, matchOrder, normalizeRepName } from './matchReps';
+import { buildNameIndex, fuzzyMatchName, matchOrder, nameMatchUsers, normalizeRepName } from './matchReps';
 
 describe('normalizeRepName', () => {
   it('removes punctuation, normalizes case and diacritics, and collapses spaces', () => {
@@ -32,6 +32,27 @@ describe('buildNameIndex', () => {
     expect(index.get('alex smith')).toBe('exact');
     expect(index.get('alex james smith')).toBe('first');
     expect(index.get('alex lee smith')).toBe('second');
+  });
+
+  it('treats a duplicate exact name as ambiguous instead of keeping the first user', () => {
+    const users = [
+      { uid: 'old', displayName: 'Sam Jones' },
+      { uid: 'new', displayName: 'sam  JONES' },
+      { uid: 'middle', displayName: 'Sam Lee Jones' },
+    ];
+    const index = buildNameIndex(users);
+
+    expect(index.has('sam jones')).toBe(false);
+    expect(index.get('sam lee jones')).toBe('middle');
+    expect(matchOrder({ repDealerId: 'D9', repName: 'Sam Jones' }, {}, index, users)).toBeNull();
+  });
+
+  it('keeps an exact name that appears twice for the same uid', () => {
+    const index = buildNameIndex([
+      { uid: 'same', displayName: 'Sam Jones' },
+      { uid: 'same', displayName: 'Sam Jones' },
+    ]);
+    expect(index.get('sam jones')).toBe('same');
   });
 
   it('does not re-add a loose key after a third colliding name', () => {
@@ -103,5 +124,29 @@ describe('matchOrder', () => {
       {},
       index,
     )).toBeNull();
+  });
+});
+
+describe('nameMatchUsers', () => {
+  const doc = (id: string, data: Record<string, unknown>) => ({ id, data: () => data });
+
+  it('keeps only active, non-demo accounts', () => {
+    expect(nameMatchUsers([
+      doc('active', { displayName: 'Real Rep', status: 'active' }),
+      doc('pending', { displayName: 'Real Rep', status: 'pending' }),
+      doc('inactive', { displayName: 'Real Rep', status: 'inactive' }),
+      doc('missing', { displayName: 'Real Rep' }),
+      doc('demo', { displayName: 'Real Rep', status: 'active', demoAccount: true }),
+    ])).toEqual([{ uid: 'active', displayName: 'Real Rep' }]);
+  });
+
+  it('stops a pending self-named signup from claiming a real rep by name', () => {
+    const users = nameMatchUsers([
+      doc('aaa-impostor', { displayName: 'Jeremy', status: 'pending' }),
+      doc('zzz-real', { displayName: 'Jeremy McFarland', status: 'active' }),
+    ]);
+    const index = buildNameIndex(users);
+    expect(matchOrder({ repDealerId: 'D1', repName: 'Jeremy McFarland' }, {}, index, users)).toBe('zzz-real');
+    expect(matchOrder({ repDealerId: 'D2', repName: 'Jeremy Smith' }, {}, index, users)).toBeNull();
   });
 });

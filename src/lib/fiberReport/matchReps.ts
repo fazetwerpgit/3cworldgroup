@@ -1,3 +1,26 @@
+import { isDemoAccount } from '@/lib/users/demoAccount';
+
+export type NameMatchUser = { uid: string; displayName?: unknown };
+
+/**
+ * The users that may take part in rep NAME matching: active, non-demo accounts
+ * only. A pending signup chooses its own displayName (firestore.rules), so it
+ * could claim a real rep's orders, and through the learned dealer map every
+ * later order on that code; inactive and demo accounts must never receive
+ * orders either. Dealer-code matches (config/fiberRepMap) are unaffected.
+ */
+export function nameMatchUsers(
+  docs: ReadonlyArray<{ id: string; data(): Record<string, unknown> | null | undefined }>,
+): NameMatchUser[] {
+  const users: NameMatchUser[] = [];
+  for (const doc of docs) {
+    const data = doc.data();
+    if (data?.status !== 'active' || isDemoAccount(data)) continue;
+    users.push({ uid: doc.id, displayName: data.displayName });
+  }
+  return users;
+}
+
 /** Normalize a report or portal representative name for matching. */
 export function normalizeRepName(value: unknown): string {
   if (typeof value !== 'string') return '';
@@ -20,12 +43,21 @@ function looseName(normalized: string): string {
  * fallbacks for names that contain a middle name (or names).
  */
 export function buildNameIndex(
-  users: Array<{ uid: string; displayName?: unknown }>,
+  users: NameMatchUser[],
 ): Map<string, string> {
   const fullNames = new Map<string, string>();
+  const ambiguousFullNames = new Set<string>();
   for (const user of users) {
     const normalized = normalizeRepName(user.displayName);
-    if (normalized && user.uid && !fullNames.has(normalized)) fullNames.set(normalized, user.uid);
+    if (!normalized || !user.uid || ambiguousFullNames.has(normalized)) continue;
+    const existing = fullNames.get(normalized);
+    if (existing === undefined) {
+      fullNames.set(normalized, user.uid);
+    } else if (existing !== user.uid) {
+      // Two accounts with the same name: neither may be chosen automatically.
+      fullNames.delete(normalized);
+      ambiguousFullNames.add(normalized);
+    }
   }
 
   const looseNames = new Map<string, string>();
@@ -47,8 +79,9 @@ export function buildNameIndex(
 
   // Exact names always win, even if an exact key also appeared as a loose key.
   const index = new Map<string, string>(fullNames);
+  // An ambiguous exact name stays out entirely, even as another user's loose key.
   for (const [key, uid] of looseNames) {
-    if (!index.has(key)) index.set(key, uid);
+    if (!index.has(key) && !ambiguousFullNames.has(key)) index.set(key, uid);
   }
   return index;
 }
@@ -68,7 +101,7 @@ function isPrefixPair(a: string, b: string): boolean {
  */
 export function fuzzyMatchName(
   reportName: string,
-  users: Array<{ uid: string; displayName?: unknown }>,
+  users: NameMatchUser[],
 ): string | null {
   const normalized = normalizeRepName(reportName);
   const reportWords = normalized.split(' ').filter(Boolean);
@@ -97,7 +130,7 @@ export function matchOrder(
   order: { repDealerId: string; repName: string },
   dealerMap: Record<string, string>,
   nameIndex: Map<string, string>,
-  users?: Array<{ uid: string; displayName?: unknown }>,
+  users?: NameMatchUser[],
 ): string | null {
   const dealerId = order.repDealerId.trim();
   if (dealerId && dealerMap[dealerId]) return dealerMap[dealerId];

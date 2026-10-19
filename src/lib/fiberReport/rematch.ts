@@ -1,5 +1,5 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
+import { buildNameIndex, matchOrder, nameMatchUsers } from '@/lib/fiberReport/matchReps';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
 
 const BATCH_SIZE = 450;
@@ -21,10 +21,7 @@ export async function rematchUnmatchedOrders(): Promise<{ updated: number; still
       : {};
 
   const usersSnapshot = await adminDb.collection('users').get();
-  const userEntries = usersSnapshot.docs.map((user) => ({
-    uid: user.id,
-    displayName: user.data()?.displayName,
-  }));
+  const userEntries = nameMatchUsers(usersSnapshot.docs);
   const nameIndex = buildNameIndex(userEntries);
 
   const snapshot = await adminDb.collection('fiberOrders').where('matchedUserId', '==', null).get();
