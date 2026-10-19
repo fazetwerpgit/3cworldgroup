@@ -82,7 +82,7 @@ export function RepTabBar({
                   onTouchStart={current ? undefined : () => prefetchTab(tab.href)}
                   onPointerDown={current ? undefined : () => prefetchTab(tab.href)}
                 >
-                  {tab.log ? (
+                  {tab.emphasis ? (
                     <span className={s.tabLog}>
                       <Icon size={20} strokeWidth={2.5} aria-hidden="true" />
                     </span>

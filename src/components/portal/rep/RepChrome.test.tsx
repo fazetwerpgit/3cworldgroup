@@ -4,6 +4,7 @@ import { NavSheet, isNavItemActive, useNavAccess } from '@/components/portal/Nav
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, repSheetClasses } from './RepTopBar';
 import { REP_PRIMARY_HREFS, activeRepHref } from './repNav';
+import tabStyles from './rep.module.css';
 
 type TestUser = { status?: string; fieldRole?: string; role?: string; solarRole?: string; uid?: string; displayName?: string; email?: string };
 
@@ -60,6 +61,11 @@ function RepMenu({ counts }: { counts?: Record<string, number> }) {
   );
 }
 
+/** The tab labels drawn with the lime center treatment. */
+function emphasized(html: string): string[] {
+  return [...html.matchAll(new RegExp(`class="${tabStyles.tabLog}">.*?</span>([^<]+)</a>`, 'g'))].map((m) => m[1]);
+}
+
 describe('RepTabBar', () => {
   beforeEach(() => {
     state.pathname = '/portal/dashboard';
@@ -86,12 +92,15 @@ describe('RepTabBar', () => {
     expect([...labels].sort((a, b) => a - b)).toEqual(labels);
     expect(html).not.toContain('Sales</a>');
     expect(html).not.toContain('Log sale');
+    // Solar carries Log sale's lime center treatment, and only Solar does.
+    expect(emphasized(html)).toEqual(['Solar']);
   });
 
   it('dual fiber + solar rep keeps the fiber tabs', () => {
     setUser({ status: 'active', fieldRole: 'entry_rep', solarRole: 'entry_canvasser', uid: 'dual-1' }, [...REP_PERMISSIONS, 'solar:read']);
     const html = renderToStaticMarkup(<RepTabBar />);
     expect(html).toContain('Log sale');
+    expect(emphasized(html)).toEqual(['Log sale']);
     expect(html).toContain('Sales</a>');
     expect(html).not.toContain('Solar</a>');
   });
@@ -99,6 +108,7 @@ describe('RepTabBar', () => {
   it('shows Home / Sales / Log sale / Board / Chat in that order and no Pay tab', () => {
     const html = renderToStaticMarkup(<RepTabBar />);
     const labels = ['Home', 'Sales', 'Log sale', 'Board', 'Chat'].map((label) => html.indexOf(`${label}</a>`));
+    expect(emphasized(html)).toEqual(['Log sale']);
     expect(labels.every((index) => index > 0)).toBe(true);
     expect([...labels].sort((a, b) => a - b)).toEqual(labels);
     expect(html).not.toContain('Pay');

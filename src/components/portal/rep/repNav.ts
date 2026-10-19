@@ -8,6 +8,8 @@ import { ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 export type RepTab = PortalNavItem & {
   short: string;
   log?: boolean;
+  /** Drawn as the bar's lime center action (Log sale; a solar-only rep's Solar). */
+  emphasis?: boolean;
   /** Carries the combined open-items count (the owner's Admin tab). */
   waiting?: boolean;
 };
@@ -15,7 +17,7 @@ export type RepTab = PortalNavItem & {
 export const REP_TABS: RepTab[] = [
   { label: 'Dashboard', short: 'Home', href: '/portal/dashboard', icon: House },
   { label: 'Sales', short: 'Sales', href: '/portal/sales', icon: ReceiptText, permissions: ['sales:read'] },
-  { label: 'Log sale', short: 'Log sale', href: '/portal/sales/new', icon: Plus, permissions: ['sales:write'], log: true },
+  { label: 'Log sale', short: 'Log sale', href: '/portal/sales/new', icon: Plus, permissions: ['sales:write'], log: true, emphasis: true },
   { label: 'Leaderboard', short: 'Board', href: '/portal/leaderboard', icon: Trophy, permissions: ['leaderboard:read'] },
   { label: 'Chat', short: 'Chat', href: '/portal/chat', icon: MessageSquare, permissions: ['chat:read'] },
 ];
@@ -37,13 +39,17 @@ export const ADMIN_TAB: RepTab = {
 
 export const SOLAR_HREF = '/portal/solar';
 
-/** A solar-only rep's center tab, where a fiber rep has Log sale: the Solar page, which opens the deck. */
+/**
+ * A solar-only rep's center tab, where a fiber rep has Log sale: the Solar
+ * page, which opens the deck. The same lime emphasis as Log sale.
+ */
 export const SOLAR_TAB: RepTab = {
   label: 'Solar',
   short: 'Solar',
   href: SOLAR_HREF,
   icon: Sun,
   permissions: ['solar:read'],
+  emphasis: true,
 };
 
 /** Home / Solar / Board / Chat: a solar-only rep sells no fiber, so Sales and Log sale give way to Solar. */
