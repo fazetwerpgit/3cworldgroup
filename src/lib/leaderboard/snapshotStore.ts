@@ -217,17 +217,77 @@ function parseJson<T>(value: unknown, fallback: T): T {
   }
 }
 
+/** How long a request that lost the lease on a MISSING snapshot waits for the holder's build. */
+export const MISSING_WAIT_MS = 8_000;
+const MISSING_POLL_MS = 400;
+
+/**
+ * What a due rebuild gave the caller: a snapshot it built (or a live build, for
+ * a missing snapshot nobody else finished in time), or 'stored' — read the
+ * stored docs (they are fresh enough, or another instance just wrote them).
+ */
+type RebuildOutcome = { snapshot: BoardSnapshot; source: 'rebuilt' | 'live' } | 'stored';
+
+/**
+ * One rebuild per server instance at a time: concurrent requests here share it.
+ * Keyed by whether the snapshot was missing, so a missing-snapshot caller never
+ * joins a stale caller's "serve the stored one" answer.
+ */
+const pendingRebuild = new Map<'missing' | 'stale', Promise<RebuildOutcome>>();
+
+/** Tests: forget an in-flight rebuild. */
+export function resetSnapshotRebuildForTests() {
+  pendingRebuild.clear();
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function readMeta(): Promise<SnapshotMeta | undefined> {
+  const doc = await db().collection(SNAPSHOT_COLLECTION).doc(META_DOC).get();
+  return doc.exists ? (doc.data() as SnapshotMeta) : undefined;
+}
+
+/**
+ * The due rebuild, behind the lease whether the snapshot is stale or missing,
+ * so a burst of requests (across instances) costs ONE full sales read:
+ * - won the lease: rebuild and store;
+ * - lost it, stale: serve the stored snapshot while the holder builds;
+ * - lost it, missing (nothing stored to serve): wait for the holder's build,
+ *   then read it; if it has not landed within MISSING_WAIT_MS (the holder died
+ *   or is slow), build once live for this instance, unstored, so a first-ever
+ *   request still gets a board, never an error.
+ * Inside one instance, concurrent callers share the same promise.
+ */
+function rebuildWhenDue(now: Date, state: SnapshotState): Promise<RebuildOutcome> {
+  const key = state === 'missing' ? 'missing' : 'stale';
+  const inFlight = pendingRebuild.get(key);
+  if (inFlight) return inFlight;
+  const run = (async (): Promise<RebuildOutcome> => {
+    const nowMs = now.getTime();
+    if (await takeLease(nowMs)) return { snapshot: await rebuildLeaderboardSnapshot(now), source: 'rebuilt' };
+    if (state !== 'missing') return 'stored';
+    const validKey = snapshotValidKey(now);
+    for (let waited = 0; waited < MISSING_WAIT_MS; waited += MISSING_POLL_MS) {
+      await sleep(MISSING_POLL_MS);
+      if (snapshotState(await readMeta(), nowMs, validKey) !== 'missing') return 'stored';
+    }
+    return { snapshot: await computeSnapshotFromFirestore(now, null), source: 'live' };
+  })().finally(() => {
+    if (pendingRebuild.get(key) === run) pendingRebuild.delete(key);
+  });
+  pendingRebuild.set(key, run);
+  return run;
+}
+
 /** One period of the board: from the stored snapshot, rebuilt first when due. */
 export async function loadBoardPeriod(req: BoardPeriodRequest): Promise<BoardPeriodResult> {
   const database = db();
   const nowMs = req.now.getTime();
   const validKey = snapshotValidKey(req.now);
   const collection = database.collection(SNAPSHOT_COLLECTION);
-  const [metaDoc, periodDoc] = await database.getAll(
-    collection.doc(META_DOC),
-    collection.doc(periodDocId(req.scope, req.periodId))
-  );
-  const meta = metaDoc.exists ? (metaDoc.data() as SnapshotMeta) : undefined;
+  const readDocs = () => database.getAll(collection.doc(META_DOC), collection.doc(periodDocId(req.scope, req.periodId)));
+  let [metaDoc, periodDoc] = await readDocs();
+  let meta = metaDoc.exists ? (metaDoc.data() as SnapshotMeta) : undefined;
 
   // A demo account sees its own demo sales on its board: built live for it alone.
   if (meta?.demoRepIds?.includes(req.viewerUid)) {
@@ -236,14 +296,17 @@ export async function loadBoardPeriod(req: BoardPeriodRequest): Promise<BoardPer
 
   const state = snapshotState(meta, nowMs, validKey);
   if (shouldRebuild(state, meta, nowMs)) {
-    // A stale snapshot is served while another instance holds the lease; a
-    // missing one is built regardless (there is nothing else to serve).
-    if (state === 'missing' || (await takeLease(nowMs))) {
-      const snapshot = await rebuildLeaderboardSnapshot(req.now);
-      if (snapshot.demoRepIds.includes(req.viewerUid)) {
+    const outcome = await rebuildWhenDue(req.now, state);
+    if (outcome !== 'stored') {
+      if (outcome.snapshot.demoRepIds.includes(req.viewerUid)) {
         return fromSnapshot(await computeSnapshotFromFirestore(req.now, req.viewerUid), req, 'live');
       }
-      return fromSnapshot(snapshot, req, 'rebuilt');
+      return fromSnapshot(outcome.snapshot, req, outcome.source);
+    }
+    if (state === 'missing') {
+      // Another instance's build landed while we waited: read what it stored.
+      [metaDoc, periodDoc] = await readDocs();
+      meta = metaDoc.exists ? (metaDoc.data() as SnapshotMeta) : undefined;
     }
   }
 
@@ -263,19 +326,26 @@ export async function loadBoardPeriod(req: BoardPeriodRequest): Promise<BoardPer
  * when due, exactly like a board read; a demo account's tape is built live.
  */
 export async function loadCompanyTape(now: Date, viewerUid: string): Promise<KeyedCompanyTape> {
-  const database = db();
   const nowMs = now.getTime();
-  const metaDoc = await database.collection(SNAPSHOT_COLLECTION).doc(META_DOC).get();
-  const meta = metaDoc.exists ? (metaDoc.data() as SnapshotMeta) : undefined;
+  let meta = await readMeta();
   if (meta?.demoRepIds?.includes(viewerUid)) {
     return (await computeSnapshotFromFirestore(now, viewerUid)).tape;
   }
-  const state = snapshotState(meta, nowMs, snapshotValidKey(now));
-  const stored = parseJson<KeyedCompanyTape | null>(meta?.tape, null);
-  if (!stored || (shouldRebuild(state, meta, nowMs) && (state === 'missing' || (await takeLease(nowMs))))) {
-    const snapshot = await rebuildLeaderboardSnapshot(now);
-    if (snapshot.demoRepIds.includes(viewerUid)) return (await computeSnapshotFromFirestore(now, viewerUid)).tape;
-    return snapshot.tape;
+  let stored = parseJson<KeyedCompanyTape | null>(meta?.tape, null);
+  // A meta with no tape (written before the tape existed) counts as missing.
+  const state = stored ? snapshotState(meta, nowMs, snapshotValidKey(now)) : 'missing';
+  if (shouldRebuild(state, meta, nowMs)) {
+    const outcome = await rebuildWhenDue(now, state);
+    if (outcome !== 'stored') {
+      if (outcome.snapshot.demoRepIds.includes(viewerUid)) return (await computeSnapshotFromFirestore(now, viewerUid)).tape;
+      return outcome.snapshot.tape;
+    }
+    if (!stored) {
+      meta = await readMeta();
+      stored = parseJson<KeyedCompanyTape | null>(meta?.tape, null);
+    }
   }
-  return stored;
+  if (stored) return stored;
+  // Waited, and the stored meta still has no tape: build it once live.
+  return (await computeSnapshotFromFirestore(now, null)).tape;
 }

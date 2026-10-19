@@ -63,6 +63,9 @@ vi.mock('@/lib/fiberReport/ordersCache', () => ({ getAllFiberOrders: vi.fn(async
 import {
   DEBOUNCE_MS,
   META_DOC,
+  MISSING_WAIT_MS,
+  rebuildLeaderboardSnapshot,
+  resetSnapshotRebuildForTests,
   SNAPSHOT_COLLECTION,
   loadBoardPeriod,
   loadCompanyTape,
@@ -85,6 +88,7 @@ function weekRequest(now: Date, viewerUid = 'r1') {
 beforeEach(() => {
   store.tables.clear();
   store.salesPageReads = 0;
+  resetSnapshotRebuildForTests();
 });
 
 describe('leaderboard snapshot store', () => {
@@ -184,5 +188,65 @@ describe('leaderboard snapshot store', () => {
     expect(store.salesPageReads).toBe(reads);
     // The demo account still sees its own sale on its tape (built live).
     expect((await loadCompanyTape(new Date(NOW.getTime() + 2_000), 'demo')).mtdCount).toBe(3);
+  });
+});
+
+describe('a missing snapshot is rebuilt behind the lease', () => {
+  it('concurrent first-ever requests share ONE full sales read and all get the board', async () => {
+    sale('a', 'r1', new Date('2026-10-13T15:00:00.000Z'));
+    sale('b', 'r2', new Date('2026-10-13T16:00:00.000Z'));
+
+    const results = await Promise.all([
+      loadBoardPeriod(weekRequest(NOW)),
+      loadBoardPeriod(weekRequest(NOW, 'r2')),
+      loadCompanyTape(NOW, 'r1'),
+      loadBoardPeriod(weekRequest(NOW)),
+    ]);
+
+    expect(store.salesPageReads).toBe(1);
+    for (const result of [results[0], results[1], results[3]] as Awaited<ReturnType<typeof loadBoardPeriod>>[]) {
+      expect(result.payload.totals.map((t) => t.salesRepId).sort()).toEqual(['r1', 'r2']);
+    }
+  });
+
+  it('another instance holds the lease: waits, then serves what that build stored (no sales read here)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      sale('a', 'r1', new Date('2026-10-13T15:00:00.000Z'));
+      table(SNAPSHOT_COLLECTION).set(META_DOC, { leaseUntilMs: NOW.getTime() + 60_000 });
+
+      const pending = loadBoardPeriod(weekRequest(NOW));
+      await vi.advanceTimersByTimeAsync(500);
+      // The lease holder's build lands (its one sales read).
+      await rebuildLeaderboardSnapshot(NOW);
+      const readsByHolder = store.salesPageReads;
+      await vi.advanceTimersByTimeAsync(1_000);
+
+      const result = await pending;
+      expect(result.source).toBe('snapshot');
+      expect(result.payload.totals.map((t) => t.salesRepId)).toEqual(['r1']);
+      expect(store.salesPageReads).toBe(readsByHolder);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("the holder never finishes: builds once live after the wait, so a first request still gets data", async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      sale('a', 'r1', new Date('2026-10-13T15:00:00.000Z'));
+      table(SNAPSHOT_COLLECTION).set(META_DOC, { leaseUntilMs: NOW.getTime() + 60_000 });
+
+      const pending = Promise.all([loadBoardPeriod(weekRequest(NOW)), loadBoardPeriod(weekRequest(NOW))]);
+      await vi.advanceTimersByTimeAsync(MISSING_WAIT_MS + 1_000);
+      const [one, two] = await pending;
+
+      expect(one.source).toBe('live');
+      expect(one.payload.totals.map((t) => t.salesRepId)).toEqual(['r1']);
+      expect(two.payload).toEqual(one.payload);
+      expect(store.salesPageReads).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
