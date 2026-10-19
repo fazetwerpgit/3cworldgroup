@@ -111,11 +111,14 @@ export async function GET(
       return NextResponse.json({ members, memberCount: members.length, ...(isAdmin ? { addable: [] } : {}) });
     }
 
-    // Active users only: members/manage refuses anyone not active, so a
-    // pending hire offered here could never actually be added.
+    // Anyone isEligibleChatMember admits (active users and hires mid-onboarding):
+    // members/manage applies the same rule, so the picker and the server agree.
     const memberIdSet = new Set(memberIds);
-    const activeUsersSnap = await adminDb.collection('users').where('status', '==', 'active').get();
-    const addable: AddableUser[] = activeUsersSnap.docs
+    const [activeUsersSnap, pendingUsersSnap] = await Promise.all([
+      adminDb.collection('users').where('status', '==', 'active').get(),
+      adminDb.collection('users').where('status', '==', 'pending').get(),
+    ]);
+    const addable: AddableUser[] = [...activeUsersSnap.docs, ...pendingUsersSnap.docs]
       .filter((doc) => isEligibleChatMember(doc.data() ?? {}))
       .filter((doc) => !memberIdSet.has(doc.id))
       .map((doc) => {

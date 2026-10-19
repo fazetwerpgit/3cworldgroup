@@ -233,6 +233,7 @@ describe('GET /api/portal/chat/channels/[channelId]/members', () => {
     firestore.users.set('pending-hire', {
       status: 'pending', fieldRole: 'entry_level_rep', displayName: 'Pending Hire',
     });
+    firestore.users.set('pending-signup', { status: 'pending', displayName: 'No Role Yet' });
     firestore.users.set('pending-self-signup', {
       status: 'pending', displayName: 'Pending Self Signup',
     });
@@ -398,13 +399,14 @@ describe('GET /api/portal/chat/channels/[channelId]/members', () => {
     for (const member of others) expect(member).not.toHaveProperty('avatarUrl');
   });
 
-  it('offers only active users as addable (members/manage refuses pending hires)', async () => {
+  it('offers active users and hires mid-onboarding as addable, as members/manage accepts', async () => {
     mockGetUser.mockResolvedValue(ADMIN);
     firestore.users.set('admin-1', { status: 'active', role: 'admin', displayName: 'Admin One' });
     firestore.users.set('rep-3', { status: 'active', fieldRole: 'entry_rep', displayName: 'Rep Three' });
     firestore.users.set('pending-hire', {
       status: 'pending', fieldRole: 'entry_level_rep', displayName: 'Pending Hire',
     });
+    firestore.users.set('pending-signup', { status: 'pending', displayName: 'No Role Yet' });
     firestore.channels.set('all-company', {
       id: 'all-company', name: 'All Company', description: 'Company-wide', audience: 'all', order: 1,
       active: true, memberIds: ['admin-1'],
@@ -414,6 +416,6 @@ describe('GET /api/portal/chat/channels/[channelId]/members', () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.addable.map((u: { uid: string }) => u.uid)).toEqual(['rep-3']);
+    expect(json.addable.map((u: { uid: string }) => u.uid).sort()).toEqual(['pending-hire', 'rep-3']);
   });
 });

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { canAccessChatChannel, isAdminLevel, resolveRoles } from '@/types';
 import { getVerifiedChatUser } from '@/lib/chat/access';
-import { readExtraMemberIds, toChatChannel } from '@/lib/chat/channels';
+import { isEligibleChatMember, readExtraMemberIds, toChatChannel } from '@/lib/chat/channels';
 import { isDemoAccount } from '@/lib/users/demoAccount';
 
 // Manage a channel's manually-added members. PLATFORM ADMINS ONLY (client decision:
@@ -79,17 +79,20 @@ export async function POST(
       return NextResponse.json({ error: 'The demo sandbox takes no added members' }, { status: 400 });
     }
 
-    // The target must be a real, active user (matches getVerifiedChatUser's own active gate).
+    // The target must be a real user the addable picker could offer: active, or a
+    // hire mid-onboarding (isEligibleChatMember, the same rule as the picker and
+    // getVerifiedChatUser's status gate).
     const userSnap = await adminDb.collection('users').doc(uid).get();
     if (!userSnap.exists) {
       return NextResponse.json({ error: 'Unknown user' }, { status: 400 });
     }
-    if ((userSnap.data() ?? {}).status !== 'active') {
-      return NextResponse.json({ error: 'User is not active' }, { status: 400 });
-    }
+    const target = userSnap.data() ?? {};
     // A demo account reaches no channel; storing it as an extra would only put it in memberIds.
-    if (isDemoAccount(userSnap.data())) {
+    if (isDemoAccount(target)) {
       return NextResponse.json({ error: 'Demo accounts cannot join channels' }, { status: 400 });
+    }
+    if (!isEligibleChatMember(target)) {
+      return NextResponse.json({ error: 'User can’t join chat yet' }, { status: 400 });
     }
 
     await ref.set(

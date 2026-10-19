@@ -242,6 +242,28 @@ describe('POST /api/portal/chat/channels/[channelId]/members/manage', () => {
     expect(firestore.setCalls).toHaveLength(0);
   });
 
+  it('adds a pending hire mid-onboarding (the addable picker offers them)', async () => {
+    mockGetUser.mockResolvedValue(ADMIN);
+    firestore.channels.set('managers', managersChannel());
+    firestore.users.set('hire', { status: 'pending', fieldRole: 'entry_level_rep' });
+
+    const res = await POST(req('managers', { uid: 'hire' }, 'POST'), ctx('managers'));
+
+    expect(res.status).toBe(200);
+    expect(firestore.setCalls).toHaveLength(1);
+  });
+
+  it('returns 400 for a pending signup that is not onboarding (no role yet)', async () => {
+    mockGetUser.mockResolvedValue(ADMIN);
+    firestore.channels.set('managers', managersChannel());
+    firestore.users.set('signup', { status: 'pending' });
+
+    const res = await POST(req('managers', { uid: 'signup' }, 'POST'), ctx('managers'));
+
+    expect(res.status).toBe(400);
+    expect(firestore.setCalls).toHaveLength(0);
+  });
+
   it('adds an active user to BOTH extraMemberIds and memberIds', async () => {
     mockGetUser.mockResolvedValue(ADMIN);
     firestore.channels.set('managers', managersChannel());
