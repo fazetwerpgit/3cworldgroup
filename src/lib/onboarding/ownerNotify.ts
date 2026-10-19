@@ -6,7 +6,7 @@ import {
   ownerDocSignedEmail,
 } from '@/lib/email/templates';
 import { RoleDisplayNames, type FieldRole } from '@/types/auth';
-import { getOnboardingItemsForUser, type OnboardingItem } from '@/types/onboarding';
+import { getOnboardingItemsForUser, isOwnerOnlyOnboardingItem, type OnboardingItem } from '@/types/onboarding';
 
 const PACKET_URL = () => `${appBaseUrl()}/portal/admin/onboarding`;
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
@@ -55,42 +55,59 @@ function displayRole(value: unknown): string | null {
     : null;
 }
 
-export async function getOwnerRecipients(): Promise<string[]> {
-  if (!adminDb) return [];
+function uniqueEmails(raw: unknown[]): string[] {
+  const seen = new Set<string>();
+  return raw.reduce<string[]>((result, value) => {
+    const email = emailValue(value);
+    const key = email?.toLowerCase();
+    if (email && key && !seen.has(key)) {
+      seen.add(key);
+      result.push(email);
+    }
+    return result;
+  }, []);
+}
+
+// Owner accounts (role 'owner') and the extra addresses in
+// config/onboardingNotifications, kept apart: the extras are not checked to be
+// owners, so they never receive tax or banking documents (sendOnboardingPacket).
+export async function getOwnerRecipientGroups(): Promise<{ owners: string[]; extras: string[] }> {
+  if (!adminDb) return { owners: [], extras: [] };
   try {
-    const [owners, config] = await Promise.all([
+    const [ownerSnap, config] = await Promise.all([
       adminDb.collection('users').where('role', '==', 'owner').get(),
       adminDb.doc('config/onboardingNotifications').get(),
     ]);
     // Some legacy user docs store the address under 'Email' (capital E) —
     // read both so no owner is silently dropped from notifications.
-    const raw = owners.docs.flatMap((doc) => [valueFromDoc(doc, 'email'), valueFromDoc(doc, 'Email')]);
+    const owners = uniqueEmails(
+      ownerSnap.docs.flatMap((doc) => [valueFromDoc(doc, 'email'), valueFromDoc(doc, 'Email')])
+    );
+    const ownerKeys = new Set(owners.map((email) => email.toLowerCase()));
     const extraEmails = valueFromDoc(config, 'extraEmails');
-    if (Array.isArray(extraEmails)) raw.push(...extraEmails);
-
-    const seen = new Set<string>();
-    return raw.reduce<string[]>((result, value) => {
-      const email = emailValue(value);
-      const key = email?.toLowerCase();
-      if (email && key && !seen.has(key)) {
-        seen.add(key);
-        result.push(email);
-      }
-      return result;
-    }, []);
+    const extras = uniqueEmails(Array.isArray(extraEmails) ? extraEmails : []).filter(
+      (email) => !ownerKeys.has(email.toLowerCase())
+    );
+    return { owners, extras };
   } catch (error) {
     console.error('[onboarding owner notify] recipient lookup failed', error);
-    return [];
+    return { owners: [], extras: [] };
   }
 }
 
-async function sendToRecipients(content: {
+export async function getOwnerRecipients(): Promise<string[]> {
+  const { owners, extras } = await getOwnerRecipientGroups();
+  return [...owners, ...extras];
+}
+
+type EmailContent = {
   subject: string;
   htmlBody: string;
   textBody: string;
   attachments?: { name: string; contentBase64: string; contentType: string }[];
-}): Promise<void> {
-  const recipients = await getOwnerRecipients();
+};
+
+async function sendEach(recipients: string[], content: EmailContent): Promise<void> {
   await Promise.all(recipients.map(async (to) => {
     try {
       await sendEmail({ ...content, to, from: onboardingFrom() });
@@ -98,6 +115,10 @@ async function sendToRecipients(content: {
       console.error('[onboarding owner notify] email failed', { to, subject: content.subject, error });
     }
   }));
+}
+
+async function sendToRecipients(content: EmailContent): Promise<void> {
+  await sendEach(await getOwnerRecipients(), content);
 }
 
 export async function notifyDocSigned(opts: { userId: string; repName: string; itemLabel: string }): Promise<void> {
@@ -152,9 +173,11 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
 
     const sensitive = await adminDb.doc(`userSensitive/${opts.userId}`).get();
     const sensitiveData = sensitive.data?.() ?? {};
+    // The SSN line is owner-only (tax ID); the DL line goes to everyone.
+    const ssnMasked: Array<[string, string]> = [];
     const masked: Array<[string, string]> = [];
     if (typeof sensitiveData.ssnLast4 === 'string' && sensitiveData.ssnLast4) {
-      masked.push(['SSN', `***-**-${sensitiveData.ssnLast4.slice(-4)}`]);
+      ssnMasked.push(['SSN', `***-**-${sensitiveData.ssnLast4.slice(-4)}`]);
     }
     if (typeof sensitiveData.dlLast4 === 'string' && sensitiveData.dlLast4) {
       masked.push(['DL', `********${sensitiveData.dlLast4.slice(-4)}`]);
@@ -162,7 +185,7 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
 
     const checklist = items.map((item) => checklistRow(item, progressByItem.get(item.id)));
     const skipped: string[] = [];
-    const attachments: { name: string; contentBase64: string; contentType: string }[] = [];
+    const attachments: { name: string; contentBase64: string; contentType: string; ownerOnly: boolean }[] = [];
     let attachmentBytes = 0;
     let bucket: ReturnType<typeof storageBucket> | undefined;
     for (const [itemId, progress] of progressByItem) {
@@ -177,25 +200,40 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
           continue;
         }
         attachmentBytes += buffer.length;
-        attachments.push({ name, contentBase64: buffer.toString('base64'), contentType: 'application/pdf' });
+        attachments.push({
+          name,
+          contentBase64: buffer.toString('base64'),
+          contentType: 'application/pdf',
+          ownerOnly: isOwnerOnlyOnboardingItem(itemId),
+        });
       } catch (error) {
         skipped.push(`${name} (download failed)`);
         console.error('[onboarding owner notify] attachment download failed', { path, error });
       }
     }
-    await sendToRecipients({
-      ...onboardingPacketEmail({
-        repName: String(user.displayName || user.email || opts.userId),
-        completedOn: dateText(new Date()),
-        profile,
-        checklist,
-        masked,
-        attached: attachments.map((attachment) => attachment.name),
-        skipped,
-        link: PACKET_URL(),
-      }),
-      attachments,
-    });
+    // The W-9 (full SSN) and direct-deposit form (bank numbers) are OWNER
+    // ONLY: owner accounts get every attachment and the masked SSN; the extra
+    // config addresses get the packet without them.
+    const packet = (forOwners: boolean) => {
+      const files = attachments
+        .filter((attachment) => forOwners || !attachment.ownerOnly)
+        .map(({ name, contentBase64, contentType }) => ({ name, contentBase64, contentType }));
+      return {
+        ...onboardingPacketEmail({
+          repName: String(user.displayName || user.email || opts.userId),
+          completedOn: dateText(new Date()),
+          profile,
+          checklist,
+          masked: forOwners ? [...ssnMasked, ...masked] : masked,
+          attached: files.map((attachment) => attachment.name),
+          skipped,
+          link: PACKET_URL(),
+        }),
+        attachments: files,
+      };
+    };
+    const { owners, extras } = await getOwnerRecipientGroups();
+    await Promise.all([sendEach(owners, packet(true)), sendEach(extras, packet(false))]);
   } catch (error) {
     console.error('[onboarding owner notify] packet failed', { userId: opts.userId, error });
   }

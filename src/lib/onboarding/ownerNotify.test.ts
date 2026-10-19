@@ -134,4 +134,23 @@ describe('sendOnboardingPacket', () => {
     expect(packet.textBody).toContain('Not attached: direct.pdf (over the 8MB email limit)');
     expect(packet.textBody).toContain('https://portal.example/portal/admin/onboarding');
   });
+
+  it('sends the W-9 / direct-deposit PDFs and the masked SSN to owner accounts only', async () => {
+    downloadMock.mockImplementation(async () => [Buffer.from('pdf')]);
+    await sendOnboardingPacket({ userId: 'u1' });
+
+    type Sent = { to: string; attachments?: Array<{ name: string }>; textBody: string };
+    const sent = (sendEmailMock.mock.calls as unknown as Array<[Sent]>).map(([email]) => email);
+    const owner = sent.find((email) => email.to === 'owner@example.com');
+    const extra = sent.find((email) => email.to === 'extra@example.com');
+    if (!owner || !extra) throw new Error('expected an owner and an extra email');
+
+    expect(owner.attachments?.map((a) => a.name)).toEqual(['contract.pdf', 'direct.pdf']);
+    expect(owner.textBody).toContain('SSN: ***-**-1234');
+
+    expect(extra.attachments?.map((a) => a.name)).toEqual(['contract.pdf']);
+    expect(extra.textBody).not.toContain('direct.pdf');
+    expect(extra.textBody).not.toContain('SSN');
+    expect(extra.textBody).toContain('DL: ********9876');
+  });
 });
