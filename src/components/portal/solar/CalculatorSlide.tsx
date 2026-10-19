@@ -217,9 +217,9 @@ export function CalculatorSlide() {
           <p className={s.totalNote}>
             Monthly deposit ${formatBill(state.monthlyBill)} <span aria-hidden>·</span> @ {rate}
           </p>
+          {/* Interest is the track; principal grows over it from the left (scaleX, not width). */}
           <div className={s.split} aria-hidden>
-            <div className={s.splitPrincipal} style={{ width: `${principalPct}%` }} />
-            <div className={s.splitInterest} style={{ width: `${100 - principalPct}%` }} />
+            <div className={s.splitPrincipal} style={{ transform: `scaleX(${principalPct / 100})` }} />
           </div>
           <dl className={s.stats}>
             <div>

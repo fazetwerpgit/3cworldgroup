@@ -345,6 +345,30 @@ button.photo:focus-visible {
   text-align: center;
 }
 
+.photoPdf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.photoPdf:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+.photoPdfOpen {
+  color: var(--c-text-3);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .photoLabel {
   color: var(--c-text-2);
   font-size: var(--t-sm);

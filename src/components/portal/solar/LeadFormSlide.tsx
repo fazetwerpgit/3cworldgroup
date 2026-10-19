@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Check, ChevronRight, RotateCcw } from 'lucide-react';
+import { Camera, Check, ChevronRight, FileText, RotateCcw } from 'lucide-react';
+import { resolveUploadMime } from '@/lib/forms/formUploads';
 import {
   FormUploadError,
   isUploadCancelled,
@@ -18,13 +19,17 @@ import {
 } from './solarClient';
 import s from './solarDeck.module.css';
 
-// Slide 5: the homeowner's details and three bill/panel photos, in three short
+// Slide 5: the homeowner's details and three bill/panel photos (or PDFs), in three short
 // steps (who, where, photos) so each fits a laptop or a phone. Photos upload
 // as soon as they are picked (one slot each, like ProofCapture) and are
 // optional at submit; the lead POST carries the session's clientId so a retry
 // returns the same lead.
 
 type SlotUi = { status: 'uploading' | 'failed'; error?: string; file: File } | null;
+/** What a tile shows of the picked file: the photo itself, or a PDF's name. */
+type Preview = { kind: 'image'; url: string } | { kind: 'pdf'; name: string };
+
+const UPLOAD_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'application/pdf'];
 
 type FieldDef = {
   key: keyof LeadFields;
@@ -76,7 +81,7 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
   const focusNext = useRef<keyof LeadFields | null>(null);
   const [focusTick, setFocusTick] = useState(0);
   const [slots, setSlots] = useState<Partial<Record<PhotoSlot, SlotUi>>>({});
-  const [previews, setPreviews] = useState<Partial<Record<PhotoSlot, string>>>({});
+  const [previews, setPreviews] = useState<Partial<Record<PhotoSlot, Preview>>>({});
   const inputs = useRef<Partial<Record<PhotoSlot, HTMLInputElement | null>>>({});
   const aborts = useRef<Partial<Record<PhotoSlot, AbortController>>>({});
 
@@ -109,9 +114,15 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
     const controller = new AbortController();
     aborts.current[slot] = controller;
     setSlots((prev) => ({ ...prev, [slot]: { status: 'uploading', file } }));
-    const url = URL.createObjectURL(file);
-    previewUrls.current.push(url);
-    setPreviews((prev) => ({ ...prev, [slot]: url }));
+    let preview: Preview;
+    if (resolveUploadMime(file.type, file.name) === 'application/pdf') {
+      preview = { kind: 'pdf', name: file.name };
+    } else {
+      const url = URL.createObjectURL(file);
+      previewUrls.current.push(url);
+      preview = { kind: 'image', url };
+    }
+    setPreviews((prev) => ({ ...prev, [slot]: preview }));
     try {
       const path = await uploadFormAttachment({
         file,
@@ -119,7 +130,7 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
         formType: 'solar-lead',
         slot,
         fields: { uploadId: state.uploadId },
-        allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'],
+        allowedTypes: UPLOAD_TYPES,
         getHeaders: solarAuthHeaders,
         signal: controller.signal,
       });
@@ -277,6 +288,7 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
           <div className={s.photos} role="group" aria-label="Photos">
             {PHOTO_SLOTS.map(({ slot, label }) => {
               const ui = slots[slot];
+              const preview = previews[slot];
               const done = Boolean(state.photos[slot]) && !ui;
               const stateName = ui?.status ?? (done ? 'done' : 'missing');
               const status =
@@ -286,7 +298,7 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
                     ? ui.error
                     : done
                       ? 'Added. Tap to replace'
-                      : 'Tap to add a photo';
+                      : 'Tap to add a photo or PDF';
               return (
                 <button
                   key={slot}
@@ -301,14 +313,22 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
                   }}
                 >
                   <span className={s.slotMedia}>
-                    {previews[slot] ? (
+                    {preview?.kind === 'image' ? (
                       // Local object URL preview of the picked photo.
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img className={s.slotThumb} src={previews[slot]} alt="" />
+                      <img className={s.slotThumb} src={preview.url} alt="" />
                     ) : null}
-                    <span className={s.slotIcon} aria-hidden>
-                      {ui?.status === 'failed' ? <RotateCcw size={20} /> : done ? <Check size={20} /> : <Camera size={20} />}
-                    </span>
+                    {preview?.kind === 'pdf' ? (
+                      <span className={s.slotPdf}>
+                        <FileText size={28} aria-hidden />
+                        <span className={s.slotPdfName}>{preview.name}</span>
+                      </span>
+                    ) : null}
+                    {preview?.kind === 'pdf' ? null : (
+                      <span className={s.slotIcon} aria-hidden>
+                        {ui?.status === 'failed' ? <RotateCcw size={20} /> : done ? <Check size={20} /> : <Camera size={20} />}
+                      </span>
+                    )}
                   </span>
                   <span className={s.slotText}>
                     <span className={s.slotLabel}>{PHOTO_TITLES[slot]}</span>
@@ -320,7 +340,7 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
                       inputs.current[slot] = el;
                     }}
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     hidden
                     onChange={(e) => {
                       const file = e.target.files?.[0];

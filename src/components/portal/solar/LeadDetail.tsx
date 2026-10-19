@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ImageOff } from 'lucide-react';
+import { FileText, ImageOff } from 'lucide-react';
 import { StatusDot } from '@/components/portal/admin-d/AdminUi';
 import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
+import { isPdfUrl } from '@/lib/forms/openAttachment';
 import ops from '@/components/portal/admin-ops/admin-ops.module.css';
 import kit from '@/components/portal/admin-ops/admin-kit.module.css';
 import { photoUrl, type SolarLeadView } from './solarClient';
@@ -109,7 +110,20 @@ export function LeadDetail({ lead, showRep = true }: { lead: SolarLeadView; show
             const p = photo(slot);
             return (
               <li key={slot}>
-                {p.status === 'ready' ? (
+                {p.status === 'ready' && isPdfUrl(p.url) ? (
+                  // A bill sent as a PDF: a plain link that opens it in a new tab.
+                  <a
+                    className={`${css.photo} ${css.photoPdf}`}
+                    href={p.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Open ${label.toLowerCase()} (PDF)`}
+                  >
+                    <FileText size={22} aria-hidden="true" />
+                    <span>PDF</span>
+                    <span className={css.photoPdfOpen}>Open</span>
+                  </a>
+                ) : p.status === 'ready' ? (
                   <button
                     type="button"
                     className={css.photo}
