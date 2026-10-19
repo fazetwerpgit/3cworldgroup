@@ -4,7 +4,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { parseFiberReport } from '@/lib/fiberReport/parseReport';
 import { isOlderReport, mailSentAt, newestStamp, reportAsOf, type ReportStamp } from '@/lib/fiberReport/staleReport';
 import { buildNameIndex, matchOrder } from '@/lib/fiberReport/matchReps';
-import { closeHandoffs, handoffOwner, readHandoffs } from '@/lib/fiberReport/dealerHandoff';
+import { closeHandoffs, handoffOwner, readHandoffs, saleDays } from '@/lib/fiberReport/dealerHandoff';
 import { assignDealerToUser } from '@/lib/fiberReport/assignDealer';
 import { rematchUnmatchedOrders } from '@/lib/fiberReport/rematch';
 import { readStoredOrders } from '@/lib/fiberReport/carrierNotices';
@@ -244,8 +244,9 @@ export async function POST(request: NextRequest) {
     const unmatchedRepNames = new Set<string>();
     let matchedReps = 0;
     const now = new Date().toISOString();
+    const sold = saleDays(parsed.orders);
     const orders: FiberOrder[] = parsed.orders.map((order, index) => {
-      const matchedUserId = handoffOwner(order, handoffs) ?? byCode[index];
+      const matchedUserId = handoffOwner(order, handoffs, sold.get(order)) ?? byCode[index];
       if (matchedUserId) matchedReps += 1;
       else if (order.repName.trim()) unmatchedRepNames.add(order.repName.trim());
       return { ...order, matchedUserId, updatedAt: now };

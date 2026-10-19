@@ -1,6 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
-import { handoffOwner, readHandoffs } from '@/lib/fiberReport/dealerHandoff';
+import { handoffOwner, readHandoffs, saleDays } from '@/lib/fiberReport/dealerHandoff';
 
 const BATCH_SIZE = 450;
 
@@ -40,15 +40,24 @@ export async function assignDealerToUser(
     .where('repDealerId', '==', trimmedDealerId)
     .get();
   const updatedAt = new Date().toISOString();
+  const rows = snapshot.docs.map((order) => {
+    const data = order.data();
+    return {
+      repDealerId: trimmedDealerId,
+      orderDate: data.orderDate ?? null,
+      estInstallDate: data.estInstallDate ?? null,
+      address: data.address ?? null,
+      unit: data.unit ?? null,
+    };
+  });
+  const sold = saleDays(rows);
   for (let offset = 0; offset < snapshot.docs.length; offset += BATCH_SIZE) {
     const batch = adminDb.batch();
-    for (const order of snapshot.docs.slice(offset, offset + BATCH_SIZE)) {
-      const data = order.data();
-      const owner =
-        handoffOwner({ repDealerId: trimmedDealerId, orderDate: data.orderDate, estInstallDate: data.estInstallDate }, handoffs) ??
-        trimmedUserId;
+    snapshot.docs.slice(offset, offset + BATCH_SIZE).forEach((order, index) => {
+      const row = rows[offset + index];
+      const owner = handoffOwner(row, handoffs, sold.get(row)) ?? trimmedUserId;
       batch.update(order.ref, { matchedUserId: owner, updatedAt });
-    }
+    });
     await batch.commit();
   }
   // The admin board reads fiberOrders from a module cache; this backfill just

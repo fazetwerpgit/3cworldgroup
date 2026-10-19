@@ -10,6 +10,9 @@
 // on the first report that shows the borrower selling on any OTHER code (their
 // own code works again): `to` becomes that order's date, so the code's later
 // orders go back to its owner and the borrower keeps what they sold before.
+// Only a row with a real order date can close a handoff: an undated row (a
+// breakage row, or a pre-sale) is old business and says nothing about the
+// borrower's own code working again.
 
 export interface DealerHandoff {
   userId: string;
@@ -19,10 +22,17 @@ export interface DealerHandoff {
 
 export type DealerHandoffs = Record<string, DealerHandoff>;
 
+import { normalizeAddress } from '@/lib/fiberReport/matchSales';
+
 interface DatedOrder {
   repDealerId: string;
   orderDate?: string | null;
   estInstallDate?: string | null;
+}
+
+interface PlacedOrder extends DatedOrder {
+  address?: string | null;
+  unit?: string | null;
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -44,24 +54,57 @@ export function readHandoffs(raw: unknown): DealerHandoffs {
 }
 
 /**
- * The order's day: when it was placed, or for a breakage row (the carrier's
- * sheet has no order date) the install day it is about.
+ * The order's day: when it was placed; for a breakage row (the carrier's sheet
+ * has no order date) the sale day of its order when known (saleDays), else the
+ * install day it is about.
  */
-function orderDay(order: DatedOrder): string | null {
-  return order.orderDate ?? order.estInstallDate ?? null;
+function orderDay(order: DatedOrder, saleDay?: string | null): string | null {
+  return order.orderDate ?? saleDay ?? order.estInstallDate ?? null;
 }
 
-/** Who a handoff gives this order to, or null when no handoff covers it. */
-export function handoffOwner(order: DatedOrder, handoffs: DealerHandoffs): string | null {
+function placeKey(order: PlacedOrder): string {
+  const address = normalizeAddress(order.address);
+  return address ? `${order.repDealerId.trim()}|${address}|${normalizeAddress(order.unit)}` : '';
+}
+
+/**
+ * For each undated row (a breakage row), the order date of the dated row on the
+ * same code at the same address: the latest one placed on or before the install
+ * day it is about. That is when the sale was made, which decides whose it is.
+ */
+export function saleDays(orders: readonly PlacedOrder[]): Map<PlacedOrder, string> {
+  const placed = new Map<string, string[]>();
+  for (const order of orders) {
+    const key = placeKey(order);
+    if (!key || !order.orderDate) continue;
+    placed.set(key, [...(placed.get(key) ?? []), order.orderDate]);
+  }
+  const days = new Map<PlacedOrder, string>();
+  for (const order of orders) {
+    if (order.orderDate) continue;
+    const candidates = (placed.get(placeKey(order)) ?? []).filter(
+      (day) => !order.estInstallDate || day <= order.estInstallDate,
+    );
+    if (candidates.length) days.set(order, candidates.reduce((a, b) => (b > a ? b : a)));
+  }
+  return days;
+}
+
+/**
+ * Who a handoff gives this order to, or null when no handoff covers it.
+ * `saleDay` (from saleDays) dates an undated row by its sale, not its install.
+ */
+export function handoffOwner(order: DatedOrder, handoffs: DealerHandoffs, saleDay?: string | null): string | null {
   const handoff = handoffs[order.repDealerId.trim()];
-  const day = orderDay(order);
+  const day = orderDay(order, saleDay);
   if (!handoff || !day) return null;
   return day >= handoff.from && (!handoff.to || day < handoff.to) ? handoff.userId : null;
 }
 
 /**
  * Closes every open handoff whose borrower shows up in `orders` selling on a
- * different code, from the handoff's start on. Returns the updated handoffs
+ * different code, from the handoff's start on. Only a row's order date counts:
+ * an undated row is dated by an install, not a sale. Returns the updated handoffs
  * and the codes that closed (empty when nothing changed).
  */
 export function closeHandoffs(
@@ -74,7 +117,7 @@ export function closeHandoffs(
     if (handoff.to) continue;
     let firstOwnDay: string | null = null;
     for (const order of orders) {
-      const day = orderDay(order);
+      const day = order.orderDate ?? null;
       if (order.matchedUserId !== handoff.userId || order.repDealerId.trim() === code || !day || day < handoff.from) continue;
       if (!firstOwnDay || day < firstOwnDay) firstOwnDay = day;
     }
