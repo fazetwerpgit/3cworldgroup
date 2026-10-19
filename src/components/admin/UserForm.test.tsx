@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import type { User } from '@/types';
+import { graduatedFieldRole, type User } from '@/types';
 
 const auth = vi.hoisted(() => ({ user: { uid: 'admin-1', role: 'admin' } as Record<string, unknown> }));
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: auth.user }) }));
@@ -158,5 +158,57 @@ describe('UserForm role and actions', () => {
     root = createRoot(container);
     await mount({ uid: 'someone-else', fieldRole: 'entry_rep' });
     expect(button('Deactivate')).toBeDefined();
+  });
+
+  it('sends status after Deactivate when the admin sets it back to Active and saves', async () => {
+    vi.stubGlobal('confirm', () => true);
+    await mount({ fieldRole: 'entry_rep', status: 'active' });
+
+    await act(async () => {
+      button('Deactivate')!.click();
+    });
+    await act(async () => {
+      await vi.waitFor(() => expect(button('Activate')).toBeDefined());
+    });
+    await act(async () => {
+      button('Active')!.click();
+    });
+    await act(async () => {
+      button('Save changes')!.click();
+    });
+
+    const puts = fetchMock.mock.calls.filter(([, call]) => call?.method === 'PUT');
+    expect(puts).toHaveLength(2);
+    expect(JSON.parse(String(puts[1][1]?.body))).toMatchObject({ status: 'active' });
+  });
+
+  it('accepts a pending rep as the role the admin picked, not the graduated signup role', async () => {
+    vi.stubGlobal('confirm', () => true);
+    await mount({ fieldRole: 'entry_rep', status: 'pending' });
+
+    const select = container.querySelector('#person-role') as HTMLSelectElement;
+    await act(async () => {
+      select.value = 'ae_tier_1';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await act(async () => {
+      button('Accept')!.click();
+    });
+
+    expect(putBody()).toEqual({ status: 'active', fieldRole: 'ae_tier_1' });
+    await act(async () => {
+      await vi.waitFor(() => expect(select.value).toBe('ae_tier_1'));
+    });
+  });
+
+  it('accepts a pending rep with no role pick as their graduated signup role', async () => {
+    vi.stubGlobal('confirm', () => true);
+    await mount({ fieldRole: 'entry_rep', status: 'pending' });
+
+    await act(async () => {
+      button('Accept')!.click();
+    });
+
+    expect(putBody()).toEqual({ status: 'active', fieldRole: graduatedFieldRole('entry_rep') });
   });
 });

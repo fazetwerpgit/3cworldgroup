@@ -109,6 +109,10 @@ export function UserForm({ user }: UserFormProps) {
   // onboarding (checklist email + e-sign envelopes), so a name-only save must
   // never re-send or default one.
   const [loadedRole, setLoadedRole] = useState<UserRole | ''>(getEffectiveRole(user) ?? '');
+  // The status the server last confirmed. Deactivate / Activate / Accept write
+  // status immediately, so Save must compare against that, not the prop: an
+  // admin who deactivates and then picks "Active" again must have it sent.
+  const [loadedStatus, setLoadedStatus] = useState(user.status || 'active');
   // managerId is only sent when changed, so a save never re-sends a stale one.
   const loadedManagerId = user.reportsToId || '';
 
@@ -211,7 +215,7 @@ export function UserForm({ user }: UserFormProps) {
           state: formData.state,
           zip: formData.zip,
           ...(formData.managerId !== loadedManagerId ? { managerId: formData.managerId || null } : {}),
-          ...(formData.status !== user.status ? { status: formData.status } : {}),
+          ...(formData.status !== loadedStatus ? { status: formData.status } : {}),
         }),
       });
 
@@ -243,6 +247,7 @@ export function UserForm({ user }: UserFormProps) {
       const data = await readJsonIfPresent(response);
       if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Failed to update user status');
       setFormData((prev) => ({ ...prev, status }));
+      setLoadedStatus(status);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update user status');
     } finally {
@@ -272,18 +277,31 @@ export function UserForm({ user }: UserFormProps) {
   const acceptPending = async () => {
     if (!user.fieldRole || actionBusy) return;
     if (!window.confirm(`Accept and activate ${user.displayName || user.email || 'this user'}?`)) return;
+    // An unsaved field-role pick is what the admin means to accept them as;
+    // only fall back to graduating their signup role when none was picked.
+    const pickedFieldRole =
+      formData.role && formData.role !== loadedRole && !isPlatformRole(formData.role)
+        ? (formData.role as FieldRole)
+        : undefined;
+    const acceptedFieldRole = pickedFieldRole ?? graduatedFieldRole(user.fieldRole);
     setActionBusy(true);
     setError('');
     try {
       const response = await fetch(`/api/portal/auth/users/${user.uid}`, {
         method: 'PUT',
         headers: await authHeaders(true),
-        body: JSON.stringify({ status: 'active', fieldRole: graduatedFieldRole(user.fieldRole) }),
+        body: JSON.stringify({ status: 'active', fieldRole: acceptedFieldRole }),
       });
       const data = await readJsonIfPresent(response);
       if (!response.ok) throw new Error(typeof data.error === 'string' ? data.error : 'Failed to accept user');
-      setFormData((prev) => ({ ...prev, status: 'active', role: graduatedFieldRole(user.fieldRole!) }));
-      setLoadedRole(graduatedFieldRole(user.fieldRole));
+      // A platform-role pick stays in the form (still unsaved) for Save to send.
+      setFormData((prev) => ({
+        ...prev,
+        status: 'active',
+        role: prev.role && isPlatformRole(prev.role) && prev.role !== loadedRole ? prev.role : acceptedFieldRole,
+      }));
+      setLoadedRole(acceptedFieldRole);
+      setLoadedStatus('active');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to accept user');
     } finally {
