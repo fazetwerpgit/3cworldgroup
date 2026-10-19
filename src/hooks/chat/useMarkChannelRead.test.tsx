@@ -97,4 +97,42 @@ describe('useMarkChannelRead', () => {
     act(() => vi.advanceTimersByTime(MARK_READ_THROTTLE_MS));
     expect(mark).toHaveBeenCalledTimes(2);
   });
+
+  it('writes a pending trailing receipt when switching channels', () => {
+    act(() => root.render(<Probe channelId="c1" latest={1} />));
+    act(() => vi.advanceTimersByTime(1000));
+    // A new message in c1 lands inside the throttle window...
+    act(() => root.render(<Probe channelId="c1" latest={2} />));
+    expect(mark).toHaveBeenCalledTimes(1);
+    // ...and the reader switches to c2 before the trailing write fires.
+    act(() => vi.advanceTimersByTime(500));
+    act(() => root.render(<Probe channelId="c2" latest={5} />));
+    expect(mark.mock.calls).toEqual([
+      ['me', 'c1'],
+      ['me', 'c1'],
+      ['me', 'c2'],
+    ]);
+    act(() => vi.advanceTimersByTime(MARK_READ_THROTTLE_MS * 2));
+    expect(mark).toHaveBeenCalledTimes(3);
+  });
+
+  it('writes a pending trailing receipt when the chat unmounts', () => {
+    act(() => root.render(<Probe channelId="c1" latest={1} />));
+    act(() => root.render(<Probe channelId="c1" latest={2} />));
+    expect(mark).toHaveBeenCalledTimes(1);
+    act(() => root.render(<></>));
+    expect(mark).toHaveBeenCalledTimes(2);
+    expect(mark).toHaveBeenLastCalledWith('me', 'c1');
+    act(() => vi.advanceTimersByTime(MARK_READ_THROTTLE_MS * 2));
+    expect(mark).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not flush on unmount once the trailing write already landed', () => {
+    act(() => root.render(<Probe channelId="c1" latest={1} />));
+    act(() => root.render(<Probe channelId="c1" latest={2} />));
+    act(() => vi.advanceTimersByTime(MARK_READ_THROTTLE_MS));
+    expect(mark).toHaveBeenCalledTimes(2);
+    act(() => root.render(<></>));
+    expect(mark).toHaveBeenCalledTimes(2);
+  });
 });

@@ -23,7 +23,8 @@ export function useDocumentVisible(): boolean {
 /**
  * Marks the open channel read on open, and again as new messages arrive while
  * it is being viewed — throttled so a burst doesn't hammer writes (a trailing
- * write captures the final state). Switching channels marks immediately.
+ * write captures the final state). Switching channels marks immediately, and
+ * leaving a channel writes any pending trailing receipt instead of dropping it.
  *
  * Only while the page is visible: a thread left open in a backgrounded tab or a
  * suspended home-screen app is not being read, so it must not write receipts
@@ -36,10 +37,21 @@ export function useMarkChannelRead(
 ): void {
   const visible = useDocumentVisible();
   const lastRef = useRef<{ channelId: string; at: number }>({ channelId: '', at: 0 });
+  // A trailing write that was scheduled but has not landed yet. Leaving the
+  // channel (switching, or unmounting the chat) writes it right away instead of
+  // dropping it, so a message the reader saw doesn't come back as unread.
+  const pendingRef = useRef<{ uid: string; channelId: string } | null>(null);
 
   useEffect(() => {
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    // Hidden page: the pending write is dropped on purpose (not being read).
     if (!uid || !channelId || !visible) return;
+    if (pending && pending.uid === uid && pending.channelId !== channelId) {
+      void markChannelRead(pending.uid, pending.channelId);
+    }
     const mark = () => {
+      pendingRef.current = null;
       lastRef.current = { channelId, at: Date.now() };
       void markChannelRead(uid, channelId);
     };
@@ -51,7 +63,20 @@ export function useMarkChannelRead(
     }
     // Within the throttle window: one trailing write so the last message in a
     // burst is still acknowledged.
+    pendingRef.current = { uid, channelId };
     const timer = setTimeout(mark, MARK_READ_THROTTLE_MS - (now - last.at));
     return () => clearTimeout(timer);
   }, [uid, channelId, latestMessageAt, visible]);
+
+  // Unmount (leaving chat) flushes a pending receipt while the page is visible.
+  useEffect(
+    () => () => {
+      const pending = pendingRef.current;
+      pendingRef.current = null;
+      if (pending && document.visibilityState === 'visible') {
+        void markChannelRead(pending.uid, pending.channelId);
+      }
+    },
+    []
+  );
 }
