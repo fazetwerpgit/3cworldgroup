@@ -767,7 +767,8 @@ function SolarHomeView(p: RepHomeViewProps) {
 
         <div className={d.colMain}>
           {p.solarEntry}
-          {p.solarNext}
+          {/* Close under the deck (one Solar group); empty when none is ahead. */}
+          {p.solarNext ? <div className={d.solarNext}>{p.solarNext}</div> : null}
           {p.askEntry}
         </div>
 

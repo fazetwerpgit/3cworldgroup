@@ -25,8 +25,14 @@
   display: contents;
 }
 
+/* A solar-only rep's next consultation reads with the deck above it. */
+.solarNext {
+  margin-top: -40px;
+}
+
 .banners:empty,
-.scanSlot:empty {
+.scanSlot:empty,
+.solarNext:empty {
   display: none;
 }
 
@@ -864,6 +870,10 @@ div.tRow {
   .carrierNote,
   .scanSlot {
     margin-bottom: 0;
+  }
+
+  .solarNext {
+    margin-top: -32px;
   }
 
   .colMain,
