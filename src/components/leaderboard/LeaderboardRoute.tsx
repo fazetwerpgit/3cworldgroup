@@ -115,6 +115,7 @@ export function LeaderboardRoute() {
             viewerId={user?.uid ?? null}
             unranked={unranked}
             recent={recent}
+            onRetry={retry}
           />
         </div>
       </div>

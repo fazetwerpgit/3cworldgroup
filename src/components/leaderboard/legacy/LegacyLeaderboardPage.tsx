@@ -102,12 +102,17 @@ function WeeklyChallenge({
   target,
   failed,
   onRetry,
+  salesFailed = false,
+  onRetrySales,
 }: {
   sales: number | null;
   loading: boolean;
   target: number | null;
   failed: boolean;
   onRetry: () => void;
+  // The rep's weekly count failed to load: say so instead of a made-up 0.
+  salesFailed?: boolean;
+  onRetrySales?: () => void;
 }) {
   const [now, setNow] = useState(() => new Date());
 
@@ -136,7 +141,7 @@ function WeeklyChallenge({
     );
   }
 
-  const complete = sales !== null && sales >= target;
+  const complete = !salesFailed && sales !== null && sales >= target;
 
   return (
     <div className={d.card}>
@@ -148,12 +153,23 @@ function WeeklyChallenge({
         <span className={d.track} aria-hidden="true">
           <span
             className={d.fill}
-            style={{ width: `${loading || sales === null ? 0 : Math.min(sales / target, 1) * 100}%` }}
+            style={{ width: `${salesFailed || loading || sales === null ? 0 : Math.min(sales / target, 1) * 100}%` }}
           />
         </span>
-        <span className={d.challengeMeta}>
-          {loading || sales === null ? `0 of ${target}, loading` : `${Math.min(sales, target)} of ${target}, ${weekTimeLeft(now)}`}
-        </span>
+        {salesFailed ? (
+          <span className={d.retryRow} role="alert">
+            Couldn&apos;t load your sales
+            {onRetrySales ? (
+              <button type="button" className={d.retry} onClick={onRetrySales}>
+                Retry
+              </button>
+            ) : null}
+          </span>
+        ) : (
+          <span className={d.challengeMeta}>
+            {loading || sales === null ? `0 of ${target}, loading` : `${Math.min(sales, target)} of ${target}, ${weekTimeLeft(now)}`}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -219,6 +235,7 @@ interface LegacyLeaderboardPageProps {
   viewerId?: string | null;
   unranked?: UnrankedRep[];
   recent?: RecentSale[];
+  onRetry?: () => void;
 }
 
 export function LegacyLeaderboardPage({
@@ -237,8 +254,14 @@ export function LegacyLeaderboardPage({
   viewerId,
   unranked,
   recent,
+  onRetry,
 }: LegacyLeaderboardPageProps) {
-  const { currentUser: weeklyCurrentUser, loading: weeklyLoading, fetchLeaderboard: fetchWeeklyLeaderboard } = useLeaderboard();
+  const {
+    currentUser: weeklyCurrentUser,
+    loading: weeklyLoading,
+    error: weeklyError,
+    fetchLeaderboard: fetchWeeklyLeaderboard,
+  } = useLeaderboard();
   const [challengeTarget, setChallengeTarget] = useState<number | null>(null);
   const [challengeFailed, setChallengeFailed] = useState(false);
   const [challengeAttempt, setChallengeAttempt] = useState(0);
@@ -276,6 +299,10 @@ export function LegacyLeaderboardPage({
     };
   }, [active, challengeAttempt]);
 
+  const retryWeeklySales = () => {
+    fetchWeeklyLeaderboard('week', 'totalSales', 1, 'submitted');
+  };
+
   const retryChallenge = () => {
     setChallengeFailed(false);
     setChallengeAttempt((value) => value + 1);
@@ -306,11 +333,24 @@ export function LegacyLeaderboardPage({
             target={challengeTarget}
             failed={challengeFailed}
             onRetry={retryChallenge}
+            salesFailed={!weeklyLoading && weeklyError !== null}
+            onRetrySales={retryWeeklySales}
           />
           <ArenaStanding userRank={userRank} userName={userName} metric={metric} />
         </div>
 
-        {error && <div className={d.error}><AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /><span>{error}</span></div>}
+        {/* A failed load: plain words and a retry, never the raw request error. */}
+        {error && !loading ? (
+          <div className={d.error} role="alert">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>{entries.length > 0 ? "Couldn't refresh the board" : "Couldn't load the board"}</span>
+            {onRetry ? (
+              <button type="button" className={d.retry} onClick={onRetry}>
+                Try again
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className={d.board}>
           {loading ? <BoardSkeleton /> : <LegacyLeaderboardTable entries={entries} currentUser={currentUser} metric={metric} period={period} pastMonth={pastMonth} unranked={unranked} recent={recent} viewerId={viewerId} />}
