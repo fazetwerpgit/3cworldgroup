@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { isOnboardingAllowedApi } from '@/lib/auth/onboardingAccess';
+import { isDemoAccount } from '@/lib/users/demoAccount';
 import {
   isAdminLevel,
   isManagementRole,
@@ -94,7 +95,16 @@ export async function requireVerifiedUser(
   request: NextRequest,
   options: { checkRevoked?: boolean } = {}
 ): Promise<
-  | { ok: true; uid: string; name: string; email: string; isOwner: boolean; isAdmin: boolean }
+  | {
+      ok: true;
+      uid: string;
+      name: string;
+      email: string;
+      isOwner: boolean;
+      isAdmin: boolean;
+      /** users/{uid}.demoAccount === true (lib/demo/redact hides other reps from it). */
+      demoAccount: boolean;
+    }
   | { ok: false; error: string; status: number }
 > {
   const c = await verifyCaller(request, options);
@@ -108,6 +118,7 @@ export async function requireVerifiedUser(
     isOwner: isOwner(role),
     // Admin or owner: may open any sale (same rule as GET /api/portal/sales/[id]).
     isAdmin: isAdminLevel(role),
+    demoAccount: isDemoAccount(c.data),
   };
 }
 
@@ -231,6 +242,8 @@ export async function requireVerifiedRequester(
       isManagerOrAbove: boolean;
       /** the owner role only (the finance tier; never an admin) */
       isOwner: boolean;
+      /** users/{uid}.demoAccount === true (lib/demo/redact hides other reps from it). */
+      demoAccount: boolean;
     }
   | { ok: false; error: string; status: number }
 > {
@@ -250,5 +263,6 @@ export async function requireVerifiedRequester(
     isManagerOrAbove:
       isManagement || (fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false),
     isOwner: isOwner(role),
+    demoAccount: isDemoAccount(c.data),
   };
 }

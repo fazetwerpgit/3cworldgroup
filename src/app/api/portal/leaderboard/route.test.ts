@@ -258,7 +258,7 @@ describe('GET /api/portal/leaderboard — owner viewing as a rep', () => {
     vi.setSystemTime(new Date('2026-09-16T17:00:00.000Z'));
     vi.mocked(requireVerifiedRequester).mockResolvedValueOnce({
       ok: true, uid: 'owner-1', name: 'Owner', email: '', isManagement: true, isAdmin: true,
-      isManagerOrAbove: true, isOwner: true,
+      isManagerOrAbove: true, isOwner: true, demoAccount: false,
     });
     state.docs = [
       { ...sale('2026-09-15T17:00:00.000Z', 'rep-noah'), salesRepName: 'Noah Smith', totalValue: 900 },
@@ -318,5 +318,73 @@ describe('GET /api/portal/leaderboard — demo account sales', () => {
     const json = await response('week');
 
     expect(json.currentUser).toMatchObject({ salesRepId: 'demo', totalSales: 1 });
+  });
+});
+
+describe('GET /api/portal/leaderboard for a demo account (App Review)', () => {
+  beforeEach(() => vi.setSystemTime(new Date('2026-09-16T17:00:00.000Z')));
+
+  const at = (min: number) => new Date(Date.UTC(2026, 8, 16, 16, 59 - min));
+  const seedBoard = () => {
+    const row = (salesRepId: string, salesRepName: string, totalPoints: number, min: number, extra: Record<string, unknown> = {}) => ({
+      salesRepId, salesRepName, totalPoints, status: 'approved', saleDate: at(min), createdAt: at(min),
+      photoURL: `https://img/${salesRepId}.png`,
+      products: [{ productName: 'TFiber 1 Gig', company: 'tfiber' }],
+      ...extra,
+    });
+    state.docs = [
+      row('u2', 'Alice Real', 30, 1),
+      row('u3', 'Bob Real', 20, 2),
+      row('demo1', 'Sam Demo', 10, 3, { demoAccount: true }),
+    ];
+    state.users = [
+      { id: 'u4', data: { status: 'active', role: 'rep', fieldRole: 'entry_rep', displayName: 'Carol Zero' } },
+    ];
+  };
+  const caller = (uid: string, demoAccount: boolean) => ({
+    ok: true as const, uid, name: 'x', email: '', isManagement: false, isAdmin: false,
+    isManagerOrAbove: false, isOwner: false, demoAccount,
+  });
+  const fetchBoard = async () =>
+    (await GET(new NextRequest('http://localhost/api/portal/leaderboard?period=week&limit=100&include=team'))).json();
+
+  it('replaces every other rep with Rep N and an opaque id, and keeps its own row', async () => {
+    seedBoard();
+    vi.mocked(requireVerifiedRequester).mockResolvedValueOnce(caller('demo1', true));
+    const json = await fetchBoard();
+
+    expect(json.leaderboard.map((r: { salesRepName: string }) => r.salesRepName)).toEqual(['Rep 1', 'Rep 2', 'Sam Demo']);
+    expect(json.leaderboard[0].salesRepId).toMatch(/^anon-[0-9a-f]+-1$/);
+    expect(json.leaderboard[1].salesRepId).toMatch(/^anon-[0-9a-f]+-2$/);
+    expect(json.leaderboard[2].salesRepId).toBe('demo1');
+    // Counts stay.
+    expect(json.leaderboard[0]).toMatchObject({ totalSales: 1, totalPoints: 30 });
+    expect(json.currentUser).toMatchObject({ salesRepId: 'demo1', salesRepName: 'Sam Demo', rank: 3 });
+    expect(json.unranked).toEqual([{ salesRepId: expect.stringMatching(/^anon-/), salesRepName: 'Rep 3' }]);
+    expect(json.recent.map((r: { repName: string }) => r.repName)).toEqual(['Rep 1', 'Rep 2', 'Sam Demo']);
+    expect(JSON.stringify(json)).not.toMatch(/Alice|Bob|Carol|"u2"|"u3"|"u4"|img\/u/);
+  });
+
+  it('gives fresh ids on every response', async () => {
+    seedBoard();
+    vi.mocked(requireVerifiedRequester).mockResolvedValueOnce(caller('demo1', true));
+    const first = await fetchBoard();
+    vi.mocked(requireVerifiedRequester).mockResolvedValueOnce(caller('demo1', true));
+    const second = await fetchBoard();
+    expect(first.leaderboard[0].salesRepId).not.toBe(second.leaderboard[0].salesRepId);
+  });
+
+  it('leaves a normal rep\'s board exactly as it was', async () => {
+    seedBoard();
+    vi.mocked(requireVerifiedRequester).mockResolvedValueOnce(caller('u2', false));
+    const json = await fetchBoard();
+
+    // Sam Demo's stamped sale stays off a real rep's board.
+    expect(json.leaderboard.map((r: { salesRepId: string; salesRepName: string }) => [r.salesRepId, r.salesRepName])).toEqual([
+      ['u2', 'Alice Real'],
+      ['u3', 'Bob Real'],
+    ]);
+    expect(json.unranked).toEqual([{ salesRepId: 'u4', salesRepName: 'Carol Zero' }]);
+    expect(json.recent.map((r: { repName: string }) => r.repName)).toEqual(['Alice Real', 'Bob Real']);
   });
 });

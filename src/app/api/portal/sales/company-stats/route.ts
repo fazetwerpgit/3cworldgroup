@@ -4,6 +4,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { periodBounds } from '@/lib/leaderboard/periods';
 import { summarizeCompanySales, type CompanyTapeStats, type TapeSale } from '@/lib/sales/companyTape';
 import { saleVisibleTo } from '@/lib/users/demoAccount';
+import { createDemoRedactor } from '@/lib/demo/redact';
 
 // Names, counts and times only: the tape never renders a per-sale or per-rep
 // amount, so an individual rep's sale value has no reason to leave this endpoint.
@@ -72,7 +73,25 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    return NextResponse.json(summarizeCompanySales(sales, monthStartMs) satisfies CompanyTapeStats);
+    // A demo account (App Review) never sees a real rep's name on the tape: the
+    // tape is summed over rep keys, then each name it prints is "Rep N" unless
+    // it is the caller's own.
+    const redact = createDemoRedactor({ uid: caller.uid, demoAccount: caller.demoAccount === true });
+    if (!redact.active) {
+      return NextResponse.json(summarizeCompanySales(sales, monthStartMs) satisfies CompanyTapeStats);
+    }
+    const nameByKey = new Map(sales.map((sale) => [sale.repKey, sale.repName]));
+    const stats = summarizeCompanySales(
+      sales.map((sale) => ({ ...sale, repName: sale.repKey })),
+      monthStartMs
+    );
+    const shown = (key: string) => redact.name(key, nameByKey.get(key) ?? 'Unknown');
+    const redacted: CompanyTapeStats = {
+      ...stats,
+      topRep: stats.topRep ? { ...stats.topRep, repName: shown(stats.topRep.repName) } : null,
+      lastSale: stats.lastSale ? { ...stats.lastSale, repName: shown(stats.lastSale.repName) } : null,
+    };
+    return NextResponse.json(redacted);
   } catch (error) {
     console.error('Error computing company sales stats:', error);
     return NextResponse.json(EMPTY_STATS);

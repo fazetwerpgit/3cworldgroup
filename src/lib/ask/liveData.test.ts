@@ -141,6 +141,16 @@ describe('loadRepSnapshot', () => {
     expect(text).toContain('- This month (Tue, Sep 1 to Wed, Sep 30): #2 of 3 with 1 sale, 10 points; just above: #1 Jordan Price (1 sale, 30 points); just below: #3 Sam Lee (1 sale, 5 points).');
   });
 
+  it('gives a demo account teammates as Rep 1, Rep 2, never their names (App Review)', async () => {
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
+    data.users.r1 = { ...data.users.r1, demoAccount: true };
+    const text = await load(createFakeAskDb(data).db);
+    expect(text).toContain('#2 of 3 with 1 sale, 10 points; just above: #1 Rep 1 (1 sale, 30 points); just below: #3 Rep 2 (1 sale, 5 points).');
+    expect(text).not.toMatch(/Jordan|Price|Sam Lee|\br2\b|\br3\b/);
+    // Its own customers are its own to see.
+    expect(text).toContain('Maria Johnson, 1412 Oak St, Des Moines IA');
+  });
+
   it('breaks a points tie the way the Board does: by name, not by who sold last', async () => {
     const data: Record<string, Record<string, Record<string, unknown>>> = seed();
     // Sam Lee sold after Dana Rep; tied on points, Dana still comes first.

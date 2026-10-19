@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
@@ -172,5 +172,37 @@ describe('GET /api/portal/sales/company-stats — demo accounts', () => {
     expect(json.mtdCount).toBe(1);
     expect(json.mtdMonthlyValue).toBe(120);
     expect(JSON.stringify(json)).not.toMatch(/App Review/);
+  });
+});
+
+describe('GET /api/portal/sales/company-stats for a demo account (App Review)', () => {
+  const caller = (uid: string, demoAccount: boolean) => ({
+    ok: true as const, uid, name: 'x', email: '', isOwner: false, isAdmin: false, demoAccount,
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-16T17:00:00.000Z'));
+    const sale = (day: number, salesRepId: string, salesRepName: string) => ({
+      salesRepId, salesRepName, saleDate: new Date(Date.UTC(2026, 8, day, 17)), totalValue: 80,
+    });
+    state.docs = [sale(10, 'u2', 'Alice Real'), sale(11, 'u2', 'Alice Real'), sale(15, 'u3', 'Bob Real')];
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('a demo caller sees Rep N in place of real names; counts stay', async () => {
+    mockUser.mockResolvedValueOnce(caller('demo1', true));
+    const json = await (await GET(get())).json();
+    expect(json.mtdCount).toBe(3);
+    expect(json.topRep).toEqual({ repName: 'Rep 1', count: 2 });
+    expect(json.lastSale.repName).toBe('Rep 2');
+    expect(JSON.stringify(json)).not.toMatch(/Alice|Bob|u2|u3/);
+  });
+
+  it('a normal rep sees the names unchanged', async () => {
+    mockUser.mockResolvedValueOnce(caller('u3', false));
+    const json = await (await GET(get())).json();
+    expect(json.topRep).toEqual({ repName: 'Alice Real', count: 2 });
+    expect(json.lastSale.repName).toBe('Bob Real');
   });
 });

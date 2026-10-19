@@ -19,7 +19,8 @@ import { isAwaitingCarrier } from '@/lib/sales/installBucket';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { LIVE_DEFAULT_ZONE, zoneFor } from './prompt';
 import { redactContact } from './redact';
-import { DEMO_ACCOUNT_FIELD, isDemoSale } from '@/lib/users/demoAccount';
+import { DEMO_ACCOUNT_FIELD, isDemoAccount, isDemoSale } from '@/lib/users/demoAccount';
+import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
 
 // The asking rep's own portal data, as a short plain-text block for Ask 3C's
 // prompt: their sales and install status, their spot on the Board, the next
@@ -307,8 +308,13 @@ async function boardRankings(db: Db, now: Date, viewerUid: string): Promise<Boar
 
 const BOARD_LIST_MAX = 10;
 
-async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
-  const rankings = await boardRankings(db, now, uid);
+async function boardSection(db: Db, uid: string, now: Date, demoAccount = false): Promise<string> {
+  // A demo account (App Review) reads teammates as "Rep 1", "Rep 2"...: one
+  // alias per rep across both periods, its own row as is. Counts stay.
+  const redact = createDemoRedactor({ uid, demoAccount });
+  const rankings = (await boardRankings(db, now, uid)).map((rows) =>
+    redactPeople(rows, redact, { idKey: 'id', nameKey: 'name' })
+  );
   const lines = BOARD_PERIODS.map(([period, name], i) => {
     // The period's own dates (Central, like the Board), so "when does the week reset" is never a guess.
     const bounds = periodBounds(period, now);
@@ -551,7 +557,10 @@ export async function loadRepSnapshot(db: Db, uid: string, now: Date, budgetMs =
         const user = await userRead;
         return user.status === 'pending' ? '' : salesSection(db, uid, now, zoneOf(user));
       }),
-      section('board', async () => ((await userRead).status === 'pending' ? '' : boardSection(db, uid, now))),
+      section('board', async () => {
+        const user = await userRead;
+        return user.status === 'pending' ? '' : boardSection(db, uid, now, isDemoAccount(user));
+      }),
       section('calls', async () => {
         const user = await userRead;
         return callsSection(db, user, now, zoneOf(user));

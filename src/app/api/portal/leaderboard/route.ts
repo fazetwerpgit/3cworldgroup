@@ -16,6 +16,7 @@ import { chicagoMonthKey, type MonthKey } from '@/lib/sales/monthWindow';
 import { boardOrder } from '@/lib/leaderboard/order';
 import { recentSales, unrankedReps, type RecentSale, type UnrankedRep } from '@/lib/leaderboard/team';
 import { saleVisibleTo } from '@/lib/users/demoAccount';
+import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
 
 // How many ranked rows a non-management caller may pull in one request. The
 // most any rep-facing view asks for is 100 (dashboard); the mini widget asks 5.
@@ -182,7 +183,14 @@ export async function GET(request: NextRequest) {
       };
     };
 
-    const rankedLeaderboard = fullyRanked.slice(0, limit).map(withHistory);
+    // A demo account (App Review) sees "Rep 1", "Rep 2"... with opaque ids in
+    // place of every other rep; its own row stays. Ranked rows are aliased
+    // first, so the board's top row is Rep 1 and the team lists below agree.
+    const redact = createDemoRedactor({ uid: gate.uid, demoAccount: caller.demoAccount === true });
+    const rankedLeaderboard = redactPeople(fullyRanked.slice(0, limit).map(withHistory), redact, {
+      idKey: 'salesRepId',
+      nameKey: 'salesRepName',
+    });
 
     // The caller's own standing (null if they have no approved sales this period).
     const rawCurrentUser = fullyRanked.find((e) => e.salesRepId === gate.uid) ?? null;
@@ -200,7 +208,11 @@ export async function GET(request: NextRequest) {
           const usersSnapshot = await adminDb.collection('users').where('status', '==', 'active').get();
           const users: Array<{ id: string; data: Record<string, unknown> }> = [];
           usersSnapshot.forEach((doc) => users.push({ id: doc.id, data: doc.data() }));
-          team.unranked = unrankedReps(users, new Set(fullyRanked.map((e) => e.salesRepId))).slice(0, UNRANKED_CAP);
+          team.unranked = redactPeople(
+            unrankedReps(users, new Set(fullyRanked.map((e) => e.salesRepId))).slice(0, UNRANKED_CAP),
+            redact,
+            { idKey: 'salesRepId', nameKey: 'salesRepName' }
+          );
         }
       } catch (teamError) {
         console.error('Leaderboard team list failed:', teamError);
@@ -214,7 +226,11 @@ export async function GET(request: NextRequest) {
           .slice(0, RECENT_SCAN)
           .flatMap((sale): Array<Record<string, unknown>> => {
             const raw = rawById.get(sale.id || '');
-            return raw ? [raw] : [];
+            if (!raw) return [];
+            if (!redact.active) return [raw];
+            const repKey = typeof raw.salesRepId === 'string' && raw.salesRepId ? raw.salesRepId : `\u0000sale-${sale.id}`;
+            const repName = typeof raw.salesRepName === 'string' ? raw.salesRepName : '';
+            return [{ ...raw, salesRepId: redact.id(repKey), salesRepName: redact.name(repKey, repName) }];
           });
         team.recent = recentSales(docs, RECENT_COUNT);
       } catch (recentError) {
