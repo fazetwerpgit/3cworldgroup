@@ -65,6 +65,8 @@ async function renderFirstPage(file: File, isCancelled: () => boolean, onTask: (
   const pdfjs = await loadPdfJs();
   if (isCancelled()) throw new Error('PDF preview timed out');
   const data = new Uint8Array(await file.arrayBuffer());
+  // Reading a large file can outlast the timeout; do not start parsing then.
+  if (isCancelled()) throw new Error('PDF preview timed out');
   // No onPassword handler: an encrypted PDF rejects with a PasswordException.
   const task = pdfjs.getDocument({ data });
   onTask(() => void task.destroy());

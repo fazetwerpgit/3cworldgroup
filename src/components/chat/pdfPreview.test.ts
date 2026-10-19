@@ -71,6 +71,22 @@ describe('prepareImageForUpload (PDF preview failures are non-fatal)', () => {
     expect(task.destroy).toHaveBeenCalled();
   });
 
+  it('does not open the PDF when the timeout fires while the file is still being read', async () => {
+    const file = pdfFile();
+    let finishRead!: (buffer: ArrayBuffer) => void;
+    vi.spyOn(file, 'arrayBuffer').mockReturnValue(
+      new Promise<ArrayBuffer>((resolve) => {
+        finishRead = resolve;
+      })
+    );
+    const preview = renderPdfPreview(file, 20);
+    preview.catch(() => undefined);
+    await expect(preview).rejects.toThrow(/timed out/);
+    finishRead(PDF_BYTES.slice().buffer);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(pdfjs.getDocument).not.toHaveBeenCalled();
+  });
+
   it('yields an attachment that stays a plain PDF when no preview was uploaded', () => {
     const file: ChatAttachment = { type: 'file', url: 'https://x/doc.pdf', name: 'a.pdf', contentType: 'application/pdf' };
     expect(withPdfPreview(file, undefined)).toEqual(file);
