@@ -8,6 +8,11 @@ const { verifyIdTokenMock, userGetMock, userUpdateMock, createAlertTaskMock, get
   getInviteMock: vi.fn(),
 }));
 
+const nameTaken = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/users/displayNameTaken', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/users/displayNameTaken')>()),
+  isDisplayNameTaken: vi.fn(async () => nameTaken.value),
+}));
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: { verifyIdToken: verifyIdTokenMock },
   adminDb: { doc: vi.fn((path: string) => ({ get: () => userGetMock(path), update: userUpdateMock })) },

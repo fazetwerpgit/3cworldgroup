@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DISPLAY_NAME_TAKEN_ERROR, displayNameKey, isDisplayNameTaken } from '@/lib/users/displayNameTaken';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isShirtSize } from '@/types/auth';
@@ -79,6 +80,14 @@ export async function PUT(request: NextRequest) {
     const existingDisplayName = trimmedDisplayName
       ? ((await docRef.get()).get('displayName') as string | undefined)
       : undefined;
+    // No exact copy of another user's name (lib/users/displayNameTaken).
+    if (
+      trimmedDisplayName &&
+      displayNameKey(trimmedDisplayName) !== displayNameKey(existingDisplayName) &&
+      (await isDisplayNameTaken(adminDb, trimmedDisplayName, userId))
+    ) {
+      return NextResponse.json({ error: DISPLAY_NAME_TAKEN_ERROR }, { status: 400 });
+    }
 
     await docRef.update(updates);
 

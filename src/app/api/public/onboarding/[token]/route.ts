@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DISPLAY_NAME_TAKEN_ERROR, isDisplayNameTaken } from '@/lib/users/displayNameTaken';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
   CLOSED_INVITE_STATUSES,
@@ -326,6 +327,12 @@ export async function POST(
         return NextResponse.json({ error: sensitive.error, field: sensitive.field }, { status: 400 });
       }
       sensitiveDoc = sensitive.doc;
+    }
+
+    // No exact copy of another user's name (lib/users/displayNameTaken). The
+    // account being finished here (existingAuth) is not "another".
+    if (await isDisplayNameTaken(adminDb, displayName, existingAuth?.uid ?? null)) {
+      return NextResponse.json({ error: DISPLAY_NAME_TAKEN_ERROR, field: 'displayName' }, { status: 400 });
     }
 
     const now = new Date();

@@ -37,6 +37,11 @@ const {
   },
 }));
 
+const nameTaken = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/users/displayNameTaken', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/users/displayNameTaken')>()),
+  isDisplayNameTaken: vi.fn(async () => nameTaken.value),
+}));
 vi.mock('next/server', () => {
   class TestNextRequest {
     body: string;

@@ -12,6 +12,11 @@ const { updateMock, gateMock, getMock, updateUserMock, restampAuthorMock, restam
   })
 );
 
+const nameTaken = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/users/displayNameTaken', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/users/displayNameTaken')>()),
+  isDisplayNameTaken: vi.fn(async () => nameTaken.value),
+}));
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: { collection: vi.fn(() => ({ doc: vi.fn(() => ({ update: updateMock, get: getMock })) })) },
   adminAuth: { updateUser: updateUserMock },
@@ -80,6 +85,17 @@ describe('PUT /api/portal/profile display name', () => {
     expect(updateUserMock).toHaveBeenCalledWith('u1', { displayName: 'Samantha Tester' });
     expect(restampAuthorMock).toHaveBeenCalledWith('u1', { authorName: 'Samantha Tester' });
     expect(restampDisplayNameMock).toHaveBeenCalledWith('u1', 'Samantha Tester');
+  });
+
+  it("refuses an exact copy of another user's name, and writes nothing", async () => {
+    nameTaken.value = true;
+    try {
+      const response = await PUT(request({ displayName: 'Jacob Myers' }));
+      expect(response.status).toBe(400);
+      expect(updateMock).not.toHaveBeenCalled();
+    } finally {
+      nameTaken.value = false;
+    }
   });
 
   it('skips the restamps when the name is unchanged', async () => {

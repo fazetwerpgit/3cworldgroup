@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isDisplayNameTaken } from '@/lib/users/displayNameTaken';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { createAlertTask } from '@/lib/alerts/alertTasks';
 import { looksLikeBotSignup } from '@/lib/auth/botDetection';
@@ -114,12 +115,18 @@ export async function POST(request: Request) {
     }
 
     const name = displayName || email || uid;
+    // The client writes the signup doc itself, so an exact copy of another
+    // user's name can't be refused there: the admin is told, and approval
+    // refuses it until the name is changed (lib/users/displayNameTaken).
+    const nameTaken = await isDisplayNameTaken(adminDb, displayName, uid).catch(() => false);
     await createAlertTask({
       kind: 'pending_assignment',
       subjectUserId: uid,
       subjectName: name,
       title: `${name} self-registered and needs a position`,
-      message: 'Assign their role to start onboarding.',
+      message: nameTaken
+        ? "Assign their role to start onboarding. Their name matches another user's exactly: change it before approving."
+        : 'Assign their role to start onboarding.',
       link: '/portal/admin/people?tab=everyone',
     });
   } catch (error) {

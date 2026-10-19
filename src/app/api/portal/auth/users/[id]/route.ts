@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DISPLAY_NAME_TAKEN_ERROR, displayNameKey, isDisplayNameTaken } from '@/lib/users/displayNameTaken';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
@@ -343,6 +344,23 @@ export async function PUT(
     // inactive account is not a new activation, so it is not stamped.
     if (updateData.status === 'active' && doc.get('status') === 'pending') {
       updateData.activatedAt = FieldValue.serverTimestamp();
+    }
+    // No exact copy of another user's name (lib/users/displayNameTaken): on a
+    // rename, and on approval, since a self-signup's name was never checked.
+    const renaming = !!trimmedDisplayName && displayNameKey(trimmedDisplayName) !== displayNameKey(existingDisplayName);
+    const approving = updateData.status === 'active' && doc.get('status') === 'pending';
+    if (renaming || approving) {
+      const effectiveName = trimmedDisplayName || existingDisplayName || '';
+      if (await isDisplayNameTaken(adminDb, effectiveName, id)) {
+        return NextResponse.json(
+          {
+            error: renaming
+              ? DISPLAY_NAME_TAKEN_ERROR
+              : "Their name matches another user's exactly. Change it (add a middle initial or last name) before approving.",
+          },
+          { status: 400 }
+        );
+      }
     }
     // Reactivating a decommissioned rep here (instead of through the pipeline's
     // Reinstate) must clear the decommission marker too: left set, the pipeline

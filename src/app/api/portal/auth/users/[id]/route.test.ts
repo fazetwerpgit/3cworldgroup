@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
+const nameTaken = vi.hoisted(() => ({ value: false }));
+vi.mock('@/lib/users/displayNameTaken', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/users/displayNameTaken')>()),
+  isDisplayNameTaken: vi.fn(async () => nameTaken.value),
+}));
 vi.mock('next/server', async () => {
   const actual = await vi.importActual<typeof import('next/server')>('next/server');
   return {
@@ -221,6 +226,19 @@ describe('PUT /api/portal/auth/users/[id] activation readiness gate', () => {
 
     expect(response.status).toBe(200);
     expect(firestore.updates[0]?.data).toMatchObject({ status: 'active', fieldRole: 'ae_tier_1' });
+  });
+
+  it("refuses Accept while the hire's name copies another user's exactly", async () => {
+    pendingHire();
+    nameTaken.value = true;
+    try {
+      const response = await PUT(request({ status: 'active', fieldRole: 'ae_tier_1' }), params());
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toContain('before approving');
+      expect(firestore.updates).toHaveLength(0);
+    } finally {
+      nameTaken.value = false;
+    }
   });
 
   it('never gates reactivating an inactive account', async () => {
