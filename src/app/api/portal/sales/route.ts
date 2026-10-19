@@ -69,10 +69,8 @@ async function createNotification(
 export async function GET(request: NextRequest) {
   try {
     if (!adminDb) {
-      return NextResponse.json(
-        { error: 'Database not configured', details: initError || 'adminDb is null' },
-        { status: 500 }
-      );
+      console.error('[sales] Database not configured:', initError || 'adminDb is null');
+      return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
     // Sales rows carry customer PII — require a verified login, and scope
@@ -100,7 +98,9 @@ export async function GET(request: NextRequest) {
     const salesRepId = gate.isAdmin
       ? searchParams.get('salesRepId')
       : gate.uid;
-    const limit = parseInt(searchParams.get('limit') || '50');
+    // A missing, non-numeric or out-of-range ?limit= falls back to 50 / 1..500.
+    const requestedLimit = Number.parseInt(searchParams.get('limit') || '50', 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 50;
     // Sale dates are stored at local noon, so a plain YYYY-MM-DD boundary taken
     // at midnight/end-of-day has ~12 hours of slack either side of whatever
     // timezone the server runs in — the day a sale lands on can't flip.
@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching sales:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch sales', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to fetch sales' },
       { status: 500 }
     );
   }
@@ -294,10 +294,8 @@ async function findOrderDuplicate(
 export async function POST(request: NextRequest) {
   try {
     if (!adminDb) {
-      return NextResponse.json(
-        { error: 'Database not configured', details: initError || 'adminDb is null' },
-        { status: 500 }
-      );
+      console.error('[sales] Database not configured:', initError || 'adminDb is null');
+      return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
     // Creating a sale writes a row under a rep's identity; require a verified
@@ -526,7 +524,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating sale:', error);
     return NextResponse.json(
-      { error: 'Failed to create sale', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to create sale' },
       { status: 500 }
     );
   }

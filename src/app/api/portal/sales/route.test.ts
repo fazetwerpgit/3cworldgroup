@@ -220,3 +220,35 @@ describe('GET /api/portal/sales — owner viewing as a rep', () => {
     expect(state.wheres).toEqual([]);
   });
 });
+
+describe('GET /api/portal/sales hardening', () => {
+  it('clamps a non-numeric or out-of-range limit instead of querying with NaN', async () => {
+    asAdmin();
+    await GET(get('?limit=abc'));
+    await GET(get('?limit=-5'));
+    await GET(get('?limit=100000'));
+    expect(state.limits).toEqual([100, 2, 500]);
+  });
+
+  it('answers a generic error without the raw exception message', async () => {
+    asAdmin();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const original = state.docs;
+    Object.defineProperty(state, 'docs', {
+      configurable: true,
+      get: () => {
+        throw new Error('9 FAILED_PRECONDITION: index projects/secret-project/...');
+      },
+    });
+    try {
+      const res = await GET(get());
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body).toEqual({ error: 'Failed to fetch sales' });
+      expect(JSON.stringify(body)).not.toContain('secret-project');
+    } finally {
+      Object.defineProperty(state, 'docs', { configurable: true, writable: true, value: original });
+      errorSpy.mockRestore();
+    }
+  });
+});
