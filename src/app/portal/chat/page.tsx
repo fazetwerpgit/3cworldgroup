@@ -41,6 +41,7 @@ import { useConnectionNotice } from '@/hooks/chat/useConnectionNotice';
 import { GROW_STEP, MAX_WINDOW, useMessages } from '@/hooks/chat/useMessages';
 import { usePinnedMessage } from '@/hooks/chat/usePinnedMessage';
 import { getAuthorColor, isDeveloperAuthor } from '@/lib/chat/authorColor';
+import { linkedChannelId } from '@/lib/chat/channelLink';
 import { chatMessageDocId, newClientMessageId, reconcileEchoes } from '@/lib/chat/outbox';
 import { countNewArrivals, newestDeliveredId } from '@/lib/chat/unseen';
 import { useLiveAppended } from '@/hooks/chat/useLiveAppended';
@@ -463,8 +464,12 @@ export default function TeamChatPage() {
   // same stale id forever), and a staged edit would PATCH the wrong channel. Clear
   // both; only the edit case (draft = another message's text) clears the composer —
   // a plain in-progress draft is preserved. pendingEdits stays (keyed by doc id).
+  // A staged desktop photo/PDF is cleared too, so a file picked in one channel
+  // (say a managers-only one) is never sent to the channel switched to.
   useEffect(() => {
     setReplyTarget(null);
+    setAttachFile(null);
+    setAttachPreview('');
     if (editTargetRef.current) setDraft('');
     setEditTarget(null);
   }, [activeChannelId]);
@@ -662,7 +667,7 @@ export default function TeamChatPage() {
   // thread screen on phones). An id the user can't see falls back to the first
   // channel via the effect below.
   useEffect(() => {
-    const linkedChannel = new URLSearchParams(window.location.search).get('channel');
+    const linkedChannel = linkedChannelId(new URLSearchParams(window.location.search).get('channel'));
     if (!linkedChannel) return;
     setActiveChannelId(linkedChannel);
     setMobileView('thread');
@@ -677,7 +682,7 @@ export default function TeamChatPage() {
       if (typeof route !== 'string') return;
       const url = new URL(route, window.location.origin);
       if (url.pathname !== '/portal/chat') return;
-      const linkedChannel = url.searchParams.get('channel');
+      const linkedChannel = linkedChannelId(url.searchParams.get('channel'));
       if (!linkedChannel) return;
       setActiveChannelId(linkedChannel);
       setMobileView('thread');
