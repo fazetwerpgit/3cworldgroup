@@ -3,7 +3,7 @@
 // The block list is the only thing hiding a blocked person's messages on the
 // chat screen (App Store 1.2), and the agreement gate must not come back right
 // after an accept. Late or failed loads must not undo either.
-import { act } from 'react';
+import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { blocksRetryDelay, useChatSafety, type ChatSafety } from './useChatSafety';
@@ -42,7 +42,10 @@ async function answer(url: string, res: Response | Error) {
 
 let latest: ChatSafety;
 function Probe({ uid }: { uid: string }) {
-  latest = useChatSafety(uid, authedFetch);
+  const value = useChatSafety(uid, authedFetch);
+  useEffect(() => {
+    latest = value;
+  });
   return null;
 }
 
