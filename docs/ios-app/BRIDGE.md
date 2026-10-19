@@ -495,6 +495,25 @@ With native chat on (`capabilities.nativeChat` and an ok `nativeAuth`), a
 routes there and hands it to the native screen with `openNativeChat`, the same
 as a push-tap deep link.
 
+### `scrollToTop`
+```json
+{ "source": "3c-shell", "type": "scrollToTop" }
+```
+The person tapped the iOS status bar. The portal scrolls inside its own
+`<main id="rep-main">`, so UIKit's status-bar tap (which only reaches the
+WKWebView's outer scroll view) does nothing by itself. On this message the
+page smooth-scrolls its scroller (or the window, on pages without one) to
+the top; under Reduce Motion it jumps.
+
+The shell sends it from `scrollViewShouldScrollToTop:` (returning `NO`), or
+from a transparent tap target over the status bar, and only when the page
+says it handles it:
+
+```js
+var b = window.__3C_BRIDGE__;
+if (b && b.features && b.features.indexOf('scrollToTop') !== -1) b.receive({ source: '3c-shell', type: 'scrollToTop' });
+```
+
 ## Foreground pushes
 
 A push that arrives while the app is open does not show the system banner

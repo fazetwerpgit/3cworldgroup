@@ -433,7 +433,7 @@ function WeekStrip({
       </div>
 
       {rank ? (
-        <Link href="/portal/leaderboard" className={`${d.surface} ${d.chase}`}>
+        <Link href="/portal/leaderboard" className={`${d.surface} ${d.chase} tap-press`}>
           <span className={d.chaseText}>{standLine(rank)}</span>
           <span className={d.chaseLink}>
             <span className={d.chaseWord}>Leaderboard</span>
@@ -508,7 +508,7 @@ function TodayPanel({
               <button
                 key={`date-${row.id}`}
                 type="button"
-                className={`${d.surface} ${d.tRow} ${d.tRowBtn}`}
+                className={`${d.surface} ${d.tRow} ${d.tRowBtn} tap-press`}
                 onClick={() => onSetDate(row)}
               >
                 {body}
@@ -522,7 +522,7 @@ function TodayPanel({
             <Link
               key={item.kind === 'call' ? `call-${item.call.id}` : item.key}
               href={href}
-              className={`${d.surface} ${d.tRow}`}
+              className={`${d.surface} ${d.tRow} tap-press`}
               {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
             >
               {item.kind === 'call' ? (
@@ -585,7 +585,7 @@ function RecentSales({ rows, report }: { rows: RecentSaleRow[]; report?: Carrier
           <li key={row.id}>
             <Link
               href={`/portal/sales/${row.id}`}
-              className={`${d.surface} ${d.sale} ${row.status === 'cancelled' ? d.saleOff : ''}`}
+              className={`${d.surface} ${d.sale} ${row.status === 'cancelled' ? d.saleOff : ''} tap-press`}
             >
               <span className={d.saleName}>{row.customer}</span>
               <span className={d.saleAmt}>{payCell(row)}</span>

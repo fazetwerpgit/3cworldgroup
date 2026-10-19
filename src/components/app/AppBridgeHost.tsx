@@ -9,6 +9,8 @@ import { APP_NAVIGATE_EVENT, inAppRoute, installAppLinkHandling } from '@/lib/ap
 import { registerNativePushToken, syncNativePush } from '@/lib/app/nativePush';
 import { installStatusBarSync } from '@/lib/app/statusBar';
 import { installResumeMotionReset } from '@/lib/app/appVisibility';
+import { installZoomCap } from '@/lib/app/viewportZoom';
+import { scrollPageToTop } from '@/lib/app/scrollToTop';
 import { clearNativeExtras, signalAppReady } from '@/lib/app/shellExtras';
 import AppNotice from './AppNotice';
 import NativeBadgeSync from './NativeBadgeSync';
@@ -94,8 +96,19 @@ export default function AppBridgeHost() {
     // Back after 30+ minutes away: replay the once-per-session reveals.
     const stopResumeReset = installResumeMotionReset();
     const stopAuthSync = startNativeAuthSync();
+    // No pinch zoom of the app's chrome (the image viewer lifts it).
+    const stopZoomCap = installZoomCap();
+    // A status-bar tap (the shell sends scrollToTop): the page scrolls inside
+    // <main>, which UIKit's own status-bar scroll never reaches.
+    const stopScrollTop = onNativeMessage((message) => {
+      if (message.type === 'scrollToTop') scrollPageToTop();
+    });
+    const stopAdvertisingScrollTop = advertiseBridgeFeature('scrollToTop');
     return () => {
       html.removeAttribute('data-app');
+      stopAdvertisingScrollTop();
+      stopScrollTop();
+      stopZoomCap();
       setChatNavigate(null);
       stopAuthSync();
       stopResumeReset();

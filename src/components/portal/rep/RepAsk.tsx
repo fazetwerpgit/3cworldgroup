@@ -432,7 +432,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
                 {turn.question ? <p className={a.questionText}>{turn.question}</p> : null}
               </div>
               {turn.answer ? (
-                <div className={a.answer}>
+                <div className={a.answer} data-message-text="">
                   <Answer text={turn.answer} />
                   <div className={a.rate} role="group" aria-label="Was this helpful?">
                     <button

@@ -53,7 +53,7 @@ export function EscalinkPanel({ ticket, className = '' }: { ticket: string; clas
             <p className={x.escError} role="alert">
               Your browser blocked copying. Press and hold the text below to copy it.
             </p>
-            <pre className={x.escTicket}>{ticket}</pre>
+            <pre className={x.escTicket} data-selectable="">{ticket}</pre>
           </>
         )}
         <Link className={x.escGuide} href="/portal/escalink">

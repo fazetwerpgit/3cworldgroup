@@ -30,6 +30,9 @@ import { PushNudge } from './PushNudge';
 import { PullToRefresh } from './PullToRefresh';
 import { isRepShellPath } from './repShellRoutes';
 import { useTabPrefetch } from './useTabPrefetch';
+import { takeTabNavigation } from './tabNav';
+import { useOfflineNavGuard } from './useOfflineNavGuard';
+import { RotateCw, WifiOff } from 'lucide-react';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import s from './rep.module.css';
 
@@ -113,6 +116,9 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
   // Keyed on the path only: a same-page router.replace that changes the query
   // or hash (a filter, the Sales month) keeps the spot instead of jumping to the top.
   useMainScrollMemory(mainRef, pathname ?? '');
+  // App only: an offline tap on a page not loaded yet shows the offline notice
+  // (and opens the page once back online) instead of a blank white page.
+  const { heldHref, retry: retryHeld } = useOfflineNavGuard(inApp, pathname ?? '');
 
   return (
     <TabBarHiddenContext.Provider value={setTabBarHidden}>
@@ -125,7 +131,10 @@ function RepChrome({ children, task, back }: { children: ReactNode; task?: strin
         <main className={s.scroller} id="rep-main" ref={mainRef}>
           {/* The shell's own pull to refresh is off in the app: this one refetches the screen. */}
           {inApp ? <PullToRefresh scrollerRef={mainRef} contentRef={contentRef} pathname={pathname} /> : null}
-          <div className={s.main} ref={contentRef}>
+          {/* While a tap is held offline the page stays mounted but hidden
+              (app-touch.css), so it is still there if the person stays. */}
+          <div className={s.main} ref={contentRef} data-offline-held={heldHref ? '' : undefined}>
+            {heldHref ? <OfflineHold onRetry={retryHeld} /> : null}
             {viewing && isViewAsPath(pathname) ? (
               <ViewAsScope loading={<ViewAsLoading />}>{children}</ViewAsScope>
             ) : (
@@ -150,7 +159,8 @@ const POP_SETTLE_MS = 1000;
 /**
  * On phones <main> is the scroller and now outlives each page, so it keeps a
  * scroll position per path: a new page opens at the top (as a fresh shell
- * did), and Back / Forward returns to where that page was left. Desktop
+ * did), and Back / Forward (or, in the app, a tab-bar tap) returns to where
+ * that page was left. Desktop
  * scrolls the window, which the browser and router already handle; there
  * <main> does not scroll and these writes do nothing.
  */
@@ -196,7 +206,10 @@ export function useMainScrollMemory(mainRef: React.RefObject<HTMLElement | null>
     cancelRestore.current?.();
     cancelRestore.current = null;
     const el = mainRef.current;
-    const target = popped.current ? (positions.current.get(pathname) ?? 0) : 0;
+    // Back / Forward, or a tab-bar tap in the app, returns to where that page
+    // was left; anything else opens at the top.
+    const fromTab = takeTabNavigation(pathname);
+    const target = popped.current || fromTab ? (positions.current.get(pathname) ?? 0) : 0;
     popped.current = false;
     positions.current.set(pathname, target);
     if (!el) return;
@@ -227,6 +240,19 @@ export function useMainScrollMemory(mainRef: React.RefObject<HTMLElement | null>
     cancelRestore.current = stop;
     frame = requestAnimationFrame(tick);
   }, [pathname, mainRef]);
+}
+
+/** The offline notice for a held tap (useOfflineNavGuard). */
+function OfflineHold({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className={s.failed} role="alert" data-offline-hold="">
+      <WifiOff size={16} aria-hidden="true" />
+      You&apos;re offline. This page opens when you&apos;re back online.
+      <button type="button" className={s.retry} onClick={onRetry}>
+        <RotateCw size={14} aria-hidden="true" /> Try again
+      </button>
+    </div>
+  );
 }
 
 /** Until the server confirms the rep: never the owner's own screen and its reads. */

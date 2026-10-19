@@ -1,21 +1,32 @@
 /* Inside the 3C iOS app only (AppBridgeHost sets html[data-app]; never on the
-   web, never during server render or hydration). A long press on the app's
-   chrome — the shell's top bar, the tab bar, buttons — should feel native: no
-   link callout, no text selection loupe. Page content (headers inside pages,
-   message text, images) is left alone. */
+   web, never during server render or hydration). A long press anywhere should
+   feel like native UI: no link callout (Open / Copy / Share), no text
+   selection loupe. Content a rep may want to copy opts back in below. */
 html[data-app],
 html[data-app] body {
   overscroll-behavior: none;
 }
 
-html[data-app] :is(
-    [data-shell] > header,
-    [data-slot='rep-tab-bar'],
-    button:not([data-attachment-type])
-  ) {
+/* No double-tap zoom and no tap wait. Pinch is capped by the viewport
+   (lib/app/viewportZoom), which the image viewer lifts while it is open. */
+html[data-app] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+html[data-app] body {
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
+}
+
+/* Opt-ins: content worth copying (order and ticket numbers, Ask 3C answers,
+   message text). Team chat bubbles stay as they are: their long press opens
+   the message menu, which has Copy text. */
+html[data-app] :is([data-selectable], [data-selectable] *, [data-message-text], [data-message-text] *) {
+  -webkit-touch-callout: default;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Chat images keep the native long-press (Save / Share / Copy). */
@@ -30,4 +41,37 @@ html[data-app] :is(input, textarea, select, [contenteditable]:not([contenteditab
   -webkit-touch-callout: default;
   -webkit-user-select: text;
   user-select: text;
+}
+
+/* The shared press state for tappable cards and rows (class="tap-press"): a
+   small scale, like a UIKit cell. It waits --press-delay (rep.module.css) like
+   the row tints, so a finger that lands on a row to scroll never shrinks it;
+   letting go eases back at once. */
+html[data-app] .tap-press {
+  transition:
+    transform 120ms ease-out,
+    opacity 120ms ease-out,
+    background-color 160ms ease;
+}
+
+html[data-app] .tap-press:active {
+  transform: scale(0.97);
+  transition-delay: var(--press-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-app] .tap-press {
+    transition: none;
+  }
+
+  html[data-app] .tap-press:active {
+    transform: none;
+    opacity: 0.8;
+  }
+}
+
+/* An offline tap held by the rep shell (useOfflineNavGuard): only its notice
+   shows; the page under it stays mounted. */
+html[data-app] [data-offline-held] > :not([data-offline-hold]) {
+  display: none !important;
 }

@@ -486,7 +486,7 @@ export function RepSaleDetail() {
               <Row label="Order / BTN">
                 {sale.orderNumberOrBtn ? (
                   <span>
-                    {sale.orderNumberOrBtn}
+                    <span data-selectable="">{sale.orderNumberOrBtn}</span>
                     {sale.orderNumberSource === 'report' ? <span className={x.none}> · from carrier report</span> : null}
                   </span>
                 ) : (

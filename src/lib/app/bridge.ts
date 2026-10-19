@@ -299,8 +299,19 @@ export interface NativeNavigateEvent {
   type: 'navigate';
   url: string;
 }
+/**
+ * Unsolicited: the person tapped the iOS status bar. The page scrolls its own
+ * scroller to the top (UIKit's tap only reaches the WebView's outer scroll
+ * view, which never scrolls). Send only when __3C_BRIDGE__.features lists
+ * 'scrollToTop'.
+ */
+export interface ScrollToTopEvent {
+  source: typeof NATIVE_SOURCE;
+  type: 'scrollToTop';
+}
 export type NativeToWebMessage =
   | ReplySuccess
+  | ScrollToTopEvent
   | ReplyFailure
   | PushTokenEvent
   | VisibleEvent
@@ -311,7 +322,7 @@ export type NativeToWebMessage =
   | NativeNavigateEvent;
 
 /** Native -> web event types this page handles; the shell reads the list to decide whether to send one or fall back. */
-export type BridgeFeature = 'navigate';
+export type BridgeFeature = 'navigate' | 'scrollToTop';
 
 const ERROR_CODES: readonly NativeErrorCode[] = ['canceled', 'denied', 'not_configured', 'unsupported', 'failed'];
 const KEYBOARD_EASINGS: readonly KeyboardEasing[] = ['keyboard', 'easeIn', 'easeOut', 'easeInEaseOut', 'linear'];
@@ -410,6 +421,9 @@ export function parseNativeMessage(raw: unknown): NativeToWebMessage | null {
       duration: Math.min(MAX_KEYBOARD_DURATION_MS, Math.max(0, Math.round(duration))),
       easing: KEYBOARD_EASINGS.includes(m.easing as KeyboardEasing) ? (m.easing as KeyboardEasing) : 'keyboard',
     };
+  }
+  if (m.type === 'scrollToTop') {
+    return { source: NATIVE_SOURCE, type: 'scrollToTop' };
   }
   if (m.type === 'navigate') {
     if (typeof m.url !== 'string' || !m.url) return null;

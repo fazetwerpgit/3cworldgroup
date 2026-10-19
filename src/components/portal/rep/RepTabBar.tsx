@@ -1,12 +1,17 @@
 'use client';
 
+import type { MouseEvent } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAs } from '@/contexts/ViewAsContext';
 import { useNavAccess } from '@/components/portal/NavSheet';
 import { isOwner } from '@/types';
+import { useIsNativeApp } from '@/lib/app/isNativeApp';
+import { nativeHaptic } from '@/lib/app/bridge';
+import { scrollPageToTop } from '@/lib/app/scrollToTop';
 import { BodyLayer } from './BodyLayer';
+import { markTabNavigation } from './tabNav';
 import { usePrefetchTabOnTouch } from './useTabPrefetch';
 import { activeRepHref, repTabsFor, viewAsTabs } from './repNav';
 import s from './rep.module.css';
@@ -17,6 +22,11 @@ import t from './rep-tabbar.module.css';
  * portal's canAccess. Owners do not sell, so theirs is Home / Sales / Board /
  * Chat / Admin, the Admin tab carrying the open-items count. Portaled to
  * <body> (see BodyLayer); hidden ≥1024px.
+ *
+ * Inside the 3C iOS app it behaves like a UITabBar: a tap gives a selection
+ * haptic and replaces the history entry (so the edge swipe never steps back
+ * through tabs), a tab opens where it was left, and tapping the tab you are on
+ * scrolls it to the top. On the web the links are plain links.
  */
 export function RepTabBar({
   chatUnread = false,
@@ -36,6 +46,19 @@ export function RepTabBar({
   const waiting = Object.values(navCounts).reduce((sum, n) => sum + n, 0);
   // A finger on a tab starts its data read before the tap lands.
   const prefetchTab = usePrefetchTabOnTouch();
+  const inApp = useIsNativeApp();
+
+  const onTabClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (!inApp || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    nativeHaptic('selection');
+    if (pathname === href) {
+      // Already on this tab's own page: back to its top, as iOS does.
+      event.preventDefault();
+      scrollPageToTop();
+      return;
+    }
+    markTabNavigation(href);
+  };
 
   return (
     <BodyLayer>
@@ -52,6 +75,9 @@ export function RepTabBar({
                   href={tab.href}
                   className={s.tab}
                   aria-current={current ? 'page' : undefined}
+                  replace={inApp}
+                  scroll={inApp ? false : undefined}
+                  onClick={(event) => onTabClick(event, tab.href)}
                   onTouchStart={current ? undefined : () => prefetchTab(tab.href)}
                   onPointerDown={current ? undefined : () => prefetchTab(tab.href)}
                 >

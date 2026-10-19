@@ -25,7 +25,7 @@ function FormsHub() {
       <ul className={`${s.panel} ${f.hubList}`} aria-label="Forms">
         {visible.map(({ href, title, description, tag, icon: Icon }) => (
           <li key={href}>
-            <Link href={href} className={f.hubRow}>
+            <Link href={href} className={`${f.hubRow} tap-press`}>
               <span className={f.hubIcon} aria-hidden="true">
                 <Icon size={20} strokeWidth={2} />
               </span>

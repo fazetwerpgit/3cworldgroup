@@ -5,6 +5,7 @@ import { AlertTriangle, ExternalLink, FileText, Loader2, X } from 'lucide-react'
 import { isPdfUrl } from '@/lib/forms/openAttachment';
 import { ONBOARDING_FILE_LINK_TTL_MS, signedLinksStale } from '@/lib/signedLinks';
 import PdfPages from '@/components/esign/PdfPages';
+import { allowPageZoom } from '@/lib/app/viewportZoom';
 import { BodyLayer } from './BodyLayer';
 import s from './rep.module.css';
 import v from './image-viewer.module.css';
@@ -135,6 +136,11 @@ export function ImageViewer({
   useEffect(() => {
     pdfShownAt.current = Date.now();
   }, [pdfUrl]);
+
+  // In the app the page is capped at scale 1 (no pinching the chrome); a photo
+  // lifts the cap while it is on screen so it still pinches.
+  const showsImage = content.status === 'image';
+  useEffect(() => (showsImage ? allowPageZoom() : undefined), [showsImage]);
 
   const failed = content.status === 'error' || (content.status === 'image' && broken) || pdfExpired;
 

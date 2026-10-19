@@ -127,7 +127,7 @@ export function ProgressCard({
         </p>
       ) : null}
       {link ? (
-        <Link href={link.href} className={`${p.row} ${l.progressLink}`}>
+        <Link href={link.href} className={`${p.row} ${l.progressLink} tap-press`}>
           <span className={`${p.tile} ${p.tileLime}`}>
             <GraduationCap size={20} aria-hidden="true" />
           </span>
@@ -162,7 +162,7 @@ export function ModuleList({ resources, progress }: { resources: TrainingResourc
         const tone = done ? p.tileLime : required ? p.tileAmber : p.tile;
         return (
           <li key={resource.id}>
-            <Link href={`/portal/training/${resource.id}`} className={`${p.row} ${l.module}`}>
+            <Link href={`/portal/training/${resource.id}`} className={`${p.row} ${l.module} tap-press`}>
               <span className={`${p.tile} ${tone}`}>
                 <ModuleTypeIcon type={resource.type} />
               </span>

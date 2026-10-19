@@ -12,7 +12,7 @@ export function AskEntryCard() {
   if (!askOpenTo(user?.role, user?.uid)) return null;
   return (
     <section className={`${d.surface} ${d.askEntry}`} aria-label="Ask 3C">
-      <Link href="/portal/ask" className={d.askRow}>
+      <Link href="/portal/ask" className={`${d.askRow} tap-press`}>
         <span className={d.askTile}>
           <MessageCircleQuestion size={22} aria-hidden="true" />
         </span>

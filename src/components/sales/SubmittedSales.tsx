@@ -59,7 +59,7 @@ export function SubmittedRows({ sales }: { sales: Sale[] }) {
         // exactly the question these rows are here to answer.
         const flagged = sale.status !== 'approved';
         return (
-          <Link className={x.subRow} data-part="sub-row" key={sale.id} href={`/portal/sales/${sale.id}`}>
+          <Link className={`${x.subRow} tap-press`} data-part="sub-row" key={sale.id} href={`/portal/sales/${sale.id}`}>
             <span className={x.subAddr} data-part="sub-addr">{sale.customerAddress || 'No address given'}</span>
             <span className={x.bVal}>
               <b>{sale.totalPoints || 0}</b> pts

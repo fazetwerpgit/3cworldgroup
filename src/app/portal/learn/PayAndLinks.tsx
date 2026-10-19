@@ -54,7 +54,7 @@ export function PayAndLinks() {
                   const Icon = link.icon;
                   return (
                     <li key={link.title}>
-                      <a className={p.row} href={link.url} target="_blank" rel="noopener noreferrer">
+                      <a className={`${p.row} tap-press`} href={link.url} target="_blank" rel="noopener noreferrer">
                         <span className={p.tile}>
                           <Icon size={20} aria-hidden="true" />
                         </span>

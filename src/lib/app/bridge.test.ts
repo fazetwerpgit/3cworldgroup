@@ -72,6 +72,11 @@ describe('postToNative', () => {
 });
 
 describe('parseNativeMessage', () => {
+  it('accepts scrollToTop (the status-bar tap)', () => {
+    expect(parseNativeMessage({ source: '3c-shell', type: 'scrollToTop' })).toEqual({ source: '3c-shell', type: 'scrollToTop' });
+    expect(parseNativeMessage({ type: 'scrollToTop' })).toBeNull();
+  });
+
   it('accepts replies and push token events from the shell, as object or JSON', () => {
     expect(parseNativeMessage({ source: '3c-shell', type: 'reply', id: 'a', ok: true, result: { x: 1 } })).toEqual({
       source: '3c-shell',
