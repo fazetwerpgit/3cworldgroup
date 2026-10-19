@@ -112,6 +112,17 @@ export interface UserChannelOnboarding {
   updatedAt: Date;
 }
 
+// Tax and banking documents are OWNER ONLY (Jacob, 10/18/2026): the W-9 shows
+// the full SSN / TIN and the direct-deposit form the routing and account
+// numbers. Admins and operations may see that the item exists and its status
+// ("signed"), never the document or a number from it. Owners also receive
+// these PDFs by email (lib/onboarding/ownerNotify).
+export const OWNER_ONLY_ONBOARDING_ITEM_IDS: readonly string[] = ['w9', 'direct_deposit'];
+
+export function isOwnerOnlyOnboardingItem(itemId: unknown): boolean {
+  return typeof itemId === 'string' && OWNER_ONLY_ONBOARDING_ITEM_IDS.includes(itemId);
+}
+
 // Guardrail for sensitive items: the app stores a reference/vendor token only,
 // never raw SSNs, bank-account, or card numbers. This rejects the obvious
 // raw-PII shapes (a bare 9-digit SSN, or a 13-19 digit card/account run, with

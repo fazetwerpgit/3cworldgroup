@@ -18,7 +18,7 @@ import { onboardingFrom } from '@/lib/email/sendEmail';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
-import { logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
+import { canOpenOnboardingItem, isOwnerOnlyOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
 import { isHeldOnboardingItem } from '@/types/onboardingHold';
 
 type ProgressData = FirebaseFirestore.DocumentData;
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
       sensitive: boolean
     ) => {
       if (!isStorageItem(itemId)) return [];
-      if (sensitive && !gate.isAdmin) return [];
+      if (!canOpenOnboardingItem(itemId, gate)) return [];
       const files = await signFolderFiles(reference);
       if (!sensitive || files.length === 0) return files;
       try {
@@ -145,9 +145,14 @@ export async function GET(request: NextRequest) {
         sensitive: item.sensitive,
         // True when the item holds sensitive files this caller may not open
         // (operations). The UI shows an "Admin only" note instead of links.
-        adminOnly: item.sensitive && !gate.isAdmin,
+        adminOnly: item.sensitive && !isOwnerOnlyOnboardingItem(item.id) && !gate.isAdmin,
+        // True for the tax and banking items (W-9, direct deposit) when the
+        // caller is not an owner: the status shows, the document never does.
+        ownerOnly: isOwnerOnlyOnboardingItem(item.id) && !gate.isOwner,
         referenceKind: item.referenceKind,
-        reference,
+        // A tax or banking item's reference (legacy upload path or vendor
+        // token) is withheld from non-owners along with the document.
+        reference: isOwnerOnlyOnboardingItem(item.id) && !gate.isOwner ? null : reference,
         // Files are signed only for items under review: that is where they
         // are looked at, and each sensitive signing is an audited reveal.
         files: status === 'submitted' ? await filesFor(userId, item.id, reference, item.sensitive) : [],
@@ -311,6 +316,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'E-signature items are completed only when the rep signs them' },
         { status: 400 }
+      );
+    }
+
+    // Tax and banking items are owner only to open, so owner only to approve.
+    if (status === 'approved' && isOwnerOnlyOnboardingItem(item.id) && !gate.isOwner) {
+      return NextResponse.json(
+        { error: 'Only an owner can approve this item' },
+        { status: 403 }
       );
     }
 

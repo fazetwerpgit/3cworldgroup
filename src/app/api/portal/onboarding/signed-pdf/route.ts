@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { isEsignItem } from '@/lib/onboarding/esign';
-import { isSensitiveOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
+import {
+  canOpenOnboardingItem,
+  isOwnerOnlyOnboardingItem,
+  isSensitiveOnboardingItem,
+  logSensitiveFileAccess,
+} from '@/lib/onboarding/sensitiveAccess';
 import { hasSignedPdf, loadSignedPdf, NO_STORED_COPY, SignedPdfError } from '@/lib/onboarding/signedPdf';
 
 function pdfResponse(pdf: Buffer, itemId: string): NextResponse {
@@ -26,8 +31,9 @@ export async function GET(request: NextRequest) {
     }
 
     // The signed PDF exposes another user's completed document; management only.
-    // Sensitive items (W-9 = full SSN, direct deposit = bank account) are
-    // narrowed further to admin/owner below, once the item id is known.
+    // Tax and banking items (W-9 = full SSN, direct deposit = bank account)
+    // are narrowed to the owner role below, once the item id is known; other
+    // sensitive items to admin/owner.
     const gate = await requireVerifiedManagement(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
@@ -45,9 +51,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Signed PDF is only available for e-sign items' }, { status: 404 });
     }
     const sensitive = isSensitiveOnboardingItem(itemId);
-    if (sensitive && !gate.isAdmin) {
+    if (!canOpenOnboardingItem(itemId, gate)) {
       return NextResponse.json(
-        { error: 'Forbidden: admin access required for sensitive documents' },
+        {
+          error: isOwnerOnlyOnboardingItem(itemId)
+            ? 'Forbidden: only an owner can open tax and banking documents'
+            : 'Forbidden: admin access required for sensitive documents',
+        },
         { status: 403 }
       );
     }

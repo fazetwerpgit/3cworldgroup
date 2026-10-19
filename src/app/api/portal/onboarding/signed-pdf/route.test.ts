@@ -40,7 +40,8 @@ vi.mock('@/lib/firebase/admin', () => ({
 
 import { GET } from './route';
 
-const MANAGEMENT = { ok: true, uid: 'manager-1', name: 'Manager', isAdmin: true };
+const MANAGEMENT = { ok: true, uid: 'manager-1', name: 'Manager', isAdmin: true, isOwner: false };
+const OWNER = { ...MANAGEMENT, isOwner: true };
 
 function request(userId = 'user-1', itemId = 'contract') {
   return new NextRequest(
@@ -128,7 +129,42 @@ describe('GET /api/portal/onboarding/signed-pdf', () => {
     expect(logAddMock).not.toHaveBeenCalled();
   });
 
-  it('streams a sensitive PDF to an admin and writes a sensitiveAccessLog row', async () => {
+  it.each(['w9', 'direct_deposit'])('refuses the %s PDF to an admin: tax and banking are owner only', async (itemId) => {
+    const response = await GET(request('user-1', itemId));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Forbidden: only an owner can open tax and banking documents',
+    });
+    expect(docMock).not.toHaveBeenCalled();
+    expect(storageDownloadMock).not.toHaveBeenCalled();
+    expect(logAddMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['l1_manager', 'entry_rep'])('refuses a %s at the management gate', async () => {
+    gateMock.mockResolvedValue({ ok: false, error: 'Forbidden: management access required', status: 403 });
+
+    const response = await GET(request('user-1', 'w9'));
+
+    expect(response.status).toBe(403);
+    expect(docMock).not.toHaveBeenCalled();
+  });
+
+  it('streams a direct-deposit PDF to an owner', async () => {
+    gateMock.mockResolvedValue(OWNER);
+    docGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ itemId: 'direct_deposit', completedPdfPath: 'esign-completed/user-1/dd.pdf' }),
+    });
+
+    const response = await GET(request('user-1', 'direct_deposit'));
+
+    expect(response.status).toBe(200);
+    expect(logAddMock).toHaveBeenCalledWith(expect.objectContaining({ itemId: 'direct_deposit' }));
+  });
+
+  it('streams a sensitive PDF to an owner and writes a sensitiveAccessLog row', async () => {
+    gateMock.mockResolvedValue(OWNER);
     docGetMock.mockResolvedValue({
       exists: true,
       data: () => ({ itemId: 'w9', completedPdfPath: 'esign-completed/user-1/w9.pdf' }),
@@ -148,6 +184,7 @@ describe('GET /api/portal/onboarding/signed-pdf', () => {
   });
 
   it('withholds a sensitive PDF when the audit row cannot be written', async () => {
+    gateMock.mockResolvedValue(OWNER);
     docGetMock.mockResolvedValue({
       exists: true,
       data: () => ({ itemId: 'w9', completedPdfPath: 'esign-completed/user-1/w9.pdf' }),

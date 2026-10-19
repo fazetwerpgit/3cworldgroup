@@ -54,6 +54,7 @@ vi.mock('@/types', () => {
     getOnboardingItemsForUser: () => ONBOARDING_ITEMS,
     resolveRoles: (role?: string, fieldRole?: string) => ({ role, fieldRole }),
     RoleDisplayNames: { entry_level_rep: 'Entry Level Rep' },
+    isOwnerOnlyOnboardingItem: (itemId: unknown) => itemId === 'w9' || itemId === 'direct_deposit',
   };
 });
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: vi.fn(() => false) }));
@@ -355,6 +356,39 @@ describe('GET /api/portal/onboarding/review', () => {
 
       expect(json.submissions).toEqual([expect.objectContaining({ itemId: 'dl_photos', files: [] })]);
     });
+  });
+});
+
+describe('GET /api/portal/onboarding/review: tax and banking items', () => {
+  const w9Submitted = () => {
+    queryGetMock.mockResolvedValueOnce({
+      docs: [{
+        id: 'user-1_w9',
+        data: () => ({ userId: 'user-1', itemId: 'w9', status: 'submitted', reference: 'legacy-ref', esignEnvelopeId: 'env-w9' }),
+      }],
+    });
+    queryGetMock.mockResolvedValueOnce({ docs: [] });
+    queryGetMock.mockResolvedValueOnce({ docs: [] });
+    getAllMock.mockResolvedValue([{ exists: true, id: 'user-1', data: () => ({ displayName: 'One', fieldRole: 'entry_level_rep' }) }]);
+  };
+  const w9Row = async () => {
+    const json = await (await GET(new NextRequest('http://localhost/api/portal/onboarding/review'))).json();
+    return (json.people as Array<{ items: Array<Record<string, unknown>> }>)
+      .flatMap((person) => person.items)
+      .find((item) => item.itemId === 'w9');
+  };
+
+  it('marks the W-9 owner only for an admin and withholds its reference', async () => {
+    w9Submitted();
+    const row = await w9Row();
+    expect(row).toMatchObject({ ownerOnly: true, adminOnly: false, reference: null, status: 'submitted' });
+  });
+
+  it('opens the W-9 row to an owner', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'owner-1', name: 'Owner', isAdmin: true, isOwner: true });
+    w9Submitted();
+    const row = await w9Row();
+    expect(row).toMatchObject({ ownerOnly: false, reference: 'legacy-ref' });
   });
 });
 

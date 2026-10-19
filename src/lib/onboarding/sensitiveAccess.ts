@@ -1,11 +1,26 @@
 import { adminDb } from '@/lib/firebase/admin';
-import { ONBOARDING_ITEMS } from '@/types';
+import { isOwnerOnlyOnboardingItem, ONBOARDING_ITEMS } from '@/types';
 
-// Onboarding items flagged `sensitive` (W-9 with a full SSN, direct deposit,
-// driver's-license photos, ...) are admin/owner only. Operations still reviews
-// the item, but never receives the file itself.
+export { isOwnerOnlyOnboardingItem };
+
+// Onboarding items flagged `sensitive` (driver's-license photos, ...) are
+// admin/owner only. Operations still reviews the item, but never receives the
+// file itself. The tax and banking items (W-9, direct deposit) are narrower
+// still: owner only, see isOwnerOnlyOnboardingItem.
 export function isSensitiveOnboardingItem(itemId: unknown): boolean {
   return ONBOARDING_ITEMS.some((item) => item.id === itemId && item.sensitive);
+}
+
+// May this caller open the files / PDF of this onboarding item? Owner-only
+// items need the owner role; other sensitive items need admin or owner; the
+// rest are open to any management caller.
+export function canOpenOnboardingItem(
+  itemId: unknown,
+  caller: { isAdmin: boolean; isOwner: boolean }
+): boolean {
+  if (isOwnerOnlyOnboardingItem(itemId)) return caller.isOwner;
+  if (isSensitiveOnboardingItem(itemId)) return caller.isAdmin;
+  return true;
 }
 
 export type SensitiveFileAccessSource =

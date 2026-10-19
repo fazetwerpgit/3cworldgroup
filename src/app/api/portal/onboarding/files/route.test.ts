@@ -21,7 +21,10 @@ vi.mock('@/types', () => ({
     { id: 'dl_photos', label: "Driver's License", sensitive: true, referenceKind: 'storage' },
     { id: 'id_card', label: 'ID card', sensitive: false, referenceKind: 'storage' },
     { id: 'contract', label: 'Contract', sensitive: false, referenceKind: 'esign' },
+    // A legacy uploaded W-9: the owner-only rule follows the item, not its kind.
+    { id: 'w9', label: 'W-9', sensitive: true, referenceKind: 'storage' },
   ],
+  isOwnerOnlyOnboardingItem: (id: unknown) => id === 'w9' || id === 'direct_deposit',
 }));
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: (id: string) => id !== 'contract' }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));
@@ -77,5 +80,26 @@ describe('GET /api/portal/onboarding/files', () => {
     gateMock.mockResolvedValue({ ok: false, error: 'Forbidden', status: 403 });
     expect((await get('u1', 'dl_photos')).status).toBe(403);
     expect(docGetMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses W-9 files to an admin (owner only) without signing or logging', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'admin1', name: 'Admin', isAdmin: true, isOwner: false });
+    const res = await get('u1', 'w9');
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'Only an owner can open these files' });
+    expect(signMock).not.toHaveBeenCalled();
+    expect(logAddMock).not.toHaveBeenCalled();
+  });
+
+  it('opens W-9 files for an owner and audits it', async () => {
+    gateMock.mockResolvedValue({ ok: true, uid: 'owner1', name: 'Jacob', isAdmin: true, isOwner: true });
+    expect((await get('u1', 'w9')).status).toBe(200);
+    expect(logAddMock).toHaveBeenCalledWith(expect.objectContaining({ itemId: 'w9', revealedBy: 'owner1' }));
+  });
+
+  it.each(['l1_manager', 'entry_rep'])('refuses a %s at the management gate', async () => {
+    gateMock.mockResolvedValue({ ok: false, error: 'Forbidden: management access required', status: 403 });
+    expect((await get('u1', 'w9')).status).toBe(403);
+    expect(signMock).not.toHaveBeenCalled();
   });
 });
