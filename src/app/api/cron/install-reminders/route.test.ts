@@ -91,7 +91,7 @@ describe('GET /api/cron/install-reminders', () => {
     vi.setSystemTime(WED_5PM);
     expect(await (await GET(request('?slot=cst'))).json()).toMatchObject({ skipped: 'not_send_hour' });
     expect(dispatchToUser).not.toHaveBeenCalled();
-    expect(fake.writes).toHaveLength(0);
+    expect(fake.writes.filter((w) => w.collection !== 'cronRuns')).toHaveLength(0);
   });
 
   it('with INSTALL_REMINDERS_OFF=true, reports what it would send and writes nothing', async () => {
@@ -105,7 +105,7 @@ describe('GET /api/cron/install-reminders', () => {
       ]);
     }
     expect(dispatchToUser).not.toHaveBeenCalled();
-    expect(fake.writes).toHaveLength(0);
+    expect(fake.writes.filter((w) => w.collection !== 'cronRuns')).toHaveLength(0);
   });
 
   it('never mass-sends when ONLY_TO is malformed, and force cannot skip the hour for it', async () => {
@@ -120,7 +120,7 @@ describe('GET /api/cron/install-reminders', () => {
       vi.setSystemTime(WED_6PM);
     }
     expect(dispatchToUser).not.toHaveBeenCalled();
-    expect(fake.writes).toHaveLength(0);
+    expect(fake.writes.filter((w) => w.collection !== 'cronRuns')).toHaveLength(0);
     error.mockRestore();
   });
 

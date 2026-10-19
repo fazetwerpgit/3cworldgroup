@@ -1,6 +1,7 @@
 import { bearerMatches } from '@/lib/auth/secretCompare';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { withCronRun } from '@/lib/cron/runLog';
 import { isReminderHour } from '@/lib/reminders/installEve';
 import { reminderRunConfig, runInstallReminders } from '@/lib/reminders/run';
 
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ skipped: 'not_send_hour', at: now.toISOString() });
   }
 
-  const summary = await runInstallReminders({ db: adminDb, now, config });
+  const db = adminDb;
+  const summary = await withCronRun(db, 'install-reminders', request, () => runInstallReminders({ db, now, config }), (s) => s.failed === 0);
   return NextResponse.json(summary);
 }

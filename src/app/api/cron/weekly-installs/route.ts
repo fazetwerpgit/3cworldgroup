@@ -1,6 +1,7 @@
 import { bearerMatches } from '@/lib/auth/secretCompare';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { withCronRun } from '@/lib/cron/runLog';
 import { runWeeklyInstallsEmail, weeklyRunConfig } from '@/lib/weeklyInstalls/run';
 import { isSendHour } from '@/lib/weeklyInstalls/week';
 
@@ -8,8 +9,9 @@ import { isSendHour } from '@/lib/weeklyInstalls/week';
 //
 // vercel.json schedules this at 13:00 AND 14:00 UTC on Mondays, because Vercel
 // crons run in UTC and 8 AM Chicago is one or the other depending on DST. The
-// run only proceeds when the Chicago hour is 8; the send log (sendLog.ts) makes
-// a double trigger harmless anyway.
+// run proceeds when the Chicago hour is 8 (the send) or 9 (the summer 14:00
+// slot: a resume pass that sends only to reps the first run did not finish;
+// the send log, sendLog.ts, skips everyone already sent).
 //
 // `?force=1` skips the hour gate, and ONLY when WEEKLY_INSTALLS_EMAIL_ONLY_TO
 // is set, so the owner can trigger a redirected test run at any time without
@@ -31,6 +33,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'firebase admin database is not configured' }, { status: 500 });
   }
 
+  const db = adminDb;
   const now = new Date();
   const config = weeklyRunConfig();
   const force = new URL(request.url).searchParams.get('force') === '1' && !!config.onlyTo;
@@ -38,6 +41,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ skipped: 'not_send_hour', at: now.toISOString() });
   }
 
-  const summary = await runWeeklyInstallsEmail({ db: adminDb, now, config });
+  const summary = await withCronRun(db, 'weekly-installs', request, () => runWeeklyInstallsEmail({ db, now, config }), (s) => s.failed === 0);
   return NextResponse.json(summary);
 }

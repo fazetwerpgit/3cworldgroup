@@ -1,6 +1,7 @@
 import { bearerMatches } from '@/lib/auth/secretCompare';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { withCronRun } from '@/lib/cron/runLog';
 import { retryPendingChatEvidence } from '@/lib/chat/evidence';
 import { sweepAbandonedChatUploads, type PendingSweepResult } from '@/lib/chat/pendingSweep';
 
@@ -33,15 +34,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    const run = await retryPendingChatEvidence();
-    let pendingUploads: PendingSweepResult | { error: string };
-    try {
-      pendingUploads = await sweepAbandonedChatUploads();
-    } catch (error) {
-      console.error('[chat evidence] pending upload sweep failed', (error as { code?: unknown } | null)?.code ?? 'unknown');
-      pendingUploads = { error: 'pending sweep failed' };
-    }
-    return NextResponse.json({ ok: true, ...run, pendingUploads });
+    const result = await withCronRun(adminDb, 'chat-evidence', request, async () => {
+      const run = await retryPendingChatEvidence();
+      let pendingUploads: PendingSweepResult | { error: string };
+      try {
+        pendingUploads = await sweepAbandonedChatUploads();
+      } catch (error) {
+        console.error('[chat evidence] pending upload sweep failed', (error as { code?: unknown } | null)?.code ?? 'unknown');
+        pendingUploads = { error: 'pending sweep failed' };
+      }
+      return { ...run, pendingUploads };
+    });
+    return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     console.error('[chat evidence] sweep failed', (error as { code?: unknown } | null)?.code ?? 'unknown');
     return NextResponse.json({ ok: false, error: 'sweep failed' }, { status: 500 });

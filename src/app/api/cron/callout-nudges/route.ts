@@ -1,6 +1,7 @@
 import { bearerMatches } from '@/lib/auth/secretCompare';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { withCronRun } from '@/lib/cron/runLog';
 import { isCalloutNudgeHour, runCalloutNudges } from '@/lib/alerts/calloutNudges';
 
 // 9 PM America/Chicago: a rep who called out more sales in All Company today
@@ -34,6 +35,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ skipped: 'not_send_hour', at: now.toISOString() });
   }
 
-  const summary = await runCalloutNudges({ db: adminDb, now });
+  const db = adminDb;
+  const summary = await withCronRun(db, 'callout-nudges', request, () => runCalloutNudges({ db, now }));
   return NextResponse.json(summary);
 }

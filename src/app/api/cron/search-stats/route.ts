@@ -1,6 +1,7 @@
 import { bearerMatches } from '@/lib/auth/secretCompare';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { withCronRun } from '@/lib/cron/runLog';
 import { runSearchStats } from '@/lib/search/searchStats';
 
 // Once a day, Google Search Console's figures for the owner's "Hiring from
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'firebase admin database is not configured' }, { status: 500 });
   }
 
-  const run = await runSearchStats({ db: adminDb, now: new Date() });
+  const db = adminDb;
+  const run = await withCronRun(db, 'search-stats', request, () => runSearchStats({ db, now: new Date() }), (r) => r.ok);
   return NextResponse.json({ ok: run.ok, error: run.error, dryRun: run.dryRun });
 }

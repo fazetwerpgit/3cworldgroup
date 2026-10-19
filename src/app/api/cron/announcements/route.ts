@@ -1,6 +1,7 @@
 import { bearerMatches } from '@/lib/auth/secretCompare';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
+import { withCronRun } from '@/lib/cron/runLog';
 import { runDueAnnouncements } from '@/lib/announcements/send';
 
 // Sends the owner's scheduled push announcements that are due.
@@ -27,6 +28,13 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'firebase admin database is not configured' }, { status: 500 });
   }
 
-  const summary = await runDueAnnouncements({ db: adminDb, now: new Date() });
+  const db = adminDb;
+  const summary = await withCronRun(
+    db,
+    'announcements',
+    request,
+    () => runDueAnnouncements({ db, now: new Date() }),
+    (s) => !s.failed?.length && !s.stalled?.length
+  );
   return NextResponse.json(summary);
 }

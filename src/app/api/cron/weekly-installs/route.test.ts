@@ -16,7 +16,8 @@ import { GET } from './route';
 
 const SECRET = 'test-cron-secret';
 const MONDAY_8AM_CDT = new Date('2026-09-21T13:00:00Z');
-const MONDAY_9AM_CDT = new Date('2026-09-21T14:00:00Z');
+/** 10 AM CDT: past both the send and the resume pass. */
+const MONDAY_10AM_CDT = new Date('2026-09-21T15:00:00Z');
 
 function seed(): FakeDb {
   const busy = busyWeekInput();
@@ -78,13 +79,13 @@ describe('GET /api/cron/weekly-installs', () => {
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  it('does nothing outside 8 AM Chicago on a Monday', async () => {
+  it('does nothing outside 8–9 AM Chicago on a Monday', async () => {
     vi.stubEnv('WEEKLY_INSTALLS_EMAIL_ENABLED', 'true');
-    vi.setSystemTime(MONDAY_9AM_CDT);
+    vi.setSystemTime(MONDAY_10AM_CDT);
     const body = await (await GET(request())).json();
     expect(body.skipped).toBe('not_send_hour');
     expect(sendEmail).not.toHaveBeenCalled();
-    expect(fake.writes).toHaveLength(0);
+    expect(fake.writes.filter((w) => w.collection !== 'cronRuns')).toHaveLength(0);
   });
 
   it('with the kill switch off, sends nothing and writes nothing (dry run)', async () => {
@@ -94,7 +95,7 @@ describe('GET /api/cron/weekly-installs', () => {
       expect(body).toMatchObject({ enabled: false, eligible: 2, sent: 0 });
     }
     expect(sendEmail).not.toHaveBeenCalled();
-    expect(fake.writes).toHaveLength(0);
+    expect(fake.writes.filter((w) => w.collection !== 'cronRuns')).toHaveLength(0);
   });
 
   it('never mass-sends when ONLY_TO is set but malformed: dry run with a clear error', async () => {
@@ -106,12 +107,12 @@ describe('GET /api/cron/weekly-installs', () => {
       expect(body).toMatchObject({ enabled: false, redirectedTo: null, eligible: 2, sent: 0 });
       expect(body.configError).toContain('WEEKLY_INSTALLS_EMAIL_ONLY_TO');
       // force=1 cannot skip the hour gate for it either.
-      vi.setSystemTime(MONDAY_9AM_CDT);
+      vi.setSystemTime(MONDAY_10AM_CDT);
       expect(await (await GET(request({ query: '?force=1' }))).json()).toMatchObject({ skipped: 'not_send_hour' });
       vi.setSystemTime(MONDAY_8AM_CDT);
     }
     expect(sendEmail).not.toHaveBeenCalled();
-    expect(fake.writes).toHaveLength(0);
+    expect(fake.writes.filter((w) => w.collection !== 'cronRuns')).toHaveLength(0);
     expect(error).toHaveBeenCalledWith(expect.stringContaining('WEEKLY_INSTALLS_EMAIL_ONLY_TO'));
   });
 
@@ -191,5 +192,13 @@ describe('GET /api/cron/weekly-installs', () => {
     expect(forced).toMatchObject({ sent: 2, redirectedTo: 'owner@example.com' });
     const calls = sendEmail.mock.calls as unknown as [{ to: string }][];
     expect(calls.every(([input]) => input.to === 'owner@example.com')).toBe(true);
+  });
+
+  it('records a short run summary in cronRuns (counts, never the rep list)', async () => {
+    vi.stubEnv('WEEKLY_INSTALLS_EMAIL_ENABLED', '');
+    await GET(request({ query: '?slot=cdt' }));
+    const log = fake.docs('cronRuns').get('weekly-installs_2026-09-21_cdt');
+    expect(log).toMatchObject({ job: 'weekly-installs', slot: 'cdt', ok: true });
+    expect(log?.summary).toMatchObject({ eligible: 2, sent: 0 });
   });
 });
