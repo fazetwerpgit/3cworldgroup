@@ -13,6 +13,9 @@ import { isCalloutNudgeHour, runCalloutNudges } from '@/lib/alerts/calloutNudges
 // the per-rep-per-day claim makes a double trigger harmless anyway.
 //
 // CALLOUT_NUDGE_OFF=true turns every run into a dry run (nothing claimed or sent).
+//
+// A run with any claim or dispatch error is logged ok:false in cronRuns, so the
+// failure shows up there instead of hiding behind a 200.
 
 export const maxDuration = 60;
 
@@ -36,6 +39,6 @@ export async function GET(request: Request) {
   }
 
   const db = adminDb;
-  const summary = await withCronRun(db, 'callout-nudges', request, () => runCalloutNudges({ db, now }));
+  const summary = await withCronRun(db, 'callout-nudges', request, () => runCalloutNudges({ db, now }), (s) => s.errors === 0);
   return NextResponse.json(summary);
 }
