@@ -10,6 +10,24 @@ import st from '@/components/portal/rep/rep-settings.module.css';
 
 const AREAS = ['Forms', 'Sales', 'Onboarding', 'Chat', 'Leaderboard', 'Other'];
 
+// Posts the report. A non-JSON error body (Vercel 502/504 HTML, a 413 page)
+// must not surface the raw JSON parse error ("The string did not match the
+// expected pattern." on iPhone), so the body read is tolerant.
+export async function postBugReport(
+  token: string,
+  payload: { area: string; summary: string; details: string; pageUrl: string }
+): Promise<void> {
+  const res = await fetch('/api/portal/forms/bug-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  const json = (await res.json().catch(() => null)) as { error?: unknown } | null;
+  if (!res.ok) {
+    throw new Error(typeof json?.error === 'string' && json.error ? json.error : "Couldn't submit");
+  }
+}
+
 // Available to every role in Settings. Files a bug report that lands in the admin
 // Bug Reports list and pings admins' notification bell.
 export default function ReportBugCard() {
@@ -57,13 +75,7 @@ export default function ReportBugCard() {
       const token = await auth?.currentUser?.getIdToken();
       if (!token) throw new Error('Not signed in');
       const pageUrl = page.trim();
-      const res = await fetch('/api/portal/forms/bug-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ area, summary, details, pageUrl }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Couldn't submit");
+      await postBugReport(token, { area, summary, details, pageUrl });
       setDone(true);
       setSummary('');
       setDetails('');
