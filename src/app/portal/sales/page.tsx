@@ -1,5 +1,6 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -9,7 +10,6 @@ import { CarrierNotice } from '@/components/portal/rep/CarrierNotice';
 import { PayHelpSheet } from '@/components/portal/rep/PayHelpSheet';
 import { RepShell } from '@/components/portal/rep/RepShell';
 import { LOG_SALE_HREF } from '@/components/portal/rep/repNav';
-import { AdminSalesBoard } from '@/components/sales/AdminSalesBoard';
 import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
 import { SalesTable, SalesViewTabs } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
@@ -55,6 +55,12 @@ function PageHead({
     </header>
   );
 }
+
+// Management's company book: its own chunk, so a rep's Sales tab never downloads it.
+const AdminSalesBoard = dynamic(
+  () => import('@/components/sales/AdminSalesBoard').then((m) => m.AdminSalesBoard),
+  { ssr: false, loading: () => <SalesSkeleton label="Loading the company book" /> }
+);
 
 function SalesSkeleton({ label = 'Loading sales' }: { label?: string }) {
   return (
