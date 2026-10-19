@@ -185,3 +185,25 @@ describe('storage.rules agree with the chat upload limits', () => {
     expect(resolveRoles('entry_rep', undefined)).toEqual({ role: undefined, fieldRole: 'entry_rep' });
   });
 });
+
+describe('validateMessageAttachment — image url (S-10)', () => {
+  const image = (url: string) => validateMessageAttachment({ type: 'image', url }, 'all-company', BUCKET);
+  const prefix = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/chat%2Fall-company%2F`;
+
+  it("accepts an image stored directly in this channel's folder", () => {
+    expect(image(objectUrl('all-company', 'abc-123.jpg')).ok).toBe(true);
+  });
+
+  it('rejects ../ tricks that pass the prefix but load from another bucket', () => {
+    expect(image(`${prefix}x/../../../other-bucket/o/pixel.png?alt=media`).ok).toBe(false);
+    expect(image(`${prefix}x/%2e%2e/%2E%2E/%2e%2e/other-bucket/o/pixel.png`).ok).toBe(false);
+    expect(image(`${prefix}x%2F..%2F..%2Fpixel.png`).ok).toBe(false);
+    expect(image(`${prefix}x\\..\\pixel.png`).ok).toBe(false);
+  });
+
+  it('rejects another channel, a nested path and a non-image object', () => {
+    expect(image(objectUrl('other-channel', 'abc.jpg')).ok).toBe(false);
+    expect(image(`${prefix}sub%2Fabc.jpg?alt=media`).ok).toBe(false);
+    expect(image(objectUrl('all-company', 'abc.html')).ok).toBe(false);
+  });
+});

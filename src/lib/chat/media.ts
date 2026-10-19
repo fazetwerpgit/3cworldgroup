@@ -170,6 +170,8 @@ export function chatImageUrlPrefix(bucketName: string, channelId: string): strin
 // one path segment of safe characters that does not start with a dot (so never
 // '.' or '..'), and never anything with a slash.
 const CHAT_OBJECT_NAME = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
+/** A "." or ".." path segment, plain or percent-encoded. */
+const DOT_SEGMENT = /(^|\/|%2f)(\.|%2e){1,2}(\/|%2f|$)/i;
 
 /**
  * The Storage object path behind a chat image download URL — only when the URL is
@@ -181,6 +183,10 @@ const CHAT_OBJECT_NAME = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
 export function chatObjectPathFromUrl(url: unknown, bucketName: string, channelId: string): string | null {
   if (typeof url !== 'string' || !bucketName || !channelId || channelId.includes('/')) return null;
   if (!url.startsWith(chatImageUrlPrefix(bucketName, channelId))) return null;
+  // No dot segments or backslashes anywhere in the path, raw or encoded: a
+  // browser resolves "/../" before loading, so a URL that passes the prefix
+  // could still load from another bucket (a tracking pixel).
+  if (DOT_SEGMENT.test(url.split(/[?#]/)[0]) || url.includes('\\')) return null;
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -304,8 +310,9 @@ export function validateMessageAttachment(
   }
 
   if (type === 'image') {
-    const prefix = chatImageUrlPrefix(bucketName, channelId);
-    if (!url.startsWith(prefix)) {
+    // The strict check the PDF branch uses (one object directly in THIS
+    // channel's folder of THIS bucket, no traversal), plus an image extension.
+    if (!isChatPreviewImageUrl(url, bucketName, channelId)) {
       return { ok: false, error: 'Attachment url is not permitted for this channel' };
     }
   } else {
