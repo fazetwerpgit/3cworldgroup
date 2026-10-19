@@ -55,4 +55,23 @@ describe('RepHomeView and Solar', () => {
     expect(html).not.toContain('Estimated pay');
     expect(html).toContain('Sol&#x27;s dashboard');
   });
+
+  it('solar-only rep: the next consultation sits under the deck, above Ask', () => {
+    const html = renderToStaticMarkup(
+      <RepHomeView
+        {...props({
+          solarOnly: true,
+          solarEntry: <div data-solar />,
+          solarNext: <div data-next />,
+        })}
+      />
+    );
+    expect(html.indexOf('data-solar')).toBeLessThan(html.indexOf('data-next'));
+    expect(html.indexOf('data-next')).toBeLessThan(html.indexOf('data-ask'));
+  });
+
+  it('a dual rep never gets the next consultation on Home', () => {
+    const html = renderToStaticMarkup(<RepHomeView {...props({ solarEntry: <div data-solar />, solarNext: <div data-next /> })} />);
+    expect(html).not.toContain('data-next');
+  });
 });

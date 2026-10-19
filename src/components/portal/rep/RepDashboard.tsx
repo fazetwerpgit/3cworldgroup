@@ -35,6 +35,7 @@ import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import { PayHelpSheet } from './PayHelpSheet';
 import { AskEntryCard } from './AskEntryCard';
 import { SolarEntryCard } from './SolarEntryCard';
+import { SolarHomeNextConsult } from '@/components/portal/solar/SolarMyLeads';
 import { InstallDateSheet } from './InstallDateSheet';
 import { ScanIntroCard } from './ScanIntroCard';
 import { LOG_SALE_HREF } from './repNav';
@@ -638,6 +639,8 @@ export interface RepHomeViewProps {
   askEntry?: ReactNode;
   /** The way into Solar (SolarEntryCard): a row beside Ask for a dual rep, the lead block for a solar-only rep. */
   solarEntry?: ReactNode;
+  /** A solar-only rep's next consultation (SolarHomeNextConsult), under the deck; renders nothing when none is ahead. */
+  solarNext?: ReactNode;
   /**
    * A solar-only rep (a solar role, no fiber role): Home leads with Solar and
    * drops every fiber part (pay, the week, recent sales). The fiber props are
@@ -750,7 +753,7 @@ function TodaySlot(p: RepHomeViewProps) {
 
 /**
  * A solar-only rep's Home: the deck leads (where pay sits for a fiber rep),
- * Ask 3C under it, and Today (calls, open paperwork) beside. No pay, week or
+ * the next consultation and Ask 3C under it, and Today (calls, open paperwork) beside. No pay, week or
  * sales: those are the fiber book, which this rep does not have.
  */
 function SolarHomeView(p: RepHomeViewProps) {
@@ -764,6 +767,7 @@ function SolarHomeView(p: RepHomeViewProps) {
 
         <div className={d.colMain}>
           {p.solarEntry}
+          {p.solarNext}
           {p.askEntry}
         </div>
 
@@ -929,6 +933,8 @@ export function RepDashboard() {
         // Solar-only: the lead block even while viewing as the rep (Open deck,
         // a write, drops out on its own). Otherwise the row, never in view-as.
         solarEntry={solarOnly ? <SolarEntryCard variant="lead" /> : readOnly ? null : <SolarEntryCard />}
+        // The viewer's own leads, so never in view-as (they would be the owner's).
+        solarNext={solarOnly && !readOnly ? <SolarHomeNextConsult /> : null}
         queues={showQueues ? <OpsQueuesPanel title="Needs attention" /> : null}
         onHelp={() => setHelpOpen(true)}
         onRetry={onRetry}

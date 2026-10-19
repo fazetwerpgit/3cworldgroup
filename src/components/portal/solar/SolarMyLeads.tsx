@@ -60,6 +60,23 @@ export function SolarNextConsult({ leads, onOpen }: { leads: SolarLeadView[] | n
   );
 }
 
+/**
+ * Home's next consultation for a solar-only rep: the Solar page's own block
+ * and data (useMyLeads), its tap opening the same read-only sheet. Nothing
+ * while loading, on a failed read, or with no consultation ahead.
+ */
+export function SolarHomeNextConsult() {
+  const { leads } = useMyLeads();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = openId ? (leads?.find((lead) => lead.id === openId) ?? null) : null;
+  return (
+    <>
+      <SolarNextConsult leads={leads} onOpen={setOpenId} />
+      {open ? <SolarLeadSheet lead={open} onClose={() => setOpenId(null)} /> : null}
+    </>
+  );
+}
+
 /** My leads: status and consultation per homeowner; a tap shows the details, read only. */
 export function SolarMyLeads({
   leads,
