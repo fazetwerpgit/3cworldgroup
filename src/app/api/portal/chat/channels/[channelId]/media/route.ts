@@ -66,6 +66,8 @@ export async function GET(
         if (!attachment || attachment.type === 'file') return null;
         return {
           messageId: doc.id,
+          // Lets the reader's screen hide someone they blocked (as the thread does).
+          authorId: typeof data.authorId === 'string' ? data.authorId : '',
           attachment,
           authorName: data.authorName ?? '3C User',
           createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,

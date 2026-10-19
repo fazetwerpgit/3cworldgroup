@@ -7,6 +7,7 @@ import type { LightboxImage } from '@/components/chat/ChatLightbox';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import s from '@/components/portal/rep/rep.module.css';
 import { getInitials } from '@/lib/chat/authorColor';
+import { BLOCKED_PINNED_LABEL, isBlockedPin } from '@/lib/chat/blocked';
 import { attachmentSnippet } from '@/lib/chat/media';
 import { ChatAttachment, ChatChannel } from '@/types';
 import { BlockedPeople } from './BlockedPeople';
@@ -36,6 +37,7 @@ interface AddableUser {
 
 interface ChannelMedia {
   messageId: string;
+  authorId?: string;
   attachment: ChatAttachment;
   authorName: string;
   createdAt: string | null;
@@ -43,6 +45,7 @@ interface ChannelMedia {
 
 interface ChannelPin {
   messageId: string;
+  authorId?: string;
   text: string;
   attachment: ChatAttachment | null;
   authorName: string;
@@ -65,6 +68,11 @@ interface ChannelInfoSheetProps {
   // Unblocks someone through the chat page's safety hook so its blocked set
   // refreshes. Omitted (design lab), the "Blocked people" list is hidden.
   onUnblock?: (uid: string) => Promise<void>;
+  // The reader and who they blocked (the chat page's safety hook): a blocked
+  // author's pins show as a placeholder and their photos leave the grid, as in
+  // the thread. Omitted (design lab), nothing is hidden.
+  currentUserId?: string | null;
+  blockedUids?: ReadonlySet<string>;
 }
 
 /** Short "Jul 1, 3:04 PM" caption for a media tile's lightbox. */
@@ -113,6 +121,8 @@ export function ChannelInfoSheet({
   onOpenImage,
   lightboxOpen,
   onUnblock,
+  currentUserId,
+  blockedUids,
 }: ChannelInfoSheetProps) {
   const [members, setMembers] = useState<ChannelMember[]>([]);
   const [loading, setLoading] = useState(false);
@@ -148,7 +158,7 @@ export function ChannelInfoSheet({
       setError('');
       try {
         const response = await authedFetch(`/api/portal/chat/channels/${channelId}/members`);
-        const json = await response.json();
+        const json = await response.json().catch(() => ({}));
         if (isCancelled?.()) return;
         if (!response.ok) throw new Error(json.error || "Couldn't load members");
         setMembers(Array.isArray(json.members) ? json.members : []);
@@ -252,7 +262,7 @@ export function ChannelInfoSheet({
       setMediaError('');
       try {
         const response = await authedFetch(`/api/portal/chat/channels/${channelId}/media`);
-        const json = await response.json();
+        const json = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(json.error || "Couldn't load media");
         if (!cancelled) {
           setMedia(Array.isArray(json.media) ? json.media : []);
@@ -281,7 +291,7 @@ export function ChannelInfoSheet({
         const response = await authedFetch(
           `/api/portal/chat/messages/pin?channelId=${encodeURIComponent(channelId)}`
         );
-        const json = await response.json();
+        const json = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(json.error || "Couldn't load pinned messages");
         if (!cancelled) {
           setPins(Array.isArray(json.pins) ? json.pins : []);
@@ -300,6 +310,9 @@ export function ChannelInfoSheet({
   }, [open, channelId, tab, pinsLoaded, authedFetch]);
 
   const isLocked = channel?.audience === 'managers';
+  const isBlockedAuthor = (authorId: string | undefined) =>
+    !!authorId && isBlockedPin({ authorId }, currentUserId, blockedUids);
+  const visibleMedia = media.filter((item) => !isBlockedAuthor(item.authorId));
 
   // Esc closes the sheet, except while the lightbox is up: it consumes Escape
   // in the capture phase and stops it, so this bubble listener only sees the
@@ -464,6 +477,19 @@ export function ChannelInfoSheet({
               ) : (
                 <ul className={c.people}>
                   {pins.map((pin) => {
+                    if (isBlockedAuthor(pin.authorId)) {
+                      return (
+                        <li key={pin.messageId}>
+                          <div className={c.person}>
+                            <span className={c.pinThumb}>
+                              <Pin size={16} aria-hidden="true" />
+                            </span>
+                            <span className={c.personName}>{BLOCKED_PINNED_LABEL}</span>
+                            <span className={c.personTime}>{formatMediaTime(pin.pinnedAt)}</span>
+                          </div>
+                        </li>
+                      );
+                    }
                     const snippet = pin.text ? pin.text : attachmentSnippet(pin.attachment);
                     const isImage = pin.attachment?.type === 'image' || pin.attachment?.type === 'gif';
                     const openImage = () => {
@@ -525,11 +551,11 @@ export function ChannelInfoSheet({
               </div>
             ) : mediaError ? (
               <p className={c.empty} role="alert">Couldn&apos;t load photos. {mediaError}</p>
-            ) : media.length === 0 ? (
+            ) : visibleMedia.length === 0 ? (
               <p className={c.empty}>No photos yet.</p>
             ) : (
               <div className={c.mediaGrid}>
-                {media.map((item) => (
+                {visibleMedia.map((item) => (
                   <button
                     key={item.messageId}
                     type="button"

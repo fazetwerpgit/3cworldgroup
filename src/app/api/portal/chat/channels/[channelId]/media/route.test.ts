@@ -130,6 +130,7 @@ describe('GET /api/portal/chat/channels/[channelId]/media', () => {
         data: {
           hasAttachment: true,
           attachment: { type: 'image', url: 'https://firebasestorage.googleapis.com/x', width: 100 },
+          authorId: 'rep-one',
           authorName: 'Rep One',
           createdAt: { toDate: () => new Date('2026-07-01T00:00:00Z') },
         },
@@ -158,6 +159,8 @@ describe('GET /api/portal/chat/channels/[channelId]/media', () => {
     expect(json.media).toHaveLength(1);
     expect(json.media[0]).toMatchObject({
       messageId: 'm1',
+      // The sheet hides a blocked author's photos by this id.
+      authorId: 'rep-one',
       authorName: 'Rep One',
       attachment: { type: 'image' },
     });

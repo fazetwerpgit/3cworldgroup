@@ -260,6 +260,7 @@ describe('GET /api/portal/chat/messages/pin', () => {
         data: {
           isPinned: true,
           text: 'older pin',
+          authorId: 'author-a',
           authorName: 'A',
           createdAt: { toDate: () => new Date('2026-07-01T00:00:00Z') },
           pinnedAt: { toDate: () => new Date('2026-07-01T10:00:00Z') },
@@ -301,7 +302,8 @@ describe('GET /api/portal/chat/messages/pin', () => {
     expect(json.pins[1].messageId).toBe('p-older');
     // GIF attachment surfaces on the newest pin; deleted/unpinned rows are gone.
     expect(json.pins[0].attachment).toMatchObject({ type: 'gif' });
-    expect(json.pins[0].pinnedAt).toBe('2026-07-02T10:00:00.000Z');
+    expect(json.pins[0].pinnedAt).toBe('2026-07-02T10:00:00.000Z');    // The sheet hides a blocked author's pin by this id.
+    expect(json.pins[1].authorId).toBe('author-a');
   });
 
   it('still returns a pin buried under hundreds of newer messages', async () => {

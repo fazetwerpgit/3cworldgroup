@@ -139,6 +139,8 @@ export async function GET(request: NextRequest) {
         const data = doc.data();
         return {
           messageId: doc.id,
+          // Lets the reader's screen hide someone they blocked (as the thread does).
+          authorId: typeof data.authorId === 'string' ? data.authorId : '',
           text: typeof data.text === 'string' ? data.text : '',
           attachment: readStoredAttachment(data.attachment),
           authorName: data.authorName ?? '3C User',

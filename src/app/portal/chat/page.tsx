@@ -1539,7 +1539,7 @@ export default function TeamChatPage() {
           </>
         )}
       </div>
-      <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} onUnblock={safety.unblock} />
+      <ChannelInfoSheet channel={activeChannel} open={infoOpen} onOpenChange={setInfoOpen} isAdmin={isRole('admin')} authedFetch={authedFetch} onOpenImage={openLightbox} lightboxOpen={!!lightbox} onUnblock={safety.unblock} currentUserId={user?.uid} blockedUids={safety.blockedUids} />
       <ReadBySheet target={readByTarget} authedFetch={authedFetch} onClose={closeReadBy} />
       <ChatLightbox image={lightbox} onClose={closeLightbox} />
       {inApp && safety.termsAccepted === false ? <ChatTermsSheet onAccept={acceptTermsAndResend} /> : null}
