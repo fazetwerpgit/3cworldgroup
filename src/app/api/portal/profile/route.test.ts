@@ -91,3 +91,43 @@ describe('PUT /api/portal/profile display name', () => {
     expect(restampDisplayNameMock).not.toHaveBeenCalled();
   });
 });
+
+describe('PUT /api/portal/profile input limits', () => {
+  it('rejects a name over 100 characters without saving or restamping', async () => {
+    const response = await PUT(request({ displayName: 'A'.repeat(101) }));
+
+    expect(response.status).toBe(400);
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(restampAuthorMock).not.toHaveBeenCalled();
+    expect(restampDisplayNameMock).not.toHaveBeenCalled();
+  });
+
+  it('accepts a 100-character name', async () => {
+    const response = await PUT(request({ displayName: 'A'.repeat(100) }));
+
+    expect(response.status).toBe(200);
+  });
+
+  it('rejects a name the chat filter would refuse or mask', async () => {
+    const response = await PUT(request({ displayName: 'fuck you' }));
+
+    expect(response.status).toBe(400);
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(restampAuthorMock).not.toHaveBeenCalled();
+  });
+
+  it('returns 400, not 500, for a non-string or oversized phone', async () => {
+    for (const phone of [null, 5, { a: 1 }, '5'.repeat(41)]) {
+      const response = await PUT(request({ displayName: 'Sam', phone }));
+      expect(response.status).toBe(400);
+    }
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('still saves a normal phone', async () => {
+    const response = await PUT(request({ displayName: 'Sam', phone: ' (555) 010-0100 ' }));
+
+    expect(response.status).toBe(200);
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ phone: '(555) 010-0100' }));
+  });
+});

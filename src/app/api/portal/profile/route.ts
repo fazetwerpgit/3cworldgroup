@@ -4,6 +4,12 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isShirtSize } from '@/types/auth';
 import { restampAuthor } from '@/lib/chat/restampAuthor';
 import { restampDisplayName } from '@/lib/users/restampDisplayName';
+import { isFilteredLabel } from '@/lib/chat/contentFilter';
+
+// Same cap firestore.rules puts on a self-written name at signup; the phone cap
+// matches the admin edit (auth/users/[id]).
+const MAX_DISPLAY_NAME_LENGTH = 100;
+const MAX_PHONE_LENGTH = 40;
 
 // PUT /api/portal/profile - Update user profile
 export async function PUT(request: NextRequest) {
@@ -35,6 +41,21 @@ export async function PUT(request: NextRequest) {
     const trimmedDisplayName = typeof displayName === 'string' ? displayName.trim() : '';
     if (displayName !== undefined && !trimmedDisplayName) {
       return NextResponse.json({ error: 'Enter your name' }, { status: 400 });
+    }
+    if (trimmedDisplayName.length > MAX_DISPLAY_NAME_LENGTH) {
+      return NextResponse.json(
+        { error: `Keep your name under ${MAX_DISPLAY_NAME_LENGTH} characters` },
+        { status: 400 }
+      );
+    }
+    // The name is stamped onto every chat message, sale and leaderboard row, so
+    // it gets the same language filter as chat text.
+    if (trimmedDisplayName && isFilteredLabel(trimmedDisplayName)) {
+      return NextResponse.json({ error: 'Pick a different name' }, { status: 400 });
+    }
+
+    if (phone !== undefined && (typeof phone !== 'string' || phone.trim().length > MAX_PHONE_LENGTH)) {
+      return NextResponse.json({ error: 'Invalid phone' }, { status: 400 });
     }
 
     // Only allow updating specific fields
