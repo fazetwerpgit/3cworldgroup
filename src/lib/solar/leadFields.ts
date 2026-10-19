@@ -1,5 +1,6 @@
 // Validation for solar lead input (POST /api/portal/solar/leads and PATCH).
 import { isCleanAttachmentPath } from '@/lib/forms/attachmentPath';
+import { buildSubmissionAttachmentFolder, isValidFormUploadId } from '@/lib/forms/formUploads';
 
 export const CREDIT_TIERS = ['purchase_600', 'lease_ppa_680'] as const;
 export type CreditTier = (typeof CREDIT_TIERS)[number];
@@ -22,6 +23,13 @@ export function photoPrefix(uid: string): string {
   return `form-attachments/${uid}/solar-lead/`;
 }
 
+/** The upload id segment of a solar-lead photo path, or '' when there is none. */
+function uploadIdOf(path: string, uid: string): string {
+  const rest = path.startsWith(photoPrefix(uid)) ? path.slice(photoPrefix(uid).length) : '';
+  const id = rest.split('/', 1)[0];
+  return isValidFormUploadId(id) ? id : '';
+}
+
 export type LeadFields = {
   first: string;
   last: string;
@@ -34,6 +42,12 @@ export type LeadFields = {
   monthlyBill: number | null;
   creditTier: CreditTier | null;
   photos: Partial<Record<PhotoSlot, string>>;
+  /**
+   * The per-lead upload id its photos live under. Stored on the lead so the
+   * upload route refuses to replace them once the lead is saved (same lock as
+   * Leads Request). '' when the caller sent neither an id nor photos.
+   */
+  uploadId: string;
   doorId: string | null;
   campaignId: string | null;
   source: 'portal' | 'knock';
@@ -62,15 +76,28 @@ export function parseLead(body: Record<string, unknown>, uid: string): { ok: tru
     creditTier = body.creditTier;
   }
 
+  let uploadId = '';
+  if (body.uploadId !== undefined && body.uploadId !== null && body.uploadId !== '') {
+    if (!isValidFormUploadId(body.uploadId)) return { ok: false, error: 'Invalid uploadId' };
+    uploadId = body.uploadId;
+  }
+
+  // Each photo must be exactly this caller's folder for this lead's upload id
+  // and that slot: form-attachments/{uid}/solar-lead/{uploadId}/{slot}/. A
+  // caller that sends photos without an uploadId (3C Doors) gets the id read
+  // from the first photo, and every other photo must share it.
   const photos: Partial<Record<PhotoSlot, string>> = {};
   const rawPhotos = body.photos;
   if (rawPhotos !== undefined && rawPhotos !== null) {
     if (typeof rawPhotos !== 'object' || Array.isArray(rawPhotos)) return { ok: false, error: 'Invalid photos' };
-    const prefix = photoPrefix(uid);
     for (const slot of PHOTO_SLOTS) {
       const v = (rawPhotos as Record<string, unknown>)[slot];
       if (v === undefined || v === null || v === '') continue;
-      if (typeof v !== 'string' || v.length > 300 || !isCleanAttachmentPath(v) || !v.startsWith(prefix)) {
+      if (typeof v !== 'string' || v.length > 300 || !isCleanAttachmentPath(v)) {
+        return { ok: false, error: 'Invalid photo path' };
+      }
+      if (!uploadId) uploadId = uploadIdOf(v, uid);
+      if (!uploadId || v !== buildSubmissionAttachmentFolder(uid, 'solar-lead', uploadId, slot)) {
         return { ok: false, error: 'Invalid photo path' };
       }
       photos[slot] = v;
@@ -95,6 +122,7 @@ export function parseLead(body: Record<string, unknown>, uid: string): { ok: tru
       monthlyBill,
       creditTier,
       photos,
+      uploadId,
       doorId,
       campaignId,
       source,

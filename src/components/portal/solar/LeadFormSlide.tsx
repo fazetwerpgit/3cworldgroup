@@ -122,6 +122,7 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
     const lead = state.lead;
     const res = await createLead({
       clientId: state.clientId,
+      uploadId: state.uploadId,
       first: lead.first.trim(),
       last: lead.last.trim(),
       address: lead.address.trim(),

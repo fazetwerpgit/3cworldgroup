@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const state = vi.hoisted(() => ({ submitted: false, saleFolders: [] as string[] }));
+const state = vi.hoisted(() => ({ submitted: false, saleFolders: [] as string[], collections: [] as string[] }));
 const save = vi.fn(async (_buffer: Buffer, _opts: { contentType: string }) => {});
 const savedPaths: string[] = [];
 const deleteFiles = vi.fn(async () => {});
@@ -20,7 +20,12 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedUser: vi.fn(async () => ({ ok: true, uid: 'u1', name: 'Rep One', email: 'rep@x.com' })),
 }));
 vi.mock('@/lib/firebase/admin', () => ({
-  adminDb: { collection: () => ({ where }) },
+  adminDb: {
+    collection: (name: string) => {
+      state.collections.push(name);
+      return { where };
+    },
+  },
   getOnboardingBucket: () => ({
     deleteFiles,
     file: (path: string) => {
@@ -36,10 +41,10 @@ import { resetUserRateLimits } from '@/lib/userRateLimits';
 const UPLOAD_ID = 'a'.repeat(32);
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]);
 
-function req(file: File, uploadId = UPLOAD_ID) {
+function req(file: File, uploadId = UPLOAD_ID, formType = 'payroll-dispute', slot = '') {
   const form = new FormData();
-  form.set('formType', 'payroll-dispute');
-  form.set('slot', '');
+  form.set('formType', formType);
+  form.set('slot', slot);
   form.set('uploadId', uploadId);
   form.set('file', file);
   return new NextRequest('http://localhost/api/portal/forms/upload', { method: 'POST', body: form });
@@ -49,6 +54,7 @@ beforeEach(() => {
   resetUserRateLimits();
   state.submitted = false;
   state.saleFolders = [];
+  state.collections = [];
   save.mockClear();
   deleteFiles.mockClear();
   where.mockClear();
@@ -72,6 +78,23 @@ describe('POST /api/portal/forms/upload', () => {
   it("won't replace the proof of a request that was already sent", async () => {
     state.submitted = true;
     const res = await POST(req(new File([PNG], 'proof.png', { type: 'image/png' })));
+    expect(res.status).toBe(409);
+    expect(where).toHaveBeenCalledWith('uploadId', '==', UPLOAD_ID);
+    expect(deleteFiles).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("won't replace a photo on a saved solar lead", async () => {
+    const photo = () => new File([PNG], 'bill.png', { type: 'image/png' });
+    const first = await POST(req(photo(), UPLOAD_ID, 'solar-lead', 'billPage1'));
+    expect(first.status).toBe(200);
+    await expect(first.json()).resolves.toEqual({ path: `form-attachments/u1/solar-lead/${UPLOAD_ID}/billPage1/` });
+    expect(state.collections).toContain('solarLeads');
+
+    state.submitted = true;
+    save.mockClear();
+    deleteFiles.mockClear();
+    const res = await POST(req(photo(), UPLOAD_ID, 'solar-lead', 'billPage1'));
     expect(res.status).toBe(409);
     expect(where).toHaveBeenCalledWith('uploadId', '==', UPLOAD_ID);
     expect(deleteFiles).not.toHaveBeenCalled();

@@ -20,8 +20,8 @@ async function saleReferencesProofFolder(folder: string): Promise<boolean> {
 }
 
 // POST /api/portal/forms/upload - verified user uploads a form attachment.
-// Writes ONLY under the verified caller's own folder. Payroll Dispute / Leads
-// Request uploads must carry a per-submission uploadId and land in
+// Writes ONLY under the verified caller's own folder. Payroll Dispute, Leads
+// Request and solar lead uploads must carry a per-submission uploadId and land in
 // form-attachments/{uid}/{formType}/{uploadId}/[{slot}/]. Returns the folder path.
 export async function POST(request: NextRequest) {
   try {

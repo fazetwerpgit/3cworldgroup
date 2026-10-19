@@ -30,6 +30,8 @@ const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
 const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 
 const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false };
+const UP = 'a'.repeat(32);
+const UP2 = 'b'.repeat(32);
 const VALID = {
   first: 'Ana',
   last: 'Lopez',
@@ -40,7 +42,7 @@ const VALID = {
   phone: '(559) 555-0101',
   email: 'ana@example.com',
   monthlyBill: '$212.50',
-  photos: { billPage1: 'form-attachments/rep1/solar-lead/abc/billPage1/', panel: 'form-attachments/rep1/solar-lead/abc/panel/' },
+  photos: { billPage1: `form-attachments/rep1/solar-lead/${UP}/billPage1/`, panel: `form-attachments/rep1/solar-lead/${UP}/panel/` },
 };
 
 function seed(users: Record<string, Record<string, unknown>>, extra: Record<string, Record<string, Record<string, unknown>>> = {}) {
@@ -140,12 +142,26 @@ describe('POST /api/portal/solar/leads', () => {
     ['bad email', { email: 'nope' }],
     ['bad bill', { monthlyBill: 'lots' }],
     ['bad credit tier', { creditTier: 'gold' }],
-    ['photo in another rep folder', { photos: { panel: 'form-attachments/other/solar-lead/abc/panel/' } }],
-    ['photo outside solar-lead', { photos: { panel: 'form-attachments/rep1/payroll-dispute/abc/' } }],
+    ['photo in another rep folder', { photos: { panel: `form-attachments/other/solar-lead/${UP}/panel/` } }],
+    ['photo outside solar-lead', { photos: { panel: `form-attachments/rep1/payroll-dispute/${UP}/` } }],
     ['traversal photo path', { photos: { panel: 'form-attachments/rep1/solar-lead/../../x/' } }],
+    ['photo without an upload id', { photos: { panel: 'form-attachments/rep1/solar-lead/panel/' } }],
+    ['photo in the wrong slot', { photos: { panel: `form-attachments/rep1/solar-lead/${UP}/billGraph/` } }],
+    ['photos from two upload ids', { photos: { billPage1: `form-attachments/rep1/solar-lead/${UP}/billPage1/`, panel: `form-attachments/rep1/solar-lead/${UP2}/panel/` } }],
+    ['photo outside the sent uploadId', { uploadId: UP2 }],
+    ['bad uploadId', { uploadId: 'nope' }],
   ])('400s on %s', async (_label, patch) => {
     expect((await POST(req({ ...VALID, ...patch }))).status).toBe(400);
     expect(db.store.get('solarLeads')).toBeUndefined();
+  });
+
+  it('stores the upload id so the photos are locked (sent, or read from the photo paths)', async () => {
+    const sent = await (await POST(req({ ...VALID, uploadId: UP, clientId: 'c-a' }))).json();
+    expect(db.store.get('solarLeads')!.get(sent.id)).toMatchObject({ uploadId: UP });
+    const derived = await (await POST(req({ ...VALID, clientId: 'c-b' }))).json();
+    expect(db.store.get('solarLeads')!.get(derived.id)).toMatchObject({ uploadId: UP });
+    const noPhotos = await (await POST(req({ ...VALID, photos: undefined, uploadId: UP2, clientId: 'c-c' }))).json();
+    expect(db.store.get('solarLeads')!.get(noPhotos.id)).toMatchObject({ uploadId: UP2, photos: {} });
   });
 
   it('marks 3C Doors leads as source knock', async () => {

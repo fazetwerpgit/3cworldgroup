@@ -155,6 +155,7 @@ async function call<T>(url: string, init: RequestInit = {}): Promise<ApiResult<T
 
 export function createLead(payload: LeadFields & {
   clientId: string;
+  uploadId: string;
   monthlyBill: number;
   photos: Partial<Record<PhotoSlot, string>>;
 }) {

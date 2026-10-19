@@ -103,7 +103,7 @@ export function isAllowedFormUpload(formType: string, slot: string): boolean {
   return Array.isArray(slots) && slots.includes(slot);
 }
 
-// Payroll Dispute + Leads Request: every submission gets its own upload id
+// Payroll Dispute, Leads Request and solar leads: every submission gets its own upload id
 // (generated client-side when the form opens), so a rep's second dispute or an
 // abandoned upload can never replace/delete the proof on an earlier submission.
 // Format: 32 lowercase hex (randomHex, the dash-stripped randomUUID shape).
@@ -115,6 +115,7 @@ const PER_SUBMISSION_FORMS = new Set(['payroll-dispute', 'leads-request', 'solar
 export const SUBMISSION_COLLECTION: Record<string, string> = {
   'payroll-dispute': 'payrollDisputes',
   'leads-request': 'leadsRequests',
+  'solar-lead': 'solarLeads',
 };
 
 export function newFormUploadId(): string {
