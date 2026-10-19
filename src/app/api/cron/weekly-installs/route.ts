@@ -7,11 +7,11 @@ import { isSendHour } from '@/lib/weeklyInstalls/week';
 
 // Monday 8 AM America/Chicago: each rep's "what got installed" email.
 //
-// vercel.json schedules this at 13:00 AND 14:00 UTC on Mondays, because Vercel
-// crons run in UTC and 8 AM Chicago is one or the other depending on DST. The
-// run proceeds when the Chicago hour is 8 (the send) or 9 (the summer 14:00
-// slot: a resume pass that sends only to reps the first run did not finish;
-// the send log, sendLog.ts, skips everyone already sent).
+// vercel.json schedules this at 13:00, 14:00 AND 15:00 UTC on Mondays, because
+// Vercel crons run in UTC and 8 AM Chicago is 13:00 or 14:00 depending on DST.
+// The run proceeds when the Chicago hour is 8 (the send) or 9 (the next slot in
+// either season: a resume pass that sends only to reps the first run did not
+// finish; the send log, sendLog.ts, skips everyone already sent).
 //
 // `?force=1` skips the hour gate, and ONLY when WEEKLY_INSTALLS_EMAIL_ONLY_TO
 // is set, so the owner can trigger a redirected test run at any time without

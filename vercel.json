@@ -13,6 +13,10 @@
       "schedule": "0 14 * * 1"
     },
     {
+      "path": "/api/cron/weekly-installs?slot=cst-resume",
+      "schedule": "0 15 * * 1"
+    },
+    {
       "path": "/api/cron/announcements?slot=cdt",
       "schedule": "0 13 * * *"
     },

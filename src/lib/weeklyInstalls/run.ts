@@ -7,8 +7,9 @@ import { reportWeekFor, type ReportWeek } from '@/lib/weeklyInstalls/week';
 
 // The Monday send. Kill switch first, then one digest per active rep, then a
 // claimed, awaited send for each one that has something to say. Resumable: a
-// second run the same Monday (the backup slot) skips every rep already `sent`
-// and retries the ones a dead or failed run left behind (sendLog.canReclaim).
+// second run the same Monday (the 9 AM resume slot, summer and winter) skips
+// every rep already `sent` and retries the ones a dead or failed run left
+// behind (sendLog.canReclaim).
 //
 //   WEEKLY_INSTALLS_EMAIL_ENABLED  must be exactly "true" or nothing is sent and
 //                                  nothing is written (a dry run reports what

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   addDays,
@@ -57,9 +59,36 @@ describe('weekly installs week bounds', () => {
     // Winter (CST, UTC-6): 14:00 UTC is 8 AM.
     expect(isSendHour(new Date('2026-11-09T13:00:00Z'))).toBe(false);
     expect(isSendHour(new Date('2026-11-09T14:00:00Z'))).toBe(true);
+    // Winter 15:00 UTC is 9 AM: the winter resume pass.
+    expect(isSendHour(new Date('2026-11-09T15:00:00Z'))).toBe(true);
+    expect(isSendHour(new Date('2026-11-09T16:00:00Z'))).toBe(false);
     // Never on another weekday.
     expect(isSendHour(new Date('2026-09-22T13:00:00Z'))).toBe(false);
     expect(chicagoHour(new Date('2026-11-09T14:00:00Z'))).toBe(8);
+  });
+
+  it('schedules a send AND a resume pass in vercel.json in both summer and winter', () => {
+    const vercel = JSON.parse(readFileSync(join(process.cwd(), 'vercel.json'), 'utf8')) as {
+      crons: { path: string; schedule: string }[];
+    };
+    const utcHours = vercel.crons
+      .filter((cron) => cron.path.startsWith('/api/cron/weekly-installs'))
+      .map((cron) => {
+        const [minute, hour, , , weekday] = cron.schedule.split(' ');
+        expect(minute).toBe('0');
+        expect(weekday).toBe('1');
+        return Number(hour);
+      });
+    const chicagoHoursOpen = (monday: string) =>
+      utcHours
+        .map((hour) => new Date(`${monday}T${String(hour).padStart(2, '0')}:00:00Z`))
+        .filter(isSendHour)
+        .map(chicagoHour)
+        .sort((a, b) => a - b);
+    // Summer (CDT) and winter (CST): one run at 8 AM, one resume run at 9 AM.
+    expect(chicagoHoursOpen('2026-09-21')).toEqual([8, 9]);
+    expect(chicagoHoursOpen('2026-11-09')).toEqual([8, 9]);
+    expect(chicagoHoursOpen('2027-01-04')).toEqual([8, 9]);
   });
 
   it('validates day keys and ranges inclusively', () => {
