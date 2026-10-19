@@ -62,8 +62,8 @@ const sale = (over: Partial<Sale>): Sale => ({
   ...over,
 } as unknown as Sale);
 
-function fiber(orders: FiberOrder[]) {
-  const data: FiberStatusResponse = { scope: 'all', lastReportAt: '2026-09-01', orders, unmatched: [] };
+function fiber(orders: FiberOrder[], unmatched: FiberOrder[] = []) {
+  const data: FiberStatusResponse = { scope: 'all', lastReportAt: '2026-09-01', orders, unmatched };
   return { data, loading: false, error: null, refetch: async () => {} };
 }
 
@@ -135,6 +135,46 @@ describe('what a rep logged, under the carrier rows', () => {
     // One group survives, expanded, and only the matching submission is in it.
     expect(container.querySelectorAll('[data-part="group"]')).toHaveLength(1);
     expect(submittedAddresses()).toEqual(['58030 Jewwel Rd.']);
+  });
+});
+
+describe('searching for an order that is not linked to an account yet', () => {
+  const linked = order({});
+  const loose = order({ id: 'TMO9', repName: 'Dana Unlinked', repDealerId: '9990001', matchedUserId: null, address: '77 CEDAR LN' });
+
+  async function search(text: string) {
+    const input = container.querySelector<HTMLInputElement>('[data-part="search"] input')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    await act(async () => {
+      setter.call(input, text);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  it('finds it in the not-linked group, open, instead of saying no carrier order exists', async () => {
+    await render({ fiber: fiber([linked], [loose]), sales: [], ownerView: true, viewerId: 'owner1' });
+    await search('cedar');
+
+    expect(container.textContent).not.toContain('Nothing matches that');
+    const groups = [...container.querySelectorAll('[data-part="group"]')];
+    expect(groups).toHaveLength(1);
+    expect(groups[0].getAttribute('aria-label')).toBe('Dana Unlinked, 1 orders');
+    expect(container.querySelector('[aria-label="Assign Dana Unlinked"]')).not.toBeNull();
+  });
+
+  it('drops not-linked groups the search does not hit', async () => {
+    await render({ fiber: fiber([linked], [loose]), sales: [], ownerView: true, viewerId: 'owner1' });
+    await search('jewell');
+
+    const labels = [...container.querySelectorAll('[data-part="group"]')].map((n) => n.getAttribute('aria-label'));
+    expect(labels).toEqual(['Noah St John, 1 orders']);
+  });
+
+  it('still says nothing matches when neither side has it', async () => {
+    await render({ fiber: fiber([linked], [loose]), sales: [], ownerView: true, viewerId: 'owner1' });
+    await search('zzz nowhere');
+
+    expect(container.textContent).toContain('Nothing matches that');
   });
 });
 

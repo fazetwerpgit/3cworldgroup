@@ -294,6 +294,12 @@ export function FiberRows({ orders, showRepName = false, saleFor, onOpenSale }: 
   );
 }
 
+// A carrier order answers a search on its street or its customer, whichever
+// group (linked or not) it sits in.
+function orderMatches(order: FiberOrder, needle: string) {
+  return `${order.address ?? ''} ${order.customerName ?? ''}`.toLowerCase().includes(needle);
+}
+
 function groupDomId(groupKey: string) {
   return `sales-line-fiber-group-${encodeURIComponent(groupKey).replace(/%/g, '-')}`;
 }
@@ -393,8 +399,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
       .sort((a, b) => a.repName.localeCompare(b.repName));
     if (!needle) return all;
     return all.filter((group) =>
-      group.orders.some((order) =>
-        `${order.address ?? ''} ${order.customerName ?? ''}`.toLowerCase().includes(needle))
+      group.orders.some((order) => orderMatches(order, needle))
       || submissionsFor(group.userId).length > 0);
   }, [matchedGroups, needle, submissionOnlyGroups, submissionsFor]);
 
@@ -408,8 +413,13 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
       groups.set(key, existing ?? { key, repName, dealerId, orders: [] });
       groups.get(key)!.orders.push(order);
     });
-    return [...groups.values()].sort((a, b) => a.repName.localeCompare(b.repName) || a.dealerId.localeCompare(b.dealerId));
-  }, [unmatchedOrders]);
+    const all = [...groups.values()].sort((a, b) => a.repName.localeCompare(b.repName) || a.dealerId.localeCompare(b.dealerId));
+    // The same search narrows these too: a street that only lives in a
+    // not-linked order is still a carrier order, and the group is where it
+    // gets assigned.
+    if (!needle) return all;
+    return all.filter((group) => group.orders.some((order) => orderMatches(order, needle)));
+  }, [needle, unmatchedOrders]);
   const updated = relativeReportDate(data?.lastReportAt ?? null);
   const isAdmin = data ? data.scope === 'all' : adminView;
 
@@ -588,7 +598,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
 
           {filteredOrders.length === 0 && repGroups.length === 0 ? (
             <p className={x.empty}>No install statuses match this filter.</p>
-          ) : needle && repGroups.length === 0 ? (
+          ) : needle && repGroups.length === 0 && unmatchedAssignmentGroups.length === 0 ? (
             <p className={x.empty}>
               Nothing matches that — no carrier order and nothing logged in the portal.
             </p>
@@ -638,7 +648,7 @@ function InstallStatusSectionContent({ fiber, sales = [], ownerView = false, vie
                   {rematchError && <p className={`${x.inlineError} ${x.note}`} role="alert">{rematchError}</p>}
                   {unmatchedAssignmentGroups.map((assignment) => {
                     const groupKey = `unmatched:${assignment.key}`;
-                    const open = openGroups.has(groupKey);
+                    const open = needle ? true : openGroups.has(groupKey);
                     return (
                       <section data-part="group" key={assignment.key} aria-label={`${assignment.repName}, ${assignment.orders.length} orders`}>
                         {groupHead(
