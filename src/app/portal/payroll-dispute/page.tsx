@@ -173,16 +173,21 @@ function PayrollDisputeForm() {
           label="Screenshot or proof"
           accept="image/*,application/pdf"
           hint="Order ID, campaign and pay line visible in one frame."
-          upload={(file, signal) =>
-            uploadFormAttachment({
+          upload={(file, signal) => {
+            // The upload route empties this dispute's folder before saving, so the
+            // old proof is gone the moment a Replace starts. Forget it now; only a
+            // finished upload (onUploaded) sets the path again, so a failed or
+            // cancelled Replace sends no proof instead of a stale or unwanted one.
+            setForm((p) => ({ ...p, orderScreenshotPath: '' }));
+            return uploadFormAttachment({
               file,
               itemId: 'payroll-dispute',
               formType: 'payroll-dispute',
               fields: { uploadId },
               getHeaders,
               signal,
-            })
-          }
+            });
+          }}
           onUploaded={(path) => setForm((p) => ({ ...p, orderScreenshotPath: path }))}
           onBusyChange={onBusyChange}
         />
