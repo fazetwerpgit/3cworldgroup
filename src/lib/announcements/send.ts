@@ -112,6 +112,53 @@ export interface CronSummary {
   sent: string[];
   skipped: string[];
   failed: string[];
+  /** Stuck in `sending` before any push went out: put back to `scheduled` and retried. */
+  requeued: string[];
+  /** Stuck in `sending` after the fan-out began: marked `failed` (partial), never resent. */
+  stalled: string[];
+}
+
+/** A send that has sat in `sending` this long died with its function (timeout, crash). */
+export const STALE_SENDING_MS = 10 * 60 * 1000;
+export const STALLED_ERROR = 'Timed out mid-send: some people may have received it. Not resent.';
+
+/**
+ * Recovers announcements a dead run left in `sending`. Before the fan-out began
+ * nobody was pushed, so it goes back to `scheduled` and this run sends it.
+ * After, it may have reached people, so it is marked `failed` (partial) for the
+ * owner to see, never resent. Each flip is re-checked in a transaction.
+ */
+export async function recoverStaleSending(
+  db: Firestore,
+  now: Date
+): Promise<{ requeued: string[]; stalled: string[] }> {
+  const out = { requeued: [] as string[], stalled: [] as string[] };
+  const snap = await db.collection(ANNOUNCEMENTS).where('status', '==', 'sending').get();
+  const isStale = (data: FirebaseFirestore.DocumentData | undefined) => {
+    const at = toDate(data?.sendingAt);
+    return !!at && now.getTime() - at.getTime() >= STALE_SENDING_MS;
+  };
+  for (const doc of snap.docs) {
+    if (!isStale(doc.data())) continue;
+    const ref = db.collection(ANNOUNCEMENTS).doc(doc.id);
+    try {
+      const outcome = await db.runTransaction(async (tx) => {
+        const fresh = await tx.get(ref);
+        const data = fresh.data();
+        if (!fresh.exists || data?.status !== 'sending' || !isStale(data)) return null;
+        if (data.fanOutStarted) {
+          tx.update(ref, { status: 'failed', error: STALLED_ERROR });
+          return 'stalled' as const;
+        }
+        tx.update(ref, { status: 'scheduled' });
+        return 'requeued' as const;
+      });
+      if (outcome) out[outcome].push(doc.id);
+    } catch (error) {
+      console.error('Announcement stale-send recovery failed', doc.id, error);
+    }
+  }
+  return out;
 }
 
 // Claims one announcement for sending. The status flip happens inside a
@@ -174,6 +221,8 @@ export async function sendAnnouncement(
 
 /** Sends every scheduled announcement whose sendAt has passed. */
 export async function runDueAnnouncements({ db, now }: { db: Firestore; now: Date }): Promise<CronSummary> {
+  // First, anything a dead run left in `sending` (requeued ones are sent below).
+  const { requeued, stalled } = await recoverStaleSending(db, now);
   // Equality-only query (no composite index); the due check runs here and again
   // inside the claim transaction.
   const snap = await db.collection(ANNOUNCEMENTS).where('status', '==', 'scheduled').get();
@@ -184,7 +233,7 @@ export async function runDueAnnouncements({ db, now }: { db: Firestore; now: Dat
     })
     .sort((a, b) => (toDate(a.data().sendAt)?.getTime() ?? 0) - (toDate(b.data().sendAt)?.getTime() ?? 0));
 
-  const summary: CronSummary = { due: due.length, sent: [], skipped: [], failed: [] };
+  const summary: CronSummary = { due: due.length, sent: [], skipped: [], failed: [], requeued, stalled };
   if (!due.length) return summary;
 
   // One recipients read per run, however many announcements are due.

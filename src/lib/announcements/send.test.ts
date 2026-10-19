@@ -101,6 +101,26 @@ describe('announcementRecipients', () => {
 });
 
 describe('runDueAnnouncements', () => {
+  it('requeues a send stuck in `sending` before the fan-out, and marks a partial one failed', async () => {
+    const stale = new Date(NOW.getTime() - 11 * 60 * 1000);
+    const fresh = new Date(NOW.getTime() - 60 * 1000);
+    const { db, store } = seed({
+      early: { title: 'E', body: 'b', status: 'sending', sendAt: past, sendingAt: stale },
+      partial: { title: 'P', body: 'b', status: 'sending', sendAt: past, sendingAt: stale, fanOutStarted: true },
+      inflight: { title: 'I', body: 'b', status: 'sending', sendAt: past, sendingAt: fresh },
+    });
+    const summary = await runDueAnnouncements({ db, now: NOW });
+    expect(summary.requeued).toEqual(['early']);
+    expect(summary.stalled).toEqual(['partial']);
+    expect(summary.sent).toEqual(['early']);
+    const docs = store.get('announcements')!;
+    expect(docs.get('early')?.status).toBe('sent');
+    expect(docs.get('partial')).toMatchObject({ status: 'failed' });
+    expect(docs.get('inflight')?.status).toBe('sending');
+    // Only the requeued one pushed (3 recipients); the partial one is never resent.
+    expect(sendPushToTokens).toHaveBeenCalledTimes(3);
+  });
+
   it('sends only scheduled announcements that are due', async () => {
     const { db, store } = seed({
       due: { title: 'Auto-fill', body: 'Try it', status: 'scheduled', sendAt: past },
