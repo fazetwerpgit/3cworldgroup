@@ -19,7 +19,13 @@ import {
   CallDay,
   CallDayLabels,
 } from '@/types';
-import { type CentralNow, getMinutesUntil, isPastOccurrence } from './callTiming';
+import {
+  type CentralNow,
+  getMinutesUntil,
+  getNextOccurrenceDateNumber,
+  getWeekStripDays,
+  isPastOccurrence,
+} from './callTiming';
 
 interface CallEntry {
   id: string;
@@ -164,19 +170,6 @@ function formatCountdown(minutes: number): string {
   if (minutes >= 1440) return `${Math.floor(minutes / 1440)}d ${Math.floor((minutes % 1440) / 60)}h`;
   if (minutes >= 60) return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
   return `${minutes}m`;
-}
-
-function getCentralDateNumber(day: CallDay, date: Date): string {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
-    timeZone: CENTRAL_TIME_ZONE,
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-  }).formatToParts(date).map(({ type, value }) => [type, value]));
-  const centralDate = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
-  const offset = CALL_DAY_ORDER.indexOf(day) - CALL_DAY_ORDER.indexOf(getCentralNow(date).day);
-  centralDate.setUTCDate(centralDate.getUTCDate() + offset);
-  return String(centralDate.getUTCDate());
 }
 
 export default function CallsSchedulePage() {
@@ -425,8 +418,8 @@ export default function CallsSchedulePage() {
                   <span className={p.rowSub}>Central Time</span>
                 </div>
                 <div className={c.week} role="tablist" aria-label="Select day">
-                  {CALL_DAY_ORDER.map((day) => {
-                    const date = getCentralDateNumber(day, new Date(nowTick));
+                  {getWeekStripDays(now.day).map((day) => {
+                    const date = getNextOccurrenceDateNumber(day, new Date(nowTick));
                     return (
                       <button
                         key={day}
