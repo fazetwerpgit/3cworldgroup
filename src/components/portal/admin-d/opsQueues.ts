@@ -5,6 +5,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { auth } from '@/lib/firebase/config';
 import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
+import { chicagoDayBounds } from '@/lib/leaderboard/periods';
+import { chicagoTodayKey } from '@/lib/sales/saleDate';
 import {
   CHAT_REPORTS_HUB,
   ONBOARDING_HUB,
@@ -58,7 +60,6 @@ interface QueueSource {
   load: (get: (url: string) => Promise<Record<string, unknown>>) => Promise<QueueFigures>;
 }
 
-const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 /** The Requests and chat-report badge figures, all from one aggregate-only call. */
 const QUEUE_COUNTS_URL = '/api/portal/admin/queue-counts';
 /** Cached queues older than this reload when a page that shows them mounts. */
@@ -74,14 +75,16 @@ async function authedJson(url: string): Promise<Record<string, unknown>> {
 
 function figuresFrom(times: (string | null | undefined)[]): QueueFigures {
   const now = Date.now();
-  const ages = times.flatMap((iso) => {
-    const age = iso ? now - new Date(iso).getTime() : Number.NaN;
-    return Number.isNaN(age) ? [] : [age];
+  // "New today" is the business day: since Chicago midnight, not the last 24 hours.
+  const todayStart = chicagoDayBounds(chicagoTodayKey(new Date(now))).start.getTime();
+  const stamps = times.flatMap((iso) => {
+    const at = iso ? new Date(iso).getTime() : Number.NaN;
+    return Number.isNaN(at) ? [] : [at];
   });
   return {
     count: times.length,
-    oldestWaitMs: ages.length ? Math.max(...ages) : null,
-    newToday: ages.filter((age) => age <= ONE_DAY_MS).length,
+    oldestWaitMs: stamps.length ? now - Math.min(...stamps) : null,
+    newToday: stamps.filter((at) => at >= todayStart).length,
   };
 }
 

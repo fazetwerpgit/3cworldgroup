@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   failing: new Set<string>(),
   /** Request forms whose count the batch endpoint answers null for. */
   nullForms: new Set<string>(),
+  /** Replaces the website applications the invites endpoint answers with. */
+  applications: null as { status: string; createdAt: string }[] | null,
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
@@ -53,7 +55,7 @@ function respond(url: string) {
       ok: true,
       body: {
         invites: [{ status: 'submitted', submittedAt: ago(3 * 24 * HOUR) }, { status: 'invited' }],
-        applications: [
+        applications: state.applications ?? [
           { status: 'applied', createdAt: ago(HOUR) },
           { status: 'applied', createdAt: ago(2 * 24 * HOUR) },
           { status: 'invited', createdAt: ago(HOUR) },
@@ -102,7 +104,13 @@ async function renderAs(user: Omit<TestUser, 'uid'>) {
   return seen!;
 }
 
+// Noon on a Tuesday in Chicago, so "an hour ago" and "30 hours ago" land on today and yesterday.
+const TUESDAY_NOON_CHICAGO = new Date('2026-10-20T17:00:00.000Z');
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(TUESDAY_NOON_CHICAGO);
+  state.applications = null;
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockClear();
@@ -115,6 +123,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 describe('useOpsQueues', () => {
@@ -159,6 +168,19 @@ describe('useOpsQueues', () => {
       '/portal/admin/chat-reports': 1,
     });
     expect(tabs).toEqual({ todo: 2 + 1 + 2 + 4 });
+  });
+
+  it('counts new today from Chicago midnight, not the last 24 hours', async () => {
+    // 9am Tuesday in Chicago (CDT): one applicant from 3pm Monday, one from 8:30am Tuesday.
+    vi.setSystemTime(new Date('2026-10-20T14:00:00.000Z'));
+    state.applications = [
+      { status: 'applied', createdAt: '2026-10-19T20:00:00.000Z' },
+      { status: 'applied', createdAt: '2026-10-20T13:30:00.000Z' },
+    ];
+    const { queues } = await renderAs({ role: 'admin' });
+    const applicants = queues.cards!.find((card) => card.key === 'applicants')!;
+    expect(applicants).toMatchObject({ count: 2, newToday: 1 });
+    expect(applicants.oldestWaitMs).toBe(18 * HOUR);
   });
 
   it('asks a manager for nothing: their Recruits tab shows no count', async () => {
