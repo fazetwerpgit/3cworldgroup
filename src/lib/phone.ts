@@ -14,16 +14,7 @@ export function displayPhone(raw: string): string {
   return formatPhone(raw) ?? raw.trim();
 }
 
-/**
- * A tel: link for a stored phone. Reps type the phone as free text, so only
- * the first number is dialed: "512-555-0142 ext 12" or "512-555-0142 /
- * 512-555-0199" both dial +1 512-555-0142, never all the digits run together.
- * A US number dials as +1 and ten digits; anything else keeps its digits and
- * a leading +.
- */
+/** A tel: link for a stored phone, keeping only digits and a leading +. */
 export function telHref(raw: string): string {
-  const first = raw.match(/\+?\d[\d\s().-]*/)?.[0] ?? '';
-  const us = formatPhone(first);
-  if (us) return `tel:+1${us.replace(/\D/g, '')}`;
-  return `tel:${first.replace(/[^0-9+]/g, '')}`;
+  return `tel:${raw.replace(/[^0-9+]/g, '')}`;
 }

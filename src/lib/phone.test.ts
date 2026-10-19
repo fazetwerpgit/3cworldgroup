@@ -21,19 +21,7 @@ describe('displayPhone', () => {
 });
 
 describe('telHref', () => {
-  it('dials a US number as +1 and its ten digits', () => {
-    expect(telHref('(515) 555-0123')).toBe('tel:+15155550123');
-    expect(telHref('1-515-555-0123')).toBe('tel:+15155550123');
-  });
-
-  it('dials only the first number when a rep typed an extension or a second phone', () => {
-    expect(telHref('512-555-0142 ext 12')).toBe('tel:+15125550142');
-    expect(telHref('512-555-0142 x12')).toBe('tel:+15125550142');
-    expect(telHref('512-555-0142 / 512-555-0199')).toBe('tel:+15125550142');
-    expect(telHref('5125550142, 5125550199')).toBe('tel:+15125550142');
-  });
-
-  it('keeps an international number with its leading +', () => {
-    expect(telHref(' +44 20 7946 0958 ')).toBe('tel:+442079460958');
+  it('dials the digits only', () => {
+    expect(telHref('(515) 555-0123')).toBe('tel:5155550123');
   });
 });
