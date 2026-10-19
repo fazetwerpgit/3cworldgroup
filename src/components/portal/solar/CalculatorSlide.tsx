@@ -5,12 +5,11 @@ import { futureValue } from '@/lib/solar/calc';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useDeck } from './deckState';
 import { formatWholeDollars } from './solarClient';
+import { BILL_SLIDER_MAX, BILL_SLIDER_MIN, cleanBillDraft, editableBill, formatBill, parseBill, sliderPosition } from './billInput';
 import s from './solarDeck.module.css';
 
 // Slide 4: what the monthly power bill would grow to if it were saved instead
 // (futureValue: monthly deposit at the start of each month, 5% APY, 25 years).
-
-const MAX_BILL = 5000;
 
 /** Tweens to `target` over ~700 ms; jumps straight there for reduced motion. */
 function useTween(target: number, reduced: boolean): number {
@@ -41,20 +40,22 @@ function useTween(target: number, reduced: boolean): number {
 export function CalculatorSlide() {
   const { state, update } = useDeck();
   const reduced = usePrefersReducedMotion();
-  // What is being typed; null shows the stored bill (after the slider moves, or on blur).
+  // What is being typed; null shows the stored bill, formatted (after the slider moves, or on blur).
   const [draft, setDraft] = useState<string | null>(null);
   const [adjusting, setAdjusting] = useState(false);
+  const billRef = useRef<HTMLInputElement>(null);
 
   const result = futureValue(state.monthlyBill, state.apy, state.years);
   const total = useTween(result.total, reduced);
   const principalPct = result.total > 0 ? (result.principal / result.total) * 100 : 100;
   const months = Math.round(state.years * 12);
 
+  // Typed amounts keep their cents and may run past the slider's top; the
+  // slider just parks at its end.
   const setBill = (text: string) => {
-    const digits = text.replace(/[^\d]/g, '').slice(0, 4);
-    setDraft(digits);
-    const n = Math.min(MAX_BILL, Number(digits) || 0);
-    update({ monthlyBill: n });
+    const clean = cleanBillDraft(text);
+    setDraft(clean);
+    update({ monthlyBill: parseBill(clean) });
   };
 
   return (
@@ -65,19 +66,31 @@ export function CalculatorSlide() {
       <div className={s.calc}>
         <div>
           <label className={s.label} htmlFor="solar-bill">
-            Monthly deposit
+            Monthly electric bill
           </label>
-          <div className={s.billInput}>
+          {/* The whole field takes the tap, the $ and "/ month" included. */}
+          <div className={s.billInput} onClick={() => billRef.current?.focus()}>
             <span aria-hidden>$</span>
             <input
+              ref={billRef}
               id="solar-bill"
-              inputMode="numeric"
-              pattern="[0-9]*"
+              type="text"
+              inputMode="decimal"
               autoComplete="off"
               enterKeyHint="done"
-              value={draft ?? String(state.monthlyBill)}
+              placeholder="0"
+              value={draft ?? formatBill(state.monthlyBill)}
+              onFocus={(e) => {
+                const input = e.currentTarget;
+                setDraft(editableBill(state.monthlyBill));
+                // After React swaps in the plain digits, select them so typing replaces the amount.
+                requestAnimationFrame(() => input.select());
+              }}
               onBlur={() => setDraft(null)}
               onChange={(e) => setBill(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+              }}
               aria-describedby="solar-bill-note"
             />
             <span className={s.perMonth}>/ month</span>
@@ -85,10 +98,10 @@ export function CalculatorSlide() {
           <input
             className={s.range}
             type="range"
-            min={50}
-            max={600}
+            min={BILL_SLIDER_MIN}
+            max={BILL_SLIDER_MAX}
             step={5}
-            value={Math.min(600, Math.max(50, state.monthlyBill))}
+            value={sliderPosition(state.monthlyBill)}
             onChange={(e) => {
               setDraft(null);
               update({ monthlyBill: Number(e.target.value) });

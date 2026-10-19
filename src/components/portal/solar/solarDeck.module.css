@@ -463,13 +463,25 @@ button.exit {
 .billInput {
   display: flex;
   align-items: baseline;
-  gap: 4px;
-  border-bottom: 2px solid var(--line-strong);
-  padding-bottom: 6px;
+  gap: 6px;
   margin-top: 10px;
+  padding: 10px 16px 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 14px;
+  background: rgba(148, 163, 184, 0.06);
+  cursor: text;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+@media (hover: hover) {
+  .billInput:hover {
+    border-color: rgba(148, 163, 184, 0.5);
+  }
 }
 .billInput:focus-within {
   border-color: var(--accent);
+  background: rgba(56, 189, 248, 0.07);
 }
 .billInput span {
   font-family: var(--display);
@@ -480,14 +492,19 @@ button.exit {
 .billInput input {
   width: 100%;
   min-width: 0;
+  padding: 0;
   background: transparent;
   border: 0;
   outline: none;
   color: var(--ink);
+  caret-color: var(--accent);
   font-family: var(--display);
   font-weight: 800;
   font-size: clamp(2.5rem, 5vw, 3.75rem);
   font-variant-numeric: tabular-nums;
+}
+.billInput input::placeholder {
+  color: var(--dim);
 }
 .perMonth {
   font-size: 1rem !important;
