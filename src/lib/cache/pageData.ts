@@ -10,6 +10,9 @@
 // the wait began, or — on a screen that never holds — after `fallbackMs`, and
 // never later than `maxMs`, so a hung request never parks it forever.
 
+/** Background calls (presence, push health, notifications) give a page that never holds this long first. */
+export const PAGE_DATA_FALLBACK_MS = 1500;
+
 let holds = 0;
 let lastReleaseAt = 0;
 const listeners = new Set<() => void>();

@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Notification } from '@/types/notifications';
 import { isAbortError } from '@/lib/fetch/isAbortError';
 import { getIdToken } from '@/lib/firebase/getIdToken';
+import { PAGE_DATA_FALLBACK_MS, waitForPageData } from '@/lib/cache/pageData';
 
 // The notifications route verifies the caller from the ID token. userId stays on
 // the wire as the TARGET bell being read/cleared — the route allows self or
@@ -142,7 +143,11 @@ export function useNotifications() {
   useEffect(() => {
     mountedRef.current = true;
     if (user) {
-      fetchNotifications();
+      // The first read waits for the page's own data (a cold open on LTE).
+      const firstRead = new AbortController();
+      void waitForPageData({ fallbackMs: PAGE_DATA_FALLBACK_MS, signal: firstRead.signal }).then(() => {
+        if (mountedRef.current) fetchNotifications();
+      });
 
       // Poll for new notifications every 30 seconds
       const interval = setInterval(() => {
@@ -151,6 +156,7 @@ export function useNotifications() {
 
       return () => {
         mountedRef.current = false;
+        firstRead.abort();
         clearInterval(interval);
         // Cancel any in-flight request on unmount
         if (abortControllerRef.current) {

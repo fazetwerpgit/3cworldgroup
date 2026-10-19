@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { pushSupported } from '@/lib/firebase/messaging';
 import { enablePushOnDeviceDetailed } from '@/lib/push/enablePushOnDevice';
 import { currentPermission, reportPushHealth } from '@/lib/push/reportPushHealth';
+import { PAGE_DATA_FALLBACK_MS, waitForPageData } from '@/lib/cache/pageData';
 
 // Silently re-registers this device's FCM token on every portal open, but only
 // when the user already granted notifications (permission === 'granted' means
@@ -43,7 +44,11 @@ export default function PushTokenRefresher() {
     if (!signedIn) return;
     lastRunRef.current = Date.now();
     let cancelled = false;
+    // Waits for the page's own data first (a cold open on LTE).
+    const wait = new AbortController();
     (async () => {
+      await waitForPageData({ fallbackMs: PAGE_DATA_FALLBACK_MS, signal: wait.signal });
+      if (cancelled) return;
       const supported = await pushSupported();
       const permission = currentPermission();
       let result = 'skipped';
@@ -60,6 +65,7 @@ export default function PushTokenRefresher() {
     })();
     return () => {
       cancelled = true;
+      wait.abort();
     };
   }, [signedIn, resumeTick]);
 

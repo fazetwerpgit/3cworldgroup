@@ -7,6 +7,8 @@ import { isNativeApp, useIsNativeApp } from '@/lib/app/isNativeApp';
 import { advertiseBridgeFeature, installNativeReceiver, onNativeMessage } from '@/lib/app/bridge';
 import { APP_NAVIGATE_EVENT, inAppRoute, installAppLinkHandling } from '@/lib/app/links';
 import { registerNativePushToken, syncNativePush } from '@/lib/app/nativePush';
+import { auth } from '@/lib/firebase/config';
+import { PAGE_DATA_FALLBACK_MS, waitForPageData } from '@/lib/cache/pageData';
 import { installStatusBarSync } from '@/lib/app/statusBar';
 import { installResumeMotionReset } from '@/lib/app/appVisibility';
 import { installZoomCap } from '@/lib/app/viewportZoom';
@@ -170,13 +172,25 @@ export default function AppBridgeHost() {
 
   useEffect(() => {
     if (!isNativeApp() || !signedIn || !user) return;
+    // The silent token sync (register + push health) waits for the first
+    // page's own data, so it never competes with it on a cold open.
+    const wait = new AbortController();
     if (syncedFor.current !== user.uid) {
-      syncedFor.current = user.uid;
-      void syncNativePush({ prompt: false });
+      const uid = user.uid;
+      void waitForPageData({ fallbackMs: PAGE_DATA_FALLBACK_MS, signal: wait.signal }).then(() => {
+        if (syncedFor.current === uid || auth?.currentUser?.uid !== uid) return;
+        syncedFor.current = uid;
+        void syncNativePush({ prompt: false });
+      });
     }
-    return onNativeMessage((message) => {
+    const stop = onNativeMessage((message) => {
       if (message.type === 'pushToken') void registerNativePushToken(message.token);
     });
+    return () => {
+      // Torn down before it ran (a re-render): the next run starts it.
+      wait.abort();
+      stop();
+    };
   }, [signedIn, user]);
 
   // Signed out (or the session ended): clear the icon badge and the widget.
