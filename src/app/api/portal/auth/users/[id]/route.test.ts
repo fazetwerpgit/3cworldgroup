@@ -486,6 +486,17 @@ describe('PUT /api/portal/auth/users/[id] role assignment', () => {
     expect(reconcileChatMembershipForUser).not.toHaveBeenCalled();
   });
 
+  it('recomputes chat membership when a solar role is granted or removed (the Solar channel)', async () => {
+    firestore.users.set('pending-user', { status: 'active', fieldRole: 'entry_rep', displayName: 'Dual' });
+
+    await PUT(request({ solarRole: 'entry_canvasser' }), params());
+    expect(reconcileChatMembershipForUser).toHaveBeenCalledWith('pending-user');
+
+    vi.mocked(reconcileChatMembershipForUser).mockClear();
+    await PUT(request({ solarRole: null }), params());
+    expect(reconcileChatMembershipForUser).toHaveBeenCalledWith('pending-user');
+  });
+
   it('rejects an operations caller assigning a platform role', async () => {
     firestore.users.set('pending-user', { status: 'pending', fieldRole: 'entry_rep' });
     mockGate.mockResolvedValue({ ok: true, uid: 'ops-1', name: 'Ops', isAdmin: false });

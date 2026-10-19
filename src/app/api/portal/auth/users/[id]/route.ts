@@ -528,7 +528,8 @@ export async function PUT(
     // Chat channel memberIds gate the Firestore reads and pushes, so a role or
     // status change must add/remove this user per channel right away. Fail-soft
     // like the restamps below: the profile update is already committed.
-    if (role !== undefined || fieldRole !== undefined || updateData.status !== undefined) {
+    // solarRole too: it alone gates the Solar channel (and reaches the 'all' ones).
+    if (role !== undefined || fieldRole !== undefined || solarRole !== undefined || updateData.status !== undefined) {
       try {
         await reconcileChatMembershipForUser(id);
       } catch (error) {
