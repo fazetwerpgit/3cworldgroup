@@ -143,6 +143,11 @@ function Deck() {
           aria-label={`Slide ${index + 1} of ${ORDER.length}`}
         >
           <div className={`${s.inner} ${TOP_ALIGNED[id] ? s.innerTop : ''}`}>{content}</div>
+          <footer className={s.legal}>
+            <span>3C Companies Corporation</span>
+            <span aria-hidden>/</span>
+            <span>Confidential</span>
+          </footer>
         </section>
       </div>
 

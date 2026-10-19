@@ -97,7 +97,6 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
           {error}
         </p>
       ) : null}
-      <p className={s.small}>Picking a range is not a credit check. No credit is pulled.</p>
     </>
   );
 }
@@ -256,7 +255,6 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
 export function ConfirmationSlide({ onBook }: { onBook: () => void }) {
   const { state } = useDeck();
   const b = state.booking;
-  const email = state.lead.email.trim();
   return (
     <>
       <div className={s.head}>
@@ -287,19 +285,17 @@ export function ConfirmationSlide({ onBook }: { onBook: () => void }) {
         </div>
       )}
       <div className={s.cols}>
-        {email ? (
-          <section className={s.col}>
-            <span className={s.colNum}>STEP 01</span>
-            <h3 className={s.colTitle}>Check Email</h3>
-            <p className={s.colKicker}>A confirmation email is on its way to {email}</p>
-            <p className={s.colBody}>
-              Thank you! You should have received an email. Please confirm your appointment, and we are glad to be of
-              service to you.
-            </p>
-          </section>
-        ) : null}
         <section className={s.col}>
-          <span className={s.colNum}>{email ? 'STEP 02' : 'STEP 01'}</span>
+          <span className={s.colNum}>STEP 01</span>
+          <h3 className={s.colTitle}>Check Email</h3>
+          <p className={s.colKicker}>Confirm Appointment</p>
+          <p className={s.colBody}>
+            Thank you! You should have received an email. Please confirm your appointment, and we are glad to be of
+            service to you.
+          </p>
+        </section>
+        <section className={s.col}>
+          <span className={s.colNum}>STEP 02</span>
           <h3 className={s.colTitle}>Courtesy Call</h3>
           <p className={s.colKicker}>1-2 Hours Prior</p>
           <p className={s.colBody}>You will receive a courtesy call 1-2 hours prior to your appointment from the consultant.</p>

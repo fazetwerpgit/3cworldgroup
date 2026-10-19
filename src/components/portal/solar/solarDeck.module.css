@@ -79,7 +79,9 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: clamp(8px, 3vh, 40px) clamp(16px, 5vw, 72px) 32px;
+  padding: clamp(8px, 3vh, 40px) clamp(16px, 5vw, 72px) 14px;
+  display: flex;
+  flex-direction: column;
   animation: enter 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .slide[data-dir='back'] {
@@ -97,8 +99,9 @@
   .slide { animation: none; }
 }
 .inner {
+  width: 100%;
   max-width: 1180px;
-  min-height: 100%;
+  flex: 1 0 auto;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -107,6 +110,17 @@
 }
 .innerTop {
   justify-content: flex-start;
+}
+/* The deck's footer line: small and quiet, like the pptx. */
+.legal {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 24px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+  opacity: 0.7;
 }
 
 .bottom {

@@ -359,11 +359,11 @@ export const SOLAR_ROLES = [
 export type SolarRole = (typeof SOLAR_ROLES)[number];
 
 export const SolarRoleDisplayNames: Record<SolarRole, string> = {
-  entry_canvasser: 'Entry Canvasser',
-  ae_canvasser: 'AE Canvasser',
+  entry_canvasser: 'Entry Level Canvasser',
+  ae_canvasser: 'Account Executive Canvasser',
   canvass_manager: 'Canvass Manager',
   canvass_closer: 'Canvass Closer',
-  in_person_closer: 'In-Person Closer',
+  in_person_closer: 'In-person Closer',
   virtual_closer: 'Virtual Closer',
   marketing_director: 'Marketing Director',
   sales_director: 'Sales Director',

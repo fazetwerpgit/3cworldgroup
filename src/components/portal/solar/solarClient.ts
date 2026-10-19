@@ -15,9 +15,9 @@ export type SolarSlot = { consultantUid: string; name: string; start: string; en
 export type SlotDay = { key: string; label: string; slots: SolarSlot[] };
 
 export const PHOTO_SLOTS: { slot: PhotoSlot; label: string }[] = [
-  { slot: 'billPage1', label: 'Bill page 1 (meter number)' },
-  { slot: 'billGraph', label: 'Bill usage graph (pages 3-4)' },
-  { slot: 'panel', label: 'Electric panel' },
+  { slot: 'billPage1', label: 'Bill Upload (First Page)' },
+  { slot: 'billGraph', label: 'Bill Upload (Bar Graph)' },
+  { slot: 'panel', label: 'Photo of Electric Panel Upload (to know if we need to upgrade)' },
 ];
 
 /** One id per deck session, so a retried lead POST dedupes. Matches ^[A-Za-z0-9_-]{1,128}$. */
