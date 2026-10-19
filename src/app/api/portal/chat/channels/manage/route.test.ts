@@ -245,6 +245,25 @@ describe('/api/portal/chat/channels/manage', () => {
     expect(asJacob.channels.map((c: { id: string }) => c.id)).toEqual(['all-company', 'app-review']);
   });
 
+  it('GET, PATCH and DELETE let Jacob reach the demo sandbox by his email too, whatever his uid', async () => {
+    firestore.channels.set('app-review', {
+      id: 'app-review', name: 'Demo Team', description: '', audience: 'all', order: 99, active: true,
+      demoSandbox: true, memberIds: ['demo'],
+    });
+    mockGate.mockResolvedValue({ ok: true, uid: 'jacob-other-uid', name: 'Jacob', data: { Email: ' JMyers@3cworldgroup.com ' } });
+
+    const listed = await (await GET(req('GET', undefined))).json();
+    expect(listed.channels.map((c: { id: string }) => c.id)).toEqual(['app-review']);
+    expect((await PATCH(req('PATCH', { id: 'app-review', name: 'Demo Team 2' }))).status).toBe(200);
+    expect(firestore.channels.get('app-review')).toMatchObject({ name: 'Demo Team 2' });
+
+    // Another admin with some other email still never sees it.
+    mockGate.mockResolvedValue({ ...ADMIN, data: { email: 'someone@3cworldgroup.com' } });
+    const asAdmin = await (await GET(req('GET', undefined))).json();
+    expect(asAdmin.channels).toEqual([]);
+    expect((await DELETE(req('DELETE', { id: 'app-review' }))).status).toBe(404);
+  });
+
   it('PATCH and DELETE treat the demo sandbox as missing for an admin who is not Jacob', async () => {
     firestore.channels.set('app-review', {
       id: 'app-review', name: 'Demo Team', description: '', audience: 'all', order: 99, active: true,

@@ -14,6 +14,7 @@ import {
 } from '@/lib/chat/channels';
 import { deletableChatObjectPaths, preserveReportedEvidence, storageErrorCode } from '@/lib/chat/evidence';
 import { getChatStorageBucketName } from '@/lib/chat/media';
+import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { ChatChannelAudience } from '@/types';
 
 function cleanString(value: unknown): string {
@@ -33,6 +34,12 @@ function validateDescription(value: unknown): string | null {
   return null;
 }
 
+/** Whether the verified admin is Jacob (sandbox staff), by uid or by the email on his users doc, like the other chat routes. */
+function gateSeesSandbox(gate: { uid: string; data?: FirebaseFirestore.DocumentData }): boolean {
+  const data = gate.data ?? {};
+  return isSandboxStaff(gate.uid, emailFromUserDoc({ get: (field) => data[field] }));
+}
+
 async function getExistingChannelDocs() {
   if (!adminDb) throw new Error('Database not configured');
   return adminDb.collection('chatChannels').orderBy('order', 'asc').get();
@@ -45,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     const snapshot = await getExistingChannelDocs();
     // The demo sandbox is listed for Jacob only: other admins and owners never see it.
-    const seesSandbox = isSandboxStaff(gate.uid);
+    const seesSandbox = gateSeesSandbox(gate);
     const channels = snapshot.docs
       .filter((doc) => seesSandbox || !isDemoSandboxChannel(doc.data()))
       .map((doc) => {
@@ -151,7 +158,7 @@ export async function PATCH(request: NextRequest) {
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
     // Only Jacob may see (so edit or delete) the demo sandbox.
-    if (isDemoSandboxChannel(snap.data()) && !isSandboxStaff(gate.uid)) {
+    if (isDemoSandboxChannel(snap.data()) && !gateSeesSandbox(gate)) {
       return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
     }
     if ('audience' in updates) {
@@ -198,7 +205,7 @@ export async function DELETE(request: NextRequest) {
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
     // Only Jacob may see (so edit or delete) the demo sandbox.
-    if (isDemoSandboxChannel(snap.data()) && !isSandboxStaff(gate.uid)) {
+    if (isDemoSandboxChannel(snap.data()) && !gateSeesSandbox(gate)) {
       return NextResponse.json({ error: 'Channel not found' }, { status: 404 });
     }
 
