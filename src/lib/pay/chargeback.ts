@@ -44,7 +44,8 @@ export interface Chargeback {
  * a portal-cancelled sale never paid, so there is nothing to take back. The
  * window runs from the carrier's activation date, falling back to the sale's
  * own install day when the report has none. Without a readable install day or
- * deactivation day there is no window to judge, so there is no chargeback.
+ * deactivation day there is no window to judge, so there is no chargeback; a
+ * deactivation dated before the install reads the same way.
  */
 export function chargebackFor(
   sale: Pick<Sale, 'status' | 'installDate'>,
@@ -55,7 +56,9 @@ export function chargebackFor(
   const installDay = carrierDayKey(order.activationDate) ?? installDayKey(sale.installDate);
   if (!deactivationDay || !installDay) return null;
   const days = daysBetween(installDay, deactivationDay);
-  if (!Number.isFinite(days) || days > CHARGEBACK_WINDOW_DAYS) return null;
+  // A deactivation dated before the activation is unreadable carrier data
+  // (a swapped column, a typo), like a missing date: no window, no chargeback.
+  if (!Number.isFinite(days) || days < 0 || days > CHARGEBACK_WINDOW_DAYS) return null;
   return { installDay, deactivationDay, days };
 }
 
