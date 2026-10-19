@@ -5,14 +5,25 @@ vi.mock('@/lib/firebase/admin', async () => ({
   adminDb: (await import('@/lib/solar/testing/fakeDb')).createFakeDb(),
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: vi.fn() }));
+vi.mock('@/lib/notifications/createNotification', () => ({ createNotification: vi.fn(async () => 'n1') }));
+vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: vi.fn(async () => {}) }));
+vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: vi.fn(async () => ({ ok: true })) }));
 
 import { PATCH } from './route';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { createNotification } from '@/lib/notifications/createNotification';
+import { sendPushToUser } from '@/lib/push/sendPush';
+import { sendEmail } from '@/lib/email/sendEmail';
 import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
 
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
+const mockNotify = createNotification as unknown as ReturnType<typeof vi.fn>;
+const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
+const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
+const notified = () => mockNotify.mock.calls.map((c) => [c[0].userId, c[0].title]);
+const pushed = () => mockPush.mock.calls.map((c) => c[0]);
 
 const ID = 'jac_2026-10-26T15:00:00.000Z';
 const ADMIN = { ok: true, uid: 'adm', name: 'Ada', email: 'a@x.com', isAdmin: true, isOwner: false, role: 'admin', solarRole: null };
@@ -29,11 +40,25 @@ function patch(id: string, body: unknown) {
   );
 }
 
+const LIVE = {
+  leadId: 'rep1_c1', consultantUid: 'jac', consultantName: 'Jacob', repUid: 'rep1', customerName: 'Ana Lopez',
+  mode: 'virtual', start: '2026-10-26T15:00:00.000Z', status: 'booked',
+};
+
 beforeEach(() => {
   db.store.clear();
-  db.store.set('solarBookings', new Map([[ID, { leadId: 'rep1_c1', consultantUid: 'jac', start: '2026-10-26T15:00:00.000Z', status: 'booked' }]]));
+  db.store.set('users', new Map(Object.entries({
+    rep1: { displayName: 'Rep One', solarRole: 'ae_canvasser' },
+    adm: { displayName: 'Ada', role: 'admin' },
+    own: { displayName: 'Owner', Email: 'owner@3cworldgroup.com', role: 'owner' },
+    jac: { displayName: 'Jacob', Email: 'jmyers@3cworldgroup.com', role: 'owner' },
+  })));
+  db.store.set('solarBookings', new Map([[ID, { ...LIVE }]]));
   db.store.set('solarLeads', new Map([['rep1_c1', { repUid: 'rep1', status: 'booked', bookingId: ID }]]));
   mockGate.mockReset().mockResolvedValue(ADMIN);
+  mockNotify.mockClear();
+  mockPush.mockClear();
+  mockEmail.mockClear();
 });
 
 describe('PATCH /api/portal/solar/bookings/[id]', () => {
@@ -81,5 +106,71 @@ describe('PATCH /api/portal/solar/bookings/[id]', () => {
     expect((await patch('../x', { status: 'cancelled' })).status).toBe(404);
     mockGate.mockResolvedValue({ ok: false, error: 'Missing authentication token', status: 401 });
     expect((await patch(ID, { status: 'cancelled' })).status).toBe(401);
+  });
+
+  describe('cancel notices', () => {
+    it('notifies the rep and the consultant (portal + push), and emails nobody', async () => {
+      expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+      expect(notified()).toEqual(expect.arrayContaining([
+        ['jac', 'Solar consult cancelled'],
+        ['rep1', 'Solar consult cancelled'],
+      ]));
+      expect(notified()).toHaveLength(2);
+      expect(pushed().sort()).toEqual(['jac', 'rep1']);
+      expect(mockNotify.mock.calls[0][0]).toMatchObject({
+        type: 'solar_booking',
+        metadata: { bookingId: ID, leadId: 'rep1_c1', cancelled: true },
+      });
+      expect(mockNotify.mock.calls[0][0].message).toContain('Ana Lopez: virtual, Monday, October 26 at 8:00 AM PT with Jacob');
+      expect(mockEmail).not.toHaveBeenCalled();
+    });
+
+    it('never notifies whoever cancelled', async () => {
+      mockGate.mockResolvedValue(CONSULTANT);
+      expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+      expect(notified()).toEqual([['rep1', 'Solar consult cancelled']]);
+      expect(pushed()).toEqual(['rep1']);
+    });
+
+    it("sends the owner nothing by default: the owner's cancel notice goes to Jacob", async () => {
+      db.store.get('solarBookings')!.set(ID, { ...LIVE, consultantUid: 'own', consultantName: 'Owner', mode: 'in_person' });
+      expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+      expect(notified()).toEqual(expect.arrayContaining([
+        ['jac', "[Owner's calendar] Solar consult cancelled"],
+        ['rep1', 'Solar consult cancelled'],
+      ]));
+      expect(notified().map(([uid]) => uid)).not.toContain('own');
+      expect(pushed()).not.toContain('own');
+      expect(mockEmail).not.toHaveBeenCalled();
+    });
+
+    it('sends the owner nothing when the owner booked it either', async () => {
+      db.store.get('solarBookings')!.set(ID, { ...LIVE, repUid: 'own' });
+      expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+      expect(notified()).toEqual([['jac', 'Solar consult cancelled']]);
+      expect(pushed()).toEqual(['jac']);
+    });
+
+    it('notifies the owner directly once settings/solar.notifyOwner is on', async () => {
+      db.store.set('settings', new Map([['solar', { notifyOwner: true }]]));
+      db.store.get('solarBookings')!.set(ID, { ...LIVE, consultantUid: 'own', consultantName: 'Owner' });
+      expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+      expect(notified()).toEqual(expect.arrayContaining([['own', 'Solar consult cancelled'], ['rep1', 'Solar consult cancelled']]));
+      expect(notified().map(([uid]) => uid)).not.toContain('jac');
+    });
+
+    it('sends nothing for a booking already cancelled', async () => {
+      db.store.get('solarBookings')!.set(ID, { ...LIVE, status: 'cancelled' });
+      expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+      expect(mockNotify).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('still cancels when a notice fails', async () => {
+      mockNotify.mockRejectedValueOnce(new Error('down'));
+      mockPush.mockRejectedValueOnce(new Error('down'));
+      expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+      expect(db.store.get('solarBookings')!.get(ID)!.status).toBe('cancelled');
+    });
   });
 });

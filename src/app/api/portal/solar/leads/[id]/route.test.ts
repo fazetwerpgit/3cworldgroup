@@ -5,14 +5,23 @@ vi.mock('@/lib/firebase/admin', async () => ({
   adminDb: (await import('@/lib/solar/testing/fakeDb')).createFakeDb(),
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: vi.fn() }));
+vi.mock('@/lib/notifications/createNotification', () => ({ createNotification: vi.fn(async () => 'n1') }));
+vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: vi.fn(async () => {}) }));
+vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: vi.fn(async () => ({ ok: true })) }));
 
 import { PATCH } from './route';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { createNotification } from '@/lib/notifications/createNotification';
+import { sendPushToUser } from '@/lib/push/sendPush';
+import { sendEmail } from '@/lib/email/sendEmail';
 import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
 
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
+const mockNotify = createNotification as unknown as ReturnType<typeof vi.fn>;
+const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
+const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false, solarRole: 'ae_canvasser' };
 
 function patch(id: string, body: unknown) {
@@ -29,9 +38,13 @@ beforeEach(() => {
     rep2: { solarRole: 'ae_canvasser' },
     adm: { role: 'admin' },
     fiber: { fieldRole: 'ae_tier_1' },
+    jac: { displayName: 'Jacob', Email: 'jmyers@3cworldgroup.com', role: 'owner' },
   })));
   db.store.set('solarLeads', new Map([['rep1_c1', { repUid: 'rep1', first: 'Ana', creditTier: null }]]));
   mockGate.mockReset().mockResolvedValue(REP);
+  mockNotify.mockClear();
+  mockPush.mockClear();
+  mockEmail.mockClear();
 });
 
 describe('PATCH /api/portal/solar/leads/[id]', () => {
@@ -82,6 +95,45 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       expect(lead().status).toBe('lost');
     });
 
+    it('mark lost cancels the live booking in the same write: slot freed, bookingId cleared, notices sent', async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      const B = 'jac_2026-10-26T15:00:00.000Z';
+      db.store.set('solarBookings', new Map([[B, {
+        leadId: 'rep1_c1', consultantUid: 'jac', consultantName: 'Jacob', repUid: 'rep1', customerName: 'Ana',
+        mode: 'virtual', start: '2026-10-26T15:00:00.000Z', status: 'booked',
+      }]]));
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'booked', bookingId: B });
+      const res = await patch('rep1_c1', { status: 'lost' });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true, id: 'rep1_c1', status: 'lost', cancelledBookingId: B });
+      expect(lead()).toMatchObject({ status: 'lost', bookingId: null, statusChangedBy: 'adm' });
+      expect(db.store.get('solarBookings')!.get(B)).toMatchObject({ status: 'cancelled', cancelledBy: 'adm' });
+      expect(mockNotify.mock.calls.map((c) => c[0].userId).sort()).toEqual(['jac', 'rep1']);
+      expect(mockNotify.mock.calls[0][0].message).toContain('The lead was marked lost.');
+      expect(mockPush.mock.calls.map((c) => c[0]).sort()).toEqual(['jac', 'rep1']);
+      expect(mockEmail).not.toHaveBeenCalled();
+    });
+
+    it('mark lost with no live booking only closes the lead and notifies nobody', async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      db.store.set('solarBookings', new Map([['b1', { status: 'cancelled', consultantUid: 'jac', repUid: 'rep1' }]]));
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'new', bookingId: 'b1' });
+      expect(await (await patch('rep1_c1', { status: 'lost' })).json()).toEqual({ success: true, id: 'rep1_c1', status: 'lost' });
+      expect(lead()).toMatchObject({ status: 'lost', bookingId: 'b1' });
+      expect(mockNotify).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('mark sold keeps the booking', async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      db.store.set('solarBookings', new Map([['b1', { status: 'booked', consultantUid: 'jac', repUid: 'rep1' }]]));
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'booked', bookingId: 'b1' });
+      expect((await patch('rep1_c1', { status: 'sold' })).status).toBe(200);
+      expect(db.store.get('solarBookings')!.get('b1')!.status).toBe('booked');
+      expect(lead()).toMatchObject({ status: 'sold', bookingId: 'b1' });
+      expect(mockNotify).not.toHaveBeenCalled();
+    });
+
     it('reopens to booked while a live booking holds the slot, else to new', async () => {
       mockGate.mockResolvedValue(ADMIN);
       db.store.set('solarBookings', new Map([['b1', { status: 'booked' }]]));
@@ -103,6 +155,7 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       mockGate.mockResolvedValue(ADMIN);
       expect((await patch('rep1_c1', { status: 'won' })).status).toBe(400);
       expect((await patch('nope', { status: 'sold' })).status).toBe(404);
+      expect((await patch('nope', { status: 'lost' })).status).toBe(404);
     });
   });
 });
