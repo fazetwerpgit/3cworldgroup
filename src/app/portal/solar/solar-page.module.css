@@ -1,4 +1,21 @@
-/* The rep Solar page: the deck block keeps a readable width on desktop. */
-.deck {
-  max-width: 640px;
+/* The rep Solar page: the deck leads; the next consultation and My leads sit
+   beside it on desktop and under it on a phone. */
+.grid {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.side {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--s5);
+  }
 }
