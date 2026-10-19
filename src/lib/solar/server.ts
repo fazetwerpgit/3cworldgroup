@@ -50,8 +50,11 @@ function emailOf(data: Record<string, unknown>): string {
 }
 
 /**
- * The two Phase 1 consultants, looked up at runtime so no uid is hard-coded:
- * Jacob by email, the owner as the role 'owner' user who is not Jacob.
+ * The owner and Jacob, looked up at runtime so no uid is hard-coded: Jacob by
+ * email, the owner as the role 'owner' user who is not Jacob. The owner
+ * notification rule (leadAlertUids, consultantNotice) and the in-person
+ * booking preference need both; the consultant list lives in
+ * solarAvailability and only uses them as the seed while that is empty.
  */
 export async function resolveConsultants(): Promise<{ owner: UserContact | null; jacob: UserContact | null }> {
   if (!adminDb) return { owner: null, jacob: null };
@@ -76,25 +79,37 @@ function cleanWindows(value: unknown): WeeklyWindow[] {
     .filter((w) => Number.isInteger(w.day) && w.day >= 0 && w.day <= 6);
 }
 
-/** solarAvailability docs, or the seed (owner + Jacob) while the collection is empty. */
-export async function loadAvailability(): Promise<SolarAvailability[]> {
-  if (!adminDb) return [];
+/** One solarAvailability doc as the slot math reads it. */
+export function availabilityOf(id: string, data: Record<string, unknown>): SolarAvailability {
+  const modes = (data.modes ?? {}) as Record<string, unknown>;
+  return {
+    consultantUid: id,
+    name: String(data.name ?? '') || 'Consultant',
+    tz: typeof data.tz === 'string' && data.tz ? data.tz : SOLAR_TZ,
+    slotMin: Number(data.slotMin) > 0 ? Number(data.slotMin) : SOLAR_SLOT_MIN,
+    modes: { virtual: cleanWindows(modes.virtual), in_person: cleanWindows(modes.in_person) },
+  };
+}
+
+/**
+ * The consultants set in Admin > Solar > Setup (solarAvailability), sorted by
+ * name. While that collection is empty the seed (owner + Jacob) stands in and
+ * `seeded` is true; the first save in Setup writes the whole seed.
+ */
+export async function loadConsultants(): Promise<{ consultants: SolarAvailability[]; seeded: boolean }> {
+  if (!adminDb) return { consultants: [], seeded: false };
   const snap = await adminDb.collection('solarAvailability').get();
   if (!snap.empty) {
-    return snap.docs.map((doc) => {
-      const data = doc.data();
-      const modes = (data.modes ?? {}) as Record<string, unknown>;
-      return {
-        consultantUid: doc.id,
-        name: String(data.name ?? '') || 'Consultant',
-        tz: typeof data.tz === 'string' && data.tz ? data.tz : SOLAR_TZ,
-        slotMin: Number(data.slotMin) > 0 ? Number(data.slotMin) : SOLAR_SLOT_MIN,
-        modes: { virtual: cleanWindows(modes.virtual), in_person: cleanWindows(modes.in_person) },
-      };
-    });
+    const consultants = snap.docs.map((doc) => availabilityOf(doc.id, doc.data()));
+    return { consultants: consultants.sort((a, b) => a.name.localeCompare(b.name)), seeded: false };
   }
   const { owner, jacob } = await resolveConsultants();
-  return seedAvailability(owner, jacob);
+  return { consultants: seedAvailability(owner, jacob), seeded: true };
+}
+
+/** solarAvailability docs, or the seed (owner + Jacob) while the collection is empty. */
+export async function loadAvailability(): Promise<SolarAvailability[]> {
+  return (await loadConsultants()).consultants;
 }
 
 async function solarSettings(): Promise<Record<string, unknown>> {
