@@ -187,6 +187,34 @@ describe('useSheetDismiss', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('springs back when a second finger lands mid-drag', async () => {
+    await act(async () => {
+      touch('touchstart', 100, 0);
+      touch('touchmove', 140, 50);
+      touch('touchmove', 300, 100);
+    });
+    expect(sheetEl().style.transform).toBe('translate3d(0, 200px, 0)');
+    const backdrop = document.getElementById('backdrop')!;
+    expect(backdrop.hasAttribute('data-dragging')).toBe(true);
+    await act(async () => {
+      const second = new Event('touchstart', { bubbles: true, cancelable: true });
+      Object.defineProperty(second, 'touches', {
+        value: [
+          { clientX: 100, clientY: 300 },
+          { clientX: 200, clientY: 300 },
+        ],
+      });
+      Object.defineProperty(second, 'timeStamp', { value: 150 });
+      document.getElementById('body')!.dispatchEvent(second);
+      touch('touchend', 300, 200);
+    });
+    expect(sheetEl().style.transform).toBe('');
+    expect(backdrop.hasAttribute('data-dragging')).toBe(false);
+    expect(backdrop.style.getPropertyValue('--sheet-dim')).toBe('');
+    await act(async () => vi.advanceTimersByTime(500));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('leaves an upward swipe to the scroller', async () => {
     await act(async () => {
       touch('touchstart', 300, 0);

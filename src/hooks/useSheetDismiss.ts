@@ -221,7 +221,16 @@ export function useSheetDismiss<S extends HTMLElement = HTMLElement, B extends H
     };
 
     const onStart = (event: TouchEvent) => {
+      // A second finger mid-drag ends the drag: put the sheet back, or the
+      // touchend that follows (with no drag left to finish) leaves it stuck
+      // partway down under a frozen dim.
+      const wasDragging = claimed;
       reset();
+      if (wasDragging) {
+        listenMoves(false);
+        snapBack();
+        return;
+      }
       if (closingRef.current || event.touches.length !== 1) return;
       if (window.matchMedia?.('(min-width: 1024px)').matches) return;
       const target = event.target instanceof Element ? event.target : null;
