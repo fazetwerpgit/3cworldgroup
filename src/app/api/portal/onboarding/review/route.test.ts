@@ -102,6 +102,29 @@ beforeEach(() => {
 });
 
 describe('POST /api/portal/onboarding/review', () => {
+  it.each([123, { text: 'no' }, ['no'], true])(
+    'returns 400, not 500, when rejectionReason is %j',
+    async (rejectionReason) => {
+      const response = await POST(
+        new NextRequest('http://localhost/api/portal/onboarding/review', {
+          method: 'POST',
+          body: JSON.stringify({
+            userId: 'user-1',
+            itemId: 'onboarding_submission',
+            status: 'rejected',
+            rejectionReason,
+          }),
+        })
+      );
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        error: 'A rejection reason is required',
+      });
+      expect(docUpdateMock).not.toHaveBeenCalled();
+    }
+  );
+
   it.each(['w9', 'contract'])('refuses approval for the e-sign item %s', async (itemId) => {
     const response = await POST(postRequest(itemId, 'approved'));
 

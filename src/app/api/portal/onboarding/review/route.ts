@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (status === 'rejected' && !rejectionReason?.trim()) {
+    if (status === 'rejected' && (typeof rejectionReason !== 'string' || !rejectionReason.trim())) {
       return NextResponse.json(
         { error: 'A rejection reason is required' },
         { status: 400 }
