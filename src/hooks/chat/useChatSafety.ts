@@ -25,62 +25,121 @@ async function errorFrom(res: Response, fallback: string): Promise<Error> {
 
 const NO_BLOCKS: ReadonlySet<string> = new Set();
 
+/** Wait before retrying a failed block-list load: 2s, 4s, 8s ... capped at 30s. */
+export function blocksRetryDelay(attempt: number): number {
+  return Math.min(30_000, 2_000 * 2 ** attempt);
+}
+
+/** What the server said when the page loaded. blocked is null until the list loads. */
+interface ServerState {
+  uid: string;
+  blocked: ReadonlySet<string> | null;
+  termsAccepted: boolean | null;
+}
+
+/**
+ * Changes the reader made on this page. They are newer than any load, so they
+ * win over a load that lands after them: an accept is not undone by a late
+ * GET /terms, and a block is not dropped by a late GET /blocks.
+ */
+interface LocalChanges {
+  uid: string;
+  terms: boolean | null;
+  /** uid -> true (blocked here) or false (unblocked here). */
+  blocks: ReadonlyMap<string, boolean>;
+}
+
+function parseBlocked(body: unknown): Set<string> | null {
+  const list = (body as { blocked?: unknown } | null)?.blocked;
+  if (!Array.isArray(list)) return null;
+  return new Set(
+    list.map((entry: { uid?: unknown } | null) => entry?.uid).filter((id: unknown): id is string => typeof id === 'string')
+  );
+}
+
 /**
  * The reader's chat safety state (App Store guideline 1.2): their block list
- * and whether they accepted the chat agreement, both loaded once per user
- * through the chat API (the Firestore rules keep blocks server-only), plus the
- * report / block / unblock / accept calls. A failed load leaves the block list
- * empty and termsAccepted null, so chat keeps working and nobody is gated on a
- * network hiccup.
+ * and whether they accepted the chat agreement, loaded through the chat API
+ * (the Firestore rules keep blocks server-only), plus the report / block /
+ * unblock / accept calls. A failed terms load leaves termsAccepted null, so
+ * nobody is gated on a network hiccup. A failed block-list load is retried
+ * (with backoff, and as soon as the device is back online), because the block
+ * list is the only thing that hides blocked people's messages on this screen.
+ * Blocks, unblocks and accepts made on this page win over a load that lands
+ * after them.
  */
 export function useChatSafety(uid: string | null | undefined, authedFetch: AuthedFetch): ChatSafety {
-  const [loaded, setLoaded] = useState<{ uid: string; blocked: Set<string>; termsAccepted: boolean | null } | null>(null);
+  const [server, setServer] = useState<ServerState | null>(null);
+  const [local, setLocal] = useState<LocalChanges | null>(null);
 
   useEffect(() => {
     if (!uid) return;
     let cancelled = false;
-    void (async () => {
-      const [blocks, terms] = await Promise.all([
-        authedFetch('/api/portal/chat/blocks')
-          .then((res) => (res.ok ? res.json() : null))
-          .catch(() => null),
-        authedFetch('/api/portal/chat/terms')
-          .then((res) => (res.ok ? res.json() : null))
-          .catch(() => null),
-      ]);
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+    let loading = false;
+    let blocksLoaded = false;
+
+    const loadBlocks = async () => {
+      if (cancelled || blocksLoaded || loading) return;
+      loading = true;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      const body = await authedFetch('/api/portal/chat/blocks')
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null);
+      loading = false;
       if (cancelled) return;
-      const blocked = new Set<string>(
-        Array.isArray(blocks?.blocked)
-          ? blocks.blocked.map((entry: { uid?: unknown }) => entry.uid).filter((id: unknown): id is string => typeof id === 'string')
-          : []
-      );
-      const termsAccepted = terms && 'acceptedAt' in terms ? typeof terms.acceptedAt === 'string' : null;
-      setLoaded({ uid, blocked, termsAccepted });
-    })();
+      const blocked = parseBlocked(body);
+      if (blocked) {
+        blocksLoaded = true;
+        setServer((prev) => ({ uid, termsAccepted: prev?.uid === uid ? prev.termsAccepted : null, blocked }));
+        return;
+      }
+      retryTimer = setTimeout(() => void loadBlocks(), blocksRetryDelay(attempt));
+      attempt += 1;
+    };
+    const onOnline = () => void loadBlocks();
+
+    void loadBlocks();
+    void authedFetch('/api/portal/chat/terms')
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then((terms) => {
+        if (cancelled) return;
+        const termsAccepted = terms && 'acceptedAt' in terms ? typeof terms.acceptedAt === 'string' : null;
+        setServer((prev) => ({ uid, blocked: prev?.uid === uid ? prev.blocked : null, termsAccepted }));
+      });
+    window.addEventListener('online', onOnline);
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      window.removeEventListener('online', onOnline);
     };
   }, [uid, authedFetch]);
 
-  const current = uid && loaded?.uid === uid ? loaded : null;
+  /** Record a change the reader made, for the user it was made as. */
+  const change = useCallback((forUid: string, apply: (prev: LocalChanges) => LocalChanges) => {
+    setLocal((prev) => apply(prev && prev.uid === forUid ? prev : { uid: forUid, terms: null, blocks: new Map() }));
+  }, []);
 
   const acceptTerms = useCallback(async () => {
+    const forUid = uid;
     const res = await authedFetch('/api/portal/chat/terms', { method: 'POST' });
     if (!res.ok) throw await errorFrom(res, "Couldn't save. Try again.");
-    setLoaded((prev) => (prev ? { ...prev, termsAccepted: true } : prev));
-  }, [authedFetch]);
+    if (forUid) change(forUid, (prev) => ({ ...prev, terms: true }));
+  }, [uid, authedFetch, change]);
 
   const requireTerms = useCallback(() => {
     if (!uid) return;
-    setLoaded((prev) =>
-      prev && prev.uid === uid
-        ? { ...prev, termsAccepted: false }
-        : { uid, blocked: prev?.uid === uid ? prev.blocked : new Set<string>(), termsAccepted: false }
-    );
-  }, [uid]);
+    change(uid, (prev) => ({ ...prev, terms: false }));
+  }, [uid, change]);
 
   const block = useCallback(
     async (target: string) => {
+      const forUid = uid;
       const res = await authedFetch('/api/portal/chat/blocks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,28 +147,24 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
       });
       if (!res.ok) throw await errorFrom(res, "Couldn't block. Try again.");
       const body = await res.json().catch(() => ({}));
-      setLoaded((prev) => (prev ? { ...prev, blocked: new Set(prev.blocked).add(target) } : prev));
+      if (forUid) change(forUid, (prev) => ({ ...prev, blocks: new Map(prev.blocks).set(target, true) }));
       return typeof body.name === 'string' ? body.name : '';
     },
-    [authedFetch]
+    [uid, authedFetch, change]
   );
 
   const unblock = useCallback(
     async (target: string) => {
+      const forUid = uid;
       const res = await authedFetch('/api/portal/chat/blocks', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: target }),
       });
       if (!res.ok) throw await errorFrom(res, "Couldn't unblock. Try again.");
-      setLoaded((prev) => {
-        if (!prev) return prev;
-        const blocked = new Set(prev.blocked);
-        blocked.delete(target);
-        return { ...prev, blocked };
-      });
+      if (forUid) change(forUid, (prev) => ({ ...prev, blocks: new Map(prev.blocks).set(target, false) }));
     },
-    [authedFetch]
+    [uid, authedFetch, change]
   );
 
   const report = useCallback(
@@ -124,8 +179,20 @@ export function useChatSafety(uid: string | null | undefined, authedFetch: Authe
     [authedFetch]
   );
 
-  const blockedUids = current?.blocked ?? NO_BLOCKS;
-  const termsAccepted = current?.termsAccepted ?? null;
+  const serverNow = uid && server?.uid === uid ? server : null;
+  const localNow = uid && local?.uid === uid ? local : null;
+  const serverBlocked = serverNow?.blocked ?? null;
+  const localBlocks = localNow?.blocks ?? null;
+  const blockedUids = useMemo<ReadonlySet<string>>(() => {
+    if (!localBlocks || localBlocks.size === 0) return serverBlocked ?? NO_BLOCKS;
+    const merged = new Set(serverBlocked ?? NO_BLOCKS);
+    for (const [target, isBlocked] of localBlocks) {
+      if (isBlocked) merged.add(target);
+      else merged.delete(target);
+    }
+    return merged;
+  }, [serverBlocked, localBlocks]);
+  const termsAccepted = localNow?.terms ?? serverNow?.termsAccepted ?? null;
   return useMemo(
     () => ({ blockedUids, termsAccepted, acceptTerms, requireTerms, block, unblock, report }),
     [blockedUids, termsAccepted, acceptTerms, requireTerms, block, unblock, report]
