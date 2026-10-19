@@ -55,7 +55,12 @@ export default function EditUserPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [salesCount, setSalesCount] = useState(0);
-  const [sensitive, setSensitive] = useState<{ ssnLast4: string | null; dlLast4: string | null } | null>(null);
+  // ssnLast4 comes back for owners only; an admin learns just that an SSN is on file.
+  const [sensitive, setSensitive] = useState<{
+    ssnOnFile: boolean;
+    ssnLast4: string | null;
+    dlLast4: string | null;
+  } | null>(null);
   const [revealed, setRevealed] = useState<{ ssn: string | null; dlNumber: string | null } | null>(null);
   const [revealOpen, setRevealOpen] = useState(false);
   const [revealLogged, setRevealLogged] = useState(false);
@@ -154,7 +159,13 @@ export default function EditUserPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const d = await r.json();
-      if (active) setSensitive({ ssnLast4: d.ssnLast4, dlLast4: d.dlLast4 });
+      if (active) {
+        setSensitive({
+          ssnOnFile: d.ssnOnFile === true,
+          ssnLast4: typeof d.ssnLast4 === 'string' ? d.ssnLast4 : null,
+          dlLast4: typeof d.dlLast4 === 'string' ? d.dlLast4 : null,
+        });
+      }
     })().catch(() => {
       if (active) setSensitive(null);
     });
@@ -191,8 +202,13 @@ export default function EditUserPage() {
   const userStatusLabel = user?.status ? user.status.replace(/^./, (c) => c.toUpperCase()) : 'Active';
 
   const back = { href: '/portal/admin/people?tab=everyone', label: 'People' };
-  const showVault = isAdminLevel(currentUser?.role) && sensitive && (sensitive.ssnLast4 || sensitive.dlLast4);
   const viewerIsOwner = isOwner(currentUser?.role);
+  // The SSN is owner only: an admin's vault is the DL# alone, plus a plain
+  // "on file" note for the SSN that carries no digits.
+  const showVault =
+    isAdminLevel(currentUser?.role) &&
+    sensitive &&
+    (sensitive.dlLast4 || (viewerIsOwner ? sensitive.ssnLast4 : sensitive.ssnOnFile));
   // Sales sit in "Where they are" for anyone the pipeline covers; the side
   // panel is the fallback for everyone else. An empty side column is dropped.
   const showSalesPanel = pipelineRep === null;
@@ -204,13 +220,18 @@ export default function EditUserPage() {
   const vaultContent = sensitive ? (
     <>
       <p className={u.hint}>
-        Their Social Security and driver license numbers. Hidden until you choose to see them, and every look is
-        recorded.
+        {viewerIsOwner
+          ? 'Their Social Security and driver license numbers. Hidden until you choose to see them, and every look is recorded.'
+          : 'Their driver license number. Hidden until you choose to see it, and every look is recorded. Tax and banking details are visible to owners only.'}
       </p>
       <dl className={`${u.facts} ${d.vaultFacts}`}>
         <div>
           <dt>Social security number</dt>
-          <dd className={u.num}>{revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}</dd>
+          {viewerIsOwner ? (
+            <dd className={u.num}>{revealed?.ssn ?? (sensitive.ssnLast4 ? `•••••${sensitive.ssnLast4}` : '—')}</dd>
+          ) : (
+            <dd>{sensitive.ssnOnFile ? 'On file, owners only' : '—'}</dd>
+          )}
         </div>
         <div>
           <dt>Driver license reference</dt>
@@ -218,7 +239,7 @@ export default function EditUserPage() {
         </div>
       </dl>
 
-      {!revealed && !revealOpen ? (
+      {!revealed && !revealOpen && (viewerIsOwner || sensitive.dlLast4) ? (
         <div className={d.revealRow}>
           <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setRevealOpen(true)}>
             <Eye size={16} aria-hidden="true" />
