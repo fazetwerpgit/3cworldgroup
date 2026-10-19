@@ -19,13 +19,21 @@ import { isAwaitingCarrier } from '@/lib/sales/installBucket';
 import { saleProofPaths } from '@/lib/sales/proofPaths';
 import { LIVE_DEFAULT_ZONE, zoneFor } from './prompt';
 import { redactContact } from './redact';
-import { DEMO_ACCOUNT_FIELD, isDemoAccount, isDemoSale } from '@/lib/users/demoAccount';
-import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
+import { DEMO_ACCOUNT_FIELD, isDemoSale } from '@/lib/users/demoAccount';
 
 // The asking rep's own portal data, as a short plain-text block for Ask 3C's
 // prompt: their sales and install status, their spot on the Board, the next
 // team calls, their forms, recent notifications and (for a new hire) their
 // onboarding checklist.
+//
+// Owner rule (Jacob, Oct 18 2026): NO homeowner or teammate identities reach
+// the AI provider. A sale is "Customer A", "Customer B"... with its city (or
+// ZIP) and the last 4 of its order number at most; never a customer's name,
+// street address, phone or email. Teammates on the Board are "Teammate 1",
+// "Teammate 2"... with their counts and points. Notifications are reduced to
+// their kind (their text names customers), and free text that does pass
+// through (a cancel reason) has the sale's customer name, any street address,
+// email and phone number taken out.
 //
 // Owner rule (Jacob): NOTHING about pay. Every line is built from an explicit
 // allow-list of fields, never by spreading a document, so no pay, commission,
@@ -77,9 +85,14 @@ const PAY_WORDS =
 /** Stands in for a reason or message that touches pay (owner rule: nothing about pay). */
 export const REASON_ON_FILE = 'reason on file, ask Jeremy or Jacob';
 
-/** Free text safe for the prompt: no contact details, no dollar amounts, one short line. */
+// A street address inside free text: a house number, then up to four words,
+// then a street type ("1412 Oak St", "88 N Elm Avenue", "9 Hidden Ln").
+const STREET =
+  /\b\d{1,6}\s+(?:[A-Za-z0-9.'-]+\s+){0,4}?(?:st|street|ave|avenue|rd|road|ln|lane|dr|drive|blvd|boulevard|ct|court|cir|circle|way|pl|place|pkwy|parkway|ter|terrace|trl|trail|hwy|highway)\b\.?/gi;
+
+/** Free text safe for the prompt: no contact details, no street addresses, no dollar amounts, one short line. */
 function clean(value: unknown, max = TEXT_MAX): string {
-  const text = redactContact(str(value).replace(/\s+/g, ' ')).replace(MONEY, '[amount]');
+  const text = redactContact(str(value).replace(/\s+/g, ' ')).replace(STREET, '[address]').replace(MONEY, '[amount]');
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
@@ -88,11 +101,68 @@ function clean(value: unknown, max = TEXT_MAX): string {
  * notification line): cleaned, or REASON_ON_FILE when it mentions pay or money
  * at all, since a half-redacted pay sentence still says something about pay.
  */
-function reasonText(value: unknown, max = TEXT_MAX): string {
+function reasonText(value: unknown, max = TEXT_MAX, names: readonly string[] = []): string {
   const raw = str(value);
   MONEY.lastIndex = 0;
   if (PAY_WORDS.test(raw) || MONEY.test(raw)) return REASON_ON_FILE;
-  return clean(raw, max);
+  return clean(withoutNames(raw, names), max);
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * `text` with each of `names` taken out: the whole name, then each word of it
+ * (3+ letters, so "Maria" and "Johnson" both go), as "the customer".
+ */
+export function withoutNames(text: string, names: readonly string[]): string {
+  const words = new Set<string>();
+  for (const name of names) {
+    const whole = name.trim();
+    if (!whole) continue;
+    words.add(whole);
+    for (const word of whole.split(/[\s,]+/)) if (word.replace(/\W/g, '').length >= 3) words.add(word);
+  }
+  // Longest first, so the full name goes before its parts.
+  const ordered = [...words].sort((a, b) => b.length - a.length);
+  let out = text;
+  for (const word of ordered) {
+    out = out.replace(new RegExp(`(?<![\\w])${escapeRegExp(word)}(?![\\w])`, 'gi'), 'the customer');
+  }
+  return out;
+}
+
+/** "Customer A", "Customer B", ... "Customer Z", "Customer 27"... */
+export function customerAlias(index: number): string {
+  return `Customer ${index < 26 ? String.fromCharCode(65 + index) : index + 1}`;
+}
+
+const STATE_ZIP = /^(?:[A-Za-z]{2})?\s*(?:\d{5}(?:-\d{4})?)?$/;
+
+/**
+ * The city of a service address, or its ZIP when no city can be told apart,
+ * or '' when neither can. Never the street: the first comma part is skipped,
+ * and a "city" with a digit in it is not one.
+ */
+export function addressArea(address: string): string {
+  const main = address.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  const parts = main.split(',').map((part) => part.trim()).filter(Boolean);
+  if (parts.length < 2) return '';
+  const rest = parts.slice(1);
+  let city = '';
+  for (let i = rest.length - 1; i >= 0; i -= 1) {
+    if (STATE_ZIP.test(rest[i])) continue;
+    city = rest[i].replace(/\s+[A-Za-z]{2}(?:\s+\d{5}(?:-\d{4})?)?$/, '').replace(/\s+\d{5}(?:-\d{4})?$/, '').trim();
+    break;
+  }
+  if (city && /^[A-Za-z][A-Za-z .'-]{1,29}$/.test(city)) return city;
+  const zip = rest.join(' ').match(/\b\d{5}(?:-\d{4})?\b/);
+  return zip ? zip[0].slice(0, 5) : '';
+}
+
+/** The last 4 characters of an order number or BTN (letters and digits only), or ''. */
+export function orderTail(value: string): string {
+  const plain = value.replace(/[^A-Za-z0-9]/g, '');
+  return plain.length >= 4 ? plain.slice(-4) : '';
 }
 
 function dayLabel(date: Date, zone: Zone): string {
@@ -164,7 +234,8 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
   if (raw.length === 0) return 'Sales: none logged yet.';
 
   // Only the fields the lines below use; the rest of the doc (value, points,
-  // commission, email, phone) never leaves this function.
+  // commission, email, phone) never leaves this function, and the name and
+  // address only ever leave it as an alias and a city (see the owner rule).
   const sales = raw.map(({ id, data }) => ({
     id,
     salesRepId: uid,
@@ -179,8 +250,8 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
       : [],
     productSold: str(data.productSold),
     hasOrderNumber: Boolean(str(data.orderNumberOrBtn)),
-    // For the carrier join only (matched by order number first, as the board
-    // does); no line below prints it.
+    // For the carrier join (matched by order number first, as the board
+    // does); a line prints its last 4 at most.
     orderNumberOrBtn: str(data.orderNumberOrBtn),
     screenshots: saleProofPaths(data).length,
     reason: str(data.status) === 'rejected' ? data.rejectionReason : str(data.status) === 'cancelled' ? data.cancelReason : '',
@@ -193,19 +264,22 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
   const fiberBySale = matchFiberOrdersToSales(sales, orders);
   const dated = applyCarrierInstallDates(sales, fiberBySale);
 
-  const lines = dated.slice(0, SALES_SHOWN).map((sale) => {
+  const lines = dated.slice(0, SALES_SHOWN).map((sale, index) => {
     const order = fiberBySale.get(sale.id);
     const status = rowStatus(sale as unknown as Sale, order, now, reportAsOf);
     const awaiting = status === 'scheduled' && isAwaitingCarrier(sale as unknown as Sale, order, now, reportAsOf);
+    // Who and where, without the who: an alias, and the city (or ZIP) only.
+    const area = addressArea(sale.customerAddress);
     const parts = [
-      `${clean(sale.customerName, 60) || 'Customer (no name)'}, ${clean(sale.customerAddress, 90) || 'no address'}`,
+      `${customerAlias(index)}${area ? `, ${area}` : ''}`,
       `plan ${clean(planLabel(sale as unknown as Sale), 40)}`,
       `sold ${sale.saleDate ? dayLabel(sale.saleDate, zone) : 'date not set'}`,
       `logged ${sale.createdAt ? `${dayLabel(sale.createdAt, zone)} ${timeLabel(sale.createdAt, zone)}` : 'unknown'}`,
       `install: ${installLine(status, sale.installDate ?? null, zone, isOverdue(sale as unknown as Sale, order, status), awaiting)}`,
     ];
     if (SALE_STATUS[sale.status]) {
-      parts.push(`in the portal: ${SALE_STATUS[sale.status]}${str(sale.reason) ? ` (${reasonText(sale.reason, 80)})` : ''}`);
+      const names = [sale.customerName];
+      parts.push(`in the portal: ${SALE_STATUS[sale.status]}${str(sale.reason) ? ` (${reasonText(sale.reason, 80, names)})` : ''}`);
     }
     if (order) {
       const reason = order.status === 'breakage' ? carrierReasonLabel(order.breakageReason) : null;
@@ -213,7 +287,8 @@ async function salesSection(db: Db, uid: string, now: Date, zone: Zone): Promise
     } else {
       parts.push('carrier report: no match yet');
     }
-    parts.push(`order # ${sale.hasOrderNumber ? 'attached' : 'not attached'}`);
+    const tail = orderTail(sale.orderNumberOrBtn);
+    parts.push(sale.hasOrderNumber ? `order # attached${tail ? ` (ending ${tail})` : ''}` : 'order # not attached');
     parts.push(`screenshot ${sale.screenshots > 0 ? 'attached' : 'not attached'}`);
     return `- ${parts.join('; ')}`;
   });
@@ -308,13 +383,31 @@ async function boardRankings(db: Db, now: Date, viewerUid: string): Promise<Boar
 
 const BOARD_LIST_MAX = 10;
 
-async function boardSection(db: Db, uid: string, now: Date, demoAccount = false): Promise<string> {
-  // A demo account (App Review) reads teammates as "Rep 1", "Rep 2"...: one
-  // alias per rep across both periods, its own row as is. Counts stay.
-  const redact = createDemoRedactor({ uid, demoAccount });
-  const rankings = (await boardRankings(db, now, uid)).map((rows) =>
-    redactPeople(rows, redact, { idKey: 'id', nameKey: 'name' })
+/**
+ * The rankings with every other rep's name as "Teammate N": one alias per rep
+ * across all periods, numbered in the order first written out (so the top row
+ * of the first period is Teammate 1). The viewer's own row keeps its name (it
+ * is never printed). Ids, counts and points stay.
+ */
+export function aliasTeammates(rankings: readonly BoardRow[][], viewerUid: string): BoardRow[][] {
+  const aliases = new Map<string, number>();
+  return rankings.map((rows) =>
+    rows.map((row) => {
+      if (row.id === viewerUid) return row;
+      let n = aliases.get(row.id);
+      if (n === undefined) {
+        n = aliases.size + 1;
+        aliases.set(row.id, n);
+      }
+      return { ...row, name: `Teammate ${n}` };
+    })
   );
+}
+
+async function boardSection(db: Db, uid: string, now: Date): Promise<string> {
+  // Teammates' names never go to the AI provider (owner rule): "Teammate 1",
+  // "Teammate 2"..., for every viewer (a demo account included). Counts stay.
+  const rankings = aliasTeammates(await boardRankings(db, now, uid), uid);
   const lines = BOARD_PERIODS.map(([period, name], i) => {
     // The period's own dates (Central, like the Board), so "when does the week reset" is never a guess.
     const bounds = periodBounds(period, now);
@@ -336,7 +429,7 @@ async function boardSection(db: Db, uid: string, now: Date, demoAccount = false)
     const below = at < ranked.length - 1 ? `; just below: ${rowText(ranked[at + 1], at + 2)}` : '';
     return `- ${label}: #${at + 1} of ${ranked.length} with ${plural(me.sales, 'sale')}, ${plural(me.points, 'point')}${above}${below}.`;
   });
-  return `Board (ranked by points like the Board's default view; cancelled sales don't count; Year and All time are on the Board; every name here is a teammate, another rep, never this rep's customer):\n${lines.join('\n')}`;
+  return `Board (ranked by points like the Board's default view; cancelled sales don't count; Year and All time are on the Board; teammates are shown as "Teammate N", not by name; the Board in the portal has the names):\n${lines.join('\n')}`;
 }
 
 // ---------- Calls ----------
@@ -419,7 +512,14 @@ const FORM_SOURCES: Array<{ collection: string; name: string; detail?: (data: Da
   {
     collection: 'expediteOrders',
     name: 'Expedite order',
-    detail: (data) => [clean(data.customerName, 60) && `for ${clean(data.customerName, 60)}`, str(data.reason) && `reason: ${reasonText(data.reason, 60)}`].filter(Boolean).join(', '),
+    // Never the customer's name, phone or email: the order's last 4 and the reason (a fixed list).
+    detail: (data) =>
+      [
+        orderTail(str(data.orderNumber)) && `order ending ${orderTail(str(data.orderNumber))}`,
+        str(data.reason) && `reason: ${reasonText(data.reason, 60, [str(data.customerName)])}`,
+      ]
+        .filter(Boolean)
+        .join(', '),
   },
   {
     collection: 'leadsRequests',
@@ -466,10 +566,20 @@ async function formsSection(db: Db, uid: string, now: Date, zone: Zone): Promise
 // announcement are about other people (a hire who stalled, a manager's
 // field-train note), and so is sale_pending ("New Sale Needs Approval. <rep>
 // submitted…", sent to managers). Onboarding lives in its own section.
-const NOTIFICATION_TYPES: Record<string, true> = {
-  sale_submitted: true, sale_approved: true, sale_rejected: true,
-  install_date_changed: true, carrier_order_issue: true, install_reminder: true,
-  install_overdue: true, unlogged_callouts: true, unlogged_orders: true,
+//
+// Only the KIND of each notification is sent, never its title or message:
+// those name the customer ("Install tomorrow. Maria J. ..."), and the sale's
+// own line in the Sales section already carries its status.
+const NOTIFICATION_TYPES: Record<string, string> = {
+  sale_submitted: 'Sale logged',
+  sale_approved: 'Sale approved',
+  sale_rejected: 'Sale rejected',
+  install_date_changed: 'Install date changed',
+  carrier_order_issue: 'Carrier flagged an order',
+  install_reminder: 'Install reminder',
+  install_overdue: 'Install overdue',
+  unlogged_callouts: 'Callouts to log',
+  unlogged_orders: 'Orders to log',
 };
 
 async function notificationsSection(db: Db, uid: string, zone: Zone): Promise<string> {
@@ -477,18 +587,12 @@ async function notificationsSection(db: Db, uid: string, zone: Zone): Promise<st
   const items = snap.docs
     .map((doc) => doc.data() as Data)
     .filter((data) => data.userId === uid && NOTIFICATION_TYPES[str(data.type)])
-    .map((data) => ({ title: reasonText(data.title, 60), message: reasonText(data.message, 100), read: data.read === true, at: toDate(data.createdAt) }))
-    // A pay notification (the title itself is about pay) is left out whole.
-    .filter((item) => item.title !== REASON_ON_FILE)
+    .map((data) => ({ kind: NOTIFICATION_TYPES[str(data.type)], read: data.read === true, at: toDate(data.createdAt) }))
     .sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0))
     .slice(0, NOTIFICATIONS_SHOWN);
   if (items.length === 0) return '';
-  const lines = items.map(
-    (item) =>
-      // A message that touches pay (even "You earned 10 points") is dropped; the title says enough.
-      `- ${item.at ? dayLabel(item.at, zone) : ''}: ${item.title}${item.message && item.message !== REASON_ON_FILE ? `. ${item.message}` : ''}${item.read ? '' : ' (unread)'}`
-  );
-  return `Latest notifications (the bell):\n${lines.join('\n')}`;
+  const lines = items.map((item) => `- ${item.at ? dayLabel(item.at, zone) : ''}: ${item.kind}${item.read ? '' : ' (unread)'}`);
+  return `Latest notifications (the bell; open the bell for the details):\n${lines.join('\n')}`;
 }
 
 // ---------- Onboarding ----------
@@ -559,7 +663,7 @@ export async function loadRepSnapshot(db: Db, uid: string, now: Date, budgetMs =
       }),
       section('board', async () => {
         const user = await userRead;
-        return user.status === 'pending' ? '' : boardSection(db, uid, now, isDemoAccount(user));
+        return user.status === 'pending' ? '' : boardSection(db, uid, now);
       }),
       section('calls', async () => {
         const user = await userRead;

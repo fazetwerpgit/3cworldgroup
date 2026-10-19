@@ -141,9 +141,58 @@ describe('POST /api/portal/ask', () => {
     const system: string = sentBody().messages[0].content;
     const live = system.indexOf("=== This rep's portal right now (as of ");
     expect(live).toBeGreaterThan(system.indexOf('Their dealer code: DLR-OWN'));
-    expect(system.indexOf('Pat Oakley, 10 Birch St')).toBeGreaterThan(live);
-    expect(system).not.toContain('Not Yours');
+    expect(system.indexOf('- Customer A;')).toBeGreaterThan(live);
+    expect(system).not.toMatch(/Oakley|Birch|Not Yours/);
     expect(system).not.toContain('4321');
+  });
+
+  it("sends DeepSeek no customer's name, street, phone or email and no teammate's name, yet still the install dates", async () => {
+    const day = (iso: string) => new Date(`${iso}T12:00:00Z`);
+    fake = createFakeAskDb({
+      knowledgeNotes: { n1: { title: 'First thing', body: 'Do the first thing.', order: 1 } },
+      config: { fiberRepMap: { map: { 'DLR-OWN': 'r1' } } },
+      users: { r1: { city: 'Austin', state: 'TX', status: 'active', fieldRole: 'entry_rep' } },
+      sales: {
+        s1: {
+          salesRepId: 'r1', salesRepName: 'Dana Rep', status: 'approved', totalPoints: 10,
+          customerName: 'Rosalind Whitfield', customerAddress: '4812 Larkspur Ln, Austin, TX 78745',
+          customerPhone: '512-555-0142', customerEmail: 'rosalind@example.com', orderNumberOrBtn: 'TF-88412907',
+          saleDate: day('2026-10-14'), installDate: day('2026-10-22'), createdAt: day('2026-10-14'),
+        },
+        s2: {
+          salesRepId: 'r1', salesRepName: 'Dana Rep', status: 'cancelled', totalPoints: 10,
+          customerName: 'Bartholomew Quist', customerAddress: '77 Juniper Court, Round Rock, TX 78664',
+          cancelReason: 'Bartholomew moved to 12 Cedar Street, call 512-555-0199',
+          saleDate: day('2026-10-12'), createdAt: day('2026-10-12'),
+        },
+        t1: { salesRepId: 'r2', salesRepName: 'Marisol Teammate', status: 'approved', totalPoints: 30, customerName: 'Other Home', customerAddress: '5 Far Rd, Austin, TX', saleDate: day('2026-10-15'), createdAt: day('2026-10-15') },
+      },
+      fiberOrders: { o1: { status: 'pending_install', matchedUserId: 'r1', orderNumber: 'TF-88412907', address: '4812 Larkspur Ln', customerName: 'Rosalind Whitfield', estInstallDate: '2026-10-22' } },
+      expediteOrders: { e1: { repUid: 'r1', status: 'new', customerName: 'Rosalind Whitfield', customerPhone: '512-555-0142', customerEmail: 'rosalind@example.com', orderNumber: 'TF-88412907', reason: 'Install too far out', createdAt: day('2026-10-15') } },
+      notifications: { n1: { userId: 'r1', type: 'install_reminder', title: 'Install for Rosalind W.', message: 'Rosalind W. at 4812 Larkspur Ln, 512-555-0142', read: false, createdAt: day('2026-10-16') } },
+    });
+    state.db = fake.db;
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-17T17:00:00Z'));
+    try {
+      modelAnswers();
+      expect((await POST(req({ question: 'When is my next install?' }))).status).toBe(200);
+    } finally {
+      vi.useRealTimers();
+    }
+    const payload = fetchMock.mock.calls[0][1].body as string;
+    for (const leak of [
+      'Rosalind', 'Whitfield', 'Bartholomew', 'Quist', 'Larkspur', 'Juniper', 'Cedar', '4812', '77 Juniper',
+      '512-555', '5125550', 'example.com', 'Marisol', 'TF-88412907', '88412907', 'Other Home', 'Far Rd',
+    ]) {
+      expect(payload, leak).not.toContain(leak);
+    }
+    expect(payload).not.toMatch(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
+    const system: string = JSON.parse(payload).messages[0].content;
+    // Still answers "when is my next install?": the alias, the city, the date.
+    expect(system).toMatch(/- Customer A, Austin;[^\n]*install: installs Thu, Oct 22[^\n]*order # attached \(ending 2907\)/);
+    expect(system).toMatch(/- Customer B, Round Rock;[^\n]*cancelled/);
+    expect(system).toContain('Teammate 1 (1 sale, 30 points)');
   });
 
   it("tells the model the code is unknown when the rep isn't mapped", async () => {

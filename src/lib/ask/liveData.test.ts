@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeAskDb } from './fakeAskDb';
-import { loadRepSnapshot, rankBoard, type BoardSale } from './liveData';
+import { addressArea, aliasTeammates, customerAlias, loadRepSnapshot, orderTail, rankBoard, withoutNames, type BoardSale } from './liveData';
 
 // loadRepSnapshot: only the asking rep's documents, never a pay or money
-// field, contact details redacted, and a failing or slow section left out
+// field, never a customer's name, street, phone or email, never a teammate's
+// name, and a failing or slow section left out
 // without taking the rest down. Every name and number here is made up.
 
 type Firestore = FirebaseFirestore.Firestore;
@@ -112,19 +113,19 @@ describe('loadRepSnapshot', () => {
   it("shows this rep's sales, install status, proof, calls, forms and notifications in their own zone", async () => {
     const text = await load(createFakeAskDb(seed()).db);
 
-    expect(text).toContain('Maria Johnson, 1412 Oak St, Des Moines IA');
+    expect(text).toContain('- Customer A, Des Moines; plan T-Fiber 1 Gig');
     expect(text).toContain('sold Thu, Sep 24');
     expect(text).toContain('logged Thu, Sep 24 8:10 PM');
     expect(text).toContain('install: installs Tue, Sep 29');
     expect(text).toContain('carrier report: pending install');
-    expect(text).toMatch(/Maria Johnson[^\n]*order # attached; screenshot not attached/);
-    expect(text).toMatch(/Tom Baker[^\n]*install: cancelled[^\n]*order # not attached; screenshot attached/);
+    expect(text).toMatch(/Customer A, Des Moines[^\n]*order # attached \(ending DER1\); screenshot not attached/);
+    expect(text).toMatch(/Customer B, Ankeny[^\n]*install: cancelled[^\n]*order # not attached; screenshot attached/);
     expect(text).toContain('- Monday Team Call: Mon, Sep 28 7:00 PM');
     expect(text).not.toContain('Managers Only Sync');
     expect(text).not.toContain('Old Call');
-    expect(text).toContain('Expedite order (for Maria Johnson, reason: Install too far out): open');
+    expect(text).toContain('Expedite order (reason: Install too far out): open');
     expect(text).toContain('Payroll dispute: open');
-    expect(text).toContain('Install tomorrow');
+    expect(text).toMatch(/: Install reminder \(unread\)$/m);
   });
 
   it('shows managers-only calls to a director, like the Calls page', async () => {
@@ -134,21 +135,21 @@ describe('loadRepSnapshot', () => {
     expect(text).toContain('Managers Only Sync');
   });
 
-  it('ranks the rep on the Board with the names just above them', async () => {
+  it('ranks the rep on the Board with the teammates just above and below as Teammate N', async () => {
     const text = await load(createFakeAskDb(seed()).db);
     // Sunday starts a new Board week, so these Thursday/Friday sales are this month's only.
     expect(text).toContain('- This week (Sun, Sep 27 to Sat, Oct 3): nobody on the Board yet.');
-    expect(text).toContain('- This month (Tue, Sep 1 to Wed, Sep 30): #2 of 3 with 1 sale, 10 points; just above: #1 Jordan Price (1 sale, 30 points); just below: #3 Sam Lee (1 sale, 5 points).');
+    expect(text).toContain('- This month (Tue, Sep 1 to Wed, Sep 30): #2 of 3 with 1 sale, 10 points; just above: #1 Teammate 1 (1 sale, 30 points); just below: #3 Teammate 2 (1 sale, 5 points).');
+    expect(text).not.toMatch(/Jordan|Price|Sam Lee|Dana/);
   });
 
-  it('gives a demo account teammates as Rep 1, Rep 2, never their names (App Review)', async () => {
+  it('gives a demo account teammates as Teammate N too, never their names (App Review)', async () => {
     const data: Record<string, Record<string, Record<string, unknown>>> = seed();
     data.users.r1 = { ...data.users.r1, demoAccount: true };
     const text = await load(createFakeAskDb(data).db);
-    expect(text).toContain('#2 of 3 with 1 sale, 10 points; just above: #1 Rep 1 (1 sale, 30 points); just below: #3 Rep 2 (1 sale, 5 points).');
+    expect(text).toContain('#2 of 3 with 1 sale, 10 points; just above: #1 Teammate 1 (1 sale, 30 points); just below: #3 Teammate 2 (1 sale, 5 points).');
     expect(text).not.toMatch(/Jordan|Price|Sam Lee|\br2\b|\br3\b/);
-    // Its own customers are its own to see.
-    expect(text).toContain('Maria Johnson, 1412 Oak St, Des Moines IA');
+    expect(text).toContain('- Customer A, Des Moines;');
   });
 
   it('breaks a points tie the way the Board does: by name, not by who sold last', async () => {
@@ -156,7 +157,7 @@ describe('loadRepSnapshot', () => {
     // Sam Lee sold after Dana Rep; tied on points, Dana still comes first.
     data.sales.third.totalPoints = 10;
     const text = await load(createFakeAskDb(data).db);
-    expect(text).toContain('#2 of 3 with 1 sale, 10 points; just above: #1 Jordan Price (1 sale, 30 points); just below: #3 Sam Lee (1 sale, 10 points).');
+    expect(text).toContain('#2 of 3 with 1 sale, 10 points; just above: #1 Teammate 1 (1 sale, 30 points); just below: #3 Teammate 2 (1 sale, 10 points).');
   });
 
   it('reads the newest notifications, however many older ones come first by id', async () => {
@@ -164,16 +165,18 @@ describe('loadRepSnapshot', () => {
     for (let i = 0; i < 45; i += 1) {
       data.notifications[`a${String(i).padStart(2, '0')}`] = { userId: 'r1', type: 'install_reminder', title: `Old note ${i}`, message: '', read: true, createdAt: noon('2026-09-01') };
     }
-    data.notifications.z9 = { userId: 'r1', type: 'install_reminder', title: 'Newest install news', message: '', read: false, createdAt: noon('2026-09-27') };
-    expect(await load(createFakeAskDb(data).db)).toContain('Newest install news');
+    data.notifications.z9 = { userId: 'r1', type: 'install_overdue', title: 'Newest install news', message: '', read: false, createdAt: noon('2026-09-27') };
+    const text = await load(createFakeAskDb(data).db);
+    expect(text).toContain('Sun, Sep 27: Install overdue (unread)');
+    expect(text).not.toContain('Newest install news');
   });
 
   it('gives someone who is not on the Board (an owner) everyone on it, not just the last row', async () => {
     const data: Record<string, Record<string, Record<string, unknown>>> = seed();
     data.users.owner1 = { displayName: 'Jeremy', status: 'active', role: 'owner' };
     const text = await loadRepSnapshot(createFakeAskDb(data).db as unknown as Firestore, 'owner1', NOW);
-    expect(text).toContain('Everyone on it (3): #1 Jordan Price (1 sale, 30 points); #2 ');
-    expect(text).toContain('#3 Sam Lee (1 sale, 5 points)');
+    expect(text).toContain('Everyone on it (3): #1 Teammate 1 (1 sale, 30 points); #2 Teammate 2 (1 sale, 10 points); #3 Teammate 3 (1 sale, 5 points)');
+    expect(text).not.toMatch(/Jordan|Sam Lee|Dana/);
   });
 
   it('reads the Board once a minute, however many questions come in', async () => {
@@ -209,7 +212,7 @@ describe('loadRepSnapshot', () => {
     notes.a2 = { userId: 'r1', type: 'announcement', title: 'Riley Quinn - You\'re Cleared!', message: 'Manager note: Riley talks too fast, watch the close', read: false, createdAt: noon('2026-09-27') };
     const text = await load(createFakeAskDb(data).db);
     for (const leak of ['Jamie Stall', 'self-registered', 'Riley', 'talks too fast', 'Cleared']) expect(text).not.toContain(leak);
-    expect(text).toContain('Install tomorrow');
+    expect(text).toContain('Install reminder');
   });
 
   it("never shows another rep's sales, carrier orders, forms or notifications", async () => {
@@ -226,11 +229,11 @@ describe('loadRepSnapshot', () => {
     expect(text).not.toMatch(/commission|payout|estimated ?pay|expected ?pay|you earn/i);
     // A reason that touches pay is replaced whole, not half-redacted.
     expect(text).not.toMatch(/chargeback/i);
-    expect(text).toMatch(/Tom Baker[^\n]*in the portal: cancelled \(reason on file, ask Jeremy or Jacob\)/);
-    expect(text).toMatch(/: Install tomorrow( \(unread\))?$/m);
+    expect(text).toMatch(/Customer B, Ankeny[^\n]*in the portal: cancelled \(reason on file, ask Jeremy or Jacob\)/);
+    expect(text).toMatch(/: Install reminder( \(unread\))?$/m);
   });
 
-  it('replaces any reason or message that mentions pay or money, in every spelling', async () => {
+  it('sends only the kind of a notification, never its text (pay, money or names)', async () => {
     const data: Record<string, Record<string, Record<string, unknown>>> = seed();
     data.notifications = {
       m1: { userId: 'r1', type: 'install_date_changed', title: 'Install date changed', message: 'Refund of USD 150 to the customer', read: false, createdAt: noon('2026-09-26') },
@@ -241,13 +244,14 @@ describe('loadRepSnapshot', () => {
     const text = await load(createFakeAskDb(data).db);
     for (const leak of ['USD', '150', 'too much', 'Wrong rate', 'Bonus', 'Nice work']) expect(text).not.toContain(leak);
     expect(text).toMatch(/: Install date changed( \(unread\))?$/m);
-    expect(text).toMatch(/: Install missed( \(unread\))?$/m);
+    expect(text).toMatch(/: Carrier flagged an order( \(unread\))?$/m);
     expect(text).toMatch(/: Sale rejected( \(unread\))?$/m);
+    expect(text).toMatch(/: Install reminder( \(unread\))?$/m);
   });
 
-  it('redacts phone numbers and emails, and never reads the contact fields', async () => {
+  it('never sends a phone number, email or the address notes, and never reads the contact fields', async () => {
     const text = await load(createFakeAskDb(seed()).db);
-    expect(text).toContain('call [phone] or [email]');
+    expect(text).not.toContain('gate code');
     expect(text).not.toContain('515-555-0142');
     expect(text).not.toContain('515-555-0199');
     expect(text).not.toContain('example.com');
@@ -257,7 +261,7 @@ describe('loadRepSnapshot', () => {
     const text = await load(createFakeAskDb(seed(), ['scheduledCalls']).db);
     expect(text).not.toContain('Monday Team Call');
     expect(text).not.toMatch(/team calls/i);
-    expect(text).toContain('Maria Johnson');
+    expect(text).toContain('Customer A, Des Moines');
     expect(warn).toHaveBeenCalledWith('[ask-3c] live section failed', 'calls', expect.any(String));
   });
 
@@ -272,12 +276,12 @@ describe('loadRepSnapshot', () => {
     const text = await load(slow, 100);
     expect(Date.now() - started).toBeLessThan(1000);
     expect(text).not.toContain('Monday Team Call');
-    expect(text).toContain('Maria Johnson');
+    expect(text).toContain('Customer A, Des Moines');
   });
 
   it("still loads when the rep's profile can't be read, in Central time", async () => {
     const text = await load(createFakeAskDb(seed(), ['users']).db);
-    expect(text).toContain('Maria Johnson');
+    expect(text).toContain('Customer A, Des Moines');
     expect(text).toContain('Monday Team Call: Mon, Sep 28 7:00 PM');
   });
 });
@@ -289,13 +293,13 @@ describe('loadRepSnapshot and the carrier report stamp (Noah, 2026-10-10)', () =
 
   it('says the install day passed and waits on the carrier while the report predates it', async () => {
     const text = await loadRepSnapshot(createFakeAskDb(withStamp('2026-09-28')).db as unknown as Firestore, 'r1', OCT1);
-    expect(text).toMatch(/Maria Johnson[^\n]*install: install day \(Tue, Sep 29\) passed, waiting on the carrier report/);
-    expect(text).not.toMatch(/Maria Johnson[^\n]*install overdue/);
+    expect(text).toMatch(/Customer A[^\n]*install: install day \(Tue, Sep 29\) passed, waiting on the carrier report/);
+    expect(text).not.toMatch(/Customer A[^\n]*install overdue/);
   });
 
   it('calls it overdue once the report covers the day', async () => {
     const text = await loadRepSnapshot(createFakeAskDb(withStamp('2026-09-30')).db as unknown as Firestore, 'r1', OCT1);
-    expect(text).toMatch(/Maria Johnson[^\n]*install: install overdue/);
+    expect(text).toMatch(/Customer A[^\n]*install: install overdue/);
   });
 });
 
@@ -335,5 +339,41 @@ describe('loadRepSnapshot — demo account on the shared Board cache', () => {
     expect(demoText).toContain('#1 of 4 with 1 sale, 99 points');
     expect(realText).toContain('#2 of 3 with 1 sale, 10 points');
     expect(realText).not.toContain('App Review');
+  });
+});
+
+describe('what Ask 3C may say about people (owner rule, Oct 18 2026)', () => {
+  it('names a sale by an alias and its city, never the customer, street, phone or email', async () => {
+    const text = await load(createFakeAskDb(seed()).db);
+    for (const leak of ['Maria', 'Johnson', 'Tom Baker', 'Baker', 'Oak St', '1412', 'Elm Ave', '88 Elm', '515-555', 'example.com', 'TMO-ORDER-1', 'Dana Rep', 'Jordan', 'Sam Lee']) {
+      expect(text, leak).not.toContain(leak);
+    }
+  });
+
+  it("takes the sale's customer name and any street out of a reason", async () => {
+    const data: Record<string, Record<string, Record<string, unknown>>> = seed();
+    data.sales.s2.cancelReason = 'Tom moved to 12 Cedar Street, Baker family said no';
+    const text = await load(createFakeAskDb(data).db);
+    expect(text).toContain('in the portal: cancelled (the customer moved to [address], the customer family said no)');
+    expect(text).not.toMatch(/Tom|Baker|Cedar/);
+  });
+
+  it('aliases customers A, B, ... and teammates 1, 2, ... consistently', () => {
+    expect([0, 1, 25, 26].map(customerAlias)).toEqual(['Customer A', 'Customer B', 'Customer Z', 'Customer 27']);
+    const row = (id: string, name: string) => ({ id, name, sales: 1, points: 1 });
+    const out = aliasTeammates([[row('a', 'Ann'), row('me', 'Me')], [row('b', 'Bo'), row('a', 'Ann')]], 'me');
+    expect(out.map((rows) => rows.map((r) => r.name))).toEqual([['Teammate 1', 'Me'], ['Teammate 2', 'Teammate 1']]);
+  });
+
+  it('keeps only the city (or ZIP) of an address, and only the last 4 of an order number', () => {
+    expect(addressArea('4812 Larkspur Ln, Austin, TX 78745')).toBe('Austin');
+    expect(addressArea('1412 Oak St, Des Moines IA (gate code 1234)')).toBe('Des Moines');
+    expect(addressArea('4812 Larkspur Ln, TX 78745')).toBe('78745');
+    expect(addressArea('4812 Larkspur Ln Austin TX')).toBe('');
+    expect(addressArea('')).toBe('');
+    expect(orderTail('TF-88412907')).toBe('2907');
+    expect(orderTail('(512) 555-0142')).toBe('0142');
+    expect(orderTail('12')).toBe('');
+    expect(withoutNames('Maria Johnson called; maria said ok', ['Maria Johnson'])).toBe('the customer called; the customer said ok');
   });
 });
