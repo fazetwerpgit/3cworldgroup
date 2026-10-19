@@ -145,3 +145,16 @@ export function isSameSaleEntry(
     normalizeEntryText(sale.customerAddress) === normalizeEntryText(entry.formData.customerAddress)
   );
 }
+
+/**
+ * The Edit sale form's install-date rule. The sales API only ever sets an
+ * install date, it has no way to clear one, so emptying a date the sale
+ * already has would be dropped on save while the form reported success, and
+ * the old day would keep driving status and payout. Block it instead.
+ */
+export function editInstallDateError(loadedInstallDate: string, installDate: string): string | null {
+  if (loadedInstallDate && !installDate) {
+    return 'The install date cannot be cleared. Pick the correct day instead.';
+  }
+  return null;
+}

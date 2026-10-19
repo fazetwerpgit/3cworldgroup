@@ -12,6 +12,7 @@ import { MAX_PROOF_SCREENSHOTS, saleProofPaths } from '@/lib/sales/proofPaths';
 import { addPlanToProducts } from '@/lib/sales/planSelection';
 import { randomHex } from '@/lib/randomHex';
 import { dateToSaleDateInput, todaySaleDateInput } from '@/lib/sales/saleDate';
+import { editInstallDateError } from '@/lib/sales/saleForm';
 import { BodyLayer } from './BodyLayer';
 import { ProofCapture, useProofUploads } from './ProofCapture';
 import { RepPlanPicker } from './RepPlanPicker';
@@ -190,6 +191,13 @@ export function RepSaleEdit() {
       return;
     }
 
+    const loadedInstallDate = sale?.installDate ? dateToSaleDateInput(new Date(sale.installDate)) : '';
+    const installDateError = editInstallDateError(loadedInstallDate, formData.installDate);
+    if (installDateError) {
+      setFormError(installDateError);
+      return;
+    }
+
     if (formData.installDate && formData.saleDate > formData.installDate) {
       setFormError('Sale date cannot be after the install date');
       return;
@@ -211,7 +219,6 @@ export function RepSaleEdit() {
     // the date the form was loaded with: re-sending an untouched field would
     // put back a day a rep or the carrier sync changed while the form was open.
     const { installDate, ...fields } = formData;
-    const loadedInstallDate = sale?.installDate ? dateToSaleDateInput(new Date(sale.installDate)) : '';
     const updates: Partial<Omit<Sale, 'saleDate' | 'installDate'>> & {
       saleDate?: string;
       installDate?: string;
