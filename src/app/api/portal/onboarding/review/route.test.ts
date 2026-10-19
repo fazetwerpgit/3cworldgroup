@@ -55,6 +55,8 @@ vi.mock('@/types', () => {
     resolveRoles: (role?: string, fieldRole?: string) => ({ role, fieldRole }),
     RoleDisplayNames: { entry_level_rep: 'Entry Level Rep' },
     isOwnerOnlyOnboardingItem: (itemId: unknown) => itemId === 'w9' || itemId === 'direct_deposit',
+    isOwnerOnlyOnboardingDocument: (itemId: unknown) =>
+      itemId === 'w9' || itemId === 'direct_deposit' || itemId === 'contract',
   };
 });
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: vi.fn(() => false) }));
@@ -289,6 +291,8 @@ describe('GET /api/portal/onboarding/review', () => {
       reviewerName: 'Jeremy',
       manualCompletion: { note: 'Signed on paper', byName: 'Jeremy' },
       hasSignedPdf: false,
+      // The contract PDF carries the EIN: an admin sees the status, not the document.
+      ownerOnly: true,
     });
     expect(fresh).toMatchObject({ userName: 'Anna New', done: 0, total: 4, toReview: 0, unsigned: 0 });
     // The dashboard's queue: submitted, never e-sign.

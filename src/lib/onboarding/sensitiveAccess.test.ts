@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/firebase/admin', () => ({ adminDb: null }));
 
-import { canApproveOnboardingItem } from './sensitiveAccess';
+import { canApproveOnboardingItem, canOpenOnboardingItem, isOwnerOnlyOnboardingDocument } from './sensitiveAccess';
 
 const operations = { isAdmin: false, isOwner: false };
 const admin = { isAdmin: true, isOwner: false };
@@ -24,5 +24,26 @@ describe('canApproveOnboardingItem', () => {
     expect(canApproveOnboardingItem('w9', admin)).toBe(false);
     expect(canApproveOnboardingItem('direct_deposit', admin)).toBe(false);
     expect(canApproveOnboardingItem('w9', owner)).toBe(true);
+  });
+});
+
+describe('canOpenOnboardingItem', () => {
+  // The contract stamps the IBO's EIN (lib/esign/documents), a tax ID like the
+  // W-9's TIN, so its document is owner only even though the item is not.
+  it.each(['w9', 'direct_deposit', 'contract'])('opens the %s document to owners only', (itemId) => {
+    expect(isOwnerOnlyOnboardingDocument(itemId)).toBe(true);
+    expect(canOpenOnboardingItem(itemId, operations)).toBe(false);
+    expect(canOpenOnboardingItem(itemId, admin)).toBe(false);
+    expect(canOpenOnboardingItem(itemId, owner)).toBe(true);
+  });
+
+  it('opens other sensitive items to admins, not operations', () => {
+    expect(canOpenOnboardingItem('dl_photos', operations)).toBe(false);
+    expect(canOpenOnboardingItem('dl_photos', admin)).toBe(true);
+  });
+
+  it('opens a plain item to any management caller', () => {
+    expect(isOwnerOnlyOnboardingDocument('pay_structure')).toBe(false);
+    expect(canOpenOnboardingItem('pay_structure', operations)).toBe(true);
   });
 });

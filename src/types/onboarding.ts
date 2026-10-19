@@ -123,6 +123,21 @@ export function isOwnerOnlyOnboardingItem(itemId: unknown): boolean {
   return typeof itemId === 'string' && OWNER_ONLY_ONBOARDING_ITEM_IDS.includes(itemId);
 }
 
+// Items management still reviews and approves, but whose signed PDF can carry
+// a tax ID: the contract stamps the IBO's EIN (lib/esign/documents). The EIN is
+// never stored outside the PDF, so the server cannot tell whether a given copy
+// has one; the document is kept as close as the W-9.
+export const OWNER_ONLY_DOCUMENT_ITEM_IDS: readonly string[] = ['contract'];
+
+// May only an owner open this item's document (signed PDF, files, emailed
+// attachment)? True for the tax and banking items and for the contract.
+export function isOwnerOnlyOnboardingDocument(itemId: unknown): boolean {
+  return (
+    isOwnerOnlyOnboardingItem(itemId) ||
+    (typeof itemId === 'string' && OWNER_ONLY_DOCUMENT_ITEM_IDS.includes(itemId))
+  );
+}
+
 // Guardrail for sensitive items: the app stores a reference/vendor token only,
 // never raw SSNs, bank-account, or card numbers. This rejects the obvious
 // raw-PII shapes (a bare 9-digit SSN, or a 13-19 digit card/account run, with

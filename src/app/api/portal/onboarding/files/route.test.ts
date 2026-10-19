@@ -25,6 +25,7 @@ vi.mock('@/types', () => ({
     { id: 'w9', label: 'W-9', sensitive: true, referenceKind: 'storage' },
   ],
   isOwnerOnlyOnboardingItem: (id: unknown) => id === 'w9' || id === 'direct_deposit',
+  isOwnerOnlyOnboardingDocument: (id: unknown) => id === 'w9' || id === 'direct_deposit' || id === 'contract',
 }));
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: (id: string) => id !== 'contract' }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));

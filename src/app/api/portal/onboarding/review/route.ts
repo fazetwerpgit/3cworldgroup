@@ -18,7 +18,13 @@ import { onboardingFrom } from '@/lib/email/sendEmail';
 import { maybeFlagActivationReady } from '@/lib/onboarding/activation';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
-import { canApproveOnboardingItem, canOpenOnboardingItem, isOwnerOnlyOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
+import {
+  canApproveOnboardingItem,
+  canOpenOnboardingItem,
+  isOwnerOnlyOnboardingDocument,
+  isOwnerOnlyOnboardingItem,
+  logSensitiveFileAccess,
+} from '@/lib/onboarding/sensitiveAccess';
 import { isHeldOnboardingItem } from '@/types/onboardingHold';
 
 type ProgressData = FirebaseFirestore.DocumentData;
@@ -148,9 +154,10 @@ export async function GET(request: NextRequest) {
         // True when the item holds sensitive files this caller may not open
         // (operations). The UI shows an "Admin only" note instead of links.
         adminOnly: item.sensitive && !isOwnerOnlyOnboardingItem(item.id) && !gate.isAdmin,
-        // True for the tax and banking items (W-9, direct deposit) when the
-        // caller is not an owner: the status shows, the document never does.
-        ownerOnly: isOwnerOnlyOnboardingItem(item.id) && !gate.isOwner,
+        // True for the tax and banking items (W-9, direct deposit) and the
+        // contract (EIN) when the caller is not an owner: the status shows,
+        // the document never does.
+        ownerOnly: isOwnerOnlyOnboardingDocument(item.id) && !gate.isOwner,
         referenceKind: item.referenceKind,
         // A tax or banking item's reference (legacy upload path or vendor
         // token) is withheld from non-owners along with the document.

@@ -4,7 +4,7 @@ import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import {
   canOpenOnboardingItem,
-  isOwnerOnlyOnboardingItem,
+  isOwnerOnlyOnboardingDocument,
   isSensitiveOnboardingItem,
   logSensitiveFileAccess,
 } from '@/lib/onboarding/sensitiveAccess';
@@ -50,11 +50,13 @@ export async function GET(request: NextRequest) {
     if (!isEsignItem(itemId)) {
       return NextResponse.json({ error: 'Signed PDF is only available for e-sign items' }, { status: 404 });
     }
-    const sensitive = isSensitiveOnboardingItem(itemId);
+    // The contract is not a sensitive item but its PDF can carry the EIN, so
+    // opening it is audited like the W-9.
+    const sensitive = isSensitiveOnboardingItem(itemId) || isOwnerOnlyOnboardingDocument(itemId);
     if (!canOpenOnboardingItem(itemId, gate)) {
       return NextResponse.json(
         {
-          error: isOwnerOnlyOnboardingItem(itemId)
+          error: isOwnerOnlyOnboardingDocument(itemId)
             ? 'Forbidden: only an owner can open tax and banking documents'
             : 'Forbidden: admin access required for sensitive documents',
         },

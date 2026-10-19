@@ -89,6 +89,7 @@ describe('GET /api/portal/onboarding/signed-pdf', () => {
   });
 
   it('streams a PDF from the stored path', async () => {
+    gateMock.mockResolvedValue(OWNER);
     docGetMock.mockResolvedValue({
       exists: true,
       data: () => ({ itemId: 'contract', completedPdfPath: 'esign-completed/user-1/contract.pdf' }),
@@ -104,6 +105,7 @@ describe('GET /api/portal/onboarding/signed-pdf', () => {
   });
 
   it('answers 404 with a plain message for a signed item with no stored copy', async () => {
+    gateMock.mockResolvedValue(OWNER);
     docGetMock.mockResolvedValue({
       exists: true,
       data: () => ({ itemId: 'contract', status: 'approved', esignEnvelopeId: 'legacy-1' }),
@@ -200,13 +202,49 @@ describe('GET /api/portal/onboarding/signed-pdf', () => {
   it('does not audit a non-sensitive PDF', async () => {
     docGetMock.mockResolvedValue({
       exists: true,
-      data: () => ({ itemId: 'contract', completedPdfPath: 'esign-completed/user-1/contract.pdf' }),
+      data: () => ({ itemId: 'pay_structure', completedPdfPath: 'esign-completed/user-1/pay_structure.pdf' }),
     });
     gateMock.mockResolvedValue({ ...MANAGEMENT, isAdmin: false });
 
-    const response = await GET(request());
+    const response = await GET(request('user-1', 'pay_structure'));
 
     expect(response.status).toBe(200);
     expect(logAddMock).not.toHaveBeenCalled();
+  });
+
+  // The contract stamps the IBO's EIN (a tax ID) on page 3, so its PDF is held
+  // to the W-9 rule: owners only, and every opening audited.
+  it.each([
+    ['operations', { ...MANAGEMENT, name: 'Ops', isAdmin: false }],
+    ['an admin', MANAGEMENT],
+  ])('refuses the contract PDF to %s: it carries the EIN', async (_label, gate) => {
+    gateMock.mockResolvedValue(gate);
+
+    const response = await GET(request('user-1', 'contract'));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Forbidden: only an owner can open tax and banking documents',
+    });
+    expect(docMock).not.toHaveBeenCalled();
+    expect(storageDownloadMock).not.toHaveBeenCalled();
+    expect(logAddMock).not.toHaveBeenCalled();
+  });
+
+  it('streams the contract PDF to an owner and writes a sensitiveAccessLog row', async () => {
+    gateMock.mockResolvedValue(OWNER);
+    docGetMock.mockResolvedValue({
+      exists: true,
+      data: () => ({ itemId: 'contract', completedPdfPath: 'esign-completed/user-1/contract.pdf' }),
+    });
+
+    const response = await GET(request('user-1', 'contract'));
+
+    expect(response.status).toBe(200);
+    expect(logAddMock).toHaveBeenCalledWith(expect.objectContaining({
+      targetUid: 'user-1',
+      itemId: 'contract',
+      source: 'onboarding-signed-pdf',
+    }));
   });
 });

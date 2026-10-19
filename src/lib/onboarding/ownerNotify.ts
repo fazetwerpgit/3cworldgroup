@@ -6,7 +6,7 @@ import {
   ownerDocSignedEmail,
 } from '@/lib/email/templates';
 import { RoleDisplayNames, type FieldRole } from '@/types/auth';
-import { getOnboardingItemsForUser, isOwnerOnlyOnboardingItem, type OnboardingItem } from '@/types/onboarding';
+import { getOnboardingItemsForUser, isOwnerOnlyOnboardingDocument, type OnboardingItem } from '@/types/onboarding';
 
 const PACKET_URL = () => `${appBaseUrl()}/portal/admin/onboarding`;
 const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
@@ -204,16 +204,16 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
           name,
           contentBase64: buffer.toString('base64'),
           contentType: 'application/pdf',
-          ownerOnly: isOwnerOnlyOnboardingItem(itemId),
+          ownerOnly: isOwnerOnlyOnboardingDocument(itemId),
         });
       } catch (error) {
         skipped.push(`${name} (download failed)`);
         console.error('[onboarding owner notify] attachment download failed', { path, error });
       }
     }
-    // The W-9 (full SSN) and direct-deposit form (bank numbers) are OWNER
-    // ONLY: owner accounts get every attachment and the masked SSN; the extra
-    // config addresses get the packet without them.
+    // The W-9 (full SSN), direct-deposit form (bank numbers) and contract
+    // (EIN) are OWNER ONLY: owner accounts get every attachment and the masked
+    // SSN; the extra config addresses get the packet without them.
     const packet = (forOwners: boolean) => {
       const files = attachments
         .filter((attachment) => forOwners || !attachment.ownerOnly)
