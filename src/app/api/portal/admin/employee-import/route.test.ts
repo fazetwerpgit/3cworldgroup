@@ -119,9 +119,17 @@ async function xlsx(rows: unknown[][]): Promise<Buffer> {
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
-async function post(mode: string, rows: unknown[][] = SHEET) {
+async function post(mode: string, rows: unknown[][] = SHEET, confirmed?: string[]): Promise<Response> {
+  if (mode === 'apply' && confirmed === undefined) {
+    // What the owner's confirm step sends: every email match the preview listed.
+    const preview = (await (await post('preview', rows)).json()) as { people?: PersonView[] };
+    confirmed = (preview.people ?? [])
+      .filter((p) => p.willFill.length > 0 && p.matchedBy === 'email' && p.matchEmail)
+      .map((p) => p.matchEmail as string);
+  }
   const form = new FormData();
   form.set('mode', mode);
+  if (confirmed !== undefined) form.set('confirmedEmailMatches', JSON.stringify(confirmed));
   form.set(
     'file',
     new File([new Uint8Array(await xlsx(rows))], 'employees.xlsx', {
@@ -136,7 +144,14 @@ function expectNoSecrets(value: unknown) {
   for (const secret of SECRETS) expect(text).not.toContain(secret);
 }
 
-type PersonView = { name: string; willFill: string[]; keptExisting: string[]; issues: string[] };
+type PersonView = {
+  name: string;
+  willFill: string[];
+  keptExisting: string[];
+  issues: string[];
+  matchedBy?: string;
+  matchEmail?: string;
+};
 const person = (json: { people: PersonView[] }, name: string) => json.people.find((p) => p.name === name);
 
 beforeEach(() => {
@@ -206,7 +221,7 @@ describe('preview', () => {
     expect(json.matched).toBe(4);
     // Nobody Portal and the inactive Evan. Gina's two rows are hers (she is skipped).
     expect(json.unmatchedRows).toBe(2);
-    expect(person(json, 'Alex Rivera')).toEqual({
+    expect(person(json, 'Alex Rivera')).toMatchObject({
       name: 'Alex Rivera',
       willFill: ['phone', 'address', 'shirt', 'ssn', 'dl'],
       keptExisting: [],
@@ -226,7 +241,7 @@ describe('preview', () => {
 
   it('reports an address it cannot read and fills the rest', async () => {
     const json = await (await post('preview')).json();
-    expect(person(json, 'Casey Moss')).toEqual({
+    expect(person(json, 'Casey Moss')).toMatchObject({
       name: 'Casey Moss',
       willFill: ['phone', 'shirt', 'ssn', 'dl'],
       keptExisting: [],
@@ -236,7 +251,7 @@ describe('preview', () => {
 
   it('keeps what the portal already has and reports a different SSN', async () => {
     const json = await (await post('preview')).json();
-    expect(person(json, 'Dana Filled')).toEqual({
+    expect(person(json, 'Dana Filled')).toMatchObject({
       name: 'Dana Filled',
       willFill: ['dl'],
       keptExisting: ['phone', 'address', 'shirt', 'ssn'],
@@ -256,6 +271,14 @@ describe('preview', () => {
 });
 
 describe('apply', () => {
+  it('refuses to write until every email match was confirmed', async () => {
+    const before = [...db.store.entries()];
+    const response = await post('apply', SHEET, []);
+    expect(response.status).toBe(409);
+    expect(db.commits).toEqual([]);
+    expect([...db.store.entries()]).toEqual(before);
+  });
+
   it('writes only empty fields, encrypted so they decrypt back, and audits counts only', async () => {
     const response = await post('apply');
     expect(response.status).toBe(200);
