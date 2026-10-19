@@ -70,6 +70,9 @@ function ReportedMessage({
   const thumbFailed = () => {
     const url = report.attachmentUrl;
     if (!url || retried.current.has(url) || !report.attachmentExpiresAt) return;
+    // Every re-sign returns a new URL, so a broken file would loop forever on
+    // the URL check alone: after the first re-sign, only an expired link retries.
+    if (retried.current.size > 0 && !reportLinkExpired(report.attachmentExpiresAt)) return;
     retried.current.add(url);
     void onRefresh();
   };
