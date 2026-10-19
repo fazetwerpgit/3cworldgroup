@@ -12,7 +12,7 @@ export async function fetchAiConsent(): Promise<AiConsentState | null> {
     const res = await fetch('/api/portal/ai-consent', { headers: { Authorization: `Bearer ${token ?? ''}` } });
     if (!res.ok) return null;
     const json = (await res.json()) as Partial<AiConsentState>;
-    return { deepseek: json.deepseek === true, gemini: json.gemini === true };
+    return { deepseek: json.deepseek === true, gemini: json.gemini === true, gemini_voice: json.gemini_voice === true };
   } catch {
     return null;
   }

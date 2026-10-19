@@ -80,7 +80,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockReset();
   mockUser.mockReset();
-  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: '', isOwner: false });
+  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: '', isOwner: false, aiConsent: { deepseek: false, gemini: false, gemini_voice: true } });
   vi.spyOn(console, 'info').mockImplementation(() => {});
   fake = createFakeAskDb({ practiceSessions: { r1: SAVED } });
   state.db = fake.db;
@@ -93,6 +93,14 @@ afterEach(() => {
 });
 
 describe('POST /api/portal/ask/practice/voice', () => {
+  it('refuses with the Practice voice consent code before calling Gemini when the rep has not agreed', async () => {
+    mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Ana', email: '', isOwner: false, aiConsent: { deepseek: true, gemini: true, gemini_voice: false } });
+    const res = await POST(req({ sessionId: 's1', text: LINE }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'ai_consent', provider: 'gemini_voice' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("streams the session's latest homeowner line in its voice as raw PCM, sent as `[tags] line` only", async () => {
     fetchMock.mockResolvedValueOnce(streamed(PCM_A, PCM_B));
     const res = await POST(req({ sessionId: 's1', text: LINE }));
@@ -188,7 +196,7 @@ describe('POST /api/portal/ask/practice/voice', () => {
 
   it("refuses a stale session and another rep's session, before counting anything", async () => {
     expect((await POST(req({ sessionId: 'old', text: LINE }))).status).toBe(409);
-    mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false });
+    mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false, aiConsent: { deepseek: false, gemini: false, gemini_voice: true } });
     expect((await POST(req({ sessionId: 's1', text: LINE }))).status).toBe(409);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(fake.docs('askUsage').size).toBe(0);

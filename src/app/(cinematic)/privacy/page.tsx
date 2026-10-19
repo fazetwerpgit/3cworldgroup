@@ -213,7 +213,9 @@ export default function PrivacyPolicyPage() {
                   <strong>Voice sales practice.</strong> Practice lets you rehearse a door conversation
                   with an AI homeowner. In hands-free mode, your microphone audio is streamed to
                   Google&apos;s Gemini service to turn your speech into text, and the homeowner&apos;s
-                  replies are spoken using Google&apos;s Gemini text-to-speech. Otherwise, your speech is
+                  replies are spoken using Google&apos;s Gemini text-to-speech. Practice voice asks first:
+                  it sends your mic audio to Google Gemini to play the homeowner, and the audio
+                  isn&apos;t stored. If you say no, Practice uses your phone&apos;s own voice instead. Otherwise, your speech is
                   turned into text by your phone or browser&apos;s built-in speech recognition (on
                   iPhone, provided by Apple). The transcript of your practice conversation is sent to
                   DeepSeek to generate the homeowner&apos;s replies and your coaching feedback, and we keep a
@@ -300,7 +302,7 @@ export default function PrivacyPolicyPage() {
                     <li>Google Firebase and Google Cloud, for sign-in, our database, file storage, and push notifications.</li>
                     <li>Vercel, which hosts our website and portal and provides cookieless page analytics on our public website pages.</li>
                     <li>Postmark, which sends our email, including the signed onboarding documents sent to the owners.</li>
-                    <li>Google Gemini, for sale screenshot auto-fill (the screenshots you choose) and for speech in hands-free voice practice.</li>
+                    <li>Google Gemini, for sale screenshot auto-fill (the screenshots you choose) and for Practice voice (your mic audio in hands-free practice, and the homeowner&apos;s spoken replies), each only after you agree.</li>
                     <li>
                       DeepSeek, which generates Ask 3C answers and the practice homeowner&apos;s
                       replies and coaching feedback.

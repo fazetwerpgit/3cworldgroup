@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { aiConsentRefusal } from '@/lib/ai/consent';
 import { practiceAudience } from '@/lib/ask/flag';
 import { isPersonaId, isPracticeSeed, practiceCustomer } from '@/lib/ask/practice';
 import { STANDARD_DOOR, parseDoor, voiceFor, type Speaker } from '@/lib/ask/practiceDoor';
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest) {
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return fail(gate.error, gate.status);
   if (audience === 'owners' && !gate.isOwner) return fail('Ask 3C is not turned on yet.', 404);
+  // Practice voice consent (lib/ai/consent): nothing goes to Gemini without it.
+  if (!gate.aiConsent.gemini_voice) return NextResponse.json(aiConsentRefusal('gemini_voice'), { status: 403 });
   if (!adminDb) return fail('Database not configured', 500);
   const db = adminDb;
 

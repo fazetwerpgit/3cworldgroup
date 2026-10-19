@@ -5,8 +5,8 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { aiConsentAt, isAiProvider } from '@/lib/ai/consent';
 
 // The one-time AI consent (lib/ai/consent, App Store 5.1.2(i)).
-// GET  -> { deepseek: boolean, gemini: boolean } for the caller.
-// POST { provider: 'deepseek' | 'gemini' } -> stamps users/{uid}.aiConsent.{provider}
+// GET  -> { deepseek, gemini, gemini_voice } (booleans) for the caller.
+// POST { provider: 'deepseek' | 'gemini' | 'gemini_voice' } -> stamps users/{uid}.aiConsent.{provider}
 // once; a repeat keeps the first time. Nothing here ever clears it.
 
 export async function GET(request: NextRequest) {

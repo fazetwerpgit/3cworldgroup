@@ -11,8 +11,8 @@ import d from './rep-dashboard.module.css';
 import c from './ai-consent-sheet.module.css';
 
 // The one-time AI consent sheet (App Store 5.1.2(i)), shown before an AI
-// feature first sends anything to its provider: Ask 3C (DeepSeek) and the
-// sale screenshot scan (Google Gemini). It names the provider, says what is
+// feature first sends anything to its provider: Ask 3C (DeepSeek), the
+// sale screenshot scan (Google Gemini) and Practice voice (Google Gemini). It names the provider, says what is
 // sent and why, and links the privacy policy. "Agree" stamps the consent on
 // the server (POST /api/portal/ai-consent); "Not now" just closes.
 
@@ -49,6 +49,13 @@ const COPY: Record<AiProvider, { title: string; body: React.ReactNode; declined:
       </>
     ),
     declined: 'Not now? You can still type the sale in yourself.',
+  },
+  gemini_voice: {
+    title: 'Use Practice voice?',
+    body: (
+      <p>Practice voice sends your mic audio to Google Gemini to play the homeowner. Audio isn&apos;t stored.</p>
+    ),
+    declined: "Not now? Practice still works with your phone's own voice and tap to talk.",
   },
 };
 

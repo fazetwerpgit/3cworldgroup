@@ -9,6 +9,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HandsFreeEvents } from './handsFreeMic';
 
+const voiceConsent = vi.hoisted(() => ({ agreed: true }));
+vi.mock('@/lib/ai/consentClient', () => ({
+  fetchAiConsent: async () => ({ deepseek: true, gemini: true, gemini_voice: voiceConsent.agreed }),
+  agreeToAi: async () => true,
+}));
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: async () => 'token' }));
 const mic = vi.hoisted(() => ({
   events: null as HandsFreeEvents | null,

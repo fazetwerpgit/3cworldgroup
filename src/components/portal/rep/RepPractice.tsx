@@ -33,7 +33,7 @@ import a from './rep-ask.module.css';
 import pr from './rep-practice.module.css';
 import { PracticeFeedback } from './PracticeFeedback';
 import { PracticeMine } from './PracticeMine';
-import { openVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type VoicePlayer } from './practiceAudio';
+import { openVoice as openGeminiVoice, unlockVoicePlayer, type OpenVoice, type PracticeEffect, type VoicePlayer } from './practiceAudio';
 import { SPECULATION_SLACK, wordsApart } from '@/lib/ask/practiceHandsFree';
 import { askForMic, canHandsFree } from './handsFreeMic';
 import { useHandsFree } from './useHandsFree';
@@ -41,6 +41,8 @@ import { useSoftKeyboardOpen } from './RepForm';
 import { useHideRepTabBar } from './RepShell';
 import { useKeepAboveKeyboard } from '@/hooks/useKeyboardInset';
 import { isComposerSend } from './composerKeys';
+import { AiConsentSheet } from './AiConsentSheet';
+import { fetchAiConsent } from '@/lib/ai/consentClient';
 
 // Ask 3C Practice: the rep knocks and pitches; the homeowner (the model)
 // answers until the door closes, they sign up, or the rep ends it, then a
@@ -295,6 +297,15 @@ export function RepPractice({
   const [listening, setListening] = useState(false);
   const [micBroken, setMicBroken] = useState(false);
   const [handsFreeOn, setHandsFreeOn] = useState(() => typeof window !== 'undefined' && readHandsFree());
+  // Practice voice consent (lib/ai/consent 'gemini_voice'): the session's own voice
+  // and hands-free send mic audio and lines to Google Gemini, so neither runs
+  // until the rep agrees. Without it the phone's own voice and tap to talk still work.
+  // null: not read yet (or the read failed); the routes enforce it either way.
+  const [voiceConsent, setVoiceConsent] = useState<boolean | null>(null);
+  const voiceConsentRef = useRef(false);
+  const [voiceSheet, setVoiceSheet] = useState<null | 'handsFree'>(null);
+  /** "Not now" on the once-a-visit Practice voice ask. */
+  const [voiceDeclined, setVoiceDeclined] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const bottomRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<Recognition | null>(null);
@@ -326,7 +337,30 @@ export function RepPractice({
   // The keyboard covers the bottom of the page: keep the composer above it.
   const composerRef = useRef<HTMLFormElement>(null);
   const { inset: keyboardInset } = useKeepAboveKeyboard(composerRef, active);
-  const handsFree = talk && canHandsFreeHere && handsFreeOn;
+  const handsFree = talk && canHandsFreeHere && handsFreeOn && voiceConsent === true;
+  /** The homeowner's line in the session's Gemini voice, only with Practice voice consent; null reads it with the phone's voice. */
+  const openVoice = useCallback(
+    (sessionId: string, text: string): Promise<OpenVoice | null> =>
+      voiceConsentRef.current ? openGeminiVoice(sessionId, text) : Promise.resolve(null),
+    []
+  );
+
+  useEffect(() => {
+    voiceConsentRef.current = voiceConsent === true;
+  }, [voiceConsent]);
+
+  useEffect(() => {
+    let live = true;
+    void fetchAiConsent().then((state) => {
+      if (live && state) setVoiceConsent(state.gemini_voice);
+    });
+    return () => {
+      live = false;
+    };
+  }, [uid]);
+
+  // Talk on and no Practice voice consent yet: ask once per visit. "Not now" keeps the phone's voice.
+  const voiceSheetMode = voiceSheet ?? (active && talk && voiceConsent === false && !voiceDeclined ? 'ask' : null);
   const hands = useHandsFree<PreparedCut>({
     onLine: (text, ms) => {
       spokenRef.current = { text, ms: Math.max(MIN_LINE_MS, ms) };
@@ -1102,6 +1136,11 @@ export function RepPractice({
           aria-pressed={handsFree}
           onClick={() => {
             const on = !handsFree;
+            // Hands-free streams the mic to Gemini: Practice voice consent first.
+            if (on && voiceConsent !== true) {
+              setVoiceSheet('handsFree');
+              return;
+            }
             setHandsFreeOn(on);
             try {
               if (on) window.localStorage.setItem(HANDS_FREE_PREF_KEY, 'on');
@@ -1128,10 +1167,35 @@ export function RepPractice({
     </div>
   ) : null;
 
+  const voiceConsentSheet = voiceSheetMode ? (
+    <AiConsentSheet
+      provider="gemini_voice"
+      onClose={() => {
+        setVoiceSheet(null);
+        setVoiceDeclined(true);
+      }}
+      onAgreed={() => {
+        const wanted = voiceSheetMode;
+        setVoiceSheet(null);
+        voiceConsentRef.current = true;
+        setVoiceConsent(true);
+        if (wanted === 'handsFree') {
+          setHandsFreeOn(true);
+          try {
+            window.localStorage.setItem(HANDS_FREE_PREF_KEY, 'on');
+          } catch {
+            // Storage blocked: the choice holds for this visit only.
+          }
+        }
+      }}
+    />
+  ) : null;
+
   if (!session) {
     return (
       <>
         {talkToggle}
+        {voiceConsentSheet}
         {canPick ? (
           <section className={s.panel} aria-labelledby="practice-pick-h">
             <div className={pr.picker}>
@@ -1196,6 +1260,7 @@ export function RepPractice({
   return (
     <>
       {talkToggle}
+      {voiceConsentSheet}
       <ol className={a.thread} aria-live="polite" aria-label="Practice conversation">
         {session.turns.flatMap((turn, index) => [
           index === session.redoFrom ? (

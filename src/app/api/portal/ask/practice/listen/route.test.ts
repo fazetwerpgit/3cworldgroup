@@ -29,7 +29,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(new Response(JSON.stringify({ name: 'auth_tokens/abc' }), { status: 200 }));
   mockUser.mockReset();
-  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Ana', email: '', isOwner: false });
+  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Ana', email: '', isOwner: false, aiConsent: { deepseek: false, gemini: false, gemini_voice: true } });
   state.db = createFakeAskDb({}).db;
 });
 
@@ -39,6 +39,14 @@ afterEach(() => {
 });
 
 describe('POST /api/portal/ask/practice/listen', () => {
+  it('refuses with the Practice voice consent code before calling Gemini when the rep has not agreed', async () => {
+    mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Ana', email: '', isOwner: false, aiConsent: { deepseek: true, gemini: true, gemini_voice: false } });
+    const res = await POST(req());
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: 'ai_consent', provider: 'gemini_voice' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('404s a rep in "owners" mode, without minting', async () => {
     vi.stubEnv('ASK_3C_ENABLED', 'owners');
     expect((await POST(req())).status).toBe(404);

@@ -9,6 +9,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PRACTICE_SESSION_KEY } from '@/lib/ask/practice';
 
+const voiceConsent = vi.hoisted(() => ({ agreed: true }));
+vi.mock('@/lib/ai/consentClient', () => ({
+  fetchAiConsent: async () => ({ deepseek: true, gemini: true, gemini_voice: voiceConsent.agreed }),
+  agreeToAi: async () => true,
+}));
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: async () => 'token' }));
 
 import { RepPractice } from './RepPractice';
@@ -186,6 +191,24 @@ describe('RepPractice', () => {
     expect(text()).toContain('The homeowner took too long.');
     expect((container.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Do you pay for internet yourself?');
     expect(text()).not.toContain('Do you pay for internet yourself?Homeowner');
+  });
+
+  it('with Talk on and no Practice voice consent: asks first, with the exact wording, and Not now closes it', async () => {
+    voiceConsent.agreed = false;
+    Object.assign(window, { speechSynthesis: { speak: vi.fn(), cancel: vi.fn(), getVoices: () => [] } });
+    try {
+      await render();
+      await act(async () => {});
+      expect(document.body.textContent).toContain(
+        "Practice voice sends your mic audio to Google Gemini to play the homeowner. Audio isn't stored."
+      );
+      const notNow = [...document.querySelectorAll('button')].find((b) => b.textContent === 'Not now')!;
+      await act(async () => notNow.click());
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
+      expect(document.body.textContent).not.toContain('Practice voice sends your mic audio');
+    } finally {
+      voiceConsent.agreed = true;
+    }
   });
 
   it("with Talk on: unlocks Web Audio on the knock, streams the session's voice through it, and sends a dictated line", async () => {

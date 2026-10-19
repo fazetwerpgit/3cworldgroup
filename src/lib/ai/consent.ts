@@ -8,8 +8,13 @@
 // missing; the client then shows the sheet.
 //   - deepseek: Ask 3C (POST /api/portal/ask)
 //   - gemini:   the sale screenshot scan (POST /api/portal/sales/scan)
+//   - gemini_voice: Practice voice, Google Gemini again but its own agreement
+//     because it sends something else: the homeowner's voice
+//     (POST /api/portal/ask/practice/voice) and the hands-free mic stream
+//     (POST /api/portal/ask/practice/listen). Without it Practice still works
+//     with the phone's own voice and tap to talk.
 
-export const AI_PROVIDERS = ['deepseek', 'gemini'] as const;
+export const AI_PROVIDERS = ['deepseek', 'gemini', 'gemini_voice'] as const;
 export type AiProvider = (typeof AI_PROVIDERS)[number];
 
 /** Which providers the user has agreed to. */
@@ -35,13 +40,23 @@ export function aiConsentAt(userData: Record<string, unknown> | null | undefined
 
 /** Every provider's consent from a users/{uid} document. */
 export function aiConsentOf(userData: Record<string, unknown> | null | undefined): AiConsentState {
-  return { deepseek: aiConsentAt(userData, 'deepseek') !== null, gemini: aiConsentAt(userData, 'gemini') !== null };
+  return {
+    deepseek: aiConsentAt(userData, 'deepseek') !== null,
+    gemini: aiConsentAt(userData, 'gemini') !== null,
+    gemini_voice: aiConsentAt(userData, 'gemini_voice') !== null,
+  };
 }
+
+const REFUSAL: Record<AiProvider, string> = {
+  deepseek: 'Agree to use Ask 3C first.',
+  gemini: 'Agree to read screenshots with AI first.',
+  gemini_voice: 'Agree to use Practice voice first.',
+};
 
 /** The 403 body for a call to `provider` with no consent on file. */
 export function aiConsentRefusal(provider: AiProvider) {
   return {
-    error: provider === 'deepseek' ? 'Agree to use Ask 3C first.' : 'Agree to read screenshots with AI first.',
+    error: REFUSAL[provider],
     code: AI_CONSENT_CODE,
     provider,
   } as const;
