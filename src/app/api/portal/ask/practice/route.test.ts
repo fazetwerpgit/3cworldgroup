@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { createFakeAskDb } from '@/lib/ask/fakeAskDb';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 import { ABUSE_CLOSES, LINE_JUDGE_PROMPT, PERSONAS, PRACTICE_REGION, practiceCustomer } from '@/lib/ask/practice';
+import { drawDoor, drawDoorKind } from '@/lib/ask/practiceDoor';
 
 // POST /api/portal/ask/practice: the Ask 3C gate, its own daily count, the
 // homeowner call (fast settings, [END] stripped) and the graded, logged
@@ -15,9 +16,39 @@ vi.mock('@/lib/firebase/admin', () => ({
   },
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: vi.fn() }));
+// A rep's knock draws its seed with node:crypto randomInt, and the seed picks the kind of door (a kid,
+// Ring or landlord door about 10% of the time) and a surprise (about 30%). Tests that build the page's
+// history as a plain homeowner would 409 on those doors, so the seed draw is pinned to a plain door;
+// a test that wants real draws calls useRealRandom().
+const crypto = vi.hoisted(() => ({ actualRandomInt: null as unknown as (min: number, max: number) => number }));
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>();
+  crypto.actualRandomInt = actual.randomInt as unknown as (min: number, max: number) => number;
+  return { ...actual, default: actual, randomInt: vi.fn(actual.randomInt) };
+});
 
 import { POST } from './route';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { randomInt } from 'node:crypto';
+
+const mockRandomInt = randomInt as unknown as ReturnType<typeof vi.fn>;
+const SEED_MAX = 2 ** 32 - 1;
+/** The first seed that draws a standard door with no surprise (the surprise roll doesn't depend on the homeowner). */
+const PLAIN_SEED = (() => {
+  for (let seed = 1; ; seed += 1) {
+    const plain =
+      drawDoorKind(seed, null) === 'standard' &&
+      drawDoor(seed, practiceCustomer('price-shopper', seed), 'standard', new Date()).surprise === null;
+    if (plain) return seed;
+  }
+})();
+/** Seeds are pinned to a plain door; other draws (the shuffle bag) stay random. */
+function pinPlainDoor() {
+  mockRandomInt.mockImplementation((min: number, max: number) => (max === SEED_MAX ? PLAIN_SEED : crypto.actualRandomInt(min, max)));
+}
+function useRealRandom() {
+  mockRandomInt.mockImplementation((min: number, max: number) => crypto.actualRandomInt(min, max));
+}
 
 const mockUser = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 const fetchMock = vi.fn();
@@ -89,6 +120,7 @@ beforeEach(() => {
     if (JSON.parse(init.body).messages[0].content === LINE_JUDGE_PROMPT) return modelResponse(verdicts.shift() ?? 'OK');
     return answers.shift() ?? new Response('no answer queued', { status: 500 });
   });
+  pinPlainDoor();
   mockUser.mockReset();
   mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: 'dana@x.test', isOwner: false });
   vi.spyOn(console, 'info').mockImplementation(() => {});
@@ -365,6 +397,8 @@ describe('POST /api/portal/ask/practice', () => {
   });
 
   it("draws a rep's homeowner server side from a shuffle bag: all nine before a repeat, never twice in a row", async () => {
+    // Real seeds, so landlord doors fall between bag draws as they do live.
+    useRealRandom();
     const drawn: string[] = [];
     // Every door in order, landlord doors included: a landlord door between two bag draws breaks a repeat.
     const doors: string[] = [];
