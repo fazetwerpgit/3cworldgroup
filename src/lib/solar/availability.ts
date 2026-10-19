@@ -8,6 +8,10 @@
 
 export const SOLAR_TZ = 'America/Los_Angeles';
 export const SOLAR_SLOT_MIN = 60;
+/** A slot must start at least this long after now (bookable and listed). */
+export const SOLAR_MIN_LEAD_MIN = 120;
+/** Jacob's virtual hours are set in Central Time. */
+export const JACOB_TZ = 'America/Chicago';
 
 export const SOLAR_MODES = ['virtual', 'in_person'] as const;
 export type SolarMode = (typeof SOLAR_MODES)[number];
@@ -65,7 +69,10 @@ export const OWNER_VIRTUAL: WeeklyWindow[] = [
   w(6, '12:00', '20:00'),
 ];
 
-/** Seed used while solarAvailability is empty. Jacob's virtual hours copy the owner's. */
+// Jacob (Central Time): virtual only, Mon-Fri 10-5.
+export const JACOB_VIRTUAL: WeeklyWindow[] = [1, 2, 3, 4, 5].map((d) => w(d, '10:00', '17:00'));
+
+/** Seed used while solarAvailability is empty: owner in PT, Jacob in CT. */
 export function seedAvailability(
   owner: { uid: string; name: string } | null,
   jacob: { uid: string; name: string } | null
@@ -84,9 +91,9 @@ export function seedAvailability(
     out.push({
       consultantUid: jacob.uid,
       name: jacob.name,
-      tz: SOLAR_TZ,
+      tz: JACOB_TZ,
       slotMin: SOLAR_SLOT_MIN,
-      modes: { virtual: OWNER_VIRTUAL.map((x) => ({ ...x })), in_person: [] },
+      modes: { virtual: JACOB_VIRTUAL.map((x) => ({ ...x })), in_person: [] },
     });
   }
   return out;
@@ -156,8 +163,9 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
 }
 
 /**
- * Open slots for `mode` whose start is in [from, to) and after `now`, sorted by
- * start then consultant name. A slot is gone when any non-cancelled booking of
+ * Open slots for `mode` whose start is in [from, to) and at least
+ * SOLAR_MIN_LEAD_MIN after `now`, sorted by start then consultant name. Each
+ * consultant's windows are read in that consultant's own `tz`. A slot is gone when any non-cancelled booking of
  * that consultant overlaps it.
  */
 export function openSlots(
@@ -168,7 +176,7 @@ export function openSlots(
   to: Date,
   now: Date
 ): SolarSlot[] {
-  const fromMs = Math.max(from.getTime(), now.getTime());
+  const fromMs = Math.max(from.getTime(), now.getTime() + SOLAR_MIN_LEAD_MIN * MINUTE);
   const toMs = to.getTime();
   if (!(toMs > fromMs)) return [];
 
@@ -234,6 +242,40 @@ export function openSlots(
       return true;
     })
     .sort((x, y) => x.start.localeCompare(y.start) || x.name.localeCompare(y.name));
+}
+
+const pacificDayFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: SOLAR_TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/**
+ * Reorders slots that share a start so the consultant to book comes first:
+ * in person, the owner; virtual, whoever has the fewest bookings on that
+ * Pacific day (ties go to the owner, then by name). Times stay in order. The
+ * UI shows each start once and books the first free consultant, falling back
+ * to the next on a 409.
+ */
+export function orderByPreference(
+  slots: SolarSlot[],
+  bookings: SolarBookingLike[],
+  mode: SolarMode,
+  ownerUid: string | null
+): SolarSlot[] {
+  const dayKey = (iso: string) => pacificDayFormatter.format(new Date(iso));
+  const load = new Map<string, number>();
+  for (const b of bookings) {
+    if (b.status === 'cancelled' || Number.isNaN(Date.parse(b.start))) continue;
+    const k = `${b.consultantUid}|${dayKey(b.start)}`;
+    load.set(k, (load.get(k) ?? 0) + 1);
+  }
+  const owner = (s: SolarSlot) => (ownerUid && s.consultantUid === ownerUid ? 0 : 1);
+  const count = (s: SolarSlot) => (mode === 'virtual' ? load.get(`${s.consultantUid}|${dayKey(s.start)}`) ?? 0 : 0);
+  return [...slots].sort(
+    (a, b) => a.start.localeCompare(b.start) || count(a) - count(b) || owner(a) - owner(b) || a.name.localeCompare(b.name)
+  );
 }
 
 /** solarBookings doc id: one booking per consultant per slot start. */

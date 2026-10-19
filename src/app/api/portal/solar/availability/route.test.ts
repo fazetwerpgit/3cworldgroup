@@ -39,8 +39,12 @@ describe('GET /api/portal/solar/availability', () => {
     const res = await get(`mode=virtual&${MON}`);
     expect(res.status).toBe(200);
     const { slots } = await res.json();
-    expect(slots).toHaveLength(18);
-    expect(slots[0]).toEqual({ consultantUid: 'jac', name: 'Jacob', start: '2026-10-26T15:00:00.000Z', end: '2026-10-26T16:00:00.000Z' });
+    // Owner 8-5 PT (9) + Jacob 10-5 CT (7). At a shared start the owner leads (tie on bookings).
+    expect(slots).toHaveLength(16);
+    expect(slots.slice(0, 2)).toEqual([
+      { consultantUid: 'own', name: 'Owner', start: '2026-10-26T15:00:00.000Z', end: '2026-10-26T16:00:00.000Z' },
+      { consultantUid: 'jac', name: 'Jacob', start: '2026-10-26T15:00:00.000Z', end: '2026-10-26T16:00:00.000Z' },
+    ]);
     expect(new Set(slots.map((s: { consultantUid: string }) => s.consultantUid))).toEqual(new Set(['jac', 'own']));
   });
 
@@ -58,6 +62,21 @@ describe('GET /api/portal/solar/availability', () => {
     const { slots } = await (await get(`mode=in_person&${MON}`)).json();
     expect(slots).toHaveLength(8);
     expect(slots[0].start).toBe('2026-10-26T16:00:00.000Z');
+  });
+
+  it('virtual: lists first whoever has fewer bookings that day', async () => {
+    db.store.set('solarBookings', new Map([[
+      'own_2026-10-26T22:00:00.000Z',
+      { consultantUid: 'own', start: '2026-10-26T22:00:00.000Z', end: '2026-10-26T23:00:00.000Z', status: 'booked' },
+    ]]));
+    const { slots } = await (await get(`mode=virtual&${MON}`)).json();
+    expect(slots.slice(0, 2).map((s: { consultantUid: string }) => s.consultantUid)).toEqual(['jac', 'own']);
+  });
+
+  it('never lists a slot less than 2 hours out', async () => {
+    vi.setSystemTime(new Date('2026-10-26T14:30:00Z'));
+    const { slots } = await (await get(`mode=in_person&${MON}`)).json();
+    expect(slots[0].start).toBe('2026-10-26T17:00:00.000Z');
   });
 
   it('prefers solarAvailability docs over the seed', async () => {

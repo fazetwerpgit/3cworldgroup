@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { isSolarMode, openSlots } from '@/lib/solar/availability';
-import { loadAvailability, loadBookings, requireSolarUser } from '@/lib/solar/server';
+import { isSolarMode, openSlots, orderByPreference } from '@/lib/solar/availability';
+import { loadAvailability, loadBookings, requireSolarUser, resolveConsultants } from '@/lib/solar/server';
 
 const DAY = 86_400_000;
 const MAX_RANGE = 31 * DAY;
 
 // GET /api/portal/solar/availability?mode=virtual|in_person&from=ISO&to=ISO
 // -> 200 {slots: [{consultantUid, name, start, end}]} (ISO UTC). from defaults
-// to now, to to from + 14 days; the range is capped at 31 days.
+// to now, to to from + 14 days; the range is capped at 31 days. Only slots at
+// least 2 hours out are listed. Slots that share a start come in booking
+// preference order (orderByPreference): the first is the one to book.
 export async function GET(request: NextRequest) {
   try {
     const gate = await requireSolarUser(request);
@@ -26,8 +28,12 @@ export async function GET(request: NextRequest) {
     }
     const cappedTo = to.getTime() - from.getTime() > MAX_RANGE ? new Date(from.getTime() + MAX_RANGE) : to;
 
-    const [availability, bookings] = await Promise.all([loadAvailability(), loadBookings(from, cappedTo)]);
-    const slots = openSlots(availability, bookings, mode, from, cappedTo, now);
+    const [availability, bookings, { owner }] = await Promise.all([
+      loadAvailability(),
+      loadBookings(from, cappedTo),
+      resolveConsultants(),
+    ]);
+    const slots = orderByPreference(openSlots(availability, bookings, mode, from, cappedTo, now), bookings, mode, owner?.uid ?? null);
     return NextResponse.json({ slots });
   } catch (error) {
     console.error('Error loading solar availability:', error);

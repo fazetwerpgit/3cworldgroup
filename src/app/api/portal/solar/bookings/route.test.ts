@@ -122,6 +122,21 @@ describe('POST /api/portal/solar/bookings', () => {
     expect(db.store.get('solarBookings')).toBeUndefined();
   });
 
+  it('400s a slot less than 2 hours out', async () => {
+    vi.setSystemTime(new Date('2026-10-26T13:30:00Z')); // 6:30 AM PDT; 8:00 AM is 1.5h away
+    const res = await post(BODY);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'slot_unavailable' });
+    vi.setSystemTime(new Date('2026-10-26T13:00:00Z')); // exactly 2h
+    expect((await post(BODY)).status).toBe(200);
+  });
+
+  it('books Jacob virtual on Central Time hours', async () => {
+    // 10 AM CDT Monday = 15:00Z; 9 AM CDT (14:00Z) is outside his hours.
+    expect((await post({ ...BODY, mode: 'virtual', consultantUid: 'jac', start: '2026-10-26T14:00:00.000Z' })).status).toBe(400);
+    expect((await post({ ...BODY, mode: 'virtual', consultantUid: 'jac', start: '2026-10-26T15:00:00.000Z' })).status).toBe(200);
+  });
+
   it('400s bad input, 404s a missing lead', async () => {
     expect((await post({ ...BODY, mode: 'phone' })).status).toBe(400);
     expect((await post({ ...BODY, start: 'soon' })).status).toBe(400);
