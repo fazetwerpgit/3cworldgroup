@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { isValidOption } from '@/lib/forms/formOptions';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { isEmailShaped } from '@/lib/forms/managerInterview';
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
     const customerPhone = s(body.customerPhone, 40);
     const orderNumber = s(body.orderNumber, 120);
     const expediteDates = s(body.expediteDates, 300);
-    const reason = s(body.reason, 80);
+    const reason = s(body.reason, OPTION_VALUE_MAX);
     const customerEmail = s(body.customerEmail, 180);
 
     // The page marks these required; enforce the same server-side so a crafted

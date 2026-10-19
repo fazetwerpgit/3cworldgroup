@@ -11,6 +11,7 @@ import {
   LEADS_REASONS,
   isValidOption,
 } from '@/lib/forms/formOptions';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { userRateLimited } from '@/lib/userRateLimits';
 
 function s(v: unknown, max = 200) {
@@ -38,12 +39,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const opts = await getResolvedFormOptions();
-    const campaign = s(body.campaign, 40);
-    const managerName = s(body.managerName, 120);
+    const campaign = s(body.campaign, OPTION_VALUE_MAX);
+    const managerName = s(body.managerName, OPTION_VALUE_MAX);
     const managerEmail = s(body.managerEmail, 180);
     const repFirstName = s(body.repFirstName, 120);
     const repLastName = s(body.repLastName, 120);
-    const location = s(body.location, 120);
+    const location = s(body.location, OPTION_VALUE_MAX);
     const category = s(body.category, 120);
     const reason = s(body.reason, 160);
 

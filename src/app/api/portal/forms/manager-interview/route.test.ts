@@ -20,6 +20,7 @@ vi.mock('@/lib/forms/resolveFormOptions', () => ({
 }));
 
 import { POST } from './route';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { requireVerifiedFieldManagerOrManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
@@ -125,5 +126,19 @@ describe('POST /api/portal/forms/manager-interview', () => {
     const res = await POST(req({ ...VALID, candidateEmail: 'not-an-email' }));
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('accepts admin-saved provider, position, manager and market as long as the options editor allows', async () => {
+    const LONG = 'Brightspeed Fiber (Quantum) - Midwest Region'.padEnd(OPTION_VALUE_MAX, '.');
+    mockGate.mockResolvedValue(VERIFIED);
+    mockOptions.mockResolvedValueOnce({
+      providers: [LONG],
+      hireManagers: [LONG],
+      hireJobPositions: ['Account Executive', LONG],
+      hireMarkets: [LONG],
+    });
+    const res = await POST(req({ ...VALID, provider: LONG, hiringManager: LONG, market: LONG }));
+    expect(res.status).toBe(200);
+    expect(mockSubmit.mock.calls[0][2]).toMatchObject({ provider: LONG, hiringManager: LONG, market: LONG });
   });
 });

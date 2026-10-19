@@ -4,6 +4,7 @@ import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { isValidOption } from '@/lib/forms/formOptions';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { isPromotionRole, validateSignatureDataUrl, isEmailShaped } from '@/lib/forms/managerInterview';
 import { userRateLimited } from '@/lib/userRateLimits';
 
@@ -31,14 +32,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const opts = await getResolvedFormOptions();
 
-    const provider = s(body.provider, 60);
-    const jobPosition = s(body.jobPosition, 80);
-    const hiringManager = s(body.hiringManager, 120);
+    const provider = s(body.provider, OPTION_VALUE_MAX);
+    const jobPosition = s(body.jobPosition, OPTION_VALUE_MAX);
+    const hiringManager = s(body.hiringManager, OPTION_VALUE_MAX);
     const hiringManagerEmail = s(body.hiringManagerEmail, 180);
     const candidateFirstName = s(body.candidateFirstName, 120);
     const candidateLastName = s(body.candidateLastName, 120);
     const candidateEmail = s(body.candidateEmail, 180);
-    const market = s(body.market, 120);
+    const market = s(body.market, OPTION_VALUE_MAX);
     const rating = Number(body.rating);
 
     if (!hiringManagerEmail || !candidateFirstName || !candidateLastName || !candidateEmail) {

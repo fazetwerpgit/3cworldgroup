@@ -25,6 +25,11 @@ export const FORM_OPTION_DEFAULTS = {
 
 export type OptionKey = keyof typeof FORM_OPTION_DEFAULTS;
 
+// Longest option text an admin can save. Submit routes truncate dropdown
+// fields to this same width before the exact-match check, so every saved
+// option stays submittable.
+export const OPTION_VALUE_MAX = 120;
+
 export const OPTION_KEYS = Object.keys(FORM_OPTION_DEFAULTS) as OptionKey[];
 
 // All keys above are editable in v1. (Leads categories/reasons are intentionally

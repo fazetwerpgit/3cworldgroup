@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { isValidOption } from '@/lib/forms/formOptions';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { buildSubmissionAttachmentFolder, isValidFormUploadId } from '@/lib/forms/formUploads';
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
     const opts = await getResolvedFormOptions();
     const contractorName = s(body.contractorName, 180);
     const contractorEmail = s(body.contractorEmail, 180);
-    const campaign = s(body.campaign, 40);
+    const campaign = s(body.campaign, OPTION_VALUE_MAX);
     const typeOfOrder = s(body.typeOfOrder, 120);
     const dateOfInstall = s(body.dateOfInstall, 40);
 

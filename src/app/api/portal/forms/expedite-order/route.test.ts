@@ -15,6 +15,8 @@ vi.mock('@/lib/forms/resolveFormOptions', () => ({
 }));
 
 import { POST } from './route';
+import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 
@@ -93,5 +95,15 @@ describe('POST /api/portal/forms/expedite-order', () => {
     expect((await POST(req({ ...VALID, customerEmail: 'x' }))).status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
     expect((await POST(req({ ...VALID, customerEmail: '' }))).status).toBe(200);
+  });
+
+  it('accepts an admin-saved reason as long as the options editor allows', async () => {
+    const LONG = 'Brightspeed Fiber (Quantum) - Midwest Region'.padEnd(OPTION_VALUE_MAX, '.');
+    mockGate.mockResolvedValue(VERIFIED);
+    const mockOptions = getResolvedFormOptions as unknown as ReturnType<typeof vi.fn>;
+    mockOptions.mockResolvedValueOnce({ expediteReasons: [LONG] });
+    const res = await POST(req({ ...VALID, reason: LONG }));
+    expect(res.status).toBe(200);
+    expect(mockSubmit.mock.calls[0][2]).toMatchObject({ reason: LONG });
   });
 });

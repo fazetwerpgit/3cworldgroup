@@ -23,6 +23,7 @@ vi.mock('@/lib/forms/resolveFormOptions', () => ({
 }));
 
 import { POST } from './route';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
@@ -107,5 +108,14 @@ describe('POST /api/portal/forms/leads-request', () => {
     const res = await POST(req({ ...VALID, reason: LEADS_REASONS[0], newRepEmail: 'nope' }));
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('accepts admin-saved campaign, manager and location as long as the options editor allows', async () => {
+    const LONG = 'Brightspeed Fiber (Quantum) - Midwest Region'.padEnd(OPTION_VALUE_MAX, '.');
+    mockGate.mockResolvedValue(VERIFIED);
+    mockOptions.mockResolvedValueOnce({ leadsCampaigns: [LONG], leadsManagers: [LONG], leadsLocations: [LONG] });
+    const res = await POST(req({ ...VALID, campaign: LONG, managerName: LONG, location: LONG }));
+    expect(res.status).toBe(200);
+    expect(mockSubmit.mock.calls[0][2]).toMatchObject({ campaign: LONG, managerName: LONG, location: LONG });
   });
 });

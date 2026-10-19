@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { isValidOption } from '@/lib/forms/formOptions';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
 import { notifySubmission } from '@/lib/forms/notifySubmission';
 import { userRateLimited } from '@/lib/userRateLimits';
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const opts = await getResolvedFormOptions();
-    const companySold = s(body.companySold, 40);
+    const companySold = s(body.companySold, OPTION_VALUE_MAX);
     const dateKnocked = s(body.dateKnocked, 40);
     // Company and date are the minimum an admin can act on.
     if (!companySold || !dateKnocked) {

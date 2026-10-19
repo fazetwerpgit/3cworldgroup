@@ -6,6 +6,7 @@ import {
   EDITABLE_OPTION_KEYS,
   LOCKED_OPTION_VALUES,
   missingLockedValue,
+  OPTION_VALUE_MAX,
   OptionKey,
 } from '@/lib/forms/formOptionsRegistry';
 
@@ -49,7 +50,7 @@ export async function PUT(request: NextRequest) {
       if (typeof raw !== 'string') {
         return NextResponse.json({ error: 'Each value must be text' }, { status: 400 });
       }
-      const v = raw.trim().slice(0, 120);
+      const v = raw.trim().slice(0, OPTION_VALUE_MAX);
       if (!v) {
         return NextResponse.json({ error: 'Values cannot be blank' }, { status: 400 });
       }

@@ -9,8 +9,15 @@ vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
 vi.mock('@/lib/forms/submitForm', () => ({
   submitFormRecord: vi.fn(async () => ({ id: 'doc123' })),
 }));
+// Wrap the real resolver so one test can supply an admin override list.
+vi.mock('@/lib/forms/resolveFormOptions', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/forms/resolveFormOptions')>();
+  return { ...actual, getResolvedFormOptions: vi.fn(actual.getResolvedFormOptions) };
+});
 
 import { POST } from './route';
+import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
+import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 
@@ -76,5 +83,15 @@ describe('POST /api/portal/forms/payroll-dispute', () => {
     const res = await POST(req({ ...VALID, contractorEmail: 'x' }));
     expect(res.status).toBe(400);
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('accepts an admin-saved campaign as long as the options editor allows', async () => {
+    const LONG = 'Brightspeed Fiber (Quantum) - Midwest Region'.padEnd(OPTION_VALUE_MAX, '.');
+    mockGate.mockResolvedValue(VERIFIED);
+    const mockOptions = getResolvedFormOptions as unknown as ReturnType<typeof vi.fn>;
+    mockOptions.mockResolvedValueOnce({ payrollCampaigns: [LONG] });
+    const res = await POST(req({ ...VALID, campaign: LONG }));
+    expect(res.status).toBe(200);
+    expect(mockSubmit.mock.calls[0][2]).toMatchObject({ campaign: LONG });
   });
 });
