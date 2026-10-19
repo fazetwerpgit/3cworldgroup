@@ -91,9 +91,13 @@ export function InviteSignAll({ token, signingKey, onSessionLost }: Props) {
     [signingKey]
   );
 
+  // The saved signature is keyed to this invite, so a portal user's ink never
+  // shows up here (and the hire's never shows up on the portal sign page).
+  const signatureOwner = `invite:${token}`;
+
   useEffect(() => {
-    setSignature(loadSignature());
-  }, []);
+    setSignature(loadSignature(signatureOwner));
+  }, [signatureOwner]);
 
   const applyView = useCallback((next: InviteSignView) => {
     setView(next);
@@ -179,8 +183,8 @@ export function InviteSignAll({ token, signingKey, onSessionLost }: Props) {
     }
     const next: StoredSignature = { png, method };
     setSignature(next);
-    saveSignature(next);
-  }, []);
+    saveSignature(next, signatureOwner);
+  }, [signatureOwner]);
 
   const signable = useMemo(
     () => (view?.documents ?? []).filter((doc) => doc.envelope && doc.state !== 'signed'),

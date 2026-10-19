@@ -26,6 +26,7 @@ import {
   type SignatureMethod,
   type StoredSignature,
 } from '@/components/esign/signatureStore';
+import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import type { EnvelopeView } from '@/lib/esign/envelopeView';
 import { friendlyError } from '@/lib/forms/friendlyError';
@@ -37,6 +38,9 @@ const CHECKLIST_HREF = '/portal/onboarding';
 
 function EsignSign() {
   const { envelopeId } = useParams<{ envelopeId: string }>();
+  // The saved signature is keyed to the signed-in user, so one person's ink is
+  // never pre-applied to someone else's documents in the same tab.
+  const signatureOwner = useAuth().user?.uid ?? '';
 
   const [envelope, setEnvelope] = useState<EnvelopeView | null>(null);
   const [values, setValues] = useState<FieldValues>({});
@@ -64,8 +68,8 @@ function EsignSign() {
   // sessionStorage only exists in the browser, so read it after mount rather
   // than in the initial state (which also runs during prerender).
   useEffect(() => {
-    setSignature(loadSignature());
-  }, []);
+    setSignature(loadSignature(signatureOwner));
+  }, [signatureOwner]);
 
   useEffect(() => {
     if (!envelopeId) return;
@@ -145,8 +149,8 @@ function EsignSign() {
     }
     const next: StoredSignature = { png, method };
     setSignature(next);
-    saveSignature(next);
-  }, []);
+    saveSignature(next, signatureOwner);
+  }, [signatureOwner]);
 
   /** The one thing still standing between the rep and a signed document. */
   const blocker = useMemo(() => {

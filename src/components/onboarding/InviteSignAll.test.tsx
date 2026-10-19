@@ -68,7 +68,7 @@ beforeEach(() => {
   window.scrollTo = vi.fn();
   // jsdom has no layout: scrolling a document into view is a no-op here.
   Element.prototype.scrollIntoView = vi.fn();
-  saveSignature({ png: PNG, method: 'draw' });
+  saveSignature({ png: PNG, method: 'draw' }, 'invite:token-1');
   signAnswers = {};
   signedEnvelopes.length = 0;
   fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -153,6 +153,16 @@ describe('InviteSignAll', () => {
     expect(container.textContent).toContain('Contract');
     expect(container.textContent).toContain('Direct Deposit');
     expect(button(/Sign all 3 documents/)).toBeTruthy();
+  });
+
+  it("never pre-applies a signature saved by someone else in the same tab", async () => {
+    // A signed-in portal user signed earlier in this tab.
+    saveSignature({ png: PNG, method: 'draw' }, 'uid-manager');
+    await render();
+    await click(container.querySelector('input[type="checkbox"]') as HTMLInputElement);
+    await click(button(/Sign all 3 documents/));
+    expect(signedEnvelopes).toEqual([]);
+    expect(container.textContent).toContain('Add your signature.');
   });
 
   it('will not sign before the consent box is checked', async () => {
