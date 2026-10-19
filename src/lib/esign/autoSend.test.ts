@@ -662,6 +662,36 @@ describe('sendPendingEsignDocs', () => {
     });
   });
 
+  it('sends to a hire whose user doc stores the address under legacy Email', async () => {
+    store.set('users/u1', {
+      fieldRole: 'entry_level_rep',
+      isIBO: false,
+      displayName: 'Sam Rep',
+      Email: ' sam@x.com ',
+      status: 'pending',
+    });
+
+    const sent = await sendPendingEsignDocs('u1');
+
+    expect(sent.length).toBeGreaterThan(0);
+    expect(createEnvelopeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ signerEmail: 'sam@x.com' })
+    );
+  });
+
+  it('sends nothing when the user doc has no usable email address', async () => {
+    store.set('users/u1', {
+      fieldRole: 'entry_level_rep',
+      isIBO: false,
+      displayName: 'Sam Rep',
+      email: 'not-an-address',
+      status: 'pending',
+    });
+
+    expect(await sendPendingEsignDocs('u1')).toEqual([]);
+    expect(createEnvelopeMock).not.toHaveBeenCalled();
+  });
+
   it('is a no-op for a decommissioned user', async () => {
     store.set('users/u1', {
       fieldRole: 'entry_rep',

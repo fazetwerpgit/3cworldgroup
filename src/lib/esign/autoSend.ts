@@ -320,7 +320,8 @@ export async function sendPendingEsignDocs(
     if (!roleRequiresOnboarding(fieldRole)) return sent;
 
     const signerName = (userSnap.get('displayName') as string | undefined) ?? 'Rep';
-    const signerEmail = userSnap.get('email') as string | undefined;
+    // Legacy user docs may store the address under 'Email' (capital E).
+    const signerEmail = emailFromUserDoc(userSnap);
     if (!signerEmail) return sent;
 
     const items = getOnboardingItemsForUser(fieldRole, !!userSnap.get('isIBO')).filter((item) =>
