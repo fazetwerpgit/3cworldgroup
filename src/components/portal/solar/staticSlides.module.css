@@ -1,15 +1,16 @@
 /* Design B static slides: light page, two-tone titles, blue numerals, hairline
-   rules. Tokens are local so the presenter chrome can change independently. */
+   rules. Tokens are local so the slides don't depend on the chrome's file. */
 
 .page,
 .split,
 .appendix {
-  --sb-ink: #0d1830;
-  --sb-ink-2: #44526b;
-  --sb-ink-3: #66748b;
-  --sb-blue: #0a5fd8;
+  /* Values match the presenter's Design B tokens (solarDeck.module.css .root). */
+  --sb-ink: #0b1a3c;
+  --sb-ink-2: #46536f;
+  --sb-ink-3: #5d6b8c;
+  --sb-blue: #0a5bd0;
   --sb-blue-tint: #e4edfb;
-  --sb-line: #d9e0ea;
+  --sb-line: #dce2ec;
   --sb-card: #ffffff;
   --sb-display: var(--font-archivo), var(--font-geist-sans), system-ui, sans-serif;
   --sb-body: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
