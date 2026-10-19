@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { safeNotificationLink } from '@/lib/notifications/safeLink';
 import { usePathname, useRouter } from 'next/navigation';
 import { Bell, BellOff, Bug, ChevronDown, ChevronLeft, LogOut, Menu, MessageCircleQuestion, Plus, Settings, X } from 'lucide-react';
 import { isNativeApp } from '@/lib/app/isNativeApp';
@@ -434,9 +435,12 @@ export function RepTopBar({
                   className={`${s.note} ${note.read ? '' : s.noteUnread}`}
                   onClick={() => {
                     markAsRead([note.id]);
-                    if (note.link) {
+                    // Same check as the API and the admin bell: only a same-origin
+                    // /portal path opens (older rows predate the API check).
+                    const link = safeNotificationLink(note.link);
+                    if (link) {
                       setPanel(null);
-                      router.push(note.link);
+                      router.push(link);
                     }
                   }}
                 >
