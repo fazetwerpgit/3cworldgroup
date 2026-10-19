@@ -162,7 +162,7 @@ it('lists everyone once: applications and invites merged per person', async () =
   ]);
   // Each row says where the person is in words, and the phone is a tap-to-call link.
   for (const node of rows()) expect(node.querySelector('[class*="sentence"]')?.textContent?.trim()).toBeTruthy();
-  expect(row('Maya Torres').querySelector('a[href="tel:5125550101"]')).not.toBeNull();
+  expect(row('Maya Torres').querySelector('a[href="tel:+15125550101"]')).not.toBeNull();
 });
 
 it('gives each row only the actions it is waiting on', async () => {
