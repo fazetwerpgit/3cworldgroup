@@ -187,6 +187,12 @@ function SalesContent() {
     setPayView(pay);
     setMonth((current) => clampMonth(current, latestPickableMonth(pay)));
   }, []);
+  // The company book has no pay list: a `?view=pay&month=<next month>` link
+  // (say, shared from a rep's pay view) must not open it past its picker's
+  // max on an empty future month, nor keep `view=pay` in the URL.
+  useEffect(() => {
+    if (canViewAll) choosePayView(false);
+  }, [canViewAll, choosePayView]);
   // useSales starts idle (loading false, no sales). Until the first fetch
   // settles the page shows skeletons, never a zero it has not measured.
   const [fetched, setFetched] = useState(seeded);
