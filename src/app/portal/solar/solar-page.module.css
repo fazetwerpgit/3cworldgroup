@@ -1,0 +1,4 @@
+/* The rep Solar page: the deck block keeps a readable width on desktop. */
+.deck {
+  max-width: 640px;
+}

@@ -22,14 +22,19 @@ export const REP_SHELL_SECTIONS = [
   'payroll-dispute',
   'sales',
   'settings',
+  'solar',
   'training',
 ] as const;
 
 const SECTIONS = new Set<string>(REP_SHELL_SECTIONS);
 
+/** Pages under a shell section that stay chrome-free: the solar deck is handed to the homeowner. */
+const BARE_PATHS = ['/portal/solar/present'];
+
 /** True when this portal path renders inside the shared rep shell. */
 export function isRepShellPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
+  if (BARE_PATHS.some((bare) => pathname === bare || pathname.startsWith(`${bare}/`))) return false;
   const match = /^\/portal\/([^/?#]+)/.exec(pathname);
   return !!match && SECTIONS.has(match[1]);
 }

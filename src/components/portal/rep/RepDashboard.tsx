@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAsReadOnly } from '@/contexts/ViewAsContext';
+import { isSolarRole } from '@/types';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import { useCountUp } from '@/hooks/useCountUp';
 import { useRepDashboard, type RepChallenge, type RepSectionKey, type Section } from '@/hooks/useRepDashboard';
@@ -33,6 +34,7 @@ import { CalloutNudge } from './CalloutNudge';
 import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import { PayHelpSheet } from './PayHelpSheet';
 import { AskEntryCard } from './AskEntryCard';
+import { SolarEntryCard } from './SolarEntryCard';
 import { InstallDateSheet } from './InstallDateSheet';
 import { ScanIntroCard } from './ScanIntroCard';
 import { LOG_SALE_HREF } from './repNav';
@@ -634,6 +636,14 @@ export interface RepHomeViewProps {
   scanIntro?: ReactNode;
   /** Ask 3C's compact entry (hidden while the feature is off). */
   askEntry?: ReactNode;
+  /** The way into Solar (SolarEntryCard): a row beside Ask for a dual rep, the lead block for a solar-only rep. */
+  solarEntry?: ReactNode;
+  /**
+   * A solar-only rep (a solar role, no fiber role): Home leads with Solar and
+   * drops every fiber part (pay, the week, recent sales). The fiber props are
+   * then ignored.
+   */
+  solarOnly?: boolean;
   /** Admin and operations: Needs attention (onboarding work), above everything else. */
   queues?: ReactNode;
   onHelp: () => void;
@@ -649,8 +659,8 @@ export interface RepHomeViewProps {
  * Desktop: money + week in the main column, Today and recent sales beside.
  */
 export function RepHomeView(p: RepHomeViewProps) {
+  if (p.solarOnly) return <SolarHomeView {...p} />;
   const payout = p.pay?.payout ?? null;
-  const showToday = p.todayItems.length > 0 || p.callsFailed;
 
   return (
     <>
@@ -697,8 +707,9 @@ export function RepHomeView(p: RepHomeViewProps) {
           </div>
 
           {/* Ask 3C right under pay: on a phone that is the first screen, where a
-              rep stuck at a door sees it without scrolling. */}
+              rep stuck at a door sees it without scrolling. Solar beside it. */}
           {p.askEntry}
+          {p.solarEntry}
 
           <WeekStrip
             standing={p.standing}
@@ -710,21 +721,54 @@ export function RepHomeView(p: RepHomeViewProps) {
         </div>
 
         <div className={d.colSide}>
-          {p.todayLoading && p.todayItems.length === 0 ? (
-            <SkeletonPanel label="Loading today" rows={2} className={d.today} />
-          ) : showToday ? (
-            <TodayPanel
-              items={p.todayItems}
-              extraDates={p.extraDates}
-              callsFailed={p.callsFailed}
-              onRetryCalls={() => p.onRetry('calls')}
-              onSetDate={p.onSetDate}
-            />
-          ) : null}
+          <TodaySlot {...p} />
 
           {p.scanIntro ? <div className={d.scanSlot}>{p.scanIntro}</div> : null}
 
           {p.payStatus === 'ready' && p.rows.length > 0 ? <RecentSales rows={p.rows} report={p.carrierReport} /> : null}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function TodaySlot(p: RepHomeViewProps) {
+  const showToday = p.todayItems.length > 0 || p.callsFailed;
+  if (p.todayLoading && p.todayItems.length === 0) {
+    return <SkeletonPanel label="Loading today" rows={2} className={d.today} />;
+  }
+  return showToday ? (
+    <TodayPanel
+      items={p.todayItems}
+      extraDates={p.extraDates}
+      callsFailed={p.callsFailed}
+      onRetryCalls={() => p.onRetry('calls')}
+      onSetDate={p.onSetDate}
+    />
+  ) : null;
+}
+
+/**
+ * A solar-only rep's Home: the deck leads (where pay sits for a fiber rep),
+ * Ask 3C under it, and Today (calls, open paperwork) beside. No pay, week or
+ * sales: those are the fiber book, which this rep does not have.
+ */
+function SolarHomeView(p: RepHomeViewProps) {
+  return (
+    <>
+      <h1 className={s.srOnly}>{p.firstName === 'Your' ? 'Your dashboard' : `${p.firstName}'s dashboard`}</h1>
+
+      <div className={d.grid}>
+        {p.banners ? <div className={d.banners}>{p.banners}</div> : null}
+        {p.queues ? <div className={d.queues}>{p.queues}</div> : null}
+
+        <div className={d.colMain}>
+          {p.solarEntry}
+          {p.askEntry}
+        </div>
+
+        <div className={d.colSide}>
+          <TodaySlot {...p} />
         </div>
       </div>
     </>
@@ -753,7 +797,10 @@ export function RepDashboard() {
   const readOnly = useViewAsReadOnly();
   // Admin and operations get the onboarding work (Needs attention) on top.
   const showQueues = !readOnly && isRole('admin', 'operations');
-  const data = useRepDashboard();
+  // A solar rep with no fiber role (and no platform role): Home is about
+  // solar, and the fiber sections are neither fetched nor shown.
+  const solarOnly = isSolarRole(user?.solarRole) && !user?.fieldRole && !user?.role;
+  const data = useRepDashboard({ fiber: !solarOnly });
   const { retry } = data;
   const [helpOpen, setHelpOpen] = useState(false);
   const closeHelp = useCallback(() => setHelpOpen(false), []);
@@ -812,7 +859,7 @@ export function RepDashboard() {
   // 3C iOS app only (both no-ops on the web): drop the splash once the money
   // block has its numbers, and feed the home-screen widget the same Est. pay
   // and rank shown here. Never while the owner views as this rep.
-  useAppReady(payStatus !== 'loading');
+  useAppReady(solarOnly ? data.calls.status !== 'loading' : payStatus !== 'loading');
   const widgetRank = standing.status === 'ready' && standing.data ? standing.data.rank : null;
   const widgetRankOf = standing.status === 'ready' && standing.data ? standing.data.of : null;
   const widgetSettled = payStatus === 'ready' && pay !== null && standing.status !== 'loading';
@@ -855,7 +902,7 @@ export function RepDashboard() {
         timeLeft={weekTimeLeft(now)}
         rows={rows}
         todayItems={todayItems}
-        todayLoading={data.calls.status === 'loading' || data.book.status === 'loading'}
+        todayLoading={data.calls.status === 'loading' || (!solarOnly && data.book.status === 'loading')}
         extraDates={Math.max(dates.length - MAX_DATE_ROWS, 0)}
         callsFailed={data.calls.status === 'error'}
         banners={
@@ -878,6 +925,10 @@ export function RepDashboard() {
         }
         scanIntro={canLog ? <ScanIntroCard now={now} /> : null}
         askEntry={readOnly ? null : <AskEntryCard />}
+        solarOnly={solarOnly}
+        // Solar-only: the lead block even while viewing as the rep (Open deck,
+        // a write, drops out on its own). Otherwise the row, never in view-as.
+        solarEntry={solarOnly ? <SolarEntryCard variant="lead" /> : readOnly ? null : <SolarEntryCard />}
         queues={showQueues ? <OpsQueuesPanel title="Needs attention" /> : null}
         onHelp={() => setHelpOpen(true)}
         onRetry={onRetry}

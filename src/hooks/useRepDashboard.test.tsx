@@ -104,3 +104,24 @@ describe('useRepDashboard resume refresh', () => {
     expect(bookSize(renders.at(-1)!)).toBe(1);
   });
 });
+
+describe('useRepDashboard for a solar-only rep', () => {
+  it('fetches no fiber section (sales, pay plan, leaderboard, challenge)', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      urls.push(url);
+      return { ok: true, status: 200, json: async () => body(url) };
+    });
+    function SolarProbe() {
+      useRepDashboard({ fiber: false });
+      return null;
+    }
+    const solarRoot = createRoot(document.createElement('div'));
+    await act(async () => solarRoot.render(<SolarProbe />));
+    await settle();
+    act(() => solarRoot.unmount());
+
+    expect(urls.some((url) => url.startsWith('/api/portal/calls'))).toBe(true);
+    expect(urls.filter((url) => /\/api\/portal\/(sales|comp-plan|leaderboard|settings\/weekly-challenge)/.test(url))).toEqual([]);
+  });
+});

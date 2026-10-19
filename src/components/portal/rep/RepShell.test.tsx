@@ -128,6 +128,9 @@ describe('isRepShellPath', () => {
     expect(isRepShellPath('/portal')).toBe(false);
     expect(isRepShellPath('/portal/signup')).toBe(false);
     expect(isRepShellPath('/portal/links')).toBe(false);
+    expect(isRepShellPath('/portal/solar')).toBe(true);
+    // The deck is handed to a homeowner: no portal chrome.
+    expect(isRepShellPath('/portal/solar/present')).toBe(false);
     expect(isRepShellPath('/careers')).toBe(false);
     expect(isRepShellPath(null)).toBe(false);
   });

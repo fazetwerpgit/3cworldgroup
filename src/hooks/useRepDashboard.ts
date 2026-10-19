@@ -220,7 +220,10 @@ function sharedRead(uid: string, gen: number, signal: AbortSignal): ShareRead {
 
 type Loaders = { [K in RepSectionKey]: (token: string | null, signal: AbortSignal) => Promise<unknown> };
 
-export function useRepDashboard() {
+/** The fiber sections: a solar-only rep's Home shows none of them, so they are never fetched. */
+const FIBER_SECTIONS: readonly RepSectionKey[] = ['book', 'plan', 'standing', 'challenge'];
+
+export function useRepDashboard({ fiber = true }: { fiber?: boolean } = {}) {
   const { user } = useAuth();
   const uid = user?.uid ?? null;
   const active = user?.status === 'active';
@@ -368,8 +371,9 @@ export function useRepDashboard() {
         return data.items?.length ?? 0;
       },
     };
+    if (!fiber) for (const key of FIBER_SECTIONS) delete loaders[key];
     return loaders;
-  }, [active, uid, gen]);
+  }, [active, uid, gen, fiber]);
 
   const run = useCallback(
     /** Resolves true when every requested section loaded. */
