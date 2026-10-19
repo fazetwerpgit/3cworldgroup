@@ -5,7 +5,7 @@ const BATCH_LIMIT = 400;
 /** Firestore's cap on the values in one `in` filter. */
 const IN_LIMIT = 30;
 /** What stands in for the rep's own name inside kept Practice text. */
-export const SCRUBBED_NAME = '[rep]';
+export const SCRUBBED_NAME = 'Former rep';
 
 /** Extra fields to write on a row, from its data and the name it was stamped with. */
 type Scrub = (data: DocumentData, names: string[]) => Record<string, unknown>;
@@ -21,15 +21,15 @@ function nameWords(repName: unknown, replacement: string): string[] {
 
 /**
  * Replaces each whole-word, same-case use of the names in text. Case is kept
- * so a rep named Will doesn't blank every "will" in a transcript.
+ * so a rep named Will doesn't blank every "will" in a transcript. A run of
+ * name words ("Jane Doe") becomes one stand-in, not one per word.
  */
 export function scrubName(text: string, names: string[]): string {
-  let out = text;
-  for (const name of names) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'gu'), SCRUBBED_NAME);
-  }
-  return out;
+  const words = [...new Set(names.filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (words.length === 0) return text;
+  const alt = words.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const run = new RegExp(`(?<![\\p{L}\\p{N}])(?:${alt})(?:\\s+(?:${alt}))*(?![\\p{L}\\p{N}])`, 'gu');
+  return text.replace(run, SCRUBBED_NAME);
 }
 
 /** Scrubs the given string fields of a row; only the ones that change are written. */

@@ -152,16 +152,16 @@ describe('anonymizeAskHistory', () => {
     const p1 = updates.find((u) => u.id === 'p1')!.data;
     expect(p1).toEqual({
       repName: 'Deleted user',
-      feedback: 'Try this line: "Hi, I\'m [rep] with 3C." [rep] will close more doors.',
+      feedback: 'Try this line: "Hi, I\'m Former rep with 3C." Former rep will close more doors.',
       turns: [
-        { role: 'rep', text: "Hi, I'm [rep] [rep] with 3C" },
+        { role: 'rep', text: "Hi, I'm Former rep with 3C" },
         { role: 'customer', text: 'What do you want, masonry?' },
       ],
     });
     expect(updates.find((u) => u.id === 'c1')!.data).toEqual({
       repName: 'Deleted user',
-      original: 'Try this line: "Hi, I\'m [rep]."',
-      take: '[rep] should ask first.',
+      original: 'Try this line: "Hi, I\'m Former rep."',
+      take: 'Former rep should ask first.',
     });
     expect(updates.some((u) => u.id === 'p2' || u.id === 'c2')).toBe(false);
     expect(deleted).toEqual(['practiceSessions/rep1']);
@@ -179,8 +179,8 @@ describe('anonymizeAskHistory', () => {
 
 describe('scrubName', () => {
   it('replaces whole, same-case words only', () => {
-    expect(scrubName('Will will go. Willow. Will.', ['Will'])).toBe('[rep] will go. Willow. [rep].');
-    expect(scrubName('José, José!', ['José'])).toBe('[rep], [rep]!');
-    expect(scrubName('a.b a+b', ['a.b'])).toBe('[rep] a+b');
+    expect(scrubName('Will will go. Willow. Will.', ['Will'])).toBe('Former rep will go. Willow. Former rep.');
+    expect(scrubName('José, José!', ['José'])).toBe('Former rep, Former rep!');
+    expect(scrubName('a.b a+b', ['a.b'])).toBe('Former rep a+b');
   });
 });
