@@ -168,7 +168,7 @@ export function AppendixSlide() {
     <div className={s.hero}>
       <div className={s.head}>
         <p className={s.eyebrow}>3C World Group</p>
-        <h2 className={`${s.title} ${s.heroTitle}`}>Apendix</h2>
+        <h2 className={`${s.title} ${s.heroTitle}`}>Appendix</h2>
       </div>
       <Image className={s.globe} src="/solar/globe.webp" alt="" width={550} height={516} />
     </div>
@@ -205,7 +205,7 @@ function RowsSlide({ title, accent, lede, rows }: { title: string; accent?: stri
 export function MovingSlide() {
   return (
     <RowsSlide
-      title="Your Moving!"
+      title="You're Moving!"
       lede="Dedicated solar solutions tailored for your new property transition"
       rows={[
         {
