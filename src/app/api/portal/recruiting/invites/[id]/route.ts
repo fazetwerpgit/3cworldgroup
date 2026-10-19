@@ -76,7 +76,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         { status: 409 }
       );
     }
-    return NextResponse.json({ inviteUrl: inviteUrlFor(request.nextUrl.origin, token) });
+    return NextResponse.json({ inviteUrl: inviteUrlFor(token) });
   } catch (error) {
     console.error('Error reading invite link:', error);
     return NextResponse.json({ error: 'Failed to load the invite link' }, { status: 500 });
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       updatedAt: now,
     });
 
-    const inviteUrl = inviteUrlFor(request.nextUrl.origin, token);
+    const inviteUrl = inviteUrlFor(token);
     const email = await sendInviteEmail(invite.data.candidateEmail, inviteUrl, id);
     const emailSent = email.sent;
     await saveInviteEmailStatus(invite.ref, inviteEmailFields(email));

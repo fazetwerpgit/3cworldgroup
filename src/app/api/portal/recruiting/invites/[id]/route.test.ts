@@ -70,7 +70,7 @@ it('gives the manager back the exact link the invite was created with', async ()
   state.requester = { role: 'field_rep', fieldRole: 'l1_manager' };
   const response = await GET(request('GET'), params);
   expect(response.status).toBe(200);
-  expect((await response.json()).inviteUrl).toBe('https://portal.test/onboard/saved-token');
+  expect((await response.json()).inviteUrl).toBe('https://www.3cworldgroup.com/onboard/saved-token');
 });
 
 it("keeps another manager's invite link from a manager who did not send it", async () => {
@@ -102,12 +102,12 @@ it('re-sends the same link with 14 more days and reopens an expired invite', asy
   const response = await POST(request('POST'), params);
   const json = await response.json();
 
-  expect(json).toMatchObject({ inviteUrl: 'https://portal.test/onboard/saved-token', emailSent: true, newLink: false });
+  expect(json).toMatchObject({ inviteUrl: 'https://www.3cworldgroup.com/onboard/saved-token', emailSent: true, newLink: false });
   expect(state.invite).toMatchObject({ status: 'invited', tokenHash: hashInviteToken('saved-token') });
   const expires = state.invite?.expiresAt;
   expect(expires instanceof Date && expires.getTime() - Date.now()).toBeGreaterThan(13 * 86_400_000);
   expect(state.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'hire@example.com' }));
-  expect(state.sendEmail.mock.calls[0][0].htmlBody).toContain('https://portal.test/onboard/saved-token');
+  expect(state.sendEmail.mock.calls[0][0].htmlBody).toContain('https://www.3cworldgroup.com/onboard/saved-token');
 });
 
 it('gives an invite from before saved links a fresh link that opens it and can be copied later', async () => {
@@ -148,7 +148,7 @@ it('sends a fresh link without asking once the opened older link has expired', a
 it('reports when the email did not go out, with the link to send by hand', async () => {
   state.sendEmail.mockResolvedValue({ ok: false, error: 'postmark_422' });
   const json = await (await POST(request('POST'), params)).json();
-  expect(json).toMatchObject({ emailSent: false, inviteUrl: 'https://portal.test/onboard/saved-token' });
+  expect(json).toMatchObject({ emailSent: false, inviteUrl: 'https://www.3cworldgroup.com/onboard/saved-token' });
 });
 
 const isServerTimestamp = (value: unknown) =>

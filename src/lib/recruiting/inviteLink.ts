@@ -2,14 +2,18 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { decryptField, encryptField } from '@/lib/security/fieldEncryption';
 import { onboardingFrom, sendEmail } from '@/lib/email/sendEmail';
 import { inviteEmail } from '@/lib/email/templates';
+import { SITE_URL } from '@/app/_cinematic/nav';
 
 // An invite is found by the hash of its token, so the hash alone cannot rebuild
 // the link. The token is also kept encrypted (tokenEncrypted) so a manager can
 // copy or re-send the same link later. Invites made before that field existed
 // have no saved link: re-sending one issues a fresh token instead.
 
-export function inviteUrlFor(origin: string, token: string): string {
-  return `${origin}/onboard/${token}`;
+// Always the production origin, never the request host: dev and preview hosts
+// share the production Firebase project, so an invite made there still goes to
+// a real hire and must carry a link that works for them.
+export function inviteUrlFor(token: string): string {
+  return `${SITE_URL}/onboard/${token}`;
 }
 
 /**

@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const inviteUrl = inviteUrlFor(request.nextUrl.origin, token);
+    const inviteUrl = inviteUrlFor(token);
     const email = await sendInviteEmail(candidateEmail, inviteUrl, inviteRef.id);
     const emailSent = email.sent;
     await saveInviteEmailStatus(inviteRef, inviteEmailFields(email));

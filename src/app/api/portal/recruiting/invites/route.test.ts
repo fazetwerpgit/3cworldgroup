@@ -272,7 +272,7 @@ describe('an email that already has an account', () => {
 it("gives a field manager the copy link for a brand-new account's invite", async () => {
   asFieldManager();
   const json = await (await POST(inviteRequest())).json();
-  expect(json.inviteUrl).toMatch(/^http:\/\/localhost\/onboard\//);
+  expect(json.inviteUrl).toMatch(/^https:\/\/www\.3cworldgroup\.com\/onboard\//);
   expect(state.created).toMatchObject({ accountExistedAtInvite: false, ownerId: 'mgr-1' });
 });
 
