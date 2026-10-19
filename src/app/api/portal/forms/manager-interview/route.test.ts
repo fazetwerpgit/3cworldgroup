@@ -24,6 +24,7 @@ import { OPTION_VALUE_MAX } from '@/lib/forms/formOptionsRegistry';
 import { requireVerifiedRequester } from '@/lib/auth/requireVerifiedAdmin';
 import { submitFormRecord } from '@/lib/forms/submitForm';
 import { getResolvedFormOptions } from '@/lib/forms/resolveFormOptions';
+import { resetUserRateLimits } from '@/lib/userRateLimits';
 
 const mockGate = requireVerifiedRequester as unknown as ReturnType<typeof vi.fn>;
 const mockSubmit = submitFormRecord as unknown as ReturnType<typeof vi.fn>;
@@ -53,6 +54,7 @@ const VALID = {
 };
 
 beforeEach(() => {
+  resetUserRateLimits();
   mockGate.mockReset();
   mockSubmit.mockClear();
   mockOptions.mockClear();
