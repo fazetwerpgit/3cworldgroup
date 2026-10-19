@@ -29,6 +29,7 @@ const EXACT: Record<string, string> = {
   '/portal/links': 'Links',
   '/portal/pay-structure': 'Pay structure',
   '/portal/onboarding': 'Onboarding',
+  '/portal/solar': 'Solar',
   '/portal/solar/present': 'Solar deck',
   '/portal/admin/announcements': 'Announcements · Admin',
   '/portal/admin/chat-reports': 'Chat reports · Admin',
@@ -36,6 +37,7 @@ const EXACT: Record<string, string> = {
   '/portal/admin/people': 'People · Admin',
   '/portal/admin/requests': 'Requests · Admin',
   '/portal/admin/settings': 'Settings · Admin',
+  '/portal/admin/solar': 'Solar · Admin',
 };
 
 const PATTERNS: [RegExp, string][] = [

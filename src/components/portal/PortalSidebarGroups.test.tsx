@@ -69,12 +69,13 @@ afterEach(() => {
 });
 
 describe('portal nav groups', () => {
-  it('keeps the admin side to six pages in one group', () => {
+  it('keeps the admin side to seven pages in one group', () => {
     const admin = portalNavGroups.find((group) => group.label === 'Admin');
     expect(admin?.items.map((item) => item.label)).toEqual([
       'People',
       'Hiring',
       'Requests',
+      'Solar',
       'Announcements',
       'Chat reports',
       'Admin settings',
@@ -82,7 +83,7 @@ describe('portal nav groups', () => {
     const adminHrefs = portalNavGroups
       .flatMap((group) => group.items)
       .filter((item) => item.href.startsWith('/portal/admin'));
-    expect(adminHrefs).toHaveLength(6);
+    expect(adminHrefs).toHaveLength(7);
   });
 });
 

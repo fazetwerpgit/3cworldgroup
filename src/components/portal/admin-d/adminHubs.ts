@@ -138,6 +138,27 @@ export const SETTINGS_HUB = {
   ],
 } as const satisfies HubConfig;
 
+// Solar: the leads reps save from the deck, and the consultation setup.
+// Admin only (the owner passes): operations never sees solar.
+export const SOLAR_HUB = {
+  href: '/portal/admin/solar',
+  param: 'tab',
+  tabs: [
+    {
+      key: 'leads',
+      label: 'Leads',
+      roles: ['admin'],
+      hint: 'Every homeowner a rep saved from the solar deck, and their consultation.',
+    },
+    {
+      key: 'setup',
+      label: 'Setup',
+      roles: ['admin'],
+      hint: 'Who takes consultations, their hours, and who hears about new leads.',
+    },
+  ],
+} as const satisfies HubConfig;
+
 export function hubTabHref(hub: HubConfig, key: string): string {
   return `${hub.href}?${hub.param}=${key}`;
 }

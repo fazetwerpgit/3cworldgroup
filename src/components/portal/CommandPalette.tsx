@@ -34,6 +34,7 @@ import {
   PEOPLE_HUB,
   REQUESTS_HUB,
   SETTINGS_HUB,
+  SOLAR_HUB,
   canOpenHubTab,
   hubRoles,
   hubTabHref,
@@ -82,9 +83,9 @@ const PALETTE_SALE_ROWS_SHOWN = 50;
 
 // This is the single portal navigation source of truth. The sidebar, mobile
 // sheet, and palette all consume these same labels, routes, and gates. The
-// admin side is six pages (Ops Home's queues are Home's Needs attention and
+// admin side is seven pages (Ops Home's queues are Home's Needs attention and
 // the nav badges); the old admin pages live on as tabs inside People,
-// Onboarding, Requests and Admin settings (see admin-d/adminHubs.ts), each tab
+// Onboarding, Requests and Admin settings, and Solar is its own hub (see admin-d/adminHubs.ts), each tab
 // under its old gate.
 export const portalNavGroups: PortalNavGroup[] = [
   {
@@ -109,6 +110,7 @@ export const portalNavGroups: PortalNavGroup[] = [
       { label: 'People', href: PEOPLE_HUB.href, icon: Users, roles: hubRoles(PEOPLE_HUB), hub: PEOPLE_HUB },
       { label: 'Hiring', href: ONBOARDING_HUB.href, icon: ClipboardCheck, roles: hubRoles(ONBOARDING_HUB), hub: ONBOARDING_HUB },
       { label: 'Requests', href: REQUESTS_HUB.href, icon: Inbox, roles: hubRoles(REQUESTS_HUB), hub: REQUESTS_HUB },
+      { label: 'Solar', href: SOLAR_HUB.href, icon: Sun, roles: hubRoles(SOLAR_HUB), hub: SOLAR_HUB },
       { label: 'Announcements', href: '/portal/admin/announcements', icon: Megaphone, roles: ['owner'] },
       { label: 'Chat reports', href: CHAT_REPORTS_HUB.href, icon: ShieldAlert, roles: hubRoles(CHAT_REPORTS_HUB) },
       { label: 'Admin settings', href: SETTINGS_HUB.href, icon: Settings, roles: hubRoles(SETTINGS_HUB), hub: SETTINGS_HUB },
