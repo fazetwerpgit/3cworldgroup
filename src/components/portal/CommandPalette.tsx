@@ -74,6 +74,11 @@ interface ActionDestination {
 
 type PaletteRow = { key: string; label: string; href: string; meta?: string };
 
+/** Sales the palette searches over (the list endpoint's max). */
+const PALETTE_SALES_FETCH_LIMIT = 500;
+/** Sale rows shown for a query. */
+const PALETTE_SALE_ROWS_SHOWN = 50;
+
 // This is the single portal navigation source of truth. The sidebar, mobile
 // sheet, and palette all consume these same labels, routes, and gates. The
 // admin side is six pages (Ops Home's queues are Home's Needs attention and
@@ -190,10 +195,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     if (!open || salesFetched.current || onboardingUser || !hasPermission('sales:read')) return;
     salesFetched.current = true;
     let cancelled = false;
+    let settled = false;
     (async () => {
       try {
         const params = new URLSearchParams();
-        params.append('limit', '50');
+        // The whole searchable set, not just the newest page: the client filters
+        // it and caps only the rows shown. 500 is the endpoint's ceiling.
+        params.append('limit', String(PALETTE_SALES_FETCH_LIMIT));
         // The list endpoint requires a verified login (sales carry customer PII).
         const token = await auth?.currentUser?.getIdToken();
         const response = await fetch(`/api/portal/sales?${params.toString()}`, {
@@ -202,6 +210,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Couldn't load sales");
         if (!cancelled) setSales(Array.isArray(data.sales) ? data.sales : []);
+        settled = true;
       } catch {
         // Pages and actions stay usable even if the sales fetch fails; allow a
         // retry on the next open.
@@ -210,6 +219,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     })();
     return () => {
       cancelled = true;
+      // Closed (or re-run) before the list landed: its result is dropped, so
+      // let the next open fetch again instead of searching an empty list.
+      if (!settled) salesFetched.current = false;
     };
   }, [open, hasPermission, onboardingUser, user]);
 
@@ -249,7 +261,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     if (actionRows.length) result.push({ heading: 'Actions', rows: actionRows });
 
     // Sales only surface with a real query (≥ 2 chars), matched on the
-    // customer fields, capped at ~50 rows.
+    // customer fields; only the rows shown are capped.
     if (!onboardingUser && hasPermission('sales:read') && q.length >= 2) {
       const saleRows = sales
         .filter((s) => {
@@ -258,7 +270,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             .join(' ');
           return matches(haystack);
         })
-        .slice(0, 50)
+        .slice(0, PALETTE_SALE_ROWS_SHOWN)
         .map((s) => ({
           key: `sale:${s.id}`,
           label: s.customerName || s.customerAddress || 'Unnamed sale',
