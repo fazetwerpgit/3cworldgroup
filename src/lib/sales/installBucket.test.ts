@@ -67,9 +67,40 @@ describe('installBucketForSale', () => {
     expect(installBucketForSale(sameDay, broke, NOW)).toBe('attention');
     expect(isStandingBreakage(rescheduled, broke)).toBe(false);
     expect(installBucketForSale(rescheduled, broke, NOW)).toBe('scheduled');
-    expect(installBucketForSale(rescheduledPast, broke, NOW)).toBe('installed');
+    // The new day passed and the report (no stamp: 5 days back is covered)
+    // still shows only the breakage: never activated, so it needs chasing.
+    expect(installBucketForSale(rescheduledPast, broke, NOW)).toBe('attention');
+    expect(installAttentionReason(rescheduledPast, broke)).toBe('overdue');
     // An earlier date than the one that broke is not a reschedule.
     expect(installBucketForSale(sale({ installDate: new Date('2026-09-05T12:00:00') }), broke, NOW)).toBe('attention');
+  });
+
+  it('does not call a rescheduled breakage installed once its new day passes', () => {
+    const broke = { status: 'breakage', estInstallDate: '2026-10-10' } as FiberOrder;
+    const rescheduled = sale({ installDate: new Date('2026-10-15T12:00:00Z') });
+    // On the new day itself: still scheduled.
+    expect(installBucketForSale(rescheduled, broke, new Date('2026-10-15T20:00:00Z'), '2026-10-14')).toBe('scheduled');
+    // The day after, the report does not cover the 15th yet: waiting on the carrier.
+    const oct16 = new Date('2026-10-16T15:00:00Z');
+    expect(installBucketForSale(rescheduled, broke, oct16, '2026-10-14')).toBe('scheduled');
+    expect(awaitingCarrierDay(rescheduled, broke, oct16, '2026-10-14')).toBe('2026-10-15');
+    expect(awaitingCarrierLabel(rescheduled, broke, oct16, '2026-10-14')).toBe(AWAITING_CARRIER_LABEL);
+    // A report covering the 15th still shows only the breakage: attention, never installed.
+    expect(installBucketForSale(rescheduled, broke, oct16, '2026-10-15')).not.toBe('installed');
+    expect(installBucketForSale(rescheduled, broke, new Date('2026-10-18T15:00:00Z'), '2026-10-17')).toBe('attention');
+    expect(countInstallBuckets([rescheduled], new Map([['s1', broke]]), new Date('2026-10-18T15:00:00Z'), '2026-10-17'))
+      .toEqual({ attention: 1, scheduled: 0, installed: 0 });
+  });
+
+  it('keeps a sale with no carrier order scheduled all through its install day (Chicago)', () => {
+    // Stored at server-local noon on a UTC server: 12:00Z = 7 AM CDT.
+    const oct20 = sale({ installDate: new Date('2026-10-20T12:00:00Z') });
+    for (const now of ['2026-10-20T13:00:00Z', '2026-10-20T22:00:00Z', '2026-10-21T04:59:00Z']) {
+      expect(installBucketForSale(oct20, null, new Date(now))).toBe('scheduled');
+      expect(scheduledInstallDay(oct20, null, new Date(now))).toBe('2026-10-20');
+    }
+    // Once the Chicago day is over, it reads installed off its own date.
+    expect(installBucketForSale(oct20, null, new Date('2026-10-21T05:01:00Z'))).toBe('installed');
   });
 
   it('does not call a cancelled order installed off the sale date; a churned one did install', () => {
