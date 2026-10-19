@@ -886,6 +886,11 @@ div.tRow {
     padding: 32px 28px 28px;
   }
 
+  /* Wider than a phone: a shorter crop keeps Open deck on the first screen. */
+  .solarLeadImg {
+    aspect-ratio: 2 / 1;
+  }
+
   .solarLeadBody {
     padding: 28px;
   }
