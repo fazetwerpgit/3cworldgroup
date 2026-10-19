@@ -12,6 +12,7 @@ import {
 } from '@/lib/cache/dataCache';
 import { Sale, SaleStatus, CreateSaleData } from '@/types';
 import type { OrderDuplicate } from '@/lib/sales/orderNumber';
+import { todaySaleDateInput } from '@/lib/sales/saleDate';
 
 interface SalesFilters {
   status?: SaleStatus;
@@ -228,7 +229,9 @@ export function useSales(seed?: SalesFilters | null) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(saleData),
+        // clientToday: the phone's own day, so an Eastern rep after midnight
+        // ET may date a sale today (the server allows one day past Chicago's).
+        body: JSON.stringify({ ...saleData, clientToday: todaySaleDateInput() }),
         signal: controller.signal,
       });
       const data = await response.json();
@@ -286,7 +289,7 @@ export function useSales(seed?: SalesFilters | null) {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify({ ...updates, clientToday: todaySaleDateInput() }),
       });
       const data = await response.json();
 

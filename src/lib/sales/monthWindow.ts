@@ -11,8 +11,13 @@ export interface MonthKey {
   month: number;
 }
 
+/**
+ * This month on the company clock (America/Chicago), never the phone's: at
+ * 00:30 ET on the 1st it is still last month in Chicago, and the est. pay,
+ * the widget and the leaderboard all still read last month.
+ */
 export function currentMonth(now: Date = new Date()): MonthKey {
-  return { year: now.getFullYear(), month: now.getMonth() };
+  return chicagoMonthKey(now);
 }
 
 /**
@@ -36,7 +41,7 @@ export function shiftMonth({ year, month }: MonthKey, by: number): MonthKey {
 }
 
 export function isCurrentMonth(key: MonthKey, now: Date = new Date()): boolean {
-  return key.year === now.getFullYear() && key.month === now.getMonth();
+  return compareMonths(key, currentMonth(now)) === 0;
 }
 
 /** Negative when `a` is before `b`, 0 in the same month, positive after. */

@@ -19,9 +19,7 @@ import {
 } from '@/lib/sales/installBucket';
 import {
   chicagoMonthKey,
-  currentMonth,
   isInChicagoMonth,
-  salesSoldIn,
   shiftMonth,
 } from '@/lib/sales/monthWindow';
 import { datedSales, missedInstallSales, sumExpectedPay, undatedSales } from '@/lib/pay/payGroups';
@@ -105,8 +103,13 @@ export function summarizePay(
       ? Math.round(((estThisMonth - estLastMonth) / estLastMonth) * 100)
       : null;
 
-  // The month's sales COUNT stays by sale date: it is activity, not money.
-  const soldThisMonth = countedSales(salesSoldIn(sales, currentMonth(now)), fiberBySale);
+  // The month's sales COUNT stays by sale date: it is activity, not money. It
+  // is the same Chicago month as the estimate above, so an Eastern phone after
+  // midnight on the 1st never reads "0 sales" beside last month's est. pay.
+  const soldThisMonth = countedSales(
+    sales.filter((sale) => isInChicagoMonth(sale.saleDate as Date | string | undefined, month)),
+    fiberBySale
+  );
   const counts = emptyInstallCounts();
   for (const sale of soldThisMonth) counts[installBucketForSale(sale, orderFor(sale, fiberBySale), now, reportAsOf)] += 1;
 

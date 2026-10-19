@@ -38,6 +38,8 @@ interface ParseDateInputOptions {
   maxFutureDays?: number;
   /** Error for a future date rejected by allowFuture=false or maxFutureDays. */
   futureError: string;
+  /** allowFuture=false: the latest YYYY-MM-DD accepted. Default: today in Chicago. */
+  latestDay?: string;
 }
 
 /**
@@ -64,15 +66,18 @@ function parseDateInput(input: unknown, options: ParseDateInputOptions): ParsedD
     return { ok: false, error: options.invalidError };
   }
 
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
-
   if (!options.allowFuture) {
-    if (date.getTime() > today.getTime()) {
+    // Compare calendar days, never instants: the server runs on UTC, so "today"
+    // there turns over at 7 pm Central. The latest day allowed is the company's
+    // (Chicago) today, or the caller's own local day when that is one ahead.
+    if (input > (options.latestDay ?? chicagoTodayKey())) {
       return { ok: false, error: options.futureError };
     }
     return { ok: true, date };
   }
+
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
 
   if (options.maxFutureDays !== undefined) {
     const maxDate = new Date(today);
@@ -85,14 +90,48 @@ function parseDateInput(input: unknown, options: ParseDateInputOptions): ParsedD
   return { ok: true, date };
 }
 
+/** Adds whole days to a YYYY-MM-DD key (calendar arithmetic at UTC noon, DST-proof). */
+function addDaysToDayKey(key: string, days: number): string {
+  const date = new Date(`${key}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Today as YYYY-MM-DD on the company clock (America/Chicago), wherever this runs. */
+export function chicagoTodayKey(now: Date = new Date()): string {
+  return installDayKey(now) ?? dateToSaleDateInput(now);
+}
+
+/**
+ * The latest sale date accepted: today in Chicago, or the rep's own local day
+ * (`clientToday`, YYYY-MM-DD from todaySaleDateInput on their phone) when it
+ * is exactly one day ahead, an Eastern rep after midnight ET. Anything else
+ * the client claims is ignored, so a wrong phone clock cannot open the door.
+ */
+export function latestSaleDayKey(clientToday?: unknown, now: Date = new Date()): string {
+  const chicago = chicagoTodayKey(now);
+  if (typeof clientToday === 'string' && DATE_INPUT_RE.test(clientToday) && clientToday === addDaysToDayKey(chicago, 1)) {
+    return clientToday;
+  }
+  return chicago;
+}
+
+/** A YYYY-MM-DD day at local noon, the way every sale date is stored. */
+export function dayKeyAtNoon(key: string): Date {
+  const [year, month, day] = key.split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
 /**
  * Parses a YYYY-MM-DD sale date input into a Date at local noon.
- * Rejects unparseable values and dates after today.
+ * Rejects unparseable values and dates after today (latestSaleDayKey: the
+ * Chicago day, or the rep's local day when it is one day ahead).
  */
-export function parseSaleDateInput(input: unknown): ParsedDateInput {
+export function parseSaleDateInput(input: unknown, options: { clientToday?: unknown } = {}): ParsedDateInput {
   return parseDateInput(input, {
     invalidError: 'Invalid sale date',
     futureError: 'Sale date cannot be in the future',
+    latestDay: latestSaleDayKey(options.clientToday),
   });
 }
 

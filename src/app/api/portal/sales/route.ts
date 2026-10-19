@@ -6,7 +6,7 @@ import { resolveSubject } from '@/lib/auth/viewAs';
 import { Sale, SaleStatus } from '@/types';
 import { hasSaleProof } from '@/lib/sales/proof';
 import { proofPathFields, validateProofPaths } from '@/lib/sales/proofPaths';
-import { parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
+import { chicagoTodayKey, dayKeyAtNoon, parseSaleDateInput, parseInstallDateInput } from '@/lib/sales/saleDate';
 import { validateHasInternetPlan, validateOnePlanPerSale } from '@/lib/sales/planSelection';
 import { CLIENT_SALE_ID_RE, priceSaleProducts } from '@/lib/sales/pricing';
 import {
@@ -407,9 +407,11 @@ export async function POST(request: NextRequest) {
 
     // Sale date is user-editable but optional for backward compatibility with
     // older clients — fall back when omitted, reject when malformed.
-    let resolvedSaleDate = new Date();
+    // The fallback is today in Chicago at noon, stored like every other sale
+    // date (never the upload instant, which reads as tomorrow after 7 pm CT).
+    let resolvedSaleDate = dayKeyAtNoon(chicagoTodayKey());
     if (saleDate !== undefined && saleDate !== null && saleDate !== '') {
-      const parsed = parseSaleDateInput(saleDate);
+      const parsed = parseSaleDateInput(saleDate, { clientToday: body.clientToday });
       if (!parsed.ok) {
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }

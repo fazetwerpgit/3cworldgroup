@@ -15,9 +15,11 @@ const sale = (salesRepId: string, iso: string, totalPoints = 10): SaleRecord => 
 });
 
 describe('dayKey', () => {
-  it('buckets by America/New_York, not UTC', () => {
-    // 02:00 UTC on the 10th is 10pm ET on the 9th.
+  it('buckets by America/Chicago (the periods\' clock), not UTC or New York', () => {
+    // 02:00 UTC on the 10th is 9pm CT on the 9th.
     expect(dayKey(new Date('2026-07-10T02:00:00Z'))).toBe('2026-07-09');
+    // 04:30 UTC is 00:30 ET on the 10th but still 23:30 CT on the 9th.
+    expect(dayKey(new Date('2026-07-10T04:30:00Z'))).toBe('2026-07-09');
     expect(dayKey(new Date('2026-07-10T16:00:00Z'))).toBe('2026-07-10');
   });
 });

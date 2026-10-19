@@ -41,6 +41,7 @@ vi.mock('@/lib/firebase/admin', () => ({
 
 import { POST } from './route';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { chicagoTodayKey, dateToSaleDateInput } from '@/lib/sales/saleDate';
 
 const mockUser = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 
@@ -85,15 +86,27 @@ describe('POST /api/portal/sales sale date', () => {
     expect((state.added[0].createdAt as Date).getTime()).toBeGreaterThan(stored.getTime());
   });
 
-  it('still falls back to now when an older client omits the sale date', async () => {
-    const before = Date.now();
+  it('falls back to today in Chicago at noon when an older client omits the sale date', async () => {
     const response = await POST(post(baseBody));
     expect(response.status).toBe(200);
 
     const stored = state.added[0].saleDate as Date;
     expect(stored).toBeInstanceOf(Date);
-    expect(stored.getTime()).toBeGreaterThanOrEqual(before);
-    expect(stored.getTime()).toBeLessThanOrEqual(Date.now());
+    // Stored like every other sale date: the Chicago day, at local noon.
+    expect(dateToSaleDateInput(stored)).toBe(chicagoTodayKey());
+    expect([stored.getHours(), stored.getMinutes()]).toEqual([12, 0]);
+  });
+
+  it('after 7 pm Central (past midnight UTC) the fallback is still the Chicago day', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-01T01:00:00Z')); // Oct 31, 8 pm CDT
+      const response = await POST(post(baseBody));
+      expect(response.status).toBe(200);
+      expect(dateToSaleDateInput(state.added[0].saleDate as Date)).toBe('2026-10-31');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('dates the sale to an install that already happened in a past month', async () => {

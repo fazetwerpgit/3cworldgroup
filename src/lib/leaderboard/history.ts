@@ -1,7 +1,12 @@
 // Pure rank-history helpers for the leaderboard. No Firestore imports — the
 // API route passes in plain sale records so all of this is unit-testable.
 
-export const LEADERBOARD_TZ = 'America/New_York';
+import { INSTALL_DATE_TIME_ZONE } from '@/lib/sales/saleDate';
+
+// The company's clock (US Central), the same one every leaderboard period uses
+// (periods.ts): "today", "yesterday", the spark's days and streaks all turn
+// over at Chicago midnight, never New York's.
+export const LEADERBOARD_TZ = INSTALL_DATE_TIME_ZONE;
 
 export interface SaleRecord {
   salesRepId: string;

@@ -237,7 +237,7 @@ export async function PUT(
     if (proofFields) Object.assign(updateData, proofFields);
 
     if (body.saleDate !== undefined && body.saleDate !== null && body.saleDate !== '') {
-      const parsed = parseSaleDateInput(body.saleDate);
+      const parsed = parseSaleDateInput(body.saleDate, { clientToday: body.clientToday });
       if (!parsed.ok) {
         return NextResponse.json({ error: parsed.error }, { status: 400 });
       }

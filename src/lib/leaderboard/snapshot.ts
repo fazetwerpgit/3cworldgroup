@@ -189,7 +189,10 @@ export function buildBoardSnapshot(
 
     for (const period of ['week', 'year', 'all'] as const) {
       const bounds = periodBounds(period, now);
-      periods[periodKey(scope, period)] = payloadFor(counted, bounds?.start ?? new Date(0), null, true, now);
+      // Every dated period is closed at its end: a sale dated tomorrow (an
+      // Eastern rep after midnight ET) must not rank in the week that is
+      // closing and then again in the next one. Only all time is open-ended.
+      periods[periodKey(scope, period)] = payloadFor(counted, bounds?.start ?? new Date(0), bounds?.end ?? null, true, now);
     }
 
     // Every month a counted sale falls in, up to this one (a later month is refused).

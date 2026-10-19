@@ -119,6 +119,19 @@ describe('GET /api/portal/leaderboard Chicago periods', () => {
     expect(json.startDate).toBe('2026-09-06T05:00:00.000Z');
   });
 
+  it('closes the week at its end: a sale dated tomorrow never counts in the week that is closing', async () => {
+    // Sat Oct 31 2026, 23:30 CDT. The sale is dated Sun Nov 1 (stored at noon),
+    // e.g. an Eastern rep logging after midnight ET.
+    state.docs = [sale('2026-10-31T12:00:00.000Z'), sale('2026-11-01T12:00:00.000Z')];
+    vi.setSystemTime(new Date('2026-11-01T04:30:00.000Z'));
+    expect((await response('week')).currentUser).toMatchObject({ totalSales: 1 });
+    expect((await response('year')).currentUser).toMatchObject({ totalSales: 2 }); // both in 2026
+    expect((await response('all')).currentUser).toMatchObject({ totalSales: 2 });
+    // After Chicago midnight it counts once, in the new week.
+    vi.setSystemTime(new Date('2026-11-01T05:30:00.000Z'));
+    expect((await response('week')).currentUser).toMatchObject({ totalSales: 1 });
+  });
+
   it('uses Chicago midnight for month and year across a UTC rollover', async () => {
     state.docs = [
       sale('2026-12-31T23:59:59.999Z'),

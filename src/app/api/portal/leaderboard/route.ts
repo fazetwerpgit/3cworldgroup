@@ -82,7 +82,8 @@ export async function GET(request: NextRequest) {
       scope,
       periodId,
       start: startDate,
-      end: monthView && bounds ? bounds.end : null,
+      // Every dated period is closed at its end (Chicago clock); only all time is open.
+      end: bounds ? bounds.end : null,
       withHistory: !pastMonth,
     });
     const served = serveBoard(board.payload, { metric: metricKey, limit, viewerUid: gate.uid });
