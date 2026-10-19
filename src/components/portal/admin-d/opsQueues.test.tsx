@@ -70,6 +70,7 @@ function respond(url: string) {
       body: {
         requests: Object.fromEntries(forms.map((form) => [form, state.nullForms.has(form) ? null : 1])),
         chatReports: { open: 1, newToday: 1, oldestCreatedAt: ago(3 * HOUR) },
+        solarLeads: 3,
       },
     };
   }
@@ -140,6 +141,7 @@ describe('useOpsQueues', () => {
       'Manager interviews',
       'Bug reports',
       'Chat reports',
+      'New solar leads',
       'Sign-ups waiting for a role',
     ]);
     const byKey = Object.fromEntries(queues.cards!.map((card) => [card.key, card]));
@@ -152,6 +154,7 @@ describe('useOpsQueues', () => {
     expect(byKey['bug-reports']).toMatchObject({ href: '/portal/admin/requests?type=bug-reports', count: 1 });
     expect(byKey['chat-reports']).toMatchObject({ count: 1, newToday: 1 });
     expect(byKey['chat-reports'].oldestWaitMs).toBeGreaterThan(2 * HOUR);
+    expect(byKey['solar-leads']).toMatchObject({ href: '/portal/admin/solar?tab=leads', count: 3 });
     // No pipeline read, and every request queue plus chat reports come from one call.
     expect(fetchMock.mock.calls.map(([url]) => url.split('?')[0]).sort()).toEqual([
       '/api/portal/admin/queue-counts',
@@ -166,6 +169,7 @@ describe('useOpsQueues', () => {
       '/portal/admin/onboarding': 2 + 1 + 2 + 4,
       '/portal/admin/requests': 6,
       '/portal/admin/chat-reports': 1,
+      '/portal/admin/solar': 3,
     });
     expect(tabs).toEqual({ todo: 2 + 1 + 2 + 4 });
   });

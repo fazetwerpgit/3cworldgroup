@@ -93,7 +93,29 @@ describe('GET /api/portal/admin/queue-counts', () => {
         'bug-report': 5,
       },
       chatReports: { open: 3, newToday: 1, oldestCreatedAt: '2026-10-10T08:00:00.000Z' },
+      solarLeads: null,
     });
+    expect(fake.state.calls).not.toContain('count(solarLeads)');
+  });
+
+  it('counts new solar leads for an admin only', async () => {
+    fake.state.gate = { ok: true, uid: 'admin-1', name: 'Ada Admin', isAdmin: true };
+    fake.state.counts = { solarLeads: 4 };
+    expect((await (await GET(req())).json()).solarLeads).toBe(4);
+    expect(fake.state.calls).toContain('count(solarLeads)');
+  });
+
+  it('answers null for solar leads when that count fails', async () => {
+    fake.state.gate = { ok: true, uid: 'admin-1', name: 'Ada Admin', isAdmin: true };
+    fake.state.failing = new Set(['solarLeads']);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const body = await (await GET(req())).json();
+      expect(body.solarLeads).toBeNull();
+      expect(body.requests['bug-report']).toBe(0);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('answers null for a queue that fails and keeps the others', async () => {

@@ -12,7 +12,9 @@ import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 // reports keep their open count, new-today count (since Chicago midnight, the
 // office's business day) and oldest open report (the
 // chatReports (status, createdAt) index). A figure that fails comes back null
-// so one bad queue does not blank the others.
+// so one bad queue does not blank the others. Admins (and the owner) also get
+// `solarLeads`, the count of solar leads still 'new' (saved, no consultation,
+// not closed); operations never sees solar, so it gets null.
 
 /** Request form (as in /api/portal/forms/<form>) to its Firestore collection. */
 const REQUEST_QUEUE_COLLECTIONS = {
@@ -61,7 +63,20 @@ export async function GET(request: NextRequest) {
     return null;
   });
 
-  const [settled, reports] = await Promise.all([requestCounts, chatReports]);
+  const solarLeads: Promise<number | null> = gate.isAdmin
+    ? db
+        .collection('solarLeads')
+        .where('status', '==', 'new')
+        .count()
+        .get()
+        .then((snap) => snap.data().count)
+        .catch((error) => {
+          console.error('[queue counts] solar leads failed', error);
+          return null;
+        })
+    : Promise.resolve(null);
+
+  const [settled, reports, solar] = await Promise.all([requestCounts, chatReports, solarLeads]);
   const requests: Record<string, number | null> = {};
   settled.forEach((result, index) => {
     const [form] = requestEntries[index];
@@ -73,5 +88,5 @@ export async function GET(request: NextRequest) {
     }
   });
 
-  return NextResponse.json({ requests, chatReports: reports }, { headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json({ requests, chatReports: reports, solarLeads: solar }, { headers: { 'Cache-Control': 'no-store' } });
 }

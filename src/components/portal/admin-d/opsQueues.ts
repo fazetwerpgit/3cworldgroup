@@ -12,6 +12,7 @@ import {
   ONBOARDING_HUB,
   REQUEST_TABS,
   REQUESTS_HUB,
+  SOLAR_HUB,
   canOpenHubTab,
   hubTabHref,
   type HubConfig,
@@ -168,6 +169,19 @@ const SOURCES: QueueSource[] = [
         oldestWaitMs: Number.isNaN(oldest) ? null : Math.max(0, Date.now() - oldest),
         newToday: typeof reports.newToday === 'number' ? reports.newToday : 0,
       };
+    },
+  },
+  {
+    key: 'solar-leads',
+    label: 'New solar leads',
+    hub: SOLAR_HUB,
+    tab: 'leads',
+    // Leads saved with no consultation booked yet (status 'new'), counted on
+    // the server; admins only (the tab's gate, and the route answers null to anyone else).
+    load: async (get) => {
+      const count = (await get(QUEUE_COUNTS_URL)).solarLeads;
+      if (typeof count !== 'number') throw new Error('count unavailable');
+      return { count, oldestWaitMs: null, newToday: null };
     },
   },
 ];
