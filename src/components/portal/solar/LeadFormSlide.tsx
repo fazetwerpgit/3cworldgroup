@@ -232,7 +232,7 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
         </div>
 
         <div className={s.formFoot}>
-          <button className={s.primary} type="submit" disabled={sending}>
+          <button className={s.primary} type="submit" disabled={sending} aria-busy={sending || undefined}>
             {saved ? 'Continue' : sending ? 'Saving...' : 'Save and continue'}
           </button>
           {saved ? (

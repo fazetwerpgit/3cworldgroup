@@ -223,7 +223,13 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
           <NeedsLead onBack={onNeedLead} />
         ) : (
           <>
-            <button type="button" className={s.primary} disabled={!picked || booking} onClick={() => void book()}>
+            <button
+              type="button"
+              className={s.primary}
+              disabled={!picked || booking}
+              aria-busy={booking || undefined}
+              onClick={() => void book()}
+            >
               {booking ? 'Booking...' : picked ? `Book ${formatSlotTime(picked.start)}` : 'Pick a time'}
             </button>
             {picked ? (
