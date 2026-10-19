@@ -30,7 +30,14 @@ vi.mock('@/lib/firebase/admin', () => {
       collection: (c: string) => ({
         doc: (id?: string) => ref(c, id ?? `auto${++h.autoId}`),
         add: async (data: Data) => ref(c, `auto${++h.autoId}`).set(data),
-        get: async () => ({ docs: [] }),
+        get: async () => ({
+          docs:
+            c === 'users'
+              ? [...h.docs.entries()]
+                  .filter(([k]) => k.startsWith('users/'))
+                  .map(([k, v]) => ({ id: k.slice('users/'.length), data: () => ({ ...v }) }))
+              : [],
+        }),
       }),
       runTransaction: async <T,>(fn: (tx: unknown) => Promise<T>) =>
         fn({
@@ -57,6 +64,7 @@ vi.mock('@/lib/fiberReport/rematch', () => ({ rematchUnmatchedOrders: vi.fn() })
 
 import { POST } from './route';
 import { readStoredOrders } from '@/lib/fiberReport/carrierNotices';
+import { parseFiberReport } from '@/lib/fiberReport/parseReport';
 
 function post(overrides: Data = {}) {
   process.env.POSTMARK_INBOUND_TOKEN = 't';
@@ -114,6 +122,23 @@ describe('POST /api/webhooks/inbound-report', () => {
     await vi.waitFor(() => expect(h.followUps).toHaveBeenCalled());
     expect(h.docs.get('config/fiberReportStatus')).toMatchObject({ lastReportAt: expect.any(String) });
     expect(importLogs()).toEqual([expect.objectContaining({ stage: 'stored', upserted: 1 })]);
+  });
+
+  it('never matches a report rep to a demo account', async () => {
+    h.followUps.mockResolvedValue({ installDateSync: null, carrierNotices: null, overdueAlerts: null, unloggedOrderNudges: null });
+    h.docs.set('users/demo', { displayName: 'Sam Demo', demoAccount: true, status: 'active' });
+    h.docs.set('users/real', { displayName: 'Real Rep', status: 'active' });
+    vi.mocked(parseFiberReport).mockResolvedValueOnce({
+      orders: [
+        { id: 'o1', repDealerId: '555', repName: 'Sam Demo', orderDate: '2026-10-13', status: 'active' },
+        { id: 'o2', repDealerId: '', repName: 'Real Rep', orderDate: '2026-10-13', status: 'active' },
+      ],
+      rowCounts: { Sheet: 2 },
+    } as unknown as Awaited<ReturnType<typeof parseFiberReport>>);
+    await post();
+    expect(h.docs.get('fiberOrders/o1')).toMatchObject({ matchedUserId: null });
+    expect(h.docs.get('fiberOrders/o2')).toMatchObject({ matchedUserId: 'real' });
+    expect(JSON.stringify(h.docs.get('config/fiberRepMap') ?? {})).not.toContain('demo');
   });
 
   it('a crash after the claim updates the same log doc with the error', async () => {

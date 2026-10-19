@@ -1,8 +1,28 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { buildNameIndex, matchOrder, nameMatchUsers } from '@/lib/fiberReport/matchReps';
 import { invalidateFiberOrdersCache } from '@/lib/fiberReport/ordersCache';
+import { handoffOwner, readHandoffs, saleDays } from '@/lib/fiberReport/dealerHandoff';
 
 const BATCH_SIZE = 450;
+
+type PlacedRow = {
+  repDealerId: string;
+  orderDate: string | null;
+  estInstallDate: string | null;
+  address: string | null;
+  unit: string | null;
+};
+
+function placedRow(data: FirebaseFirestore.DocumentData | undefined): PlacedRow {
+  const text = (value: unknown) => (typeof value === 'string' ? value : null);
+  return {
+    repDealerId: typeof data?.repDealerId === 'string' ? data.repDealerId.trim() : '',
+    orderDate: text(data?.orderDate),
+    estInstallDate: text(data?.estInstallDate),
+    address: text(data?.address),
+    unit: text(data?.unit),
+  };
+}
 
 // Re-run rep matching over every unmatched fiberOrder using the current users,
 // dealer map, and matching rules. Shared by the admin assign API and the
@@ -19,7 +39,11 @@ export async function rematchUnmatchedOrders(): Promise<{ updated: number; still
           Object.entries(rawMap).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
         )
       : {};
+  // Same owner rule as the import and assignDealerToUser: a handoff that
+  // covers the order's day gives it to the borrower, not the code's owner.
+  const handoffs = readHandoffs(mapSnapshot.data()?.handoffs);
 
+  // nameMatchUsers leaves out demo, pending and inactive accounts.
   const usersSnapshot = await adminDb.collection('users').get();
   const userEntries = nameMatchUsers(usersSnapshot.docs);
   const nameIndex = buildNameIndex(userEntries);
@@ -28,17 +52,36 @@ export async function rematchUnmatchedOrders(): Promise<{ updated: number; still
   const updatedAt = new Date().toISOString();
   const updates = new Map<string, string>();
   let learnedDealerMap = false;
-  for (const order of snapshot.docs) {
+
+  // An undated (breakage) row is dated by its sale's order date, as in the
+  // import: read the dated rows on any handed-off code it sits on.
+  const rows = snapshot.docs.map((order) => placedRow(order.data()));
+  const undatedCodes = [
+    ...new Set(rows.filter((row) => !row.orderDate && handoffs[row.repDealerId]).map((row) => row.repDealerId)),
+  ];
+  const datedRows: PlacedRow[] = [];
+  for (const code of undatedCodes) {
+    const onCode = await adminDb.collection('fiberOrders').where('repDealerId', '==', code).get();
+    for (const doc of onCode.docs) {
+      const row = placedRow(doc.data());
+      if (row.orderDate) datedRows.push(row);
+    }
+  }
+  const sold = saleDays([...rows, ...datedRows]);
+
+  for (const [index, order] of snapshot.docs.entries()) {
     const data = order.data();
-    const repDealerId = typeof data?.repDealerId === 'string' ? data.repDealerId.trim() : '';
+    const row = rows[index];
+    const repDealerId = row.repDealerId;
     const repName = typeof data?.repName === 'string' ? data.repName : '';
-    const userId = matchOrder({ repDealerId, repName }, dealerMap, nameIndex, userEntries);
-    if (!userId) continue;
-    updates.set(order.id, userId);
-    if (repDealerId && !dealerMap[repDealerId]) {
-      dealerMap[repDealerId] = userId;
+    const byCode = matchOrder({ repDealerId, repName }, dealerMap, nameIndex, userEntries);
+    if (byCode && repDealerId && !dealerMap[repDealerId]) {
+      dealerMap[repDealerId] = byCode;
       learnedDealerMap = true;
     }
+    const userId = handoffOwner(row, handoffs, sold.get(row)) ?? byCode;
+    if (!userId) continue;
+    updates.set(order.id, userId);
   }
 
   const matchedDocs = snapshot.docs.filter((order) => updates.has(order.id));
