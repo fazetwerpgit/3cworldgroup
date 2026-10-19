@@ -61,7 +61,10 @@ const MESSAGE_COUNT_FROM = PUBLIC_FIELD_LIMITS.message - 400;
 
 function messageFor(field: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): string {
   const { validity, name, validationMessage } = field;
-  if (validity.valueMissing) return MISSING[name] ?? "This field is required.";
+  // A blank-only name or message is "missing" to the server, which trims first.
+  if (validity.valueMissing || (validity.customError && MISSING[name] && !field.value.trim())) {
+    return MISSING[name] ?? "This field is required.";
+  }
   // customError is the shared email/phone check set below, the same one the server runs.
   if (validity.typeMismatch || validity.customError) return MISMATCH[name] ?? "Check this value.";
   return validationMessage || "Check this value.";
@@ -178,6 +181,20 @@ export default function ContactForm() {
     emailRef.current?.setCustomValidity(email && !isValidEmail(email) ? INVALID_EMAIL_MESSAGE : "");
     phoneRef.current?.setCustomValidity(phone && !isValidUsPhone(phone) ? INVALID_PHONE_MESSAGE : "");
   }, [formData.email, formData.phone]);
+
+  /*
+    `required` passes "   ", but the server trims before its required check and
+    would answer with a 400 that names no field. A blank-only name or message is
+    marked invalid here instead, so `handleInvalid` names it like an empty one.
+  */
+  const nameRef = useRef<HTMLInputElement>(null);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const blank = (value: string) => value !== "" && !value.trim();
+    nameRef.current?.setCustomValidity(blank(formData.name) ? MISSING.name : "");
+    messageRef.current?.setCustomValidity(blank(formData.message) ? MISSING.message : "");
+  }, [formData.name, formData.message]);
 
   /*
     Restore once, on mount. `restored` also gates the writer below, so the
@@ -373,6 +390,7 @@ export default function ContactForm() {
               type="text"
               id="contact-name"
               name="name"
+              ref={nameRef}
               maxLength={PUBLIC_FIELD_LIMITS.name}
               aria-invalid={invalid.name ? true : undefined}
               aria-describedby={invalid.name ? "contact-name-error" : undefined}
@@ -502,6 +520,7 @@ export default function ContactForm() {
             className={`${styles.input} ${styles.textarea}`}
             id="contact-message"
             name="message"
+            ref={messageRef}
             maxLength={PUBLIC_FIELD_LIMITS.message}
             aria-invalid={invalid.message ? true : undefined}
             aria-describedby={

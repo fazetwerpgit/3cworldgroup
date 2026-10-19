@@ -98,6 +98,23 @@ describe('ContactForm', () => {
     expect(field('contact-phone-error').textContent).toBe('Enter a valid phone number.');
   });
 
+  it('blocks a blank-only name or message and names the field, as the server trims them', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    await fillValid();
+    await type('contact-name', '   ');
+    await type('contact-message', '\n  \t');
+    await submit();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(field('contact-name-error').textContent).toBe('Enter your full name.');
+    expect(field('contact-name').getAttribute('aria-invalid')).toBe('true');
+    expect(field('contact-message-error').textContent).toBe('Write your message.');
+
+    await type('contact-name', 'Sam Caller');
+    expect(field<HTMLInputElement>('contact-name').validity.valid).toBe(true);
+  });
+
   it('caps the message at the server limit and shows a counter near it', async () => {
     const box = field<HTMLTextAreaElement>('contact-message');
     expect(box.maxLength).toBe(4000);
