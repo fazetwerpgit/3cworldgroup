@@ -7,7 +7,8 @@ import { sendPushToUser } from '@/lib/push/sendPush';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { appBaseUrl, managerAlertEmail, solarBookingConfirmationEmail } from '@/lib/email/templates';
 import { bookingDocId, formatSlotPT, isSolarMode, openSlots, type SolarMode } from '@/lib/solar/availability';
-import { loadAvailability, loadBookings, loadContacts, requireSolarUser } from '@/lib/solar/server';
+import { consultantNotice, loadAvailability, loadBookings, requireSolarUser } from '@/lib/solar/server';
+import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
 
 const SLOT_TAKEN = { error: 'slot_taken' };
 
@@ -22,13 +23,14 @@ type Booking = {
   repName: string;
 };
 
-// Customer confirmation + consultant alert. Best-effort: the booking stands
-// even when a message fails.
+// Customer confirmation + consultant notice. Best-effort: the booking stands
+// even when a message fails. consultantNotice() keeps the owner out of it
+// while owner notifications are off (Jacob gets the notice instead).
 async function announceBooking(b: Booking) {
   const when = formatSlotPT(b.start);
   const how = b.mode === 'virtual' ? 'virtual' : 'in-person';
   try {
-    const [consultant] = await loadContacts([b.consultantUid]);
+    const notice = await consultantNotice(b.consultantUid);
     if (b.customerEmail) {
       await sendEmail({
         to: b.customerEmail,
@@ -38,24 +40,26 @@ async function announceBooking(b: Booking) {
           mode: b.mode,
           consultantName: b.consultantName,
         }),
-        ...(consultant?.email ? { replyTo: consultant.email } : {}),
+        ...(notice.replyTo ? { replyTo: notice.replyTo } : {}),
         tag: 'solar-booking',
       });
     }
-    const title = 'Solar consult booked';
-    const message = `${b.customerName || 'A customer'}: ${how}, ${when} PT (booked by ${b.repName}).`;
+    const to = notice.to;
+    if (!to) return;
+    const title = `${notice.titlePrefix}Solar consult booked`;
+    const message = `${b.customerName || 'A customer'}: ${how}, ${when} PT with ${b.consultantName} (booked by ${b.repName}).`;
     const link = '/portal/admin';
     await createNotification({
-      userId: b.consultantUid,
+      userId: to.uid,
       type: 'solar_booking',
       title,
       message,
       link,
       metadata: { bookingId: b.id },
     }).catch((error) => console.error('solar booking notification failed:', error));
-    await sendPushToUser(b.consultantUid, { title, body: message, url: link }).catch(() => {});
-    if (consultant?.email) {
-      await sendEmail({ to: consultant.email, ...managerAlertEmail({ title, message, link: `${appBaseUrl()}${link}` }), tag: 'solar-booking' });
+    await sendPushToUser(to.uid, { title, body: message, url: link }).catch(() => {});
+    if (to.email) {
+      await sendEmail({ to: to.email, ...managerAlertEmail({ title, message, link: `${appBaseUrl()}${link}` }), tag: 'solar-booking' });
     }
   } catch (error) {
     console.error('solar booking announce failed:', error);
@@ -64,6 +68,8 @@ async function announceBooking(b: Booking) {
 
 // POST /api/portal/solar/bookings {leadId, mode, consultantUid, start}
 // -> 200 {success, id} | 409 {error: 'slot_taken'} | 400 {error: 'slot_unavailable'}.
+// The slot must start at least 2 hours out. A booking sends the lead alert
+// (once per lead, see lib/solar/leadAlert.ts).
 // The doc id is `${consultantUid}_${startISO}` written with create(), so two
 // reps racing for one slot get exactly one booking.
 export async function POST(request: NextRequest) {
@@ -143,6 +149,7 @@ export async function POST(request: NextRequest) {
       customerEmail,
       repName: gate.name,
     });
+    await sendLeadAlertOnce(leadId).catch((error) => console.error('solar lead alert failed:', error));
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error booking solar consult:', error);

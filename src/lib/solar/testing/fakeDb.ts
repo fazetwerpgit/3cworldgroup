@@ -1,5 +1,6 @@
 // Minimal in-memory stand-in for the admin Firestore calls the solar routes
-// make (doc get/create/update, add, where/limit/get, collection get). Tests only.
+// make (doc get/create/update, add, where/limit/get, collection get, and a
+// runTransaction whose writes apply when the callback resolves). Tests only.
 type Data = Record<string, unknown>;
 type Filter = { field: string; op: string; value: unknown };
 
@@ -45,8 +46,23 @@ export function createFakeDb(seed: Record<string, Record<string, Data>> = {}) {
     };
   }
 
+  type DocRef = { get: () => Promise<ReturnType<typeof snap>>; update: (data: Data) => Promise<void> };
   const db = {
     store,
+    runTransaction: async <T>(fn: (tx: {
+      get: (ref: DocRef) => Promise<ReturnType<typeof snap>>;
+      update: (ref: DocRef, data: Data) => void;
+    }) => Promise<T>): Promise<T> => {
+      const writes: (() => Promise<void>)[] = [];
+      const result = await fn({
+        get: (ref) => ref.get(),
+        update: (ref, data) => {
+          writes.push(() => ref.update(data));
+        },
+      });
+      for (const write of writes) await write();
+      return result;
+    },
     collection: (name: string) => ({
       ...query(name, []),
       doc: (id: string) => ({

@@ -5,12 +5,24 @@ import { buildSubmissionAttachmentFolder, isValidFormUploadId } from '@/lib/form
 export const CREDIT_TIERS = ['purchase_600', 'lease_ppa_680'] as const;
 export type CreditTier = (typeof CREDIT_TIERS)[number];
 
+export const CREDIT_TIER_LABELS: Record<CreditTier, string> = {
+  purchase_600: 'Purchase (600+)',
+  lease_ppa_680: 'Lease / PPA (680+)',
+};
+
 export function isCreditTier(value: unknown): value is CreditTier {
   return typeof value === 'string' && (CREDIT_TIERS as readonly string[]).includes(value);
 }
 
 export const PHOTO_SLOTS = ['billPage1', 'billGraph', 'panel'] as const;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
+
+/** Short photo names for the lead alert email. */
+export const PHOTO_SLOT_LABELS: Record<PhotoSlot, string> = {
+  billPage1: 'Bill (first page)',
+  billGraph: 'Bill (bar graph)',
+  panel: 'Electric panel',
+};
 
 export function str(v: unknown, max = 200): string {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';

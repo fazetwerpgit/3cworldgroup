@@ -101,17 +101,60 @@ export async function loadAvailability(): Promise<SolarAvailability[]> {
   return seedAvailability(owner, jacob);
 }
 
-/** settings/solar.leadAlertUids, defaulting to the owner + Jacob. */
+async function solarSettings(): Promise<Record<string, unknown>> {
+  if (!adminDb) return {};
+  const snap = await adminDb.collection('settings').doc('solar').get();
+  return (snap.exists ? snap.data() : undefined) ?? {};
+}
+
+/**
+ * settings/solar.notifyOwner === true. Off by default (Jacob's rule): while it
+ * is off, no solar notification, push or email goes to the owner.
+ */
+export async function ownerNotificationsEnabled(): Promise<boolean> {
+  return (await solarSettings()).notifyOwner === true;
+}
+
+/**
+ * Who gets the lead alert. Jacob only, unless settings/solar.notifyOwner is on
+ * and settings/solar.leadAlertUids is set. The owner is never on the list while
+ * owner notifications are off.
+ */
 export async function leadAlertUids(): Promise<string[]> {
   if (!adminDb) return [];
-  const settings = await adminDb.collection('settings').doc('solar').get();
-  const configured = settings.get('leadAlertUids');
-  if (Array.isArray(configured)) {
-    const uids = configured.filter((v): v is string => typeof v === 'string' && v.length > 0);
-    if (uids.length > 0) return [...new Set(uids)];
+  const [settings, { owner, jacob }] = await Promise.all([solarSettings(), resolveConsultants()]);
+  const notifyOwner = settings.notifyOwner === true;
+  const configured = Array.isArray(settings.leadAlertUids)
+    ? settings.leadAlertUids.filter((v): v is string => typeof v === 'string' && v.length > 0)
+    : [];
+  const uids = notifyOwner && configured.length > 0 ? configured : jacob ? [jacob.uid] : [];
+  return [...new Set(uids)].filter((uid) => notifyOwner || uid !== owner?.uid);
+}
+
+export interface ConsultantNotice {
+  /** Who gets the consultant's booking notice, or null for nobody. */
+  to: UserContact | null;
+  /** Prepended to the notice title ('' when it goes to the consultant). */
+  titlePrefix: string;
+  /** Reply-to for the customer's confirmation email ('' to leave it unset). */
+  replyTo: string;
+}
+
+/**
+ * Where a booking's consultant notice goes. Normally the consultant. When the
+ * consultant is the owner and owner notifications are off, Jacob gets it
+ * instead, marked "[Owner's calendar]", and customer replies go to Jacob too.
+ */
+export async function consultantNotice(consultantUid: string): Promise<ConsultantNotice> {
+  const [notifyOwner, { owner, jacob }, [consultant]] = await Promise.all([
+    ownerNotificationsEnabled(),
+    resolveConsultants(),
+    loadContacts([consultantUid]),
+  ]);
+  if (owner && consultantUid === owner.uid && !notifyOwner) {
+    return { to: jacob, titlePrefix: "[Owner's calendar] ", replyTo: jacob?.email ?? '' };
   }
-  const { owner, jacob } = await resolveConsultants();
-  return [...new Set([owner?.uid, jacob?.uid].filter((v): v is string => !!v))];
+  return { to: consultant ?? null, titlePrefix: '', replyTo: consultant?.email ?? '' };
 }
 
 export async function loadContacts(uids: string[]): Promise<UserContact[]> {

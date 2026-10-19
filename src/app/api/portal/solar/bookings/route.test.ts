@@ -17,7 +17,7 @@ import { POST } from './route';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { userRateLimited } from '@/lib/userRateLimits';
-import { createNotification } from '@/lib/notifications/createNotification';
+import { createNotification, createNotificationForMany } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { sendEmail } from '@/lib/email/sendEmail';
 import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
@@ -26,6 +26,7 @@ const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 const mockLimit = userRateLimited as unknown as ReturnType<typeof vi.fn>;
 const mockNotify = createNotification as unknown as ReturnType<typeof vi.fn>;
+const mockNotifyMany = createNotificationForMany as unknown as ReturnType<typeof vi.fn>;
 const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
 const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 
@@ -55,13 +56,14 @@ beforeEach(() => {
   mockGate.mockReset().mockResolvedValue(REP);
   mockLimit.mockReset().mockReturnValue(null);
   mockNotify.mockClear();
+  mockNotifyMany.mockClear();
   mockPush.mockClear();
   mockEmail.mockClear();
 });
 afterEach(() => vi.useRealTimers());
 
 describe('POST /api/portal/solar/bookings', () => {
-  it('books an open slot, stamps the lead, emails the customer and alerts the consultant', async () => {
+  it('books an open slot, stamps the lead, emails the customer, and sends the one lead alert', async () => {
     const res = await post(BODY);
     expect(res.status).toBe(200);
     const id = `own_${SLOT}`;
@@ -71,15 +73,61 @@ describe('POST /api/portal/solar/bookings', () => {
       start: SLOT, end: '2026-10-26T16:00:00.000Z', repUid: 'rep1', status: 'booked',
     });
     expect(db.store.get('solarLeads')!.get('rep1_c1')).toMatchObject({ status: 'booked', bookingId: id });
+    expect(db.store.get('solarLeads')!.get('rep1_c1')!.alertSentAt).toBeInstanceOf(Date);
 
     const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
     expect(toCustomer.subject).toBe('Your solar consultation is booked');
     expect(toCustomer.textBody).toContain('Monday, October 26 at 8:00 AM');
     expect(toCustomer.textBody).toContain('in-person consultation with Owner');
+
+    expect(mockNotifyMany).toHaveBeenCalledTimes(1);
+    expect(mockNotifyMany.mock.calls[0][0]).toEqual(['jac']);
+    expect(mockNotifyMany.mock.calls[0][1]).toMatchObject({ type: 'solar_lead', title: 'Solar appointment set' });
+    const alert = mockEmail.mock.calls.find((c) => c[0].tag === 'solar-lead')![0];
+    expect(alert.to).toBe('jmyers@3cworldgroup.com');
+    expect(alert.subject).toBe('Solar appointment set: Ana Lopez');
+    expect(alert.textBody).toContain('Appointment: Monday, October 26 at 8:00 AM PT, in-person, with Owner');
+  });
+
+  it("sends the owner nothing by default: the owner's booking notice goes to Jacob", async () => {
+    expect((await post(BODY)).status).toBe(200);
+    const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
+    expect(toCustomer.replyTo).toBe('jmyers@3cworldgroup.com');
+    expect(mockNotify).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'jac', type: 'solar_booking', title: "[Owner's calendar] Solar consult booked" })
+    );
+    expect(mockPush).toHaveBeenCalledWith('jac', expect.objectContaining({ title: "[Owner's calendar] Solar consult booked" }));
+
+    const userIds = [
+      ...mockNotify.mock.calls.map((c) => c[0].userId),
+      ...mockNotifyMany.mock.calls.flatMap((c) => c[0]),
+      ...mockPush.mock.calls.map((c) => c[0]),
+    ];
+    expect(userIds).not.toContain('own');
+    expect(mockEmail.mock.calls.map((c) => c[0].to)).not.toContain('owner@3cworldgroup.com');
+  });
+
+  it('notifies the owner directly once settings/solar.notifyOwner is on', async () => {
+    db.store.set('settings', new Map([['solar', { notifyOwner: true, leadAlertUids: ['own', 'jac'] }]]));
+    expect((await post(BODY)).status).toBe(200);
+    const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
     expect(toCustomer.replyTo).toBe('owner@3cworldgroup.com');
-    expect(mockEmail.mock.calls.some((c) => c[0].to === 'owner@3cworldgroup.com')).toBe(true);
-    expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({ userId: 'own', type: 'solar_booking' }));
+    expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({ userId: 'own', title: 'Solar consult booked' }));
     expect(mockPush).toHaveBeenCalledWith('own', expect.objectContaining({ title: 'Solar consult booked' }));
+    expect(mockNotifyMany.mock.calls[0][0]).toEqual(['own', 'jac']);
+  });
+
+  it("sends Jacob's own bookings to him unprefixed", async () => {
+    expect((await post({ ...BODY, mode: 'virtual', consultantUid: 'jac', start: '2026-10-26T15:00:00.000Z' })).status).toBe(200);
+    expect(mockNotify).toHaveBeenCalledWith(expect.objectContaining({ userId: 'jac', title: 'Solar consult booked' }));
+    expect(mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0].replyTo).toBe('jmyers@3cworldgroup.com');
+  });
+
+  it('alerts once per lead, even when the lead is booked again', async () => {
+    expect((await post(BODY)).status).toBe(200);
+    expect((await post({ ...BODY, start: '2026-10-26T16:00:00.000Z' })).status).toBe(200);
+    expect(mockNotifyMany).toHaveBeenCalledTimes(1);
+    expect(mockEmail.mock.calls.filter((c) => c[0].tag === 'solar-lead')).toHaveLength(1);
   });
 
   it('409s slot_taken on the second booking of the same slot', async () => {
@@ -104,7 +152,8 @@ describe('POST /api/portal/solar/bookings', () => {
 
   it('skips the customer email when the lead has none', async () => {
     expect((await post({ ...BODY, leadId: 'rep1_c2' })).status).toBe(200);
-    expect(mockEmail.mock.calls.map((c) => c[0].to)).toEqual(['owner@3cworldgroup.com']);
+    // Jacob's "[Owner's calendar]" notice, then the lead alert.
+    expect(mockEmail.mock.calls.map((c) => c[0].to)).toEqual(['jmyers@3cworldgroup.com', 'jmyers@3cworldgroup.com']);
   });
 
   it('400s a slot the consultant does not offer', async () => {

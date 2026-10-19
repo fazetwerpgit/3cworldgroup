@@ -253,6 +253,11 @@ export function formSubmissionEmail(p: { formName: string; submittedBy: string; 
   };
 }
 
+/**
+ * The one solar lead alert, sent once the appointment is set (or the rep moves
+ * on without booking). `booking` null reads "No appointment booked". Photo
+ * links are short-lived signed URLs.
+ */
 export function solarLeadAlertEmail(p: {
   repName: string;
   customerName: string;
@@ -260,26 +265,42 @@ export function solarLeadAlertEmail(p: {
   phone: string;
   email: string;
   monthlyBill: string;
+  creditTier: string;
+  booking: { when: string; mode: string; consultantName: string } | null;
+  photos: { label: string; url: string }[];
   link: string;
 }): EmailContent {
-  const subject = `New solar lead: ${p.customerName}`;
+  const subject = p.booking ? `Solar appointment set: ${p.customerName}` : `New solar lead: ${p.customerName}`;
+  const appointment = p.booking
+    ? `${p.booking.when} PT, ${p.booking.mode}, with ${p.booking.consultantName}`
+    : 'No appointment booked';
   const rows: [string, string][] = [
     ['Customer', p.customerName],
     ['Address', p.address],
     ['Phone', p.phone],
     ['Email', p.email],
     ['Monthly bill', p.monthlyBill],
+    ['Credit', p.creditTier],
+    ['Appointment', appointment],
     ['Submitted by', p.repName || 'A team member'],
   ];
   const filled = rows.filter(([, v]) => v);
+  const photoText = p.photos.length
+    ? `\nPhotos (links work for 7 days):\n${p.photos.map((ph) => `${ph.label}: ${ph.url}`).join('\n')}\n`
+    : '\nPhotos: none\n';
+  const photoHtml = p.photos.length
+    ? `<p style="margin:20px 0 6px;color:#5a5f68">Photos (links work for 7 days)</p><ul style="margin:0;padding-left:20px">${p.photos
+        .map((ph) => `<li><a href="${esc(ph.url)}">${esc(ph.label)}</a></li>`)
+        .join('')}</ul>`
+    : '<p style="margin:20px 0 0;color:#5a5f68">Photos: none</p>';
   return {
     subject,
-    textBody: `${filled.map(([k, v]) => `${k}: ${v}`).join('\n')}\n\nOpen the portal: ${p.link}\n`,
+    textBody: `${filled.map(([k, v]) => `${k}: ${v}`).join('\n')}\n${photoText}\nOpen the portal: ${p.link}\n`,
     htmlBody: layout(
       subject,
       `<table style="border-collapse:collapse">${filled
-        .map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#5a5f68">${esc(k)}</td><td style="padding:4px 0"><strong>${esc(v)}</strong></td></tr>`)
-        .join('')}</table><p><a href="${esc(p.link)}">Open in portal</a></p>`
+        .map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#5a5f68;vertical-align:top">${esc(k)}</td><td style="padding:4px 0"><strong>${esc(v)}</strong></td></tr>`)
+        .join('')}</table>${photoHtml}<p style="margin-top:20px"><a href="${esc(p.link)}">Open in portal</a></p>`
     ),
   };
 }

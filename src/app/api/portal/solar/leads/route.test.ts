@@ -93,8 +93,8 @@ describe('POST /api/portal/solar/leads', () => {
     expect((await POST(req(VALID))).status).toBe(429);
   });
 
-  it('writes the lead stamped with the verified rep and alerts owner + Jacob', async () => {
-    const res = await POST(req(VALID));
+  it('writes the lead stamped with the verified rep and sends no alert yet', async () => {
+    const res = await POST(req({ ...VALID, uploadId: UP }));
     expect(res.status).toBe(200);
     const { id } = await res.json();
     const lead = db.store.get('solarLeads')!.get(id)!;
@@ -106,29 +106,21 @@ describe('POST /api/portal/solar/leads', () => {
       source: 'portal',
       creditTier: null,
       photos: VALID.photos,
+      uploadId: UP,
     });
-    expect(mockNotify).toHaveBeenCalledTimes(1);
-    expect(mockNotify.mock.calls[0][0].sort()).toEqual(['jac', 'own']);
-    expect(mockNotify.mock.calls[0][1]).toMatchObject({ type: 'solar_lead', link: '/portal/admin' });
-    expect(mockPush).toHaveBeenCalledTimes(2);
-    expect(mockEmail.mock.calls.map((c) => c[0].to).sort()).toEqual(['jmyers@3cworldgroup.com', 'owner@3cworldgroup.com']);
-    expect(mockEmail.mock.calls[0][0].htmlBody).toContain('Ana Lopez');
+    expect(lead.alertSentAt).toBeUndefined();
+    // The one alert goes out from POST bookings or POST leads/{id}/finish.
+    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockEmail).not.toHaveBeenCalled();
   });
 
-  it('uses settings/solar.leadAlertUids when set', async () => {
-    seed(USERS, { settings: { solar: { leadAlertUids: ['jac'] } } });
-    await POST(req(VALID));
-    expect(mockNotify.mock.calls[0][0]).toEqual(['jac']);
-    expect(mockEmail).toHaveBeenCalledTimes(1);
-  });
-
-  it('dedupes on clientId: same id back, one record, one alert', async () => {
+  it('dedupes on clientId: same id back, one record', async () => {
     const a = await (await POST(req({ ...VALID, clientId: 'c-1' }))).json();
     const b = await (await POST(req({ ...VALID, clientId: 'c-1' }))).json();
     expect(a).toEqual({ success: true, id: 'rep1_c-1' });
     expect(b).toEqual(a);
     expect(db.store.get('solarLeads')!.size).toBe(1);
-    expect(mockNotify).toHaveBeenCalledTimes(1);
   });
 
   it('rejects a bad clientId', async () => {
@@ -167,11 +159,5 @@ describe('POST /api/portal/solar/leads', () => {
   it('marks 3C Doors leads as source knock', async () => {
     const { id } = await (await POST(req({ ...VALID, doorId: 'door9', creditTier: 'purchase_600' }))).json();
     expect(db.store.get('solarLeads')!.get(id)).toMatchObject({ source: 'knock', doorId: 'door9', creditTier: 'purchase_600' });
-  });
-
-  it('still answers 200 when alerts fail', async () => {
-    mockNotify.mockRejectedValueOnce(new Error('down'));
-    mockEmail.mockRejectedValueOnce(new Error('down'));
-    expect((await POST(req(VALID))).status).toBe(200);
   });
 });
