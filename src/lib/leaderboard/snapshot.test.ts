@@ -254,3 +254,19 @@ describe('leaderboard snapshot matches the old live route', () => {
     }
   }, 60_000);
 });
+
+describe('serveBoard limit', () => {
+  const small = fixture(400);
+  const payload = buildBoardSnapshot(small.docs, [], { now: NOW }).periods['approved:all'];
+
+  it('never lets a negative limit return the roster minus its tail', () => {
+    const all = serveBoard(payload, { metric: 'totalPoints', limit: 1000, viewerUid: 'x' });
+    expect(all.leaderboard.length).toBeGreaterThan(2);
+    for (const limit of [-1, -5, Number.NaN, 0]) {
+      const served = serveBoard(payload, { metric: 'totalPoints', limit, viewerUid: 'x' });
+      expect(served.leaderboard).toEqual([]);
+      expect(served.totalRanked).toBe(all.totalRanked);
+    }
+    expect(serveBoard(payload, { metric: 'totalPoints', limit: 2, viewerUid: 'x' }).leaderboard).toHaveLength(2);
+  });
+});

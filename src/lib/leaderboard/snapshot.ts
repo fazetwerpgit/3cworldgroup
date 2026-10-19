@@ -283,8 +283,11 @@ export function serveBoard(
     };
   };
   const current = fullyRanked.find((entry) => entry.salesRepId === opts.viewerUid) ?? null;
+  // A negative limit must never reach slice(): slice(0, -1) is "all but the
+  // last row", which would turn a capped request into the whole roster.
+  const limit = Number.isFinite(opts.limit) ? Math.max(0, Math.trunc(opts.limit)) : 0;
   return {
-    leaderboard: fullyRanked.slice(0, opts.limit).map(withHistory),
+    leaderboard: fullyRanked.slice(0, limit).map(withHistory),
     totalRanked: fullyRanked.length,
     currentUser: current ? withHistory(current) : null,
     rankedIds: fullyRanked.map((entry) => entry.salesRepId),
