@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { Suspense, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import { REP_TABS } from '@/components/portal/rep/repNav';
 import { RepHomeView, type TodayItem } from '@/components/portal/rep/RepDashboard';
@@ -88,9 +89,11 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-export default function RepCHarness() {
+function RepCHarness() {
   const [help, setHelp] = useState(false);
-  const state = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('state') : null;
+  // Read ?state= through Next so the server and the first client render agree
+  // (window.location during render caused a hydration mismatch).
+  const state = useSearchParams().get('state');
   const loading = state === 'loading';
 
   return (
@@ -117,5 +120,13 @@ export default function RepCHarness() {
       />
       {help ? <PayHelpSheet onClose={() => setHelp(false)} /> : null}
     </Shell>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense>
+      <RepCHarness />
+    </Suspense>
   );
 }
