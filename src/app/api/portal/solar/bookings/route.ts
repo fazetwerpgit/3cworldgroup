@@ -23,6 +23,7 @@ import {
 } from '@/lib/solar/timezones';
 
 const SLOT_TAKEN = { error: 'slot_taken' };
+const LOW_CREDIT_BOOK_ERROR = "This homeowner didn't pre-qualify. Change the credit answer first.";
 
 type Booking = {
   id: string;
@@ -202,7 +203,7 @@ export async function POST(request: NextRequest) {
     }
     // Closed at pre-qualification (Under 600): pick a credit tier first, which reopens it.
     if (isLowCreditDecline((lead.data() ?? {}) as Record<string, unknown>)) {
-      return NextResponse.json({ error: "This homeowner didn't pre-qualify. Change the credit answer first." }, { status: 409 });
+      return NextResponse.json({ error: LOW_CREDIT_BOOK_ERROR }, { status: 409 });
     }
 
     // A retry after success answers the booking it made, before the slot checks
@@ -246,6 +247,10 @@ export async function POST(request: NextRequest) {
         // Every read before any write.
         const leadNow = await tx.get(leadRef);
         if (!leadNow.exists) throw new Answer({ error: 'Lead not found' }, 404);
+        // Re-check: the lead may have been declined since the pre-check above.
+        if (isLowCreditDecline((leadNow.data() ?? {}) as Record<string, unknown>)) {
+          throw new Answer({ error: LOW_CREDIT_BOOK_ERROR }, 409);
+        }
         const nowHeld = typeof leadNow.get('bookingId') === 'string' ? (leadNow.get('bookingId') as string) : '';
         const heldSnap = nowHeld ? await tx.get(db.collection('solarBookings').doc(nowHeld)) : null;
         const slot = await tx.get(slotRef);

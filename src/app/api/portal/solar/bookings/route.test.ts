@@ -482,4 +482,20 @@ describe('POST /api/portal/solar/bookings', () => {
     expect(db.store.get('solarBookings')?.size ?? 0).toBe(0);
     expect(db.store.get('solarLeads')!.get('rep1_c1')!.status).toBe('lost');
   });
+
+  it('409s a lead declined for low credit after the pre-check, inside the transaction', async () => {
+    const real = db.runTransaction.bind(db);
+    // The lead turns Under 600 between the pre-check and the transaction.
+    const spy = vi.spyOn(db, 'runTransaction').mockImplementation(((fn: Parameters<typeof real>[0]) => {
+      Object.assign(db.store.get('solarLeads')!.get('rep1_c1')!, { status: 'lost', noSaleReason: 'low_credit' });
+      return real(fn);
+    }) as typeof real);
+    const res = await post(BODY);
+    spy.mockRestore();
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toMatch(/pre-qualify/);
+    expect(db.store.get('solarBookings')?.size ?? 0).toBe(0);
+    expect(db.store.get('solarLeads')!.get('rep1_c1')).toMatchObject({ status: 'lost', noSaleReason: 'low_credit' });
+    expect(mockEmail).not.toHaveBeenCalled();
+  });
 });
