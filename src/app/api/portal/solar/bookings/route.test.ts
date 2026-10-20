@@ -273,15 +273,34 @@ describe('POST /api/portal/solar/bookings', () => {
       expect(notice.message).toContain('virtual, Monday, October 26 at 10:00 AM CT (11:00 AM ET for the customer) with Jacob');
     });
 
-    it("prefers a valid customerTz from the body, and ignores a bogus one", async () => {
+    it("the lead's state beats the body's customerTz, so the client can't widen the window", async () => {
       db.store.get('solarLeads')!.set('rep1_c1', { ...db.store.get('solarLeads')!.get('rep1_c1'), state: 'FL' });
+      expect((await post({ ...BODY, customerTz: 'America/Denver' })).status).toBe(200);
+      expect(db.store.get('solarBookings')!.get(`own_${SLOT}`)!.customerTz).toBe('America/New_York');
+      // Now Mon Oct 19, 8 PM ET: the Florida window ends Nov 3 05:00Z, Hawaii's
+      // at 10:00Z. Asking for Honolulu doesn't stretch a Florida lead's window.
+      db.store.get('solarLeads')!.set('rep1_c2', { ...db.store.get('solarLeads')!.get('rep1_c2'), state: 'FL' });
+      const late = { ...BODY, leadId: 'rep1_c2', start: '2026-11-03T06:00:00.000Z', customerTz: 'Pacific/Honolulu' };
+      const farFl = await post(late);
+      expect(farFl.status).toBe(400);
+      expect(await farFl.json()).toMatchObject({ reason: 'too_far' });
+      // Without a state the same ask is inside the Hawaii window (refused only as an unoffered slot).
+      db.store.get('solarLeads')!.set('rep1_c2', { ...db.store.get('solarLeads')!.get('rep1_c2'), state: '' });
+      const noState = await post(late);
+      expect(noState.status).toBe(400);
+      expect((await noState.json()).reason).toBeUndefined();
+    });
+
+    it('uses a US-zone customerTz only for a lead without a state, and ignores others', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { ...db.store.get('solarLeads')!.get('rep1_c1'), state: '' });
       expect((await post({ ...BODY, customerTz: 'America/Denver' })).status).toBe(200);
       expect(db.store.get('solarBookings')!.get(`own_${SLOT}`)!.customerTz).toBe('America/Denver');
 
-      db.store.get('solarLeads')!.set('rep1_c2', { ...db.store.get('solarLeads')!.get('rep1_c2'), state: 'TX' });
+      db.store.get('solarLeads')!.set('rep1_c2', { ...db.store.get('solarLeads')!.get('rep1_c2'), state: '' });
       const SLOT2 = '2026-10-26T16:00:00.000Z';
-      expect((await post({ ...BODY, leadId: 'rep1_c2', start: SLOT2, customerTz: 'Mars/Olympus' })).status).toBe(200);
-      expect(db.store.get('solarBookings')!.get(`own_${SLOT2}`)!.customerTz).toBe('America/Chicago');
+      // A real IANA zone outside the US list falls back to the consultant's.
+      expect((await post({ ...BODY, leadId: 'rep1_c2', start: SLOT2, customerTz: 'Asia/Tokyo' })).status).toBe(200);
+      expect(db.store.get('solarBookings')!.get(`own_${SLOT2}`)!.customerTz).toBe('America/Los_Angeles');
     });
 
     it('books across the fall-back DST change at the right instant', async () => {

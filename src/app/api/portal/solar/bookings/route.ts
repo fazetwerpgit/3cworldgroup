@@ -15,7 +15,7 @@ import {
   SOLAR_MAX_DAYS_OUT,
   formatWhen,
   formatWhenForConsultant,
-  isValidTimeZone,
+  isUsTimeZone,
   withinBookingWindow,
   zoneForState,
 } from '@/lib/solar/timezones';
@@ -106,8 +106,8 @@ function bookedBody(id: string, b: Record<string, unknown>, duplicate: boolean) 
 // -> 200 {success, id, consultantUid, consultantName, start, mode[, customerTz][, duplicate]}
 //  | 409 {error: 'slot_taken'} | 400 {error: 'slot_unavailable'[, reason: 'too_far']}.
 // `start` is an absolute instant. The booking stores it with the customer's
-// zone (customerTz from the body when it is a real IANA zone, else the lead's
-// state, else the consultant's) and the consultant's zone, for the notices.
+// zone (the lead's state's, else customerTz from the body when it is a US
+// zone from the list, else the consultant's) and the consultant's zone, for the notices.
 // A slot must start within the booking window: through the 14th calendar day
 // after today in the customer's zone.
 // ONE active booking per lead: when lead.bookingId already holds a live
@@ -142,7 +142,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid start' }, { status: 400 });
     }
     const start = startDate.toISOString();
-    const askedTz = isValidTimeZone(body?.customerTz) ? (body.customerTz as string) : '';
+    // Only a US zone from the list; the lead's state still wins (see below).
+    const askedTz = isUsTimeZone(body?.customerTz) ? body.customerTz : '';
 
     const leadRef = db.collection('solarLeads').doc(leadId);
     const lead = await leadRef.get();
@@ -166,7 +167,9 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const availability = (await loadAvailability()).filter((a) => a.consultantUid === consultantUid);
     const consultantTz = availability[0]?.tz || LEGACY_TZ;
-    const customerTz = askedTz || zoneForState(lead.get('state')) || consultantTz;
+    // The lead's state decides the zone (so the 14-day window can't be widened
+    // from the client); a US-zone customerTz only fills in for a lead without one.
+    const customerTz = zoneForState(lead.get('state')) || askedTz || consultantTz;
     if (!withinBookingWindow(startDate, now, customerTz)) {
       return NextResponse.json(
         { error: 'slot_unavailable', reason: 'too_far', message: `Book within ${SOLAR_MAX_DAYS_OUT} days.` },
