@@ -23,8 +23,8 @@ import s from './solarDeck.module.css';
 // the deck session like every other answer (deckState `monthlyKwh`, `usage`).
 
 const MODES: { mode: UsageMode; label: string }[] = [
-  { mode: 'monthly', label: 'Monthly kWh' },
-  { mode: 'daily', label: 'Daily average' },
+  { mode: 'monthly', label: 'Monthly' },
+  { mode: 'daily', label: 'Daily' },
   { mode: 'months', label: '12 months' },
 ];
 
@@ -56,7 +56,7 @@ function KwhField({
           inputMode="decimal"
           autoComplete="off"
           enterKeyHint={compact ? 'next' : 'done'}
-          placeholder="0"
+          placeholder={compact ? undefined : '0'}
           value={draft ?? editableKwh(value)}
           onFocus={() => setDraft(editableKwh(value))}
           onBlur={() => setDraft(null)}
@@ -170,14 +170,14 @@ export function UsageSlide() {
         <div className={`${s.card} ${s.usageResult}`} aria-live="polite">
           <div className={s.usageStats}>
             <div>
-              <span className={s.label}>Annual usage (est.)</span>
+              <span className={s.label}>Per year (est.)</span>
               <p className={s.usageNum} data-testid="solar-annual-kwh">
                 {estimate ? formatKwh(estimate.annualKwh) : '-'}
                 <span className={s.usageUnit}> kWh</span>
               </p>
             </div>
             <div>
-              <span className={s.label}>Monthly average</span>
+              <span className={s.label}>Per month (avg.)</span>
               <p className={s.usageNum} data-testid="solar-monthly-kwh">
                 {estimate ? formatKwh(estimate.monthlyKwh) : '-'}
                 <span className={s.usageUnit}> kWh</span>
