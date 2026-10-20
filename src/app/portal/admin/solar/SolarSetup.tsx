@@ -7,12 +7,11 @@ import { isAdminLevel } from '@/types';
 import {
   SOLAR_SLOT_LENGTHS,
   SOLAR_TIMEZONES,
-  SOLAR_TZ,
-  zonedToUtc,
   type SolarHours,
   type SolarMode,
   type WeeklyWindow,
 } from '@/lib/solar/availability';
+import { DEFAULT_CONSULTANT_TZ, zoneAbbr } from '@/lib/solar/timezones';
 import { AdminFailed, AdminNotice, AdminSkeletonRows, StatusDot } from '@/components/portal/admin-d/AdminUi';
 import { AdminSelect, ConfirmStrip, Seg, cx } from '@/components/portal/admin-ops/AdminKit';
 import { UserPicker, pickerName, usePickerUsers, type PickerUser } from '@/components/admin/UserPicker';
@@ -76,20 +75,6 @@ function slotsIn(w: Pick<WeeklyWindow, 'start' | 'end'>, slotMin: number): numbe
 }
 
 const tzLabel = (tz: string) => SOLAR_TIMEZONES.find((z) => z.value === tz)?.label ?? tz;
-
-/** A wall time on the next `day` in `tz`, as homeowners read it (Pacific). */
-function inPacific(day: number, value: string, tz: string): string {
-  const now = new Date();
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + i));
-    if (d.getUTCDay() !== day) continue;
-    const min = minutes(value);
-    const ms = zonedToUtc(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), Math.floor(min / 60), min % 60, tz);
-    if (ms === null) break;
-    return new Intl.DateTimeFormat('en-US', { timeZone: SOLAR_TZ, hour: 'numeric', minute: '2-digit' }).format(ms);
-  }
-  return clock(value);
-}
 
 const sameHours = (a: SolarHours | null, b: SolarHours) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -210,9 +195,10 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
   const w = ordered.find((x) => x.day === focusDay) ?? ordered[0];
   const count = slotsIn(w, hours.slotMin);
   const lastStart = hm(minutes(w.start) + (count - 1) * hours.slotMin);
-  const pacific = hours.tz === SOLAR_TZ;
-  const first = pacific ? clock(w.start) : inPacific(w.day, w.start, hours.tz);
-  const last = pacific ? clock(lastStart) : inPacific(w.day, lastStart, hours.tz);
+  // In the consultant's own zone; the deck converts to each customer's zone.
+  const zone = zoneAbbr(hours.tz);
+  const first = `${clock(w.start)} ${zone}`;
+  const last = `${clock(lastStart)} ${zone}`;
   return (
     <div className={st.preview} aria-live="polite">
       <span className={st.previewLabel}>Homeowners see</span>
@@ -221,7 +207,7 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
       </strong>
       <span className={st.previewDay}>
         {DAY_LONG[w.day]}: {count === 1 ? `one slot, at ${first}` : `${count} slots, the first at ${first} and the last at ${last}`}
-        {pacific ? '' : ' Pacific'}
+        . Customers see these in their own time zone.
       </span>
     </div>
   );
@@ -242,7 +228,7 @@ function ConsultantPanel({
 }) {
   const { uid, name, saved } = consultant;
   const [draft, setDraft] = useState<SolarHours>(
-    () => saved ?? { tz: SOLAR_TZ, slotMin: 60, modes: { virtual: [], in_person: [] } }
+    () => saved ?? { tz: DEFAULT_CONSULTANT_TZ, slotMin: 60, modes: { virtual: [], in_person: [] } }
   );
   const [mode, setMode] = useState<SolarMode>(() =>
     saved && saved.modes.virtual.length === 0 && saved.modes.in_person.length > 0 ? 'in_person' : 'virtual'
