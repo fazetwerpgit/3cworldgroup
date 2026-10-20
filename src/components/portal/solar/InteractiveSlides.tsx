@@ -132,7 +132,7 @@ export function PrequalSlide({
       <>
         <div className={s.head}>
           <p className={s.eyebrow}>Program fit</p>
-          <h2 className={s.title}>
+          <h2 className={`${s.title} ${s.endTitle}`}>
             Not a fit <span className={s.accent}>right now</span>
           </h2>
           <p className={`${s.lede} ${s.endLede}`}>
@@ -236,10 +236,23 @@ export function PrequalSlide({
         </p>
       )}
       {error ? (
-        <p className={s.alert} role="alert">
+        <p className={`${s.alert} ${s.alertBlock}`} role="alert">
           {error}
         </p>
       ) : null}
+    </>
+  );
+}
+
+/** "Tuesday, Oct 20 at 9:00 AM ET", set large: the time and zone never split across lines. */
+function SlotLong({ iso, tz }: { iso: string; tz: string }) {
+  const text = formatSlotLong(iso, tz);
+  const cut = text.lastIndexOf(' at ');
+  if (cut < 0) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, cut + 4)}
+      <span className={s.nowrap}>{text.slice(cut + 4)}</span>
     </>
   );
 }
@@ -423,16 +436,16 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
             </span>
           </div>
           {slots === null ? (
-            <p className={s.note}>Loading open times...</p>
+            <p className={s.emptyBlock}>Loading open times...</p>
           ) : loadError ? (
-            <div className={s.formFoot}>
-              <p className={s.alert}>Could not load times. {loadError}</p>
+            <div className={s.loadError}>
+              <p className={`${s.alert} ${s.alertBlock}`}>Could not load times. {loadError}</p>
               <button type="button" className={s.ghost} onClick={() => void load(mode, tz)}>
                 Try again
               </button>
             </div>
           ) : !day ? (
-            <p className={s.note}>No open {mode === 'virtual' ? 'virtual' : 'in-person'} times in the next two weeks.</p>
+            <p className={s.emptyBlock}>No open {mode === 'virtual' ? 'virtual' : 'in-person'} times in the next two weeks.</p>
           ) : (
             <div className={s.times}>
               {day.times.map((time) => (
@@ -460,7 +473,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
         ) : (
           <>
             <p className={picked ? s.bookPicked : s.note}>
-              {picked ? formatSlotLong(picked.start, tz) : 'Pick a day and a time.'}
+              {picked ? <SlotLong iso={picked.start} tz={tz} /> : 'Pick a day and a time.'}
             </p>
             <button
               type="button"
@@ -474,7 +487,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
           </>
         )}
         {message ? (
-          <p className={s.alert} role="alert">
+          <p className={`${s.alert} ${s.alertBlock}`} role="alert">
             {message}
           </p>
         ) : null}
@@ -497,18 +510,21 @@ export function ConfirmationSlide({ onBook, onNewCustomer }: { onBook: () => voi
         <p className={s.lede}>Important details regarding your upcoming consultation</p>
       </div>
       <div className={s.confirmGrid}>
-        <section className={s.card} aria-label="Status">
-          <span className={s.checkWrap} data-on={b ? true : undefined} aria-hidden>
-            <Check size={22} strokeWidth={2.5} />
-          </span>
-          <span className={s.label}>Status</span>
+        <section className={`${s.card} ${s.statusCard}`} aria-label="Status">
+          <div className={s.statusHead}>
+            <span className={s.label}>Status</span>
+            <span className={s.checkWrap} data-on={b ? true : undefined} aria-hidden>
+              <Check size={24} strokeWidth={3} />
+            </span>
+          </div>
           <h3 className={s.statusTitle}>All Set!</h3>
           <p className={s.statusKicker}>We&apos;re Ready for You</p>
-          <hr className={s.rule} />
           {b ? (
             <dl className={s.confirm}>
               <dt>When</dt>
-              <dd>{formatSlotLong(b.start, b.tz ?? customerZone(state.lead.state))}</dd>
+              <dd>
+                <SlotLong iso={b.start} tz={b.tz ?? customerZone(state.lead.state)} />
+              </dd>
               <dt>Type</dt>
               <dd>{b.mode === 'virtual' ? 'Virtual' : 'In-Person'}</dd>
               <dt>Consultant</dt>
