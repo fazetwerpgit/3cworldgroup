@@ -346,6 +346,12 @@
   text-wrap: pretty;
 }
 
+/* A note on this connection's state is read, not skimmed: full ink. The
+   standing help line stays secondary. */
+.gcalNote {
+  color: var(--c-text);
+}
+
 .gcalWarn {
   color: var(--c-amber);
 }

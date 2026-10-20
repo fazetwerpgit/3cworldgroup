@@ -132,6 +132,8 @@ export function GoogleCalendarRow({
 
   const state = connected ? (
     <StatusDot tone="lime">{status?.email ? `Connected as ${status.email}` : 'Connected'}</StatusDot>
+  ) : waiting ? (
+    <StatusDot tone="blue">Waiting for Google</StatusDot>
   ) : broken ? (
     <StatusDot tone="amber">Needs reconnecting</StatusDot>
   ) : (
@@ -162,7 +164,7 @@ export function GoogleCalendarRow({
         </span>
         <span className={st.gcalState}>{state}</span>
         {note ? (
-          <p className={cx(st.help, broken && st.gcalWarn)} role={waiting ? 'status' : undefined}>
+          <p className={cx(st.help, st.gcalNote, broken && st.gcalWarn)} role={waiting ? 'status' : undefined}>
             {note}
           </p>
         ) : null}

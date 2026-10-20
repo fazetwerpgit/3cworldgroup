@@ -183,6 +183,7 @@ describe('Google Calendar row', () => {
     expect(calls.find((c) => c.method === 'POST')).toMatchObject({ url: '/api/portal/solar/google/connect', body: { from: 'app' } });
     expect(open).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?state=s', '_blank');
     expect(container.textContent).toContain('Finish signing in to Google');
+    expect(container.textContent).toContain('Waiting for Google');
     // Back from the browser sheet: the row checks at once and shows the account.
     googleNow = CONNECTED;
     await act(async () => window.dispatchEvent(new Event('focus')));
