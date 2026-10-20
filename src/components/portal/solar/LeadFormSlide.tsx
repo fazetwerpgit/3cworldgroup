@@ -124,15 +124,20 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
     unsentContact.current =
       contactDirty && state.leadId && Object.keys(errors).length === 0 ? { id: state.leadId, lead: state.lead } : null;
   });
+  // Only on unmount (a ref, so a new `update` identity never fires it early).
+  const updateRef = useRef(update);
+  useEffect(() => {
+    updateRef.current = update;
+  });
   useEffect(
     () => () => {
       const unsent = unsentContact.current;
       if (!unsent) return;
       void updateLeadContact(unsent.id, unsent.lead).then((res) => {
-        if (res.ok) update({ savedContact: contactKey(unsent.lead) });
+        if (res.ok) updateRef.current({ savedContact: contactKey(unsent.lead) });
       });
     },
-    [update]
+    []
   );
 
   const setField = (key: keyof LeadFields, value: string) =>
@@ -266,6 +271,8 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
       return;
     }
     update({ savedContact: contactKey(lead) });
+    // onSaved leaves the slide before a re-render clears this: don't send it twice.
+    unsentContact.current = null;
     onSaved();
   };
 

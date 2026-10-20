@@ -230,6 +230,18 @@ describe('LeadFormSlide after the lead is saved (review > Edit)', () => {
     expect(deck.state.savedContact).toBe(contactKey(SAVED));
   });
 
+  it('Save changes then leaving the slide sends the change once', async () => {
+    deck.state.lead = { ...SAVED, phone: '(559) 555-0199' };
+    // As in the deck: onSaved moves to the review in the same batch, so the form unmounts at once.
+    onSaved.mockImplementation(() => root.render(<p>review</p>));
+    render();
+    await act(async () => {
+      button('Save changes')!.click();
+    });
+    expect(container.textContent).toBe('review');
+    expect(api.updateLeadContact).toHaveBeenCalledTimes(1);
+  });
+
   it('leaving the slide with a valid unsent change sends it quietly', async () => {
     deck.state.lead = { ...SAVED, first: 'Anita' };
     render();
