@@ -2,28 +2,56 @@
 // the API routes share it.
 //
 // - A consultant's hours are entered and stored in the consultant's own zone
-//   (solarAvailability/{uid}.tz, America/Chicago when unset).
+//   (solarAvailability/{uid}.tz). A doc with no tz reads as Pacific: the
+//   pre-zone code read every consultant's hours in America/Los_Angeles.
 // - The deck shows bookable times in the CUSTOMER's zone: the lead's state
 //   (zoneForState), else the rep's device zone.
 // - A booking stores the UTC instant (start/startAt) plus customerTz and
-//   consultantTz. Bookings made before these fields existed read the
-//   consultant zone as America/Chicago (bookingZones).
+//   consultantTz. Bookings made before these fields existed read in Pacific,
+//   as the old notices and deck showed them (bookingZones).
 
-/** A consultant with no zone set, and old bookings with no zone stored. */
+/**
+ * The zone the pre-zone code assumed for everything: consultant hours with no
+ * tz, and how booked times were shown. Stored data with no zone keeps reading
+ * in it, so nothing already saved moves when zones ship.
+ */
+export const LEGACY_TZ = 'America/Los_Angeles';
+
+/** The zone a consultant newly added in Admin > Solar > Setup starts on. */
 export const DEFAULT_CONSULTANT_TZ = 'America/Chicago';
 
-/** Bookable times reach at most this many days out (Jeremy). */
+/** Bookable times reach at most this many calendar days out (Jeremy). */
 export const SOLAR_MAX_DAYS_OUT = 14;
-const DAY_MS = 86_400_000;
 
-/** The booking window's end: now + 14 days (rolling). A slot must start before it. */
-export function bookingWindowEnd(now: Date): Date {
-  return new Date(now.getTime() + SOLAR_MAX_DAYS_OUT * DAY_MS);
+/** UTC ms of 00:00 on a calendar date in `tz` (US zones change clocks at 2 AM, so midnight exists). */
+function midnightIn(y: number, m: number, d: number, tz: string): number {
+  const guess = Date.UTC(y, m - 1, d);
+  const offset = (ms: number) => {
+    const p: Record<string, number> = {};
+    for (const part of fmt(tz, 'parts', {
+      hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric',
+    }).formatToParts(new Date(ms))) {
+      if (part.type !== 'literal') p[part.type] = Number(part.value);
+    }
+    return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second) - Math.floor(ms / 1000) * 1000;
+  };
+  let ms = guess - offset(guess);
+  ms = guess - offset(ms);
+  return ms;
 }
 
-/** Whether a slot starting at `start` is inside the booking window. */
-export function withinBookingWindow(start: Date, now: Date): boolean {
-  return start.getTime() < bookingWindowEnd(now).getTime();
+/**
+ * The booking window's end: the end of the 14th calendar day after today in
+ * the customer's zone `tz` (today is day 0). A slot must start before it.
+ */
+export function bookingWindowEnd(now: Date, tz: string): Date {
+  const [y, m, d] = dayKeyIn(now.toISOString(), tz).split('-').map(Number);
+  return new Date(midnightIn(y, m, d + SOLAR_MAX_DAYS_OUT + 1, tz));
+}
+
+/** Whether a slot starting at `start` is inside the booking window for a customer in `tz`. */
+export function withinBookingWindow(start: Date, now: Date, tz: string): boolean {
+  return start.getTime() < bookingWindowEnd(now, tz).getTime();
 }
 
 /** US zones a consultant can work in, and the deck's zone switcher offers. */
@@ -211,13 +239,12 @@ export function formatWhenForConsultant(iso: string, consultantTz: string, custo
 
 /**
  * The zones a stored booking reads in. consultantTz / customerTz when stored;
- * an older booking has neither, so the consultant zone falls back to
- * `fallbackConsultantTz` (America/Chicago unless the caller knows better) and
- * the customer zone to the consultant's.
+ * an older booking has neither, so both read in `fallbackConsultantTz`
+ * (Pacific, as the old code showed every booking, unless the caller knows better).
  */
 export function bookingZones(
   data: Record<string, unknown> | undefined,
-  fallbackConsultantTz: string = DEFAULT_CONSULTANT_TZ
+  fallbackConsultantTz: string = LEGACY_TZ
 ): { consultantTz: string; customerTz: string } {
   const consultantTz = isValidTimeZone(data?.consultantTz) ? data.consultantTz : fallbackConsultantTz;
   const customerTz = isValidTimeZone(data?.customerTz) ? data.customerTz : consultantTz;

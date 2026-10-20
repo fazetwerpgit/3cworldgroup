@@ -12,7 +12,7 @@ import {
   type SolarBookingLike,
   type WeeklyWindow,
 } from '@/lib/solar/availability';
-import { DEFAULT_CONSULTANT_TZ } from '@/lib/solar/timezones';
+import { LEGACY_TZ } from '@/lib/solar/timezones';
 
 export const JACOB_EMAIL = 'jmyers@3cworldgroup.com';
 
@@ -85,7 +85,7 @@ export function availabilityOf(id: string, data: Record<string, unknown>): Solar
   return {
     consultantUid: id,
     name: String(data.name ?? '') || 'Consultant',
-    tz: typeof data.tz === 'string' && data.tz ? data.tz : DEFAULT_CONSULTANT_TZ,
+    tz: typeof data.tz === 'string' && data.tz ? data.tz : LEGACY_TZ,
     slotMin: Number(data.slotMin) > 0 ? Number(data.slotMin) : SOLAR_SLOT_MIN,
     modes: { virtual: cleanWindows(modes.virtual), in_person: cleanWindows(modes.in_person) },
   };

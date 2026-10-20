@@ -128,13 +128,15 @@ describe('solar deck helpers', () => {
     });
   });
 
-  it('drops slots past the 14-day booking window', () => {
+  it("drops slots past day 14 in the customer's zone", () => {
+    // 8 PM Oct 19 ET: the Eastern window ends Nov 3 00:00 EST (05:00Z).
     const now = new Date('2026-10-20T00:00:00Z');
     const kept = slotsInWindow(
-      [slot('2026-11-02T16:00:00.000Z'), slot('2026-11-03T00:00:00.000Z'), slot('2026-11-09T16:00:00.000Z')],
+      [slot('2026-11-02T16:00:00.000Z'), slot('2026-11-03T04:59:00.000Z'), slot('2026-11-03T05:00:00.000Z'), slot('2026-11-09T16:00:00.000Z')],
+      'America/New_York',
       now
     );
-    expect(kept.map((x) => x.start)).toEqual(['2026-11-02T16:00:00.000Z']);
+    expect(kept.map((x) => x.start)).toEqual(['2026-11-02T16:00:00.000Z', '2026-11-03T04:59:00.000Z']);
   });
 
   it('makes a clientId the API accepts', () => {

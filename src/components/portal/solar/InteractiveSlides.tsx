@@ -153,12 +153,12 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
     [device]
   );
 
-  const load = useCallback(async (which: SolarMode) => {
+  const load = useCallback(async (which: SolarMode, zone: string) => {
     setSlots(null);
     setLoadError(null);
     const from = new Date();
-    const to = bookingWindowEnd(from);
-    const res = await fetchAvailability(which, from, to);
+    const to = bookingWindowEnd(from, zone);
+    const res = await fetchAvailability(which, from, to, zone);
     if (!res.ok) {
       setLoadError(res.error);
       setSlots([]);
@@ -170,10 +170,10 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
   useEffect(() => {
     // Fetch on mount and on each mode switch; the result lands asynchronously.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void load(mode);
-  }, [mode, load]);
+    void load(mode, tz);
+  }, [mode, tz, load]);
 
-  const days = useMemo(() => groupSlotsByDay(slotsInWindow(slots ?? []), tz), [slots, tz]);
+  const days = useMemo(() => groupSlotsByDay(slotsInWindow(slots ?? [], tz), tz), [slots, tz]);
   // The day on show: the one picked, else the picked time's, else the first open day.
   const day =
     days.find((d) => d.key === dayKey) ??
@@ -191,7 +191,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
       if (res.taken) {
         setPicked(null);
         setMessage('That time was just taken. Pick another.');
-        void load(mode);
+        void load(mode, tz);
       } else {
         setMessage(res.error);
       }
@@ -290,7 +290,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
           ) : loadError ? (
             <div className={s.formFoot}>
               <p className={s.alert}>Could not load times. {loadError}</p>
-              <button type="button" className={s.ghost} onClick={() => void load(mode)}>
+              <button type="button" className={s.ghost} onClick={() => void load(mode, tz)}>
                 Try again
               </button>
             </div>

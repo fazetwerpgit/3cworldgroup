@@ -121,8 +121,8 @@ describe('PATCH /api/portal/solar/bookings/[id]', () => {
         type: 'solar_booking',
         metadata: { bookingId: ID, leadId: 'rep1_c1', cancelled: true },
       });
-      // No zones stored on this (older) booking: Central Time for everyone.
-      expect(mockNotify.mock.calls[0][0].message).toContain('Ana Lopez: virtual, Monday, October 26 at 10:00 AM CT with Jacob');
+      // No zones stored on this (older) booking: Pacific, as the old notices read.
+      expect(mockNotify.mock.calls[0][0].message).toContain('Ana Lopez: virtual, Monday, October 26 at 8:00 AM PT with Jacob');
       expect(mockEmail).not.toHaveBeenCalled();
     });
 

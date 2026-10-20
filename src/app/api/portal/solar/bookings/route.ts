@@ -11,7 +11,7 @@ import { consultantNotice, loadAvailability, loadBookings, requireSolarUser } fr
 import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
 import { solarLeadHref } from '@/lib/solar/leadView';
 import {
-  DEFAULT_CONSULTANT_TZ,
+  LEGACY_TZ,
   SOLAR_MAX_DAYS_OUT,
   formatWhen,
   formatWhenForConsultant,
@@ -108,7 +108,8 @@ function bookedBody(id: string, b: Record<string, unknown>, duplicate: boolean) 
 // `start` is an absolute instant. The booking stores it with the customer's
 // zone (customerTz from the body when it is a real IANA zone, else the lead's
 // state, else the consultant's) and the consultant's zone, for the notices.
-// A slot must start within the booking window (now + 14 days).
+// A slot must start within the booking window: through the 14th calendar day
+// after today in the customer's zone.
 // ONE active booking per lead: when lead.bookingId already holds a live
 // (not cancelled) booking, any POST for that lead answers that booking with
 // duplicate: true, whatever slot or consultant it asked for, and sends nothing
@@ -163,15 +164,16 @@ export async function POST(request: NextRequest) {
     // The slot must be inside the booking window, one the consultant offers in
     // this mode, and still open.
     const now = new Date();
-    if (!withinBookingWindow(startDate, now)) {
+    const availability = (await loadAvailability()).filter((a) => a.consultantUid === consultantUid);
+    const consultantTz = availability[0]?.tz || LEGACY_TZ;
+    const customerTz = askedTz || zoneForState(lead.get('state')) || consultantTz;
+    if (!withinBookingWindow(startDate, now, customerTz)) {
       return NextResponse.json(
         { error: 'slot_unavailable', reason: 'too_far', message: `Book within ${SOLAR_MAX_DAYS_OUT} days.` },
         { status: 400 }
       );
     }
     const windowEnd = new Date(startDate.getTime() + 60_000);
-    const availability = (await loadAvailability()).filter((a) => a.consultantUid === consultantUid);
-    const consultantTz = availability[0]?.tz || DEFAULT_CONSULTANT_TZ;
     const offered = openSlots(availability, [], mode, startDate, windowEnd, now).find((s) => s.start === start);
     if (!offered) return NextResponse.json({ error: 'slot_unavailable' }, { status: 400 });
     const bookings = await loadBookings(startDate, new Date(startDate.getTime() + 86_400_000));
@@ -196,7 +198,6 @@ export async function POST(request: NextRequest) {
 
         const customerName = `${leadNow.get('first') ?? ''} ${leadNow.get('last') ?? ''}`.trim();
         const customerEmail = typeof leadNow.get('email') === 'string' ? (leadNow.get('email') as string) : '';
-        const customerTz = askedTz || zoneForState(leadNow.get('state')) || consultantTz;
         const booking: Record<string, unknown> = {
           leadId,
           mode,

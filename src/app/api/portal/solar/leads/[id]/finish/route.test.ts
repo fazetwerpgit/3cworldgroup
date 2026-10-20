@@ -144,8 +144,8 @@ describe('POST /api/portal/solar/leads/{id}/finish', () => {
     await finish();
     const mail = mockEmail.mock.calls[0][0];
     expect(mail.subject).toBe('Solar appointment set: Ana <Lopez>');
-    // A booking stored before zones existed reads in Central Time (back-compat).
-    expect(mail.textBody).toContain('Appointment: Monday, October 26 at 10:00 AM CT, in-person, with Owner');
+    // A booking stored before zones existed reads in Pacific, as it always did.
+    expect(mail.textBody).toContain('Appointment: Monday, October 26 at 8:00 AM PT, in-person, with Owner');
   });
 
   it("shows the customer's zone, plus the consultant's when it differs", async () => {

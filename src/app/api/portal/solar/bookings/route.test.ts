@@ -305,11 +305,26 @@ describe('POST /api/portal/solar/bookings', () => {
       expect(db.store.get('solarBookings')).toBeUndefined();
     });
 
-    it('books a slot just inside the window and refuses one just past it', async () => {
-      // Window ends Nov 3 00:00Z. Monday Nov 2 8:00 AM PST (16:00Z) is inside.
+    it("counts 14 calendar days in the customer's zone, through the end of day 14", async () => {
+      // Now: Mon Oct 19, 5 PM Pacific (the customer's zone: no state, the owner's).
+      // Day 14 is Mon Nov 2, so the window ends Nov 3 00:00 PST (08:00Z).
       expect((await post({ ...BODY, start: '2026-11-02T16:00:00.000Z' })).status).toBe(200);
-      vi.setSystemTime(new Date('2026-10-19T15:59:00Z')); // the window now ends Nov 2 15:59Z
-      expect((await post({ ...BODY, leadId: 'rep1_c2', start: '2026-11-02T17:00:00.000Z' })).status).toBe(400);
+      const tue = await post({ ...BODY, leadId: 'rep1_c2', start: '2026-11-03T16:00:00.000Z' });
+      expect(tue.status).toBe(400);
+      expect(await tue.json()).toMatchObject({ reason: 'too_far' });
+      // Just after midnight Pacific on Oct 20, day 14 is Tue Nov 3: bookable,
+      // though a rolling 336 hours (to Nov 3 07:30Z) would refuse it.
+      vi.setSystemTime(new Date('2026-10-20T07:30:00Z'));
+      expect((await post({ ...BODY, leadId: 'rep1_c2', start: '2026-11-03T16:00:00.000Z' })).status).toBe(200);
+    });
+
+    it("ends the window at midnight in a Florida customer's zone", async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { ...db.store.get('solarLeads')!.get('rep1_c1'), state: 'FL' });
+      // Now: Mon Oct 19, 8 PM ET, so the window ends Nov 3 00:00 EST (05:00Z).
+      // Tue Nov 3 8 AM PST (16:00Z) is day 15 in Florida.
+      const res = await post({ ...BODY, start: '2026-11-03T16:00:00.000Z' });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ reason: 'too_far' });
     });
 
     it('still answers a retry for a held booking whatever it asks for', async () => {

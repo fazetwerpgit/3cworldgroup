@@ -91,9 +91,9 @@ export function groupSlotsByDay(slots: SolarSlot[], tz: string = SOLAR_TZ): Slot
   return days;
 }
 
-/** Only slots inside the booking window (now + 14 days); the server enforces it too. */
-export function slotsInWindow(slots: SolarSlot[], now: Date = new Date()): SolarSlot[] {
-  return slots.filter((x) => withinBookingWindow(new Date(x.start), now));
+/** Only slots inside the booking window (through day 14 in `tz`); the server enforces it too. */
+export function slotsInWindow(slots: SolarSlot[], tz: string, now: Date = new Date()): SolarSlot[] {
+  return slots.filter((x) => withinBookingWindow(new Date(x.start), now, tz));
 }
 
 export type LeadFields = {
@@ -169,8 +169,9 @@ export function setCreditTier(id: string, creditTier: CreditTier) {
   });
 }
 
-export function fetchAvailability(mode: SolarMode, from: Date, to: Date) {
-  const q = new URLSearchParams({ mode, from: from.toISOString(), to: to.toISOString() });
+/** `tz`: the customer's zone, which the server's 14-day window counts days in. */
+export function fetchAvailability(mode: SolarMode, from: Date, to: Date, tz?: string) {
+  const q = new URLSearchParams({ mode, from: from.toISOString(), to: to.toISOString(), ...(tz ? { tz } : {}) });
   return call<{ slots: SolarSlot[] }>(`/api/portal/solar/availability?${q}`);
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_CONSULTANT_TZ,
+  LEGACY_TZ,
   SOLAR_MAX_DAYS_OUT,
   US_STATE_TZ,
   bookingWindowEnd,
@@ -137,9 +138,10 @@ describe('conversions', () => {
     expect(formatWhenForConsultant(ISO, 'America/Chicago', null)).toBe('Monday, October 26 at 10:00 AM CT');
   });
 
-  it('reads older bookings (no zones stored) as Central Time', () => {
-    expect(bookingZones({ start: ISO })).toEqual({ consultantTz: 'America/Chicago', customerTz: 'America/Chicago' });
-    expect(bookingZones(undefined)).toEqual({ consultantTz: 'America/Chicago', customerTz: 'America/Chicago' });
+  it('reads older bookings (no zones stored) in Pacific, as the old code showed them', () => {
+    expect(LEGACY_TZ).toBe('America/Los_Angeles');
+    expect(bookingZones({ start: ISO })).toEqual({ consultantTz: 'America/Los_Angeles', customerTz: 'America/Los_Angeles' });
+    expect(bookingZones(undefined)).toEqual({ consultantTz: 'America/Los_Angeles', customerTz: 'America/Los_Angeles' });
     expect(bookingZones({ consultantTz: 'America/Los_Angeles', customerTz: 'America/New_York' })).toEqual({
       consultantTz: 'America/Los_Angeles',
       customerTz: 'America/New_York',
@@ -149,13 +151,26 @@ describe('conversions', () => {
 });
 
 describe('booking window', () => {
-  const now = new Date('2026-10-20T00:00:00Z');
-
-  it('reaches 14 days out, rolling', () => {
+  it("runs through the end of the 14th calendar day in the customer's zone", () => {
     expect(SOLAR_MAX_DAYS_OUT).toBe(14);
-    expect(bookingWindowEnd(now).toISOString()).toBe('2026-11-03T00:00:00.000Z');
-    expect(withinBookingWindow(new Date('2026-11-02T23:59:00Z'), now)).toBe(true);
-    expect(withinBookingWindow(new Date('2026-11-03T00:00:00Z'), now)).toBe(false);
-    expect(withinBookingWindow(new Date('2026-12-01T00:00:00Z'), now)).toBe(false);
+    // Tue Oct 20, 10 AM ET: day 14 is Tue Nov 3, which ends Nov 4 00:00 EST (05:00Z).
+    const now = new Date('2026-10-20T14:00:00Z');
+    expect(bookingWindowEnd(now, 'America/New_York').toISOString()).toBe('2026-11-04T05:00:00.000Z');
+    expect(bookingWindowEnd(now, 'America/Los_Angeles').toISOString()).toBe('2026-11-04T08:00:00.000Z');
+    expect(withinBookingWindow(new Date('2026-11-04T04:59:00Z'), now, 'America/New_York')).toBe(true);
+    expect(withinBookingWindow(new Date('2026-11-04T05:00:00Z'), now, 'America/New_York')).toBe(false);
+    expect(withinBookingWindow(new Date('2026-12-01T00:00:00Z'), now, 'America/New_York')).toBe(false);
+  });
+
+  it('counts days from the customer\'s today, not UTC', () => {
+    // 11 PM Mon Oct 19 Pacific is already Tue Oct 20 in UTC and in Florida.
+    const now = new Date('2026-10-20T06:00:00Z');
+    expect(bookingWindowEnd(now, 'America/Los_Angeles').toISOString()).toBe('2026-11-03T08:00:00.000Z');
+    expect(bookingWindowEnd(now, 'America/New_York').toISOString()).toBe('2026-11-04T05:00:00.000Z');
+  });
+
+  it('crosses the fall-back change and a month end without drifting', () => {
+    // Oct 25 noon CT (CDT); day 14 is Sun Nov 8, ending Nov 9 00:00 CST (06:00Z).
+    expect(bookingWindowEnd(new Date('2026-10-25T17:00:00Z'), 'America/Chicago').toISOString()).toBe('2026-11-09T06:00:00.000Z');
   });
 });

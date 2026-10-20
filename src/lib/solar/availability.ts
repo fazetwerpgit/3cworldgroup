@@ -6,7 +6,7 @@
 // by the window's end. A booking blocks its consultant in every mode (one
 // person can't be on a virtual call and at a door at the same time).
 
-import { DEFAULT_CONSULTANT_TZ, US_TIMEZONES } from './timezones';
+import { LEGACY_TZ, US_TIMEZONES } from './timezones';
 
 /** The owner's (Jeremy's) zone: his seed hours and the per-day booking load. */
 export const SOLAR_TZ = 'America/Los_Angeles';
@@ -199,7 +199,7 @@ export function openSlots(
   for (const a of availability) {
     const windows = a.modes[mode] ?? [];
     if (windows.length === 0) continue;
-    const tz = a.tz || DEFAULT_CONSULTANT_TZ;
+    const tz = a.tz || LEGACY_TZ;
     const slotMin = a.slotMin > 0 ? a.slotMin : SOLAR_SLOT_MIN;
     const busy = taken.get(a.consultantUid) ?? [];
 

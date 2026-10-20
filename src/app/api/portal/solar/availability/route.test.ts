@@ -105,12 +105,19 @@ describe('GET /api/portal/solar/availability', () => {
     expect(slots.every((s: { start: string }) => s.start >= '2026-10-20T00:00:00.000Z' && s.start < '2026-11-03T00:00:00.000Z')).toBe(true);
   });
 
-  it('never lists past the booking window (now + 14 days), whatever `to` asks', async () => {
-    const { slots } = await (await get('mode=in_person&from=2026-10-20T00:00:00.000Z&to=2026-11-20T00:00:00.000Z')).json();
-    expect(slots.length).toBeGreaterThan(0);
-    expect(slots.at(-1).start < '2026-11-03T00:00:00.000Z').toBe(true);
-    // Monday Nov 2 is the last bookable Monday: 8 AM PST = 16:00Z.
-    expect(slots.some((s: { start: string }) => s.start === '2026-11-02T16:00:00.000Z')).toBe(true);
+  it("never lists past the end of day 14 in the customer's zone, whatever `to` asks", async () => {
+    // Now: Mon Oct 19, 5 PM Pacific. Day 14 is Mon Nov 2; it ends Nov 3 08:00Z.
+    const range = 'from=2026-10-20T00:00:00.000Z&to=2026-11-20T00:00:00.000Z';
+    const { slots } = await (await get(`mode=in_person&${range}`)).json();
+    expect(slots.at(-1).start).toBe('2026-11-03T00:00:00.000Z'); // Nov 2, 4 PM PST: the last slot that day
+    // Florida (tz=America/New_York): it is already 8 PM Oct 19 there, the
+    // window ends Nov 3 00:00 EST (05:00Z).
+    const fl = (await (await get(`mode=in_person&${range}&tz=America/New_York`)).json()).slots;
+    expect(fl.at(-1).start).toBe('2026-11-03T00:00:00.000Z');
+    expect(fl.every((s: { start: string }) => s.start < '2026-11-03T05:00:00.000Z')).toBe(true);
+    // A bogus tz falls back to Pacific.
+    const bogus = (await (await get(`mode=in_person&${range}&tz=Mars/Olympus`)).json()).slots;
+    expect(bogus).toEqual(slots);
   });
 
   it('answers no slots for a range wholly past the window', async () => {
@@ -119,13 +126,15 @@ describe('GET /api/portal/solar/availability', () => {
     expect((await res.json()).slots).toEqual([]);
   });
 
-  it('reads a consultant with no zone set in Central Time', async () => {
+  it('old data: a consultant doc with no tz yields the same instants as before zones (Pacific)', async () => {
+    // Jeremy-style doc saved before zones: hours with no tz. The pre-zone code
+    // read them in America/Los_Angeles; they must not move.
     db.store.set('solarAvailability', new Map([[
       'c9',
-      { name: 'Closer', slotMin: 60, modes: { virtual: [{ day: 1, start: '09:00', end: '10:00' }] } },
+      { name: 'Closer', slotMin: 60, modes: { virtual: [{ day: 1, start: '09:00', end: '11:00' }] } },
     ]]));
     const { slots } = await (await get(`mode=virtual&${MON}`)).json();
-    // 9:00 AM CDT = 14:00Z.
-    expect(slots.map((s: { start: string }) => s.start)).toEqual(['2026-10-26T14:00:00.000Z']);
+    // 9 and 10 AM PDT = 16:00Z and 17:00Z, exactly what aa85faab listed.
+    expect(slots.map((s: { start: string }) => s.start)).toEqual(['2026-10-26T16:00:00.000Z', '2026-10-26T17:00:00.000Z']);
   });
 });
