@@ -107,6 +107,52 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
     });
   });
 
+  describe('usage from the deck (monthlyKwh, usage)', () => {
+    const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;
+    const USAGE = { mode: 'monthly', months: [900, 1000], daily: '', annual: '' };
+
+    it('lets the owner rep save them, rounding monthlyKwh', async () => {
+      const res = await patch('rep1_c1', { monthlyKwh: 950.6, usage: USAGE });
+      expect(res.status).toBe(200);
+      expect(lead()).toMatchObject({ monthlyKwh: 951, usage: USAGE, creditTier: null });
+      expect(lead().updatedAt).toBeInstanceOf(Date);
+    });
+
+    it('lets an admin save them', async () => {
+      mockGate.mockResolvedValue({ ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null });
+      expect((await patch('rep1_c1', { monthlyKwh: 700 })).status).toBe(200);
+      expect(lead().monthlyKwh).toBe(700);
+    });
+
+    it('lets a Setup consultant or a closer save them, but nothing else', async () => {
+      db.store.set('solarAvailability', new Map([['con', { name: 'Consultant', modes: {} }]]));
+      mockGate.mockResolvedValue({ ...REP, uid: 'con', solarRole: 'ae_canvasser' });
+      expect((await patch('rep1_c1', { monthlyKwh: 800, usage: USAGE })).status).toBe(200);
+      expect(lead().monthlyKwh).toBe(800);
+      expect((await patch('rep1_c1', { monthlyKwh: 810, roofType: 'flat' })).status).toBe(403);
+      expect((await patch('rep1_c1', { creditTier: 'purchase_600' })).status).toBe(403);
+      mockGate.mockResolvedValue({ ...REP, uid: 'closer', solarRole: 'virtual_closer' });
+      expect((await patch('rep1_c1', { monthlyKwh: 820 })).status).toBe(200);
+      expect(lead()).toMatchObject({ monthlyKwh: 820, creditTier: null });
+      expect(lead().roofType).toBeUndefined();
+    });
+
+    it('403s another rep who is not a consultant', async () => {
+      db.store.set('solarAvailability', new Map([['con', { name: 'Consultant', modes: {} }]]));
+      mockGate.mockResolvedValue({ ...REP, uid: 'rep2' });
+      expect((await patch('rep1_c1', { monthlyKwh: 800 })).status).toBe(403);
+      expect(lead().monthlyKwh).toBeUndefined();
+    });
+
+    it('400s a bad monthlyKwh or a usage over 4KB', async () => {
+      expect((await patch('rep1_c1', { monthlyKwh: -1 })).status).toBe(400);
+      expect((await patch('rep1_c1', { monthlyKwh: 'lots' })).status).toBe(400);
+      expect((await patch('rep1_c1', { usage: { note: 'x'.repeat(5000) } })).status).toBe(400);
+      expect(lead().monthlyKwh).toBeUndefined();
+      expect(lead().usage).toBeUndefined();
+    });
+  });
+
   describe('status', () => {
     const ADMIN = { ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null };
     const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;

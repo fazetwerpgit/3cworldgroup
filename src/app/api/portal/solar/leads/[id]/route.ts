@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireSolarUser } from '@/lib/solar/server';
+import { loadAvailability, requireSolarUser } from '@/lib/solar/server';
 import { hasLeadExtras, isCreditTier, isSolarLeadStatus, parseLeadExtras } from '@/lib/solar/leadFields';
-import { stagePatchForStatus } from '@/lib/solar/leadStage';
+import { SOLAR_STAGE_ROLES, stagePatchForStatus } from '@/lib/solar/leadStage';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
+
+/** What the deck's usage slide saves after the lead exists. */
+const USAGE_KEYS = ['monthlyKwh', 'usage'] as const;
+
+/** The sales side, as the stage route counts it: closer roles and the consultants set in Admin > Solar > Setup. */
+async function isSolarConsultant(gate: { uid: string; solarRole?: string | null }): Promise<boolean> {
+  if (gate.solarRole && (SOLAR_STAGE_ROLES as readonly string[]).includes(gate.solarRole)) return true;
+  const consultants = await loadAvailability().catch(() => []);
+  return consultants.some((c) => c.consultantUid === gate.uid);
+}
 
 // PATCH /api/portal/solar/leads/{id}
 //   {creditTier: 'purchase_600' | 'lease_ppa_680'} -> 200 {success, id}.
@@ -19,7 +29,9 @@ import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/
 //     reopen clears a closing stage. Finer stages: PATCH .../{id}/stage.
 //   {creditTier?, roofType?, heavyShade?, needsReview?, monthlyKwh?, usage?}
 //     -> 200 {success, id}. The creator or an admin; validated as on create
-//     (a blocked roof is refused).
+//     (a blocked roof is refused; monthlyKwh rounded; usage 4KB of JSON max).
+//     A consultant (closer role or Admin > Solar > Setup) may send
+//     monthlyKwh / usage alone.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const gate = await requireSolarUser(request);
@@ -101,7 +113,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     if (snap.get('repUid') !== gate.uid && !gate.isAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      // A Setup consultant may fill in the usage numbers, nothing else.
+      const usageOnly = Object.keys(patch).every((key) => (USAGE_KEYS as readonly string[]).includes(key));
+      if (!usageOnly || !(await isSolarConsultant(gate))) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
     await ref.update({ ...patch, updatedAt: new Date() });
     return NextResponse.json({ success: true, id });

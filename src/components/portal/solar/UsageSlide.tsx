@@ -15,12 +15,14 @@ import {
   type UsageEntry,
   type UsageMode,
 } from './usage';
+import { useUsageSync } from './usageSync';
 import s from './solarDeck.module.css';
 
 // The usage helper: the rep reads the homeowner's usage off the electric bill
 // (monthly kWh, a daily average, or the twelve monthly bars), the deck works
 // out the annual and monthly figures and copies a block for Aurora. Kept in
-// the deck session like every other answer (deckState `monthlyKwh`, `usage`).
+// the deck session like every other answer (deckState `monthlyKwh`, `usage`),
+// and sent to the saved lead as it changes (usageSync).
 
 const MODES: { mode: UsageMode; label: string }[] = [
   { mode: 'monthly', label: 'Monthly' },
@@ -81,6 +83,7 @@ export function UsageSlide() {
   const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle');
   const entry = state.usage;
   const estimate = estimateUsage(entry);
+  const saveStatus = useUsageSync();
 
   const setUsage = (patch: Partial<UsageEntry>) => {
     setCopy('idle');
@@ -185,6 +188,15 @@ export function UsageSlide() {
             </div>
           </div>
           <p className={s.small}>{estimate ? usageBasis(entry, estimate) : 'Enter usage to see the totals.'}</p>
+          {state.leadId && saveStatus !== 'idle' ? (
+            <p className={s.small} data-testid="solar-usage-save" data-state={saveStatus}>
+              {saveStatus === 'saving'
+                ? 'Saving to the lead...'
+                : saveStatus === 'saved'
+                  ? 'Saved to the lead.'
+                  : 'Not saved to the lead yet. It stays here and saves on the next change.'}
+            </p>
+          ) : null}
           <div className={s.formFoot}>
             <button type="button" className={s.primary} disabled={!estimate} onClick={() => void copyBlock()}>
               {copy === 'copied' ? <Check size={18} aria-hidden /> : <Copy size={18} aria-hidden />}

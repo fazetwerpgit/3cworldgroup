@@ -112,6 +112,24 @@ export const EMPTY_LEAD: LeadFields = {
   first: '', last: '', address: '', city: '', state: '', zip: '', phone: '', email: '',
 };
 
+/** The contact fields as the lead form sends them (trimmed, state upper-cased), as one comparable string. */
+export function contactPayload(lead: LeadFields): LeadFields {
+  return {
+    first: lead.first.trim(),
+    last: lead.last.trim(),
+    address: lead.address.trim(),
+    city: lead.city.trim(),
+    state: lead.state.trim().toUpperCase(),
+    zip: lead.zip.trim(),
+    phone: lead.phone.trim(),
+    email: lead.email.trim(),
+  };
+}
+
+export function contactKey(lead: LeadFields): string {
+  return JSON.stringify(contactPayload(lead));
+}
+
 /** Inline errors for the lead form; an empty object means it can be sent. */
 export function validateLead(f: LeadFields): Partial<Record<keyof LeadFields, string>> {
   const e: Partial<Record<keyof LeadFields, string>> = {};
@@ -293,7 +311,10 @@ export function setLeadStage(id: string, stage: SolarLeadStage | null, outcome?:
   });
 }
 
-/** The creator or an admin: e.g. {needsReview: false} once the closer has looked. */
+/**
+ * The creator or an admin: e.g. {needsReview: false} once the closer has
+ * looked. monthlyKwh / usage alone: also closers and Setup consultants.
+ */
 export function updateLeadExtras(id: string, extras: LeadExtras) {
   return call<{ success?: boolean }>(`/api/portal/solar/leads/${encodeURIComponent(id)}`, {
     method: 'PATCH',

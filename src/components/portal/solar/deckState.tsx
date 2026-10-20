@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { newFormUploadId } from '@/lib/forms/formUploads';
 import {
+  contactKey,
   EMPTY_LEAD,
   newDeckClientId,
   type CreditTier,
@@ -37,6 +38,10 @@ export type DeckState = {
   /** The roof answer on the lead form; a blocked roof stops the lead. */
   roofType: RoofChoice | null;
   leadId: string | null;
+  /** usageSync's key for the usage last saved to the lead (null: none yet). */
+  usageSaved: string | null;
+  /** contactKey of the contact fields as the server holds them (null until the lead is saved). */
+  savedContact: string | null;
   creditTier: CreditTier | null;
   booking: Booking | null;
 };
@@ -56,6 +61,8 @@ function freshState(): DeckState {
     photos: {},
     roofType: null,
     leadId: null,
+    usageSaved: null,
+    savedContact: null,
     creditTier: null,
     booking: null,
   };
@@ -68,12 +75,15 @@ function loadState(): DeckState {
     if (!raw) return fresh;
     const saved = JSON.parse(raw) as Partial<DeckState>;
     const usage = normalizeUsage(saved.usage);
+    const lead = { ...fresh.lead, ...(saved.lead ?? {}) };
     return {
       ...fresh,
       ...saved,
-      lead: { ...fresh.lead, ...(saved.lead ?? {}) },
+      lead,
       usage,
       monthlyKwh: estimateUsage(usage)?.monthlyKwh ?? null,
+      // A session saved before contact edits existed: what it holds is what was sent.
+      savedContact: saved.savedContact ?? (saved.leadId ? contactKey(lead) : null),
     };
   } catch {
     return fresh;
