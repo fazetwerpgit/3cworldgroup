@@ -4,6 +4,7 @@
 import type { DeckState } from './deckState';
 import type { StepId } from './LeadFormSlide';
 import { billLine, CREDIT_LABEL, leadName, PHOTO_LABELS } from './leadDisplay';
+import { PHOTO_SLOTS as DECK_PHOTO_SLOTS, type PhotoSlot } from './solarClient';
 import { estimateUsage, formatAddress, formatKwh } from './usage';
 
 /** The lead form's steps, so an Edit can open the right one. */
@@ -19,6 +20,11 @@ export type ReviewSection = { id: string; title: string; rows: ReviewRow[]; edit
 
 export const NOT_ENTERED = 'Not entered';
 
+// PHOTO_LABELS also carries the knock app's meter slot, which the deck never asks for.
+const DECK_PHOTO_LABELS = PHOTO_LABELS.filter((p): p is { slot: PhotoSlot; label: string } =>
+  DECK_PHOTO_SLOTS.some((d) => d.slot === p.slot)
+);
+
 function row(label: string, value: string): ReviewRow {
   const v = value.trim();
   return v ? { label, value: v } : { label, value: NOT_ENTERED, missing: true };
@@ -30,8 +36,7 @@ export function reviewSections(state: ReviewInput): ReviewSection[] {
   const { lead } = state;
   const named = lead.first.trim() || lead.last.trim();
   const usage = estimateUsage(state.usage);
-  // PHOTO_LABELS includes the knock app's meter slot, which the deck never uploads.
-  const photos = PHOTO_LABELS.filter((p) => (state.photos as Partial<Record<string, string>>)[p.slot]);
+  const photos = DECK_PHOTO_LABELS.filter((p) => state.photos[p.slot]);
 
   return [
     {
@@ -72,7 +77,7 @@ export function reviewSections(state: ReviewInput): ReviewSection[] {
       rows: [
         row(
           'Photos',
-          photos.length ? `${photos.length} of ${PHOTO_LABELS.length}: ${photos.map((p) => p.label).join('; ')}` : ''
+          photos.length ? `${photos.length} of ${DECK_PHOTO_LABELS.length}: ${photos.map((p) => p.label).join('; ')}` : ''
         ),
       ],
     },
