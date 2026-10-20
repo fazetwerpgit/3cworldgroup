@@ -58,7 +58,6 @@ function KwhField({
           inputMode="decimal"
           autoComplete="off"
           enterKeyHint={compact ? 'next' : 'done'}
-          placeholder={compact ? undefined : '0'}
           value={draft ?? editableKwh(value)}
           onFocus={() => setDraft(editableKwh(value))}
           onBlur={() => setDraft(null)}
@@ -174,16 +173,28 @@ export function UsageSlide() {
           <div className={s.usageStats}>
             <div>
               <span className={s.label}>Per year (est.)</span>
-              <p className={s.usageNum} data-testid="solar-annual-kwh">
-                {estimate ? formatKwh(estimate.annualKwh) : '-'}
-                <span className={s.usageUnit}> kWh</span>
+              <p className={s.usageNum} data-testid="solar-annual-kwh" data-empty={estimate ? undefined : true}>
+                {estimate ? (
+                  <>
+                    {formatKwh(estimate.annualKwh)}
+                    <span className={s.usageUnit}> kWh</span>
+                  </>
+                ) : (
+                  '\u2014'
+                )}
               </p>
             </div>
             <div>
               <span className={s.label}>Per month (avg.)</span>
-              <p className={s.usageNum} data-testid="solar-monthly-kwh">
-                {estimate ? formatKwh(estimate.monthlyKwh) : '-'}
-                <span className={s.usageUnit}> kWh</span>
+              <p className={s.usageNum} data-testid="solar-monthly-kwh" data-empty={estimate ? undefined : true}>
+                {estimate ? (
+                  <>
+                    {formatKwh(estimate.monthlyKwh)}
+                    <span className={s.usageUnit}> kWh</span>
+                  </>
+                ) : (
+                  '\u2014'
+                )}
               </p>
             </div>
           </div>
