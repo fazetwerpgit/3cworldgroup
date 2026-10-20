@@ -30,7 +30,7 @@ function lead(patch: Partial<SolarLeadView> = {}): SolarLeadView {
   return {
     id: 'L1', status: 'booked', first: 'Ana', last: 'Ruiz', address: '1 Main St', city: 'Fresno', state: 'CA',
     zip: '93701', phone: '5595551234', email: 'ana@example.com', monthlyBill: 150, creditTier: null, photos: {},
-    source: 'portal', repUid: 'rep1', repName: 'Rep One', createdAt: null, updatedAt: null, booking: BOOKING,
+    source: 'portal', campaignId: null, repUid: 'rep1', repName: 'Rep One', createdAt: null, updatedAt: null, booking: BOOKING,
     stage: null, stageOutcome: null, stageHistory: [], roofType: null, heavyShade: null, needsReview: false,
     monthlyKwh: null, usage: null, ...patch,
   };

@@ -37,6 +37,7 @@ const lead: SolarLeadView = {
   creditTier: null,
   photos: { billPage1: BILL, panel: PANEL },
   source: 'portal',
+  campaignId: null,
   repUid: 'rep1',
   repName: 'Rep One',
   createdAt: null,

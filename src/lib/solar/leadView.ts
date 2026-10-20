@@ -43,6 +43,8 @@ export interface SolarLeadView {
   creditTier: CreditTier | null;
   photos: Partial<Record<PhotoSlot, string>>;
   source: 'portal' | 'knock';
+  /** The 3C Doors (knock app) campaign the lead was created under; null when none was sent. */
+  campaignId: string | null;
   repUid: string;
   repName: string;
   createdAt: string | null;
@@ -129,6 +131,7 @@ export function leadView(id: string, data: Record<string, unknown>, booking: Sol
     creditTier,
     photos,
     source: data.source === 'knock' ? 'knock' : 'portal',
+    campaignId: text(data.campaignId) || null,
     repUid: text(data.repUid),
     repName: text(data.repName),
     createdAt: isoOf(data.createdAt),
