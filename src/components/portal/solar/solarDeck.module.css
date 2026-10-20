@@ -1437,6 +1437,67 @@
   background: var(--accent);
 }
 
+/* Under 600: a quiet full-width row under the two programs, not an error. */
+.tierQuiet {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: clamp(16px, 2.4vw, 32px);
+  padding-block: clamp(14px, 1.6vw, 20px);
+  background: var(--surface-2);
+  box-shadow: none;
+}
+.tierQuietScore {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+}
+.tierQuietValue {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(1.5rem, 1.1rem + 1.2vw, 2.25rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink-2);
+}
+.tierQuietText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.tierQuietName {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: clamp(1.0625rem, 0.95rem + 0.4vw, 1.25rem);
+}
+.tierQuietNote {
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+/* Phones: score and radio on one line, the words under them at full width. */
+@media (max-width: 560px) {
+  .tierQuiet {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px 16px;
+  }
+  .tierQuietText {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+.endActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
 /* ---------- booking ---------- */
 .book {
   display: grid;

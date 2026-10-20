@@ -9,6 +9,7 @@ import {
   formatSlotLong,
   formatSlotTime,
   groupSlotsByDay,
+  markLowCredit,
   setCreditTier,
   slotsInWindow,
   type CreditTier,
@@ -38,41 +39,121 @@ function NeedsLead({ onBack }: { onBack: () => void }) {
   );
 }
 
-const TIERS: { tier: CreditTier; score: string; name: string; points: string[] }[] = [
-  {
-    tier: 'purchase_600',
-    score: '600+',
-    name: 'Purchase',
-    points: ['System Ownership & Equity', 'Federal Tax Credit Eligible', 'Maximizes Long-Term Value', 'Flexible Financing Options'],
-  },
+/** What the homeowner picks on the prequal slide: a credit tier, or Under 600 (no program fits). */
+export type PrequalChoice = CreditTier | 'under_600';
+
+/**
+ * The prequal cards, high to low (Jeremy's slide 73, no overlaps). The two
+ * programs are cards; Under 600 sits below them as a quiet full-width row.
+ * Wire values stay purchase_600 / lease_ppa_680; Under 600 sends no tier.
+ */
+export const TIERS: { tier: CreditTier; score: string; name: string; points: string[] }[] = [
   {
     tier: 'lease_ppa_680',
     score: '680+',
-    name: 'Lease / PPA',
-    points: ['$0 Upfront Installation Cost', 'Complete System Maintenance', 'Immediate Rate Reduction', 'Predictable Monthly Payments'],
+    name: 'Lease, PPA or Purchase',
+    points: [
+      '$0 Upfront Installation Cost',
+      'Complete System Maintenance',
+      'Immediate Rate Reduction',
+      'Predictable Monthly Payments',
+      'Or Purchase and Own It',
+    ],
+  },
+  {
+    tier: 'purchase_600',
+    score: '600–679',
+    name: 'Purchase',
+    points: ['System Ownership & Equity', 'Federal Tax Credit Eligible', 'Maximizes Long-Term Value', 'Financing Through Credit Human'],
   },
 ];
 
-/** Slide 7: the homeowner picks the credit range that fits; nothing is pulled. */
-export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNeedLead: () => void }) {
+/**
+ * Slide 8: the homeowner picks the credit range that fits; nothing is pulled.
+ * Under 600 closes the lead as no sale (low credit) and shows a polite end
+ * state; Change answer brings the cards back, and a tier reopens the lead.
+ */
+export function PrequalSlide({
+  onDone,
+  onNeedLead,
+  onNewCustomer,
+}: {
+  onDone: () => void;
+  onNeedLead: () => void;
+  onNewCustomer: () => void;
+}) {
   const { state, update } = useDeck();
-  const [pending, setPending] = useState<CreditTier | null>(null);
+  const [pending, setPending] = useState<PrequalChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Under 600 tapped while a consultation is booked: ask before it is cancelled.
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  // Change answer on the end state: the cards again, Under 600 still picked.
+  const [changing, setChanging] = useState(false);
 
-  const choose = async (tier: CreditTier) => {
+  const choose = async (choice: PrequalChoice) => {
     if (!state.leadId || pending) return;
-    setPending(tier);
     setError(null);
-    const res = await setCreditTier(state.leadId, tier);
+    if (choice === 'under_600') {
+      if (state.lowCredit) {
+        setChanging(false);
+        return;
+      }
+      if (state.booking && !confirmCancel) {
+        setConfirmCancel(true);
+        return;
+      }
+      setConfirmCancel(false);
+      setPending(choice);
+      const res = await markLowCredit(state.leadId);
+      setPending(null);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      update({ lowCredit: true, creditTier: null, booking: null });
+      setChanging(false);
+      return;
+    }
+    setConfirmCancel(false);
+    setPending(choice);
+    const res = await setCreditTier(state.leadId, choice);
     setPending(null);
     if (!res.ok) {
       setError(res.error);
       return;
     }
-    update({ creditTier: tier });
+    update({ creditTier: choice, lowCredit: false });
+    setChanging(false);
     onDone();
   };
 
+  if (state.lowCredit && !changing) {
+    return (
+      <>
+        <div className={s.head}>
+          <p className={s.eyebrow}>Program fit</p>
+          <h2 className={s.title}>
+            Not a fit <span className={s.accent}>right now</span>
+          </h2>
+          <p className={s.lede}>
+            Thanks for your time today. Our solar programs start at a 600 credit score, so we can&apos;t move forward at
+            this time.
+          </p>
+        </div>
+        <div className={s.endActions}>
+          <button type="button" className={s.primary} onClick={onNewCustomer}>
+            New customer
+          </button>
+          <button type="button" className={s.ghost} onClick={() => setChanging(true)}>
+            Change answer
+          </button>
+        </div>
+        <p className={s.small}>Saved to this lead as no sale: low credit.</p>
+      </>
+    );
+  }
+
+  const busy = !state.leadId || pending !== null;
   return (
     <>
       <div className={s.head}>
@@ -82,7 +163,7 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
         </h2>
         <p className={s.lede}>Let&apos;s see what we can get you qualified for and what program would best suit your needs!</p>
       </div>
-      <div className={s.tiers} role="group" aria-label="Program">
+      <div className={s.tiers} role="group" aria-label="Credit score range">
         {TIERS.map((t) => {
           const on = state.creditTier === t.tier;
           return (
@@ -91,11 +172,11 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
               type="button"
               className={s.tier}
               aria-pressed={on}
-              disabled={!state.leadId || pending !== null}
+              disabled={busy}
               onClick={() => void choose(t.tier)}
             >
               <span className={s.tierTop}>
-                <span className={s.label}>Minimum credit score</span>
+                <span className={s.label}>Credit score</span>
                 <span className={s.radio} aria-hidden>
                   {on ? <Check size={14} strokeWidth={3} /> : null}
                 </span>
@@ -110,12 +191,48 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
             </button>
           );
         })}
+        <button
+          type="button"
+          className={`${s.tier} ${s.tierQuiet}`}
+          aria-pressed={state.lowCredit}
+          disabled={busy}
+          onClick={() => void choose('under_600')}
+        >
+          <span className={s.tierQuietScore}>
+            <span className={s.label}>Credit score</span>
+            <span className={s.tierQuietValue}>Under 600</span>
+          </span>
+          <span className={s.tierQuietText}>
+            <span className={s.tierQuietName}>{pending === 'under_600' ? 'Saving...' : 'Not qualified right now'}</span>
+            <span className={s.tierQuietNote}>No program fits today.</span>
+          </span>
+          <span className={s.radio} aria-hidden>
+            {state.lowCredit ? <Check size={14} strokeWidth={3} /> : null}
+          </span>
+        </button>
       </div>
       {!state.leadId ? (
         <NeedsLead onBack={onNeedLead} />
+      ) : confirmCancel && state.booking ? (
+        <div className={s.formFoot} role="group" aria-label="Cancel the booked consultation?">
+          <p className={s.note}>
+            This also cancels the consultation booked for{' '}
+            {formatSlotLong(state.booking.start, state.booking.tz ?? customerZone(state.lead.state))}.
+          </p>
+          <button type="button" className={s.ghost} onClick={() => setConfirmCancel(false)}>
+            Keep booking
+          </button>
+          <button type="button" className={s.ghost} onClick={() => void choose('under_600')}>
+            Cancel it
+          </button>
+        </div>
       ) : (
         <p className={`${s.small} ${s.center}`}>
-          {state.creditTier ? 'Saved with this lead. Tap the other card to change it.' : 'Tap the program that fits.'}
+          {state.lowCredit
+            ? 'Tap a program to reopen this lead.'
+            : state.creditTier
+              ? 'Saved with this lead. Tap another card to change it.'
+              : 'Tap the program that fits.'}
         </p>
       )}
       {error ? (
@@ -123,6 +240,26 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
           {error}
         </p>
       ) : null}
+    </>
+  );
+}
+
+/** Booking slide stand-in when the homeowner didn't pre-qualify: nothing to book. */
+export function NotQualifiedBooking({ onPrequal }: { onPrequal: () => void }) {
+  return (
+    <>
+      <div className={s.head}>
+        <p className={s.eyebrow}>Consultation</p>
+        <h2 className={s.title}>
+          Nothing to <span className={s.accent}>book</span>
+        </h2>
+        <p className={s.lede}>This homeowner didn&apos;t pre-qualify (credit score under 600).</p>
+      </div>
+      <div className={s.endActions}>
+        <button type="button" className={s.ghost} onClick={onPrequal}>
+          Change the credit answer
+        </button>
+      </div>
     </>
   );
 }

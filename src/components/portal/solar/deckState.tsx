@@ -43,6 +43,8 @@ export type DeckState = {
   /** contactKey of the contact fields as the server holds them (null until the lead is saved). */
   savedContact: string | null;
   creditTier: CreditTier | null;
+  /** "Under 600" on the prequal slide: the lead is saved as no sale (low credit), with no tier. */
+  lowCredit: boolean;
   booking: Booking | null;
 };
 
@@ -64,6 +66,7 @@ function freshState(): DeckState {
     usageSaved: null,
     savedContact: null,
     creditTier: null,
+    lowCredit: false,
     booking: null,
   };
 }
@@ -93,10 +96,10 @@ function loadState(): DeckState {
 /**
  * Whether this deck holds a homeowner the rep hasn't finished with: anything
  * typed, uploaded or saved, and no booking yet. Starting a new customer then
- * asks first.
+ * asks first. A homeowner who didn't pre-qualify (Under 600) is finished.
  */
 export function hasLeadInProgress(state: DeckState): boolean {
-  if (state.booking) return false;
+  if (state.booking || state.lowCredit) return false;
   if (state.leadId || state.creditTier) return true;
   if (Object.values(state.photos).some(Boolean)) return true;
   if (state.monthlyKwh !== null) return true;

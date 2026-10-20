@@ -30,7 +30,7 @@ function row(label: string, value: string): ReviewRow {
   return v ? { label, value: v } : { label, value: NOT_ENTERED, missing: true };
 }
 
-type ReviewInput = Pick<DeckState, 'lead' | 'monthlyBill' | 'usage' | 'photos' | 'creditTier'>;
+type ReviewInput = Pick<DeckState, 'lead' | 'monthlyBill' | 'usage' | 'photos' | 'creditTier'> & { lowCredit?: boolean };
 
 export function reviewSections(state: ReviewInput): ReviewSection[] {
   const { lead } = state;
@@ -85,7 +85,7 @@ export function reviewSections(state: ReviewInput): ReviewSection[] {
       id: 'program',
       title: 'Program',
       edit: { slide: 'prequal' },
-      rows: [row('Credit range', state.creditTier ? (CREDIT_LABEL[state.creditTier] ?? '') : '')],
+      rows: [row('Credit range', state.lowCredit ? 'Under 600' : state.creditTier ? (CREDIT_LABEL[state.creditTier] ?? '') : '')],
     },
   ];
 }

@@ -13,7 +13,7 @@ import { LeadFormSlide, leadNavLabel, type LeadNavHandle, type LeadNavState } fr
 import { ReviewSlide } from './ReviewSlide';
 import { UsageSlide } from './UsageSlide';
 import type { LeadStep, ReviewTarget } from './reviewSummary';
-import { BookingSlide, ConfirmationSlide, PrequalSlide } from './InteractiveSlides';
+import { BookingSlide, ConfirmationSlide, NotQualifiedBooking, PrequalSlide } from './InteractiveSlides';
 import {
   BillSlide,
   IntroSlide,
@@ -161,10 +161,14 @@ function Deck() {
   useEffect(() => {
     if (confirming) cancelRef.current?.focus();
   }, [confirming]);
+  // Under 600 ends the pitch on the prequal slide: forward stops there (Back,
+  // Change answer, New customer and the slide list still move).
+  const forwardBlocked = ORDER[index] === 'prequal' && state.lowCredit;
   const next = useCallback(() => {
+    if (forwardBlocked) return;
     setEdit(null);
     setPos((cur) => (cur.index >= ORDER.length - 1 ? cur : { index: cur.index + 1, dir: 'fwd' }));
-  }, []);
+  }, [forwardBlocked]);
   const prev = useCallback(() => {
     setEdit(null);
     setPos((cur) => (cur.index <= 0 ? cur : { index: cur.index - 1, dir: 'back' }));
@@ -225,6 +229,7 @@ function Deck() {
   const [leadNavState, setLeadNavState] = useState<LeadNavState | null>(null);
   const formNav = id === 'lead' ? leadNavState : null;
   const goNext = () => {
+    if (forwardBlocked) return;
     if (formNav && leadNav.current) leadNav.current.next();
     else if (editing) afterEdit('review');
     else next();
@@ -234,7 +239,7 @@ function Deck() {
     prev();
   };
   const nextLabel = formNav ? leadNavLabel(formNav, editing) : editing ? 'Back to review' : 'Next';
-  const nextDisabled = formNav ? formNav.disabled || formNav.busy : !editing && index === ORDER.length - 1;
+  const nextDisabled = formNav ? formNav.disabled || formNav.busy : forwardBlocked || (!editing && index === ORDER.length - 1);
   const backDisabled = index === 0 && !formNav?.canStepBack;
 
   let content: ReactNode;
@@ -255,11 +260,21 @@ function Deck() {
       break;
     case 'bill': content = <BillSlide />; break;
     case 'usage': content = <UsageSlide />; break;
-    case 'prequal': content = <PrequalSlide onDone={() => afterEdit('steps')} onNeedLead={() => goTo('lead')} />; break;
+    case 'prequal':
+      content = (
+        <PrequalSlide onDone={() => afterEdit('steps')} onNeedLead={() => goTo('lead')} onNewCustomer={requestNewCustomer} />
+      );
+      break;
     case 'steps': content = <StepsSlide />; break;
     case 'needs': content = <NeedsSlide />; break;
     case 'review': content = <ReviewSlide onEdit={editFromReview} onContinue={() => goTo('booking')} />; break;
-    case 'booking': content = <BookingSlide onBooked={() => goTo('confirm')} onNeedLead={() => goTo('lead')} />; break;
+    case 'booking':
+      content = state.lowCredit ? (
+        <NotQualifiedBooking onPrequal={() => goTo('prequal')} />
+      ) : (
+        <BookingSlide onBooked={() => goTo('confirm')} onNeedLead={() => goTo('lead')} />
+      );
+      break;
     case 'confirm': content = <ConfirmationSlide onBook={() => goTo('booking')} onNewCustomer={requestNewCustomer} />; break;
   }
 
