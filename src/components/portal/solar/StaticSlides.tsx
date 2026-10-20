@@ -213,6 +213,8 @@ export function NeedsSlide() {
   );
 }
 
+// Appendix, Moving, Fast and Price are off the deck (owner, 2026-10-20) but
+// kept here so they can go back in: re-add them to SolarPresenter's ORDER.
 export function AppendixSlide() {
   return (
     <div className={s.appendix}>

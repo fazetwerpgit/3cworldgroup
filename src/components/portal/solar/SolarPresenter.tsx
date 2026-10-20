@@ -15,15 +15,11 @@ import { UsageSlide } from './UsageSlide';
 import type { LeadStep, ReviewTarget } from './reviewSummary';
 import { BookingSlide, ConfirmationSlide, PrequalSlide } from './InteractiveSlides';
 import {
-  AppendixSlide,
   BillSlide,
-  FastSlide,
   IntroSlide,
-  MovingSlide,
   NeedsSlide,
   OptionsSlide,
   PartnersSlide,
-  PriceSlide,
   StepsSlide,
 } from './StaticSlides';
 import s from './solarDeck.module.css';
@@ -36,11 +32,11 @@ import s from './solarDeck.module.css';
 
 type SlideId =
   | 'intro' | 'options' | 'partners' | 'calculator' | 'lead' | 'bill' | 'usage' | 'prequal' | 'steps'
-  | 'needs' | 'review' | 'booking' | 'confirm' | 'appendix' | 'moving' | 'fast' | 'price';
+  | 'needs' | 'review' | 'booking' | 'confirm';
 
 const ORDER: SlideId[] = [
   'intro', 'options', 'partners', 'calculator', 'lead', 'bill', 'usage', 'prequal', 'steps',
-  'needs', 'review', 'booking', 'confirm', 'appendix', 'moving', 'fast', 'price',
+  'needs', 'review', 'booking', 'confirm',
 ];
 
 /** What the slide list calls each slide; `true` marks the ones the homeowner fills in. */
@@ -58,10 +54,6 @@ const SLIDES: Record<SlideId, { title: string; interactive?: true }> = {
   review: { title: 'Does everything look right?', interactive: true },
   booking: { title: 'Book your solar consultation', interactive: true },
   confirm: { title: 'Appointment confirmation', interactive: true },
-  appendix: { title: 'Appendix' },
-  moving: { title: "You're moving!" },
-  fast: { title: 'We make the process fast' },
-  price: { title: "We will beat anybody's prices" },
 };
 
 /** Slides whose content starts at the top (long forms) instead of centering. */
@@ -269,10 +261,6 @@ function Deck() {
     case 'review': content = <ReviewSlide onEdit={editFromReview} onContinue={() => goTo('booking')} />; break;
     case 'booking': content = <BookingSlide onBooked={() => goTo('confirm')} onNeedLead={() => goTo('lead')} />; break;
     case 'confirm': content = <ConfirmationSlide onBook={() => goTo('booking')} onNewCustomer={requestNewCustomer} />; break;
-    case 'appendix': content = <AppendixSlide />; break;
-    case 'moving': content = <MovingSlide />; break;
-    case 'fast': content = <FastSlide />; break;
-    case 'price': content = <PriceSlide />; break;
   }
 
   const first = state.lead.first.trim();
