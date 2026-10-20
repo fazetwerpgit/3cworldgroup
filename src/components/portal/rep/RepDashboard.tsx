@@ -1048,7 +1048,9 @@ export function RepDashboard() {
         solarNext={solarOnly && !readOnly ? <SolarHomeNextConsult /> : null}
         // The viewer's own numbers, so never in view-as.
         solarWeek={
-          readOnly ? null : dual ? (
+          readOnly ? null : solarOnly ? (
+            <SolarWeekSlot variant="solarOnly" timeLeft={weekTimeLeft(now)} />
+          ) : dual ? (
             <SolarWeekSlot variant="dual" timeLeft={weekTimeLeft(now)} />
           ) : null
         }
