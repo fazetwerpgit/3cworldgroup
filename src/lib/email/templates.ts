@@ -362,11 +362,14 @@ export function solarBookingConfirmationEmail(p: {
   const phone = (p.consultantPhone ?? '').trim();
   const who = firstName(p.consultantName) || 'your consultant';
   const muted = 'color:#5a5f68';
+  // layout() leaves paragraphs at the client default (about 1.15); a two-line
+  // booking sentence on a phone needs room.
+  const para = 'margin:0 0 16px;font-size:16px;line-height:1.5';
 
   const text: string[] = [greeting, line];
   const html: string[] = [
-    `<p>${esc(greeting)}</p>`,
-    `<p>You are booked for <strong>${esc(how)}</strong> with <strong>${esc(p.consultantName)}</strong> on <strong>${esc(p.when)}</strong>.</p>`,
+    `<p style="${para}">${esc(greeting)}</p>`,
+    `<p style="${para}">You are booked for <strong>${esc(how)}</strong> with <strong>${esc(p.consultantName)}</strong> on <strong>${esc(p.when)}</strong>.</p>`,
   ];
   if (meetLink) {
     text.push(`Join on Google Meet: ${meetLink}`);
@@ -376,23 +379,23 @@ export function solarBookingConfirmationEmail(p: {
   }
   if (address) {
     text.push(`Where: ${address}`);
-    html.push(`<p><span style="${muted}">Where:</span> <strong>${esc(address)}</strong></p>`);
+    html.push(`<p style="${para}"><span style="${muted}">Where:</span> <strong>${esc(address)}</strong></p>`);
   }
   if (phone) {
     const shown = displayPhone(phone);
     text.push(`Questions before then? Call or text ${who} at ${shown}.`);
     html.push(
-      `<p>Questions before then? Call or text ${esc(who)} at <a href="${esc(telHref(phone))}" style="color:#1155cc;white-space:nowrap">${esc(shown)}</a>.</p>`
+      `<p style="${para}">Questions before then? Call or text ${esc(who)} at <a href="${esc(telHref(phone))}" style="color:#1155cc;white-space:nowrap">${esc(shown)}</a>.</p>`
     );
   }
   if (p.calendarAttached) {
     const cal = 'To add it to your calendar, open the attached invite.';
     text.push(cal);
-    html.push(`<p>${cal}</p>`);
+    html.push(`<p style="${para}">${cal}</p>`);
   }
   const change = 'If you need to change the time, reply to this email.';
   text.push(change, '3C World Group');
-  html.push(`<p>${change}</p>`);
+  html.push(`<p style="${para}">${change}</p>`);
   return {
     subject,
     textBody: `${text.join('\n\n')}\n`,
