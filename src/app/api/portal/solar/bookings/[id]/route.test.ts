@@ -121,8 +121,21 @@ describe('PATCH /api/portal/solar/bookings/[id]', () => {
         type: 'solar_booking',
         metadata: { bookingId: ID, leadId: 'rep1_c1', cancelled: true },
       });
-      expect(mockNotify.mock.calls[0][0].message).toContain('Ana Lopez: virtual, Monday, October 26 at 8:00 AM PT with Jacob');
+      // No zones stored on this (older) booking: Central Time for everyone.
+      expect(mockNotify.mock.calls[0][0].message).toContain('Ana Lopez: virtual, Monday, October 26 at 10:00 AM CT with Jacob');
       expect(mockEmail).not.toHaveBeenCalled();
+    });
+
+    it("tells the consultant in their zone and the rep in the customer's", async () => {
+      db.store.get('solarBookings')!.set(ID, {
+        ...db.store.get('solarBookings')!.get(ID),
+        consultantTz: 'America/Chicago',
+        customerTz: 'America/Los_Angeles',
+      });
+      expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+      const messageTo = (uid: string) => mockNotify.mock.calls.find((c) => c[0].userId === uid)![0].message as string;
+      expect(messageTo('jac')).toContain('Monday, October 26 at 10:00 AM CT (8:00 AM PT for the customer) with Jacob');
+      expect(messageTo('rep1')).toContain('Monday, October 26 at 8:00 AM PT with Jacob');
     });
 
     it('never notifies whoever cancelled', async () => {

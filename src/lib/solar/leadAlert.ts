@@ -6,7 +6,7 @@ import { createNotificationForMany } from '@/lib/notifications/createNotificatio
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { appBaseUrl, solarLeadAlertEmail } from '@/lib/email/templates';
-import { formatSlotPT } from '@/lib/solar/availability';
+import { bookingZones, formatWhen, timeIn, zoneAbbr } from '@/lib/solar/timezones';
 import { CREDIT_TIER_LABELS, PHOTO_SLOTS, PHOTO_SLOT_LABELS, isCreditTier } from '@/lib/solar/leadFields';
 import { leadAlertUids, loadContacts } from '@/lib/solar/server';
 import { solarLeadHref } from '@/lib/solar/leadView';
@@ -49,8 +49,14 @@ async function bookingFor(bookingId: string) {
   if (!snap.exists || snap.get('status') === 'cancelled') return null;
   const start = text(snap.get('start'));
   if (!start) return null;
+  // The customer's zone, plus the consultant's when it differs.
+  const { consultantTz, customerTz } = bookingZones(snap.data());
+  const consultantPart =
+    zoneAbbr(consultantTz, start) === zoneAbbr(customerTz, start)
+      ? ''
+      : ` (${timeIn(start, consultantTz)} ${zoneAbbr(consultantTz, start)} for the consultant)`;
   return {
-    when: formatSlotPT(start),
+    when: `${formatWhen(start, customerTz)}${consultantPart}`,
     mode: snap.get('mode') === 'virtual' ? 'virtual' : 'in-person',
     consultantName: text(snap.get('consultantName')) || 'a consultant',
   };
@@ -83,7 +89,7 @@ export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
     const link = solarLeadHref(leadId);
     const title = booking ? 'Solar appointment set' : 'New solar lead';
     const message = `${repName || 'A rep'} added ${customerName}${city ? ` in ${city}` : ''}${
-      booking ? `: ${booking.mode}, ${booking.when} PT.` : '. No appointment booked.'
+      booking ? `: ${booking.mode}, ${booking.when}.` : '. No appointment booked.'
     }`;
 
     await createNotificationForMany(uids, {

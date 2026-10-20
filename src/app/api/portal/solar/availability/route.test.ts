@@ -104,4 +104,28 @@ describe('GET /api/portal/solar/availability', () => {
     expect(slots.length).toBeGreaterThan(0);
     expect(slots.every((s: { start: string }) => s.start >= '2026-10-20T00:00:00.000Z' && s.start < '2026-11-03T00:00:00.000Z')).toBe(true);
   });
+
+  it('never lists past the booking window (now + 14 days), whatever `to` asks', async () => {
+    const { slots } = await (await get('mode=in_person&from=2026-10-20T00:00:00.000Z&to=2026-11-20T00:00:00.000Z')).json();
+    expect(slots.length).toBeGreaterThan(0);
+    expect(slots.at(-1).start < '2026-11-03T00:00:00.000Z').toBe(true);
+    // Monday Nov 2 is the last bookable Monday: 8 AM PST = 16:00Z.
+    expect(slots.some((s: { start: string }) => s.start === '2026-11-02T16:00:00.000Z')).toBe(true);
+  });
+
+  it('answers no slots for a range wholly past the window', async () => {
+    const res = await get('mode=in_person&from=2026-11-05T00:00:00.000Z&to=2026-11-12T00:00:00.000Z');
+    expect(res.status).toBe(200);
+    expect((await res.json()).slots).toEqual([]);
+  });
+
+  it('reads a consultant with no zone set in Central Time', async () => {
+    db.store.set('solarAvailability', new Map([[
+      'c9',
+      { name: 'Closer', slotMin: 60, modes: { virtual: [{ day: 1, start: '09:00', end: '10:00' }] } },
+    ]]));
+    const { slots } = await (await get(`mode=virtual&${MON}`)).json();
+    // 9:00 AM CDT = 14:00Z.
+    expect(slots.map((s: { start: string }) => s.start)).toEqual(['2026-10-26T14:00:00.000Z']);
+  });
 });

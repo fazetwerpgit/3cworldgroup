@@ -144,7 +144,23 @@ describe('POST /api/portal/solar/leads/{id}/finish', () => {
     await finish();
     const mail = mockEmail.mock.calls[0][0];
     expect(mail.subject).toBe('Solar appointment set: Ana <Lopez>');
-    expect(mail.textBody).toContain('Appointment: Monday, October 26 at 8:00 AM PT, in-person, with Owner');
+    // A booking stored before zones existed reads in Central Time (back-compat).
+    expect(mail.textBody).toContain('Appointment: Monday, October 26 at 10:00 AM CT, in-person, with Owner');
+  });
+
+  it("shows the customer's zone, plus the consultant's when it differs", async () => {
+    db.store.set('solarBookings', new Map([[
+      'own_2026-10-26T15:00:00.000Z',
+      {
+        start: '2026-10-26T15:00:00.000Z', mode: 'in_person', consultantName: 'Owner', status: 'booked',
+        customerTz: 'America/New_York', consultantTz: 'America/Los_Angeles',
+      },
+    ]]));
+    db.store.get('solarLeads')!.set('rep1_c1', { ...LEAD, bookingId: 'own_2026-10-26T15:00:00.000Z' });
+    await finish();
+    expect(mockEmail.mock.calls[0][0].textBody).toContain(
+      'Appointment: Monday, October 26 at 11:00 AM ET (8:00 AM PT for the consultant), in-person, with Owner'
+    );
   });
 
   it('is idempotent: a second finish (or one after a booking alert) sends nothing', async () => {
