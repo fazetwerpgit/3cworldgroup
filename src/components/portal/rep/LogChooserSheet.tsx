@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Plus, Sun, X } from 'lucide-react';
+import { ArrowUpRight, Plus, Sun, X } from 'lucide-react';
 import { useSheetDismiss } from '@/hooks/useSheetDismiss';
 import { BodyLayer } from './BodyLayer';
 import { LOG_SALE_HREF, SOLAR_DECK_HREF } from './repNav';
@@ -106,10 +106,10 @@ export function LogChooserSheet({
               }}
             >
               <span className={c.icon} aria-hidden="true">
-                <Plus size={20} strokeWidth={2.5} />
+                <Plus size={24} strokeWidth={2.5} />
               </span>
               <span className={c.label}>Log fiber sale</span>
-              <ChevronRight className={c.chev} size={18} aria-hidden="true" />
+              <ArrowUpRight className={c.chev} size={20} aria-hidden="true" />
             </Link>
             <Link
               href={SOLAR_DECK_HREF}
@@ -118,10 +118,10 @@ export function LogChooserSheet({
               onClick={() => onClose(true)}
             >
               <span className={c.icon} aria-hidden="true">
-                <Sun size={20} strokeWidth={2.25} />
+                <Sun size={24} strokeWidth={2.5} />
               </span>
               <span className={c.label}>Open solar deck</span>
-              <ChevronRight className={c.chev} size={18} aria-hidden="true" />
+              <ArrowUpRight className={c.chev} size={20} aria-hidden="true" />
             </Link>
           </div>
         </section>

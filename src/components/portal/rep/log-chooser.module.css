@@ -1,22 +1,25 @@
-/* The dual rep's center + chooser (LogChooserSheet): two full-width rows. */
+/* The dual rep's center + chooser (LogChooserSheet): two tall tiles side by
+   side, each the whole choice in display type, the bar's own lime mark (the
+   + and the Sun, at the tab's weight) at its top. Tone steps, no lines. */
 .body {
   display: grid;
-  gap: var(--s2);
-  padding: var(--s1) var(--s4) var(--s5);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s3);
+  padding: var(--s2) var(--s4) var(--s5);
 }
 
 .choice {
-  display: flex;
-  align-items: center;
-  gap: var(--s3);
-  min-height: 64px;
-  padding: 0 var(--s3) 0 var(--s3);
-  border-radius: var(--r-control);
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  align-content: space-between;
+  justify-items: start;
+  gap: var(--s5);
+  min-height: 168px;
+  padding: var(--s4);
+  border-radius: 16px;
   background: var(--c-panel-hi);
   color: var(--c-text);
-  font-family: var(--f-ui);
-  font-size: var(--t-ui);
-  font-weight: 600;
   text-decoration: none;
   transition:
     background-color 160ms ease,
@@ -24,7 +27,7 @@
 }
 
 .choice:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 @media (hover: hover) {
@@ -33,11 +36,16 @@
   }
 }
 
+.choice:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: 2px;
+}
+
+/* The tab bar's center mark, a size up: the same lime field and stroke. */
 .icon {
   display: grid;
-  flex: none;
   place-items: center;
-  width: 40px;
+  width: 56px;
   height: 40px;
   border-radius: var(--r-control);
   background: var(--c-lime);
@@ -45,11 +53,30 @@
 }
 
 .label {
-  flex: 1;
-  min-width: 0;
+  align-self: end;
+  font: 400 34px / 0.92 var(--f-display);
+  letter-spacing: 0.005em;
+  text-wrap: balance;
 }
 
 .chev {
-  flex: none;
+  position: absolute;
+  top: var(--s4);
+  right: var(--s4);
   color: var(--c-text-3);
+  transition: transform 160ms ease;
+}
+
+@media (hover: hover) {
+  .choice:hover .chev {
+    color: var(--c-text-2);
+    transform: translate(2px, -2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .choice,
+  .chev {
+    transition: none;
+  }
 }
