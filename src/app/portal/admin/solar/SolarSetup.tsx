@@ -477,29 +477,6 @@ function ConsultantPanel({
           </div>
         </div>
 
-        <div className={st.contact}>
-          <ContactInput
-            id={headId}
-            field="meetLink"
-            label="Google Meet link"
-            value={draft.meetLink}
-            error={fieldError('meetLink')}
-            hint="Google Meet → New meeting → Create a meeting for later, then paste the link."
-            onChange={(v) => editContact('meetLink', v)}
-            onBlur={() => tidy('meetLink')}
-          />
-          <ContactInput
-            id={headId}
-            field="phone"
-            label="Phone"
-            value={draft.phone}
-            error={fieldError('phone')}
-            hint="Homeowners can call or text this number."
-            onChange={(v) => editContact('phone', v)}
-            onBlur={() => tidy('phone')}
-          />
-        </div>
-
         <div className={st.week}>
           <div className={st.well}>
             <Seg
@@ -532,6 +509,29 @@ function ConsultantPanel({
         </div>
 
         <Preview name={name} hours={draft} mode={mode} focusDay={focusDay} />
+
+        <div className={st.contact}>
+          <ContactInput
+            id={headId}
+            field="meetLink"
+            label="Google Meet link"
+            value={draft.meetLink}
+            error={fieldError('meetLink')}
+            hint="Google Meet → New meeting → Create a meeting for later."
+            onChange={(v) => editContact('meetLink', v)}
+            onBlur={() => tidy('meetLink')}
+          />
+          <ContactInput
+            id={headId}
+            field="phone"
+            label="Phone"
+            value={draft.phone}
+            error={fieldError('phone')}
+            hint="Homeowners can call or text this number."
+            onChange={(v) => editContact('phone', v)}
+            onBlur={() => tidy('phone')}
+          />
+        </div>
 
         {error ? <AdminNotice tone="error">{error}</AdminNotice> : null}
         {justSaved && !dirty ? <AdminNotice tone="ok">Saved. Homeowners see these hours now.</AdminNotice> : null}

@@ -96,7 +96,7 @@ describe('consultant Meet link and phone', () => {
     expect(input('phone').inputMode).toBe('tel');
     expect(input('meetLink').type).toBe('url');
     expect(input('meetLink').value).toBe('');
-    expect(container.textContent).toContain('Google Meet → New meeting → Create a meeting for later, then paste the link.');
+    expect(container.textContent).toContain('Google Meet → New meeting → Create a meeting for later.');
   });
 
   it('flags a non-Meet link once the field is left, and Save does not send it', async () => {

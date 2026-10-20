@@ -63,7 +63,8 @@
   gap: var(--s3);
 }
 
-/* The Meet link and phone the homeowner's confirmation email shows. Side by
+/* The Meet link and phone the homeowner's confirmation email shows, after the
+   hours and their preview so the hours editor stays in one piece. Side by
    side only where a whole Meet link fits in its half (a lone wide panel);
    stacked in the two-up desktop grid and on phones. */
 .contact {
@@ -71,6 +72,10 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
   gap: var(--s4);
   align-items: start;
+}
+
+.contact p {
+  text-wrap: pretty;
 }
 
 .contact [aria-invalid='true'] {
