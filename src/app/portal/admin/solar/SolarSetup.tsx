@@ -286,8 +286,9 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
   const lastStart = hm(minutes(w.start) + (count - 1) * hours.slotMin);
   // In the consultant's own zone; the deck converts to each customer's zone.
   const zone = zoneAbbr(hours.tz);
-  const first = `${clock(w.start)} ${zone}`;
-  const last = `${clock(lastStart)} ${zone}`;
+  // Non-breaking, so a time never wraps away from its AM/PM and zone.
+  const first = `${clock(w.start)} ${zone}`.replace(/ /g, ' ');
+  const last = `${clock(lastStart)} ${zone}`.replace(/ /g, ' ');
   return (
     <div className={st.preview} aria-live="polite">
       <p className={st.previewLine}>
@@ -499,12 +500,12 @@ function ConsultantPanel({
           <h2 className={st.name} id={`${headId}-name`}>
             {name}
           </h2>
-          <span className={st.whoStatus}>{status}</span>
           <p className={st.whoMeta}>
             {own ? <span className={st.you}>Your card</span> : null}
             <span>
               {tzLabel(draft.tz)} time, {slotText} slots
             </span>
+            <span className={st.whoStatus}>{status}</span>
           </p>
         </div>
         <div className={st.glance}>

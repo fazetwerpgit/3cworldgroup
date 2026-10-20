@@ -73,13 +73,17 @@
 
 .who {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: var(--s2) var(--s3);
   min-width: 0;
 }
 
+/* The name gets the whole width (a long one, or "Unsaved changes", never
+   squeezes it onto two lines); the save state ends the line of facts, and
+   wraps under them when the line is full. */
 .name {
+  grid-column: 1 / -1;
   margin: 0;
   color: var(--c-text);
   font: 400 var(--t-d1) / 0.92 var(--f-display);
@@ -89,11 +93,12 @@
 }
 
 .whoStatus {
-  padding-top: 4px;
+  margin-left: auto;
 }
 
 .whoMeta {
   grid-column: 1 / -1;
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 2px var(--s3);
