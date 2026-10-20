@@ -294,9 +294,14 @@ export function RepTopBar({
             ) : null}
           </ul>
 
+          {/* Labeled, not a bare icon: a lone question bubble read as generic help,
+              so reps only found Ask 3C through the Home card. */}
           {showAsk ? (
-            <Link href={ASK_HREF} className={s.iconBtn} aria-label="Ask 3C" title="Ask 3C">
-              <MessageCircleQuestion size={22} strokeWidth={1.75} aria-hidden="true" />
+            <Link href={ASK_HREF} className={s.askBtn} aria-label="Ask 3C">
+              <MessageCircleQuestion size={18} strokeWidth={2} aria-hidden="true" />
+              <span>
+                Ask<span className={s.askBtnTail}>&nbsp;3C</span>
+              </span>
             </Link>
           ) : null}
 

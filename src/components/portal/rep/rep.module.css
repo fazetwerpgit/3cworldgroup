@@ -585,6 +585,61 @@
   }
 }
 
+/* Ask 3C: the one labeled control in the bar, on every rep page. The icon
+   carries the Home card's lime; the pill is the bar's lifted tone. */
+.askBtn {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--r-control);
+  background: var(--c-panel-hi);
+  color: var(--c-text);
+  font: 600 var(--t-ui) / 1 var(--f-ui);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: transform 120ms ease-out;
+}
+
+/* A 44px hit area around the 36px pill. */
+.askBtn::before {
+  content: '';
+  position: absolute;
+  inset: -4px 0;
+}
+
+.askBtn svg {
+  flex: none;
+  color: var(--c-lime-hi);
+}
+
+.askBtn:active {
+  transform: scale(0.97);
+}
+
+@media (hover: hover) {
+  .askBtn:hover {
+    background: #26375a;
+  }
+}
+
+/* Phones say "Ask"; the full name returns with the desktop bar's room. */
+@media (max-width: 1023px) {
+  .askBtnTail {
+    display: none;
+  }
+}
+
+/* The narrowest phones drop the brand word so Ask, the bell and Menu fit. */
+@media (max-width: 389px) {
+  .brandWord {
+    display: none;
+  }
+}
+
 .badge {
   position: absolute;
   top: 6px;
