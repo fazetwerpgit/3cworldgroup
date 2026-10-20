@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { X } from 'lucide-react';
-import { getIdToken } from '@/lib/firebase/getIdToken';
 import { isAdminLevel } from '@/types';
 import {
   SOLAR_SLOT_LENGTHS,
@@ -26,26 +26,13 @@ import rep from '@/components/portal/rep/rep.module.css';
 import ops from '@/components/portal/admin-ops/admin-ops.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import st from './solar-setup.module.css';
+import { api, failure } from './setupApi';
+import { GoogleCalendarRow } from './GoogleCalendarRow';
+import { connectErrorText, googleStatusOf, type GoogleCalendarStatus } from '@/lib/solar/google/status';
 
 // Admin > Solar > Setup: who takes consultations and when (solarAvailability,
 // one panel each), and who hears about new leads (settings/solar). Both are
 // read by lib/solar/server.ts.
-
-async function api(url: string, init?: RequestInit) {
-  const token = await getIdToken();
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      Authorization: `Bearer ${token ?? ''}`,
-    },
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(typeof data.error === 'string' ? data.error : '');
-  return data;
-}
-
-const failure = (err: unknown, fallback: string) => (err instanceof Error && err.message) || fallback;
 
 // ---------- time helpers ----------
 
@@ -97,6 +84,7 @@ interface ConsultantDoc {
   modes: Partial<Record<SolarMode, WeeklyWindow[]>>;
   meetLink?: string;
   phone?: string;
+  googleCalendar?: unknown;
 }
 
 /**
@@ -110,6 +98,8 @@ interface Consultant {
   name: string;
   /** What the server has; null for one added here and not saved yet. */
   saved: ConsultantSettings | null;
+  /** Their Google Calendar connection (absent: never connected). */
+  google?: GoogleCalendarStatus;
 }
 
 function hoursOf(c: Pick<ConsultantDoc, 'tz' | 'slotMin' | 'modes' | 'meetLink' | 'phone'>): ConsultantSettings {
@@ -311,16 +301,21 @@ function ConsultantPanel({
   consultant,
   seeded,
   removable,
+  own,
   onSaved,
   onRemoved,
+  onGoogle,
 }: {
   consultant: Consultant;
   seeded: boolean;
   removable: boolean;
+  /** The signed-in person's own card. */
+  own: boolean;
   onSaved: (uid: string, settings: ConsultantSettings) => void;
   onRemoved: (uid: string, futureBookings: number | null) => void;
+  onGoogle: (uid: string, status: GoogleCalendarStatus | undefined) => void;
 }) {
-  const { uid, name, saved } = consultant;
+  const { uid, name, saved, google } = consultant;
   const [draft, setDraft] = useState<ConsultantSettings>(() =>
     saved
       ? draftOf(saved)
@@ -510,6 +505,15 @@ function ConsultantPanel({
 
         <Preview name={name} hours={draft} mode={mode} focusDay={focusDay} />
 
+        <GoogleCalendarRow
+          uid={uid}
+          name={name}
+          own={own}
+          canConnect={Boolean(saved) && !seeded}
+          status={google}
+          onChange={onGoogle}
+        />
+
         <div className={st.contact}>
           <ContactInput
             id={headId}
@@ -517,7 +521,11 @@ function ConsultantPanel({
             label="Google Meet link"
             value={draft.meetLink}
             error={fieldError('meetLink')}
-            hint="Google Meet → New meeting → Create a meeting for later."
+            hint={
+              google?.connected
+                ? 'Each booking gets its own Meet link from Google Calendar. This one is the backup.'
+                : 'Google Meet → New meeting → Create a meeting for later.'
+            }
             onChange={(v) => editContact('meetLink', v)}
             onBlur={() => tidy('meetLink')}
           />
@@ -572,6 +580,44 @@ function ConsultantPanel({
   );
 }
 
+/**
+ * Back from Google's sign-in (web): the callback sent the browser here with
+ * ?google=connected|error[&reason][&freebusy=off]. Shown once as a banner, then
+ * dropped from the address so a reload doesn't repeat it.
+ */
+type GoogleNotice = { tone: 'ok' | 'warn' | 'error'; text: string };
+
+function googleReturnNotice(search: string): GoogleNotice | null {
+  const params = new URLSearchParams(search);
+  const outcome = params.get('google');
+  if (outcome === 'connected') {
+    return params.get('freebusy') === 'off'
+      ? {
+          tone: 'warn',
+          text: "Google Calendar connected. Free/busy wasn't allowed, so homeowners still see every open time; reconnect and allow it to hide busy times.",
+        }
+      : { tone: 'ok', text: 'Google Calendar connected. New bookings go on your calendar, and busy times are hidden from homeowners.' };
+  }
+  if (outcome === 'error') {
+    return { tone: 'error', text: `Google Calendar isn't connected. ${connectErrorText(params.get('reason'))}` };
+  }
+  return null;
+}
+
+function useGoogleReturn() {
+  // Read once, from the address the page opened with (Setup renders on the client, after sign-in).
+  const [notice, setNotice] = useState<GoogleNotice | null>(() =>
+    typeof window === 'undefined' ? null : googleReturnNotice(window.location.search)
+  );
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('google')) return;
+    for (const key of ['google', 'reason', 'freebusy']) url.searchParams.delete(key);
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }, []);
+  return { notice, dismiss: () => setNotice(null) };
+}
+
 function Consultants({ users, usersLoaded, after }: { users: PickerUser[]; usersLoaded: boolean; after: ReactNode }) {
   const [list, setList] = useState<Consultant[] | null>(null);
   const [seeded, setSeeded] = useState(false);
@@ -579,6 +625,12 @@ function Consultants({ users, usersLoaded, after }: { users: PickerUser[]; users
   const [attempt, setAttempt] = useState(0);
   const [removedNote, setRemovedNote] = useState('');
   const added = useRef<string | null>(null);
+  const { user } = useAuth();
+  const googleReturn = useGoogleReturn();
+
+  const onGoogle = useCallback((uid: string, google: GoogleCalendarStatus | undefined) => {
+    setList((prev) => prev?.map((c) => (c.uid === uid ? { ...c, google } : c)) ?? prev);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -587,7 +639,9 @@ function Consultants({ users, usersLoaded, after }: { users: PickerUser[]; users
         const data = await api('/api/portal/solar/consultants');
         if (!active) return;
         const docs = (data.consultants ?? []) as ConsultantDoc[];
-        setList(docs.map((c) => ({ uid: c.consultantUid, name: c.name, saved: hoursOf(c) })));
+        setList(
+          docs.map((c) => ({ uid: c.consultantUid, name: c.name, saved: hoursOf(c), google: googleStatusOf(c.googleCalendar) }))
+        );
         setSeeded(data.seeded === true);
       } catch {
         if (active) setFailed(true);
@@ -673,6 +727,11 @@ function Consultants({ users, usersLoaded, after }: { users: PickerUser[]; users
           {removedNote}
         </AdminNotice>
       ) : null}
+      {googleReturn.notice ? (
+        <AdminNotice tone={googleReturn.notice.tone} onDismiss={googleReturn.dismiss}>
+          {googleReturn.notice.text}
+        </AdminNotice>
+      ) : null}
       <div className={st.grid}>
         {list.map((c) => (
           <ConsultantPanel
@@ -680,8 +739,10 @@ function Consultants({ users, usersLoaded, after }: { users: PickerUser[]; users
             consultant={c}
             seeded={seeded}
             removable={!c.saved || savedCount > 1}
+            own={Boolean(user?.uid) && user?.uid === c.uid}
             onSaved={onSaved}
             onRemoved={onRemoved}
+            onGoogle={onGoogle}
           />
         ))}
         <section className={cx(rep.panel, st.add)} aria-labelledby="solar-add">

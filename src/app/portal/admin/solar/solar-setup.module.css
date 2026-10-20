@@ -301,3 +301,61 @@
     color: var(--c-text);
   }
 }
+
+/* ---------- Google Calendar (one row per consultant) ----------
+   The same well row as Notify owner: label and state on the left, the action
+   on the right where there's room, under it on a phone. */
+.gcal {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3) var(--s3) var(--s3) var(--s4);
+  border-radius: var(--r-control);
+  background: var(--c-well);
+}
+
+@media (min-width: 560px) {
+  .gcal {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+  /* The disconnect confirmation takes the whole row. */
+  .gcal > [role='alertdialog'] {
+    grid-column: 1 / -1;
+  }
+}
+
+.gcalText {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.gcalLabel {
+  font-size: var(--t-body);
+  font-weight: 650;
+}
+
+/* A long Google address wraps instead of pushing the panel wide. */
+.gcalState > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.gcalText p {
+  text-wrap: pretty;
+}
+
+.gcalWarn {
+  color: var(--c-amber);
+}
+
+.gcalActions {
+  justify-content: flex-start;
+}
+
+@media (min-width: 560px) {
+  .gcalActions {
+    justify-content: flex-end;
+  }
+}

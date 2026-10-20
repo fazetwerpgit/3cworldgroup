@@ -7,6 +7,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: vi.fn(async () => 'tok') }));
+const auth = vi.hoisted(() => ({ uid: 'sam' }));
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: { uid: auth.uid } }) }));
 vi.mock('@/components/admin/UserPicker', () => ({
   UserPicker: () => null,
   pickerName: (p: { displayName?: string }) => p.displayName ?? '',
@@ -28,6 +30,9 @@ const SAM = {
   phone: '+15125550142',
 };
 
+let consultants: Record<string, unknown>[];
+let calls: { url: string; method: string; body: unknown }[];
+let googleNow: unknown;
 let container: HTMLDivElement;
 let root: Root;
 let puts: Record<string, unknown>[];
@@ -38,6 +43,10 @@ const json = (status: number, body: unknown) =>
 
 beforeEach(() => {
   puts = [];
+  calls = [];
+  consultants = [SAM];
+  googleNow = null;
+  auth.uid = 'sam';
   putAnswer = (body) => ({
     status: 200,
     json: { consultant: { ...SAM, ...body, meetLink: MEET, phone: '+15125550142' } },
@@ -45,7 +54,14 @@ beforeEach(() => {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
-      if (url === '/api/portal/solar/consultants') return json(200, { consultants: [SAM], seeded: false });
+      if (url === '/api/portal/solar/consultants') return json(200, { consultants, seeded: false });
+      if (url.startsWith('/api/portal/solar/google/connect')) {
+        const method = init?.method ?? 'GET';
+        calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : null });
+        if (method === 'POST') return json(200, { url: 'https://accounts.google.com/o/oauth2/v2/auth?state=s' });
+        if (method === 'DELETE') return json(200, { success: true, revoked: true });
+        return json(200, { googleCalendar: googleNow });
+      }
       if (url === '/api/portal/settings/solar') return json(200, { notifyOwner: false, recipients: [] });
       if (url.startsWith('/api/portal/solar/consultants/') && init?.method === 'PUT') {
         const body = JSON.parse(String(init.body));
@@ -65,6 +81,8 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   vi.unstubAllGlobals();
+  delete window.__3C_APP__;
+  window.history.replaceState(null, '', '/');
 });
 
 const flush = () => act(async () => {
@@ -144,5 +162,86 @@ describe('consultant Meet link and phone', () => {
     await flush();
     expect(puts[0].phone).toBe('');
     expect(input('phone').value).toBe('');
+  });
+});
+
+const CONNECTED = { connected: true, email: 'sam@gmail.com', connectedAt: '2026-10-19T12:00:00.000Z', freeBusy: true };
+const button = (label: string) => [...container.querySelectorAll('button')].find((b) => b.textContent === label);
+
+describe('Google Calendar row', () => {
+  it('own card, not connected: the help line and Connect, which opens Google from the app through window.open', async () => {
+    window.__3C_APP__ = true;
+    const open = vi.fn(() => null);
+    vi.stubGlobal('open', open);
+    await renderSetup();
+    expect(container.textContent).toContain('Not connected');
+    expect(container.textContent).toContain(
+      "Bookings go on your Google Calendar with their own Meet link, and homeowners only see times you're free."
+    );
+    await act(async () => button('Connect Google Calendar')!.click());
+    await flush();
+    expect(calls.find((c) => c.method === 'POST')).toMatchObject({ url: '/api/portal/solar/google/connect', body: { from: 'app' } });
+    expect(open).toHaveBeenCalledWith('https://accounts.google.com/o/oauth2/v2/auth?state=s', '_blank');
+    expect(container.textContent).toContain('Finish signing in to Google');
+    // Back from the browser sheet: the row checks at once and shows the account.
+    googleNow = CONNECTED;
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    await flush();
+    expect(container.textContent).toContain('Connected as sam@gmail.com');
+    expect(button('Disconnect')).toBeTruthy();
+    expect(container.textContent).toContain('This one is the backup.');
+  });
+
+  it('own card, connected: Disconnect asks first, then removes the connection', async () => {
+    consultants = [{ ...SAM, googleCalendar: CONNECTED }];
+    await renderSetup();
+    expect(container.textContent).toContain('Connected as sam@gmail.com');
+    expect(button('Connect Google Calendar')).toBeUndefined();
+    await act(async () => button('Disconnect')!.click());
+    expect(container.textContent).toContain('Disconnect your Google Calendar?');
+    const strip = container.querySelector('[role="alertdialog"]')!;
+    const confirm = [...strip.querySelectorAll('button')].find((b) => b.textContent === 'Disconnect')!;
+    await act(async () => confirm.click());
+    await flush();
+    expect(calls.find((c) => c.method === 'DELETE')?.url).toBe('/api/portal/solar/google/connect');
+    expect(container.textContent).toContain('Not connected');
+    expect(button('Connect Google Calendar')).toBeTruthy();
+  });
+
+  it("someone else's card is status only, plus Disconnect (by uid) for the admin", async () => {
+    auth.uid = 'admin1';
+    consultants = [{ ...SAM, googleCalendar: CONNECTED }];
+    await renderSetup();
+    expect(container.textContent).toContain('Connected as sam@gmail.com');
+    expect(container.textContent).not.toContain('Bookings go on your Google Calendar');
+    expect(button('Connect Google Calendar')).toBeUndefined();
+    await act(async () => button('Disconnect')!.click());
+    expect(container.textContent).toContain('Disconnect Sam’s Google Calendar?');
+    const strip = container.querySelector('[role="alertdialog"]')!;
+    await act(async () => [...strip.querySelectorAll('button')].find((b) => b.textContent === 'Disconnect')!.click());
+    await flush();
+    expect(calls.find((c) => c.method === 'DELETE')?.url).toBe('/api/portal/solar/google/connect?uid=sam');
+  });
+
+  it('a broken connection says so and offers Reconnect', async () => {
+    consultants = [{ ...SAM, googleCalendar: { connected: false, needsReconnect: true, email: 'sam@gmail.com', connectedAt: CONNECTED.connectedAt } }];
+    await renderSetup();
+    expect(container.textContent).toContain('Needs reconnecting');
+    expect(container.textContent).toContain('Google stopped accepting the connection.');
+    expect(button('Reconnect')).toBeTruthy();
+  });
+
+  it('back from Google on the web: a banner, and the outcome leaves the address', async () => {
+    window.history.replaceState(null, '', '/portal/admin/solar?tab=setup&google=connected');
+    consultants = [{ ...SAM, googleCalendar: CONNECTED }];
+    await renderSetup();
+    expect(container.textContent).toContain('Google Calendar connected.');
+    expect(window.location.search).toBe('?tab=setup');
+  });
+
+  it('a failed connect explains why', async () => {
+    window.history.replaceState(null, '', '/portal/admin/solar?tab=setup&google=error&reason=scope');
+    await renderSetup();
+    expect(container.textContent).toContain("Google Calendar isn't connected. Calendar access was left unticked");
   });
 });
