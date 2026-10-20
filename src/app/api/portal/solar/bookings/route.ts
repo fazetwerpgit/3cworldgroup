@@ -24,6 +24,9 @@ import {
   zoneForState,
 } from '@/lib/solar/timezones';
 
+// Google (free/busy re-check up to ~6s, the event up to ~10s) plus the emails.
+export const maxDuration = 30;
+
 const SLOT_TAKEN = { error: 'slot_taken' };
 const LOW_CREDIT_BOOK_ERROR = "This homeowner didn't pre-qualify. Change the credit answer first.";
 
@@ -328,7 +331,7 @@ export async function POST(request: NextRequest) {
 
     const b = outcome.booking;
     // After the commit, outside the transaction: the Google event (best
-    // effort, ~6s cap; null falls back to the .ics emails).
+    // effort, ~10s budget; null falls back to the .ics emails).
     const google = await addBookingToGoogle(consultantUid, availability[0]?.googleCalendar, {
       bookingId: id,
       createdAtMs: now.getTime(),

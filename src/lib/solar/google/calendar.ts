@@ -101,18 +101,30 @@ type Call = { status: number; data: Record<string, unknown>; timedOut?: boolean 
 /**
  * One authorized call to Google. A 401 drops the cached access token and tries
  * once more with a fresh one. status 0: no answer (no token, network, timeout).
+ * `budget` is the caller's overall deadline: once it fires, nothing new is sent
+ * and a request in flight is cut off (reported as a timeout).
  */
-async function call(uid: string, method: string, url: string, body?: unknown, timeoutMs = GOOGLE_TIMEOUT_MS): Promise<Call> {
+async function call(
+  uid: string,
+  method: string,
+  url: string,
+  body?: unknown,
+  timeoutMs = GOOGLE_TIMEOUT_MS,
+  budget?: AbortSignal
+): Promise<Call> {
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (budget?.aborted) return { status: 0, data: {}, timedOut: false };
     const token = await accessTokenFor(uid);
     if (!token) return { status: 0, data: {}, timedOut: false };
+    if (budget?.aborted) return { status: 0, data: {}, timedOut: false };
+    const timeout = AbortSignal.timeout(timeoutMs);
     let res: Response;
     try {
       res = await fetch(url, {
         method,
         headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}),
-        signal: AbortSignal.timeout(timeoutMs),
+        signal: budget ? AbortSignal.any([timeout, budget]) : timeout,
         cache: 'no-store',
       });
     } catch (error) {
@@ -148,15 +160,15 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * bookings get a new Meet link. A retried insert finds the event already
  * there (409) and reads it instead.
  */
-export async function insertBookingEvent(uid: string, input: BookingEventInput): Promise<CreatedEvent> {
+export async function insertBookingEvent(uid: string, input: BookingEventInput, budget?: AbortSignal): Promise<CreatedEvent> {
   const body = buildBookingEvent(input);
   const eventId = String(body.id);
-  const inserted = await call(uid, 'POST', `${EVENTS}?conferenceDataVersion=1&sendUpdates=all`, body);
+  const inserted = await call(uid, 'POST', `${EVENTS}?conferenceDataVersion=1&sendUpdates=all`, body, GOOGLE_TIMEOUT_MS, budget);
   let event: Record<string, unknown> | null = null;
   if (inserted.status === 200 || inserted.status === 201) {
     event = inserted.data;
   } else if (inserted.status === 409) {
-    const got = await call(uid, 'GET', `${EVENTS}/${eventId}`);
+    const got = await call(uid, 'GET', `${EVENTS}/${eventId}`, undefined, GOOGLE_TIMEOUT_MS, budget);
     if (got.status === 200 && got.data.status !== 'cancelled') event = got.data;
   }
   if (!event) {
@@ -165,20 +177,27 @@ export async function insertBookingEvent(uid: string, input: BookingEventInput):
   }
   let meetLink = meetLinkOf(event);
   // Meet creation can finish a moment after the insert answers.
-  if (input.mode === 'virtual' && !meetLink && meetPending(event)) {
+  if (input.mode === 'virtual' && !meetLink && meetPending(event) && !budget?.aborted) {
     await wait(1500);
-    const again = await call(uid, 'GET', `${EVENTS}/${eventId}`, undefined, 3000);
+    const again = await call(uid, 'GET', `${EVENTS}/${eventId}`, undefined, 3000, budget);
     if (again.status === 200) meetLink = meetLinkOf(again.data);
   }
   return { ok: true, eventId: String(event.id ?? eventId), meetLink };
 }
 
 /**
- * Deletes the event and lets Google tell the homeowner (sendUpdates=all).
+ * Deletes the event. By default Google tells the homeowner (sendUpdates=all);
+ * `quiet` sends nothing, for an event they were never meant to have.
  * True when it's gone (404 / 410: already gone counts).
  */
-export async function deleteBookingEvent(uid: string, eventId: string, timeoutMs = GOOGLE_TIMEOUT_MS): Promise<boolean> {
-  const res = await call(uid, 'DELETE', `${EVENTS}/${encodeURIComponent(eventId)}?sendUpdates=all`, undefined, timeoutMs);
+export async function deleteBookingEvent(
+  uid: string,
+  eventId: string,
+  timeoutMs = GOOGLE_TIMEOUT_MS,
+  { quiet = false }: { quiet?: boolean } = {}
+): Promise<boolean> {
+  const notify = quiet ? 'none' : 'all';
+  const res = await call(uid, 'DELETE', `${EVENTS}/${encodeURIComponent(eventId)}?sendUpdates=${notify}`, undefined, timeoutMs);
   if (res.status === 204 || res.status === 200 || res.status === 404 || res.status === 410) return true;
   console.error('google calendar: event delete failed', errorCode(res));
   return false;

@@ -17,7 +17,8 @@ export interface FakeGoogle {
   /** Answer to grant_type=authorization_code. */
   exchange: { status: number; body: Record<string, unknown> };
   /** events.insert. */
-  insert: 'ok' | 'conflict' | 'error' | 'timeout';
+  /** 'hang': never answers until the request is aborted (our budget or timeout). */
+  insert: 'ok' | 'conflict' | 'error' | 'timeout' | 'hang';
   /** The Meet link an insert with conferenceData answers. */
   meetLink: string;
   /** freeBusy: busy intervals, or 'error'. */
@@ -86,6 +87,13 @@ export function createFakeGoogle(): FakeGoogle {
     if (eventMatch) {
       const id = eventMatch[1] ? decodeURIComponent(eventMatch[1]) : '';
       if (method === 'POST') {
+        if (g.insert === 'hang') {
+          await new Promise((_, reject) => {
+            const signal = init?.signal;
+            if (signal?.aborted) reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+            signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+          });
+        }
         if (g.insert === 'timeout') throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
         if (g.insert === 'error') return json(500, { error: { status: 'INTERNAL' } });
         if (g.insert === 'conflict' || events.has(String(body?.id))) {

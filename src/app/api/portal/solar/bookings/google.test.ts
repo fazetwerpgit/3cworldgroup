@@ -178,8 +178,36 @@ describe('booking with Google Calendar connected', () => {
     sam(LIVE);
     google.insert = 'timeout';
     expect((await book('virtual')).status).toBe(200);
-    expect(google.find('DELETE', `/events/${bookingEventId(ID, NOW.getTime())}`)!.url).toContain('sendUpdates=all');
+    // Quietly: the homeowner gets no invite-then-cancel, only our .ics.
+    expect(google.find('DELETE', `/events/${bookingEventId(ID, NOW.getTime())}`)!.url).toContain('sendUpdates=none');
     expect(emailTo('ana@example.com').attachments).toHaveLength(1);
+  });
+
+  it('Google past the ~10s budget: the booking goes out with the .ics, and the maybe-made event is taken down quietly', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(NOW);
+    sam(LIVE);
+    google.insert = 'hang';
+    let settled = false;
+    const pending = book('virtual').then((res) => {
+      settled = true;
+      return res;
+    });
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(settled).toBe(false);
+    expect(google.find('POST', '/calendars/primary/events')).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(1_500);
+    const res = await pending;
+    expect(res.status).toBe(200);
+    expect(google.find('DELETE', `/events/${bookingEventId(ID, NOW.getTime())}`)!.url).toContain('sendUpdates=none');
+    expect(db.store.get('solarBookings')!.get(ID)!.googleEventId).toBeUndefined();
+    const toCustomer = emailTo('ana@example.com');
+    expect(toCustomer.attachments).toHaveLength(1);
+    expect(toCustomer.textBody).not.toContain('Google Calendar invite');
+  });
+
+  it('the route asks for enough time for Google and the emails', async () => {
+    expect((await import('./route')).maxDuration).toBe(30);
   });
 
   it('a broken refresh token: booked as usual with the .ics, and the card says reconnect', async () => {

@@ -13,6 +13,12 @@ import { deleteBookingEvent, insertBookingEvent, patchBookingEventContact, type 
 import { usesGoogleCalendar, type GoogleCalendarStatus } from './status';
 
 const BOOKINGS = 'solarBookings';
+/**
+ * The whole Google step of a booking (token refresh, insert, Meet read-back)
+ * gets this long; past it the booking goes out with the .ics emails instead.
+ * Only the quiet clean-up of a maybe-created event runs past it (3s more).
+ */
+export const GOOGLE_BOOKING_BUDGET_MS = 10_000;
 
 export interface GoogleBookingEvent {
   eventId: string;
@@ -29,18 +35,22 @@ export interface GoogleBookingEvent {
 export async function addBookingToGoogle(
   consultantUid: string,
   status: GoogleCalendarStatus | undefined,
-  input: BookingEventInput
+  input: BookingEventInput,
+  budgetMs = GOOGLE_BOOKING_BUDGET_MS
 ): Promise<GoogleBookingEvent | null> {
   if (!usesGoogleCalendar(status) || !adminDb) return null;
   const db = adminDb;
   const ref = db.collection(BOOKINGS).doc(input.bookingId);
+  const budget = new AbortController();
+  const timer = setTimeout(() => budget.abort(), budgetMs);
   try {
-    const created = await insertBookingEvent(consultantUid, input);
+    const created = await insertBookingEvent(consultantUid, input, budget.signal);
     if (!created.ok) {
       if (created.maybeCreated) {
-        // Google may have made it after all: take it down so the homeowner
-        // isn't left with it next to our .ics, and remember the id for a cancel.
-        const gone = await deleteBookingEvent(consultantUid, created.eventId, 3000);
+        // Google may have made it after all: take it down quietly
+        // (sendUpdates=none), so the homeowner doesn't get an invite, then a
+        // cancellation, then our .ics. Remember the id for a cancel if it stays.
+        const gone = await deleteBookingEvent(consultantUid, created.eventId, 3000, { quiet: true });
         if (!gone) await ref.update({ googleEventId: created.eventId, googleEventState: 'unconfirmed' }).catch(() => {});
       }
       return null;
@@ -63,6 +73,8 @@ export async function addBookingToGoogle(
   } catch (error) {
     console.error('google calendar: booking event failed', error instanceof Error ? error.message : '');
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
