@@ -323,7 +323,7 @@ export function updateLeadExtras(id: string, extras: LeadExtras) {
 }
 
 /**
- * The rep who added the lead, while it is open (no stage, not sold or lost):
+ * The rep who added the lead (or an admin), while it is open (no stage, not sold or lost):
  * fixes the homeowner's name, phone, email and address (the review slide's
  * Edit). Checked as on create; 409 once the lead is closed.
  */

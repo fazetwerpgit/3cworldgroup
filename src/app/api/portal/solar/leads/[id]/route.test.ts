@@ -194,14 +194,24 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       expect(db.store.get('solarBookings')!.get('b1')).toMatchObject({ customerName: 'Anna Ruis', customerEmail: 'old@example.com' });
     });
 
-    it('403s another rep, and an admin (owner rep only)', async () => {
+    it('403s another rep', async () => {
       mockGate.mockResolvedValue({ ...REP, uid: 'rep2' });
       const res = await patch('rep1_c1', CONTACT);
       expect(res.status).toBe(403);
       expect(lead().first).toBe('Anna');
+    });
+
+    it('lets an admin or owner fix them too, still only while open', async () => {
       mockGate.mockResolvedValue({ ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null });
-      expect((await patch('rep1_c1', CONTACT)).status).toBe(403);
-      expect(lead().first).toBe('Anna');
+      expect((await patch('rep1_c1', CONTACT)).status).toBe(200);
+      expect(lead()).toMatchObject({ first: 'Ana', repUid: 'rep1' });
+      mockGate.mockResolvedValue({ ...REP, uid: 'jac', isAdmin: true, isOwner: true, role: 'owner', solarRole: null });
+      expect((await patch('rep1_c1', { ...CONTACT, first: 'Anita' })).status).toBe(200);
+      expect(lead().first).toBe('Anita');
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold', first: 'Anna' });
+      const res = await patch('rep1_c1', CONTACT);
+      expect(res.status).toBe(409);
+      expect((await res.json()).error).toBe('This lead is closed, so its contact details can no longer be changed.');
     });
 
     it('403s a consultant sneaking contact fields in with usage', async () => {

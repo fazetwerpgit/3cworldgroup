@@ -218,7 +218,7 @@ describe('LeadFormSlide after the lead is saved (review > Edit)', () => {
 
   it('shows the server refusal (a closed lead) and stays on the form', async () => {
     api.updateLeadContact.mockResolvedValue({
-      ok: false, status: 409, error: 'This lead is closed. Ask an admin to change its contact details.',
+      ok: false, status: 409, error: 'This lead is closed, so its contact details can no longer be changed.',
     });
     deck.state.lead = { ...SAVED, last: 'Ruiz-Lopez' };
     render('home');

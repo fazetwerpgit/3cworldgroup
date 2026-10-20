@@ -5,7 +5,7 @@ import { hasLeadContact, hasLeadExtras, isCreditTier, isSolarLeadStatus, parseLe
 import { SOLAR_STAGE_ROLES, readStage, stagePatchForStatus } from '@/lib/solar/leadStage';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
 
-const LEAD_CLOSED_ERROR = 'This lead is closed. Ask an admin to change its contact details.';
+const LEAD_CLOSED_ERROR = 'This lead is closed, so its contact details can no longer be changed.';
 
 /** Contact fixes stop once the lead has a stage or is sold / lost. */
 function leadIsClosed(data: Record<string, unknown>): boolean {
@@ -40,8 +40,8 @@ async function isSolarConsultant(gate: { uid: string; solarRole?: string | null 
 //     A consultant (closer role or Admin > Solar > Setup) may send
 //     monthlyKwh / usage alone.
 //   {first, last, phone, email, address, city, state, zip} (with or without
-//     the fields above) -> 200 {success, id}. Only the rep who created the
-//     lead, while it is open (no stage, not sold or lost; else 409). Checked
+//     the fields above) -> 200 {success, id}. The rep who created the lead
+//     or an admin/owner, while it is open (no stage, not sold or lost; else 409). Checked
 //     as on create: first, last and a valid email required, phone-shaped
 //     phone; a missing key reads as ''. The review slide's Edit sends these.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -131,8 +131,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     if (contactAsked) {
-      if (snap.get('repUid') !== gate.uid) {
-        return NextResponse.json({ error: 'Only the rep who added this lead can change its contact details' }, { status: 403 });
+      if (snap.get('repUid') !== gate.uid && !gate.isAdmin) {
+        return NextResponse.json({ error: 'Only the rep who added this lead, or an admin, can change its contact details' }, { status: 403 });
       }
       if (leadIsClosed((snap.data() ?? {}) as Record<string, unknown>)) {
         return NextResponse.json({ error: LEAD_CLOSED_ERROR }, { status: 409 });
