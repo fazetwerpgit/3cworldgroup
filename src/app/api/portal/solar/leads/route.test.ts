@@ -160,6 +160,46 @@ describe('POST /api/portal/solar/leads', () => {
     const { id } = await (await POST(req({ ...VALID, doorId: 'door9', creditTier: 'purchase_600' }))).json();
     expect(db.store.get('solarLeads')!.get(id)).toMatchObject({ source: 'knock', doorId: 'door9', creditTier: 'purchase_600' });
   });
+
+  it("stores the app's qualifying fields and the meter photo", async () => {
+    const meter = `form-attachments/rep1/solar-lead/${UP}/meter/`;
+    const usage = { mode: 'daily', daily: 41, months: [900, 1000] };
+    const res = await POST(req({
+      ...VALID, photos: { ...VALID.photos, meter }, roofType: 'concrete_tile', heavyShade: false, needsReview: false,
+      monthlyKwh: 1246.4, usage,
+    }));
+    expect(res.status).toBe(200);
+    const lead = db.store.get('solarLeads')!.get((await res.json()).id)!;
+    expect(lead).toMatchObject({ roofType: 'concrete_tile', heavyShade: false, needsReview: false, monthlyKwh: 1246, usage });
+    expect((lead.photos as Record<string, string>).meter).toBe(meter);
+  });
+
+  it('marks a heavy-shade lead for review, and defaults needsReview to false', async () => {
+    const shaded = await (await POST(req({ ...VALID, clientId: 'c_shade', heavyShade: true }))).json();
+    expect(db.store.get('solarLeads')!.get(shaded.id)).toMatchObject({ heavyShade: true, needsReview: true });
+    const plain = await (await POST(req({ ...VALID, clientId: 'c_plain' }))).json();
+    const stored = db.store.get('solarLeads')!.get(plain.id)!;
+    expect(stored.needsReview).toBe(false);
+    expect('roofType' in stored).toBe(false);
+  });
+
+  it.each([
+    [{ roofType: 'metal' }, /doesn't qualify/],
+    [{ roofType: 'clay' }, /doesn't qualify/],
+    [{ roofType: 'wood_shingle' }, /doesn't qualify/],
+    [{ roofType: 'thatch' }, /roofType/],
+    [{ heavyShade: 'yes' }, /heavyShade/],
+    [{ needsReview: 1 }, /needsReview/],
+    [{ monthlyKwh: -5 }, /monthlyKwh/],
+    [{ monthlyKwh: '1200' }, /monthlyKwh/],
+    [{ usage: [1, 2] }, /usage/],
+    [{ usage: { blob: 'x'.repeat(5000) } }, /usage is too large/],
+  ])('refuses %j', async (extra, error) => {
+    const res = await POST(req({ ...VALID, ...extra }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(error);
+    expect(db.store.get('solarLeads')?.size ?? 0).toBe(0);
+  });
 });
 
 describe('GET /api/portal/solar/leads', () => {
@@ -198,6 +238,25 @@ describe('GET /api/portal/solar/leads', () => {
     });
     // A cancelled booking is no booking, and the lead reads new.
     expect(leads[0]).toMatchObject({ status: 'new', booking: null });
+  });
+
+  it('includes the stage: an old sold lead reads demoed + sale, an old lead none', async () => {
+    mockGate.mockResolvedValue(ADMIN);
+    const { leads } = await (await get()).json();
+    const byId = Object.fromEntries(leads.map((l: { id: string }) => [l.id, l]));
+    expect(byId.rep2_a).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'sale', stageHistory: [] });
+    expect(byId.rep1_a).toMatchObject({
+      stage: null, stageOutcome: null, needsReview: false, roofType: null, heavyShade: null, monthlyKwh: null, usage: null,
+    });
+  });
+
+  it('gives a rep the stage on their own leads (?mine=1)', async () => {
+    db.store.get('solarLeads')!.set('rep1_a', {
+      ...db.store.get('solarLeads')!.get('rep1_a')!, stage: 'appointment_demoed', stageOutcome: 'proposal_sent',
+    });
+    const res = await GET(new NextRequest('http://localhost/api/portal/solar/leads?mine=1'));
+    const lead = (await res.json()).leads.find((l: { id: string }) => l.id === 'rep1_a');
+    expect(lead).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'proposal_sent' });
   });
 
   it("gives an admin every lead but demo accounts'", async () => {

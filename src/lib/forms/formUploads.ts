@@ -90,7 +90,7 @@ export const FORM_UPLOAD_SLOTS: Record<string, string[]> = {
   'payroll-dispute': [''],
   'leads-request': ['hostile', 'blind-knock', 'lasso'],
   // Solar lead photos (deck slide 5 / 3C Doors): one slot per photo.
-  'solar-lead': ['billPage1', 'billGraph', 'panel'],
+  'solar-lead': ['billPage1', 'billGraph', 'panel', 'meter'],
 };
 
 // sale-proof uploads use a per-sale unique id as the slot, so one rep's sales

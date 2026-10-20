@@ -81,6 +81,32 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
     expect((await patch('nope', { creditTier: 'purchase_600' })).status).toBe(404);
   });
 
+  describe('app fields', () => {
+    const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;
+
+    it('lets the creator update roofType, heavyShade, monthlyKwh and usage without a creditTier', async () => {
+      const res = await patch('rep1_c1', { roofType: 'flat', heavyShade: true, monthlyKwh: 900, usage: { daily: 30 } });
+      expect(res.status).toBe(200);
+      expect(lead()).toMatchObject({ roofType: 'flat', heavyShade: true, needsReview: true, monthlyKwh: 900, usage: { daily: 30 }, creditTier: null });
+    });
+
+    it('lets an admin clear needsReview', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', needsReview: true });
+      mockGate.mockResolvedValue({ ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null });
+      expect((await patch('rep1_c1', { needsReview: false })).status).toBe(200);
+      expect(lead().needsReview).toBe(false);
+    });
+
+    it('refuses a blocked roof and another rep', async () => {
+      const res = await patch('rep1_c1', { roofType: 'metal' });
+      expect(res.status).toBe(400);
+      expect((await res.json()).error).toMatch(/doesn't qualify/);
+      mockGate.mockResolvedValue({ ...REP, uid: 'rep2' });
+      expect((await patch('rep1_c1', { roofType: 'flat' })).status).toBe(403);
+      expect(lead().roofType).toBeUndefined();
+    });
+  });
+
   describe('status', () => {
     const ADMIN = { ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null };
     const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;
@@ -144,6 +170,29 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold', bookingId: 'b1' });
       expect(await (await patch('rep1_c1', { status: 'booked' })).json()).toMatchObject({ status: 'new' });
       expect(lead().status).toBe('new');
+    });
+
+    it('moves the stage with the status: sold, lost, reopen (history kept)', async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      await patch('rep1_c1', { status: 'sold' });
+      expect(lead()).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'sale', stageChangedBy: 'adm' });
+      await patch('rep1_c1', { status: 'lost' });
+      expect(lead()).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'no_sale' });
+      await patch('rep1_c1', { status: 'new' });
+      expect(lead()).toMatchObject({ status: 'new', stage: null, stageOutcome: null });
+      const history = lead().stageHistory as { stage: string | null; outcome?: string; byUid: string }[];
+      expect(history.map((e) => [e.stage, e.outcome ?? null])).toEqual([
+        ['appointment_demoed', 'sale'],
+        ['appointment_demoed', 'no_sale'],
+        [null, null],
+      ]);
+    });
+
+    it('mark sold keeps a later stage', async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold', stage: 'site_survey', stageHistory: [] });
+      await patch('rep1_c1', { status: 'sold' });
+      expect(lead()).toMatchObject({ stage: 'site_survey', stageHistory: [] });
     });
 
     it('403s anyone but an admin, even the rep who created it', async () => {

@@ -1,4 +1,5 @@
 // Validation for solar lead input (POST /api/portal/solar/leads and PATCH).
+import { z } from 'zod';
 import { isCleanAttachmentPath } from '@/lib/forms/attachmentPath';
 import { buildSubmissionAttachmentFolder, isValidFormUploadId } from '@/lib/forms/formUploads';
 
@@ -26,7 +27,7 @@ export function isSolarLeadStatus(value: unknown): value is SolarLeadStatus {
   return typeof value === 'string' && (SOLAR_LEAD_STATUSES as readonly string[]).includes(value);
 }
 
-export const PHOTO_SLOTS = ['billPage1', 'billGraph', 'panel'] as const;
+export const PHOTO_SLOTS = ['billPage1', 'billGraph', 'panel', 'meter'] as const;
 export type PhotoSlot = (typeof PHOTO_SLOTS)[number];
 
 /** Short photo names for the lead alert email. */
@@ -34,7 +35,104 @@ export const PHOTO_SLOT_LABELS: Record<PhotoSlot, string> = {
   billPage1: 'Bill (first page)',
   billGraph: 'Bill (bar graph)',
   panel: 'Electric panel',
+  meter: 'Electric meter',
 };
+
+/** Roofs that qualify (the knock app's "asphalt" is shingle). */
+export const ROOF_TYPES = ['concrete_tile', 'shingle', 'flat'] as const;
+export type RoofType = (typeof ROOF_TYPES)[number];
+/** Roofs that stop the lead: the deck and the app block them, the API refuses them. */
+export const BLOCKED_ROOF_TYPES = ['metal', 'clay', 'wood_shingle'] as const;
+export type BlockedRoofType = (typeof BLOCKED_ROOF_TYPES)[number];
+
+export const ROOF_TYPE_LABELS: Record<RoofType | BlockedRoofType, string> = {
+  concrete_tile: 'Concrete tile',
+  shingle: 'Shingle (asphalt)',
+  flat: 'Flat',
+  metal: 'Metal',
+  clay: 'Clay tile',
+  wood_shingle: 'Wood shingle',
+};
+
+export const ROOF_NOT_QUALIFIED = "This roof type doesn't qualify for solar right now";
+
+export function isRoofType(value: unknown): value is RoofType {
+  return typeof value === 'string' && (ROOF_TYPES as readonly string[]).includes(value);
+}
+
+export function isBlockedRoofType(value: unknown): value is BlockedRoofType {
+  return typeof value === 'string' && (BLOCKED_ROOF_TYPES as readonly string[]).includes(value);
+}
+
+/** Largest stored `usage` object (the deck's usage helper), as JSON. */
+export const USAGE_MAX_BYTES = 4096;
+
+/** The qualifying answers the app (and deck) send with a lead; every one optional. */
+export type LeadExtras = {
+  roofType?: RoofType;
+  heavyShade?: boolean;
+  needsReview?: boolean;
+  monthlyKwh?: number;
+  usage?: Record<string, unknown>;
+};
+
+const usageSchema = z
+  .record(z.string(), z.unknown())
+  .refine((v) => {
+    try {
+      return new TextEncoder().encode(JSON.stringify(v)).length <= USAGE_MAX_BYTES;
+    } catch {
+      return false;
+    }
+  }, 'usage is too large');
+
+const extrasSchema = z.object({
+  roofType: z
+    .string()
+    .refine((v) => !isBlockedRoofType(v), ROOF_NOT_QUALIFIED)
+    .refine(isRoofType, 'Invalid roofType')
+    .optional(),
+  heavyShade: z.boolean().optional(),
+  needsReview: z.boolean().optional(),
+  monthlyKwh: z.number().min(0, 'Invalid monthlyKwh').max(100000, 'Invalid monthlyKwh').optional(),
+  usage: usageSchema.optional(),
+});
+
+const EXTRA_KEYS = ['roofType', 'heavyShade', 'needsReview', 'monthlyKwh', 'usage'] as const;
+
+/** Whether the body carries any of the extras (PATCH picks its branch on it). */
+export function hasLeadExtras(body: Record<string, unknown>): boolean {
+  return EXTRA_KEYS.some((k) => body[k] !== undefined && body[k] !== null);
+}
+
+/**
+ * roofType, heavyShade, needsReview, monthlyKwh and usage, validated. Absent
+ * or null fields are left out. A blocked roof (metal, clay, wood shingle) is
+ * refused. Heavy shade always means needsReview (the closer looks first).
+ */
+export function parseLeadExtras(body: Record<string, unknown>): { ok: true; extras: LeadExtras } | { ok: false; error: string } {
+  const picked: Record<string, unknown> = {};
+  for (const k of EXTRA_KEYS) if (body[k] !== undefined && body[k] !== null) picked[k] = body[k];
+  const res = extrasSchema.safeParse(picked);
+  if (!res.success) {
+    const issue = res.error.issues[0];
+    const field = String(issue?.path?.[0] ?? '');
+    const custom = issue?.message && !issue.message.startsWith('Invalid input') && !issue.message.startsWith('Too ')
+      ? issue.message
+      : '';
+    return { ok: false, error: custom || `Invalid ${field || 'field'}` };
+  }
+  const extras: LeadExtras = {};
+  const v = res.data;
+  if (v.roofType !== undefined) extras.roofType = v.roofType as RoofType;
+  if (v.heavyShade !== undefined) extras.heavyShade = v.heavyShade;
+  if (v.needsReview !== undefined) extras.needsReview = v.needsReview;
+  if (v.heavyShade === true) extras.needsReview = true;
+  if (v.monthlyKwh !== undefined) extras.monthlyKwh = Math.round(v.monthlyKwh);
+  // A JSON round trip keeps only plain data (no undefined, no prototypes).
+  if (v.usage !== undefined) extras.usage = JSON.parse(JSON.stringify(v.usage)) as Record<string, unknown>;
+  return { ok: true, extras };
+}
 
 export function str(v: unknown, max = 200): string {
   return typeof v === 'string' ? v.trim().slice(0, max) : '';
@@ -75,7 +173,9 @@ export type LeadFields = {
   doorId: string | null;
   campaignId: string | null;
   source: 'portal' | 'knock';
-};
+  /** False unless sent true (or heavyShade is true); every new lead stores it. */
+  needsReview: boolean;
+} & Omit<LeadExtras, 'needsReview'>;
 
 export function parseLead(body: Record<string, unknown>, uid: string): { ok: true; fields: LeadFields } | { ok: false; error: string } {
   const first = str(body.first, 80);
@@ -128,6 +228,10 @@ export function parseLead(body: Record<string, unknown>, uid: string): { ok: tru
     }
   }
 
+  const parsedExtras = parseLeadExtras(body);
+  if (!parsedExtras.ok) return parsedExtras;
+  const { needsReview, ...extras } = parsedExtras.extras;
+
   const doorId = str(body.doorId, 128) || null;
   const campaignId = str(body.campaignId, 128) || null;
   const source = body.source === 'knock' || doorId || campaignId ? 'knock' : 'portal';
@@ -150,6 +254,8 @@ export function parseLead(body: Record<string, unknown>, uid: string): { ok: tru
       doorId,
       campaignId,
       source,
+      ...extras,
+      needsReview: needsReview === true,
     },
   };
 }
