@@ -11,6 +11,8 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 import { JACOB_VIRTUAL, OWNER_IN_PERSON, OWNER_VIRTUAL } from '@/lib/solar/availability';
 import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
+import { createFakeGoogle } from '@/lib/solar/testing/fakeGoogle';
+import { encryptToken } from '@/lib/solar/google/crypto';
 
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedAdmin as unknown as ReturnType<typeof vi.fn>;
@@ -175,6 +177,37 @@ describe('DELETE /api/portal/solar/consultants/[uid]', () => {
     const res = await del('jac');
     expect(res.status).toBe(409);
     expect(saved().has('jac')).toBe(true);
+  });
+
+  it("revokes the removed consultant's Google grant and deletes the token", async () => {
+    vi.stubEnv('GOOGLE_OAUTH_CLIENT_ID', 'client-id.apps.googleusercontent.com');
+    vi.stubEnv('GOOGLE_OAUTH_CLIENT_SECRET', 'test-client-secret');
+    const google = createFakeGoogle();
+    vi.stubGlobal('fetch', google.fetch);
+    try {
+      await put('jac', HOURS);
+      db.store.set('solarGoogleTokens', new Map([['own', { refreshToken: encryptToken('1//refresh-secret', 'own'), status: 'ok' }]]));
+      expect((await del('own')).status).toBe(200);
+      expect(google.find('POST', 'oauth2.googleapis.com/revoke')!.body).toEqual({ token: '1//refresh-secret' });
+      expect(db.store.get('solarGoogleTokens')!.has('own')).toBe(false);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('a Google failure never fails the removal', async () => {
+    vi.stubEnv('GOOGLE_OAUTH_CLIENT_SECRET', 'test-client-secret');
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
+    try {
+      await put('jac', HOURS);
+      db.store.set('solarGoogleTokens', new Map([['own', { refreshToken: encryptToken('1//refresh-secret', 'own'), status: 'ok' }]]));
+      expect((await del('own')).status).toBe(200);
+      expect([...saved().keys()]).toEqual(['jac']);
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('404s for someone who is not a consultant', async () => {

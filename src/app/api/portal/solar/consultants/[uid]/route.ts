@@ -3,6 +3,7 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 import { parseAvailability, type SolarAvailability } from '@/lib/solar/availability';
 import { availabilityOf, loadConsultants } from '@/lib/solar/server';
+import { disconnect as disconnectGoogle } from '@/lib/solar/google/connection';
 import { parseConsultantContact, storedConsultantPhone, storedMeetLink } from '@/lib/solar/consultantContact';
 
 const COLLECTION = 'solarAvailability';
@@ -130,6 +131,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     if (outcome === 'last') {
       return NextResponse.json({ error: 'Add another consultant before removing the last one' }, { status: 409 });
     }
+
+    // Their Google grant goes with them: revoked at Google, token doc deleted.
+    // Best effort; a failure here never fails the removal. (Their booked
+    // events stay on their calendar; a later cancel can't delete them.)
+    await disconnectGoogle(uid).catch((error: unknown) => {
+      console.error('solar consultant removal: google disconnect failed', error instanceof Error ? error.message : '');
+    });
 
     // Equality filter only (no composite index); time and status are checked here.
     const bookings = await db.collection('solarBookings').where('consultantUid', '==', uid).get();
