@@ -195,7 +195,7 @@ function AcrossTheBoard({ entries, currentUser, metric, period, pastMonth }: { e
       <div className={d.stat}>
         <span className={d.statLabel}>Team pulse</span>
         <strong className={d.statValue}>{formatNumber(totalPoints)} {isSolarMetric(metric) ? unit : 'pts'}</strong>
-        <span className={d.statSub}>{entries.length} reps, {pastMonth ? monthLabel(pastMonth) : daysLeft ? `${daysLeft} days left` : 'all time'}</span>
+        <span className={d.statSub}>{entries.length} {entries.length === 1 ? 'rep' : 'reps'}, {pastMonth ? monthLabel(pastMonth) : daysLeft ? `${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left` : 'all time'}</span>
       </div>
     </section>
   );

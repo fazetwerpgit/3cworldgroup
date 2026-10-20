@@ -66,21 +66,21 @@ describe('LegacyLeaderboardTable team pulse', () => {
     // Saturday 2026-10-24 12:00 Chicago.
     vi.setSystemTime(new Date('2026-10-24T17:00:00.000Z'));
     render();
-    expect(pulse()).toContain('1 days left');
+    expect(pulse()).toContain('1 day left');
   });
 
   it('uses the Chicago day, not the device day, near midnight', () => {
     // 2026-10-25 03:00 UTC is still Saturday 22:00 in Chicago.
     vi.setSystemTime(new Date('2026-10-25T03:00:00.000Z'));
     render();
-    expect(pulse()).toContain('1 days left');
+    expect(pulse()).toContain('1 day left');
   });
 
   it('counts the month down to the 1st at Chicago midnight', () => {
     // 2026-10-31 23:00 Chicago is already Nov 1 in UTC.
     vi.setSystemTime(new Date('2026-11-01T04:00:00.000Z'));
     render({ period: 'month' });
-    expect(pulse()).toContain('1 days left');
+    expect(pulse()).toContain('1 day left');
   });
 
   it('labels the leader margin in the active metric', () => {

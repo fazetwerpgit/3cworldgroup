@@ -209,7 +209,7 @@ function SolarWeek({ metric, count, loading, failed, onRetry }: { metric: SolarM
 
   return (
     <div className={d.card}>
-      <h2 className={d.cardTitle}>This week</h2>
+      <h2 className={d.cardTitle}>Your week</h2>
       <div className={d.challengeBody}>
         {failed ? (
           <span className={d.retryRow} role="alert">
