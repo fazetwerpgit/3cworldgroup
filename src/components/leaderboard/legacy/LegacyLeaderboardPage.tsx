@@ -13,7 +13,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { LegacyLeaderboardTable } from './LegacyLeaderboardTable';
-import { SOLAR_COPY, SOLAR_METRIC_OPTIONS, isSolarMetric } from '../solarMetrics';
+import { SOLAR_COPY, SOLAR_METRIC_OPTIONS, isSolarMetric, type SolarMetric } from '../solarMetrics';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
@@ -196,8 +196,10 @@ function WeeklyChallenge({
 }
 
 // The solar board's card in the weekly challenge's slot: there is no solar
-// target, so it is the viewer's own consults booked this week and the time left.
-function SolarWeek({ booked, loading, failed, onRetry }: { booked: number | null; loading: boolean; failed: boolean; onRetry: () => void }) {
+// target, so it is the viewer's own count this week (the selected Set | Demoed |
+// Closed) and the time left.
+function SolarWeek({ metric, count, loading, failed, onRetry }: { metric: SolarMetric; count: number | null; loading: boolean; failed: boolean; onRetry: () => void }) {
+  const copy = SOLAR_COPY[metric];
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -211,7 +213,7 @@ function SolarWeek({ booked, loading, failed, onRetry }: { booked: number | null
       <div className={d.challengeBody}>
         {failed ? (
           <span className={d.retryRow} role="alert">
-            Couldn&apos;t load your consults
+            Couldn&apos;t load your {copy.label.toLowerCase()} count
             <button type="button" className={d.retry} onClick={onRetry}>
               Retry
             </button>
@@ -219,9 +221,9 @@ function SolarWeek({ booked, loading, failed, onRetry }: { booked: number | null
         ) : (
           <>
             <strong className={d.challengeLine}>
-              {loading || booked === null ? 'Consults booked' : `${booked} ${booked === 1 ? 'consult' : 'consults'} booked`}
+              {loading || count === null ? copy.label : `${count} ${copy.unit}`}
             </strong>
-            <span className={d.challengeMeta}>{loading || booked === null ? 'Loading' : weekTimeLeft(now)}</span>
+            <span className={d.challengeMeta}>{loading || count === null ? 'Loading' : weekTimeLeft(now)}</span>
           </>
         )}
       </div>
@@ -318,8 +320,9 @@ export function LegacyLeaderboardPage({
   onRetry,
   boardSwitch = null,
 }: LegacyLeaderboardPageProps) {
-  // The weekly slot on the solar board stays booked consults, whichever count ranks the board.
-  const solar = isSolarMetric(metric);
+  // The weekly slot on the solar board follows the selected Set | Demoed | Closed.
+  const solarMetric: SolarMetric | null = isSolarMetric(metric) ? metric : null;
+  const solar = solarMetric !== null;
   const {
     currentUser: weeklyCurrentUser,
     loading: weeklyLoading,
@@ -332,15 +335,15 @@ export function LegacyLeaderboardPage({
 
   useEffect(() => {
     if (!active) return;
-    // The solar board's slot: the viewer's consults booked this week.
-    if (solar) {
-      fetchWeeklyLeaderboard('week', 'bookedConsults', 1, 'approved', { source: 'solar' });
+    // The solar board's slot: the viewer's own count this week, by the selected metric.
+    if (solarMetric) {
+      fetchWeeklyLeaderboard('week', solarMetric, 1, 'approved', { source: 'solar' });
       return;
     }
     // 'submitted' scope: the challenge counts sales as reps log them,
     // not only after admin approval.
     fetchWeeklyLeaderboard('week', 'totalSales', 1, 'submitted');
-  }, [active, solar, fetchWeeklyLeaderboard]);
+  }, [active, solarMetric, fetchWeeklyLeaderboard]);
 
   useEffect(() => {
     if (!active || solar) return;
@@ -369,7 +372,7 @@ export function LegacyLeaderboardPage({
   }, [active, solar, challengeAttempt]);
 
   const retryWeeklySales = () => {
-    if (solar) fetchWeeklyLeaderboard('week', 'bookedConsults', 1, 'approved', { source: 'solar' });
+    if (solarMetric) fetchWeeklyLeaderboard('week', solarMetric, 1, 'approved', { source: 'solar' });
     else fetchWeeklyLeaderboard('week', 'totalSales', 1, 'submitted');
   };
 
@@ -397,9 +400,10 @@ export function LegacyLeaderboardPage({
         </header>
         <LegacyLeaderboardFilters period={period} metric={metric} setPeriod={onPeriodChange} setMetric={onMetricChange} monthNav={monthNav} boardSwitch={boardSwitch} />
         <div className={d.summary}>
-          {solar ? (
+          {solarMetric ? (
             <SolarWeek
-              booked={weeklySales}
+              metric={solarMetric}
+              count={weeklySales}
               loading={weeklyLoading}
               failed={!weeklyLoading && weeklyError !== null}
               onRetry={retryWeeklySales}

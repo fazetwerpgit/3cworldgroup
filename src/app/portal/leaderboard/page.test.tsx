@@ -309,7 +309,7 @@ describe('fiber and solar boards', () => {
     await act(async () => root.render(<LeaderboardRoute />));
     expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'bookedConsults', 100, 'approved', { team: true, source: 'solar' });
     expect(container.textContent).toContain('Weekly booked consults · resets Sunday');
-    expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 consults this week');
+    expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 set this week');
     expect(container.querySelector('[aria-label="Leaderboard"]')).toBeNull();
     const metricGroup = container.querySelector('[aria-label="Leaderboard metric"]');
     expect(metricGroup?.textContent).toBe('SetDemoedClosed');
@@ -324,7 +324,7 @@ describe('fiber and solar boards', () => {
     await act(async () => demoed?.click());
     expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'solarDemoed', 100, 'approved', { team: true, source: 'solar' });
     expect(container.textContent).toContain('Monthly demoed appointments · resets on the 1st');
-    expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 demos this month');
+    expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 demoed this month');
 
     const closed = buttonsIn().find((b) => b.textContent === 'Closed');
     await act(async () => closed?.click());

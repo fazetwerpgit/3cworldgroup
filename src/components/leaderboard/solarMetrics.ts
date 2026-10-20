@@ -9,15 +9,10 @@ export function isSolarMetric(metric: string): metric is SolarMetric {
   return metric === 'bookedConsults' || metric === 'solarDemoed' || metric === 'solarClosed';
 }
 
-/** Set | Demoed | Closed, in switch order. Set (booked consults) is the default. */
-export const SOLAR_METRIC_OPTIONS: { value: SolarMetric; label: string }[] = [
-  { value: 'bookedConsults', label: 'Set' },
-  { value: 'solarDemoed', label: 'Demoed' },
-  { value: 'solarClosed', label: 'Closed' },
-];
-
 export interface SolarCopy {
-  /** After a number: "3 consults". */
+  /** The tab label: Set, Demoed, Closed. */
+  label: string;
+  /** After a number: "3 set", "3 demoed", "3 closed". */
   unit: string;
   /** In a sentence: "1 consult passes ...". */
   one: string;
@@ -42,7 +37,8 @@ export interface SolarCopy {
 
 export const SOLAR_COPY: Record<SolarMetric, SolarCopy> = {
   bookedConsults: {
-    unit: 'consults',
+    label: 'Set',
+    unit: 'set',
     one: 'consult',
     many: 'consults',
     head: 'Booked',
@@ -57,7 +53,8 @@ export const SOLAR_COPY: Record<SolarMetric, SolarCopy> = {
     footer: 'Rankings count consults booked in the selected period; cancelled ones drop off.',
   },
   solarDemoed: {
-    unit: 'demos',
+    label: 'Demoed',
+    unit: 'demoed',
     one: 'demo',
     many: 'demos',
     head: 'Demoed',
@@ -72,6 +69,7 @@ export const SOLAR_COPY: Record<SolarMetric, SolarCopy> = {
     footer: 'Rankings count appointments demoed in the selected period, any outcome.',
   },
   solarClosed: {
+    label: 'Closed',
     unit: 'closed',
     one: 'sale',
     many: 'sales',
@@ -87,3 +85,8 @@ export const SOLAR_COPY: Record<SolarMetric, SolarCopy> = {
     footer: 'Rankings count demos closed as a sale in the selected period.',
   },
 };
+
+/** Set | Demoed | Closed, in switch order. Set (booked consults) is the default. */
+export const SOLAR_METRIC_OPTIONS: { value: SolarMetric; label: string }[] = (
+  ['bookedConsults', 'solarDemoed', 'solarClosed'] as const
+).map((value) => ({ value, label: SOLAR_COPY[value].label }));
