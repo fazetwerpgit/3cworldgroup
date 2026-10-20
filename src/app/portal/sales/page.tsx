@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { CheckCircle2, Plus, RotateCw, X } from 'lucide-react';
@@ -17,7 +17,10 @@ import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { useAuth } from '@/contexts/AuthContext';
-import { isOwner, isSolarOnlyUser } from '@/types';
+import { useViewAs } from '@/contexts/ViewAsContext';
+import { BOARD_OPTIONS } from '@/components/leaderboard/BoardSwitch';
+import { SALES_SIDE_KEY, useRememberedSide, type RememberedSide } from '@/lib/portal/rememberedSide';
+import { isDualRoleUser, isOwner, isSolarOnlyUser } from '@/types';
 import { datedSales, undatedSales } from '@/lib/pay/payGroups';
 import { isTFiberSale, payoutsInMonth } from '@/lib/pay/payoutWindow';
 import { countedSales } from '@/lib/sales/installBucket';
@@ -39,6 +42,8 @@ import { cacheTimeLabel } from '@/lib/cache/dataCache';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
+import tx from '@/components/portal/rep/rep-taste.module.css';
+import css from './solar-sales.module.css';
 
 function PageHead({
   month,
@@ -55,6 +60,25 @@ function PageHead({
       <h1 className={`${p.title} ${x.salesTitle}`}>Sales</h1>
       {month && onMonth ? <MonthPicker month={month} max={max ?? currentMonth()} onChange={onMonth} /> : null}
     </header>
+  );
+}
+
+/** A dual rep's Fiber | Solar switch, styled and worded as the Board's. */
+function SalesSideSwitch({ side, onChange }: { side: RememberedSide; onChange: (side: RememberedSide) => void }) {
+  return (
+    <div className={`${tx.seg} ${css.switch}`} role="group" aria-label="Sales">
+      {BOARD_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          className={tx.segBtn}
+          aria-pressed={side === option.value}
+          onClick={() => onChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -115,7 +139,8 @@ function LoggedBanner({ name, onDismiss }: { name: string | null; onDismiss: () 
   );
 }
 
-function SalesContent() {
+/** `sideSwitch`: a dual rep's Fiber | Solar switch, under the page head. */
+function SalesContent({ sideSwitch = null }: { sideSwitch?: ReactNode }) {
   const { user, hasPermission, isRole } = useAuth();
   const params = useSearchParams();
 
@@ -300,6 +325,7 @@ function SalesContent() {
     return (
       <div className={x.page}>
         <PageHead month={month} onMonth={setMonth} />
+        {sideSwitch}
         {loggedBanner}
         {booting ? (
           <SalesSkeleton label="Loading the company book" />
@@ -353,6 +379,7 @@ function SalesContent() {
         max={maxMonth}
         onMonth={booting || failed || sales.length === 0 ? undefined : setMonth}
       />
+      {sideSwitch}
       {loggedBanner}
 
       {booting ? (
@@ -423,19 +450,48 @@ function SalesContent() {
   );
 }
 
+// A dual (fiber + solar) rep's Sales: a Fiber | Solar switch, remembered on
+// this device like the Board's. A link into the fiber list (a sale just
+// logged, a month, the pay view) opens on Fiber whatever was last picked.
+function DualSales() {
+  const params = useSearchParams();
+  const fiberLink = ['logged', 'month', 'view'].some((key) => params.has(key));
+  const [remembered, setSide] = useRememberedSide(SALES_SIDE_KEY);
+  const [linkedFiber, setLinkedFiber] = useState(fiberLink);
+  const side: RememberedSide = linkedFiber ? 'fiber' : remembered;
+  const pick = (next: RememberedSide) => {
+    setLinkedFiber(false);
+    setSide(next);
+  };
+  const sideSwitch = <SalesSideSwitch side={side} onChange={pick} />;
+  return side === 'solar' ? (
+    <SolarSales
+      head={
+        <>
+          <PageHead />
+          {sideSwitch}
+        </>
+      }
+    />
+  ) : (
+    <SalesContent sideSwitch={sideSwitch} />
+  );
+}
+
 // A solar-only rep sells no fiber: their Sales tab is their solar leads, so
-// the page asks for solar:read instead of sales:read.
+// the page asks for solar:read instead of sales:read. Fiber-only reps, and the
+// owner viewing as a rep, get today's list and no switch.
 export default function SalesPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
+  const { viewing } = useViewAs();
   const solarOnly = isSolarOnlyUser(user);
+  const dual = !viewing && isDualRoleUser(user) && hasPermission('solar:read');
   return (
     <RepShell permissions={solarOnly ? SOLAR_SALES_PERMISSIONS : FIBER_SALES_PERMISSIONS}>
       {solarOnly ? (
         <SolarSales head={<PageHead />} />
       ) : (
-        <Suspense fallback={<SalesSkeleton />}>
-          <SalesContent />
-        </Suspense>
+        <Suspense fallback={<SalesSkeleton />}>{dual ? <DualSales /> : <SalesContent />}</Suspense>
       )}
     </RepShell>
   );

@@ -11,3 +11,12 @@
     max-width: 720px;
   }
 }
+
+/* A dual rep's Fiber | Solar switch under the Sales title: full width on a
+   phone; on desktop it sizes like the Sales | Pay switch under it. */
+@media (min-width: 1024px) {
+  .switch {
+    align-self: flex-start;
+    min-width: 292px;
+  }
+}

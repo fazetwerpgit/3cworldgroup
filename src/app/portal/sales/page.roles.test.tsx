@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
 // The Sales tab by role: a fiber rep gets today's Sales list under sales:read;
-// a solar-only rep gets My leads plus the next consultation under solar:read.
+// a solar-only rep gets My leads plus the next consultation under solar:read;
+// a dual rep gets a remembered Fiber | Solar switch.
 
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -9,10 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const env = vi.hoisted(() => ({
   user: null as Record<string, unknown> | null,
+  search: '',
+  viewing: false,
   shellPermissions: [] as Array<string[] | undefined>,
 }));
 
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('') }));
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(env.search) }));
+vi.mock('@/contexts/ViewAsContext', () => ({ useViewAs: () => ({ viewing: env.viewing }) }));
 vi.mock('next/dynamic', () => ({ default: () => () => <div data-testid="board" /> }));
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -76,6 +80,8 @@ const q = (id: string) => container.querySelector(`[data-testid="${id}"]`);
 
 beforeEach(() => {
   env.shellPermissions = [];
+  env.search = '';
+  env.viewing = false;
   window.localStorage.clear();
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -85,7 +91,19 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.restoreAllMocks();
 });
+
+const DUAL = { uid: 'u1', role: 'rep', fieldRole: 'ae_tier_1', solarRole: 'entry_canvasser' };
+const sideSwitch = () => container.querySelector('[aria-label="Sales"]');
+const pressed = () => sideSwitch()?.querySelector('[aria-pressed="true"]')?.textContent;
+const tap = (label: string) =>
+  act(() => [...container.querySelectorAll<HTMLButtonElement>('[aria-label="Sales"] button')].find((b) => b.textContent === label)?.click());
+function reload() {
+  act(() => root.unmount());
+  root = createRoot(container);
+  act(() => root.render(<SalesPage />));
+}
 
 describe('the Sales tab by role', () => {
   it('a fiber-only rep: today\'s Sales list under sales:read, nothing solar, no switch', () => {
@@ -109,5 +127,64 @@ describe('the Sales tab by role', () => {
     // A lead opens its details sheet.
     act(() => (q('next-consult') as HTMLButtonElement).click());
     expect(q('lead-sheet')).not.toBeNull();
+  });
+
+  it('a dual rep: a Fiber | Solar switch, Fiber first; Solar shows My leads and the next consultation', () => {
+    env.user = DUAL;
+    act(() => root.render(<SalesPage />));
+    expect(env.shellPermissions.at(-1)).toEqual(['sales:read']);
+    expect(sideSwitch()?.textContent).toBe('FiberSolar');
+    expect(pressed()).toBe('Fiber');
+    expect(q('fiber-sales')).not.toBeNull();
+
+    tap('Solar');
+    expect(pressed()).toBe('Solar');
+    expect(q('my-leads')).not.toBeNull();
+    expect(q('next-consult')).not.toBeNull();
+    expect(q('fiber-sales')).toBeNull();
+    expect(container.querySelector('h1')?.textContent).toBe('Sales');
+  });
+
+  it('a dual rep reopens on the side last picked', () => {
+    env.user = DUAL;
+    act(() => root.render(<SalesPage />));
+    tap('Solar');
+    expect(window.localStorage.getItem('3c-sales-side')).toBe('solar');
+    reload();
+    expect(pressed()).toBe('Solar');
+    expect(q('my-leads')).not.toBeNull();
+    tap('Fiber');
+    reload();
+    expect(pressed()).toBe('Fiber');
+  });
+
+  it('a dual rep falls back to Fiber when storage throws, and the switch still works', () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    env.user = DUAL;
+    act(() => root.render(<SalesPage />));
+    expect(pressed()).toBe('Fiber');
+    tap('Solar');
+    expect(pressed()).toBe('Solar');
+  });
+
+  it('a link into the fiber list (a sale just logged) opens on Fiber even when Solar was last', () => {
+    window.localStorage.setItem('3c-sales-side', 'solar');
+    env.user = DUAL;
+    env.search = 'logged=s1';
+    act(() => root.render(<SalesPage />));
+    expect(pressed()).toBe('Fiber');
+    expect(q('fiber-sales')).not.toBeNull();
+  });
+
+  it('the owner viewing as a rep gets no switch', () => {
+    env.user = DUAL;
+    env.viewing = true;
+    act(() => root.render(<SalesPage />));
+    expect(sideSwitch()).toBeNull();
   });
 });
