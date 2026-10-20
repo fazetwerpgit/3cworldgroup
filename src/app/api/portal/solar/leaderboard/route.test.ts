@@ -157,7 +157,7 @@ describe('GET /api/portal/solar/leaderboard — counting', () => {
     vi.mocked(resolveSubject).mockResolvedValueOnce({ ok: true, viewing: true, uid: 'ben', ownerUid: 'own', target: {} as never });
     db.store.set('solarBookings', new Map(Object.entries({ b1: booking('ben', '2026-10-13T15:00:00Z') })));
     const body = await (await get('?period=week')).json();
-    expect(body.currentUser).toMatchObject({ uid: 'ben', booked: 1 });
+    expect(body.currentUser).toMatchObject({ uid: 'ben', booked: 1, count: 1 });
   });
 
   it('passes a refused view-as through', async () => {
@@ -168,5 +168,85 @@ describe('GET /api/portal/solar/leaderboard — counting', () => {
   it('fails with 500 instead of an empty board', async () => {
     vi.spyOn(db, 'collection').mockImplementationOnce(() => { throw new Error('unavailable'); });
     expect((await get()).status).toBe(500);
+  });
+});
+
+describe('GET /api/portal/solar/leaderboard — metric=set|demoed|closed', () => {
+  const at = (iso: string) => new Date(iso);
+  beforeEach(() => {
+    db.store.set('solarBookings', new Map(Object.entries({
+      b1: booking('cy', '2026-10-12T15:00:00Z'),
+    })));
+    db.store.set('solarLeads', new Map(Object.entries({
+      // Ana: demoed this week (proposal sent), demoed + sold this week, sold last month.
+      L1: { repUid: 'ana', stage: 'appointment_demoed', outcome: 'proposal_sent', updatedAt: at('2026-10-14T15:00:00Z'),
+        stageHistory: [{ stage: 'appointment_demoed', outcome: 'proposal_sent', at: at('2026-10-12T15:00:00Z') }] },
+      L2: { repUid: 'ana', stage: 'site_survey', updatedAt: at('2026-10-14T15:00:00Z'),
+        stageHistory: [
+          { stage: 'appointment_demoed', outcome: 'sale', at: at('2026-10-13T15:00:00Z') },
+          { stage: 'site_survey', at: at('2026-10-14T15:00:00Z') },
+        ] },
+      L3: { repUid: 'ana', status: 'sold', statusChangedAt: at('2026-09-10T15:00:00Z'), updatedAt: at('2026-10-14T15:00:00Z') },
+      // Ben: old lost lead this week (demoed, no sale); demo reached last month, sale this week.
+      L4: { repUid: 'ben', status: 'lost', statusChangedAt: at('2026-10-13T16:00:00Z') },
+      L5: { repUid: 'ben', stage: 'appointment_demoed', outcome: 'sale',
+        stageHistory: [
+          { stage: 'appointment_demoed', outcome: 'proposal_sent', at: at('2026-09-20T15:00:00Z') },
+          { stage: 'appointment_demoed', outcome: 'sale', at: at('2026-10-14T15:00:00Z') },
+        ] },
+      // Not counted: not demoed, a demo account's lead, no rep.
+      L6: { repUid: 'cy', status: 'booked', updatedAt: at('2026-10-14T15:00:00Z') },
+      L7: { repUid: 'cy', status: 'demo', stage: 'appointment_demoed', updatedAt: at('2026-10-14T15:00:00Z') },
+      L8: { status: 'sold', statusChangedAt: at('2026-10-14T15:00:00Z') },
+    })));
+  });
+  const rows = async (q: string) =>
+    (await (await get(q)).json()).leaderboard.map((r: { uid: string; count: number }) => [r.uid, r.count]);
+
+  it('defaults to set (booked consults), with booked kept on the rows', async () => {
+    const body = await (await get('?period=week')).json();
+    expect(body.metric).toBe('booked');
+    expect(body.leaderboard).toEqual([expect.objectContaining({ uid: 'cy', count: 1, booked: 1 })]);
+    expect(await rows('?period=week&metric=set')).toEqual([['cy', 1]]);
+    expect(await rows('?period=week&metric=bookedConsults')).toEqual([['cy', 1]]);
+    expect(await rows('?period=week&metric=nonsense')).toEqual([['cy', 1]]);
+  });
+
+  it('demoed: leads that reached the demo, any outcome, by when, credited to the setter', async () => {
+    const body = await (await get('?period=week&metric=demoed&include=team')).json();
+    expect(body.metric).toBe('demoed');
+    expect(body.leaderboard.map((r: { uid: string; count: number }) => [r.uid, r.count])).toEqual([['ana', 2], ['ben', 1]]);
+    expect(body.leaderboard[0]).not.toHaveProperty('booked');
+    expect(body.leaderboard[0].mix).toEqual([{ tier: 'Proposal sent', count: 1 }, { tier: 'Sale', count: 1 }]);
+    expect(body.recent[0]).toEqual({ repName: 'Ben Cole', plan: 'No sale', at: '2026-10-13T16:00:00.000Z' });
+    expect(await rows('?period=month&metric=solarDemoed')).toEqual([['ana', 2], ['ben', 1]]);
+    expect(await rows('?period=month&month=2026-09&metric=demoed')).toEqual([['ana', 1], ['ben', 1]]);
+    expect(await rows('?period=all&metric=demoed')).toEqual([['ana', 3], ['ben', 2]]);
+  });
+
+  it('closed: sales only, by when the sale showed', async () => {
+    const body = await (await get('?period=week&metric=closed')).json();
+    expect(body.metric).toBe('closed');
+    expect(body.leaderboard[0].mix).toEqual([]);
+    expect(body.leaderboard.map((r: { uid: string; count: number }) => [r.uid, r.count])).toEqual([['ana', 1], ['ben', 1]]);
+    expect(await rows('?period=month&month=2026-09&metric=closed')).toEqual([['ana', 1]]);
+    expect(await rows('?period=all&metric=solarClosed')).toEqual([['ana', 2], ['ben', 1]]);
+  });
+
+  it('firstMonth follows the metric', async () => {
+    expect((await (await get('?period=month&metric=demoed')).json()).firstMonth).toBe('2026-09');
+    expect((await (await get('?period=month')).json()).firstMonth).toBe('2026-10');
+  });
+
+  it('demoed/closed never read the bookings, and keep gating and view-as', async () => {
+    const spy = vi.spyOn(db, 'collection');
+    spy.mockClear();
+    await get('?period=week&metric=closed');
+    expect(spy.mock.calls.map(([name]) => name)).not.toContain('solarBookings');
+    mockGate.mockResolvedValue(fiberRep);
+    expect((await get('?metric=closed')).status).toBe(403);
+    mockGate.mockResolvedValue({ ok: true, uid: 'own', name: 'Owner', role: 'owner', solarRole: null, demoAccount: false, isAdmin: true, isOwner: true });
+    vi.mocked(resolveSubject).mockResolvedValueOnce({ ok: true, viewing: true, uid: 'ben', ownerUid: 'own', target: {} as never });
+    expect((await (await get('?period=week&metric=closed')).json()).currentUser).toMatchObject({ uid: 'ben', count: 1 });
   });
 });

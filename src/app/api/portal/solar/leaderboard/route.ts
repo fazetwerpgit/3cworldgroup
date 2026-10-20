@@ -6,13 +6,19 @@ import { permissionsFor } from '@/types/auth';
 import { chicagoMonthBounds, formatMonthParam, parseLeaderboardMonth, periodBounds } from '@/lib/leaderboard/periods';
 import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
 import {
+  bookingEvents,
   bookingLeadId,
   countedBookings,
   firstBookedMonth,
+  leadEvents,
+  parseSolarMetric,
   rankSolarBoard,
   recentConsults,
   unrankedSolarReps,
+  type SolarEvent,
 } from '@/lib/solar/leaderboard';
+import { SOLAR_LEAD_STAGES } from '@/lib/solar/leadStage';
+import { LEGACY_CLOSED_STATUSES, leadMilestones } from '@/lib/solar/leadMilestones';
 
 // The most ranked rows one request returns (the fiber board's rep cap).
 const LIMIT_CAP = 100;
@@ -20,14 +26,60 @@ const LIMIT_CAP = 100;
 const UNRANKED_CAP = 200;
 
 type Data = Record<string, unknown>;
+type Db = NonNullable<typeof adminDb>;
+type Doc = { id: string; data: Data };
+
+const docsOf = (snap: { docs: { id: string; data: () => Data | undefined }[] }): Doc[] =>
+  snap.docs.map((doc) => ({ id: doc.id, data: (doc.data() ?? {}) as Data }));
+
+/** Booked consults: every solarBookings doc, credited through its lead when it has no repUid. */
+async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>): Promise<SolarEvent[]> {
+  const bookings = docsOf(await db.collection('solarBookings').get());
+  const leadIds = [
+    ...new Set(
+      bookings
+        .filter(({ data }) => data.status !== 'cancelled' && !(typeof data.repUid === 'string' && data.repUid))
+        .map(({ data }) => bookingLeadId(data))
+        .filter(Boolean)
+    ),
+  ];
+  const leadSnaps = await Promise.all(leadIds.map((id) => db.collection('solarLeads').doc(id).get()));
+  const leadRepUid = new Map<string, string>();
+  leadSnaps.forEach((snap, index) => {
+    const repUid = snap.exists ? snap.get('repUid') : null;
+    if (typeof repUid === 'string' && repUid) leadRepUid.set(leadIds[index], repUid);
+  });
+  return bookingEvents(countedBookings(bookings, leadRepUid, await names));
+}
 
 /**
- * GET /api/portal/solar/leaderboard?period=week|month|year|all[&month=YYYY-MM][&limit=N][&include=team]
+ * Demoed or Closed: only the leads at or past the demo are read (two
+ * single-field `in` queries: a stage at/after the demo, or an old sold/lost
+ * status), never the whole solarLeads collection.
+ */
+async function stageEvents(db: Db, metric: 'demoed' | 'closed', names: Promise<ReadonlyMap<string, string>>): Promise<SolarEvent[]> {
+  const leadsRef = db.collection('solarLeads');
+  const [byStage, byStatus] = await Promise.all([
+    leadsRef.where('stage', 'in', [...SOLAR_LEAD_STAGES]).get(),
+    leadsRef.where('status', 'in', [...LEGACY_CLOSED_STATUSES]).get(),
+  ]);
+  const leads = new Map<string, Doc>();
+  for (const doc of [...docsOf(byStage), ...docsOf(byStatus)]) leads.set(doc.id, doc);
+  return leadEvents([...leads.values()], metric, await names, leadMilestones);
+}
+
+/**
+ * GET /api/portal/solar/leaderboard?period=week|month|year|all[&metric=set|demoed|closed][&month=YYYY-MM][&limit=N][&include=team]
  *
- * The solar board: reps ranked by booked consults (non-cancelled solarBookings,
- * credited to the lead's rep, counted by when they were booked). solar:read
- * only (a solar role, or admin/owner): 403 for everyone else. Same periods and
- * month stepper as GET /api/portal/leaderboard.
+ * The solar board, by `metric` (default set):
+ *  - set: booked consults (non-cancelled solarBookings, credited to the lead's
+ *    rep, counted by when they were booked);
+ *  - demoed: leads that reached the demo, any outcome;
+ *  - closed: leads whose demo outcome is a sale;
+ * Demoed and Closed credit the lead's rep (the setter) and count by when the
+ * lead got there. solar:read only (a solar role, or admin/owner): 403 for
+ * everyone else. Same periods and month stepper as GET /api/portal/leaderboard.
+ * Each row carries `count` (and `booked`, the same number, on the Set board).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -44,6 +96,7 @@ export async function GET(request: NextRequest) {
     const db = adminDb;
 
     const params = request.nextUrl.searchParams;
+    const metric = parseSolarMetric(params.get('metric'));
     const raw = params.get('period');
     const period = raw === 'week' || raw === 'year' || raw === 'all' ? raw : 'month';
     const parsedLimit = parseInt(params.get('limit') || '100', 10);
@@ -59,40 +112,35 @@ export async function GET(request: NextRequest) {
     const pastMonth = monthView !== null && !monthView.current;
     const bounds = monthView ? chicagoMonthBounds(monthView.key) : periodBounds(period, now);
 
-    const [bookingsSnap, usersSnap] = await Promise.all([
-      db.collection('solarBookings').get(),
-      db.collection('users').where('status', '==', 'active').get(),
-    ]);
-    const bookings = bookingsSnap.docs.map((doc) => ({ id: doc.id, data: (doc.data() ?? {}) as Data }));
-    const users = usersSnap.docs.map((doc) => ({ id: doc.id, data: (doc.data() ?? {}) as Data }));
-    const names = new Map(
-      users
-        .map(({ id, data }) => [id, typeof data.displayName === 'string' ? data.displayName.trim() : ''] as const)
-        .filter(([, name]) => !!name)
+    // Users and the board's own reads go out together; names join at the end.
+    const usersRead = db.collection('users').where('status', '==', 'active').get().then(docsOf);
+    const namesRead = usersRead.then(
+      (list) =>
+        new Map(
+          list
+            .map(({ id, data }) => [id, typeof data.displayName === 'string' ? data.displayName.trim() : ''] as const)
+            .filter(([, name]) => !!name)
+        )
     );
-
-    // A booking without its own repUid is credited through its lead.
-    const leadIds = [
-      ...new Set(
-        bookings
-          .filter(({ data }) => data.status !== 'cancelled' && !(typeof data.repUid === 'string' && data.repUid))
-          .map(({ data }) => bookingLeadId(data))
-          .filter(Boolean)
-      ),
-    ];
-    const leadSnaps = await Promise.all(leadIds.map((id) => db.collection('solarLeads').doc(id).get()));
-    const leadRepUid = new Map<string, string>();
-    leadSnaps.forEach((snap, index) => {
-      const repUid = snap.exists ? snap.get('repUid') : null;
-      if (typeof repUid === 'string' && repUid) leadRepUid.set(leadIds[index], repUid);
-    });
-
-    const counted = countedBookings(bookings, leadRepUid, names);
-    const ranked = rankSolarBoard(
+    // A failed users read surfaces through usersRead; don't also leave this one unhandled.
+    namesRead.catch(() => {});
+    const [users, counted] = await Promise.all([
+      usersRead,
+      metric === 'set' ? setEvents(db, namesRead) : stageEvents(db, metric, namesRead),
+    ]);
+    const rankedRows = rankSolarBoard(
       counted,
       { start: bounds?.start ?? null, end: bounds?.end ?? null },
       { now, withHistory: !pastMonth }
     );
+    // `booked` stays on the Set board's rows for clients that read it. Closed
+    // has no mix line: every close is a sale.
+    const ranked =
+      metric === 'set'
+        ? rankedRows.map((row) => ({ ...row, booked: row.count }))
+        : metric === 'closed'
+          ? rankedRows.map((row) => ({ ...row, mix: [] }))
+          : rankedRows;
 
     // A demo account (App Review) sees aliases for everyone but itself.
     const redact = createDemoRedactor({ uid: youUid, demoAccount: gate.demoAccount === true });
@@ -117,7 +165,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       period,
-      metric: 'booked',
+      metric: metric === 'set' ? 'booked' : metric,
       startDate: bounds?.start ?? new Date(0),
       ...(monthView && bounds
         ? { month: formatMonthParam(monthView.key), firstMonth: firstBookedMonth(counted), endDate: bounds.end }

@@ -10,6 +10,7 @@ import { LeaderboardPageContent } from './LeaderboardPageContent';
 import { LegacyLeaderboardPage } from './legacy/LegacyLeaderboardPage';
 import type { LeaderboardMetric, LeaderboardPeriod } from './LeaderboardTable';
 import { useWideViewport } from './useWideViewport';
+import { isSolarMetric, type SolarMetric } from './solarMetrics';
 import type { MonthNav } from './MonthNav';
 import { formatMonthParam, monthKeyFromParam } from '@/lib/leaderboard/periods';
 import { chicagoMonthKey, compareMonths, type MonthKey } from '@/lib/sales/monthWindow';
@@ -37,9 +38,14 @@ export function LeaderboardRoute() {
   const { leaderboard, currentUser, unranked, recent, firstMonth, loading, error, staleAt, fetchLeaderboard } =
     useLeaderboard(boards[0] === 'solar' ? FIRST_SOLAR_BOARD : FIRST_BOARD);
   const [period, setPeriod] = useState<LeaderboardPeriod>('week');
-  const [fiberMetric, setMetric] = useState<LeaderboardMetric>('totalPoints');
-  // The solar board ranks by one thing; the fiber metric pick waits for the way back.
-  const metric: LeaderboardMetric = solar ? 'bookedConsults' : fiberMetric;
+  const [fiberMetric, setFiberMetric] = useState<LeaderboardMetric>('totalPoints');
+  // Set | Demoed | Closed on the solar board (Set first); each board keeps its own pick for the way back.
+  const [solarMetric, setSolarMetric] = useState<SolarMetric>('bookedConsults');
+  const metric: LeaderboardMetric = solar ? solarMetric : fiberMetric;
+  const setMetric = useCallback((next: LeaderboardMetric) => {
+    if (isSolarMetric(next)) setSolarMetric(next);
+    else setFiberMetric(next);
+  }, []);
   // Only the solar board names its source: the fiber request stays as it was.
   const sourceOpt = useMemo(() => (solar ? { source: 'solar' as const } : {}), [solar]);
   const boardSwitch: BoardSwitch | null = boards.length > 1 ? { board, onChange: setPicked } : null;

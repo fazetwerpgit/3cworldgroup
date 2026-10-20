@@ -6,6 +6,7 @@ import styles from './leaderboard.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import tx from '@/components/portal/rep/rep-taste.module.css';
 import { BOARD_OPTIONS } from './BoardSwitch';
+import { SOLAR_METRIC_OPTIONS, isSolarMetric } from './solarMetrics';
 
 const periods: { value: LeaderboardPeriod; label: string }[] = [
   { value: 'week', label: 'Week' },
@@ -56,23 +57,21 @@ export function LeaderboardFilters({
           ))}
         </div>
       ) : null}
-      {/* Points | Sales switches what the board is ranked by: the lime switch.
-          The solar board ranks by booked consults alone, so it has none. */}
-      {metric === 'bookedConsults' ? null : (
-        <div className={tx.seg} role="group" aria-label="Leaderboard metric">
-          {metrics.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={tx.segBtn}
-              aria-pressed={metric === option.value}
-              onClick={() => onMetricChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Points | Sales (fiber) or Set | Demoed | Closed (solar) switches what
+          the board is ranked by: the lime switch. */}
+      <div className={tx.seg} role="group" aria-label="Leaderboard metric">
+        {(isSolarMetric(metric) ? SOLAR_METRIC_OPTIONS : metrics).map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={tx.segBtn}
+            aria-pressed={metric === option.value}
+            onClick={() => onMetricChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
       {/* Week / Month / Year / All time only filters the same board: filled chips. */}
       <div className={p.chipRow} role="group" aria-label="Leaderboard period">
         {periods.map((option) => (

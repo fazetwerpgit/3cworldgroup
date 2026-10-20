@@ -1,9 +1,12 @@
 // The solar leaderboard, pure so the route and the tests agree.
 //
-// Reps rank by BOOKED CONSULTS: every solarBookings doc that is not cancelled,
-// credited to the rep who owns the lead (booking.repUid, else the lead's
-// repUid) and counted in the period its consult was BOOKED (createdAt), not
-// when it happens. Same periods, order, rank history (movement, 7-day spark,
+// Three boards, one ranking: SET (the default) ranks BOOKED CONSULTS: every
+// solarBookings doc that is not cancelled, credited to the rep who owns the
+// lead (booking.repUid, else the lead's repUid) and counted in the period its
+// consult was BOOKED (createdAt), not when it happens. DEMOED ranks leads that
+// reached the demo (any outcome) and CLOSED leads whose outcome is a sale, both
+// credited to the lead's rep (the setter) and counted by when the lead got
+// there (lib/solar/leadMilestones). Same periods, order, rank history (movement, 7-day spark,
 // streak) and team extras as the fiber board, so the fiber board's components
 // draw it unchanged. Names, counts, modes and times only: no customer data.
 
@@ -17,13 +20,32 @@ import type { PlanMixEntry } from '@/lib/sales/planMix';
 
 type Data = Record<string, unknown>;
 
+/** Which count the solar board ranks by: ?metric=set|demoed|closed. */
+export type SolarBoardMetric = 'set' | 'demoed' | 'closed';
+
+/** The ?metric param, read leniently: anything unknown is the Set board. */
+export function parseSolarMetric(raw: string | null): SolarBoardMetric {
+  if (raw === 'demoed' || raw === 'solarDemoed') return 'demoed';
+  if (raw === 'closed' || raw === 'solarClosed') return 'closed';
+  return 'set';
+}
+
+/** One counted thing on the board: a booked consult, a demo, a close. */
+export interface SolarEvent {
+  repUid: string;
+  repName: string;
+  at: Date;
+  /** Its label in the mix line and the recent list ("Virtual", "Sale", ...). */
+  kind: string;
+}
+
 export interface SolarBoardRow {
   rank: number;
   uid: string;
   name: string;
-  /** Non-cancelled consults booked in the period. */
-  booked: number;
-  /** In the fiber board's plan-mix slot: booked consults by mode ("3× Virtual · 1× In person"). */
+  /** What the board counts in the period (consults booked, demos, closes). */
+  count: number;
+  /** In the fiber board's plan-mix slot: the count by kind ("3× Virtual · 1× In person"). */
   mix: PlanMixEntry[];
   movement: number | null;
   spark: (number | null)[];
@@ -36,10 +58,10 @@ export interface SolarUnrankedRep {
   name: string;
 }
 
-/** The newest booked consults team-wide: rep name, mode, when it was booked. */
+/** The newest events team-wide: rep name, kind (mode or outcome), when. */
 export interface SolarRecentConsult {
   repName: string;
-  /** "Virtual" or "In person". */
+  /** "Virtual" / "In person" on Set; the outcome on Demoed and Closed. */
   plan: string;
   at: string;
   /** Server-side only (demo aliasing); routes strip it. */
@@ -106,44 +128,82 @@ export function countedBookings(
   return out;
 }
 
-/** Mode counts, most first, then In person before Virtual on a tie. */
-function modeMix(bookings: CountedBooking[]): PlanMixEntry[] {
+/** The board's events for booked consults: one per counted booking, by mode. */
+export function bookingEvents(counted: CountedBooking[]): SolarEvent[] {
+  return counted.map((b) => ({ repUid: b.repUid, repName: b.repName, at: b.createdAt, kind: modeLabel(b.mode) }));
+}
+
+export function outcomeLabel(outcome: string | null): string {
+  return outcome === 'sale' ? 'Sale' : outcome === 'no_sale' ? 'No sale' : outcome === 'proposal_sent' ? 'Proposal sent' : 'Demoed';
+}
+
+/**
+ * The board's events for Demoed or Closed: one per lead that stands there,
+ * credited to the lead's rep (the setter) and dated when it got there.
+ * Demo accounts' leads ('demo' status) and leads with no rep are skipped.
+ */
+export function leadEvents(
+  leads: ReadonlyArray<{ id: string; data: Data }>,
+  metric: 'demoed' | 'closed',
+  names: ReadonlyMap<string, string>,
+  milestones: (data: Data) => { demoedAt: Date | null; outcome: string | null; closedAt: Date | null }
+): SolarEvent[] {
+  const out: SolarEvent[] = [];
+  for (const { data } of leads) {
+    if (data.status === 'demo') continue;
+    const repUid = text(data.repUid);
+    if (!repUid) continue;
+    const m = milestones(data);
+    const at = metric === 'closed' ? m.closedAt : m.demoedAt;
+    if (!at) continue;
+    out.push({
+      repUid,
+      repName: names.get(repUid) || text(data.repName) || 'Unknown',
+      at,
+      kind: metric === 'closed' ? 'Sale' : outcomeLabel(m.outcome),
+    });
+  }
+  return out;
+}
+
+/** Kind counts, most first, then A to Z on a tie (In person before Virtual). */
+function kindMix(events: SolarEvent[]): PlanMixEntry[] {
   const counts = new Map<string, number>();
-  for (const b of bookings) counts.set(modeLabel(b.mode), (counts.get(modeLabel(b.mode)) ?? 0) + 1);
+  for (const e of events) counts.set(e.kind, (counts.get(e.kind) ?? 0) + 1);
   return [...counts.entries()]
     .map(([tier, count]) => ({ tier, count }))
     .sort((a, b) => b.count - a.count || a.tier.localeCompare(b.tier));
 }
 
 /**
- * Every rep with a booking booked in [start, end), ranked by booked consults
- * (ties by name A to Z, then uid: the fiber board's order), with rank history.
+ * Every rep with an event in [start, end), ranked by their count (ties by
+ * name A to Z, then uid: the fiber board's order), with rank history.
  */
 export function rankSolarBoard(
-  counted: CountedBooking[],
+  counted: SolarEvent[],
   window: { start: Date | null; end: Date | null },
   opts: { now: Date; withHistory: boolean }
 ): SolarBoardRow[] {
   const start = window.start?.getTime() ?? -Infinity;
   const end = window.end?.getTime() ?? Infinity;
-  const byRep = new Map<string, { name: string; bookings: CountedBooking[] }>();
+  const byRep = new Map<string, { name: string; events: SolarEvent[] }>();
   const allRecords: SaleRecord[] = [];
   const periodRecords: SaleRecord[] = [];
 
   for (const b of counted) {
-    const record: SaleRecord = { salesRepId: b.repUid, saleDate: b.createdAt, totalPoints: 1, salesRepName: b.repName };
+    const record: SaleRecord = { salesRepId: b.repUid, saleDate: b.at, totalPoints: 1, salesRepName: b.repName };
     allRecords.push(record);
-    const time = b.createdAt.getTime();
+    const time = b.at.getTime();
     if (!(time >= start && time < end)) continue;
     periodRecords.push(record);
-    const rep = byRep.get(b.repUid) ?? { name: b.repName, bookings: [] };
-    rep.bookings.push(b);
+    const rep = byRep.get(b.repUid) ?? { name: b.repName, events: [] };
+    rep.events.push(b);
     byRep.set(b.repUid, rep);
   }
 
   const ranked = [...byRep.entries()]
-    .map(([uid, rep]) => ({ uid, name: rep.name, booked: rep.bookings.length, mix: modeMix(rep.bookings) }))
-    .sort((a, b) => boardOrder({ score: a.booked, name: a.name, id: a.uid }, { score: b.booked, name: b.name, id: b.uid }));
+    .map(([uid, rep]) => ({ uid, name: rep.name, count: rep.events.length, mix: kindMix(rep.events) }))
+    .sort((a, b) => boardOrder({ score: a.count, name: a.name, id: a.uid }, { score: b.count, name: b.name, id: b.uid }));
 
   let history: ReturnType<typeof computeHistory> | null = null;
   if (opts.withHistory && ranked.length > 0) {
@@ -184,17 +244,17 @@ export function unrankedSolarReps(
     .sort((a, b) => a.name.localeCompare(b.name) || a.uid.localeCompare(b.uid));
 }
 
-/** The newest `limit` booked consults, newest booked first. */
-export function recentConsults(counted: CountedBooking[], limit = 5): SolarRecentConsult[] {
+/** The newest `limit` events (consults, demos or closes), newest first. */
+export function recentConsults(counted: SolarEvent[], limit = 5): SolarRecentConsult[] {
   return [...counted]
-    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
     .slice(0, limit)
-    .map((b) => ({ repName: b.repName, plan: modeLabel(b.mode), at: b.createdAt.toISOString(), repKey: b.repUid }));
+    .map((b) => ({ repName: b.repName, plan: b.kind, at: b.at.toISOString(), repKey: b.repUid }));
 }
 
-/** YYYY-MM of the earliest booked consult (office clock), or null. */
-export function firstBookedMonth(counted: CountedBooking[]): string | null {
+/** YYYY-MM of the earliest event (office clock), or null. */
+export function firstBookedMonth(counted: SolarEvent[]): string | null {
   if (counted.length === 0) return null;
-  const first = counted.reduce((min, b) => (b.createdAt < min ? b.createdAt : min), counted[0].createdAt);
+  const first = counted.reduce((min, b) => (b.at < min ? b.at : min), counted[0].at);
   return formatMonthParam(chicagoMonthKey(first));
 }

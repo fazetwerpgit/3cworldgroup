@@ -1,4 +1,4 @@
-import { CalendarCheck, Handshake, Zap } from 'lucide-react';
+import { CalendarCheck, Handshake, Presentation, Zap } from 'lucide-react';
 import {
   formatLeaderboardValue,
   leaderboardUnit,
@@ -8,8 +8,9 @@ import {
 } from './LeaderboardTable';
 import styles from './leaderboard.module.css';
 
-/** The score, then its glyph: a bolt for points, a handshake for closed sales,
- *  a calendar check for booked consults (the solar board).
+/** The score, then its glyph: a bolt for points, a handshake for closed sales
+ *  (fiber, and solar Closed), a calendar check for booked consults (solar Set),
+ *  a presentation board for demos (solar Demoed).
  *  The unit still reaches screen readers as a word. */
 export function MetricValue({
   entry,
@@ -21,7 +22,7 @@ export function MetricValue({
   size?: 'row' | 'podium';
 }) {
   const isPoints = metric === 'totalPoints';
-  const Glyph = isPoints ? Zap : metric === 'bookedConsults' ? CalendarCheck : Handshake;
+  const Glyph = isPoints ? Zap : metric === 'bookedConsults' ? CalendarCheck : metric === 'solarDemoed' ? Presentation : Handshake;
   const glyphClass = isPoints
     ? `${styles.metricGlyph} ${styles.metricGlyphFilled}`
     : styles.metricGlyph;

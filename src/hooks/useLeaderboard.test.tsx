@@ -151,6 +151,18 @@ describe('solar board answers', () => {
     expect(board.totalRanked).toBe(1);
   });
 
+  it('read `count` (Demoed / Closed rows carry no `booked`)', () => {
+    const board = solarBoardFromResponse({ leaderboard: [{ rank: 1, uid: 'ana', name: 'Ana R', count: 4, mix: [] }] });
+    expect(board.leaderboard[0]).toMatchObject({ totalSales: 4, totalPoints: 4, planMix: [] });
+  });
+
+  it('cache each of Set | Demoed | Closed apart', () => {
+    const request = { period: 'week', limit: 100, team: true, source: 'solar' } as const;
+    const keys = (['bookedConsults', 'solarDemoed', 'solarClosed'] as const).map((metric) => leaderboardCacheKey({ ...request, metric }));
+    expect(new Set(keys).size).toBe(3);
+    expect(keys[1]).toContain('metric=solarDemoed');
+  });
+
   it('cache apart from the fiber board', () => {
     const request = { period: 'week', metric: 'bookedConsults', limit: 100, team: true } as const;
     expect(leaderboardCacheKey({ ...request, source: 'solar' })).not.toBe(leaderboardCacheKey(request));

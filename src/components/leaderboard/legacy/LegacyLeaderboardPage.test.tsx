@@ -23,7 +23,7 @@ vi.mock('@/hooks/useLeaderboard', () => ({
 }));
 
 import { LegacyLeaderboardPage } from './LegacyLeaderboardPage';
-import type { LeaderboardEntry } from '../LeaderboardTable';
+import type { LeaderboardEntry, LeaderboardMetric } from '../LeaderboardTable';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -38,7 +38,7 @@ const entries: LeaderboardEntry[] = [1, 2, 3, 4].map((rank) => ({
   totalPoints: (5 - rank) * 10,
 }));
 
-function render(active: boolean, extra: { error?: string | null; onRetry?: () => void } = {}) {
+function render(active: boolean, extra: { error?: string | null; onRetry?: () => void; metric?: LeaderboardMetric } = {}) {
   act(() => {
     root.render(
       <LegacyLeaderboardPage
@@ -49,7 +49,7 @@ function render(active: boolean, extra: { error?: string | null; onRetry?: () =>
         error={extra.error ?? null}
         onRetry={extra.onRetry}
         period="month"
-        metric="totalPoints"
+        metric={extra.metric ?? 'totalPoints'}
         onPeriodChange={() => {}}
         onMetricChange={() => {}}
         viewerName="Ada Lovelace"
@@ -136,6 +136,23 @@ describe('legacy desktop leaderboard', () => {
 
     expect(container.textContent).toMatch(/3 of 10, /);
     expect(container.textContent).not.toContain("Couldn't load your sales");
+  });
+
+  it('the solar weekly card follows Set | Demoed | Closed', async () => {
+    const fetchWeekly = weekly.fetchLeaderboard as ReturnType<typeof vi.fn>;
+    const cases = [
+      ['bookedConsults', '3 set'],
+      ['solarDemoed', '3 demoed'],
+      ['solarClosed', '3 closed'],
+    ] as const;
+    for (const [metric, line] of cases) {
+      render(true, { metric });
+      await act(async () => {});
+      expect(fetchWeekly).toHaveBeenLastCalledWith('week', metric, 1, 'approved', { source: 'solar' });
+      expect(container.textContent).toContain(line);
+    }
+    const group = container.querySelector('[aria-label="Leaderboard metric"]');
+    expect(group?.textContent).toBe('SetDemoedClosed');
   });
 
   it('builds nothing while the phone board is the visible one', () => {
