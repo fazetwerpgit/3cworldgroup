@@ -11,9 +11,10 @@ const env = vi.hoisted(() => ({
   user: null as Record<string, unknown> | null,
   viewing: false,
   pathname: '/portal/dashboard',
+  native: false,
 }));
 
-vi.mock('@/lib/app/isNativeApp', () => ({ isNativeApp: () => false, useIsNativeApp: () => false }));
+vi.mock('@/lib/app/isNativeApp', () => ({ isNativeApp: () => env.native, useIsNativeApp: () => env.native }));
 vi.mock('@/lib/app/bridge', () => ({ nativeHaptic: vi.fn() }));
 vi.mock('@/lib/app/scrollToTop', () => ({ scrollPageToTop: vi.fn() }));
 vi.mock('next/navigation', () => ({ usePathname: () => env.pathname }));
@@ -66,6 +67,7 @@ const dialog = () => container.querySelector('[role="dialog"]');
 
 beforeEach(() => {
   env.viewing = false;
+  env.native = false;
   env.pathname = '/portal/dashboard';
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -151,6 +153,20 @@ describe('the center + by role', () => {
     const deck = [...(dialog()?.querySelectorAll<HTMLAnchorElement>('a') ?? [])][1];
     act(() => deck.click());
     expect(dialog()).toBeNull();
+    // A choice that navigates does not pull focus back to the +.
+    expect(document.activeElement).not.toBe(center());
+  });
+
+  it('in the app, both choices leave the scroll to the shell, like the tab links', () => {
+    env.user = DUAL;
+    env.native = true;
+    act(() => root.render(<RepTabBar />));
+    act(() => center()?.click());
+    const choices = [...(dialog()?.querySelectorAll<HTMLAnchorElement>('a') ?? [])];
+    expect(choices.map((a) => a.dataset.scroll)).toEqual(['false', 'false']);
+    act(() => choices[0].click());
+    expect(dialog()).toBeNull();
+    expect(document.activeElement).not.toBe(center());
   });
 
   it('a fiber-only rep keeps the plain Log sale link', () => {

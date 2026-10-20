@@ -20,7 +20,8 @@ export function LogChooserSheet({
   inApp = false,
   onFiberClick,
 }: {
-  onClose: () => void;
+  /** `navigated` is true after a choice that navigates (focus moves on its own). */
+  onClose: (navigated?: boolean) => void;
   /** Inside the 3C app the fiber choice replaces the entry, as the Log sale tab does. */
   inApp?: boolean;
   /** The tab bar's own tap handling for Log sale (haptic, tab restore). */
@@ -98,9 +99,10 @@ export function LogChooserSheet({
               href={LOG_SALE_HREF}
               className={c.choice}
               replace={inApp}
+              scroll={inApp ? false : undefined}
               onClick={(event) => {
                 onFiberClick?.(event);
-                onClose();
+                onClose(true);
               }}
             >
               <span className={c.icon} aria-hidden="true">
@@ -109,7 +111,12 @@ export function LogChooserSheet({
               <span className={c.label}>Log fiber sale</span>
               <ChevronRight className={c.chev} size={18} aria-hidden="true" />
             </Link>
-            <Link href={SOLAR_DECK_HREF} className={c.choice} onClick={onClose}>
+            <Link
+              href={SOLAR_DECK_HREF}
+              className={c.choice}
+              scroll={inApp ? false : undefined}
+              onClick={() => onClose(true)}
+            >
               <span className={c.icon} aria-hidden="true">
                 <Sun size={20} strokeWidth={2.25} />
               </span>

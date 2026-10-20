@@ -55,10 +55,10 @@ export function RepTabBar({
   const chooser = !viewing && !isOwner(user?.role ?? undefined) && isDualRoleUser(user);
   const [choosing, setChoosing] = useState(false);
   const chooserBtn = useRef<HTMLButtonElement | null>(null);
-  const closeChooser = () => {
+  const closeChooser = (navigated?: boolean) => {
     setChoosing(false);
-    // Back to the + it came from (a choice that navigates moves focus on its own).
-    chooserBtn.current?.focus({ preventScroll: true });
+    // Back to the + it came from, unless a choice navigated (focus moves on its own).
+    if (!navigated) chooserBtn.current?.focus({ preventScroll: true });
   };
 
   const onTabClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
