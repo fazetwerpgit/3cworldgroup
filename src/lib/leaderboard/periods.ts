@@ -117,3 +117,55 @@ export function parseLeaderboardMonth(value: string | null | undefined, now = ne
   if (order > 0) return { ok: false, error: 'month cannot be in the future' };
   return { ok: true, month, current: order === 0 };
 }
+
+const DAY_PARAM_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+/** The longest custom range, in days counted inclusively (a leap year). */
+export const MAX_RANGE_DAYS = 366;
+
+/** A real calendar `YYYY-MM-DD` day as its UTC-midnight epoch ms, or null. */
+function dayParamMs(value: string): number | null {
+  const match = DAY_PARAM_RE.exec(value);
+  if (!match) return null;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const ms = Date.UTC(year, month - 1, day);
+  const back = new Date(ms);
+  return back.getUTCFullYear() === year && back.getUTCMonth() === month - 1 && back.getUTCDate() === day ? ms : null;
+}
+
+/** Today on the office clock, as `YYYY-MM-DD`. */
+export function chicagoDayParam(now = new Date()): string {
+  const local = chicagoParts(now);
+  return `${local.year}-${String(local.month).padStart(2, '0')}-${String(local.day).padStart(2, '0')}`;
+}
+
+export type LeaderboardRangeResult =
+  | { ok: true; range: { from: string; to: string; start: Date; end: Date } | null }
+  | { ok: false; error: string };
+
+/**
+ * The leaderboard's custom `from`/`to` days (`YYYY-MM-DD`, office clock): from
+ * Chicago midnight starting `from` up to (not including) Chicago midnight after
+ * `to`, so `to` counts through the end of its day. Neither sent: no range.
+ * Both are required together, from ≤ to, at most MAX_RANGE_DAYS days, and
+ * `from` cannot be after today (`to` may run past today).
+ */
+export function parseLeaderboardRange(
+  fromRaw: string | null | undefined,
+  toRaw: string | null | undefined,
+  now = new Date()
+): LeaderboardRangeResult {
+  const from = (fromRaw ?? '').trim();
+  const to = (toRaw ?? '').trim();
+  if (!from && !to) return { ok: true, range: null };
+  if (!from || !to) return { ok: false, error: 'from and to are both required for a date range' };
+  const fromMs = dayParamMs(from);
+  if (fromMs === null) return { ok: false, error: 'from must be a date as YYYY-MM-DD' };
+  const toMs = dayParamMs(to);
+  if (toMs === null) return { ok: false, error: 'to must be a date as YYYY-MM-DD' };
+  if (fromMs > toMs) return { ok: false, error: 'from must be on or before to' };
+  if (Math.round((toMs - fromMs) / DAY_MS) + 1 > MAX_RANGE_DAYS) {
+    return { ok: false, error: `A date range can span at most ${MAX_RANGE_DAYS} days` };
+  }
+  if (from > chicagoDayParam(now)) return { ok: false, error: 'from cannot be in the future' };
+  return { ok: true, range: { from, to, start: chicagoDayBounds(from).start, end: chicagoDayBounds(to).end } };
+}

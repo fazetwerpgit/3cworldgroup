@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   chicagoMonthBounds,
+  parseLeaderboardRange,
   formatMonthParam,
   monthKeyFromParam,
   parseLeaderboardMonth,
@@ -111,5 +112,58 @@ describe('month params', () => {
     expect(monthKeyFromParam('2026-09')).toEqual({ year: 2026, month: 8 });
     expect(monthKeyFromParam(null)).toBeNull();
     expect(monthKeyFromParam('2026-13')).toBeNull();
+  });
+});
+
+describe('parseLeaderboardRange', () => {
+  // Thursday 2026-10-15, noon in Chicago.
+  const now = new Date('2026-10-15T17:00:00Z');
+
+  it('is no range when neither day is sent', () => {
+    expect(parseLeaderboardRange(null, null, now)).toEqual({ ok: true, range: null });
+    expect(parseLeaderboardRange('', '', now)).toEqual({ ok: true, range: null });
+  });
+
+  it('runs from Chicago midnight on from through the end of to', () => {
+    const result = parseLeaderboardRange('2026-10-01', '2026-10-10', now);
+    expect(result).toEqual({
+      ok: true,
+      range: {
+        from: '2026-10-01',
+        to: '2026-10-10',
+        start: new Date('2026-10-01T05:00:00.000Z'),
+        end: new Date('2026-10-11T05:00:00.000Z'),
+      },
+    });
+  });
+
+  it('a single day is one Chicago day, 25 hours across the fall DST change', () => {
+    const later = new Date('2026-11-20T17:00:00Z');
+    const result = parseLeaderboardRange('2026-11-01', '2026-11-01', later);
+    expect(result.ok && result.range).toMatchObject({
+      start: new Date('2026-11-01T05:00:00.000Z'),
+      end: new Date('2026-11-02T06:00:00.000Z'),
+    });
+  });
+
+  it('lets to run past today, and from be today', () => {
+    expect(parseLeaderboardRange('2026-10-15', '2026-10-31', now).ok).toBe(true);
+  });
+
+  it('refuses half a range, bad days, a backwards range, too long a range, and a future from', () => {
+    const error = (from: string | null, to: string | null) => {
+      const result = parseLeaderboardRange(from, to, now);
+      return result.ok ? null : result.error;
+    };
+    expect(error('2026-10-01', null)).toBe('from and to are both required for a date range');
+    expect(error(null, '2026-10-01')).toBe('from and to are both required for a date range');
+    expect(error('2026-10', '2026-10-10')).toBe('from must be a date as YYYY-MM-DD');
+    expect(error('2026-02-30', '2026-03-10')).toBe('from must be a date as YYYY-MM-DD');
+    expect(error('2026-10-01', '10/10/2026')).toBe('to must be a date as YYYY-MM-DD');
+    expect(error('2026-10-10', '2026-10-01')).toBe('from must be on or before to');
+    expect(error('2025-10-14', '2026-10-15')).toBe('A date range can span at most 366 days');
+    expect(error('2026-10-16', '2026-10-20')).toBe('from cannot be in the future');
+    // 366 days inclusive is the most allowed.
+    expect(error('2025-10-15', '2026-10-15')).toBeNull();
   });
 });
