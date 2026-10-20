@@ -52,7 +52,7 @@ const FIELDS: FieldDef[] = [
   { key: 'zip', label: 'Zip', type: 'text', autoComplete: 'postal-code', inputMode: 'numeric', className: s.fieldZip, maxLength: 10 },
 ];
 
-type StepId = 'owner' | 'home' | 'photos';
+export type StepId = 'owner' | 'home' | 'photos';
 const STEPS: { id: StepId; label: string; fields: (keyof LeadFields)[] }[] = [
   { id: 'owner', label: 'Homeowner', fields: ['first', 'last', 'phone', 'email'] },
   { id: 'home', label: 'Home', fields: ['address', 'city', 'state', 'zip'] },
@@ -70,13 +70,14 @@ const PHOTO_TITLES: Record<PhotoSlot, string> = {
   panel: 'Electric panel',
 };
 
-export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
+export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; startStep?: StepId | null }) {
   const { state, update } = useDeck();
   const [touched, setTouched] = useState<Partial<Record<keyof LeadFields, boolean>>>({});
   const [tried, setTried] = useState(false);
   const [sending, setSending] = useState(false);
   const [alert, setAlert] = useState<string | null>(null);
-  const [step, setStep] = useState(0);
+  // The review slide's Edit opens the step holding that field.
+  const [step, setStep] = useState(() => Math.max(0, STEPS.findIndex((st) => st.id === startStep)));
   // A field to focus once its step has rendered (the first error on submit or Next).
   const focusNext = useRef<keyof LeadFields | null>(null);
   const [focusTick, setFocusTick] = useState(0);
