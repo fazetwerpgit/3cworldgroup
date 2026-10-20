@@ -197,6 +197,14 @@ service cloud.firestore {
     match /solarAvailability/{id} {
       allow read, write: if false;
     }
+    // Google Calendar connections: encrypted refresh tokens and single-use
+    // OAuth states. Server only (lib/solar/google/connection.ts), never a client.
+    match /solarGoogleTokens/{uid} {
+      allow read, write: if false;
+    }
+    match /solarGoogleOAuthStates/{nonce} {
+      allow read, write: if false;
+    }
     match /expediteOrders/{id} {
       allow read, write: if false;
     }

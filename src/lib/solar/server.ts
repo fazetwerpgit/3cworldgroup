@@ -14,6 +14,7 @@ import {
 } from '@/lib/solar/availability';
 import { LEGACY_TZ } from '@/lib/solar/timezones';
 import { storedConsultantPhone, storedMeetLink } from '@/lib/solar/consultantContact';
+import { googleStatusOf } from '@/lib/solar/google/status';
 
 export const JACOB_EMAIL = 'jmyers@3cworldgroup.com';
 
@@ -83,6 +84,7 @@ function cleanWindows(value: unknown): WeeklyWindow[] {
 /** One solarAvailability doc as the slot math reads it. */
 export function availabilityOf(id: string, data: Record<string, unknown>): SolarAvailability {
   const modes = (data.modes ?? {}) as Record<string, unknown>;
+  const google = googleStatusOf(data.googleCalendar);
   return {
     consultantUid: id,
     name: String(data.name ?? '') || 'Consultant',
@@ -91,6 +93,7 @@ export function availabilityOf(id: string, data: Record<string, unknown>): Solar
     modes: { virtual: cleanWindows(modes.virtual), in_person: cleanWindows(modes.in_person) },
     meetLink: storedMeetLink(data.meetLink),
     phone: storedConsultantPhone(data.phone),
+    ...(google ? { googleCalendar: google } : {}),
   };
 }
 

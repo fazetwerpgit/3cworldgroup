@@ -7,6 +7,7 @@
 // person can't be on a virtual call and at a door at the same time).
 
 import { LEGACY_TZ, US_TIMEZONES } from './timezones';
+import type { GoogleCalendarStatus } from './google/status';
 
 /** The owner's (Jeremy's) zone: his seed hours and the per-day booking load. */
 export const SOLAR_TZ = 'America/Los_Angeles';
@@ -40,6 +41,8 @@ export interface SolarAvailability {
   meetLink?: string;
   /** "+15125550142", or '' / absent when not set. */
   phone?: string;
+  /** The Google Calendar connection (lib/solar/google), absent when never connected. */
+  googleCalendar?: GoogleCalendarStatus;
 }
 
 /** A taken slot. `end` defaults to start + 60 min. Cancelled bookings never block. */
