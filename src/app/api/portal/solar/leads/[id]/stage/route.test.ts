@@ -5,11 +5,21 @@ vi.mock('@/lib/firebase/admin', async () => ({
   adminDb: (await import('@/lib/solar/testing/fakeDb')).createFakeDb(),
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedUser: vi.fn() }));
+vi.mock('@/lib/notifications/createNotification', () => ({ createNotification: vi.fn(async () => 'n1') }));
+vi.mock('@/lib/push/sendPush', () => ({ sendPushToUser: vi.fn(async () => {}) }));
+vi.mock('@/lib/email/sendEmail', () => ({ sendEmail: vi.fn(async () => ({ ok: true })) }));
 
 import { PATCH } from './route';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { createNotification } from '@/lib/notifications/createNotification';
+import { sendPushToUser } from '@/lib/push/sendPush';
+import { sendEmail } from '@/lib/email/sendEmail';
 import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
+
+const mockNotify = createNotification as unknown as ReturnType<typeof vi.fn>;
+const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
+const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
@@ -45,8 +55,13 @@ beforeEach(() => {
       ['old_sold', { repUid: 'rep1', status: 'sold' }],
     ])
   );
-  db.store.set('solarBookings', new Map([['b1', { status: 'booked', start: '2026-10-26T15:00:00.000Z' }]]));
+  db.store.set('solarBookings', new Map([['b1', {
+    leadId: 'l1', consultantUid: 'con', consultantName: 'Consultant', repUid: 'rep1', customerName: 'Ana',
+    mode: 'virtual', status: 'booked', start: '2026-10-26T15:00:00.000Z',
+  }]]));
+  db.store.set('users', new Map(Object.entries({ con: { displayName: 'Consultant' }, rep1: { displayName: 'Rep' } })));
   mockGate.mockReset().mockResolvedValue(ADMIN);
+  for (const m of [mockNotify, mockPush, mockEmail]) m.mockClear();
 });
 
 describe('PATCH /api/portal/solar/leads/[id]/stage: who', () => {
@@ -106,10 +121,36 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
     });
   });
 
-  it('no sale closes the lead as lost', async () => {
+  it('no sale cancels the live booking like Mark lost: slot freed, bookingId cleared, notices sent', async () => {
     const res = await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' });
-    expect((await res.json()).status).toBe('lost');
-    expect(lead().status).toBe('lost');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: 'lost', cancelledBookingId: 'b1' });
+    expect(lead()).toMatchObject({
+      status: 'lost', bookingId: null, stage: 'appointment_demoed', stageOutcome: 'no_sale', statusChangedBy: 'adm',
+    });
+    expect((lead().stageHistory as unknown[]).length).toBe(1);
+    expect(db.store.get('solarBookings')!.get('b1')).toMatchObject({ status: 'cancelled', cancelledBy: 'adm' });
+    expect(mockNotify.mock.calls.map((c) => c[0].userId).sort()).toEqual(['con', 'rep1']);
+    expect(mockNotify.mock.calls[0][0].message).toContain('The lead was marked lost.');
+    expect(mockPush.mock.calls.map((c) => c[0]).sort()).toEqual(['con', 'rep1']);
+    expect(mockEmail).not.toHaveBeenCalled();
+  });
+
+  it('no sale with no live booking only closes the lead and notifies nobody', async () => {
+    db.store.get('solarBookings')!.set('b1', { status: 'cancelled', consultantUid: 'con', repUid: 'rep1' });
+    const res = await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' });
+    const body = await res.json();
+    expect(body.status).toBe('lost');
+    expect(body.cancelledBookingId).toBeUndefined();
+    expect(lead()).toMatchObject({ status: 'lost', bookingId: 'b1' });
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it('a sale keeps the booking', async () => {
+    await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' });
+    expect(db.store.get('solarBookings')!.get('b1')!.status).toBe('booked');
+    expect(lead()).toMatchObject({ status: 'sold', bookingId: 'b1' });
+    expect(mockNotify).not.toHaveBeenCalled();
   });
 
   it("refuses a non-admin's move back, lets an admin move back and clear", async () => {

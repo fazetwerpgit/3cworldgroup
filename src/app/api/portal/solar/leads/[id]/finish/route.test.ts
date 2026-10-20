@@ -120,6 +120,24 @@ describe('POST /api/portal/solar/leads/{id}/finish', () => {
     expect(mail.htmlBody).toContain('?v=v4&amp;a=1');
   });
 
+  it('adds roof type, monthly kWh and a Needs review line when set, and leaves them out on an old lead', async () => {
+    db.store.get('solarLeads')!.set('rep1_c1', {
+      ...LEAD, roofType: 'concrete_tile', monthlyKwh: 1250, heavyShade: true, needsReview: true,
+    });
+    await finish('rep1_c1');
+    const mail = mockEmail.mock.calls[0][0];
+    expect(mail.textBody).toContain('Roof type: Concrete tile');
+    expect(mail.textBody).toContain('Monthly usage: 1,250 kWh/mo');
+    expect(mail.textBody).toContain('Needs review: Yes: heavy shade on the roof');
+    expect(mail.htmlBody).toContain('Needs review');
+
+    mockEmail.mockClear();
+    db.store.get('solarLeads')!.set('rep1_c1', { ...LEAD });
+    await finish('rep1_c1');
+    const old = mockEmail.mock.calls[0][0];
+    expect(old.textBody).not.toMatch(/Roof type|Monthly usage|Needs review/);
+  });
+
   it('signs 7-day V4 read links for each photo folder', async () => {
     await finish();
     expect(bucket.getFiles.mock.calls.map((c) => c[0])).toEqual([

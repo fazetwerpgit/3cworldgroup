@@ -267,7 +267,8 @@ export function setLeadStatus(id: string, status: SolarLeadStatus) {
 
 /**
  * Admins, closers and consultants: the sales-dept stage (outcome only with
- * appointment_demoed). null clears it (admins only).
+ * appointment_demoed). null clears it (admins only). no_sale also cancels a
+ * live booking.
  */
 export function setLeadStage(id: string, stage: SolarLeadStage | null, outcome?: SolarDemoOutcome) {
   return call<{
@@ -277,6 +278,8 @@ export function setLeadStage(id: string, stage: SolarLeadStage | null, outcome?:
     outcome: SolarDemoOutcome | null;
     status: SolarLeadStatus;
     entry: SolarStageEntry;
+    /** Set when no_sale cancelled the lead's live booking (as Mark lost does). */
+    cancelledBookingId?: string;
   }>(`/api/portal/solar/leads/${encodeURIComponent(id)}/stage`, {
     method: 'PATCH',
     body: JSON.stringify(outcome ? { stage, outcome } : { stage }),

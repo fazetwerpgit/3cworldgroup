@@ -495,6 +495,8 @@ function LeadSheet({
       stageOutcome: res.data.outcome,
       status: res.data.status,
       stageHistory: [...lead.stageHistory, res.data.entry],
+      // No sale freed the consultation, as Mark lost does.
+      ...(res.data.cancelledBookingId ? { booking: null } : {}),
     });
   };
 
