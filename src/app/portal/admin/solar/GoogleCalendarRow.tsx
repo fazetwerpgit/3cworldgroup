@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { CalendarDays } from 'lucide-react';
 import { isNativeApp } from '@/lib/app/isNativeApp';
 import { firstName } from '@/lib/solar/consultantContact';
 import { googleStatusOf, type GoogleCalendarStatus } from '@/lib/solar/google/status';
@@ -145,12 +146,16 @@ export function GoogleCalendarRow({
   else if (broken) {
     note = own
       ? "Google stopped accepting the connection. Bookings still work, but they aren't added to your calendar until you reconnect."
-      : `Google stopped accepting ${who}’s connection. They need to reconnect from their own card.`;
+      : `Google stopped accepting ${who}’s connection. They need to reconnect from their own portal login.`;
   } else if (connected && status?.freeBusy === false) {
     note = own
       ? "Free/busy wasn't allowed, so homeowners still see every open time. Reconnect and allow it to hide busy times."
       : 'Free/busy wasn’t allowed, so their busy times aren’t hidden from homeowners.';
   } else if (own && !connected && !canConnect) note = 'Save your hours first, then connect.';
+
+  // Someone else's card can't start the sign-in: the connection is to their own Google account.
+  const othersOnly =
+    !own && !connected && !broken ? `Only ${who} can connect their calendar, from their own portal login.` : '';
 
   const connectLabel = busy === 'connect' ? 'Opening Google…' : broken || (connected && status?.freeBusy === false) ? 'Reconnect' : 'Connect Google Calendar';
   const showConnect = own && (!connected || status?.freeBusy === false);
@@ -159,8 +164,11 @@ export function GoogleCalendarRow({
   return (
     <div className={st.gcal} role="group" aria-labelledby={labelId}>
       <div className={st.gcalText}>
-        <span className={st.gcalLabel} id={labelId}>
-          Google Calendar
+        <span className={st.gcalHead}>
+          <CalendarDays className={st.gcalIcon} size={18} strokeWidth={1.75} aria-hidden="true" />
+          <span className={st.gcalLabel} id={labelId}>
+            Google Calendar
+          </span>
         </span>
         <span className={st.gcalState}>{state}</span>
         {note ? (
@@ -169,6 +177,7 @@ export function GoogleCalendarRow({
           </p>
         ) : null}
         {own && !connected && !broken && !waiting ? <p className={st.help}>{HELP}</p> : null}
+        {othersOnly ? <p className={st.help}>{othersOnly}</p> : null}
         {error ? (
           <p className={cx(u.hint, u.hintError)} role="alert">
             {error}
