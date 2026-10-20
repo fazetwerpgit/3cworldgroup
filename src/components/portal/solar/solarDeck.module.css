@@ -1359,12 +1359,15 @@
   cursor: pointer;
   transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms var(--ease);
 }
-.tier:not(:disabled):hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-}
-.tier:not(:disabled):active {
-  transform: none;
+/* Hover only where a pointer hovers: on a phone a tapped card kept the lift and the blue edge. */
+@media (hover: hover) {
+  .tier:not(:disabled):hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .tier:not(:disabled):active {
+    transform: none;
+  }
 }
 .tier[aria-pressed='true'] {
   border-color: var(--accent);
@@ -1490,6 +1493,10 @@
     grid-column: 1 / -1;
     grid-row: 2;
   }
+}
+.endLede {
+  max-width: 52ch;
+  text-wrap: pretty;
 }
 .endActions {
   display: flex;

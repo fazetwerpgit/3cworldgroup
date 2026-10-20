@@ -135,7 +135,7 @@ export function PrequalSlide({
           <h2 className={s.title}>
             Not a fit <span className={s.accent}>right now</span>
           </h2>
-          <p className={s.lede}>
+          <p className={`${s.lede} ${s.endLede}`}>
             Thanks for your time today. Our solar programs start at a 600 credit score, so we can&apos;t move forward at
             this time.
           </p>
@@ -148,7 +148,7 @@ export function PrequalSlide({
             Change answer
           </button>
         </div>
-        <p className={s.small}>Saved to this lead as no sale: low credit.</p>
+        <p className={s.small}>Saved to this lead as No sale: low credit.</p>
       </>
     );
   }
