@@ -276,15 +276,9 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
   if (total === 0 || ordered.length === 0) {
     return (
       <div className={cx(st.preview, st.previewEmpty)} aria-live="polite">
-        <span className={st.previewCount} aria-hidden="true">
-          0
-        </span>
-        <div className={st.previewText}>
-          <span className={st.previewLabel}>Homeowners see</span>
-          <strong>
-            No {MODE_LABEL[mode]} times with {name}
-          </strong>
-        </div>
+        <p className={st.previewLine}>
+          Homeowners see <strong>no {MODE_LABEL[mode]} times</strong> with {name}
+        </p>
       </div>
     );
   }
@@ -297,20 +291,16 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
   const last = `${clock(lastStart)} ${zone}`;
   return (
     <div className={st.preview} aria-live="polite">
-      <span className={st.previewCount} aria-hidden="true">
-        {total}
-      </span>
-      <div className={st.previewText}>
-        <span className={st.previewLabel}>Homeowners see</span>
+      <p className={st.previewLine}>
+        <span className={st.previewLead}>Homeowners see </span>
         <strong>
-          <span className={st.srOnly}>{total} </span>
-          {MODE_LABEL[mode]} {total === 1 ? 'slot' : 'slots'} a week
+          <span className={st.previewCount}>{total}</span> {MODE_LABEL[mode]} {total === 1 ? 'slot' : 'slots'} a week
         </strong>
-        <span className={st.previewDay}>
-          {DAY_LONG[w.day]}: {count === 1 ? `one slot, at ${first}` : `${count} slots, the first at ${first} and the last at ${last}`}
-          . Customers see these in their own time zone.
-        </span>
-      </div>
+      </p>
+      <p className={st.previewDay}>
+        {DAY_LONG[w.day]}: {count === 1 ? `one slot, at ${first}` : `${count} slots, the first at ${first} and the last at ${last}`}
+        . Customers see these in their own time zone.
+      </p>
     </div>
   );
 }
