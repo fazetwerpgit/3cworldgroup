@@ -100,6 +100,7 @@ beforeEach(() => {
   testState.firstMonth = null;
   testState.user = { uid: 'current', displayName: 'Ada Lovelace', avatarUrl: null };
   testState.permissions = ['leaderboard:read'];
+  window.localStorage.clear();
   setViewport(false);
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -358,5 +359,70 @@ describe('fiber and solar boards', () => {
     expect(container.querySelector('[aria-label="Leaderboard metric"]')?.textContent).toBe('PointsSales');
     await act(async () => buttonsIn().find((b) => b.textContent === 'Solar')?.click());
     expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'solarClosed', 100, 'approved', { team: true, source: 'solar' });
+  });
+  describe('the remembered side (dual reps)', () => {
+    const DUAL = { uid: 'current', displayName: 'Ada Lovelace', fieldRole: 'entry_rep', solarRole: 'virtual_closer' };
+    const DUAL_PERMS = ['leaderboard:read', 'sales:read', 'solar:read', 'solar:write'];
+    const pressed = () => container.querySelector('[aria-label="Leaderboard"] [aria-pressed="true"]')?.textContent;
+
+    it('reopens on Solar after a reload when Solar was the last pick', async () => {
+      testState.user = DUAL;
+      testState.permissions = DUAL_PERMS;
+      testState.leaderboard = board();
+      await act(async () => root.render(<LeaderboardRoute />));
+      await act(async () => buttonsIn().find((b) => b.textContent === 'Solar')?.click());
+      expect(window.localStorage.getItem('3c-board-side')).toBe('solar');
+
+      // A reload: a fresh mount reads the stored side.
+      act(() => root.unmount());
+      root = createRoot(container);
+      testState.fetchLeaderboard.mockClear();
+      await act(async () => root.render(<LeaderboardRoute />));
+      expect(pressed()).toBe('Solar');
+      expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'bookedConsults', 100, 'approved', { team: true, source: 'solar' });
+      for (const call of testState.fetchLeaderboard.mock.calls) expect(call[4]).toHaveProperty('source', 'solar');
+
+      await act(async () => buttonsIn().find((b) => b.textContent === 'Fiber')?.click());
+      expect(window.localStorage.getItem('3c-board-side')).toBe('fiber');
+    });
+
+    it('falls back to Fiber when storage throws, and the switch still works', async () => {
+      vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      testState.user = DUAL;
+      testState.permissions = DUAL_PERMS;
+      testState.leaderboard = board();
+      try {
+        await act(async () => root.render(<LeaderboardRoute />));
+        expect(pressed()).toBe('Fiber');
+        await act(async () => buttonsIn().find((b) => b.textContent === 'Solar')?.click());
+        expect(pressed()).toBe('Solar');
+        expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'bookedConsults', 100, 'approved', { team: true, source: 'solar' });
+      } finally {
+        vi.restoreAllMocks();
+      }
+    });
+
+    it('ignores a stored Solar for a fiber-only rep, and a stored Fiber for a solar-only rep', async () => {
+      window.localStorage.setItem('3c-board-side', 'solar');
+      testState.user = { uid: 'current', displayName: 'Ada Lovelace', fieldRole: 'entry_rep' };
+      testState.leaderboard = board();
+      await act(async () => root.render(<LeaderboardRoute />));
+      for (const call of testState.fetchLeaderboard.mock.calls) expect(call[4]).not.toHaveProperty('source');
+      expect(container.querySelector('[aria-label="Leaderboard"]')).toBeNull();
+
+      act(() => root.unmount());
+      root = createRoot(container);
+      testState.fetchLeaderboard.mockClear();
+      window.localStorage.setItem('3c-board-side', 'fiber');
+      testState.user = { uid: 'current', displayName: 'Ada Lovelace', solarRole: 'entry_canvasser' };
+      testState.permissions = ['leaderboard:read', 'solar:read', 'solar:write'];
+      await act(async () => root.render(<LeaderboardRoute />));
+      for (const call of testState.fetchLeaderboard.mock.calls) expect(call[4]).toHaveProperty('source', 'solar');
+    });
   });
 });

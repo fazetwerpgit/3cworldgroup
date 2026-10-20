@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { FIRST_LEADERBOARD_BOARD, FIRST_SOLAR_BOARD, useLeaderboard } from '@/hooks/useLeaderboard';
 import { isSolarOnlyUser } from '@/types';
 import { boardsFor, type BoardSwitch, type LeaderboardBoard } from './BoardSwitch';
+import { BOARD_SIDE_KEY, useRememberedSide } from '@/lib/portal/rememberedSide';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { LeaderboardPageContent } from './LeaderboardPageContent';
 import { LegacyLeaderboardPage } from './legacy/LegacyLeaderboardPage';
@@ -31,12 +32,15 @@ export function LeaderboardRoute() {
   // Fiber, solar, or both (a dual rep, an admin): a solar-only rep has the
   // solar board alone, a fiber rep with no solar role never sees solar.
   const boards = boardsFor({ solarRead: hasPermission('solar:read'), solarOnly: isSolarOnlyUser(user) });
-  const [picked, setPicked] = useState<LeaderboardBoard>(boards[0]);
+  // A viewer with both boards reopens on the side they last picked (stored on
+  // this device; Fiber when there is none or storage is blocked). A viewer
+  // with one board never reads it: `boards` alone decides.
+  const [picked, setPicked] = useRememberedSide(BOARD_SIDE_KEY);
   const board: LeaderboardBoard = boards.includes(picked) ? picked : boards[0];
   const solar = board === 'solar';
   // Seeded with the board fetched first below (week, points or booked, team), so a revisit paints it at once.
   const { leaderboard, currentUser, unranked, recent, firstMonth, loading, error, staleAt, fetchLeaderboard } =
-    useLeaderboard(boards[0] === 'solar' ? FIRST_SOLAR_BOARD : FIRST_BOARD);
+    useLeaderboard(solar ? FIRST_SOLAR_BOARD : FIRST_BOARD);
   const [period, setPeriod] = useState<LeaderboardPeriod>('week');
   const [fiberMetric, setFiberMetric] = useState<LeaderboardMetric>('totalPoints');
   // Set | Demoed | Closed on the solar board (Set first); each board keeps its own pick for the way back.
