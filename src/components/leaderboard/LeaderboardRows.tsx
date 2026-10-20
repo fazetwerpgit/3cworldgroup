@@ -5,6 +5,7 @@ import { PlanMixLine } from './PlanMixLine';
 import { leaderboardMixLabel, type LeaderboardEntry, type LeaderboardMetric } from './LeaderboardTable';
 import styles from './leaderboard.module.css';
 import { SOLAR_COPY, isSolarMetric } from './solarMetrics';
+import { belowPodiumTitle } from './belowPodium';
 
 interface LeaderboardRowsProps {
   entries: LeaderboardEntry[];
@@ -27,7 +28,7 @@ export function LeaderboardRows({ entries, metric, currentUser, zeros = [] }: Le
   return (
     <section aria-label="Ranking" className={styles.rows}>
       <header className={styles.band}>
-        <h2 className={styles.bandTitle}>{rows[rows.length - 1].rank <= 4 ? 'Rank 4' : `Ranks 4 to ${rows[rows.length - 1].rank}`}</h2>
+        <h2 className={styles.bandTitle}>{belowPodiumTitle(entries, zeros)}</h2>
         <span className={styles.bandMeta}>{metricHead(metric)}</span>
       </header>
       {rows.map((entry, index) => {
@@ -46,7 +47,7 @@ export function LeaderboardRows({ entries, metric, currentUser, zeros = [] }: Le
             data-zero={isZero || undefined}
             style={{ '--i': index } as CSSProperties}
           >
-            <span className={styles.rank}>{entry.rank}</span>
+            <span className={styles.rank}>{isZero && entries.length === 0 ? <><span aria-hidden="true">–</span><span className="sr-only">Unranked</span></> : entry.rank}</span>
             <Avatar entry={entry} />
             <span className={styles.rowWho}>
               <strong className={styles.rowName}>

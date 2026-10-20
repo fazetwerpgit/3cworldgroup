@@ -268,7 +268,9 @@ describe('below the podium', () => {
     await act(async () => root.render(<LeaderboardRoute />));
 
     const rows = [...container.querySelectorAll('[aria-label="Ranking"] > div')];
-    expect(rows.map((row) => row.textContent)).toEqual(['4ALAda LovelaceYou0pts', '5BCBen Carter0pts']);
+    // Only two ranked: the band holds just the team at 0, unnumbered.
+    expect(container.querySelector('[aria-label="Ranking"] h2')?.textContent).toBe('Not on the board yet');
+    expect(rows.map((row) => row.textContent)).toEqual(['–UnrankedALAda LovelaceYou0pts', '–UnrankedBCBen Carter0pts']);
     expect(rows[0].getAttribute('data-current-user')).toBe('true');
     expect(container.querySelector('[data-testid="spot-line"]')?.textContent).toBe('1 sale gets you on the board.');
     expect(container.querySelector('[data-testid="standing-copy"]')).toBeNull();

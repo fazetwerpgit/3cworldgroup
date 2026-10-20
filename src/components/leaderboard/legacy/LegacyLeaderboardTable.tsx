@@ -16,7 +16,7 @@ import { LegacySparkline } from './LegacySparkline';
 import d from './leaderboard-desk.module.css';
 import type { LeaderboardEntry, LeaderboardMetric } from '../LeaderboardTable';
 import { SOLAR_COPY, isSolarMetric } from '../solarMetrics';
-import { recentSaleLabel, recentSaleWhen, spotLine, useMinuteClock, zeroEntries } from '../belowPodium';
+import { belowPodiumTitle, recentSaleLabel, recentSaleWhen, spotLine, useMinuteClock, zeroEntries } from '../belowPodium';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import { periodBounds } from '@/lib/leaderboard/periods';
@@ -240,14 +240,13 @@ function Podium({ entries, currentUser, metric, period, pastMonth }: { entries: 
 function ChaseTable({ entries, zeros, currentUser, metric, pastMonth = null }: { entries: LeaderboardEntry[]; zeros: LeaderboardEntry[]; currentUser?: LeaderboardEntry | null; metric: Metric; pastMonth?: MonthKey | null }) {
   const rest = entries.filter((entry) => entry.rank >= 4).sort((a, b) => a.rank - b.rank);
   if (rest.length === 0 && zeros.length === 0) return null;
-  const lastRank = (zeros.length > 0 ? zeros[zeros.length - 1] : rest[rest.length - 1]).rank;
   const unit = metricUnit(metric);
   const noHistory = entries.every((entry) => (entry.movement ?? null) === null);
 
   return (
     <section className={d.section} aria-labelledby="chase-heading">
       <div className={d.secHead}>
-        <h2 id="chase-heading" className={d.secTitle}>{lastRank <= 4 ? 'Rank 4' : `Ranks 4 to ${lastRank}`}</h2>
+        <h2 id="chase-heading" className={d.secTitle}>{belowPodiumTitle(rest, zeros)}</h2>
         <p className={d.secMeta}>{pastMonth ? monthLabel(pastMonth) : 'Movement since yesterday'}</p>
       </div>
       <div className={d.table}>
@@ -282,7 +281,7 @@ function ChaseTable({ entries, zeros, currentUser, metric, pastMonth = null }: {
           const mine = entry.salesRepId === currentUser?.salesRepId;
           return (
             <div key={entry.salesRepId} data-zero className={`${d.cols} ${d.row} ${d.rowZero} ${mine ? d.rowMine : ''}`}>
-              <div className={d.rankCell}><b className={d.rank}>{entry.rank}</b></div>
+              <div className={d.rankCell}><b className={d.rank}>{rest.length === 0 ? <><span aria-hidden="true">–</span><span className="sr-only">Unranked</span></> : entry.rank}</b></div>
               <div className={d.who}>
                 <span className={d.avatar}>{initialsOf(entry.salesRepName)}</span>
                 <span className={d.name}>{entry.salesRepName}{mine && <em className={d.you}>You</em>}</span>

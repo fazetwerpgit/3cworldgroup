@@ -22,6 +22,17 @@ export function zeroEntries(ranked: LeaderboardEntry[], unranked: UnrankedRep[])
   }));
 }
 
+/**
+ * The band over the rows below the podium. Ranked rows there start at 4; with
+ * three or fewer reps ranked the band holds only the team at 0, so it says so
+ * instead of "Ranks 4 to N" (and those rows show no rank number).
+ */
+export function belowPodiumTitle(ranked: LeaderboardEntry[], zeros: LeaderboardEntry[]): string {
+  if (ranked.length === 0) return 'Not on the board yet';
+  const last = (zeros.length > 0 ? zeros[zeros.length - 1] : ranked[ranked.length - 1]).rank;
+  return last <= 4 ? 'Rank 4' : `Ranks 4 to ${last}`;
+}
+
 function ordinal(n: number) {
   const tens = n % 100;
   if (tens >= 11 && tens <= 13) return `${n}th`;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { recentSaleWhen, spotLine, zeroEntries } from './belowPodium';
+import { belowPodiumTitle, recentSaleWhen, spotLine, zeroEntries } from './belowPodium';
 import type { LeaderboardEntry } from './LeaderboardTable';
 
 const entry = (rank: number, totalSales: number, name = `Rep ${rank}`): LeaderboardEntry => ({
@@ -62,5 +62,18 @@ describe('recentSaleWhen', () => {
   it('shows only the day for a sale logged later', () => {
     expect(recentSaleWhen({ repName: 'A', plan: '', at: '2026-09-16T12:00:00.000Z', dayOnly: true }, now)).toBe('Today');
     expect(recentSaleWhen({ repName: 'A', plan: '', at: '2026-09-15T12:00:00.000Z', dayOnly: true }, now)).toBe('Tue');
+  });
+});
+
+describe('belowPodiumTitle', () => {
+  const row = (rank: number) => ({ rank, salesRepId: `r${rank}`, salesRepName: `Rep ${rank}`, totalSales: 1, totalPoints: 1 });
+  it('says the band holds only reps at 0 when 0 to 3 are ranked', () => {
+    expect(belowPodiumTitle([], [])).toBe('Not on the board yet');
+    expect(belowPodiumTitle([], [row(4), row(5)])).toBe('Not on the board yet');
+  });
+  it('counts from rank 4 once a fourth rep is ranked', () => {
+    expect(belowPodiumTitle([row(4)], [])).toBe('Rank 4');
+    expect(belowPodiumTitle([row(4), row(5)], [])).toBe('Ranks 4 to 5');
+    expect(belowPodiumTitle([row(4)], [row(5), row(6)])).toBe('Ranks 4 to 6');
   });
 });
