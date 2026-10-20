@@ -151,8 +151,21 @@ class Answer {
 
 const LEAD_ID_RE = /^[A-Za-z0-9_-]{1,300}$/;
 
-/** The 200 body for a booking: the real one, so a retrying app shows what was booked. */
-function bookedBody(id: string, b: Record<string, unknown>, duplicate: boolean) {
+const nonEmpty = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
+
+/**
+ * The 200 body for a booking: the real one, so a retrying app shows what was booked.
+ * Virtual only: the consultant's own Meet link (snapshotted on the booking) and the
+ * one Google made for the event (fresh: from addBookingToGoogle; duplicate: the
+ * stored googleMeetLink), each only when non-empty.
+ */
+function bookedBody(
+  id: string,
+  b: Record<string, unknown>,
+  duplicate: boolean,
+  googleMeetLink: unknown = b.googleMeetLink
+) {
+  const virtual = b.mode === 'virtual';
   return {
     success: true,
     id,
@@ -162,12 +175,19 @@ function bookedBody(id: string, b: Record<string, unknown>, duplicate: boolean) 
     start: String(b.start ?? ''),
     mode: b.mode === 'virtual' ? 'virtual' : 'in_person',
     ...(typeof b.customerTz === 'string' && b.customerTz ? { customerTz: b.customerTz } : {}),
+    ...(virtual && nonEmpty(b.consultantMeetLink) ? { consultantMeetLink: b.consultantMeetLink } : {}),
+    ...(virtual && nonEmpty(googleMeetLink) ? { googleMeetLink } : {}),
   };
 }
 
 // POST /api/portal/solar/bookings {leadId, mode, consultantUid, start[, customerTz]}
-// -> 200 {success, id, consultantUid, consultantName, start, mode[, customerTz][, duplicate]}
+// -> 200 {success, id, consultantUid, consultantName, start, mode[, customerTz][, duplicate]
+//          [, consultantMeetLink][, googleMeetLink]}
 //  | 409 {error: 'slot_taken'} | 400 {error: 'slot_unavailable'[, reason: 'too_far']}.
+// The Meet links come only for a virtual booking, each only when set:
+// consultantMeetLink is the consultant's own room snapshotted at booking time;
+// googleMeetLink is the one Google made for the event (consultant on Google
+// Calendar and the event made; a duplicate answers the stored one).
 // `start` is an absolute instant. The booking stores it with the customer's
 // zone (the lead's state's, else customerTz from the body when it is a US
 // zone from the list, else the consultant's) and the consultant's zone, for the notices.
@@ -365,7 +385,7 @@ export async function POST(request: NextRequest) {
       google,
     });
     await sendLeadAlertOnce(leadId).catch((error) => console.error('solar lead alert failed:', error));
-    return NextResponse.json(bookedBody(id, b, false));
+    return NextResponse.json(bookedBody(id, b, false, google?.meetLink));
   } catch (error) {
     console.error('Error booking solar consult:', error);
     return NextResponse.json({ error: 'Failed to book' }, { status: 500 });

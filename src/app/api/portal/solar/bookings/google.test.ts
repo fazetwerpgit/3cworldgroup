@@ -234,6 +234,66 @@ describe('booking with Google Calendar connected', () => {
   });
 });
 
+describe('the Meet links in the POST response (3C Doors app)', () => {
+  const OWN_MEET = 'https://meet.google.com/abc-defg-hij';
+  const GOOGLE_MEET = 'https://meet.google.com/new-meet-abc';
+
+  it('fresh virtual booking with Google: both links', async () => {
+    sam(LIVE);
+    const body = await (await book('virtual')).json();
+    expect(body).toMatchObject({ success: true, id: ID, mode: 'virtual', consultantMeetLink: OWN_MEET, googleMeetLink: GOOGLE_MEET });
+    expect(body.duplicate).toBeUndefined();
+  });
+
+  it('fresh virtual booking without Google: only the consultant link', async () => {
+    sam();
+    const body = await (await book('virtual')).json();
+    expect(body.consultantMeetLink).toBe(OWN_MEET);
+    expect(body).not.toHaveProperty('googleMeetLink');
+  });
+
+  it('fresh virtual booking where Google failed: only the consultant link', async () => {
+    sam(LIVE);
+    google.insert = 'error';
+    const body = await (await book('virtual')).json();
+    expect(body.consultantMeetLink).toBe(OWN_MEET);
+    expect(body).not.toHaveProperty('googleMeetLink');
+  });
+
+  it('in person: neither link, even with Google', async () => {
+    sam(LIVE);
+    const body = await (await book('in_person')).json();
+    expect(body).not.toHaveProperty('consultantMeetLink');
+    expect(body).not.toHaveProperty('googleMeetLink');
+  });
+
+  it('a consultant without a Meet link and no Google: neither link', async () => {
+    sam();
+    delete db.store.get('solarAvailability')!.get('sam')!.meetLink;
+    const body = await (await book('virtual')).json();
+    expect(body).not.toHaveProperty('consultantMeetLink');
+    expect(body).not.toHaveProperty('googleMeetLink');
+  });
+
+  it('a duplicate answers the stored links, the same as the first response', async () => {
+    sam(LIVE);
+    const first = await (await book('virtual')).json();
+    const again = await (await book('virtual')).json();
+    expect(again).toEqual({ ...first, duplicate: true });
+    expect(again).toMatchObject({ consultantMeetLink: OWN_MEET, googleMeetLink: GOOGLE_MEET });
+  });
+
+  it('a duplicate omits empty or missing stored links', async () => {
+    sam();
+    await book('virtual');
+    Object.assign(db.store.get('solarBookings')!.get(ID)!, { consultantMeetLink: '', googleMeetLink: '  ' });
+    const again = await (await book('virtual')).json();
+    expect(again.duplicate).toBe(true);
+    expect(again).not.toHaveProperty('consultantMeetLink');
+    expect(again).not.toHaveProperty('googleMeetLink');
+  });
+});
+
 describe('booking-time free/busy re-check', () => {
   it('busy on Google now: 409 slot_taken and nothing is booked', async () => {
     sam(LIVE);
