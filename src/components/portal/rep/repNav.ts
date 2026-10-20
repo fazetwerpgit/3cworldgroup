@@ -7,6 +7,7 @@ import { ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 
 export type RepTab = PortalNavItem & {
   short: string;
+  /** The bar's center action (Log sale; a solar-only rep's Solar): no desktop top link, the desktop CTA instead. */
   log?: boolean;
   /** Drawn as the bar's lime center action (Log sale; a solar-only rep's Solar). */
   emphasis?: boolean;
@@ -43,21 +44,32 @@ export const SOLAR_HREF = '/portal/solar';
 export const SOLAR_DECK_HREF = '/portal/solar/present';
 
 /**
- * A solar-only rep's center tab, where a fiber rep has Log sale: the Solar
- * page, which opens the deck. The same lime emphasis as Log sale.
+ * A solar-only rep's center tab, where a fiber rep has Log sale: the solar
+ * deck itself, opened in one tap the way Log sale opens its flow. The same
+ * lime emphasis. (The Solar page, /portal/solar, stays a route: the deck's
+ * Exit and the menu lead there.)
  */
 export const SOLAR_TAB: RepTab = {
   label: 'Solar',
   short: 'Solar',
-  href: SOLAR_HREF,
+  href: SOLAR_DECK_HREF,
   icon: Sun,
-  permissions: ['solar:read'],
+  permissions: ['solar:write'],
+  log: true,
   emphasis: true,
 };
 
-/** Home / Solar / Board / Chat: a solar-only rep sells no fiber, so Sales and Log sale give way to Solar. */
+/** Who may open the Sales tab: a fiber seller, or a solar rep (their Sales is My leads). */
+export const FIBER_SALES_PERMISSIONS = ['sales:read'];
+export const SOLAR_SALES_PERMISSIONS = ['solar:read'];
+
+/** A solar-only rep's Sales tab: their solar leads, so it is gated on solar:read. */
+export const SOLAR_SALES_TAB: RepTab = { ...REP_TABS[1], permissions: SOLAR_SALES_PERMISSIONS };
+
+/** Home / Sales / [Solar] / Board / Chat: the fiber bar, with the deck in the center where Log sale sits. */
 export const SOLAR_REP_TABS: RepTab[] = [
   REP_TABS[0],
+  SOLAR_SALES_TAB,
   SOLAR_TAB,
   ...REP_TABS.filter((tab) => tab.href === '/portal/leaderboard' || tab.href === '/portal/chat'),
 ];
@@ -77,12 +89,17 @@ export function viewAsTabs(): RepTab[] {
   return REP_TABS.filter((tab) => !tab.log && tab.href !== '/portal/chat');
 }
 
-/** Which primary destination the current path belongs to. Log sale wins over Sales; every admin page is Admin. */
+/**
+ * Which primary destination the current path belongs to. Log sale wins over
+ * Sales; every admin page is Admin. The Solar page (My leads and the deck's
+ * way back) belongs to Sales; the deck itself to the Solar center tab.
+ */
 export function activeRepHref(pathname: string): string | null {
   if (pathname.startsWith(LOG_SALE_HREF)) return LOG_SALE_HREF;
   if (pathname === '/portal/dashboard') return '/portal/dashboard';
   if (pathname === '/portal/admin' || pathname.startsWith('/portal/admin/')) return ADMIN_TAB.href;
-  if (pathname === SOLAR_HREF || pathname.startsWith(`${SOLAR_HREF}/`)) return SOLAR_HREF;
+  if (pathname === SOLAR_DECK_HREF || pathname.startsWith(`${SOLAR_DECK_HREF}/`)) return SOLAR_DECK_HREF;
+  if (pathname === SOLAR_HREF || pathname.startsWith(`${SOLAR_HREF}/`)) return '/portal/sales';
   const match = REP_TABS.find((tab) => tab.href !== '/portal/dashboard' && pathname.startsWith(tab.href));
   return match?.href ?? null;
 }
@@ -90,5 +107,8 @@ export function activeRepHref(pathname: string): string | null {
 /** Hrefs already on screen as tabs / top links, so the menu does not repeat them. */
 export const REP_PRIMARY_HREFS = new Set(REP_TABS.map((tab) => tab.href));
 
-/** The same for a solar-only rep, whose Solar is a tab (a dual rep finds it in the menu). */
-export const SOLAR_REP_PRIMARY_HREFS = new Set([...REP_PRIMARY_HREFS, SOLAR_HREF]);
+/**
+ * The same for a solar-only rep. The Solar page is no longer a tab (the deck
+ * is), so it stays in the menu, as it is for a dual rep.
+ */
+export const SOLAR_REP_PRIMARY_HREFS = new Set(SOLAR_REP_TABS.map((tab) => tab.href));

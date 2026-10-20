@@ -414,7 +414,7 @@ export function permissionsFor(
   return [...new Set([...base, ...SolarRolePermissions[user.solarRole]])];
 }
 
-/** A solar rep with no fiber field role and no platform role: gets the solar tab set. */
+/** A solar rep with no fiber field role and no platform role: gets the solar tab set (Solar in the center). */
 export function isSolarOnlyUser(
   user: { role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown } | null | undefined
 ): boolean {

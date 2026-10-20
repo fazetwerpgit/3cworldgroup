@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { safeNotificationLink } from '@/lib/notifications/safeLink';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, BellOff, Bug, ChevronDown, ChevronLeft, LogOut, Menu, MessageCircleQuestion, Plus, Settings, X } from 'lucide-react';
+import { Bell, BellOff, Bug, ChevronDown, ChevronLeft, LogOut, Menu, MessageCircleQuestion, Plus, Settings, Sun, X } from 'lucide-react';
 import { isNativeApp } from '@/lib/app/isNativeApp';
 import { nativePushNotAskedYet } from '@/lib/app/nativePush';
 import { askOpenTo } from '@/lib/ask/flag';
@@ -15,7 +15,16 @@ import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { NavGroupsList, NavSheet, useNavAccess, type NavSheetClasses } from '@/components/portal/NavSheet';
 import { BodyLayer } from './BodyLayer';
 import { ClearNotes } from './ClearNotes';
-import { ASK_HREF, LOG_SALE_HREF, REP_PRIMARY_HREFS, REP_TABS, SOLAR_REP_PRIMARY_HREFS, activeRepHref, repTabsFor } from './repNav';
+import {
+  ASK_HREF,
+  LOG_SALE_HREF,
+  REP_PRIMARY_HREFS,
+  REP_TABS,
+  SOLAR_REP_PRIMARY_HREFS,
+  SOLAR_TAB,
+  activeRepHref,
+  repTabsFor,
+} from './repNav';
 import { isOwner, isSolarOnlyUser } from '@/types';
 import type { PortalNavGroup, PortalNavItem } from '@/components/portal/CommandPalette';
 import s from './rep.module.css';
@@ -222,6 +231,8 @@ export function RepTopBar({
   const deskLinks = (solarOnly ? repTabsFor(false, true) : REP_TABS).filter((tab) => !tab.log && canAccess(tab));
   // Owners do not sell: no primary Log sale button, just a menu entry for the rare case.
   const canLog = !owner && REP_TABS.some((tab) => tab.log && canAccess(tab));
+  // A solar-only rep's equivalent: the deck, as on their phone bar's center tab.
+  const canDeck = solarOnly && canAccess(SOLAR_TAB);
   const baseGroups = sheetGroups(solarOnly ? SOLAR_REP_PRIMARY_HREFS : REP_PRIMARY_HREFS);
   const groups: PortalNavGroup[] = owner
     ? baseGroups.length
@@ -335,6 +346,12 @@ export function RepTopBar({
             <Link href={LOG_SALE_HREF} className={`${s.btnPrimary} ${s.navCta}`}>
               <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
               Log sale
+            </Link>
+          ) : null}
+          {canDeck ? (
+            <Link href={SOLAR_TAB.href} className={`${s.btnPrimary} ${s.navCta}`}>
+              <Sun size={18} strokeWidth={2.5} aria-hidden="true" />
+              {SOLAR_TAB.short}
             </Link>
           ) : null}
         </div>

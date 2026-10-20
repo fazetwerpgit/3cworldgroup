@@ -63,7 +63,10 @@ function RepMenu({ counts }: { counts?: Record<string, number> }) {
 
 /** The tab labels drawn with the lime center treatment. */
 function emphasized(html: string): string[] {
-  return [...html.matchAll(new RegExp(`class="${tabStyles.tabLog}">.*?</span>([^<]+)</a>`, 'g'))].map((m) => m[1]);
+  // A link, or a dual rep's + (a button that opens the fiber-or-solar chooser).
+  return [...html.matchAll(new RegExp(`class="${tabStyles.tabLog}">(?:(?!</(?:a|button)>).)*?</span>([^<]+)</(?:a|button)>`, 'g'))].map(
+    (m) => m[1],
+  );
 }
 
 describe('RepTabBar', () => {
@@ -84,16 +87,30 @@ describe('RepTabBar', () => {
     expect(html).not.toContain('Chat</a>');
   });
 
-  it('solar-only rep: Home / Solar / Board / Chat, no Sales or Log sale', () => {
-    setUser({ status: 'active', solarRole: 'entry_canvasser', uid: 'solar-1' }, ['leaderboard:read', 'chat:read', 'solar:read']);
+  it('solar-only rep: the fiber bar with Solar in the center: Home / Sales / Solar / Board / Chat', () => {
+    setUser({ status: 'active', solarRole: 'entry_canvasser', uid: 'solar-1' }, [
+      'leaderboard:read',
+      'chat:read',
+      'solar:read',
+      'solar:write',
+    ]);
     const html = renderToStaticMarkup(<RepTabBar />);
-    const labels = ['Home', 'Solar', 'Board', 'Chat'].map((label) => html.indexOf(`${label}</a>`));
+    const labels = ['Home', 'Sales', 'Solar', 'Board', 'Chat'].map((label) => html.indexOf(`${label}</a>`));
     expect(labels.every((index) => index > 0)).toBe(true);
     expect([...labels].sort((a, b) => a - b)).toEqual(labels);
-    expect(html).not.toContain('Sales</a>');
     expect(html).not.toContain('Log sale');
+    // Sales is their solar leads; the center Solar opens the deck itself.
+    expect(html).toMatch(/href="\/portal\/sales"/);
+    expect(html).toMatch(/href="\/portal\/solar\/present"[^>]*>(?:(?!<\/a>).)*Solar<\/a>/);
+    expect(html).not.toMatch(/href="\/portal\/solar"/);
     // Solar carries Log sale's lime center treatment, and only Solar does.
     expect(emphasized(html)).toEqual(['Solar']);
+  });
+
+  it('solar-only rep on the Solar page: the Sales tab is current', () => {
+    setUser({ status: 'active', solarRole: 'entry_canvasser', uid: 'solar-1' }, ['leaderboard:read', 'chat:read', 'solar:read', 'solar:write']);
+    state.pathname = '/portal/solar';
+    expect(renderToStaticMarkup(<RepTabBar />)).toMatch(/aria-current="page" href="\/portal\/sales"/);
   });
 
   it('dual fiber + solar rep keeps the fiber tabs', () => {
@@ -101,6 +118,8 @@ describe('RepTabBar', () => {
     const html = renderToStaticMarkup(<RepTabBar />);
     expect(html).toContain('Log sale');
     expect(emphasized(html)).toEqual(['Log sale']);
+    // Their + is a button: it opens the fiber-or-solar chooser.
+    expect(html).toMatch(/<button[^>]*aria-haspopup="dialog"[^>]*>(?:(?!<\/button>).)*Log sale<\/button>/);
     expect(html).toContain('Sales</a>');
     expect(html).not.toContain('Solar</a>');
   });
@@ -184,6 +203,19 @@ describe('RepTopBar', () => {
   it('gives an owner no Log sale button', () => {
     setUser({ status: 'active', role: 'owner', uid: 'o-1' });
     expect(renderToStaticMarkup(<RepTopBar />)).not.toContain('href="/portal/sales/new"');
+  });
+
+  it('gives a solar-only rep Home / Sales / Board / Chat links and a Solar button to the deck, no Log sale', () => {
+    setUser({ status: 'active', solarRole: 'entry_canvasser', uid: 'solar-1' }, ['leaderboard:read', 'chat:read', 'solar:read', 'solar:write']);
+    const html = renderToStaticMarkup(<RepTopBar />);
+    expect(html).toContain('href="/portal/sales"');
+    expect(html).toMatch(/href="\/portal\/solar\/present"[^>]*>(?:(?!<\/a>).)*Solar<\/a>/);
+    expect(html).not.toContain('href="/portal/sales/new"');
+  });
+
+  it('gives fiber and dual reps no Solar button in the top bar', () => {
+    setUser({ status: 'active', fieldRole: 'entry_rep', solarRole: 'entry_canvasser', uid: 'dual-1' }, [...REP_PERMISSIONS, 'solar:read', 'solar:write']);
+    expect(renderToStaticMarkup(<RepTopBar />)).not.toContain('href="/portal/solar/present"');
   });
 
   it('sends a task page back to its parent, or the dashboard by default', () => {
@@ -274,8 +306,9 @@ describe('activeRepHref', () => {
     expect(activeRepHref('/portal/sales/abc')).toBe('/portal/sales');
     expect(activeRepHref('/portal/chat/general')).toBe('/portal/chat');
     expect(activeRepHref('/portal/settings')).toBeNull();
-    expect(activeRepHref('/portal/solar')).toBe('/portal/solar');
-    expect(activeRepHref('/portal/solar/present')).toBe('/portal/solar');
+    // The Solar page belongs to Sales (My leads); the deck is the solar center tab.
+    expect(activeRepHref('/portal/solar')).toBe('/portal/sales');
+    expect(activeRepHref('/portal/solar/present')).toBe('/portal/solar/present');
     expect(activeRepHref('/portal/solarish')).toBeNull();
     expect(activeRepHref('/portal/admin/requests')).toBe('/portal/admin/onboarding');
     expect(activeRepHref('/portal/admin')).toBe('/portal/admin/onboarding');

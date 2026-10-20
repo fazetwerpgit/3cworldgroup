@@ -1,0 +1,13 @@
+/* The Sales tab's solar side: next consultation over My leads on a phone; on
+   desktop, a readable column rather than the full page width. */
+.solar {
+  display: grid;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .solar {
+    max-width: 720px;
+  }
+}

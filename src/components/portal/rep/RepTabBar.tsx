@@ -22,8 +22,9 @@ import t from './rep-tabbar.module.css';
  * Phone bottom bar: Home / Sales / Log sale / Board / Chat, each gated by the
  * portal's canAccess. Owners do not sell, so theirs is Home / Sales / Board /
  * Chat / Admin, the Admin tab carrying the open-items count. A solar-only rep
- * gets Home / Solar / Board / Chat. A dual (fiber + solar) rep's center + opens
- * a chooser (LogChooserSheet): Log fiber sale, or Open solar deck. Portaled to
+ * gets Home / Sales / Solar / Board / Chat, the center Solar opening the deck.
+ * A dual (fiber + solar) rep's center + opens a chooser (LogChooserSheet): Log
+ * fiber sale, or Open solar deck. Portaled to
  * <body> (see BodyLayer); hidden ≥1024px.
  *
  * Inside the 3C iOS app it behaves like a UITabBar: a tap gives a selection

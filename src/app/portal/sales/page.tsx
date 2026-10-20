@@ -9,7 +9,7 @@ import { MonthPicker } from '@/components/portal/rep/MonthPicker';
 import { CarrierNotice } from '@/components/portal/rep/CarrierNotice';
 import { PayHelpSheet } from '@/components/portal/rep/PayHelpSheet';
 import { RepShell } from '@/components/portal/rep/RepShell';
-import { LOG_SALE_HREF } from '@/components/portal/rep/repNav';
+import { FIBER_SALES_PERMISSIONS, LOG_SALE_HREF, SOLAR_SALES_PERMISSIONS } from '@/components/portal/rep/repNav';
 import { InstallStatusSection } from '@/components/sales/InstallStatusSection';
 import { SalesTable, SalesViewTabs } from '@/components/sales/SalesTable';
 import { useSales } from '@/hooks/useSales';
@@ -17,7 +17,7 @@ import { useCompPlan } from '@/hooks/useCompPlan';
 import { useFiberStatus } from '@/hooks/useFiberStatus';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { useAuth } from '@/contexts/AuthContext';
-import { isOwner } from '@/types';
+import { isOwner, isSolarOnlyUser } from '@/types';
 import { datedSales, undatedSales } from '@/lib/pay/payGroups';
 import { isTFiberSale, payoutsInMonth } from '@/lib/pay/payoutWindow';
 import { countedSales } from '@/lib/sales/installBucket';
@@ -34,6 +34,7 @@ import {
   type MonthKey,
 } from '@/lib/sales/monthWindow';
 import { PayoutCard } from './PayoutCard';
+import { SolarSales } from './SolarSales';
 import { cacheTimeLabel } from '@/lib/cache/dataCache';
 import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
@@ -422,12 +423,20 @@ function SalesContent() {
   );
 }
 
+// A solar-only rep sells no fiber: their Sales tab is their solar leads, so
+// the page asks for solar:read instead of sales:read.
 export default function SalesPage() {
+  const { user } = useAuth();
+  const solarOnly = isSolarOnlyUser(user);
   return (
-    <RepShell permissions={['sales:read']}>
-      <Suspense fallback={<SalesSkeleton />}>
-        <SalesContent />
-      </Suspense>
+    <RepShell permissions={solarOnly ? SOLAR_SALES_PERMISSIONS : FIBER_SALES_PERMISSIONS}>
+      {solarOnly ? (
+        <SolarSales head={<PageHead />} />
+      ) : (
+        <Suspense fallback={<SalesSkeleton />}>
+          <SalesContent />
+        </Suspense>
+      )}
     </RepShell>
   );
 }
