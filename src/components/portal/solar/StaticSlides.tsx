@@ -85,7 +85,7 @@ export function PartnersSlide() {
           <div className={s.partnerArt}>
             <Image src="/solar/b/panel.webp" alt="Solar panel" width={800} height={480} sizes="320px" />
           </div>
-          <p className={s.partnerName}>Bold Power</p>
+          <p className={s.partnerName}>Bold Energy</p>
           <p className={s.partnerNote}>Certified solar installers</p>
         </div>
       </div>
@@ -128,7 +128,7 @@ const STEPS = [
   {
     title: 'Design & Installation',
     kicker: 'Leave the heavy lifting to us.',
-    body: "A trusted team of Bold Power certified solar installers make your solar dreams a reality. They'll even handle all of the permitting and paperwork.",
+    body: "A trusted team of Bold Energy certified solar installers makes your solar dreams a reality. They'll even handle all of the permitting and paperwork.",
   },
   {
     title: 'Enjoy Your Savings!',
