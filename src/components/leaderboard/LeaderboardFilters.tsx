@@ -43,12 +43,12 @@ export function LeaderboardFilters({
     <div className={styles.filters}>
       {/* Fiber | Solar picks the board itself, so it sits above the rest. */}
       {boardSwitch ? (
-        <div className={tx.seg} role="group" aria-label="Leaderboard">
+        <div className={tx.side} role="group" aria-label="Leaderboard">
           {BOARD_OPTIONS.map((option) => (
             <button
               key={option.value}
               type="button"
-              className={tx.segBtn}
+              className={tx.sideBtn}
               aria-pressed={boardSwitch.board === option.value}
               onClick={() => boardSwitch.onChange(option.value)}
             >

@@ -43,7 +43,6 @@ import s from '@/components/portal/rep/rep.module.css';
 import x from '@/components/portal/rep/rep-sales.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import tx from '@/components/portal/rep/rep-taste.module.css';
-import css from './solar-sales.module.css';
 
 function PageHead({
   month,
@@ -66,12 +65,12 @@ function PageHead({
 /** A dual rep's Fiber | Solar switch, styled and worded as the Board's. */
 function SalesSideSwitch({ side, onChange }: { side: RememberedSide; onChange: (side: RememberedSide) => void }) {
   return (
-    <div className={`${tx.seg} ${css.switch}`} role="group" aria-label="Sales">
+    <div className={tx.side} role="group" aria-label="Sales">
       {BOARD_OPTIONS.map((option) => (
         <button
           key={option.value}
           type="button"
-          className={tx.segBtn}
+          className={tx.sideBtn}
           aria-pressed={side === option.value}
           onClick={() => onChange(option.value)}
         >
