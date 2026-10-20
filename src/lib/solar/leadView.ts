@@ -137,7 +137,9 @@ export function leadView(id: string, data: Record<string, unknown>, booking: Sol
     stage,
     stageOutcome: outcome,
     stageHistory: readStageHistory(data.stageHistory),
-    noSaleReason: status === 'lost' && stage === null && isNoSaleReason(data.noSaleReason) ? data.noSaleReason : null,
+    // A demo account's lead (stored 'demo', listed as new/booked) shows it too.
+    noSaleReason:
+      (status === 'lost' || stored === 'demo') && stage === null && isNoSaleReason(data.noSaleReason) ? data.noSaleReason : null,
     roofType: isRoofType(data.roofType) ? data.roofType : null,
     heavyShade: typeof data.heavyShade === 'boolean' ? data.heavyShade : null,
     needsReview: data.needsReview === true,
