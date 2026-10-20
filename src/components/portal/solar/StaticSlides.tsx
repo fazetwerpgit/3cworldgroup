@@ -3,8 +3,8 @@ import Image from 'next/image';
 import s from './staticSlides.module.css';
 
 // The deck's static slides, text verbatim from "3C Solar Pitch Deck.pptx",
-// laid out as "Design B": light page, two-tone titles, blue numerals, hairline
-// rules. Photos live in public/solar/b (the Design B set) and public/solar.
+// laid out as "Design B": light page, two-tone titles, big blue numerals,
+// space instead of rules. Photos live in public/solar/b (the Design B set) and public/solar.
 
 function Title({ dark, blue }: { dark: string; blue: string }) {
   return (
@@ -30,13 +30,11 @@ export function IntroSlide() {
   return (
     <div className={s.split}>
       <div className={s.splitText}>
-        <span className={s.dash} aria-hidden />
         <h1 className={`${s.title} ${s.display}`}>
           3C
           <br />
           <span className={s.blue}>World Group</span>
         </h1>
-        <hr className={s.shortRule} />
         <p className={s.tagline}>Giving clients the options they deserve!</p>
       </div>
       <div className={s.globeDisc}>
@@ -50,7 +48,6 @@ export function OptionsSlide() {
   return (
     <div className={`${s.split} ${s.splitPhoto}`}>
       <div className={s.splitText}>
-        <span className={s.dash} aria-hidden />
         <h2 className={`${s.title} ${s.display}`}>
           Time to take a look at <span className={s.blue}>your options!</span>
         </h2>
