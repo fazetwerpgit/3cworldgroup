@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { localTimeLine, supportStatus } from './prompt';
+import { buildSystemPrompt, localTimeLine, supportStatus } from './prompt';
 
 // Instants in September (EDT, UTC-4).
 const et = (iso: string) => new Date(`${iso}-04:00`);
@@ -53,5 +53,14 @@ describe('localTimeLine', () => {
 
   it('says nothing when the state is unknown rather than guessing Eastern', () => {
     expect(localTimeLine(et('2026-09-27T17:30'), 'Iowa City')).toBe('');
+  });
+});
+
+describe('buildSystemPrompt order fixes', () => {
+  it('knows an auto-filled payment card can break a T-Fiber order, and the fix', () => {
+    const prompt = buildSystemPrompt([], { firstName: 'Braeden', dealerCodes: [] });
+    expect(prompt).toContain(
+      'if the payment card was auto-filled (browser, iPhone or Apple autofill of saved card details) while entering a T-Fiber order, that can break the order: the fix is to have the customer type the card details in by hand'
+    );
   });
 });
