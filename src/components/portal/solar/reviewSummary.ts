@@ -30,7 +30,8 @@ export function reviewSections(state: ReviewInput): ReviewSection[] {
   const { lead } = state;
   const named = lead.first.trim() || lead.last.trim();
   const usage = estimateUsage(state.usage);
-  const photos = PHOTO_LABELS.filter((p) => state.photos[p.slot]);
+  // PHOTO_LABELS includes the knock app's meter slot, which the deck never uploads.
+  const photos = PHOTO_LABELS.filter((p) => (state.photos as Partial<Record<string, string>>)[p.slot]);
 
   return [
     {
