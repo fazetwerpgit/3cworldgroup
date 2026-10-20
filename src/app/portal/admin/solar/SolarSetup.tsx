@@ -70,13 +70,6 @@ function slotsIn(w: Pick<WeeklyWindow, 'start' | 'end'>, slotMin: number): numbe
 
 const tzLabel = (tz: string) => SOLAR_TIMEZONES.find((z) => z.value === tz)?.label ?? tz;
 
-/** "Sam Closer" -> "SC": the card's mark, so whose card it is reads before the name does. */
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] ?? '?').slice(0, 2);
-  return letters.toUpperCase();
-}
-
 const sameHours = (a: SolarHours | null, b: SolarHours) =>
   JSON.stringify(a && hoursPart(a)) === JSON.stringify(hoursPart(b));
 const hoursPart = (h: SolarHours): SolarHours => ({ tz: h.tz, slotMin: h.slotMin, modes: h.modes });
@@ -277,7 +270,13 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
     return (
       <div className={cx(st.preview, st.previewEmpty)} aria-live="polite">
         <p className={st.previewLine}>
-          Homeowners see <strong>no {MODE_LABEL[mode]} times</strong> with {name}
+          <span className={st.previewCount}>0</span>
+          <span className={st.previewWords}>
+            <strong>{MODE_LABEL[mode]} slots a week</strong>
+            <span className={st.previewSub}>
+              Homeowners see no {MODE_LABEL[mode]} times with {name}.
+            </span>
+          </span>
         </p>
       </div>
     );
@@ -292,15 +291,56 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
   return (
     <div className={st.preview} aria-live="polite">
       <p className={st.previewLine}>
-        <span className={st.previewLead}>Homeowners see </span>
-        <strong>
-          <span className={st.previewCount}>{total}</span> {MODE_LABEL[mode]} {total === 1 ? 'slot' : 'slots'} a week
-        </strong>
+        <span className={st.previewCount}>{total}</span>
+        <span className={st.previewWords}>
+          <strong>
+            {MODE_LABEL[mode]} {total === 1 ? 'slot' : 'slots'} a week
+          </strong>
+          <span className={st.previewSub}>Homeowners see them in their own time zone.</span>
+        </span>
       </p>
       <p className={st.previewDay}>
-        {DAY_LONG[w.day]}: {count === 1 ? `one slot, at ${first}` : `${count} slots, the first at ${first} and the last at ${last}`}
-        . Customers see these in their own time zone.
+        {DAY_LONG[w.day]}: {count === 1 ? `one slot, at ${first}` : `${count} slots, the first at ${first} and the last at ${last}`}.
       </p>
+    </div>
+  );
+}
+
+/** Where a day's open hours fall on a 5 AM to 11 PM track, as shares of it. */
+const TRACK_FROM = 5 * 60;
+const TRACK_SPAN = 18 * 60;
+function trackOf(w: WeeklyWindow): { top: number; size: number } {
+  const from = Math.min(Math.max(minutes(w.start) - TRACK_FROM, 0), TRACK_SPAN);
+  const to = Math.min(Math.max(minutes(w.end) - TRACK_FROM, from), TRACK_SPAN);
+  return { top: from / TRACK_SPAN, size: (to - from) / TRACK_SPAN };
+}
+
+/**
+ * The week drawn from its own hours: a column per day, the open window filled
+ * where it falls between 5 AM and 11 PM. It redraws as the hours change. The
+ * sentence beside it says the same, so it is hidden from screen readers.
+ */
+function WeekStrip({ hours, mode, focusDay }: { hours: SolarHours; mode: SolarMode; focusDay: number | null }) {
+  const windows = hours.modes[mode];
+  return (
+    <div className={st.strip} aria-hidden="true">
+      {WEEK.map((day) => {
+        const w = windows.find((x) => x.day === day);
+        const t = w ? trackOf(w) : null;
+        return (
+          <span key={day} className={cx(st.stripDay, !w && st.stripClosed, w && day === focusDay && st.stripFocus)}>
+            <span className={st.stripTrack}>
+              {t ? (
+                <span
+                  className={cx(st.stripFill, slotsIn(w!, hours.slotMin) === 0 && st.stripShort)}
+                  style={{ transform: `translateY(${(t.top * 100).toFixed(2)}%) scaleY(${t.size.toFixed(4)})` }}
+                />
+              ) : null}
+            </span>
+            <span className={st.stripName}>{DAY_SHORT[day]}</span>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -449,35 +489,64 @@ function ConsultantPanel({
     ? [...SOLAR_TIMEZONES]
     : [...SOLAR_TIMEZONES, { value: draft.tz, label: draft.tz }];
 
-  const calendar = google?.connected ? (
-    <StatusDot tone="lime">Calendar connected</StatusDot>
-  ) : google?.needsReconnect ? (
-    <StatusDot tone="amber">Calendar needs reconnecting</StatusDot>
-  ) : (
-    <StatusDot tone="muted">No calendar</StatusDot>
-  );
+  const slotText = SLOT_LABEL[draft.slotMin] ?? `${draft.slotMin} min`;
 
   return (
     <section className={cx(rep.panel, st.consultant)} aria-labelledby={`${headId}-name`} id={headId}>
-      <header className={st.who}>
-        <span className={st.mono} aria-hidden="true">
-          {initials(name)}
-        </span>
-        <div className={st.whoText}>
+      {/* The field: whose week this is, and the week itself as homeowners get it. */}
+      <header className={st.field}>
+        <div className={st.who}>
           <h2 className={st.name} id={`${headId}-name`}>
             {name}
-            {own ? <span className={st.you}>You</span> : null}
           </h2>
+          <span className={st.whoStatus}>{status}</span>
           <p className={st.whoMeta}>
+            {own ? <span className={st.you}>Your card</span> : null}
             <span>
-              {tzLabel(draft.tz)} time · {SLOT_LABEL[draft.slotMin] ?? `${draft.slotMin} min`} slots
+              {tzLabel(draft.tz)} time, {slotText} slots
             </span>
-            {calendar}
           </p>
         </div>
-        <span className={st.whoStatus}>{status}</span>
+        <div className={st.glance}>
+          <Preview name={name} hours={draft} mode={mode} focusDay={focusDay} />
+          <WeekStrip hours={draft} mode={mode} focusDay={focusDay} />
+        </div>
+        <div className={st.well}>
+          <Seg
+            label="Consultation type"
+            value={mode}
+            options={[
+              { value: 'virtual', label: 'Virtual', count: draft.modes.virtual.length },
+              { value: 'in_person', label: 'In person', count: draft.modes.in_person.length },
+            ]}
+            onChange={(m) => {
+              setMode(m);
+              setFocusDay(null);
+            }}
+          />
+        </div>
       </header>
       <div className={cx(u.panelBody, st.body)}>
+        <div className={st.group} role="group" aria-labelledby={`${headId}-hours`}>
+          <h3 className={st.groupTitle} id={`${headId}-hours`}>
+            {mode === 'virtual' ? 'Virtual' : 'In-person'} hours
+          </h3>
+          <ul
+            className={st.days}
+            aria-label={`${mode === 'virtual' ? 'Virtual' : 'In-person'} hours, ${tzLabel(draft.tz)} Time`}
+          >
+            {WEEK.map((day) => (
+              <DayRow
+                key={day}
+                day={day}
+                slotMin={draft.slotMin}
+                window={draft.modes[mode].find((w) => w.day === day)}
+                onChange={(next) => setDay(day, next)}
+              />
+            ))}
+          </ul>
+        </div>
+
         <div className={st.group} role="group" aria-labelledby={`${headId}-rules`}>
           <h3 className={st.groupTitle} id={`${headId}-rules`}>
             Booking rules
@@ -505,41 +574,6 @@ function ConsultantPanel({
               </div>
             </div>
           </div>
-        </div>
-
-        <div className={st.group} role="group" aria-labelledby={`${headId}-hours`}>
-          <h3 className={st.groupTitle} id={`${headId}-hours`}>
-            Weekly hours
-          </h3>
-          <div className={st.well}>
-            <Seg
-              label="Consultation type"
-              value={mode}
-              options={[
-                { value: 'virtual', label: 'Virtual', count: draft.modes.virtual.length },
-                { value: 'in_person', label: 'In person', count: draft.modes.in_person.length },
-              ]}
-              onChange={(m) => {
-                setMode(m);
-                setFocusDay(null);
-              }}
-            />
-          </div>
-          <ul
-            className={st.days}
-            aria-label={`${mode === 'virtual' ? 'Virtual' : 'In-person'} hours, ${tzLabel(draft.tz)} Time`}
-          >
-            {WEEK.map((day) => (
-              <DayRow
-                key={day}
-                day={day}
-                slotMin={draft.slotMin}
-                window={draft.modes[mode].find((w) => w.day === day)}
-                onChange={(next) => setDay(day, next)}
-              />
-            ))}
-          </ul>
-          <Preview name={name} hours={draft} mode={mode} focusDay={focusDay} />
         </div>
 
         <div className={st.group} role="group" aria-labelledby={`${headId}-reach`}>
@@ -787,9 +821,12 @@ function Consultants({ users, usersLoaded, after }: { users: PickerUser[]; users
           />
         ))}
         <section className={cx(rep.panel, st.add)} aria-labelledby="solar-add">
-          <div className={cx(rep.panelHead, u.band)}>
-            <h2 id="solar-add">Add a consultant</h2>
-          </div>
+          <header className={st.field}>
+            <h2 className={st.name} id="solar-add">
+              Add a consultant
+            </h2>
+            <p className={st.fieldNote}>Their days start closed. Open the ones they take, then save.</p>
+          </header>
           <div className={cx(u.panelBody, u.field)}>
             <label className={u.label} htmlFor="solar-add-search">
               Search people
@@ -805,7 +842,6 @@ function Consultants({ users, usersLoaded, after }: { users: PickerUser[]; users
                 setList((prev) => [...(prev ?? []), { uid: p.uid, name: pickerName(p), saved: null }]);
               }}
             />
-            <p className={u.hint}>Their days start closed. Open the ones they take, then save.</p>
           </div>
         </section>
         {after}
@@ -882,9 +918,12 @@ function AlertsPanel({ users }: { users: PickerUser[] }) {
 
   return (
     <section className={cx(rep.panel, st.alerts)} aria-labelledby="solar-alerts">
-      <div className={cx(rep.panelHead, u.band)}>
-        <h2 id="solar-alerts">Lead alerts</h2>
-      </div>
+      <header className={st.field}>
+        <h2 className={st.name} id="solar-alerts">
+          Lead alerts
+        </h2>
+        <p className={st.fieldNote}>Who gets each solar lead once it's booked, or once the rep finishes with the homeowner.</p>
+      </header>
       {failed ? (
         <AdminFailed
           what="lead alerts"

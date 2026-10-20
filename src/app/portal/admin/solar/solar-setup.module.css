@@ -35,99 +35,230 @@
   scroll-margin-top: var(--s4);
 }
 
-/* ---------- whose card: mark, name, the two facts, and its save state ----------
-   The identity sits on the panel itself (no band) at display size, so two cards
-   side by side read as two people before any field does. */
-.who {
+/* ---------- the field: whose week it is, and the week itself ----------
+   Every Setup panel opens on a raised field (one tone step up from the panel,
+   no band, no line): the title at display size, then what it holds. On a
+   consultant's card the field carries the result of the editor below it: the
+   week's open slots as the card's one big figure, and the week drawn from its
+   own hours. */
+.field {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--s3);
-  padding: var(--s4) var(--s4) 0;
+  gap: var(--s5);
+  padding: var(--s5) var(--s4) var(--s4);
+  border-radius: var(--r-panel) var(--r-panel) 0 0;
+  background: var(--c-raised);
+  min-width: 0;
 }
 
 @media (min-width: 1024px) {
-  .who {
-    gap: var(--s4);
-    padding: var(--s5) var(--s5) 0;
+  .field {
+    gap: var(--s6);
+    padding: var(--s6) var(--s5) var(--s5);
   }
 }
 
-.mono {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--c-panel-hi);
-  color: var(--c-text);
-  font: 400 21px / 1 var(--f-display);
-  letter-spacing: 0.02em;
-  padding-top: 2px;
+/* Add and Lead alerts: a title and the sentence that says what the panel is for. */
+.field:not(:has(.glance)) {
+  gap: var(--s2);
 }
 
-/* The signed-in person's own card: the one place lime marks a person. */
-.who:has(.you) .mono {
-  background: var(--c-lime-wash);
-  color: var(--c-lime);
+.fieldNote {
+  margin: 0;
+  max-width: 56ch;
+  color: var(--c-text-2);
+  font-size: var(--t-body);
+  line-height: 1.45;
+  text-wrap: pretty;
 }
 
-.whoText {
+.who {
   display: grid;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--s2) var(--s3);
   min-width: 0;
 }
 
 .name {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px var(--s2);
   margin: 0;
   color: var(--c-text);
-  font: 400 30px / 1 var(--f-display);
-  letter-spacing: 0.01em;
+  font: 400 var(--t-d1) / 0.92 var(--f-display);
+  letter-spacing: 0.005em;
   overflow-wrap: anywhere;
-  padding-top: 2px;
-}
-
-.you {
-  display: inline-flex;
-  align-items: center;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--c-lime-wash);
-  color: var(--c-lime);
-  font: 650 var(--t-min) / 1 var(--f-ui);
-  letter-spacing: 0;
-}
-
-.whoMeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px var(--s4);
-  margin: 0;
-  color: var(--c-text-2);
-  font-size: var(--t-sm);
-  font-weight: 500;
-}
-
-.whoMeta > span:last-child {
-  white-space: normal;
+  text-wrap: balance;
 }
 
 .whoStatus {
-  padding-top: 12px;
+  padding-top: 4px;
 }
 
-/* ---------- the three groups: booking rules, weekly hours, calendar and contact ----------
-   Grouped by space and a heading in full ink, not by more boxes. */
+.whoMeta {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--s3);
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 500;
+}
+
+/* The signed-in person's own card says so in words, in the accent. */
+.you {
+  color: var(--c-lime);
+  font-weight: 650;
+}
+
+/* The figure and the drawn week: side by side wherever the week fits beside it. */
+.glance {
+  display: grid;
+  gap: var(--s4);
+  align-items: end;
+  min-width: 0;
+}
+
+@media (min-width: 560px) {
+  .glance {
+    grid-template-columns: minmax(0, 1fr) minmax(196px, 252px);
+    gap: var(--s5);
+  }
+}
+
+.preview {
+  display: grid;
+  gap: var(--s3);
+  min-width: 0;
+}
+
+.previewLine {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s3);
+  margin: 0;
+}
+
+.previewCount {
+  flex: none;
+  color: var(--c-lime);
+  font: 400 var(--t-score) / 0.78 var(--f-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.previewEmpty .previewCount {
+  color: var(--c-text-3);
+}
+
+.previewWords {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.previewWords strong {
+  color: var(--c-text);
+  white-space: nowrap;
+  font-size: var(--t-body);
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.previewSub,
+.previewDay {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.previewDay {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The week, drawn: a column per day on a 5 AM to 11 PM track, the open hours
+   filled in the accent. The fill is a transform of a full-height bar, so a
+   changed time redraws as a move, not a reflow. */
+.strip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.stripDay {
+  display: grid;
+  gap: 6px;
+  justify-items: stretch;
+}
+
+.stripTrack {
+  position: relative;
+  height: 96px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--c-well);
+}
+
+@media (min-width: 1024px) {
+  .stripTrack {
+    height: 112px;
+  }
+}
+
+.stripFill {
+  position: absolute;
+  inset: 0;
+  background: var(--c-lime);
+  transform-origin: top;
+  transition:
+    transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    background-color 160ms ease;
+}
+
+/* Open but too short for one slot: the same warning colour as the row's note. */
+.stripShort {
+  background: var(--c-amber);
+}
+
+.stripFocus .stripFill:not(.stripShort) {
+  background: var(--c-lime-hi);
+}
+
+.stripName {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+.stripFocus .stripName {
+  color: var(--c-text);
+}
+
+.stripClosed .stripName {
+  color: var(--c-text-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stripFill {
+    transition: none;
+  }
+}
+
+/* ---------- the groups under the field: hours, booking rules, calendar and contact ----------
+   Grouped by space and a display-face heading in full ink, not by more boxes. */
 .body {
   display: grid;
   gap: var(--s6);
   min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .body {
+    padding-top: var(--s5);
+  }
 }
 
 .group {
@@ -139,9 +270,8 @@
 .groupTitle {
   margin: 0;
   color: var(--c-text);
-  font-size: 17px;
-  font-weight: 650;
-  line-height: 1.3;
+  font: 400 var(--t-d3) / 1 var(--f-display);
+  letter-spacing: 0.01em;
 }
 
 .settings {
@@ -156,7 +286,7 @@
   }
 }
 
-/* Seg sits on the panel here, so its track drops one tone to the well. */
+/* Seg sits on a panel or the field here, so its track drops to the well. */
 .well > [role='group'] {
   background: var(--c-well);
 }
@@ -172,14 +302,15 @@
   margin-top: var(--s2);
 }
 
+/* Field hints here are read once and acted on: set at the reading size, not as fine print. */
 .contact p {
+  font-size: var(--t-ui);
   text-wrap: pretty;
 }
 
 .contact [aria-invalid='true'] {
   border-color: var(--c-red);
 }
-
 /* ---------- the week ----------
    Rows sit on the panel, not in seven wells: the day, its hours, its switch.
    Alignment carries the grid; only the time pills are filled. */
@@ -277,61 +408,6 @@
   font-weight: 600;
 }
 
-/* ---------- what homeowners see ----------
-   The result of everything above it, read as one sentence with the week's
-   open slots as the card's one figure, on a lime wash. Text on the wash is
-   the ink at an opacity, never a grey. */
-.preview {
-  display: grid;
-  gap: var(--s1);
-  margin-top: var(--s1);
-  padding: var(--s3) var(--s4) 14px;
-  border-radius: var(--r-control);
-  background: var(--c-lime-wash);
-}
-
-.previewLine {
-  margin: 0;
-  color: var(--c-text);
-  font-size: var(--t-body);
-  line-height: 1.3;
-  text-wrap: balance;
-}
-
-.previewLead {
-  display: block;
-  color: rgba(242, 245, 249, 0.78);
-  font-size: var(--t-sm);
-  font-weight: 600;
-}
-
-.previewLine strong {
-  font-weight: 650;
-}
-
-.previewCount {
-  margin-right: 1px;
-  color: var(--c-lime);
-  font: 400 34px / 1 var(--f-display);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  vertical-align: -3px;
-}
-
-.previewDay {
-  margin: 0;
-  color: rgba(242, 245, 249, 0.78);
-  font-size: var(--t-sm);
-  line-height: 1.45;
-  font-variant-numeric: tabular-nums;
-  text-wrap: pretty;
-}
-
-/* Nothing bookable: a plain well, no figure. */
-.previewEmpty {
-  background: var(--c-well);
-}
-
 .actions {
   justify-content: space-between;
 }
@@ -373,7 +449,7 @@
 .help {
   margin: 0;
   color: var(--c-text-2);
-  font-size: var(--t-ui);
+  font-size: var(--t-body);
   line-height: 1.45;
 }
 
@@ -442,52 +518,53 @@
   }
 }
 
-/* ---------- Google Calendar (one row per consultant) ----------
-   A status line, not another well: the icon and label, the connection in its
-   own colour, and the action on the right where there's room, under it on a
-   phone. Only the state carries colour. */
+/* ---------- Google Calendar (one block per consultant) ----------
+   A filled block one step up from the panel: the label with its off switch
+   on the same line (Disconnect never sits alone on a phone), the state and
+   notes under it, lined up past the icon, and Connect as the block's action. */
 .gcal {
   display: grid;
-  gap: var(--s3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  padding: var(--s3) var(--s3) var(--s4) var(--s4);
+  border-radius: var(--r-panel);
+  background: var(--c-raised);
 }
 
-@media (min-width: 560px) {
-  .gcal {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-  }
-  /* The disconnect confirmation takes the whole row. */
-  .gcal > [role='alertdialog'] {
-    grid-column: 1 / -1;
-  }
+.gcal > [role='alertdialog'] {
+  grid-column: 1 / -1;
 }
 
 .gcalHead {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
+  min-height: 36px;
+  min-width: 0;
 }
 
 .gcalIcon {
   flex: none;
-  color: var(--c-text-3);
-}
-
-.gcalText {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  padding-top: 2px;
-}
-
-/* The state lines up under the label, past the icon. */
-.gcalText > :not(.gcalHead) {
-  padding-left: 26px;
+  color: var(--c-text-2);
 }
 
 .gcalLabel {
   font-size: var(--t-body);
   font-weight: 650;
+}
+
+/* The ghost button's label lines up with the block's right padding. */
+.gcalOff.gcalOff {
+  justify-self: end;
+}
+
+.gcalText {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-left: 28px;
 }
 
 /* A long Google address wraps instead of pushing the panel wide. */
@@ -511,18 +588,20 @@
 }
 
 .gcalActions {
+  grid-column: 1 / -1;
   justify-content: flex-start;
+  margin-top: var(--s1);
+}
+
+/* On a phone Connect is the block's whole-width action; past that it lines up with the text. */
+@media (max-width: 559px) {
+  .gcalActions > button {
+    flex: 1 1 auto;
+  }
 }
 
 @media (min-width: 560px) {
   .gcalActions {
-    justify-content: flex-end;
-  }
-}
-
-/* On a phone the action sits under the state: its label lines up with the text above. */
-@media (max-width: 559px) {
-  .gcalActions {
-    padding-left: 12px;
+    padding-left: 28px;
   }
 }
