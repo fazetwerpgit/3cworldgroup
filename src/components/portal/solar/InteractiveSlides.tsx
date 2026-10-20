@@ -10,11 +10,21 @@ import {
   formatSlotTime,
   groupSlotsByDay,
   setCreditTier,
+  slotsInWindow,
   type CreditTier,
   type SlotTime,
   type SolarMode,
   type SolarSlot,
 } from './solarClient';
+import {
+  DEFAULT_CONSULTANT_TZ,
+  US_TIMEZONES,
+  bookingWindowEnd,
+  customerZone,
+  deviceTimeZone,
+  zoneForState,
+  zoneName,
+} from '@/lib/solar/timezones';
 import s from './solarDeck.module.css';
 
 function NeedsLead({ onBack }: { onBack: () => void }) {
@@ -117,11 +127,11 @@ export function PrequalSlide({ onDone, onNeedLead }: { onDone: () => void; onNee
   );
 }
 
-const DAYS = 14;
-
 /**
- * Slide 10: open consultation times for the next 14 days, Pacific time. Each
- * time shows once; booking picks the consultant (bookTime).
+ * Slide 10: open consultation times for the next 14 days (the booking window),
+ * in the customer's time zone: the lead's state, else the rep's device zone
+ * with a switcher. Each time shows once; booking picks the consultant
+ * (bookTime) and stores the customer's zone with it.
  */
 export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; onNeedLead: () => void }) {
   const { state, update } = useDeck();
@@ -132,12 +142,22 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
   const [booking, setBooking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [dayKey, setDayKey] = useState<string | null>(null);
+  // The customer's zone. A known state decides it; otherwise the rep's phone
+  // zone, which the rep can switch.
+  const stateZone = zoneForState(state.lead.state);
+  const [device] = useState(() => deviceTimeZone() ?? DEFAULT_CONSULTANT_TZ);
+  const [chosenZone, setChosenZone] = useState<string | null>(null);
+  const tz = stateZone ?? chosenZone ?? device;
+  const zoneOptions = useMemo(
+    () => [...US_TIMEZONES.map((z) => z.value), ...(US_TIMEZONES.some((z) => z.value === device) ? [] : [device])],
+    [device]
+  );
 
   const load = useCallback(async (which: SolarMode) => {
     setSlots(null);
     setLoadError(null);
     const from = new Date();
-    const to = new Date(from.getTime() + DAYS * 24 * 60 * 60 * 1000);
+    const to = bookingWindowEnd(from);
     const res = await fetchAvailability(which, from, to);
     if (!res.ok) {
       setLoadError(res.error);
@@ -153,7 +173,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
     void load(mode);
   }, [mode, load]);
 
-  const days = useMemo(() => groupSlotsByDay(slots ?? []), [slots]);
+  const days = useMemo(() => groupSlotsByDay(slotsInWindow(slots ?? []), tz), [slots, tz]);
   // The day on show: the one picked, else the picked time's, else the first open day.
   const day =
     days.find((d) => d.key === dayKey) ??
@@ -165,7 +185,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
     if (!picked || !state.leadId || booking) return;
     setBooking(true);
     setMessage(null);
-    const res = await bookTime(picked, state.leadId, mode);
+    const res = await bookTime(picked, state.leadId, mode, undefined, tz);
     setBooking(false);
     if (!res.ok) {
       if (res.taken) {
@@ -177,7 +197,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
       }
       return;
     }
-    update({ booking: { id: res.id, start: res.slot.start, mode, consultantName: res.slot.name } });
+    update({ booking: { id: res.id, start: res.slot.start, mode, consultantName: res.slot.name, tz: res.customerTz ?? tz } });
     onBooked();
   };
 
@@ -244,7 +264,25 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
             <span className={s.label}>{day ? `Times on ${day.label}` : 'Times available'}</span>
             <span className={s.zone}>
               <Clock size={14} aria-hidden />
-              Pacific Time (PT)
+              {stateZone ? (
+                zoneName(tz)
+              ) : (
+                <select
+                  className={s.zoneSelect}
+                  value={tz}
+                  aria-label="Customer time zone"
+                  onChange={(e) => {
+                    setChosenZone(e.target.value);
+                    setDayKey(null);
+                  }}
+                >
+                  {zoneOptions.map((z) => (
+                    <option key={z} value={z}>
+                      {zoneName(z)}
+                    </option>
+                  ))}
+                </select>
+              )}
             </span>
           </div>
           {slots === null ? (
@@ -271,7 +309,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
                     setMessage(null);
                   }}
                 >
-                  {formatSlotTime(time.start)}
+                  {formatSlotTime(time.start, tz)}
                 </button>
               ))}
             </div>
@@ -285,7 +323,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
         ) : (
           <>
             <p className={picked ? s.bookPicked : s.note}>
-              {picked ? formatSlotLong(picked.start) : 'Pick a day and a time.'}
+              {picked ? formatSlotLong(picked.start, tz) : 'Pick a day and a time.'}
             </p>
             <button
               type="button"
@@ -294,7 +332,7 @@ export function BookingSlide({ onBooked, onNeedLead }: { onBooked: () => void; o
               aria-busy={booking || undefined}
               onClick={() => void book()}
             >
-              {booking ? 'Booking...' : picked ? `Book ${formatSlotTime(picked.start)}` : 'Book consultation'}
+              {booking ? 'Booking...' : picked ? `Book ${formatSlotTime(picked.start, tz)}` : 'Book consultation'}
             </button>
           </>
         )}
@@ -333,7 +371,7 @@ export function ConfirmationSlide({ onBook, onNewCustomer }: { onBook: () => voi
           {b ? (
             <dl className={s.confirm}>
               <dt>When</dt>
-              <dd>{formatSlotLong(b.start)}</dd>
+              <dd>{formatSlotLong(b.start, b.tz ?? customerZone(state.lead.state))}</dd>
               <dt>Type</dt>
               <dd>{b.mode === 'virtual' ? 'Virtual' : 'In-Person'}</dd>
               <dt>Consultant</dt>

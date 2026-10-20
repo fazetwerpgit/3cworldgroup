@@ -15,7 +15,8 @@ import {
 // sessionStorage so a reload mid-pitch keeps the same clientId (the lead POST
 // dedupes on it) and the same answers.
 
-export type Booking = { id: string; start: string; mode: SolarMode; consultantName: string };
+/** `tz`: the customer's zone the time was booked in (older sessions: none). */
+export type Booking = { id: string; start: string; mode: SolarMode; consultantName: string; tz?: string };
 
 export type DeckState = {
   clientId: string;

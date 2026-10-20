@@ -14,7 +14,7 @@ import css from './solar-leads.module.css';
 const FIRST_ROWS = 8;
 
 function rowSub(lead: SolarLeadView): string {
-  if (lead.booking) return `${consultTime(lead.booking)}, ${modeLabel(lead.booking.mode).toLowerCase()}`;
+  if (lead.booking) return `${consultTime({ start: lead.booking.start, tz: lead.booking.customerTz })}, ${modeLabel(lead.booking.mode).toLowerCase()}`;
   const saved = savedDate(lead.createdAt);
   return saved ? `Saved ${saved}` : 'No consultation';
 }
@@ -52,7 +52,7 @@ export function SolarNextConsult({ leads, onOpen }: { leads: SolarLeadView[] | n
   return (
     <button type="button" className={`${css.next} ${css.nextBtn}`} onClick={() => onOpen(next.id)}>
       <span className={css.nextLabel}>Next consultation</span>
-      <span className={css.nextWhen}>{consultTime(next.booking)}</span>
+      <span className={css.nextWhen}>{consultTime({ start: next.booking.start, tz: next.booking.customerTz })}</span>
       <span className={css.nextWho}>
         {leadName(next)}, {modeLabel(next.booking.mode).toLowerCase()} with {next.booking.consultantName}
       </span>
