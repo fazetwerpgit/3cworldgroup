@@ -91,6 +91,20 @@ function parseStageKey(key: string): { stage: SolarLeadStage | null; outcome?: S
   return { stage };
 }
 
+/**
+ * Whether picking this stage cancels the lead's live consultation on the
+ * server (no sale frees the slot, as Mark lost does), so the sheet asks first.
+ */
+export function stageChangeCancelsBooking(key: string, lead: Pick<SolarLeadView, 'stage' | 'stageOutcome' | 'booking'>): boolean {
+  const next = parseStageKey(key);
+  return (
+    Boolean(lead.booking) &&
+    key !== stageKey(lead) &&
+    next?.stage === 'appointment_demoed' &&
+    next.outcome === 'no_sale'
+  );
+}
+
 const CSV_COLUMNS = [
   { key: 'first', label: 'First name' },
   { key: 'last', label: 'Last name' },
@@ -460,7 +474,7 @@ function LeadRow({ lead, onOpen }: { lead: SolarLeadView; onOpen: () => void }) 
 
 type Busy = null | 'sold' | 'lost' | 'reopen' | 'cancel' | 'stage' | 'review';
 
-function LeadSheet({
+export function LeadSheet({
   lead,
   onClose,
   onChanged,
@@ -477,6 +491,8 @@ function LeadSheet({
   const [confirmCancel, setConfirmCancel] = useState(false);
   // Mark lost on a booked lead also cancels its consultation, so it asks first.
   const [confirmLost, setConfirmLost] = useState(false);
+  // No sale on a booked lead cancels its consultation too: the picked key waits here for a confirm.
+  const [confirmStage, setConfirmStage] = useState<string | null>(null);
   const closed = lead.status === 'sold' || lead.status === 'lost';
 
   const setStage = async (key: string) => {
@@ -490,6 +506,7 @@ function LeadSheet({
       setError(res.error || "Couldn't save the stage. Try again.");
       return;
     }
+    setConfirmStage(null);
     onChanged(lead.id, {
       stage: res.data.stage,
       stageOutcome: res.data.outcome,
@@ -541,8 +558,33 @@ function LeadSheet({
     onChanged(lead.id, { booking: null, status: closed ? lead.status : 'new' });
   };
 
+  const pickStage = (key: string) => {
+    setError('');
+    if (stageChangeCancelsBooking(key, lead)) {
+      setConfirmLost(false);
+      setConfirmCancel(false);
+      setConfirmStage(key);
+    } else {
+      setConfirmStage(null);
+      void setStage(key);
+    }
+  };
+
   let actions: ReactNode;
-  if (confirmLost && lead.booking) {
+  if (confirmStage && lead.booking) {
+    actions = (
+      <ConfirmStrip
+        label="Set No sale? This also cancels the consultation."
+        sub={`${consultTime(lead.booking)} with ${lead.booking.consultantName} opens up again. The rep and consultant get a notice; the homeowner isn't emailed.`}
+        confirming={busy === 'stage'}
+        confirmLabel="Set No sale"
+        busyLabel="Saving…"
+        cancelLabel="Back"
+        onCancel={() => setConfirmStage(null)}
+        onConfirm={() => void setStage(confirmStage)}
+      />
+    );
+  } else if (confirmLost && lead.booking) {
     actions = (
       <ConfirmStrip
         label="Mark lost? This also frees the consultation."
@@ -639,7 +681,7 @@ function LeadSheet({
     >
       <section className={css.stagePicker} aria-label="Sales stage">
         <span className={css.stagePickerLabel}>Sales stage</span>
-        <AdminSelect value={stageKey(lead)} onChange={(key) => void setStage(key)} label="Sales stage">
+        <AdminSelect value={stageKey(lead)} onChange={pickStage} label="Sales stage">
           <option value="none">Not set</option>
           {STAGE_CHOICES.map((c) => (
             <option key={c.key} value={c.key}>
