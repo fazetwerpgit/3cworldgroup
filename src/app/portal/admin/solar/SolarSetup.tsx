@@ -923,7 +923,7 @@ function AlertsPanel({ users }: { users: PickerUser[] }) {
         <h2 className={st.name} id="solar-alerts">
           Lead alerts
         </h2>
-        <p className={st.fieldNote}>Who gets each solar lead once it's booked, or once the rep finishes with the homeowner.</p>
+        <p className={st.fieldNote}>Who gets each solar lead once it’s booked, or once the rep finishes with the homeowner.</p>
       </header>
       {failed ? (
         <AdminFailed
