@@ -6,10 +6,22 @@
   min-width: 0;
 }
 
+/* Open deck in the page head: full width under the title on a phone, beside
+   it on a wider screen. */
+.openDeck {
+  flex: 1 1 100%;
+}
+
 .side {
   display: grid;
   gap: var(--s4);
   min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .openDeck {
+    flex: 0 0 auto;
+  }
 }
 
 @media (min-width: 1024px) {

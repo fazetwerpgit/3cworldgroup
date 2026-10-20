@@ -11,6 +11,7 @@ import {
   type SolarMode,
 } from './solarClient';
 import type { RoofChoice } from './RoofTypeField';
+import { EMPTY_USAGE, estimateUsage, normalizeUsage, type UsageEntry } from './usage';
 
 // One deck session: what the homeowner typed, carried across slides. Kept in
 // sessionStorage so a reload mid-pitch keeps the same clientId (the lead POST
@@ -22,6 +23,12 @@ export type DeckState = {
   clientId: string;
   uploadId: string;
   monthlyBill: number;
+  /**
+   * Average monthly kWh from the usage helper (null until entered). The lead
+   * field the knock app also sends; `usage` holds what the rep typed.
+   */
+  monthlyKwh: number | null;
+  usage: UsageEntry;
   apy: number;
   years: number;
   lead: LeadFields;
@@ -40,6 +47,8 @@ function freshState(): DeckState {
     clientId: newDeckClientId(),
     uploadId: newFormUploadId(),
     monthlyBill: 150,
+    monthlyKwh: null,
+    usage: { ...EMPTY_USAGE, months: [...EMPTY_USAGE.months] },
     apy: 0.05,
     years: 25,
     lead: { ...EMPTY_LEAD },
@@ -57,7 +66,14 @@ function loadState(): DeckState {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return fresh;
     const saved = JSON.parse(raw) as Partial<DeckState>;
-    return { ...fresh, ...saved, lead: { ...fresh.lead, ...(saved.lead ?? {}) } };
+    const usage = normalizeUsage(saved.usage);
+    return {
+      ...fresh,
+      ...saved,
+      lead: { ...fresh.lead, ...(saved.lead ?? {}) },
+      usage,
+      monthlyKwh: estimateUsage(usage)?.monthlyKwh ?? null,
+    };
   } catch {
     return fresh;
   }
@@ -72,6 +88,7 @@ export function hasLeadInProgress(state: DeckState): boolean {
   if (state.booking) return false;
   if (state.leadId || state.creditTier) return true;
   if (Object.values(state.photos).some(Boolean)) return true;
+  if (state.monthlyKwh !== null) return true;
   return Object.values(state.lead).some((v) => v.trim() !== '');
 }
 

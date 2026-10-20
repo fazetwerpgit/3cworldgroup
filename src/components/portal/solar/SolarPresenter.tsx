@@ -10,6 +10,9 @@ import { overrideStatusBar } from '@/lib/app/statusBar';
 import { disableBackGestures } from '@/lib/app/backGestures';
 import { CalculatorSlide } from './CalculatorSlide';
 import { LeadFormSlide } from './LeadFormSlide';
+import { ReviewSlide } from './ReviewSlide';
+import { UsageSlide } from './UsageSlide';
+import type { LeadStep, ReviewTarget } from './reviewSummary';
 import { BookingSlide, ConfirmationSlide, PrequalSlide } from './InteractiveSlides';
 import {
   AppendixSlide,
@@ -28,15 +31,16 @@ import s from './solarDeck.module.css';
 // The full-screen solar deck a rep hands to a homeowner. It sits outside the
 // rep shell (no <main> scroller), fills the viewport itself and keeps no
 // position:fixed layers, so iOS has nothing to clip. Swipe, arrow keys, the
-// Back/Next buttons or the slide list (the counter) move between slides.
+// Back/Next buttons (top bar and the big pair under the slide) or the slide
+// list (the counter) move between slides.
 
 type SlideId =
-  | 'intro' | 'options' | 'partners' | 'calculator' | 'lead' | 'bill' | 'prequal' | 'steps'
-  | 'needs' | 'booking' | 'confirm' | 'appendix' | 'moving' | 'fast' | 'price';
+  | 'intro' | 'options' | 'partners' | 'calculator' | 'lead' | 'bill' | 'usage' | 'prequal' | 'steps'
+  | 'needs' | 'review' | 'booking' | 'confirm' | 'appendix' | 'moving' | 'fast' | 'price';
 
 const ORDER: SlideId[] = [
-  'intro', 'options', 'partners', 'calculator', 'lead', 'bill', 'prequal', 'steps',
-  'needs', 'booking', 'confirm', 'appendix', 'moving', 'fast', 'price',
+  'intro', 'options', 'partners', 'calculator', 'lead', 'bill', 'usage', 'prequal', 'steps',
+  'needs', 'review', 'booking', 'confirm', 'appendix', 'moving', 'fast', 'price',
 ];
 
 /** What the slide list calls each slide; `true` marks the ones the homeowner fills in. */
@@ -47,9 +51,11 @@ const SLIDES: Record<SlideId, { title: string; interactive?: true }> = {
   calculator: { title: 'How much do you currently spend?', interactive: true },
   lead: { title: "Let's gather some info", interactive: true },
   bill: { title: 'Evaluation of your bill' },
+  usage: { title: 'Your electric usage', interactive: true },
   prequal: { title: 'Pre-qualification', interactive: true },
   steps: { title: 'Make the switch in three easy steps' },
   needs: { title: 'What we need to get started' },
+  review: { title: 'Does everything look right?', interactive: true },
   booking: { title: 'Book your solar consultation', interactive: true },
   confirm: { title: 'Appointment confirmation', interactive: true },
   appendix: { title: 'Appendix' },
@@ -59,7 +65,7 @@ const SLIDES: Record<SlideId, { title: string; interactive?: true }> = {
 };
 
 /** Slides whose content starts at the top (long forms) instead of centering. */
-const TOP_ALIGNED: Partial<Record<SlideId, true>> = { lead: true, booking: true };
+const TOP_ALIGNED: Partial<Record<SlideId, true>> = { lead: true, usage: true, review: true, booking: true };
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -95,12 +101,30 @@ function Deck() {
   }, []);
   const goTo = useCallback((id: SlideId) => go(ORDER.indexOf(id)), [go]);
 
+  // An Edit on the review slide: open that slide (the lead form on the right
+  // step); saving the form or picking a program then comes back to review.
+  // Moving any other way (Back/Next, swipe, the slide list) drops it.
+  const [edit, setEdit] = useState<{ slide: SlideId; step: LeadStep | null } | null>(null);
+  const editFromReview = useCallback(
+    (target: ReviewTarget) => {
+      setEdit({ slide: target.slide, step: target.slide === 'lead' ? target.step : null });
+      goTo(target.slide);
+    },
+    [goTo]
+  );
+  const editing = edit !== null && edit.slide === ORDER[index];
+  const afterEdit = (normalNext: SlideId) => {
+    goTo(editing ? 'review' : normalNext);
+    setEdit(null);
+  };
+
   // Done with this homeowner: the server sends the lead alert if a booking
   // didn't (idempotent), then every field, id and photo is cleared.
   const startNewCustomer = useCallback(() => {
     if (state.leadId) void finishLead(state.leadId);
     reset();
     setConfirming(false);
+    setEdit(null);
     go(0);
   }, [state.leadId, reset, go]);
   const requestNewCustomer = () => {
@@ -114,6 +138,7 @@ function Deck() {
     if (refocus) requestAnimationFrame(() => counterRef.current?.focus());
   }, []);
   const pickSlide = (i: number) => {
+    setEdit(null);
     go(i);
     closeList(true);
   };
@@ -144,8 +169,14 @@ function Deck() {
   useEffect(() => {
     if (confirming) cancelRef.current?.focus();
   }, [confirming]);
-  const next = useCallback(() => setPos((cur) => (cur.index >= ORDER.length - 1 ? cur : { index: cur.index + 1, dir: 'fwd' })), []);
-  const prev = useCallback(() => setPos((cur) => (cur.index <= 0 ? cur : { index: cur.index - 1, dir: 'back' })), []);
+  const next = useCallback(() => {
+    setEdit(null);
+    setPos((cur) => (cur.index >= ORDER.length - 1 ? cur : { index: cur.index + 1, dir: 'fwd' }));
+  }, []);
+  const prev = useCallback(() => {
+    setEdit(null);
+    setPos((cur) => (cur.index <= 0 ? cur : { index: cur.index - 1, dir: 'back' }));
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -200,11 +231,13 @@ function Deck() {
     case 'options': content = <OptionsSlide />; break;
     case 'partners': content = <PartnersSlide />; break;
     case 'calculator': content = <CalculatorSlide />; break;
-    case 'lead': content = <LeadFormSlide onSaved={() => goTo('bill')} />; break;
+    case 'lead': content = <LeadFormSlide startStep={editing ? edit.step : null} onSaved={() => afterEdit('bill')} />; break;
     case 'bill': content = <BillSlide />; break;
-    case 'prequal': content = <PrequalSlide onDone={() => goTo('steps')} onNeedLead={() => goTo('lead')} />; break;
+    case 'usage': content = <UsageSlide />; break;
+    case 'prequal': content = <PrequalSlide onDone={() => afterEdit('steps')} onNeedLead={() => goTo('lead')} />; break;
     case 'steps': content = <StepsSlide />; break;
     case 'needs': content = <NeedsSlide />; break;
+    case 'review': content = <ReviewSlide onEdit={editFromReview} onContinue={() => goTo('booking')} />; break;
     case 'booking': content = <BookingSlide onBooked={() => goTo('confirm')} onNeedLead={() => goTo('lead')} />; break;
     case 'confirm': content = <ConfirmationSlide onBook={() => goTo('booking')} onNewCustomer={requestNewCustomer} />; break;
     case 'appendix': content = <AppendixSlide />; break;
@@ -335,6 +368,17 @@ function Deck() {
           </>
         ) : null}
       </div>
+
+      <nav className={s.bottomNav} aria-label="Slide navigation">
+        <button type="button" className={s.navBack} onClick={prev} disabled={index === 0}>
+          <ChevronLeft size={20} aria-hidden />
+          Back
+        </button>
+        <button type="button" className={s.navNext} onClick={next} disabled={index === ORDER.length - 1}>
+          Next
+          <ChevronRight size={20} aria-hidden />
+        </button>
+      </nav>
     </div>
   );
 }
