@@ -70,6 +70,13 @@ function slotsIn(w: Pick<WeeklyWindow, 'start' | 'end'>, slotMin: number): numbe
 
 const tzLabel = (tz: string) => SOLAR_TIMEZONES.find((z) => z.value === tz)?.label ?? tz;
 
+/** "Sam Closer" -> "SC": the card's mark, so whose card it is reads before the name does. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] ?? '?').slice(0, 2);
+  return letters.toUpperCase();
+}
+
 const sameHours = (a: SolarHours | null, b: SolarHours) =>
   JSON.stringify(a && hoursPart(a)) === JSON.stringify(hoursPart(b));
 const hoursPart = (h: SolarHours): SolarHours => ({ tz: h.tz, slotMin: h.slotMin, modes: h.modes });
@@ -268,11 +275,16 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
   );
   if (total === 0 || ordered.length === 0) {
     return (
-      <div className={st.preview} aria-live="polite">
-        <span className={st.previewLabel}>Homeowners see</span>
-        <strong>
-          No {MODE_LABEL[mode]} times with {name}
-        </strong>
+      <div className={cx(st.preview, st.previewEmpty)} aria-live="polite">
+        <span className={st.previewCount} aria-hidden="true">
+          0
+        </span>
+        <div className={st.previewText}>
+          <span className={st.previewLabel}>Homeowners see</span>
+          <strong>
+            No {MODE_LABEL[mode]} times with {name}
+          </strong>
+        </div>
       </div>
     );
   }
@@ -285,14 +297,20 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
   const last = `${clock(lastStart)} ${zone}`;
   return (
     <div className={st.preview} aria-live="polite">
-      <span className={st.previewLabel}>Homeowners see</span>
-      <strong>
-        {total} {MODE_LABEL[mode]} {total === 1 ? 'slot' : 'slots'} a week
-      </strong>
-      <span className={st.previewDay}>
-        {DAY_LONG[w.day]}: {count === 1 ? `one slot, at ${first}` : `${count} slots, the first at ${first} and the last at ${last}`}
-        . Customers see these in their own time zone.
+      <span className={st.previewCount} aria-hidden="true">
+        {total}
       </span>
+      <div className={st.previewText}>
+        <span className={st.previewLabel}>Homeowners see</span>
+        <strong>
+          <span className={st.srOnly}>{total} </span>
+          {MODE_LABEL[mode]} {total === 1 ? 'slot' : 'slots'} a week
+        </strong>
+        <span className={st.previewDay}>
+          {DAY_LONG[w.day]}: {count === 1 ? `one slot, at ${first}` : `${count} slots, the first at ${first} and the last at ${last}`}
+          . Customers see these in their own time zone.
+        </span>
+      </div>
     </div>
   );
 }
@@ -441,38 +459,68 @@ function ConsultantPanel({
     ? [...SOLAR_TIMEZONES]
     : [...SOLAR_TIMEZONES, { value: draft.tz, label: draft.tz }];
 
+  const calendar = google?.connected ? (
+    <StatusDot tone="lime">Calendar connected</StatusDot>
+  ) : google?.needsReconnect ? (
+    <StatusDot tone="amber">Calendar needs reconnecting</StatusDot>
+  ) : (
+    <StatusDot tone="muted">No calendar</StatusDot>
+  );
+
   return (
     <section className={cx(rep.panel, st.consultant)} aria-labelledby={`${headId}-name`} id={headId}>
-      <div className={cx(rep.panelHead, u.band)}>
-        <h2 id={`${headId}-name`}>{name}</h2>
-        {status}
-      </div>
-      <div className={cx(u.panelBody, st.stack)}>
-        <div className={st.settings}>
-          <div className={u.field}>
-            <span className={u.label}>Time zone</span>
-            <AdminSelect value={draft.tz} label="Time zone" onChange={(tz) => edit({ ...draft, tz })}>
-              {tzOptions.map((z) => (
-                <option key={z.value} value={z.value}>
-                  {z.label}
-                </option>
-              ))}
-            </AdminSelect>
-          </div>
-          <div className={u.field}>
-            <span className={u.label}>Slot length</span>
-            <div className={st.well}>
-              <Seg
-                label="Slot length"
-                value={String(draft.slotMin)}
-                options={SOLAR_SLOT_LENGTHS.map((m) => ({ value: String(m), label: SLOT_LABEL[m] }))}
-                onChange={(v) => edit({ ...draft, slotMin: Number(v) })}
-              />
+      <header className={st.who}>
+        <span className={st.mono} aria-hidden="true">
+          {initials(name)}
+        </span>
+        <div className={st.whoText}>
+          <h2 className={st.name} id={`${headId}-name`}>
+            {name}
+            {own ? <span className={st.you}>You</span> : null}
+          </h2>
+          <p className={st.whoMeta}>
+            <span>
+              {tzLabel(draft.tz)} time · {SLOT_LABEL[draft.slotMin] ?? `${draft.slotMin} min`} slots
+            </span>
+            {calendar}
+          </p>
+        </div>
+        <span className={st.whoStatus}>{status}</span>
+      </header>
+      <div className={cx(u.panelBody, st.body)}>
+        <div className={st.group} role="group" aria-labelledby={`${headId}-rules`}>
+          <h3 className={st.groupTitle} id={`${headId}-rules`}>
+            Booking rules
+          </h3>
+          <div className={st.settings}>
+            <div className={u.field}>
+              <span className={u.label}>Time zone</span>
+              <AdminSelect value={draft.tz} label="Time zone" onChange={(tz) => edit({ ...draft, tz })}>
+                {tzOptions.map((z) => (
+                  <option key={z.value} value={z.value}>
+                    {z.label}
+                  </option>
+                ))}
+              </AdminSelect>
+            </div>
+            <div className={u.field}>
+              <span className={u.label}>Slot length</span>
+              <div className={st.well}>
+                <Seg
+                  label="Slot length"
+                  value={String(draft.slotMin)}
+                  options={SOLAR_SLOT_LENGTHS.map((m) => ({ value: String(m), label: SLOT_LABEL[m] }))}
+                  onChange={(v) => edit({ ...draft, slotMin: Number(v) })}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className={st.week}>
+        <div className={st.group} role="group" aria-labelledby={`${headId}-hours`}>
+          <h3 className={st.groupTitle} id={`${headId}-hours`}>
+            Weekly hours
+          </h3>
           <div className={st.well}>
             <Seg
               label="Consultation type"
@@ -501,44 +549,47 @@ function ConsultantPanel({
               />
             ))}
           </ul>
+          <Preview name={name} hours={draft} mode={mode} focusDay={focusDay} />
         </div>
 
-        <Preview name={name} hours={draft} mode={mode} focusDay={focusDay} />
-
-        <GoogleCalendarRow
-          uid={uid}
-          name={name}
-          own={own}
-          canConnect={Boolean(saved) && !seeded}
-          status={google}
-          onChange={onGoogle}
-        />
-
-        <div className={st.contact}>
-          <ContactInput
-            id={headId}
-            field="meetLink"
-            label="Google Meet link"
-            value={draft.meetLink}
-            error={fieldError('meetLink')}
-            hint={
-              google?.connected
-                ? 'Each booking gets its own Meet link from Google Calendar. This one is the backup.'
-                : 'Google Meet → New meeting → Create a meeting for later.'
-            }
-            onChange={(v) => editContact('meetLink', v)}
-            onBlur={() => tidy('meetLink')}
+        <div className={st.group} role="group" aria-labelledby={`${headId}-reach`}>
+          <h3 className={st.groupTitle} id={`${headId}-reach`}>
+            Calendar and contact
+          </h3>
+          <GoogleCalendarRow
+            uid={uid}
+            name={name}
+            own={own}
+            canConnect={Boolean(saved) && !seeded}
+            status={google}
+            onChange={onGoogle}
           />
-          <ContactInput
-            id={headId}
-            field="phone"
-            label="Phone"
-            value={draft.phone}
-            error={fieldError('phone')}
-            hint="Homeowners can call or text this number."
-            onChange={(v) => editContact('phone', v)}
-            onBlur={() => tidy('phone')}
-          />
+          <div className={st.contact}>
+            <ContactInput
+              id={headId}
+              field="meetLink"
+              label="Google Meet link"
+              value={draft.meetLink}
+              error={fieldError('meetLink')}
+              hint={
+                google?.connected
+                  ? 'Each booking gets its own Meet link from Google Calendar. This one is the backup.'
+                  : 'Google Meet → New meeting → Create a meeting for later.'
+              }
+              onChange={(v) => editContact('meetLink', v)}
+              onBlur={() => tidy('meetLink')}
+            />
+            <ContactInput
+              id={headId}
+              field="phone"
+              label="Phone"
+              value={draft.phone}
+              error={fieldError('phone')}
+              hint="Homeowners can call or text this number."
+              onChange={(v) => editContact('phone', v)}
+              onBlur={() => tidy('phone')}
+            />
+          </div>
         </div>
 
         {error ? <AdminNotice tone="error">{error}</AdminNotice> : null}
