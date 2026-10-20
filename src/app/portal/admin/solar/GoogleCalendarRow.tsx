@@ -161,15 +161,25 @@ export function GoogleCalendarRow({
   const showConnect = own && (!connected || status?.freeBusy === false);
   const showDisconnect = connected || broken;
 
+  const disconnectButton = showDisconnect ? (
+    <button type="button" className={cx(ops.btnGhost, u.sm, st.gcalOff)} disabled={busy !== null} onClick={() => setConfirming(true)}>
+      Disconnect
+    </button>
+  ) : null;
+
+  // The connection's own block: label and its one off switch on top (Disconnect
+  // never floats on its own line), the state and notes under it, and Connect
+  // as the block's action at the bottom.
   return (
     <div className={st.gcal} role="group" aria-labelledby={labelId}>
-      <div className={st.gcalText}>
-        <span className={st.gcalHead}>
-          <CalendarDays className={st.gcalIcon} size={18} strokeWidth={1.75} aria-hidden="true" />
-          <span className={st.gcalLabel} id={labelId}>
-            Google Calendar
-          </span>
+      <span className={st.gcalHead}>
+        <CalendarDays className={st.gcalIcon} size={20} strokeWidth={1.75} aria-hidden="true" />
+        <span className={st.gcalLabel} id={labelId}>
+          Google Calendar
         </span>
+      </span>
+      {confirming ? null : disconnectButton}
+      <div className={st.gcalText}>
         <span className={st.gcalState}>{state}</span>
         {note ? (
           <p className={cx(st.help, st.gcalNote, broken && st.gcalWarn)} role={waiting ? 'status' : undefined}>
@@ -194,28 +204,11 @@ export function GoogleCalendarRow({
           onCancel={() => setConfirming(false)}
           onConfirm={disconnect}
         />
-      ) : showConnect || showDisconnect ? (
+      ) : showConnect ? (
         <div className={cx(u.btnRow, st.gcalActions)}>
-          {showConnect ? (
-            <button
-              type="button"
-              className={cx(ops.btn, u.sm)}
-              disabled={busy !== null || !canConnect}
-              onClick={connect}
-            >
-              {waiting ? 'Open Google again' : connectLabel}
-            </button>
-          ) : null}
-          {showDisconnect ? (
-            <button
-              type="button"
-              className={cx(ops.btnGhost, u.sm)}
-              disabled={busy !== null}
-              onClick={() => setConfirming(true)}
-            >
-              Disconnect
-            </button>
-          ) : null}
+          <button type="button" className={cx(ops.btn, u.sm)} disabled={busy !== null || !canConnect} onClick={connect}>
+            {waiting ? 'Open Google again' : connectLabel}
+          </button>
         </div>
       ) : null}
     </div>
