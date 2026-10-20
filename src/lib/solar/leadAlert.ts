@@ -59,7 +59,9 @@ async function bookingFor(bookingId: string) {
     when: `${formatWhen(start, customerTz)}${consultantPart}`,
     mode: snap.get('mode') === 'virtual' ? 'virtual' : 'in-person',
     consultantName: text(snap.get('consultantName')) || 'a consultant',
-    meetLink: snap.get('mode') === 'virtual' ? text(snap.get('consultantMeetLink')) : '',
+    // The Meet link Google made for the event, else the consultant's own.
+    meetLink:
+      snap.get('mode') === 'virtual' ? text(snap.get('googleMeetLink')) || text(snap.get('consultantMeetLink')) : '',
   };
 }
 

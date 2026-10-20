@@ -14,6 +14,7 @@ import {
 } from '@/lib/solar/leadFields';
 import { SOLAR_STAGE_ROLES, readStage, stagePatchForStatus } from '@/lib/solar/leadStage';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
+import { syncBookingContactToGoogle } from '@/lib/solar/google/bookingEvents';
 
 const LEAD_CLOSED_ERROR = 'This lead is closed, so its contact details can no longer be changed.';
 
@@ -258,8 +259,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // A contact fix on a booked lead also fixes the name and email its live
     // booking carries (the consultant's notices and reminders read them), in
-    // one transaction with the lead.
-    const closedNow = await db.runTransaction(async (tx) => {
+    // one transaction with the lead. When the booking is on the consultant's
+    // Google Calendar, the event's title and invitee follow after the commit.
+    type GoogleSync = { consultantUid: string; eventId: string; customerName: string; customerEmail: string };
+    const contactFix = await db.runTransaction(async (tx) => {
+      let googleSync: GoogleSync | null = null;
       const lead = await tx.get(ref);
       if (!lead.exists) return 'missing' as const;
       const data = (lead.data() ?? {}) as Record<string, unknown>;
@@ -269,15 +273,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const booking = bookingRef ? await tx.get(bookingRef) : null;
       tx.update(ref, { ...patch, updatedAt: new Date() });
       if (bookingRef && isLiveBooking(booking)) {
-        tx.update(bookingRef, {
-          customerName: `${patch.first ?? ''} ${patch.last ?? ''}`.trim(),
-          customerEmail: typeof patch.email === 'string' ? patch.email : '',
-        });
+        const customerName = `${patch.first ?? ''} ${patch.last ?? ''}`.trim();
+        const customerEmail = typeof patch.email === 'string' ? patch.email : '';
+        tx.update(bookingRef, { customerName, customerEmail });
+        const eventId = booking?.get('googleEventId');
+        const changed = booking?.get('customerName') !== customerName || booking?.get('customerEmail') !== customerEmail;
+        if (typeof eventId === 'string' && eventId && changed) {
+          googleSync = { consultantUid: String(booking?.get('consultantUid') ?? ''), eventId, customerName, customerEmail };
+        }
       }
-      return 'ok' as const;
+      return { googleSync };
     });
-    if (closedNow === 'missing') return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
-    if (closedNow === 'closed') return NextResponse.json({ error: LEAD_CLOSED_ERROR }, { status: 409 });
+    if (contactFix === 'missing') return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    if (contactFix === 'closed') return NextResponse.json({ error: LEAD_CLOSED_ERROR }, { status: 409 });
+    const sync = contactFix.googleSync;
+    if (sync) await syncBookingContactToGoogle(sync.consultantUid, sync.eventId, sync);
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error updating solar lead:', error);

@@ -1,11 +1,13 @@
 // Cancelling a solar booking: the transaction writes (shared by PATCH
-// bookings/{id} and PATCH leads/{id} {status:'lost'}) and the notices that
-// follow. Server only (admin SDK).
+// bookings/{id}, PATCH leads/{id} {status:'lost'} / {noSaleReason}, and the
+// stage route) and what follows the commit: the notices and the Google
+// Calendar event's delete. Server only (admin SDK).
 import { createNotification } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { bookingZones, formatWhen, formatWhenForConsultant } from '@/lib/solar/timezones';
 import { solarLeadHref } from '@/lib/solar/leadView';
 import { consultantNotice, ownerNotificationsEnabled, resolveConsultants } from '@/lib/solar/server';
+import { removeBookingFromGoogle } from '@/lib/solar/google/bookingEvents';
 
 type Data = Record<string, unknown>;
 type Snap = { exists: boolean; get: (field: string) => unknown; data: () => Data | undefined };
@@ -26,6 +28,8 @@ export interface CancelledBooking {
   /** The booking's zones (old bookings: consultant America/Chicago, customer the same). */
   consultantTz: string;
   customerTz: string;
+  /** The booking's event on the consultant's Google Calendar ('' when none). */
+  googleEventId: string;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -77,10 +81,15 @@ export function stageBookingCancel(
     start: str(booking.get('start')),
     mode: booking.get('mode') === 'virtual' ? 'virtual' : 'in_person',
     ...zones,
+    googleEventId: str(booking.get('googleEventId')),
   };
 }
 
 /**
+ * After the cancel commits (every cancel path calls this): the booking's
+ * Google Calendar event is deleted with sendUpdates=all, so Google emails the
+ * homeowner the cancellation (best effort, lib/solar/google/bookingEvents).
+ *
  * The cancel notice: a portal notification plus a best-effort push to the rep
  * who booked it and to the consultant. The owner rule holds (see
  * consultantNotice): while settings/solar.notifyOwner is off the owner gets
@@ -93,6 +102,7 @@ export async function announceBookingCancel(
   cancelledBy: string,
   reason: 'cancelled' | 'lost' = 'cancelled'
 ): Promise<void> {
+  const google = c.googleEventId ? removeBookingFromGoogle(c.consultantUid, c.googleEventId) : Promise.resolve(false);
   try {
     const [notice, notifyOwner, { owner }] = await Promise.all([
       c.consultantUid ? consultantNotice(c.consultantUid) : Promise.resolve(null),
@@ -137,4 +147,5 @@ export async function announceBookingCancel(
   } catch (error) {
     console.error('solar cancel announce failed:', error);
   }
+  await google;
 }

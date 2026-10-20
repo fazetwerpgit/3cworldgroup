@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isSolarMode, openSlots, orderByPreference } from '@/lib/solar/availability';
 import { loadAvailability, loadBookings, requireSolarUser, resolveConsultants } from '@/lib/solar/server';
+import { googleBusyBlocks } from '@/lib/solar/google/freeBusy';
 import { bookingWindowEnd, isValidTimeZone, LEGACY_TZ, SOLAR_MAX_DAYS_OUT } from '@/lib/solar/timezones';
 
 const DAY = 86_400_000;
@@ -13,6 +14,8 @@ const DAY = 86_400_000;
 // at least 2 hours out. Times are absolute; the deck shows them in the
 // customer's zone. Slots that share a start come in booking
 // preference order (orderByPreference): the first is the one to book.
+// Consultants with Google Calendar connected (and free/busy granted) lose the
+// slots their primary calendar is busy for (lib/solar/google/freeBusy).
 export async function GET(request: NextRequest) {
   try {
     const gate = await requireSolarUser(request);
@@ -40,7 +43,17 @@ export async function GET(request: NextRequest) {
       loadBookings(from, cappedTo),
       resolveConsultants(),
     ]);
-    const slots = orderByPreference(openSlots(availability, bookings, mode, from, cappedTo, now), bookings, mode, owner?.uid ?? null);
+    // A consultant who connected Google Calendar only offers times they're free
+    // there too (cached ~60s; no filtering when Google doesn't answer). The busy
+    // blocks only hide slots: the booking-load order still counts real bookings.
+    const busy = await googleBusyBlocks(
+      availability.filter((a) => (a.modes[mode]?.length ?? 0) > 0),
+      from,
+      cappedTo,
+      now.getTime()
+    );
+    const open = openSlots(availability, busy.length > 0 ? [...bookings, ...busy] : bookings, mode, from, cappedTo, now);
+    const slots = orderByPreference(open, bookings, mode, owner?.uid ?? null);
     return NextResponse.json({ slots });
   } catch (error) {
     console.error('Error loading solar availability:', error);

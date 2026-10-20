@@ -79,7 +79,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
           if (s.consultantUid !== uid) tx.set(coll.doc(s.consultantUid), docOf(s, gate.uid, now));
         }
       }
-      tx.set(coll.doc(uid), docOf(next, gate.uid, now));
+      // The Google Calendar status is the connect flow's (lib/solar/google), not this form's: keep it.
+      tx.set(coll.doc(uid), {
+        ...docOf(next, gate.uid, now),
+        ...(kept.googleCalendar ? { googleCalendar: kept.googleCalendar } : {}),
+      });
       return next;
     });
     return NextResponse.json({ consultant });

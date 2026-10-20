@@ -12,6 +12,8 @@ import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
 import { isLowCreditDecline } from '@/lib/solar/leadFields';
 import { consultantBookingAttachment, customerBookingAttachment, type BookingInviteInput } from '@/lib/solar/bookingInvite';
 import { solarLeadHref } from '@/lib/solar/leadView';
+import { addBookingToGoogle, type GoogleBookingEvent } from '@/lib/solar/google/bookingEvents';
+import { googleSlotBusy } from '@/lib/solar/google/freeBusy';
 import {
   LEGACY_TZ,
   SOLAR_MAX_DAYS_OUT,
@@ -44,6 +46,8 @@ type Booking = {
   repName: string;
   customerTz: string;
   consultantTz: string;
+  /** The event on the consultant's Google Calendar, or null (not connected, or Google failed). */
+  google: GoogleBookingEvent | null;
 };
 
 /** The lead's address on one line: "12 Elm St, Austin, TX, 78701". */
@@ -59,12 +63,18 @@ function addressOf(lead: { get: (field: string) => unknown }): string {
 // even when a message fails. consultantNotice() keeps the owner out of it
 // while owner notifications are off (Jacob gets the notice instead). The
 // customer reads the time in their zone, the consultant in theirs. Both
-// emails carry an .ics invite with the same UID (lib/solar/bookingInvite).
+// emails carry an .ics invite with the same UID (lib/solar/bookingInvite),
+// except when the booking is on the consultant's Google Calendar: Google's
+// own invite puts it on both calendars, so a second .ics would double it.
+// Then the Meet link is the one Google made for the event. A notice that goes
+// to someone else (Jacob, for the owner's calendar) keeps its .ics: they
+// aren't on the Google event.
 async function announceBooking(b: Booking) {
   const when = formatWhen(b.start, b.customerTz);
   const consultantWhen = formatWhenForConsultant(b.start, b.consultantTz, b.customerTz);
   const how = b.mode === 'virtual' ? 'virtual' : 'in-person';
-  const meetLink = b.mode === 'virtual' ? b.meetLink : '';
+  const bookedMeet = b.google?.meetLink || b.meetLink;
+  const meetLink = b.mode === 'virtual' ? bookedMeet : '';
   const link = solarLeadHref(b.leadId);
   const invite: BookingInviteInput = {
     bookingId: b.id,
@@ -72,7 +82,7 @@ async function announceBooking(b: Booking) {
     start: b.start,
     end: b.end,
     consultantName: b.consultantName,
-    meetLink: b.meetLink,
+    meetLink: bookedMeet,
     consultantPhone: b.consultantPhone,
     customerName: b.customerName,
     customerPhone: b.customerPhone,
@@ -89,13 +99,14 @@ async function announceBooking(b: Booking) {
           when,
           mode: b.mode,
           consultantName: b.consultantName,
-          meetLink: b.meetLink,
+          meetLink: bookedMeet,
           consultantPhone: b.consultantPhone,
           address: b.address,
-          calendarAttached: true,
+          calendarAttached: !b.google,
+          googleInvite: Boolean(b.google),
         }),
         ...(notice.replyTo ? { replyTo: notice.replyTo } : {}),
-        attachments: [customerBookingAttachment(invite)],
+        ...(b.google ? {} : { attachments: [customerBookingAttachment(invite)] }),
         tag: 'solar-booking',
       });
     }
@@ -121,7 +132,7 @@ async function announceBooking(b: Booking) {
           link: `${appBaseUrl()}${link}`,
           ...(meetLink ? { action: { label: 'Join on Google Meet', href: meetLink } } : {}),
         }),
-        attachments: [consultantBookingAttachment(invite)],
+        ...(b.google && to.uid === b.consultantUid ? {} : { attachments: [consultantBookingAttachment(invite)] }),
         tag: 'solar-booking',
       });
     }
@@ -170,6 +181,11 @@ function bookedBody(id: string, b: Record<string, unknown>, duplicate: boolean) 
 // lead get one booking. A fresh booking sends the lead alert (once per lead,
 // see lib/solar/leadAlert.ts). Cancelling (PATCH bookings/{id}) frees both.
 // A lead closed at pre-qualification (noSaleReason 'low_credit') 409s.
+// Google Calendar (lib/solar/google), for a consultant who connected it: the
+// slot is re-checked against their free/busy (busy -> 409 slot_taken), and
+// after the commit the booking goes on their calendar with the homeowner
+// invited by Google (googleEventId / googleMeetLink saved on the booking).
+// Google failing never fails the booking; the emails fall back to the .ics.
 export async function POST(request: NextRequest) {
   try {
     const gate = await requireSolarUser(request);
@@ -236,6 +252,11 @@ export async function POST(request: NextRequest) {
     const bookings = await loadBookings(startDate, new Date(startDate.getTime() + 86_400_000));
     const open = openSlots(availability, bookings, mode, startDate, windowEnd, now).some((s) => s.start === start);
     if (!open) return NextResponse.json(SLOT_TAKEN, { status: 409 });
+    // Their Google Calendar, asked fresh (no cache): busy there since the list
+    // loaded is taken too. Google not answering doesn't block the booking.
+    if (await googleSlotBusy(availability[0], startDate, new Date(offered.end))) {
+      return NextResponse.json(SLOT_TAKEN, { status: 409 });
+    }
 
     const id = bookingDocId(consultantUid, start);
     const slotRef = db.collection('solarBookings').doc(id);
@@ -306,6 +327,21 @@ export async function POST(request: NextRequest) {
     if (!outcome.fresh) return NextResponse.json(bookedBody(outcome.id, outcome.booking, true));
 
     const b = outcome.booking;
+    // After the commit, outside the transaction: the Google event (best
+    // effort, ~6s cap; null falls back to the .ics emails).
+    const google = await addBookingToGoogle(consultantUid, availability[0]?.googleCalendar, {
+      bookingId: id,
+      createdAtMs: now.getTime(),
+      mode,
+      start,
+      end: offered.end,
+      timeZone: consultantTz,
+      customerName: String(b.customerName ?? ''),
+      customerEmail: String(b.customerEmail ?? ''),
+      customerPhone: outcome.customerPhone,
+      address: String(b.customerAddress ?? ''),
+      leadUrl: `${appBaseUrl()}${solarLeadHref(leadId)}`,
+    });
     await announceBooking({
       id,
       leadId,
@@ -323,6 +359,7 @@ export async function POST(request: NextRequest) {
       repName: gate.name,
       customerTz: String(b.customerTz ?? consultantTz),
       consultantTz,
+      google,
     });
     await sendLeadAlertOnce(leadId).catch((error) => console.error('solar lead alert failed:', error));
     return NextResponse.json(bookedBody(id, b, false));

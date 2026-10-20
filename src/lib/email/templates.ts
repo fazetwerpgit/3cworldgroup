@@ -352,6 +352,11 @@ export function solarBookingConfirmationEmail(p: {
   address?: string;
   /** True when an .ics invite rides along, so the email can point to it. */
   calendarAttached?: boolean;
+  /**
+   * True when the consultant's Google Calendar sent the homeowner its own
+   * invite (no .ics then): the email says to look for it.
+   */
+  googleInvite?: boolean;
 }): EmailContent {
   const subject = 'Your solar consultation is booked';
   const how = p.mode === 'virtual' ? 'a virtual consultation' : 'an in-person consultation';
@@ -392,6 +397,10 @@ export function solarBookingConfirmationEmail(p: {
     const cal = 'To add it to your calendar, open the attached invite.';
     text.push(cal);
     html.push(`<p style="${para}">${cal}</p>`);
+  } else if (p.googleInvite) {
+    const cal = `${who === 'your consultant' ? 'Your consultant' : who} also sent you a Google Calendar invite. Accept it to add the time to your calendar.`;
+    text.push(cal);
+    html.push(`<p style="${para}">${esc(cal)}</p>`);
   }
   const change = 'If you need to change the time, reply to this email.';
   text.push(change, '3C World Group');
