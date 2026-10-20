@@ -2,7 +2,7 @@
 //
 // Three boards, one ranking: SET (the default) ranks BOOKED CONSULTS: every
 // solarBookings doc that is not cancelled, credited to the rep who owns the
-// lead (booking.repUid, else the lead's repUid) and counted in the period its
+// lead (the lead's repUid, else booking.repUid) and counted in the period its
 // consult was BOOKED (createdAt), not when it happens. DEMOED ranks leads that
 // reached the demo (any outcome) and CLOSED leads whose outcome is a sale, both
 // credited to the lead's rep (the setter) and counted by when the lead got
@@ -104,7 +104,8 @@ export function modeLabel(mode: string): string {
 
 /**
  * The bookings the board counts: not cancelled, with a booked time and a rep.
- * The rep is booking.repUid, else the lead's (leadRepUid), else it is skipped.
+ * The rep is the lead's owner (leadRepUid), the same rep Demoed and Closed
+ * credit, else booking.repUid (a lead without one), else it is skipped.
  */
 export function countedBookings(
   bookings: ReadonlyArray<{ id: string; data: Data }>,
@@ -116,7 +117,7 @@ export function countedBookings(
     if (data.status === 'cancelled') continue;
     const createdAt = toDate(data.createdAt);
     if (!createdAt) continue;
-    const repUid = text(data.repUid) || leadRepUid.get(bookingLeadId(data)) || '';
+    const repUid = leadRepUid.get(bookingLeadId(data)) || text(data.repUid) || '';
     if (!repUid) continue;
     out.push({
       repUid,

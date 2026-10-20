@@ -110,21 +110,27 @@ describe('GET /api/portal/solar/leaderboard — counting', () => {
     expect((await get('?period=month&month=2027-01')).status).toBe(400);
   });
 
-  it("credits a booking without repUid to its lead's rep", async () => {
+  it("credits each booking to its lead's owner, as Demoed and Closed do; booking.repUid only without one", async () => {
     db.store.set('solarLeads', new Map(Object.entries({
       L1: { repUid: 'cy', status: 'booked' },
       L2: { repUid: 'cy', status: 'booked' },
+      L3: { status: 'booked' },
     })));
     db.store.set('solarBookings', new Map(Object.entries({
       b1: booking(null, '2026-10-12T15:00:00Z', { leadId: 'L1' }),
       b2: booking(null, '2026-10-12T16:00:00Z', { leadId: undefined, lead: 'L2' }),
+      // Booked by Ana on Cy's lead: Cy's, like the lead's demo and sale.
       b3: booking('ana', '2026-10-12T17:00:00Z', { leadId: 'L1' }),
-      orphan: booking(null, '2026-10-12T18:00:00Z', { leadId: 'missing' }),
+      // Lead without a rep, or missing: the booking's own repUid.
+      b4: booking('ana', '2026-10-12T18:00:00Z', { leadId: 'L3' }),
+      b5: booking('ben', '2026-10-12T19:00:00Z', { leadId: 'gone' }),
+      orphan: booking(null, '2026-10-12T20:00:00Z', { leadId: 'missing' }),
     })));
     const body = await (await get('?period=week')).json();
     expect(body.leaderboard.map((r: { uid: string; booked: number }) => [r.uid, r.booked])).toEqual([
-      ['cy', 2],
+      ['cy', 3],
       ['ana', 1],
+      ['ben', 1],
     ]);
   });
 
@@ -179,7 +185,7 @@ describe('GET /api/portal/solar/leaderboard — metric=set|demoed|closed', () =>
     })));
     db.store.set('solarLeads', new Map(Object.entries({
       // Ana: demoed this week (proposal sent), demoed + sold this week, sold last month.
-      L1: { repUid: 'ana', stage: 'appointment_demoed', outcome: 'proposal_sent', updatedAt: at('2026-10-14T15:00:00Z'),
+      L1: { repUid: 'ana', stage: 'appointment_demoed', stageOutcome: 'proposal_sent', updatedAt: at('2026-10-14T15:00:00Z'),
         stageHistory: [{ stage: 'appointment_demoed', outcome: 'proposal_sent', at: at('2026-10-12T15:00:00Z') }] },
       L2: { repUid: 'ana', stage: 'site_survey', updatedAt: at('2026-10-14T15:00:00Z'),
         stageHistory: [
@@ -189,7 +195,7 @@ describe('GET /api/portal/solar/leaderboard — metric=set|demoed|closed', () =>
       L3: { repUid: 'ana', status: 'sold', statusChangedAt: at('2026-09-10T15:00:00Z'), updatedAt: at('2026-10-14T15:00:00Z') },
       // Ben: old lost lead this week (demoed, no sale); demo reached last month, sale this week.
       L4: { repUid: 'ben', status: 'lost', statusChangedAt: at('2026-10-13T16:00:00Z') },
-      L5: { repUid: 'ben', stage: 'appointment_demoed', outcome: 'sale',
+      L5: { repUid: 'ben', stage: 'appointment_demoed', stageOutcome: 'sale',
         stageHistory: [
           { stage: 'appointment_demoed', outcome: 'proposal_sent', at: at('2026-09-20T15:00:00Z') },
           { stage: 'appointment_demoed', outcome: 'sale', at: at('2026-10-14T15:00:00Z') },

@@ -32,13 +32,13 @@ type Doc = { id: string; data: Data };
 const docsOf = (snap: { docs: { id: string; data: () => Data | undefined }[] }): Doc[] =>
   snap.docs.map((doc) => ({ id: doc.id, data: (doc.data() ?? {}) as Data }));
 
-/** Booked consults: every solarBookings doc, credited through its lead when it has no repUid. */
+/** Booked consults: every solarBookings doc, credited to its lead's owner (booking.repUid only without one). */
 async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>): Promise<SolarEvent[]> {
   const bookings = docsOf(await db.collection('solarBookings').get());
   const leadIds = [
     ...new Set(
       bookings
-        .filter(({ data }) => data.status !== 'cancelled' && !(typeof data.repUid === 'string' && data.repUid))
+        .filter(({ data }) => data.status !== 'cancelled')
         .map(({ data }) => bookingLeadId(data))
         .filter(Boolean)
     ),
