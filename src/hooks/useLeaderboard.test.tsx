@@ -156,6 +156,26 @@ describe('solar board answers', () => {
     expect(board.leaderboard[0]).toMatchObject({ totalSales: 4, totalPoints: 4, planMix: [] });
   });
 
+  it('give every row a unique, non-empty rep id (the board keys rows on it)', () => {
+    // Rows in the fiber board's shape (salesRepId, no uid) used to map to
+    // salesRepId '' on every row: React's "two children with the same key".
+    const board = solarBoardFromResponse({
+      leaderboard: [
+        { rank: 1, salesRepId: 'ana', salesRepName: 'Ana R', count: 6 },
+        { rank: 2, salesRepId: 'ben', salesRepName: 'Ben C', count: 5 },
+        { rank: 3, uid: 'cy', name: 'Cy D', count: 4 },
+        { rank: 4, uid: 'cy', name: 'Cy D', count: 4 },
+        { rank: 5, name: 'No Id', count: 1 },
+      ],
+      currentUser: { rank: 2, salesRepId: 'ben', salesRepName: 'Ben C', count: 5 },
+      unranked: [{ salesRepId: 'dee', salesRepName: 'Dee E' }, { name: 'No Id' }, { uid: 'dee', name: 'Dee E' }],
+    });
+    expect(board.leaderboard.map((row) => row.salesRepId)).toEqual(['ana', 'ben', 'cy']);
+    expect(board.leaderboard.map((row) => row.salesRepName)).toEqual(['Ana R', 'Ben C', 'Cy D']);
+    expect(board.currentUser).toMatchObject({ salesRepId: 'ben', salesRepName: 'Ben C' });
+    expect(board.unranked).toEqual([{ salesRepId: 'dee', salesRepName: 'Dee E' }]);
+  });
+
   it('cache each of Set | Demoed | Closed apart', () => {
     const request = { period: 'week', limit: 100, team: true, source: 'solar' } as const;
     const keys = (['bookedConsults', 'solarDemoed', 'solarClosed'] as const).map((metric) => leaderboardCacheKey({ ...request, metric }));

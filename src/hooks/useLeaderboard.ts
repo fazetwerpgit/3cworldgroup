@@ -95,6 +95,9 @@ type SolarRow = {
   rank?: unknown;
   uid?: unknown;
   name?: unknown;
+  /** The fiber board's field names, accepted when a row carries them instead. */
+  salesRepId?: unknown;
+  salesRepName?: unknown;
   /** The board's count (consults, demos or closes); older answers carry `booked` only. */
   count?: unknown;
   booked?: unknown;
@@ -105,14 +108,33 @@ type SolarRow = {
 };
 
 const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+const str = (value: unknown) => (typeof value === 'string' ? value : '');
+
+/** A solar row's rep id: `uid`, else the fiber board's `salesRepId`, else ''. */
+const solarRowId = (row: { uid?: unknown; salesRepId?: unknown }) => str(row.uid) || str(row.salesRepId);
+
+/**
+ * Rows keyed by rep id, keeping the first of each id and dropping rows with
+ * none. The board renders one element per row keyed on that id, so a missing
+ * id used to become '' on every row and React warned about duplicate keys.
+ */
+function uniqueById<T extends { uid?: unknown; salesRepId?: unknown }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const id = row && typeof row === 'object' ? solarRowId(row) : '';
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
 
 /** One solar row in the fiber board's shape: the count rides in totalSales and totalPoints. */
 function solarEntry(row: SolarRow): LeaderboardEntry {
   const booked = num(row.count ?? row.booked);
   return {
     rank: num(row.rank),
-    salesRepId: typeof row.uid === 'string' ? row.uid : '',
-    salesRepName: typeof row.name === 'string' ? row.name : 'Unknown',
+    salesRepId: solarRowId(row),
+    salesRepName: str(row.name) || str(row.salesRepName) || 'Unknown',
     totalSales: booked,
     totalPoints: booked,
     movement: typeof row.movement === 'number' ? row.movement : null,
@@ -131,15 +153,19 @@ export function solarBoardFromResponse(data: {
   firstMonth?: unknown;
   totalRanked?: unknown;
 }): CachedBoard {
-  const rows = Array.isArray(data.leaderboard) ? (data.leaderboard as SolarRow[]) : [];
-  const unranked = Array.isArray(data.unranked) ? (data.unranked as { uid?: unknown; name?: unknown }[]) : [];
+  const rows = uniqueById(Array.isArray(data.leaderboard) ? (data.leaderboard as SolarRow[]) : []);
+  const unranked = uniqueById(
+    Array.isArray(data.unranked)
+      ? (data.unranked as { uid?: unknown; name?: unknown; salesRepId?: unknown; salesRepName?: unknown }[])
+      : [],
+  );
   return {
     ...(typeof data.totalRanked === 'number' ? { totalRanked: data.totalRanked } : {}),
     leaderboard: rows.map(solarEntry),
     currentUser: data.currentUser && typeof data.currentUser === 'object' ? solarEntry(data.currentUser as SolarRow) : null,
     unranked: unranked.map((rep) => ({
-      salesRepId: typeof rep.uid === 'string' ? rep.uid : '',
-      salesRepName: typeof rep.name === 'string' ? rep.name : '',
+      salesRepId: solarRowId(rep),
+      salesRepName: str(rep.name) || str(rep.salesRepName),
     })),
     recent: Array.isArray(data.recent) ? (data.recent as RecentSale[]) : [],
     firstMonth: 'firstMonth' in data ? (typeof data.firstMonth === 'string' ? data.firstMonth : null) : undefined,
