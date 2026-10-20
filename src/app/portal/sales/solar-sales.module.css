@@ -1,14 +1,22 @@
-/* The Sales tab's solar side: next consultation over My leads on a phone; on
-   desktop, a readable column rather than the full page width. */
+/* The Sales tab's solar side: next consultation over My leads on a phone. */
 .solar {
   display: grid;
   gap: var(--s4);
   min-width: 0;
 }
 
+/* Desktop: the next consultation beside My leads, as on the Solar page, so
+   the list keeps a readable width and the page is not half empty. */
 @media (min-width: 1024px) {
   .solar {
-    max-width: 720px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+    align-items: start;
+    gap: var(--s5);
+  }
+
+  /* No consultation booked: My leads takes the row. */
+  .solar > :only-child {
+    grid-column: 1 / -1;
   }
 }
 

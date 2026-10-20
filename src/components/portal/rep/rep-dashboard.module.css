@@ -469,6 +469,15 @@
   width: 100%;
 }
 
+/* Desktop: a compact button at the left edge, like How pay works above, not a
+   bar across the column. */
+@media (min-width: 1024px) {
+  .solarDeck {
+    justify-self: start;
+    width: auto;
+  }
+}
+
 .skelNext {
   display: block;
   height: 112px;

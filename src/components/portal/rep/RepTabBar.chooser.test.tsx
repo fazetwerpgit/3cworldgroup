@@ -45,7 +45,7 @@ vi.mock('@/components/portal/NavSheet', () => ({ useNavAccess: () => ({ canAcces
 vi.mock('./useTabPrefetch', () => ({ usePrefetchTabOnTouch: () => () => {} }));
 vi.mock('./BodyLayer', () => ({ BodyLayer: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('@/hooks/useSheetDismiss', () => ({
-  useSheetDismiss: (onClose: () => void) => ({ close: onClose, closing: false, sheetRef: { current: null }, backdropRef: { current: null } }),
+  useSheetDismiss: (onClose: () => void) => ({ close: onClose, closing: false, sheetRef: () => {}, backdropRef: () => {} }),
 }));
 
 import { RepTabBar } from './RepTabBar';
@@ -105,6 +105,26 @@ describe('the center + by role', () => {
     });
     expect(dialog()).toBeNull();
     expect(document.activeElement).toBe(center());
+  });
+
+  it('Tab cycles inside the sheet (aria-modal)', () => {
+    env.user = DUAL;
+    act(() => root.render(<RepTabBar />));
+    act(() => center()?.click());
+    const focusables = [...(dialog()?.querySelectorAll<HTMLElement>('a[href], button') ?? [])];
+    const last = focusables[focusables.length - 1];
+    last.focus();
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    act(() => {
+      document.dispatchEvent(tab);
+    });
+    expect(tab.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(focusables[0]);
+    const back = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true });
+    act(() => {
+      document.dispatchEvent(back);
+    });
+    expect(document.activeElement).toBe(last);
   });
 
   it('a backdrop tap closes it; a tap inside the sheet does not', () => {

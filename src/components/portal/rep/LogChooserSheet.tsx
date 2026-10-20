@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, type MouseEvent } from 'react';
+import { useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Plus, Sun, X } from 'lucide-react';
 import { useSheetDismiss } from '@/hooks/useSheetDismiss';
@@ -28,6 +28,14 @@ export function LogChooserSheet({
 }) {
   const firstRef = useRef<HTMLAnchorElement | null>(null);
   const { close, closing, sheetRef, backdropRef } = useSheetDismiss<HTMLElement>(onClose);
+  const boxRef = useRef<HTMLElement | null>(null);
+  const setSheet = useCallback(
+    (el: HTMLElement | null) => {
+      boxRef.current = el;
+      sheetRef(el);
+    },
+    [sheetRef],
+  );
 
   useEffect(() => {
     firstRef.current?.focus();
@@ -35,6 +43,22 @@ export function LogChooserSheet({
       if (event.key === 'Escape') {
         event.preventDefault();
         close();
+        return;
+      }
+      // aria-modal: Tab cycles inside the sheet instead of reaching the page under it.
+      if (event.key === 'Tab' && boxRef.current) {
+        const items = [...boxRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled])')];
+        if (!items.length) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        const active = document.activeElement;
+        if (event.shiftKey && (active === first || !boxRef.current.contains(active))) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && (active === last || !boxRef.current.contains(active))) {
+          event.preventDefault();
+          first.focus();
+        }
       }
     };
     document.addEventListener('keydown', onKey);
@@ -52,7 +76,7 @@ export function LogChooserSheet({
         }}
       >
         <section
-          ref={sheetRef}
+          ref={setSheet}
           className={s.sheet}
           data-closing={closing || undefined}
           role="dialog"
