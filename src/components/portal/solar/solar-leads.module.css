@@ -385,13 +385,15 @@ button.photo:focus-visible {
   line-height: 1.3;
 }
 
-/* ---------- rep Solar page: next consultation and My leads ---------- */
+/* ---------- rep Solar page: next consultation and My leads ----------
+   The next consultation is a raised field with the day as its one figure
+   (the Setup cards' figure-and-words line); the time and who sit beside it. */
 .next {
   display: grid;
-  gap: var(--s2);
-  padding: var(--s4);
+  gap: var(--s3);
+  padding: var(--s4) var(--s4) var(--s4);
   border-radius: 16px;
-  background: var(--c-panel);
+  background: var(--c-raised);
 }
 
 .nextBtn {
@@ -419,6 +421,59 @@ button.photo:focus-visible {
 .nextBtn:focus-visible {
   outline: 2px solid var(--c-lime-hi);
   outline-offset: 2px;
+}
+
+@media (min-width: 1024px) {
+  .next {
+    padding: var(--s5) 28px 28px;
+  }
+}
+
+.nextGlance {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.nextDate {
+  display: grid;
+  flex: none;
+  justify-items: start;
+  gap: 2px;
+}
+
+.nextMonth {
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 650;
+  line-height: 1;
+}
+
+.nextDay {
+  color: var(--c-lime);
+  font: 400 var(--t-score) / 0.78 var(--f-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.nextWords {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-bottom: 2px;
+}
+
+.nextWords .nextLabel {
+  margin-bottom: 6px;
+}
+
+.nextTime {
+  color: var(--c-text);
+  font-size: 17px;
+  font-weight: 650;
+  line-height: 1.25;
+  text-wrap: balance;
 }
 
 .minePad {
@@ -457,10 +512,10 @@ button.photo:focus-visible {
 
 .mineHead {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--s3);
-  padding: var(--s4) var(--s4) var(--s2);
+  padding: var(--s5) var(--s4) var(--s3);
 }
 
 .mineTitle {
@@ -471,10 +526,10 @@ button.photo:focus-visible {
   line-height: 0.95;
 }
 
+/* How many homeowners: the list's figure, in the accent like the next day. */
 .mineCount {
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
-  font-weight: 600;
+  color: var(--c-lime);
+  font: 400 var(--t-d1) / 0.8 var(--f-display);
   font-variant-numeric: tabular-nums;
 }
 

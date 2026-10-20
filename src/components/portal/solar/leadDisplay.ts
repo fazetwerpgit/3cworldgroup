@@ -98,6 +98,39 @@ export function modeLabel(mode: SolarLeadBooking['mode']): string {
   return MODE[mode];
 }
 
+/**
+ * The same moment as consultTime, in pieces for a date figure: month "Oct",
+ * day "27", weekday "Tuesday", time "10:00 AM CDT". Null when the zone or the
+ * date cannot be read (callers fall back to consultTime).
+ */
+export function consultParts(
+  booking: Pick<SolarLeadBooking, 'start' | 'tz'>
+): { month: string; day: string; weekday: string; time: string } | null {
+  try {
+    const parts: Record<string, string> = {};
+    for (const part of new Intl.DateTimeFormat('en-US', {
+      timeZone: booking.tz,
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    }).formatToParts(new Date(booking.start))) {
+      parts[part.type] = part.value;
+    }
+    if (!parts.day || !parts.month || !parts.hour) return null;
+    return {
+      month: parts.month,
+      day: parts.day,
+      weekday: parts.weekday ?? '',
+      time: `${parts.hour}:${parts.minute} ${parts.dayPeriod ?? ''} ${parts.timeZoneName ?? ''}`.replace(/\s+/g, ' ').trim(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** "Tue, Oct 27, 10:00 AM CDT" in the consultant's own zone. */
 export function consultTime(booking: Pick<SolarLeadBooking, 'start' | 'tz'>): string {
   try {

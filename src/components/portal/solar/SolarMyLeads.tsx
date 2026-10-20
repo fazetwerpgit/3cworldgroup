@@ -9,6 +9,7 @@ import { LeadDetail } from './LeadDetail';
 import {
   STATUS_LABEL,
   STATUS_TONE,
+  consultParts,
   consultTime,
   leadName,
   modeLabel,
@@ -59,13 +60,39 @@ export function useMyLeads() {
 export function SolarNextConsult({ leads, onOpen }: { leads: SolarLeadView[] | null; onOpen: (id: string) => void }) {
   const next = leads ? nextConsult(leads) : null;
   if (!next?.booking) return null;
+  const at = { start: next.booking.start, tz: next.booking.customerTz };
+  const when = consultTime(at);
+  const parts = consultParts(at);
+  const who = `${leadName(next)}, ${modeLabel(next.booking.mode).toLowerCase()} with ${next.booking.consultantName}`;
   return (
     <button type="button" className={`${css.next} ${css.nextBtn}`} onClick={() => onOpen(next.id)}>
-      <span className={css.nextLabel}>Next consultation</span>
-      <span className={css.nextWhen}>{consultTime({ start: next.booking.start, tz: next.booking.customerTz })}</span>
-      <span className={css.nextWho}>
-        {leadName(next)}, {modeLabel(next.booking.mode).toLowerCase()} with {next.booking.consultantName}
-      </span>
+      {parts ? (
+        // The day as the block's one figure; what it is, when and who beside it.
+        <span className={css.nextGlance}>
+          <span className={css.nextDate} aria-hidden="true">
+            <span className={css.nextMonth}>{parts.month}</span>
+            <span className={css.nextDay}>{parts.day}</span>
+          </span>
+          <span className={css.nextWords}>
+            <span className={css.nextLabel}>Next consultation</span>
+            <span className={css.nextTime} aria-hidden="true">
+              {parts.weekday}, {parts.time}
+            </span>
+            <span className={css.nextWho} aria-hidden="true">
+              {who}
+            </span>
+            <span className={rep.srOnly}>
+              , {when}. {who}
+            </span>
+          </span>
+        </span>
+      ) : (
+        <>
+          <span className={css.nextLabel}>Next consultation</span>
+          <span className={css.nextWhen}>{when}</span>
+          <span className={css.nextWho}>{who}</span>
+        </>
+      )}
     </button>
   );
 }
@@ -111,7 +138,12 @@ export function SolarMyLeads({
         <h2 id="solar-mine-h" className={css.mineTitle}>
           My leads
         </h2>
-        {leads && leads.length > 0 ? <span className={css.mineCount}>{leads.length}</span> : null}
+        {leads && leads.length > 0 ? (
+          <span className={css.mineCount}>
+            {leads.length}
+            <span className={rep.srOnly}>{leads.length === 1 ? ' homeowner' : ' homeowners'}</span>
+          </span>
+        ) : null}
       </div>
       {failed && !leads ? (
         <div className={css.minePad}>
