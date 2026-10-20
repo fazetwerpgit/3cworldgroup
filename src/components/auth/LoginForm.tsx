@@ -5,9 +5,7 @@ import Link from 'next/link';
 import { AlertCircle, CircleCheck, Eye, EyeOff, LoaderCircle } from 'lucide-react';
 import {
   GoogleAuthProvider,
-  browserLocalPersistence,
   browserPopupRedirectResolver,
-  setPersistence,
   signInWithCredential,
   signInWithPopup,
 } from 'firebase/auth';
@@ -122,8 +120,11 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      // Keep reps signed in across reloads and browser restarts.
-      if (auth) await setPersistence(auth, browserLocalPersistence);
+      // No setPersistence here or on the other sign-ins: Auth already keeps the
+      // session in IndexedDB (firebase/config.ts), which survives reloads,
+      // restarts and app kills. Switching to localStorage moved the fresh
+      // session into WKWebView's lazily flushed localStorage, so leaving the
+      // iOS app soon after signing in could lose it (back to the login form).
       await signIn(email, password);
       await finishPendingLink();
     } catch (err: unknown) {
@@ -138,7 +139,6 @@ export function LoginForm() {
     setGoogleLoading(true);
     try {
       if (!auth) throw new Error('auth/not-configured');
-      await setPersistence(auth, browserLocalPersistence);
       // The resolver is passed here only: auth itself is created without one
       // so cold opens skip Google's iframe (see firebase/config.ts).
       await signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver);
@@ -161,7 +161,6 @@ export function LoginForm() {
     setNativeLoading(provider);
     try {
       if (!auth) throw new Error('auth/not-configured');
-      await setPersistence(auth, browserLocalPersistence);
       const native = await getNativeCredential(provider);
       rememberPendingDisplayName(native.displayName);
       try {
