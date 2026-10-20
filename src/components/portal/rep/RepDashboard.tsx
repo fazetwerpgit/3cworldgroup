@@ -501,39 +501,61 @@ export function SolarWeekSection({
         </span>
       </SectionHead>
 
-      {state.status === 'error' ? (
-        <div className={`${d.surface} ${d.half}`}>
+      {/* One field, not a box per number: the week's three counts side by
+          side, Set (the first step) in the accent, each over a track filled
+          to its share of the week's largest count. */}
+      <div className={`${d.surface} ${d.solarField}`}>
+        {state.status === 'error' ? (
           <Failed what="your solar numbers" onRetry={onRetry} className={d.cellFailed} />
-        </div>
-      ) : (
-        <div className={`${d.halves} ${d.thirds}`}>
-          {SOLAR_WEEK_CELLS.map((cell) => (
-            <div key={cell.key} className={`${d.surface} ${d.half}`}>
-              {state.status === 'loading' ? (
-                <span className={`${s.skel} ${d.skelStat}`} aria-label={`Loading ${cell.noun}`} />
-              ) : (
-                <p className={`${d.big} ${d.statBig}`} aria-label={`${state.data[cell.key]} ${cell.noun} this week`}>
-                  {state.data[cell.key]}
-                </p>
-              )}
-              <p className={d.cap} aria-hidden={state.status === 'ready' || undefined}>
-                {cell.label}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+        ) : (
+          <SolarFunnel state={state} />
+        )}
 
-      {dual ? (
-        <div className={d.solarMore}>
-          {next}
-          <Link href={SOLAR_DECK_HREF} className={`${s.btnSecondary} ${d.solarDeck}`}>
-            <Sun size={18} aria-hidden="true" />
-            Open deck
-          </Link>
-        </div>
-      ) : null}
+        {dual ? (
+          <div className={d.solarMore}>
+            {next}
+            <Link href={SOLAR_DECK_HREF} className={`${s.btnSecondary} ${d.solarDeck}`}>
+              <Sun size={18} aria-hidden="true" />
+              Open deck
+            </Link>
+          </div>
+        ) : null}
+      </div>
     </section>
+  );
+}
+
+/**
+ * Set, Demoed, Closed as columns: the count, a track filled to its share of
+ * the week's largest count, the word under it. The tracks only restate the
+ * numbers, so they are hidden from screen readers.
+ */
+function SolarFunnel({ state }: { state: Exclude<SolarWeekState, { status: 'error' }> }) {
+  const data = state.status === 'ready' ? state.data : null;
+  const top = data ? Math.max(data.set, data.demoed, data.closed) : 0;
+  return (
+    <div className={`${d.funnel} ${data && top === 0 ? d.funnelEmpty : ''}`}>
+      {SOLAR_WEEK_CELLS.map((cell) => (
+        <div key={cell.key} className={d.funnelCol}>
+          {data ? (
+            <p className={d.funnelNum} aria-label={`${data[cell.key]} ${cell.noun} this week`}>
+              {data[cell.key]}
+            </p>
+          ) : (
+            <span className={`${s.skel} ${d.skelStat}`} aria-label={`Loading ${cell.noun}`} />
+          )}
+          <span className={d.funnelTrack} aria-hidden="true">
+            <span
+              className={d.funnelFill}
+              style={{ transform: `scaleX(${data && top > 0 ? (data[cell.key] / top).toFixed(4) : 0})` }}
+            />
+          </span>
+          <p className={d.funnelLabel} aria-hidden={data ? true : undefined}>
+            {cell.label}
+          </p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -859,8 +881,9 @@ function TodaySlot(p: RepHomeViewProps) {
 }
 
 /**
- * A solar-only rep's Home: the deck leads (where pay sits for a fiber rep),
- * the next consultation and Ask 3C under it, and Today (calls, open paperwork) beside. No pay, week or
+ * A solar-only rep's Home: the deck leads (where pay sits for a fiber rep)
+ * with the next consultation as its foot; this week, Ask 3C and Today (calls,
+ * open paperwork) follow, beside it on desktop. No pay, fiber week or
  * sales: those are the fiber book, which this rep does not have.
  */
 function SolarHomeView(p: RepHomeViewProps) {
@@ -876,11 +899,13 @@ function SolarHomeView(p: RepHomeViewProps) {
           {p.solarEntry}
           {/* Close under the deck (one Solar group); empty when none is ahead. */}
           {p.solarNext ? <div className={d.solarNext}>{p.solarNext}</div> : null}
-          {p.solarWeek}
-          {p.askEntry}
         </div>
 
+        {/* Phone: straight on under the deck (the columns are display:
+            contents). Desktop: the week heads the side column beside the deck. */}
         <div className={d.colSide}>
+          {p.solarWeek}
+          {p.askEntry}
           <TodaySlot {...p} />
         </div>
       </div>

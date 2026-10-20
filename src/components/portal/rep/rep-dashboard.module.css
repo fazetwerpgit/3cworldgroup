@@ -25,9 +25,20 @@
   display: contents;
 }
 
-/* A solar-only rep's next consultation reads with the deck above it. */
+/* A solar-only rep's next consultation is the deck's own foot: one block,
+   the consultation a tone step up from the deck's panel, no gap between. */
 .solarNext {
-  margin-top: -40px;
+  margin-top: -56px;
+}
+
+.solarLead:has(+ .solarNext:not(:empty)) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.solarNext > *:first-child {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .banners:empty,
@@ -425,7 +436,7 @@
 .solarLeadTitle {
   margin: 0;
   font-family: var(--f-display);
-  font-size: 34px;
+  font-size: var(--t-d1);
   font-weight: 400;
   line-height: 0.95;
 }
@@ -442,27 +453,93 @@
   margin-top: var(--s1);
 }
 
-/* ---------- solar this week: Set | Demoed | Closed ---------- */
-/* The week's halves, three across, the numbers a size down so the section
-   stays smaller than the fiber week under it. */
-.halves.thirds {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+/* ---------- solar this week: Set | Demoed | Closed ----------
+   One field (as on Setup), not a box per number: three counts at figure
+   size, Set in the accent, each over a track filled to its share of the
+   week's largest count. A dual rep's next consultation and Open deck sit in
+   the same field, under the counts. */
+.solarField {
+  display: grid;
+  gap: var(--s5);
+  padding: var(--s5) var(--s4) var(--s4);
+  min-width: 0;
 }
 
-.big.statBig {
-  font-size: 56px;
+.funnel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s4);
+  min-width: 0;
+}
+
+.funnelCol {
+  display: grid;
+  align-content: end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.funnelNum {
+  margin: 0;
+  color: var(--c-text);
+  font: 400 var(--t-score) / 0.78 var(--f-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.funnelCol:first-child .funnelNum {
+  color: var(--c-lime);
+}
+
+.funnelEmpty .funnelNum,
+.funnelEmpty .funnelCol:first-child .funnelNum {
+  color: var(--c-text-3);
+}
+
+.funnelTrack {
+  position: relative;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--c-well);
+}
+
+.funnelFill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--c-text-3);
+  transform-origin: left;
+  transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.funnelCol:first-child .funnelFill {
+  background: var(--c-lime);
+}
+
+.funnelLabel {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .funnelFill {
+    transition: none;
+  }
 }
 
 .skelStat {
   display: block;
   width: 60%;
-  height: 48px;
+  height: 56px;
 }
 
 .solarMore {
   display: grid;
-  gap: var(--s2);
-  margin-top: var(--s2);
+  gap: var(--s3);
 }
 
 .solarDeck {
@@ -472,6 +549,11 @@
 /* Desktop: a compact button at the left edge, like How pay works above, not a
    bar across the column. */
 @media (min-width: 1024px) {
+  .solarField {
+    gap: var(--s6);
+    padding: var(--s6) var(--s5) var(--s5);
+  }
+
   .solarDeck {
     justify-self: start;
     width: auto;
@@ -480,12 +562,12 @@
 
 .skelNext {
   display: block;
-  height: 112px;
+  height: 132px;
   border-radius: 16px;
 }
 
 .solarQuiet {
-  margin: var(--s1) 0;
+  margin: 0;
   color: var(--c-text-2);
   font-size: var(--t-ui);
   line-height: 1.4;
@@ -922,7 +1004,7 @@ div.tRow {
   }
 
   .solarNext {
-    margin-top: -32px;
+    margin-top: -48px;
   }
 
   .colMain,
