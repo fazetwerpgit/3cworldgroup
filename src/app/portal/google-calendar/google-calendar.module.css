@@ -19,18 +19,25 @@
 .mark {
   width: 48px;
   height: auto;
-  margin-bottom: var(--s2);
+  margin-bottom: var(--s1);
 }
 
 .ok {
+  flex: none;
+  margin-top: 0.15em;
   color: var(--c-lime);
 }
 
 .warn {
+  flex: none;
+  margin-top: 0.15em;
   color: var(--c-amber);
 }
 
 .title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
   margin: 0;
   font-size: var(--t-d2);
   font-weight: 650;

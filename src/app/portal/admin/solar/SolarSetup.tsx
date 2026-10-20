@@ -594,7 +594,7 @@ function googleReturnNotice(search: string): GoogleNotice | null {
     return params.get('freebusy') === 'off'
       ? {
           tone: 'warn',
-          text: "Google Calendar connected. Free/busy wasn't allowed, so homeowners still see every open time; reconnect and allow it to hide busy times.",
+          text: "Google Calendar connected, but free/busy wasn't allowed, so homeowners still see every open time. Reconnect and allow it to hide busy times.",
         }
       : { tone: 'ok', text: 'Google Calendar connected. New bookings go on your calendar, and busy times are hidden from homeowners.' };
   }

@@ -61,7 +61,7 @@ const CONNECT_ERROR_TEXT: Record<ConnectError, string> = {
   bad_state: "That sign-in link wasn't valid. Start again from Solar setup.",
   expired: 'That sign-in link expired. Start again from Solar setup.',
   reused: 'That sign-in link was already used. Start again from Solar setup.',
-  scope: 'Calendar access was left unticked, so nothing was connected. Connect again and allow it.',
+  scope: 'Calendar access was left unticked. Connect again and allow it.',
   exchange: "Google didn't finish the sign-in. Try again.",
   not_consultant: 'Only a saved consultant can connect a calendar.',
   server: "Something went wrong on our side. Try again.",

@@ -32,13 +32,13 @@ function Outcome() {
       <main className={s.wrap}>
         <section className={`${rep.panel} ${s.card}`} aria-labelledby="gcal-outcome">
           <Image src="/logo.webp" alt="3C World Group" width={550} height={516} sizes="48px" className={s.mark} priority />
-          {connected ? (
-            <CheckCircle2 size={32} aria-hidden="true" className={s.ok} />
-          ) : (
-            <CircleAlert size={32} aria-hidden="true" className={s.warn} />
-          )}
           <h1 id="gcal-outcome" className={s.title}>
-            {connected ? 'Connected.' : 'Google Calendar isn’t connected.'}
+            {connected ? (
+              <CheckCircle2 size={28} aria-hidden="true" className={s.ok} />
+            ) : (
+              <CircleAlert size={28} aria-hidden="true" className={s.warn} />
+            )}
+            <span>{connected ? 'Google Calendar connected.' : 'Google Calendar isn’t connected.'}</span>
           </h1>
           {connected ? (
             <>
@@ -55,7 +55,7 @@ function Outcome() {
           ) : (
             <>
               <p className={s.lead}>{connectErrorText(params.get('reason'))}</p>
-              <p className={s.note}>Go back to the app and try again from Solar setup.</p>
+              <p className={s.note}>Go back to the app to try again.</p>
             </>
           )}
         </section>

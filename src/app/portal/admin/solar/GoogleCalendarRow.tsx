@@ -166,7 +166,7 @@ export function GoogleCalendarRow({
             {note}
           </p>
         ) : null}
-        {own ? <p className={st.help}>{HELP}</p> : null}
+        {own && !connected && !broken && !waiting ? <p className={st.help}>{HELP}</p> : null}
         {error ? (
           <p className={cx(u.hint, u.hintError)} role="alert">
             {error}
