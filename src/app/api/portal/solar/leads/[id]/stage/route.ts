@@ -61,8 +61,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (!snap.exists) return { error: 'Lead not found', code: 404 } as const;
       const data = (snap.data() ?? {}) as Record<string, unknown>;
       const current = readStage(data);
-      if (!gate.isAdmin && !isForwardMove(current.stage, stage)) {
-        return { error: 'Only an admin can move a lead back a stage', code: 403 } as const;
+      if (!gate.isAdmin && !isForwardMove(current, { stage, outcome }, data.status)) {
+        return { error: 'Only an admin can move a lead back a stage or change a closed outcome', code: 403 } as const;
       }
 
       const bookingId = typeof data.bookingId === 'string' ? data.bookingId : '';

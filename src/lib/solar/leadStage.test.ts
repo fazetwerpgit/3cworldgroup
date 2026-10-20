@@ -35,10 +35,26 @@ describe('leadStage', () => {
     expect(statusForStage('appointment_demoed', 'no_sale')).toBe('lost');
     expect(statusForStage('install_complete', null)).toBe('sold');
     expect(statusForStage('appointment_demoed', 'proposal_sent')).toBeNull();
-    expect(isForwardMove(null, 'appointment_demoed')).toBe(true);
-    expect(isForwardMove('appointment_demoed', 'appointment_demoed')).toBe(true);
-    expect(isForwardMove('permit_approved', 'site_survey')).toBe(false);
-    expect(isForwardMove('site_survey', null)).toBe(false);
+    const none = { stage: null, outcome: null };
+    const demo = (outcome: 'sale' | 'no_sale' | 'proposal_sent') => ({ stage: 'appointment_demoed' as const, outcome });
+    expect(isForwardMove(none, demo('no_sale'))).toBe(true);
+    expect(isForwardMove({ stage: 'permit_approved', outcome: null }, { stage: 'site_survey', outcome: null })).toBe(false);
+    expect(isForwardMove({ stage: 'site_survey', outcome: null }, none)).toBe(false);
+    expect(isForwardMove(demo('sale'), { stage: 'site_survey', outcome: null }, 'sold')).toBe(true);
+  });
+
+  it('lets non-admins only move a demo outcome up, never off a sale', () => {
+    const demo = (outcome: 'sale' | 'no_sale' | 'proposal_sent') => ({ stage: 'appointment_demoed' as const, outcome });
+    expect(isForwardMove(demo('no_sale'), demo('proposal_sent'), 'lost')).toBe(true);
+    expect(isForwardMove(demo('proposal_sent'), demo('sale'), 'booked')).toBe(true);
+    expect(isForwardMove(demo('proposal_sent'), demo('proposal_sent'), 'booked')).toBe(true);
+    expect(isForwardMove(demo('proposal_sent'), demo('no_sale'), 'booked')).toBe(false);
+    expect(isForwardMove(demo('sale'), demo('no_sale'), 'sold')).toBe(false);
+    expect(isForwardMove(demo('sale'), demo('proposal_sent'), 'sold')).toBe(false);
+    // An old status-only sold lead reads as appointment_demoed + sale.
+    expect(isForwardMove(readStage({ status: 'sold' }), demo('no_sale'), 'sold')).toBe(false);
+    // Sold status wins over a stale stored outcome.
+    expect(isForwardMove(demo('proposal_sent'), demo('no_sale'), 'sold')).toBe(false);
   });
 
   it('writes an old closed lead its stage without a history entry when nothing changes', () => {

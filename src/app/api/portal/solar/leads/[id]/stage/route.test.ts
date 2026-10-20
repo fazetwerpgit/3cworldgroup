@@ -153,6 +153,26 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
+  it("refuses a closer's move from sale to no sale: the lead stays sold and the booking stays", async () => {
+    await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' });
+    mockGate.mockResolvedValue(CLOSER);
+    const res = await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' });
+    expect(res.status).toBe(403);
+    expect(lead()).toMatchObject({ status: 'sold', stageOutcome: 'sale', bookingId: 'b1' });
+    expect(db.store.get('solarBookings')!.get('b1')!.status).toBe('booked');
+    expect(mockNotify).not.toHaveBeenCalled();
+    mockGate.mockResolvedValue(ADMIN);
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(200);
+  });
+
+  it('lets a closer move an outcome up but not down', async () => {
+    mockGate.mockResolvedValue(CLOSER);
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'proposal_sent' })).status).toBe(200);
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(403);
+    expect(lead()).toMatchObject({ stageOutcome: 'proposal_sent', status: 'booked' });
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' })).status).toBe(200);
+  });
+
   it("refuses a non-admin's move back, lets an admin move back and clear", async () => {
     mockGate.mockResolvedValue(CLOSER);
     await patch('l1', { stage: 'permit_approved' });
@@ -168,9 +188,11 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
     expect((lead().stageHistory as unknown[]).length).toBe(3);
   });
 
-  it('reads an old sold lead as demoed + sale, so a closer can move it on', async () => {
+  it('reads an old sold lead as demoed + sale, so a closer can move it on but not off the sale', async () => {
     mockGate.mockResolvedValue(CLOSER);
-    expect((await patch('old_sold', { stage: 'appointment_demoed', outcome: 'proposal_sent' })).status).toBe(200);
+    expect((await patch('old_sold', { stage: 'appointment_demoed', outcome: 'proposal_sent' })).status).toBe(403);
+    expect((await patch('old_sold', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(403);
+    expect(lead('old_sold').status).toBe('sold');
     expect((await patch('old_sold', { stage: 'install_scheduled' })).status).toBe(200);
     expect(lead('old_sold')).toMatchObject({ stage: 'install_scheduled', status: 'sold' });
   });

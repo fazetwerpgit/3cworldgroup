@@ -157,13 +157,25 @@ export function parseStageRequest(body: unknown): { ok: true; value: StageReques
   return { ok: true, value: { stage, outcome: null } };
 }
 
+/** Demo outcomes from worst to best: a non-admin may only move up this list. */
+export const OUTCOME_RANK: Record<SolarDemoOutcome, number> = { no_sale: 0, proposal_sent: 1, sale: 2 };
+
 /**
- * Whether a non-admin may make this move: forward, or a different outcome on
- * the same stage. Moving back or clearing the stage is admins' only.
+ * Whether a non-admin may make this move: a later stage, or on
+ * appointment_demoed a better outcome (no_sale < proposal_sent < sale; the
+ * same one is a no-op). Moving back, clearing the stage, a worse outcome, or
+ * any outcome change on a sold lead (`status` 'sold', old status-only leads
+ * too) is admins' only.
  */
-export function isForwardMove(from: SolarLeadStage | null, to: SolarLeadStage | null): boolean {
-  if (to === null) return false;
-  return stageRank(to) >= stageRank(from);
+export function isForwardMove(from: StageRequest, to: StageRequest, status?: unknown): boolean {
+  if (to.stage === null) return false;
+  const fromRank = stageRank(from.stage);
+  const toRank = stageRank(to.stage);
+  if (toRank !== fromRank) return toRank > fromRank;
+  if (to.stage !== 'appointment_demoed' || from.outcome === null) return true;
+  if (to.outcome === from.outcome) return true;
+  if (status === 'sold' || from.outcome === 'sale') return false;
+  return to.outcome !== null && OUTCOME_RANK[to.outcome] > OUTCOME_RANK[from.outcome];
 }
 
 /**
