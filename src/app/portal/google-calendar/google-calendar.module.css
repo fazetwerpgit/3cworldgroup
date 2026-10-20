@@ -1,0 +1,61 @@
+/* The Google Calendar sign-in outcome, shown in the app's browser sheet: one
+   panel on the D ground, centred, nothing to tap (Close is the sheet's own). */
+.wrap {
+  display: grid;
+  place-items: center;
+  min-height: calc(100dvh / var(--pz, 1));
+  padding: max(var(--s6), env(safe-area-inset-top)) var(--gutter) max(var(--s6), env(safe-area-inset-bottom));
+}
+
+.card {
+  display: grid;
+  justify-items: start;
+  gap: var(--s3);
+  width: 100%;
+  max-width: 440px;
+  padding: var(--s5) var(--s4);
+}
+
+.mark {
+  width: 48px;
+  height: auto;
+  margin-bottom: var(--s2);
+}
+
+.ok {
+  color: var(--c-lime);
+}
+
+.warn {
+  color: var(--c-amber);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--t-d2);
+  font-weight: 650;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.lead {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-body);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.note {
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+@media (min-width: 1024px) {
+  .card {
+    padding: var(--s6);
+  }
+}
