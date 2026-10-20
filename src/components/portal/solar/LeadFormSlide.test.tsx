@@ -15,6 +15,7 @@ const deck = vi.hoisted(() => ({
     photos: {} as Record<string, string>,
     leadId: null as string | null,
     roofType: null as string | null,
+    savedContact: null as string | null,
   },
 }));
 vi.mock('./deckState', () => ({
@@ -31,13 +32,15 @@ vi.mock('@/lib/forms/uploadFormAttachment', () => ({
   FormUploadError: class extends Error {},
 }));
 
-const api = vi.hoisted(() => ({ createLead: vi.fn() }));
+const api = vi.hoisted(() => ({ createLead: vi.fn(), updateLeadContact: vi.fn() }));
 vi.mock('./solarClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./solarClient')>()),
   createLead: api.createLead,
+  updateLeadContact: api.updateLeadContact,
 }));
 
 import { LeadFormSlide } from './LeadFormSlide';
+import { contactKey } from './solarClient';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -141,5 +144,97 @@ describe('LeadFormSlide roof type', () => {
     });
     expect(api.createLead).toHaveBeenCalledTimes(1);
     expect(api.createLead.mock.calls[0][0]).toMatchObject({ roofType: 'shingle', first: 'Ana' });
+  });
+});
+
+describe('LeadFormSlide after the lead is saved (review > Edit)', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  const onSaved = vi.fn();
+  const SAVED = {
+    first: 'Ana', last: 'Ruiz', address: '1 Main St', city: 'Fresno', state: 'CA', zip: '93701',
+    phone: '5595551234', email: 'ana@example.com',
+  };
+  const button = (text: string) =>
+    [...container.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(text));
+  const render = (step: 'owner' | 'home' = 'owner') =>
+    act(() => root.render(<LeadFormSlide startStep={step} onSaved={onSaved} />));
+
+  beforeEach(() => {
+    deck.state.photos = {};
+    deck.state.leadId = 'lead1';
+    deck.state.roofType = 'shingle';
+    deck.state.lead = { ...SAVED };
+    deck.state.savedContact = contactKey(SAVED);
+    onSaved.mockReset();
+    api.createLead.mockReset();
+    api.updateLeadContact.mockReset().mockResolvedValue({ ok: true, data: { success: true } });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    deck.state.leadId = null;
+    deck.state.savedContact = null;
+  });
+
+  it('keeps the contact fields editable and, with nothing changed, Continue just goes back', async () => {
+    render();
+    expect(container.querySelector<HTMLInputElement>('#solar-first')!.disabled).toBe(false);
+    await act(async () => {
+      button('Continue')!.click();
+    });
+    expect(api.updateLeadContact).not.toHaveBeenCalled();
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it('a changed phone or email is saved to the lead with Save changes', async () => {
+    deck.state.lead = { ...SAVED, phone: '(559) 555-0199', email: 'ana.ruiz@example.com' };
+    render();
+    expect(container.textContent).toContain('Changes not saved yet.');
+    expect(button('Continue')).toBeUndefined();
+    await act(async () => {
+      button('Save changes')!.click();
+    });
+    expect(api.updateLeadContact).toHaveBeenCalledWith('lead1', deck.state.lead);
+    expect(api.createLead).not.toHaveBeenCalled();
+    expect(deck.state.savedContact).toBe(contactKey(deck.state.lead));
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it('checks the change as on create before sending', async () => {
+    deck.state.lead = { ...SAVED, email: 'ana@' };
+    render();
+    await act(async () => {
+      button('Save changes')!.click();
+    });
+    expect(api.updateLeadContact).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('Check the email');
+  });
+
+  it('shows the server refusal (a closed lead) and stays on the form', async () => {
+    api.updateLeadContact.mockResolvedValue({
+      ok: false, status: 409, error: 'This lead is closed. Ask an admin to change its contact details.',
+    });
+    deck.state.lead = { ...SAVED, last: 'Ruiz-Lopez' };
+    render('home');
+    await act(async () => {
+      button('Save changes')!.click();
+    });
+    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/This lead is closed/);
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(deck.state.savedContact).toBe(contactKey(SAVED));
+  });
+
+  it('leaving the slide with a valid unsent change sends it quietly', async () => {
+    deck.state.lead = { ...SAVED, first: 'Anita' };
+    render();
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    expect(api.updateLeadContact).toHaveBeenCalledWith('lead1', expect.objectContaining({ first: 'Anita' }));
   });
 });

@@ -177,7 +177,20 @@ export type LeadFields = {
   needsReview: boolean;
 } & Omit<LeadExtras, 'needsReview'>;
 
-export function parseLead(body: Record<string, unknown>, uid: string): { ok: true; fields: LeadFields } | { ok: false; error: string } {
+/** The homeowner's contact fields: what the rep may still fix on an open lead. */
+export const LEAD_CONTACT_KEYS = ['first', 'last', 'phone', 'email', 'address', 'city', 'state', 'zip'] as const;
+export type LeadContact = Pick<LeadFields, (typeof LEAD_CONTACT_KEYS)[number]>;
+
+export function hasLeadContact(body: Record<string, unknown>): boolean {
+  return LEAD_CONTACT_KEYS.some((key) => body[key] !== undefined);
+}
+
+/**
+ * Name, phone, email and address, validated as on create: first, last and a
+ * valid email required; phone optional but phone-shaped; address parts
+ * trimmed and capped. A missing key reads as ''.
+ */
+export function parseLeadContact(body: Record<string, unknown>): { ok: true; contact: LeadContact } | { ok: false; error: string } {
   const first = str(body.first, 80);
   const last = str(body.last, 80);
   const phone = str(body.phone, 40);
@@ -186,6 +199,25 @@ export function parseLead(body: Record<string, unknown>, uid: string): { ok: tru
   if (!email) return { ok: false, error: 'Email is required' };
   if (!EMAIL_RE.test(email)) return { ok: false, error: 'Enter a valid email' };
   if (phone && !/^[\d\s()+.-]{7,40}$/.test(phone)) return { ok: false, error: 'Enter a valid phone number' };
+  return {
+    ok: true,
+    contact: {
+      first,
+      last,
+      address: str(body.address, 200),
+      city: str(body.city, 80),
+      state: str(body.state, 40),
+      zip: str(body.zip, 20),
+      phone,
+      email,
+    },
+  };
+}
+
+export function parseLead(body: Record<string, unknown>, uid: string): { ok: true; fields: LeadFields } | { ok: false; error: string } {
+  const parsedContact = parseLeadContact(body);
+  if (!parsedContact.ok) return parsedContact;
+  const { contact } = parsedContact;
 
   let monthlyBill: number | null = null;
   if (body.monthlyBill !== undefined && body.monthlyBill !== null && body.monthlyBill !== '') {
@@ -239,14 +271,7 @@ export function parseLead(body: Record<string, unknown>, uid: string): { ok: tru
   return {
     ok: true,
     fields: {
-      first,
-      last,
-      address: str(body.address, 200),
-      city: str(body.city, 80),
-      state: str(body.state, 40),
-      zip: str(body.zip, 20),
-      phone,
-      email,
+      ...contact,
       monthlyBill,
       creditTier,
       photos,

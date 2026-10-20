@@ -37,6 +37,7 @@ const deck = vi.hoisted(() => ({ state: {} as unknown }));
 vi.mock('./deckState', () => ({ useDeck: () => ({ state: deck.state, update: vi.fn() }) }));
 
 import { ReviewSlide } from './ReviewSlide';
+import { contactKey, type LeadFields } from './solarClient';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -99,5 +100,16 @@ describe('ReviewSlide', () => {
     const go = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('book a time'));
     act(() => go?.click());
     expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it('flags a contact change that never reached the saved lead', () => {
+    const savedContact = contactKey(FILLED.lead as LeadFields);
+    deck.state = { ...FILLED, leadId: 'lead1', savedContact };
+    act(() => root.render(<ReviewSlide onEdit={vi.fn()} onContinue={vi.fn()} />));
+    expect(host.querySelector('[data-testid="solar-review-unsaved"]')).toBeNull();
+
+    deck.state = { ...FILLED, lead: { ...FILLED.lead, phone: '(559) 555-0199' }, leadId: 'lead1', savedContact };
+    act(() => root.render(<ReviewSlide onEdit={vi.fn()} onContinue={vi.fn()} />));
+    expect(host.querySelector('[data-testid="solar-review-unsaved"]')?.textContent).toMatch(/not saved to the lead/);
   });
 });

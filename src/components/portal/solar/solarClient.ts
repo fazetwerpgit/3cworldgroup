@@ -322,6 +322,18 @@ export function updateLeadExtras(id: string, extras: LeadExtras) {
   });
 }
 
+/**
+ * The rep who added the lead, while it is open (no stage, not sold or lost):
+ * fixes the homeowner's name, phone, email and address (the review slide's
+ * Edit). Checked as on create; 409 once the lead is closed.
+ */
+export function updateLeadContact(id: string, contact: LeadFields) {
+  return call<{ success?: boolean }>(`/api/portal/solar/leads/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(contactPayload(contact)),
+  });
+}
+
 /** Admin or the booking's consultant: frees the slot and puts the lead back to new. */
 export function cancelBooking(id: string) {
   return call<{ success: boolean; id: string }>(`/api/portal/solar/bookings/${encodeURIComponent(id)}`, {

@@ -12,9 +12,12 @@ import {
 import { useDeck } from './deckState';
 import { RoofTypeField, roofError } from './RoofTypeField';
 import {
+  contactKey,
+  contactPayload,
   createLead,
   PHOTO_SLOTS,
   solarAuthHeaders,
+  updateLeadContact,
   validateLead,
   type LeadFields,
   type PhotoSlot,
@@ -110,6 +113,27 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
   const [roofTouched, setRoofTouched] = useState(false);
   const uploading = Object.values(slots).some((v) => v?.status === 'uploading');
   const saved = Boolean(state.leadId);
+  // Once saved, the contact fields stay editable (the review slide's Edit);
+  // a change is sent with PATCH while the lead is open. Roof and photos lock.
+  const contactDirty = saved && contactKey(state.lead) !== state.savedContact;
+
+  // Leaving the slide (the deck's Back / Next) with a valid unsent contact
+  // change sends it anyway, quietly; an invalid one stays in the deck only.
+  const unsentContact = useRef<{ id: string; lead: LeadFields } | null>(null);
+  useEffect(() => {
+    unsentContact.current =
+      contactDirty && state.leadId && Object.keys(errors).length === 0 ? { id: state.leadId, lead: state.lead } : null;
+  });
+  useEffect(
+    () => () => {
+      const unsent = unsentContact.current;
+      if (!unsent) return;
+      void updateLeadContact(unsent.id, unsent.lead).then((res) => {
+        if (res.ok) update({ savedContact: contactKey(unsent.lead) });
+      });
+    },
+    [update]
+  );
 
   const setField = (key: keyof LeadFields, value: string) =>
     update((prev) => ({ lead: { ...prev.lead, [key]: key === 'state' ? value.toUpperCase() : value } }));
@@ -158,7 +182,7 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
       if (!STEPS[step].fields.some((k) => errors[k])) return;
     }
     const bad = STEPS[step].fields.find((k) => errors[k]);
-    if (bad && !saved) {
+    if (bad && (!saved || contactDirty)) {
       setTouched((prev) => ({ ...prev, ...Object.fromEntries(STEPS[step].fields.map((k) => [k, true])) }));
       focusNext.current = bad;
       setFocusTick((n) => n + 1);
@@ -170,7 +194,11 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saved) {
-      onSaved();
+      if (!contactDirty) {
+        onSaved();
+        return;
+      }
+      await saveContact();
       return;
     }
     // Enter in a field on an early step moves on instead of saving.
@@ -203,14 +231,7 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
     const res = await createLead({
       clientId: state.clientId,
       uploadId: state.uploadId,
-      first: lead.first.trim(),
-      last: lead.last.trim(),
-      address: lead.address.trim(),
-      city: lead.city.trim(),
-      state: lead.state.trim().toUpperCase(),
-      zip: lead.zip.trim(),
-      phone: lead.phone.trim(),
-      email: lead.email.trim(),
+      ...contactPayload(lead),
       monthlyBill: state.monthlyBill,
       ...(isRoofType(state.roofType) ? { roofType: state.roofType } : {}),
       photos: state.photos,
@@ -220,7 +241,31 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
       setAlert(res.ok ? 'Could not save. Try again.' : res.error);
       return;
     }
-    update({ leadId: res.data.id });
+    update({ leadId: res.data.id, savedContact: contactKey(lead) });
+    onSaved();
+  };
+
+  /** Save changes on a saved lead: the contact fields only, checked as on create. */
+  const saveContact = async () => {
+    setTried(true);
+    setAlert(null);
+    const first = FIELDS.find((f) => errors[f.key]);
+    if (first) {
+      focusNext.current = first.key;
+      setStep(stepOf(first.key));
+      setFocusTick((n) => n + 1);
+      return;
+    }
+    if (!state.leadId) return;
+    setSending(true);
+    const lead = state.lead;
+    const res = await updateLeadContact(state.leadId, lead);
+    setSending(false);
+    if (!res.ok) {
+      setAlert(res.error);
+      return;
+    }
+    update({ savedContact: contactKey(lead) });
     onSaved();
   };
 
@@ -290,7 +335,6 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
                     placeholder={f.key === 'state' ? 'CA' : undefined}
                     required
                     value={state.lead[f.key]}
-                    disabled={saved}
                     onChange={(e) => setField(f.key, e.target.value)}
                     onBlur={() => setTouched((t) => ({ ...t, [f.key]: true }))}
                     aria-invalid={showError ? true : undefined}
@@ -387,7 +431,11 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
         )}
 
         <div className={s.formFoot}>
-          {saved ? (
+          {saved && contactDirty ? (
+            <button key="save-changes" className={s.primary} type="submit" disabled={sending} aria-busy={sending || undefined}>
+              {sending ? 'Saving...' : 'Save changes'}
+            </button>
+          ) : saved ? (
             <button key="continue" className={s.primary} type="submit">
               Continue
             </button>
@@ -402,7 +450,9 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
               <ChevronRight size={18} aria-hidden />
             </button>
           )}
-          {saved ? (
+          {saved && contactDirty ? (
+            <p className={s.note}>Changes not saved yet.</p>
+          ) : saved ? (
             <p className={s.note}>Saved for {state.lead.first.trim()}.</p>
           ) : last && missing > 0 ? (
             <p className={s.note}>

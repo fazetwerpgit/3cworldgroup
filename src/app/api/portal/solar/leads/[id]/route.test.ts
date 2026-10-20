@@ -153,6 +153,87 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
     });
   });
 
+  describe('contact edits from the review slide', () => {
+    const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;
+    const CONTACT = {
+      first: ' Ana ', last: 'Ruiz', phone: '(559) 555-0101', email: 'Ana@Example.com',
+      address: '12 Elm St', city: 'Fresno', state: 'CA', zip: '93701',
+    };
+    beforeEach(() => {
+      db.store.get('solarLeads')!.set('rep1_c1', {
+        repUid: 'rep1', status: 'new', first: 'Anna', last: 'Ruis', phone: '', email: 'old@example.com',
+        address: '1 Old Rd', city: 'Clovis', state: 'CA', zip: '93611', creditTier: null,
+      });
+    });
+
+    it('lets the owner rep fix name, phone, email and address on an open lead, cleaned as on create', async () => {
+      const res = await patch('rep1_c1', CONTACT);
+      expect(res.status).toBe(200);
+      expect(lead()).toMatchObject({
+        first: 'Ana', last: 'Ruiz', phone: '(559) 555-0101', email: 'ana@example.com',
+        address: '12 Elm St', city: 'Fresno', state: 'CA', zip: '93701', creditTier: null, status: 'new',
+      });
+    });
+
+    it('still open while booked', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'booked', bookingId: 'b1' });
+      expect((await patch('rep1_c1', CONTACT)).status).toBe(200);
+      expect(lead().first).toBe('Ana');
+    });
+
+    it('403s another rep, and an admin (owner rep only)', async () => {
+      mockGate.mockResolvedValue({ ...REP, uid: 'rep2' });
+      const res = await patch('rep1_c1', CONTACT);
+      expect(res.status).toBe(403);
+      expect(lead().first).toBe('Anna');
+      mockGate.mockResolvedValue({ ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null });
+      expect((await patch('rep1_c1', CONTACT)).status).toBe(403);
+      expect(lead().first).toBe('Anna');
+    });
+
+    it('403s a consultant sneaking contact fields in with usage', async () => {
+      db.store.set('solarAvailability', new Map([['con', { name: 'Consultant', modes: {} }]]));
+      mockGate.mockResolvedValue({ ...REP, uid: 'con' });
+      expect((await patch('rep1_c1', { monthlyKwh: 900, ...CONTACT })).status).toBe(403);
+      expect(lead()).toMatchObject({ first: 'Anna' });
+      expect(lead().monthlyKwh).toBeUndefined();
+    });
+
+    it('409s once the lead has a stage or is sold / lost', async () => {
+      for (const closed of [
+        { status: 'booked', stage: 'appointment_demoed', stageOutcome: 'proposal_sent' },
+        { status: 'sold' },
+        { status: 'lost' },
+      ]) {
+        db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', first: 'Anna', ...closed });
+        const res = await patch('rep1_c1', CONTACT);
+        expect(res.status).toBe(409);
+        expect(lead().first).toBe('Anna');
+      }
+    });
+
+    it('400s what create refuses', async () => {
+      const bad: [Record<string, unknown>, RegExp][] = [
+        [{ ...CONTACT, first: '  ' }, /First and last name/],
+        [{ ...CONTACT, last: undefined }, /First and last name/],
+        [{ ...CONTACT, email: '' }, /Email is required/],
+        [{ ...CONTACT, email: 'ana@' }, /valid email/],
+        [{ ...CONTACT, phone: 'call me' }, /valid phone/],
+        [{ phone: '5595550101' }, /First and last name/],
+      ];
+      for (const [body, error] of bad) {
+        const res = await patch('rep1_c1', body);
+        expect(res.status).toBe(400);
+        expect((await res.json()).error).toMatch(error);
+      }
+      expect(lead()).toMatchObject({ first: 'Anna', email: 'old@example.com' });
+    });
+
+    it('404s a missing lead', async () => {
+      expect((await patch('nope', CONTACT)).status).toBe(404);
+    });
+  });
+
   describe('status', () => {
     const ADMIN = { ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null };
     const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;

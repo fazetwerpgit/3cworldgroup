@@ -3,6 +3,7 @@
 import { ChevronRight, Pencil } from 'lucide-react';
 import { useDeck } from './deckState';
 import { reviewSections, type ReviewTarget } from './reviewSummary';
+import { contactKey } from './solarClient';
 import s from './solarDeck.module.css';
 
 // The review before booking: everything the homeowner gave so far, read only,
@@ -13,6 +14,8 @@ import s from './solarDeck.module.css';
 export function ReviewSlide({ onEdit, onContinue }: { onEdit: (target: ReviewTarget) => void; onContinue: () => void }) {
   const { state } = useDeck();
   const sections = reviewSections(state);
+  // A contact change made on the lead form but never saved to the lead.
+  const contactUnsaved = Boolean(state.leadId) && contactKey(state.lead) !== state.savedContact;
 
   return (
     <>
@@ -54,6 +57,11 @@ export function ReviewSlide({ onEdit, onContinue }: { onEdit: (target: ReviewTar
       </div>
 
       <div className={`${s.formFoot} ${s.reviewFoot}`}>
+        {contactUnsaved ? (
+          <p className={s.note} data-testid="solar-review-unsaved">
+            Contact changes are not saved to the lead yet. Tap Edit, then Save changes.
+          </p>
+        ) : null}
         <button type="button" className={s.primary} onClick={onContinue}>
           Looks good, book a time
           <ChevronRight size={18} aria-hidden />

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { loadAvailability, requireSolarUser } from '@/lib/solar/server';
-import { hasLeadExtras, isCreditTier, isSolarLeadStatus, parseLeadExtras } from '@/lib/solar/leadFields';
-import { SOLAR_STAGE_ROLES, stagePatchForStatus } from '@/lib/solar/leadStage';
+import { hasLeadContact, hasLeadExtras, isCreditTier, isSolarLeadStatus, parseLeadContact, parseLeadExtras } from '@/lib/solar/leadFields';
+import { SOLAR_STAGE_ROLES, readStage, stagePatchForStatus } from '@/lib/solar/leadStage';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
 
 /** What the deck's usage slide saves after the lead exists. */
@@ -32,6 +32,11 @@ async function isSolarConsultant(gate: { uid: string; solarRole?: string | null 
 //     (a blocked roof is refused; monthlyKwh rounded; usage 4KB of JSON max).
 //     A consultant (closer role or Admin > Solar > Setup) may send
 //     monthlyKwh / usage alone.
+//   {first, last, phone, email, address, city, state, zip} (with or without
+//     the fields above) -> 200 {success, id}. Only the rep who created the
+//     lead, while it is open (no stage, not sold or lost; else 409). Checked
+//     as on create: first, last and a valid email required, phone-shaped
+//     phone; a missing key reads as ''. The review slide's Edit sends these.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const gate = await requireSolarUser(request);
@@ -101,17 +106,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const patch: Record<string, unknown> = {};
-    if (body.creditTier !== undefined || !hasLeadExtras(body)) {
+    const contactAsked = hasLeadContact(body);
+    if (body.creditTier !== undefined || (!hasLeadExtras(body) && !contactAsked)) {
       if (!isCreditTier(body.creditTier)) return NextResponse.json({ error: 'Invalid creditTier' }, { status: 400 });
       patch.creditTier = body.creditTier;
     }
     const extras = parseLeadExtras(body);
     if (!extras.ok) return NextResponse.json({ error: extras.error }, { status: 400 });
     Object.assign(patch, extras.extras);
+    if (contactAsked) {
+      const contact = parseLeadContact(body);
+      if (!contact.ok) return NextResponse.json({ error: contact.error }, { status: 400 });
+      Object.assign(patch, contact.contact);
+    }
 
     const ref = db.collection('solarLeads').doc(id);
     const snap = await ref.get();
     if (!snap.exists) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    if (contactAsked) {
+      if (snap.get('repUid') !== gate.uid) {
+        return NextResponse.json({ error: 'Only the rep who added this lead can change its contact details' }, { status: 403 });
+      }
+      const data = (snap.data() ?? {}) as Record<string, unknown>;
+      if (readStage(data).stage !== null || data.status === 'sold' || data.status === 'lost') {
+        return NextResponse.json({ error: 'This lead is closed. Ask an admin to change its contact details.' }, { status: 409 });
+      }
+    }
     if (snap.get('repUid') !== gate.uid && !gate.isAdmin) {
       // A Setup consultant may fill in the usage numbers, nothing else.
       const usageOnly = Object.keys(patch).every((key) => (USAGE_KEYS as readonly string[]).includes(key));
