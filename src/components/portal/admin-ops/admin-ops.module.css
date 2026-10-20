@@ -228,6 +228,19 @@
   transform: scale(0.97);
 }
 
+/* A 44px tap on a 40px button: the hit area reaches 2px into the well's 4px
+   padding (inside its clip) and half of the 4px gap, so neighbours never overlap. */
+.segBtn {
+  position: relative;
+}
+
+.segBtn::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+}
+
 /* The pick: solid lime (rep-page .tabs). */
 .segBtn[aria-pressed='true'] {
   background: var(--c-lime);

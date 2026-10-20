@@ -164,6 +164,27 @@
   opacity: 0.4;
   cursor: default;
 }
+/* Top bar controls stay visually compact (40px, 36px for the counter) but
+   take a 44px tap: an invisible hit area past each edge. Gaps are 8px+, so
+   neighbours never overlap. */
+.iconBtn,
+.chip,
+.counter,
+.next {
+  position: relative;
+}
+.iconBtn::after,
+.chip::after,
+.next::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+}
+.counter::after {
+  content: '';
+  position: absolute;
+  inset: -4px -2px;
+}
 .logo {
   flex: none;
   width: 36px;
