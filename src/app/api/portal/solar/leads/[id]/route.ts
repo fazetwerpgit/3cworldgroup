@@ -148,6 +148,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }
+    // Heavy shade (stored, or sent now) keeps the lead flagged for review:
+    // only an admin's Mark reviewed clears it.
+    const heavyShade = patch.heavyShade ?? snap.get('heavyShade');
+    if (patch.needsReview === false && heavyShade === true && !gate.isAdmin) patch.needsReview = true;
     if (!contactAsked) {
       await ref.update({ ...patch, updatedAt: new Date() });
       return NextResponse.json({ success: true, id });

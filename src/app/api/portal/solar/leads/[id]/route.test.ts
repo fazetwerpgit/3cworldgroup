@@ -97,6 +97,19 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       expect(lead().needsReview).toBe(false);
     });
 
+    it('keeps needsReview on while the stored heavyShade is true (only an admin clears it)', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', heavyShade: true, needsReview: true });
+      expect((await patch('rep1_c1', { needsReview: false, roofType: 'flat' })).status).toBe(200);
+      expect(lead()).toMatchObject({ needsReview: true, heavyShade: true, roofType: 'flat' });
+      // Clearing the shade itself clears the reason.
+      expect((await patch('rep1_c1', { heavyShade: false, needsReview: false })).status).toBe(200);
+      expect(lead()).toMatchObject({ needsReview: false, heavyShade: false });
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', heavyShade: true, needsReview: true });
+      mockGate.mockResolvedValue({ ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null });
+      expect((await patch('rep1_c1', { needsReview: false })).status).toBe(200);
+      expect(lead().needsReview).toBe(false);
+    });
+
     it('refuses a blocked roof and another rep', async () => {
       const res = await patch('rep1_c1', { roofType: 'metal' });
       expect(res.status).toBe(400);
