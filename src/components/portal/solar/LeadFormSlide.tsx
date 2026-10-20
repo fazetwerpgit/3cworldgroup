@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Camera, Check, ChevronRight, FileText, RotateCcw } from 'lucide-react';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { Camera, Check, FileText, RotateCcw } from 'lucide-react';
 import { resolveUploadMime } from '@/lib/forms/formUploads';
 import { isBlockedRoofType, isRoofType } from '@/lib/solar/leadFields';
 import {
@@ -75,7 +75,48 @@ const PHOTO_TITLES: Record<PhotoSlot, string> = {
   panel: 'Electric panel',
 };
 
-export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; startStep?: StepId | null }) {
+/**
+ * The form's one forward action, run by the deck's own Next (top bar and the
+ * bottom bar) so the slide has a single Next: walk the steps, then save.
+ */
+export type LeadNavAction =
+  | { kind: 'step'; to: string }
+  | { kind: 'save' }
+  | { kind: 'saveChanges' }
+  | { kind: 'leave' };
+export type LeadNavState = { action: LeadNavAction; busy: boolean; disabled: boolean; canStepBack: boolean };
+export type LeadNavHandle = {
+  /** The current step's forward action (next step, save, or leave once saved). */
+  next: () => void;
+  /** One step back; false on the first step, so the deck goes to the previous slide. */
+  back: () => boolean;
+};
+
+/** The deck button's label for the form's forward action. */
+export function leadNavLabel(nav: LeadNavState, editing: boolean): string {
+  switch (nav.action.kind) {
+    case 'step':
+      return `Next: ${nav.action.to}`;
+    case 'save':
+      return nav.busy ? 'Saving...' : 'Save and continue';
+    case 'saveChanges':
+      return nav.busy ? 'Saving...' : 'Save changes';
+    default:
+      return editing ? 'Back to review' : 'Next';
+  }
+}
+
+export function LeadFormSlide({
+  onSaved,
+  startStep,
+  navRef,
+  onNavState,
+}: {
+  onSaved: () => void;
+  startStep?: StepId | null;
+  navRef?: Ref<LeadNavHandle>;
+  onNavState?: (nav: LeadNavState | null) => void;
+}) {
   const { state, update } = useDeck();
   const [touched, setTouched] = useState<Partial<Record<keyof LeadFields, boolean>>>({});
   const [tried, setTried] = useState(false);
@@ -196,8 +237,9 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
     setStep((cur) => Math.min(STEPS.length - 1, cur + 1));
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  /** The forward action: Next on the first two steps, then save (or Save changes / leave once saved). */
+  const primary = async () => {
+    if (sending) return;
     if (saved) {
       if (!contactDirty) {
         onSaved();
@@ -250,6 +292,11 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
     onSaved();
   };
 
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void primary();
+  };
+
   /** Save changes on a saved lead: the contact fields only, checked as on create. */
   const saveContact = async () => {
     setTried(true);
@@ -283,7 +330,40 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
     STEPS[i].fields.some((k) => (tried || touched[k]) && errors[k]) ||
     (STEPS[i].id === 'home' && (tried || roofTouched) && Boolean(roofProblem));
   const last = step === STEPS.length - 1;
+  // A blocked roof ends the lead here (the roof error says why): no way on to Photos.
   const roofBlocksStep = !saved && current.id === 'home' && isBlockedRoofType(state.roofType);
+
+  const action: LeadNavAction =
+    saved && contactDirty
+      ? { kind: 'saveChanges' }
+      : saved
+        ? { kind: 'leave' }
+        : last
+          ? { kind: 'save' }
+          : { kind: 'step', to: STEPS[step + 1].label };
+  const primaryRef = useRef(primary);
+  useEffect(() => {
+    primaryRef.current = primary;
+  });
+  useImperativeHandle(
+    navRef,
+    () => ({
+      next: () => void primaryRef.current(),
+      back: () => {
+        if (step === 0) return false;
+        setStep(step - 1);
+        return true;
+      },
+    }),
+    [step]
+  );
+  const actionKey = action.kind === 'step' ? `step:${action.to}` : action.kind;
+  useEffect(() => {
+    onNavState?.({ action, busy: sending, disabled: roofBlocksStep, canStepBack: step > 0 });
+    // `action` is rebuilt every render; actionKey carries its value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onNavState, actionKey, sending, roofBlocksStep, step]);
+  useEffect(() => () => onNavState?.(null), [onNavState]);
 
   return (
     <>
@@ -293,7 +373,19 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
           Let&apos;s Gather <span className={s.accent}>Some Info</span>
         </h2>
       </div>
-      <form className={s.formCard} onSubmit={submit} noValidate aria-label="Homeowner info">
+      <form
+        className={s.formCard}
+        onSubmit={submit}
+        onKeyDown={(e) => {
+          // No submit button here (the deck's Next is the form's action): Enter in a field runs it.
+          if (e.key === 'Enter' && e.target instanceof HTMLInputElement && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            void primary();
+          }
+        }}
+        noValidate
+        aria-label="Homeowner info"
+      >
         <div className={s.steps} role="group" aria-label="Info steps">
           {STEPS.map((st, i) => {
             const done =
@@ -439,26 +531,6 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
         )}
 
         <div className={s.formFoot}>
-          {saved && contactDirty ? (
-            <button key="save-changes" className={s.primary} type="submit" disabled={sending} aria-busy={sending || undefined}>
-              {sending ? 'Saving...' : 'Save changes'}
-            </button>
-          ) : saved ? (
-            <button key="continue" className={s.primary} type="submit">
-              Continue
-            </button>
-          ) : last ? (
-            // Keyed apart from Next, so React never turns the clicked Next into a submit mid-click.
-            <button key="save" className={s.primary} type="submit" disabled={sending} aria-busy={sending || undefined}>
-              {sending ? 'Saving...' : 'Save and continue'}
-            </button>
-          ) : (
-            // A blocked roof ends the lead here (the roof error says why): no way on to Photos.
-            <button key="next" className={s.primary} type="button" onClick={advance} disabled={roofBlocksStep}>
-              Next: {STEPS[step + 1].label}
-              <ChevronRight size={18} aria-hidden />
-            </button>
-          )}
           {saved && contactDirty ? (
             <p className={s.note}>Changes not saved yet.</p>
           ) : saved ? (

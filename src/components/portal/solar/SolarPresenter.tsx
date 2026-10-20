@@ -9,7 +9,7 @@ import { finishLead } from './solarClient';
 import { overrideStatusBar } from '@/lib/app/statusBar';
 import { disableBackGestures } from '@/lib/app/backGestures';
 import { CalculatorSlide } from './CalculatorSlide';
-import { LeadFormSlide } from './LeadFormSlide';
+import { LeadFormSlide, leadNavLabel, type LeadNavHandle, type LeadNavState } from './LeadFormSlide';
 import { ReviewSlide } from './ReviewSlide';
 import { UsageSlide } from './UsageSlide';
 import type { LeadStep, ReviewTarget } from './reviewSummary';
@@ -225,13 +225,42 @@ function Deck() {
   };
 
   const id = ORDER[index];
+
+  // The lead form's steps run on the deck's own Back / Next (one Next on the
+  // slide): Next walks Homeowner > Home > Photos and saves; the slide is left
+  // only once the lead is saved. Back walks the steps back first.
+  const leadNav = useRef<LeadNavHandle>(null);
+  const [leadNavState, setLeadNavState] = useState<LeadNavState | null>(null);
+  const formNav = id === 'lead' ? leadNavState : null;
+  const goNext = () => {
+    if (formNav && leadNav.current) leadNav.current.next();
+    else if (editing) afterEdit('review');
+    else next();
+  };
+  const goBack = () => {
+    if (formNav && leadNav.current?.back()) return;
+    prev();
+  };
+  const nextLabel = formNav ? leadNavLabel(formNav, editing) : editing ? 'Back to review' : 'Next';
+  const nextDisabled = formNav ? formNav.disabled || formNav.busy : !editing && index === ORDER.length - 1;
+  const backDisabled = index === 0 && !formNav?.canStepBack;
+
   let content: ReactNode;
   switch (id) {
     case 'intro': content = <IntroSlide />; break;
     case 'options': content = <OptionsSlide />; break;
     case 'partners': content = <PartnersSlide />; break;
     case 'calculator': content = <CalculatorSlide />; break;
-    case 'lead': content = <LeadFormSlide startStep={editing ? edit.step : null} onSaved={() => afterEdit('bill')} />; break;
+    case 'lead':
+      content = (
+        <LeadFormSlide
+          startStep={editing ? edit.step : null}
+          onSaved={() => afterEdit('bill')}
+          navRef={leadNav}
+          onNavState={setLeadNavState}
+        />
+      );
+      break;
     case 'bill': content = <BillSlide />; break;
     case 'usage': content = <UsageSlide />; break;
     case 'prequal': content = <PrequalSlide onDone={() => afterEdit('steps')} onNeedLead={() => goTo('lead')} />; break;
@@ -275,7 +304,13 @@ function Deck() {
               >
                 <X size={18} aria-hidden />
               </Link>
-              <button type="button" className={s.chip} onClick={prev} disabled={index === 0} aria-label="Previous slide">
+              <button
+                type="button"
+                className={s.chip}
+                onClick={goBack}
+                disabled={backDisabled}
+                aria-label={formNav?.canStepBack ? 'Previous step' : 'Previous slide'}
+              >
                 <ChevronLeft size={18} aria-hidden />
                 <span className={s.chipText}>Back</span>
               </button>
@@ -300,9 +335,10 @@ function Deck() {
               <button
                 type="button"
                 className={s.next}
-                onClick={next}
-                disabled={index === ORDER.length - 1}
-                aria-label="Next slide"
+                onClick={goNext}
+                disabled={nextDisabled}
+                aria-label={nextLabel === 'Next' ? 'Next slide' : nextLabel}
+                title={nextLabel === 'Next' ? undefined : nextLabel}
               >
                 <span className={s.chipText}>Next</span>
                 <ChevronRight size={18} aria-hidden />
@@ -370,23 +406,21 @@ function Deck() {
       </div>
 
       <nav className={s.bottomNav} aria-label="Slide navigation">
-        <button type="button" className={s.navBack} onClick={prev} disabled={index === 0}>
+        <button type="button" className={s.navBack} onClick={goBack} disabled={backDisabled}>
           <ChevronLeft size={20} aria-hidden />
           Back
         </button>
-        {editing ? (
-          // Opened from the review's Edit: the way back, for the slides with no
-          // save of their own (usage, the bill calculator) as much as the rest.
-          <button type="button" className={s.navNext} onClick={() => afterEdit('review')}>
-            Back to review
-            <ChevronRight size={20} aria-hidden />
-          </button>
-        ) : (
-          <button type="button" className={s.navNext} onClick={next} disabled={index === ORDER.length - 1}>
-            Next
-            <ChevronRight size={20} aria-hidden />
-          </button>
-        )}
+        {/* One forward action for the slide: Next, a lead form step or save, or Back to review after an Edit. */}
+        <button
+          type="button"
+          className={s.navNext}
+          onClick={goNext}
+          disabled={nextDisabled}
+          aria-busy={formNav?.busy || undefined}
+        >
+          {nextLabel}
+          {formNav?.busy ? null : <ChevronRight size={20} aria-hidden />}
+        </button>
       </nav>
     </div>
   );

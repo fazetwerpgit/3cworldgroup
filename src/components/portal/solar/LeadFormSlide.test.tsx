@@ -2,7 +2,7 @@
 //
 // Slide 5's upload tiles take a photo or a PDF of the bill or panel. A PDF
 // tile shows the file's name instead of an image preview.
-import { act } from 'react';
+import { act, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,8 +39,31 @@ vi.mock('./solarClient', async (importOriginal) => ({
   updateLeadContact: api.updateLeadContact,
 }));
 
-import { LeadFormSlide } from './LeadFormSlide';
+import { LeadFormSlide as Form, leadNavLabel, type LeadNavHandle, type LeadNavState, type StepId } from './LeadFormSlide';
 import { contactKey } from './solarClient';
+
+// The form has no buttons of its own past the step tabs: the deck's Back and
+// Next run it. This stands in for the deck's bottom bar.
+const leftSlide = vi.fn();
+function LeadFormSlide(props: { onSaved: () => void; startStep?: StepId | null }) {
+  const nav = useRef<LeadNavHandle>(null);
+  const [state, setState] = useState<LeadNavState | null>(null);
+  return (
+    <>
+      <Form {...props} navRef={nav} onNavState={setState} />
+      <nav>
+        <button type="button" onClick={() => nav.current?.back() || leftSlide()}>
+          Deck back
+        </button>
+        {state ? (
+          <button type="button" disabled={state.disabled || state.busy} onClick={() => nav.current?.next()}>
+            {leadNavLabel(state, false)}
+          </button>
+        ) : null}
+      </nav>
+    </>
+  );
+}
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -181,11 +204,12 @@ describe('LeadFormSlide after the lead is saved (review > Edit)', () => {
     deck.state.savedContact = null;
   });
 
-  it('keeps the contact fields editable and, with nothing changed, Continue just goes back', async () => {
+  it('keeps the contact fields editable and, with nothing changed, Next just goes back', async () => {
     render();
     expect(container.querySelector<HTMLInputElement>('#solar-first')!.disabled).toBe(false);
+    const next = [...container.querySelectorAll('nav button')].find((b) => b.textContent === 'Next') as HTMLButtonElement;
     await act(async () => {
-      button('Continue')!.click();
+      next.click();
     });
     expect(api.updateLeadContact).not.toHaveBeenCalled();
     expect(onSaved).toHaveBeenCalledTimes(1);
@@ -195,7 +219,7 @@ describe('LeadFormSlide after the lead is saved (review > Edit)', () => {
     deck.state.lead = { ...SAVED, phone: '(559) 555-0199', email: 'ana.ruiz@example.com' };
     render();
     expect(container.textContent).toContain('Changes not saved yet.');
-    expect(button('Continue')).toBeUndefined();
+    expect([...container.querySelectorAll('nav button')].some((b) => b.textContent === 'Next')).toBe(false);
     await act(async () => {
       button('Save changes')!.click();
     });
@@ -248,5 +272,97 @@ describe('LeadFormSlide after the lead is saved (review > Edit)', () => {
     await act(async () => root.unmount());
     root = createRoot(container);
     expect(api.updateLeadContact).toHaveBeenCalledWith('lead1', expect.objectContaining({ first: 'Anita' }));
+  });
+});
+
+describe('LeadFormSlide step walking on the deck buttons', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  const deckNext = () => container.querySelectorAll<HTMLButtonElement>('nav button')[1];
+  const deckBack = () => container.querySelectorAll<HTMLButtonElement>('nav button')[0];
+  const currentStep = () => container.querySelector('[aria-current="step"]')?.textContent;
+  const rerender = () => act(() => root.render(<LeadFormSlide onSaved={onSaved} />));
+  const onSaved = vi.fn();
+
+  beforeEach(() => {
+    deck.state.photos = {};
+    deck.state.leadId = null;
+    deck.state.savedContact = null;
+    deck.state.roofType = 'shingle';
+    deck.state.lead = {
+      first: 'Ana', last: 'Ruiz', address: '1 Main St', city: 'Fresno', state: 'CA', zip: '93701',
+      phone: '5595551234', email: 'ana@example.com',
+    };
+    onSaved.mockReset();
+    leftSlide.mockReset();
+    api.createLead.mockReset().mockResolvedValue({ ok: true, data: { success: true, id: 'lead1' } });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    rerender();
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+    deck.state.leadId = null;
+  });
+
+  it('has no Next or save button inside the form', () => {
+    const formButtons = [...container.querySelectorAll('form button')].map((b) => b.textContent ?? '');
+    expect(formButtons.some((t) => /^Next|Save|Continue/.test(t))).toBe(false);
+  });
+
+  it('Next walks Homeowner > Home > Photos, then saves and leaves', async () => {
+    expect(currentStep()).toContain('Homeowner');
+    expect(deckNext().textContent).toBe('Next: Home');
+    act(() => deckNext().click());
+    expect(currentStep()).toContain('Home');
+    expect(deckNext().textContent).toBe('Next: Photos');
+    act(() => deckNext().click());
+    expect(currentStep()).toContain('Photos');
+    expect(deckNext().textContent).toBe('Save and continue');
+    expect(api.createLead).not.toHaveBeenCalled();
+    await act(async () => {
+      deckNext().click();
+    });
+    expect(api.createLead).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it('Back walks the steps back, then leaves the slide from the first step', () => {
+    act(() => deckNext().click());
+    act(() => deckNext().click());
+    expect(currentStep()).toContain('Photos');
+    act(() => deckBack().click());
+    expect(currentStep()).toContain('Home');
+    act(() => deckBack().click());
+    expect(currentStep()).toContain('Homeowner');
+    expect(leftSlide).not.toHaveBeenCalled();
+    act(() => deckBack().click());
+    expect(leftSlide).toHaveBeenCalledTimes(1);
+  });
+
+  it('Next stays on a step with a missing field', () => {
+    deck.state.lead = { ...deck.state.lead, phone: '' };
+    rerender();
+    act(() => deckNext().click());
+    expect(currentStep()).toContain('Homeowner');
+  });
+
+  it('Next is disabled on Home with a blocked roof', () => {
+    deck.state.roofType = 'metal';
+    rerender();
+    act(() => deckNext().click());
+    expect(currentStep()).toContain('Home');
+    expect(deckNext().disabled).toBe(true);
+  });
+
+  it('Enter in a field runs the same action as Next', () => {
+    const input = container.querySelector<HTMLInputElement>('#solar-email')!;
+    act(() => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    });
+    expect(currentStep()).toContain('Home');
   });
 });
