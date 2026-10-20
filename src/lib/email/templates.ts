@@ -371,7 +371,7 @@ export function solarBookingConfirmationEmail(p: {
   if (meetLink) {
     text.push(`Join on Google Meet: ${meetLink}`);
     html.push(
-      `${emailButton(meetLink, 'Join on Google Meet')}<p style="margin:0 0 16px;font-size:13px;line-height:1.5;${muted}">Or open this link: <a href="${esc(meetLink)}" style="${muted};word-break:break-all">${esc(meetLink)}</a></p>`
+      `${emailButton(meetLink, 'Join on Google Meet')}<p style="margin:0 0 16px;font-size:13px;line-height:1.5;${muted}">Or open this link:<br><a href="${esc(meetLink)}" style="${muted};overflow-wrap:anywhere">${esc(meetLink)}</a></p>`
     );
   }
   if (address) {
