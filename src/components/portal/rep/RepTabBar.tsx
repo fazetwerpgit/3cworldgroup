@@ -1,19 +1,20 @@
 'use client';
 
-import type { MouseEvent } from 'react';
+import { useRef, useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAs } from '@/contexts/ViewAsContext';
 import { useNavAccess } from '@/components/portal/NavSheet';
-import { isOwner, isSolarOnlyUser } from '@/types';
+import { isDualRoleUser, isOwner, isSolarOnlyUser } from '@/types';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { nativeHaptic } from '@/lib/app/bridge';
 import { scrollPageToTop } from '@/lib/app/scrollToTop';
 import { BodyLayer } from './BodyLayer';
+import { LogChooserSheet } from './LogChooserSheet';
 import { markTabNavigation } from './tabNav';
 import { usePrefetchTabOnTouch } from './useTabPrefetch';
-import { activeRepHref, repTabsFor, viewAsTabs } from './repNav';
+import { activeRepHref, LOG_SALE_HREF, repTabsFor, viewAsTabs } from './repNav';
 import s from './rep.module.css';
 import t from './rep-tabbar.module.css';
 
@@ -21,7 +22,8 @@ import t from './rep-tabbar.module.css';
  * Phone bottom bar: Home / Sales / Log sale / Board / Chat, each gated by the
  * portal's canAccess. Owners do not sell, so theirs is Home / Sales / Board /
  * Chat / Admin, the Admin tab carrying the open-items count. A solar-only rep
- * gets Home / Solar / Board / Chat. Portaled to
+ * gets Home / Solar / Board / Chat. A dual (fiber + solar) rep's center + opens
+ * a chooser (LogChooserSheet): Log fiber sale, or Open solar deck. Portaled to
  * <body> (see BodyLayer); hidden ≥1024px.
  *
  * Inside the 3C iOS app it behaves like a UITabBar: a tap gives a selection
@@ -48,6 +50,15 @@ export function RepTabBar({
   // A finger on a tab starts its data read before the tap lands.
   const prefetchTab = usePrefetchTabOnTouch();
   const inApp = useIsNativeApp();
+  // A dual rep's + asks fiber or solar first; everyone else's goes straight to its page.
+  const chooser = !viewing && !isOwner(user?.role ?? undefined) && isDualRoleUser(user);
+  const [choosing, setChoosing] = useState(false);
+  const chooserBtn = useRef<HTMLButtonElement | null>(null);
+  const closeChooser = () => {
+    setChoosing(false);
+    // Back to the + it came from (a choice that navigates moves focus on its own).
+    chooserBtn.current?.focus({ preventScroll: true });
+  };
 
   const onTabClick = (event: MouseEvent<HTMLAnchorElement>, href: string) => {
     if (!inApp || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -70,6 +81,29 @@ export function RepTabBar({
             const Icon = tab.icon;
             const unread = tab.href === '/portal/chat' && chatUnread;
             const count = tab.waiting ? waiting : 0;
+            if (tab.log && chooser) {
+              return (
+                <li key={tab.href}>
+                  <button
+                    ref={chooserBtn}
+                    type="button"
+                    className={`${s.tab} ${t.tabBtn}`}
+                    aria-current={current ? 'page' : undefined}
+                    aria-haspopup="dialog"
+                    aria-expanded={choosing}
+                    onClick={() => {
+                      if (inApp) nativeHaptic('selection');
+                      setChoosing(true);
+                    }}
+                  >
+                    <span className={s.tabLog}>
+                      <Icon size={20} strokeWidth={2.5} aria-hidden="true" />
+                    </span>
+                    {tab.short}
+                  </button>
+                </li>
+              );
+            }
             return (
               <li key={tab.href}>
                 <Link
@@ -106,6 +140,10 @@ export function RepTabBar({
           })}
         </ul>
       </nav>
+      {/* Its own BodyLayer portals it straight to <body>, beside the bar. */}
+      {choosing ? (
+        <LogChooserSheet onClose={closeChooser} inApp={inApp} onFiberClick={(event) => onTabClick(event, LOG_SALE_HREF)} />
+      ) : null}
     </BodyLayer>
   );
 }

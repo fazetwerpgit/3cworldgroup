@@ -4,11 +4,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronRight, Sun } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { SOLAR_DECK_HREF, SOLAR_HREF } from './repNav';
 import s from './rep.module.css';
 import d from './rep-dashboard.module.css';
 
-export const SOLAR_HREF = '/portal/solar';
-export const SOLAR_DECK_HREF = '/portal/solar/present';
+export { SOLAR_DECK_HREF, SOLAR_HREF } from './repNav';
 
 /**
  * Home's way into Solar, for whoever holds solar:read. `row` (a rep who also

@@ -15,3 +15,14 @@
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
+
+/* A dual rep's center +: a button (it opens LogChooserSheet), dressed as the tab links. */
+.tabBtn {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}

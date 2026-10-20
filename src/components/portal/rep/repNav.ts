@@ -39,6 +39,9 @@ export const ADMIN_TAB: RepTab = {
 
 export const SOLAR_HREF = '/portal/solar';
 
+/** The solar deck itself (full screen, no shell): what a solar rep opens at the door. */
+export const SOLAR_DECK_HREF = '/portal/solar/present';
+
 /**
  * A solar-only rep's center tab, where a fiber rep has Log sale: the Solar
  * page, which opens the deck. The same lime emphasis as Log sale.
