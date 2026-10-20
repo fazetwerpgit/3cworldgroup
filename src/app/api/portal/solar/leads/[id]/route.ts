@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireSolarUser } from '@/lib/solar/server';
-import { isCreditTier, isSolarLeadStatus } from '@/lib/solar/leadFields';
+import { hasLeadExtras, isCreditTier, isSolarLeadStatus, parseLeadExtras } from '@/lib/solar/leadFields';
+import { stagePatchForStatus } from '@/lib/solar/leadStage';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
 
 // PATCH /api/portal/solar/leads/{id}
@@ -13,6 +14,12 @@ import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/
 //     slot, else 'new'. 'lost' also cancels the lead's live booking in the
 //     same transaction (slot freed, bookingId cleared, rep and consultant
 //     notified) and answers its id as cancelledBookingId. 'sold' keeps it.
+//     The sales-dept stage follows (lib/solar/leadStage stagePatchForStatus):
+//     sold = appointment_demoed + sale, lost = appointment_demoed + no_sale,
+//     reopen clears a closing stage. Finer stages: PATCH .../{id}/stage.
+//   {creditTier?, roofType?, heavyShade?, needsReview?, monthlyKwh?, usage?}
+//     -> 200 {success, id}. The creator or an admin; validated as on create
+//     (a blocked roof is refused).
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const gate = await requireSolarUser(request);
@@ -33,10 +40,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // One transaction: the lead closes and its live booking (if any) is
         // cancelled, so the slot opens and lead.bookingId clears.
         const now = new Date();
-        const statusPatch = { status: 'lost', statusChangedAt: now, statusChangedBy: gate.uid, updatedAt: now };
         const cancelled = await db.runTransaction(async (tx) => {
           const lead = await tx.get(ref);
           if (!lead.exists) return undefined;
+          const statusPatch = {
+            status: 'lost',
+            statusChangedAt: now,
+            statusChangedBy: gate.uid,
+            updatedAt: now,
+            ...stagePatchForStatus((lead.data() ?? {}) as Record<string, unknown>, 'lost', gate.uid, now),
+          };
           const bookingId = typeof lead.get('bookingId') === 'string' ? (lead.get('bookingId') as string) : '';
           const bookingRef = bookingId ? db.collection('solarBookings').doc(bookingId) : null;
           const booking = bookingRef ? await tx.get(bookingRef) : null;
@@ -65,12 +78,24 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         status = booking?.exists && booking.get('status') !== 'cancelled' ? 'booked' : 'new';
       }
       const now = new Date();
-      await ref.update({ status, statusChangedAt: now, statusChangedBy: gate.uid, updatedAt: now });
+      await ref.update({
+        status,
+        statusChangedAt: now,
+        statusChangedBy: gate.uid,
+        updatedAt: now,
+        ...stagePatchForStatus((snap.data() ?? {}) as Record<string, unknown>, status, gate.uid, now),
+      });
       return NextResponse.json({ success: true, id, status });
     }
 
-    const creditTier = body.creditTier;
-    if (!isCreditTier(creditTier)) return NextResponse.json({ error: 'Invalid creditTier' }, { status: 400 });
+    const patch: Record<string, unknown> = {};
+    if (body.creditTier !== undefined || !hasLeadExtras(body)) {
+      if (!isCreditTier(body.creditTier)) return NextResponse.json({ error: 'Invalid creditTier' }, { status: 400 });
+      patch.creditTier = body.creditTier;
+    }
+    const extras = parseLeadExtras(body);
+    if (!extras.ok) return NextResponse.json({ error: extras.error }, { status: 400 });
+    Object.assign(patch, extras.extras);
 
     const ref = db.collection('solarLeads').doc(id);
     const snap = await ref.get();
@@ -78,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (snap.get('repUid') !== gate.uid && !gate.isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    await ref.update({ creditTier, updatedAt: new Date() });
+    await ref.update({ ...patch, updatedAt: new Date() });
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error updating solar lead:', error);

@@ -14,6 +14,7 @@ const deck = vi.hoisted(() => ({
     lead: { first: '', last: '', address: '', city: '', state: '', zip: '', phone: '', email: '' },
     photos: {} as Record<string, string>,
     leadId: null as string | null,
+    roofType: null as string | null,
   },
 }));
 vi.mock('./deckState', () => ({
@@ -28,6 +29,12 @@ vi.mock('@/lib/forms/uploadFormAttachment', () => ({
   uploadFormAttachment: upload.fn,
   isUploadCancelled: () => false,
   FormUploadError: class extends Error {},
+}));
+
+const api = vi.hoisted(() => ({ createLead: vi.fn() }));
+vi.mock('./solarClient', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./solarClient')>()),
+  createLead: api.createLead,
 }));
 
 import { LeadFormSlide } from './LeadFormSlide';
@@ -79,5 +86,60 @@ describe('LeadFormSlide uploads', () => {
     expect(deck.state.photos.billPage1).toBe('form-attachments/rep1/solar-lead/up1/billPage1/');
     expect(container.textContent).toContain('edison-bill.pdf');
     expect(container.querySelector('img')).toBeNull();
+  });
+});
+
+describe('LeadFormSlide roof type', () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  const button = (text: string) =>
+    [...container.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(text))!;
+
+  beforeEach(() => {
+    deck.state.photos = {};
+    deck.state.leadId = null;
+    deck.state.roofType = null;
+    deck.state.lead = {
+      first: 'Ana', last: 'Ruiz', address: '1 Main St', city: 'Fresno', state: 'CA', zip: '93701',
+      phone: '5595551234', email: 'ana@example.com',
+    };
+    api.createLead.mockReset().mockResolvedValue({ ok: true, data: { success: true, id: 'lead1' } });
+    container = document.createElement('div');
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => root.render(<LeadFormSlide onSaved={() => {}} />));
+    act(() => button('2Home').click());
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('stops the lead on a blocked roof', async () => {
+    act(() => button('Metal').click());
+    expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/Metal roofs don't qualify/);
+    act(() => button('Next').click());
+    expect(container.textContent).toContain('Roof type'); // still on Home
+    act(() => button('3Photos').click());
+    await act(async () => {
+      button('Save and continue').click();
+    });
+    expect(api.createLead).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('Roof type'); // sent back to Home
+  });
+
+  it('asks for a roof, then sends a qualifying one with the lead', async () => {
+    act(() => button('Next').click());
+    expect(container.textContent).toContain('Pick the roof type');
+    act(() => button('Shingle').click());
+    // The mocked deck doesn't re-render on update; render again to read it.
+    act(() => root.render(<LeadFormSlide onSaved={() => {}} />));
+    act(() => button('Next').click());
+    await act(async () => {
+      button('Save and continue').click();
+    });
+    expect(api.createLead).toHaveBeenCalledTimes(1);
+    expect(api.createLead.mock.calls[0][0]).toMatchObject({ roofType: 'shingle', first: 'Ana' });
   });
 });

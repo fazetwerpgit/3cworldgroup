@@ -40,6 +40,7 @@
   grid-template-areas:
     'who status'
     'when when'
+    'stage stage'
     'rep bill';
   align-items: center;
   gap: 6px var(--s3);
@@ -153,8 +154,8 @@
   .row {
     display: grid;
     grid-template-columns:
-      minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.4fr) 116px 20px;
-    grid-template-areas: 'who rep bill when status chev';
+      minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1.3fr) minmax(0, 1fr) 116px 20px;
+    grid-template-areas: 'who rep bill when stage status chev';
     gap: var(--s4);
     align-items: center;
   }
@@ -271,11 +272,18 @@
 
 .photos {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Four photos: two by two on a phone, one row once there's room. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--s2);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+@media (min-width: 480px) {
+  .photos {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .photos > li {
@@ -562,4 +570,89 @@ button.photo:focus-visible {
   button.photo {
     transition: none;
   }
+}
+
+/* ---------- stage, review ---------- */
+.reviewBadge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-amber) 18%, transparent);
+  color: var(--c-amber);
+  font-size: var(--t-sm);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.reviewNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+  margin: 0;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.whoLine {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.stage {
+  grid-area: stage;
+}
+
+.stage[data-empty] .main {
+  color: var(--c-text-3);
+  font-weight: 500;
+}
+
+@media (max-width: 1023px) {
+  .stage[data-empty] {
+    display: none;
+  }
+
+  .stage .main {
+    color: var(--c-text-2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+  }
+}
+
+.reviewToggle[aria-pressed='true'] {
+  border-color: var(--c-amber);
+  color: var(--c-amber);
+}
+
+.stagePicker {
+  display: grid;
+  gap: var(--s2);
+  margin-bottom: var(--s4);
+}
+
+.stagePickerLabel {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 600;
+}
+
+.stageHistory {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+}
+
+.mineStage {
+  margin-top: 2px;
 }

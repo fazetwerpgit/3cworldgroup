@@ -1,6 +1,8 @@
 // How a solar lead reads on screen (admin Leads tab, rep Solar page). Pure.
 import type { Tone } from '@/components/portal/admin-d/AdminUi';
 import type { SolarLeadBooking, SolarLeadStatus, SolarLeadView } from './solarClient';
+import { ROOF_TYPE_LABELS, type RoofType } from '@/lib/solar/leadFields';
+import { OUTCOME_LABEL, STAGE_LABEL, stageText, type SolarDemoOutcome, type SolarLeadStage } from '@/lib/solar/leadStage';
 
 export const STATUS_LABEL: Record<SolarLeadStatus, string> = {
   new: 'New',
@@ -22,11 +24,41 @@ export const CREDIT_LABEL: Record<string, string> = {
   lease_ppa_680: 'Lease or PPA, 680+',
 };
 
-export const PHOTO_LABELS: { slot: 'billPage1' | 'billGraph' | 'panel'; label: string }[] = [
+export const PHOTO_LABELS: { slot: 'billPage1' | 'billGraph' | 'panel' | 'meter'; label: string }[] = [
   { slot: 'billPage1', label: 'Bill, first page' },
-  { slot: 'billGraph', label: 'Bill, usage graph' },
+  { slot: 'billGraph', label: 'Bill, usage page' },
   { slot: 'panel', label: 'Electric panel' },
+  { slot: 'meter', label: 'Electric meter' },
 ];
+
+/** The sales-dept stage as a status line, or null before one is set. */
+export function stageLine(
+  lead: { stage: SolarLeadStage | null; stageOutcome: SolarDemoOutcome | null }
+): { text: string; short: string; tone: Tone } | null {
+  if (!lead.stage) return null;
+  const tone: Tone =
+    lead.stage !== 'appointment_demoed'
+      ? 'lime'
+      : lead.stageOutcome === 'sale'
+        ? 'lime'
+        : lead.stageOutcome === 'no_sale'
+          ? 'muted'
+          : 'blue';
+  const short =
+    lead.stage === 'appointment_demoed' && lead.stageOutcome ? OUTCOME_LABEL[lead.stageOutcome] : STAGE_LABEL[lead.stage];
+  return { text: stageText(lead.stage, lead.stageOutcome), short, tone };
+}
+
+export function roofLabel(roofType: RoofType | null): string {
+  return roofType ? ROOF_TYPE_LABELS[roofType] : '';
+}
+
+const kwh = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+
+/** "1,250 kWh/mo", or '' when none was entered. */
+export function kwhLine(monthlyKwh: number | null): string {
+  return monthlyKwh == null ? '' : `${kwh.format(monthlyKwh)} kWh/mo`;
+}
 
 export function leadName(lead: Pick<SolarLeadView, 'first' | 'last'>): string {
   return `${lead.first} ${lead.last}`.trim() || 'Homeowner';

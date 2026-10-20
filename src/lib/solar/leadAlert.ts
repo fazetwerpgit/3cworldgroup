@@ -7,7 +7,7 @@ import { sendPushToUser } from '@/lib/push/sendPush';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { appBaseUrl, solarLeadAlertEmail } from '@/lib/email/templates';
 import { formatSlotPT } from '@/lib/solar/availability';
-import { CREDIT_TIER_LABELS, PHOTO_SLOTS, PHOTO_SLOT_LABELS, isCreditTier } from '@/lib/solar/leadFields';
+import { CREDIT_TIER_LABELS, PHOTO_SLOTS, PHOTO_SLOT_LABELS, ROOF_TYPE_LABELS, isCreditTier, isRoofType } from '@/lib/solar/leadFields';
 import { leadAlertUids, loadContacts } from '@/lib/solar/server';
 import { solarLeadHref } from '@/lib/solar/leadView';
 
@@ -97,6 +97,8 @@ export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
 
     const monthlyBill = lead.get('monthlyBill');
     const creditTier = lead.get('creditTier');
+    const roofType = lead.get('roofType');
+    const monthlyKwh = lead.get('monthlyKwh');
     const [contacts, photos] = await Promise.all([loadContacts(uids), signPhotos(lead.get('photos'))]);
     const email = solarLeadAlertEmail({
       repName,
@@ -106,6 +108,17 @@ export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
       email: text(lead.get('email')),
       monthlyBill: typeof monthlyBill === 'number' ? `$${monthlyBill.toFixed(2)}` : '',
       creditTier: isCreditTier(creditTier) ? CREDIT_TIER_LABELS[creditTier] : 'Not picked',
+      roofType: isRoofType(roofType) ? ROOF_TYPE_LABELS[roofType] : '',
+      monthlyKwh:
+        typeof monthlyKwh === 'number' && Number.isFinite(monthlyKwh)
+          ? `${Math.round(monthlyKwh).toLocaleString('en-US')} kWh/mo`
+          : '',
+      needsReview:
+        lead.get('needsReview') === true
+          ? lead.get('heavyShade') === true
+            ? 'Yes: heavy shade on the roof'
+            : 'Yes'
+          : '',
       booking,
       photos,
       link: `${appBaseUrl()}${link}`,

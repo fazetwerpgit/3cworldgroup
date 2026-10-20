@@ -101,6 +101,14 @@ describe('POST /api/portal/forms/upload', () => {
     expect(save).not.toHaveBeenCalled();
   });
 
+  it('takes the solar lead meter photo slot, and refuses an unknown slot', async () => {
+    const photo = () => new File([PNG], 'meter.png', { type: 'image/png' });
+    const res = await POST(req(photo(), UPLOAD_ID, 'solar-lead', 'meter'));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ path: `form-attachments/u1/solar-lead/${UPLOAD_ID}/meter/` });
+    expect((await POST(req(photo(), UPLOAD_ID, 'solar-lead', 'roof'))).status).toBe(400);
+  });
+
   describe('sale proof', () => {
     const SLOT = 'sale123_abcdef';
     const FOLDER = `form-attachments/u1/sale-proof/${SLOT}/`;

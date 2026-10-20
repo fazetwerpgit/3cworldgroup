@@ -266,6 +266,12 @@ export function solarLeadAlertEmail(p: {
   email: string;
   monthlyBill: string;
   creditTier: string;
+  /** '' when not sent (older leads). */
+  roofType?: string;
+  /** "1,250 kWh/mo", or '' when not entered. */
+  monthlyKwh?: string;
+  /** e.g. "Yes: heavy shade on the roof"; '' when the lead doesn't need review. */
+  needsReview?: string;
   booking: { when: string; mode: string; consultantName: string } | null;
   photos: { label: string; url: string }[];
   link: string;
@@ -280,7 +286,10 @@ export function solarLeadAlertEmail(p: {
     ['Phone', p.phone],
     ['Email', p.email],
     ['Monthly bill', p.monthlyBill],
+    ['Monthly usage', p.monthlyKwh ?? ''],
     ['Credit', p.creditTier],
+    ['Roof type', p.roofType ?? ''],
+    ['Needs review', p.needsReview ?? ''],
     ['Appointment', appointment],
     ['Submitted by', p.repName || 'A team member'],
   ];

@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Check, ChevronRight, FileText, RotateCcw } from 'lucide-react';
 import { resolveUploadMime } from '@/lib/forms/formUploads';
+import { isRoofType } from '@/lib/solar/leadFields';
 import {
   FormUploadError,
   isUploadCancelled,
   uploadFormAttachment,
 } from '@/lib/forms/uploadFormAttachment';
 import { useDeck } from './deckState';
+import { RoofTypeField, roofError } from './RoofTypeField';
 import {
   createLead,
   PHOTO_SLOTS,
@@ -103,6 +105,8 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
   }, [step, focusTick]);
 
   const errors = validateLead(state.lead);
+  const roofProblem = roofError(state.roofType ?? null);
+  const [roofTouched, setRoofTouched] = useState(false);
   const uploading = Object.values(slots).some((v) => v?.status === 'uploading');
   const saved = Boolean(state.leadId);
 
@@ -147,6 +151,11 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
 
   /** Next on the first two steps: this step's fields must be right before moving on. */
   const advance = () => {
+    // The roof question sits on the Home step: no lead past a missing or blocked roof.
+    if (STEPS[step].id === 'home' && roofProblem && !saved) {
+      setRoofTouched(true);
+      if (!STEPS[step].fields.some((k) => errors[k])) return;
+    }
     const bad = STEPS[step].fields.find((k) => errors[k]);
     if (bad && !saved) {
       setTouched((prev) => ({ ...prev, ...Object.fromEntries(STEPS[step].fields.map((k) => [k, true])) }));
@@ -179,6 +188,11 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
       }
       return;
     }
+    if (roofProblem) {
+      setRoofTouched(true);
+      setStep(STEPS.findIndex((st) => st.id === 'home'));
+      return;
+    }
     if (uploading) {
       setAlert('A photo is still uploading. One moment.');
       return;
@@ -197,6 +211,7 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
       phone: lead.phone.trim(),
       email: lead.email.trim(),
       monthlyBill: state.monthlyBill,
+      ...(isRoofType(state.roofType) ? { roofType: state.roofType } : {}),
       photos: state.photos,
     });
     setSending(false);
@@ -211,7 +226,9 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
   const missing = PHOTO_SLOTS.filter((p) => !state.photos[p.slot]).length;
   const added = PHOTO_SLOTS.length - missing;
   const current = STEPS[step];
-  const stepHasError = (i: number) => STEPS[i].fields.some((k) => (tried || touched[k]) && errors[k]);
+  const stepHasError = (i: number) =>
+    STEPS[i].fields.some((k) => (tried || touched[k]) && errors[k]) ||
+    (STEPS[i].id === 'home' && (tried || roofTouched) && Boolean(roofProblem));
   const last = step === STEPS.length - 1;
 
   return (
@@ -225,7 +242,10 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
       <form className={s.formCard} onSubmit={submit} noValidate aria-label="Homeowner info">
         <div className={s.steps} role="group" aria-label="Info steps">
           {STEPS.map((st, i) => {
-            const done = st.id === 'photos' ? added === PHOTO_SLOTS.length : st.fields.every((k) => !errors[k]);
+            const done =
+              st.id === 'photos'
+                ? added === PHOTO_SLOTS.length
+                : st.fields.every((k) => !errors[k]) && (st.id !== 'home' || !roofProblem);
             return (
               <button
                 key={st.id}
@@ -283,6 +303,17 @@ export function LeadFormSlide({ onSaved }: { onSaved: () => void }) {
                 </div>
               );
             })}
+            {current.id === 'home' ? (
+              <RoofTypeField
+                value={state.roofType ?? null}
+                onChange={(roof) => {
+                  setRoofTouched(true);
+                  update({ roofType: roof });
+                }}
+                showError={tried || roofTouched}
+                disabled={saved}
+              />
+            ) : null}
           </div>
         ) : (
           <div className={s.photos} role="group" aria-label="Photos">

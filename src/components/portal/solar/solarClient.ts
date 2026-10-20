@@ -1,7 +1,8 @@
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { randomHex } from '@/lib/randomHex';
 import type { SolarLeadView } from '@/lib/solar/leadView';
-import type { SolarLeadStatus } from '@/lib/solar/leadFields';
+import type { LeadExtras, SolarLeadStatus } from '@/lib/solar/leadFields';
+import type { SolarDemoOutcome, SolarLeadStage, SolarStageEntry } from '@/lib/solar/leadStage';
 
 // Client half of the solar deck: the authed calls to /api/portal/solar/** and
 // the pure formatting helpers the slides share (tested in solarClient.test.ts).
@@ -161,7 +162,7 @@ async function call<T>(url: string, init: RequestInit = {}): Promise<ApiResult<T
   }
 }
 
-export function createLead(payload: LeadFields & {
+export function createLead(payload: LeadFields & LeadExtras & {
   clientId: string;
   uploadId: string;
   monthlyBill: number;
@@ -262,6 +263,35 @@ export function setLeadStatus(id: string, status: SolarLeadStatus) {
     `/api/portal/solar/leads/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: JSON.stringify({ status }) }
   );
+}
+
+/**
+ * Admins, closers and consultants: the sales-dept stage (outcome only with
+ * appointment_demoed). null clears it (admins only). no_sale also cancels a
+ * live booking.
+ */
+export function setLeadStage(id: string, stage: SolarLeadStage | null, outcome?: SolarDemoOutcome) {
+  return call<{
+    success: boolean;
+    id: string;
+    stage: SolarLeadStage | null;
+    outcome: SolarDemoOutcome | null;
+    status: SolarLeadStatus;
+    entry: SolarStageEntry;
+    /** Set when no_sale cancelled the lead's live booking (as Mark lost does). */
+    cancelledBookingId?: string;
+  }>(`/api/portal/solar/leads/${encodeURIComponent(id)}/stage`, {
+    method: 'PATCH',
+    body: JSON.stringify(outcome ? { stage, outcome } : { stage }),
+  });
+}
+
+/** The creator or an admin: e.g. {needsReview: false} once the closer has looked. */
+export function updateLeadExtras(id: string, extras: LeadExtras) {
+  return call<{ success?: boolean }>(`/api/portal/solar/leads/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(extras),
+  });
 }
 
 /** Admin or the booking's consultant: frees the slot and puts the lead back to new. */

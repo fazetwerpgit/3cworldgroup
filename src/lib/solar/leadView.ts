@@ -2,7 +2,8 @@
 // stored lead with its live booking joined. Pure: the route builds it, the
 // admin Leads tab and the rep Solar page read it.
 import { SOLAR_HUB, hubTabHref } from '@/components/portal/admin-d/adminHubs';
-import { CREDIT_TIERS, PHOTO_SLOTS, type CreditTier, type PhotoSlot, type SolarLeadStatus } from './leadFields';
+import { CREDIT_TIERS, PHOTO_SLOTS, isRoofType, type CreditTier, type PhotoSlot, type RoofType, type SolarLeadStatus } from './leadFields';
+import { readStage, readStageHistory, type SolarDemoOutcome, type SolarLeadStage, type SolarStageEntry } from './leadStage';
 
 export interface SolarLeadBooking {
   id: string;
@@ -35,6 +36,17 @@ export interface SolarLeadView {
   createdAt: string | null;
   updatedAt: string | null;
   booking: SolarLeadBooking | null;
+  /** Sales-dept stage (old sold/lost leads read appointment_demoed + sale/no_sale); null before one is set. */
+  stage: SolarLeadStage | null;
+  /** Only with stage 'appointment_demoed'. */
+  stageOutcome: SolarDemoOutcome | null;
+  stageHistory: SolarStageEntry[];
+  roofType: RoofType | null;
+  heavyShade: boolean | null;
+  needsReview: boolean;
+  monthlyKwh: number | null;
+  /** The deck's usage helper answers, as sent (size-limited on write). */
+  usage: Record<string, unknown> | null;
 }
 
 /** The admin Leads tab with this lead's sheet open: where every lead alert and booking notice links. */
@@ -84,6 +96,8 @@ export function leadView(id: string, data: Record<string, unknown>, booking: Sol
     const path = text(photosIn[slot]);
     if (path) photos[slot] = path;
   }
+  const { stage, outcome } = readStage(data);
+  const usage = data.usage && typeof data.usage === 'object' && !Array.isArray(data.usage) ? (data.usage as Record<string, unknown>) : null;
   const creditTier = (CREDIT_TIERS as readonly unknown[]).includes(data.creditTier) ? (data.creditTier as CreditTier) : null;
   return {
     id,
@@ -105,5 +119,13 @@ export function leadView(id: string, data: Record<string, unknown>, booking: Sol
     createdAt: isoOf(data.createdAt),
     updatedAt: isoOf(data.updatedAt),
     booking,
+    stage,
+    stageOutcome: outcome,
+    stageHistory: readStageHistory(data.stageHistory),
+    roofType: isRoofType(data.roofType) ? data.roofType : null,
+    heavyShade: typeof data.heavyShade === 'boolean' ? data.heavyShade : null,
+    needsReview: data.needsReview === true,
+    monthlyKwh: typeof data.monthlyKwh === 'number' && Number.isFinite(data.monthlyKwh) ? data.monthlyKwh : null,
+    usage,
   };
 }

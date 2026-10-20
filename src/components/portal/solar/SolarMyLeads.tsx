@@ -6,7 +6,7 @@ import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import rep from '@/components/portal/rep/rep.module.css';
 import { LeadDetail } from './LeadDetail';
-import { STATUS_LABEL, STATUS_TONE, consultTime, leadName, modeLabel, nextConsult, savedDate } from './leadDisplay';
+import { STATUS_LABEL, STATUS_TONE, consultTime, leadName, modeLabel, nextConsult, savedDate, stageLine } from './leadDisplay';
 import { fetchLeads, type SolarLeadView } from './solarClient';
 import css from './solar-leads.module.css';
 
@@ -127,7 +127,7 @@ export function SolarMyLeads({
                     <span className={css.mineName}>{leadName(lead)}</span>
                     <span className={css.mineSub}>{rowSub(lead)}</span>
                   </span>
-                  <StatusDot tone={STATUS_TONE[lead.status]}>{STATUS_LABEL[lead.status]}</StatusDot>
+                  <LeadStatus lead={lead} />
                 </button>
               </li>
             ))}
@@ -140,6 +140,18 @@ export function SolarMyLeads({
         </>
       )}
     </section>
+  );
+}
+
+/** The sales-dept stage once one is set (read only), else the lead status. */
+function LeadStatus({ lead }: { lead: SolarLeadView }) {
+  const stage = stageLine(lead);
+  return stage ? (
+    <span title={stage.text}>
+      <StatusDot tone={stage.tone}>{stage.short}</StatusDot>
+    </span>
+  ) : (
+    <StatusDot tone={STATUS_TONE[lead.status]}>{STATUS_LABEL[lead.status]}</StatusDot>
   );
 }
 
