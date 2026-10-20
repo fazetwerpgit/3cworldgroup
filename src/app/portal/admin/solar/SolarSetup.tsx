@@ -12,6 +12,13 @@ import {
   type WeeklyWindow,
 } from '@/lib/solar/availability';
 import { DEFAULT_CONSULTANT_TZ, zoneAbbr } from '@/lib/solar/timezones';
+import {
+  MEET_LINK_ERROR,
+  PHONE_ERROR,
+  normalizeConsultantPhone,
+  normalizeMeetLink,
+} from '@/lib/solar/consultantContact';
+import { displayPhone } from '@/lib/phone';
 import { AdminFailed, AdminNotice, AdminSkeletonRows, StatusDot } from '@/components/portal/admin-d/AdminUi';
 import { AdminSelect, ConfirmStrip, Seg, cx } from '@/components/portal/admin-ops/AdminKit';
 import { UserPicker, pickerName, usePickerUsers, type PickerUser } from '@/components/admin/UserPicker';
@@ -76,7 +83,9 @@ function slotsIn(w: Pick<WeeklyWindow, 'start' | 'end'>, slotMin: number): numbe
 
 const tzLabel = (tz: string) => SOLAR_TIMEZONES.find((z) => z.value === tz)?.label ?? tz;
 
-const sameHours = (a: SolarHours | null, b: SolarHours) => JSON.stringify(a) === JSON.stringify(b);
+const sameHours = (a: SolarHours | null, b: SolarHours) =>
+  JSON.stringify(a && hoursPart(a)) === JSON.stringify(hoursPart(b));
+const hoursPart = (h: SolarHours): SolarHours => ({ tz: h.tz, slotMin: h.slotMin, modes: h.modes });
 
 // ---------- consultants ----------
 
@@ -86,17 +95,102 @@ interface ConsultantDoc {
   tz: string;
   slotMin: number;
   modes: Partial<Record<SolarMode, WeeklyWindow[]>>;
+  meetLink?: string;
+  phone?: string;
 }
+
+/**
+ * A consultant's hours plus what the homeowner's confirmation email shows.
+ * Saved: meetLink and phone as stored ("+15125550142"). Draft: as typed.
+ */
+type ConsultantSettings = SolarHours & { meetLink: string; phone: string };
 
 interface Consultant {
   uid: string;
   name: string;
   /** What the server has; null for one added here and not saved yet. */
-  saved: SolarHours | null;
+  saved: ConsultantSettings | null;
 }
 
-function hoursOf(c: Pick<ConsultantDoc, 'tz' | 'slotMin' | 'modes'>): SolarHours {
-  return { tz: c.tz, slotMin: c.slotMin, modes: { virtual: c.modes.virtual ?? [], in_person: c.modes.in_person ?? [] } };
+function hoursOf(c: Pick<ConsultantDoc, 'tz' | 'slotMin' | 'modes' | 'meetLink' | 'phone'>): ConsultantSettings {
+  return {
+    tz: c.tz,
+    slotMin: c.slotMin,
+    modes: { virtual: c.modes.virtual ?? [], in_person: c.modes.in_person ?? [] },
+    meetLink: c.meetLink ?? '',
+    phone: c.phone ?? '',
+  };
+}
+
+/** A saved consultant as the editor shows it: the phone reads "(512) 555-0142". */
+const draftOf = (saved: ConsultantSettings): ConsultantSettings => ({
+  ...saved,
+  phone: saved.phone ? displayPhone(saved.phone) : '',
+});
+
+/** True when a typed field still means what is saved (an invalid entry never does). */
+function sameContact(saved: ConsultantSettings | null, draft: ConsultantSettings): boolean {
+  const meet = normalizeMeetLink(draft.meetLink);
+  const phone = normalizeConsultantPhone(draft.phone);
+  return meet.ok && phone.ok && meet.value === (saved?.meetLink ?? '') && phone.value === (saved?.phone ?? '');
+}
+
+type ContactField = 'meetLink' | 'phone';
+
+function ContactInput({
+  id,
+  field,
+  label,
+  value,
+  error,
+  hint,
+  onChange,
+  onBlur,
+}: {
+  id: string;
+  field: ContactField;
+  label: string;
+  value: string;
+  error: string;
+  hint: string;
+  onChange: (value: string) => void;
+  onBlur: () => void;
+}) {
+  const inputId = `${id}-${field}`;
+  const hintId = `${inputId}-hint`;
+  const errorId = `${inputId}-error`;
+  const meet = field === 'meetLink';
+  return (
+    <div className={u.field}>
+      <label className={u.label} htmlFor={inputId}>
+        {label}
+      </label>
+      <input
+        id={inputId}
+        className={u.input}
+        type={meet ? 'url' : 'tel'}
+        inputMode={meet ? 'url' : 'tel'}
+        autoComplete={meet ? 'off' : 'tel'}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        placeholder={meet ? 'meet.google.com/abc-defg-hij' : '(555) 555-5555'}
+        value={value}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${errorId} ${hintId}` : hintId}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+      />
+      {error ? (
+        <p className={cx(u.hint, u.hintError)} id={errorId} role="alert">
+          {error}
+        </p>
+      ) : null}
+      <p className={u.hint} id={hintId}>
+        {hint}
+      </p>
+    </div>
+  );
 }
 
 function TimeSelect({
@@ -223,13 +317,18 @@ function ConsultantPanel({
   consultant: Consultant;
   seeded: boolean;
   removable: boolean;
-  onSaved: (uid: string, hours: SolarHours) => void;
+  onSaved: (uid: string, settings: ConsultantSettings) => void;
   onRemoved: (uid: string, futureBookings: number | null) => void;
 }) {
   const { uid, name, saved } = consultant;
-  const [draft, setDraft] = useState<SolarHours>(
-    () => saved ?? { tz: DEFAULT_CONSULTANT_TZ, slotMin: 60, modes: { virtual: [], in_person: [] } }
+  const [draft, setDraft] = useState<ConsultantSettings>(() =>
+    saved
+      ? draftOf(saved)
+      : { tz: DEFAULT_CONSULTANT_TZ, slotMin: 60, modes: { virtual: [], in_person: [] }, meetLink: '', phone: '' }
   );
+  // A field's error shows once it has been left (or Save was pressed), not mid-typing.
+  const [touched, setTouched] = useState<Record<ContactField, boolean>>({ meetLink: false, phone: false });
+  const [serverField, setServerField] = useState<{ field: ContactField; error: string } | null>(null);
   const [mode, setMode] = useState<SolarMode>(() =>
     saved && saved.modes.virtual.length === 0 && saved.modes.in_person.length > 0 ? 'in_person' : 'virtual'
   );
@@ -240,16 +339,36 @@ function ConsultantPanel({
   const [confirming, setConfirming] = useState(false);
   const [removing, setRemoving] = useState(false);
 
-  const dirty = !sameHours(saved, draft);
+  const dirty = !sameHours(saved, draft) || !sameContact(saved, draft);
+  const checked = { meetLink: normalizeMeetLink(draft.meetLink), phone: normalizeConsultantPhone(draft.phone) };
+  const fieldError = (field: ContactField): string => {
+    if (serverField?.field === field) return serverField.error;
+    const c = checked[field];
+    return !c.ok && touched[field] ? c.error : '';
+  };
   const invalid = (['virtual', 'in_person'] as const).some((m) =>
     draft.modes[m].some((w) => slotsIn(w, draft.slotMin) === 0)
   );
   const headId = `consultant-${uid}`;
 
-  const edit = (next: SolarHours) => {
+  const edit = (next: ConsultantSettings) => {
     setDraft(next);
     setJustSaved(false);
     setError('');
+  };
+
+  const editContact = (field: ContactField, value: string) => {
+    if (serverField?.field === field) setServerField(null);
+    edit({ ...draft, [field]: value });
+  };
+
+  // Leaving a valid field tidies it: the Meet link to its full form, a US phone to (512) 555-0142.
+  const tidy = (field: ContactField) => {
+    setTouched((t) => ({ ...t, [field]: true }));
+    const c = checked[field];
+    if (!c.ok || !c.value) return;
+    const shown = field === 'phone' ? displayPhone(c.value) : c.value;
+    if (shown !== draft[field]) setDraft((d) => ({ ...d, [field]: shown }));
   };
 
   const setDay = (day: number, next: WeeklyWindow | null) => {
@@ -266,20 +385,31 @@ function ConsultantPanel({
   };
 
   const save = async () => {
+    if (!checked.meetLink.ok || !checked.phone.ok) {
+      setTouched({ meetLink: true, phone: true });
+      document.getElementById(`${headId}-${checked.meetLink.ok ? 'phone' : 'meetLink'}`)?.focus();
+      return;
+    }
     setSaving(true);
     setError('');
+    setServerField(null);
     setJustSaved(false);
     try {
       const data = await api(`/api/portal/solar/consultants/${encodeURIComponent(uid)}`, {
         method: 'PUT',
-        body: JSON.stringify(draft),
+        body: JSON.stringify({ ...hoursPart(draft), meetLink: draft.meetLink.trim(), phone: draft.phone.trim() }),
       });
-      const hours = hoursOf(data.consultant as ConsultantDoc);
-      setDraft(hours);
-      onSaved(uid, hours);
+      const next = hoursOf(data.consultant as ConsultantDoc);
+      setDraft(draftOf(next));
+      onSaved(uid, next);
       setJustSaved(true);
     } catch (err) {
-      setError(failure(err, "Couldn't save. Try again."));
+      const message = failure(err, "Couldn't save. Try again.");
+      // The API names the field it refused; show the message under it.
+      const field: ContactField | null =
+        message === MEET_LINK_ERROR ? 'meetLink' : message === PHONE_ERROR ? 'phone' : null;
+      if (field) setServerField({ field, error: message });
+      else setError(message);
     } finally {
       setSaving(false);
     }
@@ -345,6 +475,29 @@ function ConsultantPanel({
               />
             </div>
           </div>
+        </div>
+
+        <div className={st.contact}>
+          <ContactInput
+            id={headId}
+            field="meetLink"
+            label="Google Meet link"
+            value={draft.meetLink}
+            error={fieldError('meetLink')}
+            hint="Google Meet → New meeting → Create a meeting for later, then paste the link."
+            onChange={(v) => editContact('meetLink', v)}
+            onBlur={() => tidy('meetLink')}
+          />
+          <ContactInput
+            id={headId}
+            field="phone"
+            label="Phone"
+            value={draft.phone}
+            error={fieldError('phone')}
+            hint="Homeowners can call or text this number."
+            onChange={(v) => editContact('phone', v)}
+            onBlur={() => tidy('phone')}
+          />
         </div>
 
         <div className={st.week}>
@@ -486,7 +639,7 @@ function Consultants({ users, usersLoaded, after }: { users: PickerUser[]; users
 
   const savedCount = list.filter((c) => c.saved).length;
 
-  const onSaved = (uid: string, hours: SolarHours) => {
+  const onSaved = (uid: string, hours: ConsultantSettings) => {
     // The first save writes the whole seed, so everyone shown is saved now.
     setSeeded(false);
     setList((prev) => prev?.map((c) => (c.uid === uid ? { ...c, saved: hours } : c)) ?? prev);

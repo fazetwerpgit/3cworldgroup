@@ -63,6 +63,23 @@
   gap: var(--s3);
 }
 
+/* The Meet link and phone the homeowner's confirmation email shows. */
+.contact {
+  display: grid;
+  gap: var(--s4);
+  align-items: start;
+}
+
+@media (min-width: 560px) {
+  .contact {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+}
+
+.contact [aria-invalid='true'] {
+  border-color: var(--c-red);
+}
+
 /* ---------- the week ---------- */
 .days {
   display: grid;
