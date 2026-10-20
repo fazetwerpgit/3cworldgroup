@@ -32,6 +32,14 @@ function landing(request: NextRequest, from: ConnectFrom | null, outcome: { ok: 
 //  3. The refresh token is saved encrypted in solarGoogleTokens/{uid} and the
 //     status mirrored onto solarAvailability/{uid}.googleCalendar.
 // Never logs or forwards a token or the code.
+//
+// Not bound to a browser session, by design: the app starts the flow in its
+// WebView and Google finishes it in the browser sheet, which shares no
+// cookies with it. That leaves reverse login-CSRF possible (someone tricks a
+// consultant into finishing THEIR OWN sign-in link, attaching the attacker's
+// Google account). Accepted: it needs a fresh link minted by a signed-in
+// consultant, and the Setup row shows "Connected as <email>", which is where
+// a wrong account is noticed (and disconnected).
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
   let from: ConnectFrom | null = null;
