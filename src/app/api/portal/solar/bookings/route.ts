@@ -9,6 +9,7 @@ import { appBaseUrl, managerAlertEmail, solarBookingConfirmationEmail } from '@/
 import { bookingDocId, isSolarMode, openSlots, type SolarMode } from '@/lib/solar/availability';
 import { consultantNotice, loadAvailability, loadBookings, requireSolarUser } from '@/lib/solar/server';
 import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
+import { consultantBookingAttachment, customerBookingAttachment, type BookingInviteInput } from '@/lib/solar/bookingInvite';
 import { solarLeadHref } from '@/lib/solar/leadView';
 import {
   LEGACY_TZ,
@@ -27,23 +28,55 @@ type Booking = {
   leadId: string;
   mode: SolarMode;
   start: string;
+  end: string;
   consultantUid: string;
   consultantName: string;
+  /** The consultant's details as they were at booking time ('' when not set). */
+  meetLink: string;
+  consultantPhone: string;
   customerName: string;
   customerEmail: string;
+  customerPhone: string;
+  /** The homeowner's address from the lead ('' when it has none). */
+  address: string;
   repName: string;
   customerTz: string;
   consultantTz: string;
 };
 
+/** The lead's address on one line: "12 Elm St, Austin, TX, 78701". */
+function addressOf(lead: { get: (field: string) => unknown }): string {
+  return ['address', 'city', 'state', 'zip']
+    .map((k) => lead.get(k))
+    .map((v) => (typeof v === 'string' ? v.trim() : ''))
+    .filter(Boolean)
+    .join(', ');
+}
+
 // Customer confirmation + consultant notice. Best-effort: the booking stands
 // even when a message fails. consultantNotice() keeps the owner out of it
 // while owner notifications are off (Jacob gets the notice instead). The
-// customer reads the time in their zone, the consultant in theirs.
+// customer reads the time in their zone, the consultant in theirs. Both
+// emails carry an .ics invite with the same UID (lib/solar/bookingInvite).
 async function announceBooking(b: Booking) {
   const when = formatWhen(b.start, b.customerTz);
   const consultantWhen = formatWhenForConsultant(b.start, b.consultantTz, b.customerTz);
   const how = b.mode === 'virtual' ? 'virtual' : 'in-person';
+  const meetLink = b.mode === 'virtual' ? b.meetLink : '';
+  const link = solarLeadHref(b.leadId);
+  const invite: BookingInviteInput = {
+    bookingId: b.id,
+    mode: b.mode,
+    start: b.start,
+    end: b.end,
+    consultantName: b.consultantName,
+    meetLink: b.meetLink,
+    consultantPhone: b.consultantPhone,
+    customerName: b.customerName,
+    customerPhone: b.customerPhone,
+    address: b.address,
+    leadUrl: `${appBaseUrl()}${link}`,
+  };
   try {
     const notice = await consultantNotice(b.consultantUid);
     if (b.customerEmail) {
@@ -54,8 +87,13 @@ async function announceBooking(b: Booking) {
           when,
           mode: b.mode,
           consultantName: b.consultantName,
+          meetLink: b.meetLink,
+          consultantPhone: b.consultantPhone,
+          address: b.address,
+          calendarAttached: true,
         }),
         ...(notice.replyTo ? { replyTo: notice.replyTo } : {}),
+        attachments: [customerBookingAttachment(invite)],
         tag: 'solar-booking',
       });
     }
@@ -63,7 +101,6 @@ async function announceBooking(b: Booking) {
     if (!to) return;
     const title = `${notice.titlePrefix}Solar consult booked`;
     const message = `${b.customerName || 'A customer'}: ${how}, ${consultantWhen} with ${b.consultantName} (booked by ${b.repName}).`;
-    const link = solarLeadHref(b.leadId);
     await createNotification({
       userId: to.uid,
       type: 'solar_booking',
@@ -74,7 +111,17 @@ async function announceBooking(b: Booking) {
     }).catch((error) => console.error('solar booking notification failed:', error));
     await sendPushToUser(to.uid, { title, body: message, url: link }).catch(() => {});
     if (to.email) {
-      await sendEmail({ to: to.email, ...managerAlertEmail({ title, message, link: `${appBaseUrl()}${link}` }), tag: 'solar-booking' });
+      await sendEmail({
+        to: to.email,
+        ...managerAlertEmail({
+          title,
+          message,
+          link: `${appBaseUrl()}${link}`,
+          ...(meetLink ? { action: { label: 'Join on Google Meet', href: meetLink } } : {}),
+        }),
+        attachments: [consultantBookingAttachment(invite)],
+        tag: 'solar-booking',
+      });
     }
   } catch (error) {
     console.error('solar booking announce failed:', error);
@@ -185,7 +232,9 @@ export async function POST(request: NextRequest) {
 
     const id = bookingDocId(consultantUid, start);
     const slotRef = db.collection('solarBookings').doc(id);
-    let outcome: { fresh: true; booking: Record<string, unknown> } | { fresh: false; id: string; booking: Record<string, unknown> };
+    let outcome:
+      | { fresh: true; booking: Record<string, unknown>; customerPhone: string }
+      | { fresh: false; id: string; booking: Record<string, unknown> };
     try {
       outcome = await db.runTransaction(async (tx) => {
         // Every read before any write.
@@ -201,6 +250,10 @@ export async function POST(request: NextRequest) {
 
         const customerName = `${leadNow.get('first') ?? ''} ${leadNow.get('last') ?? ''}`.trim();
         const customerEmail = typeof leadNow.get('email') === 'string' ? (leadNow.get('email') as string) : '';
+        // What the confirmation and later views show, as it was at booking time.
+        const meetLink = availability[0]?.meetLink ?? '';
+        const consultantPhone = availability[0]?.phone ?? '';
+        const customerAddress = addressOf(leadNow);
         const booking: Record<string, unknown> = {
           leadId,
           mode,
@@ -216,6 +269,9 @@ export async function POST(request: NextRequest) {
           repName: gate.name,
           customerName,
           customerEmail,
+          ...(meetLink ? { consultantMeetLink: meetLink } : {}),
+          ...(consultantPhone ? { consultantPhone } : {}),
+          ...(customerAddress ? { customerAddress } : {}),
           status: 'booked',
           createdAt: now,
         };
@@ -228,7 +284,8 @@ export async function POST(request: NextRequest) {
           tx.create(slotRef, booking);
         }
         tx.update(leadRef, { status: 'booked', bookingId: id, updatedAt: now });
-        return { fresh: true as const, booking };
+        const customerPhone = typeof leadNow.get('phone') === 'string' ? (leadNow.get('phone') as string).trim() : '';
+        return { fresh: true as const, booking, customerPhone };
       });
     } catch (error) {
       if (error instanceof Answer) return NextResponse.json(error.body, { status: error.status });
@@ -243,10 +300,15 @@ export async function POST(request: NextRequest) {
       leadId,
       mode,
       start,
+      end: offered.end,
       consultantUid,
       consultantName: offered.name,
+      meetLink: String(b.consultantMeetLink ?? ''),
+      consultantPhone: String(b.consultantPhone ?? ''),
       customerName: String(b.customerName ?? ''),
       customerEmail: String(b.customerEmail ?? ''),
+      customerPhone: outcome.customerPhone,
+      address: String(b.customerAddress ?? ''),
       repName: gate.name,
       customerTz: String(b.customerTz ?? consultantTz),
       consultantTz,

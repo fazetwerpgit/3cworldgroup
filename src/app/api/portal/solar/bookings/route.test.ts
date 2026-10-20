@@ -137,6 +137,95 @@ describe('POST /api/portal/solar/bookings', () => {
     expect(mockPush).toHaveBeenCalledWith('jac', expect.objectContaining({ url: href }));
   });
 
+  describe("the consultant's Meet link and phone", () => {
+    const MEET = 'https://meet.google.com/abc-defg-hij';
+    const unfold = (ics: string) => ics.replace(/\r\n[ \t]/g, '');
+    const icsOf = (call: { attachments?: { contentBase64: string }[] }) =>
+      unfold(Buffer.from(call.attachments![0].contentBase64, 'base64').toString('utf8'));
+    const prop = (ics: string, name: string) => ics.split('\r\n').find((l) => l.startsWith(`${name}:`))?.slice(name.length + 1);
+
+    beforeEach(() => {
+      db.store.set('solarAvailability', new Map(Object.entries({
+        jac: {
+          name: 'Jacob Myers', tz: 'America/Chicago', slotMin: 60,
+          modes: { virtual: [{ day: 1, start: '10:00', end: '17:00' }], in_person: [{ day: 1, start: '10:00', end: '17:00' }] },
+          meetLink: MEET, phone: '+15125550142',
+        },
+      })));
+      Object.assign(db.store.get('solarLeads')!.get('rep1_c1')!, {
+        phone: '512-555-0199', address: '12 Elm St', city: 'Austin', state: 'TX', zip: '78701',
+      });
+    });
+    const JAC = { ...BODY, consultantUid: 'jac', mode: 'virtual' };
+
+    it('snapshots them on the booking and puts them in the confirmation, with an .ics invite', async () => {
+      expect((await post(JAC)).status).toBe(200);
+      const id = `jac_${SLOT}`;
+      expect(db.store.get('solarBookings')!.get(id)).toMatchObject({
+        consultantMeetLink: MEET, consultantPhone: '+15125550142', customerAddress: '12 Elm St, Austin, TX, 78701',
+      });
+      const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
+      expect(toCustomer.textBody).toContain(`Join on Google Meet: ${MEET}`);
+      expect(toCustomer.textBody).toContain('Call or text Jacob at (512) 555-0142.');
+      expect(toCustomer.htmlBody).toContain('href="tel:+15125550142"');
+      expect(toCustomer.attachments).toHaveLength(1);
+      expect(toCustomer.attachments[0]).toMatchObject({
+        name: 'solar-consultation.ics', contentType: 'text/calendar; charset=utf-8; method=PUBLISH',
+      });
+      const ics = icsOf(toCustomer);
+      expect(prop(ics, 'METHOD')).toBe('PUBLISH');
+      expect(prop(ics, 'UID')).toBe(`${id}@3cworldgroup.com`);
+      expect(prop(ics, 'DTSTART')).toBe('20261026T150000Z');
+      expect(prop(ics, 'DTEND')).toBe('20261026T160000Z');
+      expect(prop(ics, 'SUMMARY')).toBe('Solar consultation with Jacob Myers');
+      expect(prop(ics, 'LOCATION')).toBe(MEET);
+    });
+
+    it("attaches the consultant's own .ics (same UID) and the Meet link to their notice", async () => {
+      expect((await post(JAC)).status).toBe(200);
+      const notice = mockEmail.mock.calls.find((c) => c[0].to === 'jmyers@3cworldgroup.com' && c[0].tag === 'solar-booking')![0];
+      expect(notice.textBody).toContain(`Join on Google Meet: ${MEET}`);
+      expect(notice.attachments[0]).toMatchObject({ name: 'solar-consult.ics', contentType: 'text/calendar; charset=utf-8; method=PUBLISH' });
+      const ics = icsOf(notice);
+      const customerIcs = icsOf(mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0]);
+      expect(prop(ics, 'UID')).toBe(prop(customerIcs, 'UID'));
+      expect(prop(ics, 'SUMMARY')).toBe('Solar consult: Ana Lopez');
+      const d = prop(ics, 'DESCRIPTION')!;
+      expect(d).toContain('Phone: (512) 555-0199');
+      expect(d).toContain('Address: 12 Elm St\\, Austin\\, TX\\, 78701');
+      expect(d).toContain(`Google Meet: ${MEET}`);
+      expect(d).toContain('Lead: http');
+      expect(d).toContain('/portal/admin/solar?tab=leads&lead=rep1_c1');
+      // The lead alert names the Meet link too.
+      const alert = mockEmail.mock.calls.find((c) => c[0].tag === 'solar-lead')![0];
+      expect(alert.textBody).toContain(`Google Meet: ${MEET}`);
+    });
+
+    it('in person: the address is where, and the Meet link stays out of every email', async () => {
+      expect((await post({ ...JAC, mode: 'in_person' })).status).toBe(200);
+      const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
+      expect(toCustomer.textBody).toContain('Where: 12 Elm St, Austin, TX, 78701');
+      expect(prop(icsOf(toCustomer), 'LOCATION')).toBe('12 Elm St\\, Austin\\, TX\\, 78701');
+      for (const [call] of mockEmail.mock.calls) {
+        expect(call.textBody).not.toContain('meet.google.com');
+      }
+    });
+
+    it('a consultant without them: nothing snapshotted, nothing empty in the email', async () => {
+      const jac = db.store.get('solarAvailability')!.get('jac')!;
+      delete jac.meetLink;
+      delete jac.phone;
+      expect((await post(JAC)).status).toBe(200);
+      const booking = db.store.get('solarBookings')!.get(`jac_${SLOT}`)!;
+      expect(booking).not.toHaveProperty('consultantMeetLink');
+      expect(booking).not.toHaveProperty('consultantPhone');
+      const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
+      expect(toCustomer.textBody).not.toMatch(/Google Meet|Call or text|undefined/);
+      expect(toCustomer.attachments).toHaveLength(1);
+      expect(prop(icsOf(toCustomer), 'LOCATION')).toBeUndefined();
+    });
+  });
+
   describe('one active booking per lead', () => {
     const emailsTo = (to: string) => mockEmail.mock.calls.filter((c) => c[0].to === to).length;
 

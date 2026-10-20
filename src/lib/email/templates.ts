@@ -1,3 +1,6 @@
+import { displayPhone, telHref } from '@/lib/phone';
+import { firstName } from '@/lib/solar/consultantContact';
+
 export interface EmailContent {
   subject: string;
   htmlBody: string;
@@ -235,11 +238,23 @@ ${p.checklist
   };
 }
 
-export function managerAlertEmail(p: { title: string; message: string; link: string }): EmailContent {
+export function managerAlertEmail(p: {
+  title: string;
+  message: string;
+  link: string;
+  /** One more link above the portal link (e.g. the booking's Google Meet link). */
+  action?: { label: string; href: string };
+}): EmailContent {
+  const action = p.action?.href ? p.action : null;
   return {
     subject: `[Portal] ${p.title}`,
-    textBody: `${p.title}\n\n${p.message}\n\n${p.link}\n`,
-    htmlBody: layout(p.title, `<p>${esc(p.message)}</p><p><a href="${esc(p.link)}">Open in portal</a></p>`),
+    textBody: `${p.title}\n\n${p.message}\n\n${action ? `${action.label}: ${action.href}\n\n` : ''}${p.link}\n`,
+    htmlBody: layout(
+      p.title,
+      `<p>${esc(p.message)}</p>${
+        action ? `<p><a href="${esc(action.href)}">${esc(action.label)}</a><br><span style="font-size:13px;color:#5a5f68;word-break:break-all">${esc(action.href)}</span></p>` : ''
+      }<p><a href="${esc(p.link)}">Open in portal</a></p>`
+    ),
   };
 }
 
@@ -273,7 +288,7 @@ export function solarLeadAlertEmail(p: {
   /** e.g. "Yes: heavy shade on the roof"; '' when the lead doesn't need review. */
   needsReview?: string;
   /** `when` carries its zone label(s). */
-  booking: { when: string; mode: string; consultantName: string } | null;
+  booking: { when: string; mode: string; consultantName: string; meetLink?: string } | null;
   photos: { label: string; url: string }[];
   link: string;
 }): EmailContent {
@@ -292,6 +307,7 @@ export function solarLeadAlertEmail(p: {
     ['Roof type', p.roofType ?? ''],
     ['Needs review', p.needsReview ?? ''],
     ['Appointment', appointment],
+    ['Google Meet', p.booking?.meetLink ?? ''],
     ['Submitted by', p.repName || 'A team member'],
   ];
   const filled = rows.filter(([, v]) => v);
@@ -315,23 +331,71 @@ export function solarLeadAlertEmail(p: {
   };
 }
 
+/** A button in the onboarding teal, built from a table so Gmail and Outlook render it the same. */
+function emailButton(href: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:20px 0 8px"><tr>
+<td align="center" bgcolor="${INVITE_TEAL}" style="border-radius:6px;background:${INVITE_TEAL}"><a href="${esc(href)}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:700;line-height:1.2;color:#ffffff;text-decoration:none;border-radius:6px">${esc(label)}</a></td>
+</tr></table>`;
+}
+
 export function solarBookingConfirmationEmail(p: {
   customerName: string;
   /** With its zone, in the customer's time ("Tuesday, October 20, 3:00 PM ET"). */
   when: string;
   mode: 'virtual' | 'in_person';
   consultantName: string;
+  /** The consultant's Google Meet link at booking time; shown for virtual consultations only. */
+  meetLink?: string;
+  /** The consultant's phone at booking time ("+15125550142"). */
+  consultantPhone?: string;
+  /** The homeowner's address; shown for in-person consultations only. */
+  address?: string;
+  /** True when an .ics invite rides along, so the email can point to it. */
+  calendarAttached?: boolean;
 }): EmailContent {
   const subject = 'Your solar consultation is booked';
   const how = p.mode === 'virtual' ? 'a virtual consultation' : 'an in-person consultation';
   const line = `You are booked for ${how} with ${p.consultantName} on ${p.when}.`;
   const greeting = p.customerName ? `Hi ${p.customerName},` : 'Hi,';
+  const meetLink = p.mode === 'virtual' ? (p.meetLink ?? '').trim() : '';
+  const address = p.mode === 'in_person' ? (p.address ?? '').trim() : '';
+  const phone = (p.consultantPhone ?? '').trim();
+  const who = firstName(p.consultantName) || 'your consultant';
+  const muted = 'color:#5a5f68';
+
+  const text: string[] = [greeting, line];
+  const html: string[] = [
+    `<p>${esc(greeting)}</p>`,
+    `<p>You are booked for <strong>${esc(how)}</strong> with <strong>${esc(p.consultantName)}</strong> on <strong>${esc(p.when)}</strong>.</p>`,
+  ];
+  if (meetLink) {
+    text.push(`Join on Google Meet: ${meetLink}`);
+    html.push(
+      `${emailButton(meetLink, 'Join on Google Meet')}<p style="margin:0 0 16px;font-size:13px;line-height:1.5;${muted}">Or open this link: <a href="${esc(meetLink)}" style="${muted};word-break:break-all">${esc(meetLink)}</a></p>`
+    );
+  }
+  if (address) {
+    text.push(`Where: ${address}`);
+    html.push(`<p><span style="${muted}">Where:</span> <strong>${esc(address)}</strong></p>`);
+  }
+  if (phone) {
+    const shown = displayPhone(phone);
+    text.push(`Questions before then? Call or text ${who} at ${shown}.`);
+    html.push(
+      `<p>Questions before then? Call or text ${esc(who)} at <a href="${esc(telHref(phone))}" style="color:#1155cc;white-space:nowrap">${esc(shown)}</a>.</p>`
+    );
+  }
+  if (p.calendarAttached) {
+    const cal = 'To add it to your calendar, open the attached invite.';
+    text.push(cal);
+    html.push(`<p>${cal}</p>`);
+  }
+  const change = 'If you need to change the time, reply to this email.';
+  text.push(change, '3C World Group');
+  html.push(`<p>${change}</p>`);
   return {
     subject,
-    textBody: `${greeting}\n\n${line}\n\nIf you need to change the time, reply to this email.\n\n3C World Group\n`,
-    htmlBody: layout(
-      subject,
-      `<p>${esc(greeting)}</p><p>You are booked for <strong>${esc(how)}</strong> with <strong>${esc(p.consultantName)}</strong> on <strong>${esc(p.when)}</strong>.</p><p>If you need to change the time, reply to this email.</p>`
-    ),
+    textBody: `${text.join('\n\n')}\n`,
+    htmlBody: layout(subject, html.join('')),
   };
 }
