@@ -150,9 +150,9 @@ const VIRTUAL: BookingEventInput = {
   timeZone: 'America/Chicago',
   customerName: 'Ana Lopez',
   customerEmail: 'ana@example.com',
-  customerPhone: '+15125550142',
   address: '12 Elm St, Austin, TX, 78701',
-  leadUrl: 'https://www.3cworldgroup.com/portal/admin/solar?tab=leads&lead=rep1_c1',
+  consultantName: 'Sam Closer',
+  consultantPhone: '+15125550199',
 };
 
 describe('event payload', () => {
@@ -167,15 +167,27 @@ describe('event payload', () => {
       conferenceData: { createRequest: { conferenceSolutionKey: { type: 'hangoutsMeet' } } },
     });
     expect(e.location).toBeUndefined();
-    expect(e.description).toContain('Phone: (512) 555-0142');
-    expect(e.description).toContain('Address: 12 Elm St, Austin, TX, 78701');
-    expect(e.description).toContain(`Lead in the 3C portal: ${VIRTUAL.leadUrl}`);
+    expect(e.description).toBe(
+      'Solar consultation with 3C World Group.\n\n' +
+        'Questions before then? Call or text Sam at (512) 555-0199.\n\n' +
+        'Reply to the invite to change the time.'
+    );
+    // Google adds its own Meet line; the booking id rides only in private properties.
+    expect(e.description).not.toMatch(/meet\.google|portal|12 Elm|sam_2026/i);
+    expect(e.extendedProperties).toEqual({ private: { solarBookingId: VIRTUAL.bookingId } });
+  });
+
+  it('no consultant phone: the call-or-text line is left out', () => {
+    expect(buildBookingEvent({ ...VIRTUAL, consultantPhone: '' }).description).toBe(
+      'Solar consultation with 3C World Group.\n\nReply to the invite to change the time.'
+    );
   });
 
   it('in person: the address is the location and no Meet is made', () => {
     const e = buildBookingEvent({ ...VIRTUAL, mode: 'in_person' });
     expect(e.location).toBe('12 Elm St, Austin, TX, 78701');
     expect(e.conferenceData).toBeUndefined();
+    expect(e.description).not.toContain('12 Elm');
   });
 
   it('no homeowner email: nobody is invited', () => {

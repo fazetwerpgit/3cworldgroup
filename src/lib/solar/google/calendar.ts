@@ -4,6 +4,7 @@
 // result the caller can fall back on, never throw.
 import { createHash } from 'node:crypto';
 import { displayPhone } from '@/lib/phone';
+import { firstName } from '@/lib/solar/consultantContact';
 import { accessTokenFor, rejectAccessToken } from './connection';
 import { GOOGLE_TIMEOUT_MS } from './oauth';
 
@@ -23,10 +24,12 @@ export interface BookingEventInput {
   customerName: string;
   /** '' when the lead has none: then nobody is invited. */
   customerEmail: string;
-  customerPhone: string;
+  /** In person: the event's location. Never put in the description. */
   address: string;
-  /** Full URL of the lead in the portal. */
-  leadUrl: string;
+  /** The consultant, for the homeowner's "call or text" line. */
+  consultantName: string;
+  /** '' when not set: then the line is left out. */
+  consultantPhone: string;
 }
 
 /**
@@ -42,14 +45,19 @@ export function eventSummary(customerName: string): string {
   return `Solar consultation: ${customerName.trim() || 'Homeowner'}`;
 }
 
+// The homeowner is an attendee and sees this description, so it carries
+// nothing internal: no lead link, no homeowner phone or address (the
+// consultant gets those in the booking notice email). Virtual: Google adds
+// its own Meet line, so none here.
 function eventDescription(i: BookingEventInput): string {
-  const details = [
-    `Homeowner: ${i.customerName.trim() || 'Not given'}`,
-    i.customerPhone ? `Phone: ${displayPhone(i.customerPhone)}` : '',
-    i.address ? `Address: ${i.address}` : '',
-    i.mode === 'virtual' ? 'Virtual consultation (Google Meet).' : 'In-person consultation at the address above.',
-  ].filter(Boolean);
-  return [...details, '', `Lead in the 3C portal: ${i.leadUrl}`].join('\n');
+  const first = firstName(i.consultantName) || i.consultantName.trim() || 'your consultant';
+  return [
+    'Solar consultation with 3C World Group.',
+    i.consultantPhone ? `Questions before then? Call or text ${first} at ${displayPhone(i.consultantPhone)}.` : '',
+    'Reply to the invite to change the time.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 /** The events.insert body. Virtual: a new Meet link. In person: the address as location. */

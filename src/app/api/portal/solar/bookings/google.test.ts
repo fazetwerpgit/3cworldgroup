@@ -55,6 +55,7 @@ function sam(googleCalendar?: Record<string, unknown>) {
           slotMin: 60,
           modes: { virtual: HOURS, in_person: HOURS },
           meetLink: 'https://meet.google.com/abc-defg-hij',
+          phone: '+15125550199',
           ...(googleCalendar ? { googleCalendar } : {}),
         },
       ],
@@ -122,8 +123,14 @@ describe('booking with Google Calendar connected', () => {
       attendees: [{ email: 'ana@example.com', displayName: 'Ana Lopez' }],
       conferenceData: { createRequest: { conferenceSolutionKey: { type: 'hangoutsMeet' } } },
     });
-    expect(String(insert.body!.description)).toContain('Address: 12 Elm St, Austin, TX, 78701');
-    expect(String(insert.body!.description)).toContain('https://www.3cworldgroup.com/portal/admin/solar?tab=leads&lead=rep1_c1');
+    // The homeowner sees the description: nothing internal in the event body.
+    const body = JSON.stringify(insert.body);
+    expect(String(insert.body!.description)).toContain('Solar consultation with 3C World Group.');
+    expect(String(insert.body!.description)).toContain('Call or text Sam at (512) 555-0199.');
+    expect(body).not.toContain('/portal/');
+    expect(body).not.toContain('tab=leads');
+    expect(body).not.toMatch(/555-?0142|5125550142/);
+    expect(String(insert.body!.description)).not.toContain('12 Elm');
 
     expect(db.store.get('solarBookings')!.get(ID)).toMatchObject({
       googleEventId: bookingEventId(ID, NOW.getTime()),
@@ -147,6 +154,9 @@ describe('booking with Google Calendar connected', () => {
     const insert = google.find('POST', '/calendars/primary/events')!;
     expect(insert.body!.location).toBe('12 Elm St, Austin, TX, 78701');
     expect(insert.body!.conferenceData).toBeUndefined();
+    const body = JSON.stringify(insert.body);
+    expect(body).not.toContain('/portal/');
+    expect(body).not.toMatch(/555-?0142|5125550142/);
     expect(db.store.get('solarBookings')!.get(ID)!.googleMeetLink).toBeUndefined();
   });
 

@@ -338,9 +338,9 @@ export async function POST(request: NextRequest) {
       timeZone: consultantTz,
       customerName: String(b.customerName ?? ''),
       customerEmail: String(b.customerEmail ?? ''),
-      customerPhone: outcome.customerPhone,
       address: String(b.customerAddress ?? ''),
-      leadUrl: `${appBaseUrl()}${solarLeadHref(leadId)}`,
+      consultantName: offered.name,
+      consultantPhone: String(b.consultantPhone ?? ''),
     });
     await announceBooking({
       id,
