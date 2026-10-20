@@ -20,8 +20,8 @@ vi.mock('next/navigation', () => ({ usePathname: () => env.pathname }));
 vi.mock('next/link', () => ({
   default: ({
     href,
-    replace: _replace,
-    scroll: _scroll,
+    replace,
+    scroll,
     children,
     ...rest
   }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string; replace?: boolean; scroll?: boolean } & {
@@ -29,6 +29,8 @@ vi.mock('next/link', () => ({
   }) => (
     <a
       href={href}
+      data-replace={String(!!replace)}
+      data-scroll={String(scroll)}
       {...rest}
       onClick={(event) => {
         rest.onClick?.(event);
