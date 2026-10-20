@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { FileText, ImageOff } from 'lucide-react';
 import { StatusDot } from '@/components/portal/admin-d/AdminUi';
 import { useAttachmentViewer } from '@/components/portal/rep/ImageViewer';
@@ -68,7 +68,16 @@ function usePhotoUrls(photos: SolarLeadView['photos']) {
  * consultation and who saved it. Read only; the admin sheet adds the status
  * actions in its footer.
  */
-export function LeadDetail({ lead, showRep = true }: { lead: SolarLeadView; showRep?: boolean }) {
+export function LeadDetail({
+  lead,
+  showRep = true,
+  reviewAction,
+}: {
+  lead: SolarLeadView;
+  showRep?: boolean;
+  /** The admin sheet's Mark reviewed, set beside the reason it needs review. */
+  reviewAction?: ReactNode;
+}) {
   const photo = usePhotoUrls(lead.photos);
   const viewer = useAttachmentViewer();
   const address = leadAddress(lead);
@@ -76,14 +85,19 @@ export function LeadDetail({ lead, showRep = true }: { lead: SolarLeadView; show
   const booking = lead.booking;
   const stage = stageLine(lead);
   const kwh = kwhLine(lead.monthlyKwh);
+  const addedPhotos = PHOTO_LABELS.filter(({ slot }) => lead.photos[slot]);
+  const missingPhotos = PHOTO_LABELS.filter(({ slot }) => !lead.photos[slot]);
 
   return (
     <div className={ops.detail}>
       {lead.needsReview && showRep ? (
-        <p className={css.reviewNote} role="note">
+        <div className={css.reviewNote} role="note">
           <span className={css.reviewBadge}>Needs review</span>
-          {lead.heavyShade ? 'Heavy shade on the roof. Look before the consultation.' : 'Look before the consultation.'}
-        </p>
+          <p className={css.reviewWhy}>
+            {lead.heavyShade ? 'Heavy shade on the roof. Look before the consultation.' : 'Look before the consultation.'}
+          </p>
+          {reviewAction}
+        </div>
       ) : null}
       <dl className={ops.fields}>
         <div>
@@ -132,8 +146,11 @@ export function LeadDetail({ lead, showRep = true }: { lead: SolarLeadView; show
 
       <section className={ops.section} aria-label="Photos">
         <h3 className={kit.sectionTitle}>Photos</h3>
+        {missingPhotos.length === PHOTO_LABELS.length ? (
+          <p className={css.quiet}>No photos added.</p>
+        ) : (
         <ul className={css.photos}>
-          {PHOTO_LABELS.map(({ slot, label }) => {
+          {addedPhotos.map(({ slot, label }) => {
             const p = photo(slot);
             return (
               <li key={slot}>
@@ -177,6 +194,10 @@ export function LeadDetail({ lead, showRep = true }: { lead: SolarLeadView; show
             );
           })}
         </ul>
+        )}
+        {missingPhotos.length > 0 && missingPhotos.length < PHOTO_LABELS.length ? (
+          <p className={css.quiet}>Not added: {missingPhotos.map((p) => p.label).join(', ')}.</p>
+        ) : null}
       </section>
 
       <section className={ops.section} aria-label="Consultation">

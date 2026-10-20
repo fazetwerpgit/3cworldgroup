@@ -372,7 +372,7 @@ export default function SolarLeads() {
             ))}
           </AdminSelect>
         </div>
-        <div className={ops.toolbarRow}>
+        <div className={cx(ops.toolbarRow, css.statusRow)}>
           <Seg<View>
             label="Status"
             value={view}
@@ -431,11 +431,14 @@ function LeadRow({ lead, onOpen }: { lead: SolarLeadView; onOpen: () => void }) 
   return (
     <button type="button" className={cx(css.row, closed && css.closed)} onClick={onOpen}>
       <span className={cx(css.cell, css.who)}>
-        <span className={css.whoLine}>
-          <span className={css.main}>{leadName(lead)}</span>
-          {lead.needsReview ? <span className={css.reviewBadge}>Needs review</span> : null}
-        </span>
-        {place ? <span className={css.sub}>{place}</span> : null}
+        <span className={css.main}>{leadName(lead)}</span>
+        {/* The flag rides the second line, so a long name keeps its room. */}
+        {lead.needsReview || place ? (
+          <span className={css.whoLine}>
+            {lead.needsReview ? <span className={css.reviewBadge}>Needs review</span> : null}
+            {place ? <span className={css.sub}>{place}</span> : null}
+          </span>
+        ) : null}
       </span>
       <span className={cx(css.cell, css.rep)}>
         <span className={css.main}>{lead.repName || 'Unknown rep'}</span>
@@ -461,8 +464,10 @@ function LeadRow({ lead, onOpen }: { lead: SolarLeadView; onOpen: () => void }) 
           <span className={cx(css.main, css.unbooked)}>Not booked</span>
         )}
       </span>
-      <span className={cx(css.cell, css.stage)} data-empty={stage ? undefined : true}>
-        <span className={css.main}>{stage ? stage.text : 'No stage'}</span>
+      <span className={cx(css.cell, css.stage)} data-empty={stage ? undefined : true} title={stage?.text}>
+        {/* The outcome leads ("Proposal sent"): the full "Appointment demoed: ..." never fits the column. */}
+        <span className={css.main}>{stage ? stage.short : 'No stage'}</span>
+        {stage && stage.short !== stage.text ? <span className={css.sub}>{STAGE_LABEL.appointment_demoed}</span> : null}
       </span>
       <span className={css.status}>
         <StatusDot tone={STATUS_TONE[lead.status]}>{STATUS_LABEL[lead.status]}</StatusDot>
@@ -690,16 +695,6 @@ export function LeadSheet({
           ))}
         </AdminSelect>
         {busy === 'stage' ? <span className={css.stagePickerLabel}>Saving…</span> : null}
-        {lead.needsReview ? (
-          <button
-            type="button"
-            className={cx(rep.btnSecondary, u.sm)}
-            disabled={busy !== null}
-            onClick={() => void markReviewed()}
-          >
-            {busy === 'review' ? 'Saving…' : 'Mark reviewed'}
-          </button>
-        ) : null}
         {lead.stageHistory.length ? (
           <ol className={css.stageHistory} aria-label="Stage history">
             {[...lead.stageHistory].reverse().slice(0, 8).map((entry, i) => (
@@ -710,7 +705,19 @@ export function LeadSheet({
           </ol>
         ) : null}
       </section>
-      <LeadDetail lead={lead} />
+      <LeadDetail
+        lead={lead}
+        reviewAction={
+          <button
+            type="button"
+            className={cx(rep.btnSecondary, u.sm)}
+            disabled={busy !== null}
+            onClick={() => void markReviewed()}
+          >
+            {busy === 'review' ? 'Saving…' : 'Mark reviewed'}
+          </button>
+        }
+      />
     </AdminSheet>
   );
 }

@@ -174,8 +174,10 @@
     padding: var(--s2) var(--s5);
   }
 
+  /* Stretch, not start: a start-aligned cell grows past its column and the
+     kWh / credit line ran into Consultation. */
   .bill {
-    justify-self: start;
+    justify-self: stretch;
     text-align: left;
   }
 
@@ -588,14 +590,18 @@ button.photo:focus-visible {
   white-space: nowrap;
 }
 
+/* The flag, why, and (admin sheet) Mark reviewed, read top to bottom. */
 .reviewNote {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  justify-items: start;
   gap: var(--s2);
   margin: 0;
   color: var(--c-text-2);
   font-size: var(--t-sm);
+}
+
+.reviewWhy {
+  margin: 0;
 }
 
 .whoLine {
@@ -624,6 +630,10 @@ button.photo:focus-visible {
     font-size: var(--t-sm);
     font-weight: 500;
   }
+
+  .stage .sub {
+    display: none;
+  }
 }
 
 .reviewToggle[aria-pressed='true'] {
@@ -631,10 +641,39 @@ button.photo:focus-visible {
   color: var(--c-amber);
 }
 
+/* Sits above LeadDetail in the sheet body: the same side gutter as the details. */
 .stagePicker {
   display: grid;
   gap: var(--s2);
-  margin-bottom: var(--s4);
+  padding: var(--s4) var(--s4) 0;
+}
+
+/* Status, Needs review and Export under the filters: on a phone the status
+   switch takes its own row so Open / Sold / Lost / All keep their labels. */
+.statusRow {
+  flex-wrap: wrap;
+}
+
+.statusRow > :first-child {
+  flex: 1 1 100%;
+}
+
+.statusRow > .reviewToggle {
+  flex: 1 1 auto;
+}
+
+@media (min-width: 1024px) {
+  .statusRow {
+    flex-wrap: nowrap;
+  }
+
+  .statusRow > :first-child {
+    flex: 0 1 auto;
+  }
+
+  .statusRow > .reviewToggle {
+    flex: none;
+  }
 }
 
 .stagePickerLabel {
