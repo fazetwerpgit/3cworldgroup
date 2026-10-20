@@ -15,21 +15,37 @@ import {
   STATUS_TONE,
   billLine,
   consultTime,
+  kwhLine,
   leadName,
   leadPlace,
   modeLabel,
+  roofLabel,
   savedDate,
+  stageLine,
 } from '@/components/portal/solar/leadDisplay';
 import {
   cancelBooking,
   fetchLeads,
+  setLeadStage,
   setLeadStatus,
+  updateLeadExtras,
   type SolarLeadStatus,
   type SolarLeadView,
 } from '@/components/portal/solar/solarClient';
 import { useFirstReveal } from '@/hooks/useFirstReveal';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { downloadCsv, toCsv } from '@/lib/export/csv';
+import {
+  OUTCOME_LABEL,
+  SOLAR_DEMO_OUTCOMES,
+  SOLAR_LEAD_STAGES,
+  STAGE_LABEL,
+  isSolarDemoOutcome,
+  isSolarLeadStage,
+  stageText,
+  type SolarDemoOutcome,
+  type SolarLeadStage,
+} from '@/lib/solar/leadStage';
 import rep from '@/components/portal/rep/rep.module.css';
 import ops from '@/components/portal/admin-ops/admin-ops.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
@@ -44,6 +60,37 @@ const IN_VIEW: Record<View, (status: SolarLeadStatus) => boolean> = {
   all: () => true,
 };
 
+/**
+ * One key per stage choice: 'none', 'appointment_demoed:{outcome}', or a later
+ * stage. The stage filter and the sheet's stage picker share it.
+ */
+function stageKey(lead: Pick<SolarLeadView, 'stage' | 'stageOutcome'>): string {
+  if (!lead.stage) return 'none';
+  return lead.stage === 'appointment_demoed' ? `appointment_demoed:${lead.stageOutcome ?? 'sale'}` : lead.stage;
+}
+
+const STAGE_CHOICES: { key: string; label: string; stage: SolarLeadStage; outcome?: SolarDemoOutcome }[] = [
+  ...SOLAR_DEMO_OUTCOMES.map((outcome) => ({
+    key: `appointment_demoed:${outcome}`,
+    label: `${STAGE_LABEL.appointment_demoed}: ${OUTCOME_LABEL[outcome]}`,
+    stage: 'appointment_demoed' as const,
+    outcome,
+  })),
+  ...SOLAR_LEAD_STAGES.filter((st) => st !== 'appointment_demoed').map((stage) => ({
+    key: stage,
+    label: STAGE_LABEL[stage],
+    stage,
+  })),
+];
+
+function parseStageKey(key: string): { stage: SolarLeadStage | null; outcome?: SolarDemoOutcome } | null {
+  if (key === 'none') return { stage: null };
+  const [stage, outcome] = key.split(':');
+  if (!isSolarLeadStage(stage)) return null;
+  if (stage === 'appointment_demoed') return isSolarDemoOutcome(outcome) ? { stage, outcome } : null;
+  return { stage };
+}
+
 const CSV_COLUMNS = [
   { key: 'first', label: 'First name' },
   { key: 'last', label: 'Last name' },
@@ -54,8 +101,13 @@ const CSV_COLUMNS = [
   { key: 'state', label: 'State' },
   { key: 'zip', label: 'ZIP' },
   { key: 'monthlyBill', label: 'Monthly bill' },
+  { key: 'monthlyKwh', label: 'Monthly kWh' },
   { key: 'credit', label: 'Credit' },
+  { key: 'roof', label: 'Roof' },
+  { key: 'heavyShadeText', label: 'Heavy shade' },
+  { key: 'needsReviewText', label: 'Needs review' },
   { key: 'status', label: 'Status' },
+  { key: 'stageText', label: 'Stage' },
   { key: 'consultation', label: 'Consultation' },
   { key: 'consultType', label: 'Consultation type' },
   { key: 'consultant', label: 'Consultant' },
@@ -68,8 +120,13 @@ function csvRow(lead: SolarLeadView): Record<string, unknown> {
   return {
     ...lead,
     monthlyBill: lead.monthlyBill ?? '',
+    monthlyKwh: lead.monthlyKwh ?? '',
     credit: lead.creditTier ? CREDIT_LABEL[lead.creditTier] : '',
+    roof: roofLabel(lead.roofType),
+    heavyShadeText: lead.heavyShade === null ? '' : lead.heavyShade ? 'Yes' : 'No',
+    needsReviewText: lead.needsReview ? 'Yes' : '',
     status: STATUS_LABEL[lead.status],
+    stageText: stageText(lead.stage, lead.stageOutcome),
     consultation: lead.booking ? consultTime(lead.booking) : '',
     consultType: lead.booking ? modeLabel(lead.booking.mode) : '',
     consultant: lead.booking?.consultantName ?? '',
@@ -99,6 +156,8 @@ export default function SolarLeads() {
   const [failed, setFailed] = useState(false);
   const [view, setView] = useState<View>('open');
   const [repFilter, setRepFilter] = useState('all');
+  const [stageFilter, setStageFilter] = useState('all');
+  const [reviewOnly, setReviewOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
   const [exportError, setExportError] = useState('');
@@ -152,10 +211,13 @@ export default function SolarLeads() {
         (lead) =>
           IN_VIEW[view](lead.status) &&
           (repFilter === 'all' || lead.repUid === repFilter) &&
+          (stageFilter === 'all' || stageKey(lead) === stageFilter) &&
+          (!reviewOnly || lead.needsReview) &&
           (!q || haystack(lead).includes(q))
       ),
-    [leads, view, repFilter, q]
+    [leads, view, repFilter, stageFilter, reviewOnly, q]
   );
+  const reviewCount = leads?.filter((lead) => lead.needsReview).length ?? 0;
   const openCount = leads?.filter((lead) => IN_VIEW.open(lead.status)).length;
   const reveal = useFirstReveal('3c:reveal:solar-leads', !!leads && leads.length > 0);
   const openLead = openId ? (leads?.find((lead) => lead.id === openId) ?? null) : null;
@@ -178,6 +240,8 @@ export default function SolarLeads() {
   const clearFilters = () => {
     setSearch('');
     setRepFilter('all');
+    setStageFilter('all');
+    setReviewOnly(false);
     setView('open');
   };
 
@@ -201,7 +265,7 @@ export default function SolarLeads() {
       </AdminEmpty>
     );
   } else if (shown.length === 0) {
-    const nothingOpen = view === 'open' && !q && repFilter === 'all';
+    const nothingOpen = view === 'open' && !q && repFilter === 'all' && stageFilter === 'all' && !reviewOnly;
     body = nothingOpen ? (
       <AdminEmpty
         title="Nothing open"
@@ -233,6 +297,7 @@ export default function SolarLeads() {
           <span>Rep</span>
           <span>Bill</span>
           <span>Consultation</span>
+          <span>Stage</span>
           <span>Status</span>
           <span />
         </div>
@@ -274,6 +339,25 @@ export default function SolarLeads() {
             </AdminSelect>
           </div>
         ) : null}
+        <div className={ops.filterSlot}>
+          <AdminSelect
+            value={stageFilter}
+            onChange={(value) => {
+              setStageFilter(value);
+              // Stages cut across Open / Sold / Lost: show every status while one is picked.
+              if (value !== 'all') setView('all');
+            }}
+            label="Filter by stage"
+          >
+            <option value="all">All stages</option>
+            <option value="none">No stage yet</option>
+            {STAGE_CHOICES.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </AdminSelect>
+        </div>
         <div className={ops.toolbarRow}>
           <Seg<View>
             label="Status"
@@ -286,6 +370,15 @@ export default function SolarLeads() {
               { value: 'all', label: 'All' },
             ]}
           />
+          <button
+            type="button"
+            className={cx(ops.btn, css.reviewToggle)}
+            aria-pressed={reviewOnly}
+            disabled={!reviewOnly && reviewCount === 0}
+            onClick={() => setReviewOnly((on) => !on)}
+          >
+            Needs review{reviewCount ? ` ${reviewCount}` : ''}
+          </button>
           <button
             type="button"
             className={cx(ops.btn, ops.iconOnlyPhone)}
@@ -303,7 +396,15 @@ export default function SolarLeads() {
         {body}
       </section>
 
-      {openLead ? <LeadSheet key={openLead.id} lead={openLead} onClose={closeSheet} onChanged={patchLead} /> : null}
+      {openLead ? (
+        <LeadSheet
+          key={openLead.id}
+          lead={openLead}
+          onClose={closeSheet}
+          onChanged={patchLead}
+          onReload={() => void load(true)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -312,10 +413,14 @@ function LeadRow({ lead, onOpen }: { lead: SolarLeadView; onOpen: () => void }) 
   const place = leadPlace(lead);
   const bill = billLine(lead.monthlyBill);
   const closed = lead.status === 'sold' || lead.status === 'lost';
+  const stage = stageLine(lead);
   return (
     <button type="button" className={cx(css.row, closed && css.closed)} onClick={onOpen}>
       <span className={cx(css.cell, css.who)}>
-        <span className={css.main}>{leadName(lead)}</span>
+        <span className={css.whoLine}>
+          <span className={css.main}>{leadName(lead)}</span>
+          {lead.needsReview ? <span className={css.reviewBadge}>Needs review</span> : null}
+        </span>
         {place ? <span className={css.sub}>{place}</span> : null}
       </span>
       <span className={cx(css.cell, css.rep)}>
@@ -324,7 +429,11 @@ function LeadRow({ lead, onOpen }: { lead: SolarLeadView; onOpen: () => void }) 
       </span>
       <span className={cx(css.cell, css.bill)}>
         <span className={css.main}>{bill || 'No bill'}</span>
-        <span className={css.sub}>{lead.creditTier ? CREDIT_LABEL[lead.creditTier] : 'Credit not picked'}</span>
+        <span className={css.sub}>
+          {[kwhLine(lead.monthlyKwh), lead.creditTier ? CREDIT_LABEL[lead.creditTier] : 'Credit not picked']
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
       </span>
       <span className={cx(css.cell, css.when)}>
         {lead.booking ? (
@@ -338,6 +447,9 @@ function LeadRow({ lead, onOpen }: { lead: SolarLeadView; onOpen: () => void }) 
           <span className={cx(css.main, css.unbooked)}>Not booked</span>
         )}
       </span>
+      <span className={cx(css.cell, css.stage)} data-empty={stage ? undefined : true}>
+        <span className={css.main}>{stage ? stage.text : 'No stage'}</span>
+      </span>
       <span className={css.status}>
         <StatusDot tone={STATUS_TONE[lead.status]}>{STATUS_LABEL[lead.status]}</StatusDot>
       </span>
@@ -346,16 +458,19 @@ function LeadRow({ lead, onOpen }: { lead: SolarLeadView; onOpen: () => void }) 
   );
 }
 
-type Busy = null | 'sold' | 'lost' | 'reopen' | 'cancel';
+type Busy = null | 'sold' | 'lost' | 'reopen' | 'cancel' | 'stage' | 'review';
 
 function LeadSheet({
   lead,
   onClose,
   onChanged,
+  onReload,
 }: {
   lead: SolarLeadView;
   onClose: () => void;
   onChanged: (id: string, patch: Partial<SolarLeadView>) => void;
+  /** Re-reads the list (a status change also moves the stage on the server). */
+  onReload: () => void;
 }) {
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState('');
@@ -364,7 +479,38 @@ function LeadSheet({
   const [confirmLost, setConfirmLost] = useState(false);
   const closed = lead.status === 'sold' || lead.status === 'lost';
 
-  const setStatus = async (status: SolarLeadStatus, which: Exclude<Busy, null | 'cancel'>) => {
+  const setStage = async (key: string) => {
+    const next = parseStageKey(key);
+    if (!next || key === stageKey(lead)) return;
+    setBusy('stage');
+    setError('');
+    const res = await setLeadStage(lead.id, next.stage, next.outcome);
+    setBusy(null);
+    if (!res.ok) {
+      setError(res.error || "Couldn't save the stage. Try again.");
+      return;
+    }
+    onChanged(lead.id, {
+      stage: res.data.stage,
+      stageOutcome: res.data.outcome,
+      status: res.data.status,
+      stageHistory: [...lead.stageHistory, res.data.entry],
+    });
+  };
+
+  const markReviewed = async () => {
+    setBusy('review');
+    setError('');
+    const res = await updateLeadExtras(lead.id, { needsReview: false });
+    setBusy(null);
+    if (!res.ok) {
+      setError(res.error || "Couldn't save. Try again.");
+      return;
+    }
+    onChanged(lead.id, { needsReview: false });
+  };
+
+  const setStatus = async (status: SolarLeadStatus, which: 'sold' | 'lost' | 'reopen') => {
     setBusy(which);
     setError('');
     const res = await setLeadStatus(lead.id, status);
@@ -376,6 +522,7 @@ function LeadSheet({
     setConfirmLost(false);
     // Mark lost cancelled the live booking with it (the slot is open again).
     onChanged(lead.id, { status: res.data.status, ...(res.data.cancelledBookingId ? { booking: null } : {}) });
+    onReload();
   };
 
   const cancel = async () => {
@@ -488,6 +635,37 @@ function LeadSheet({
         </div>
       }
     >
+      <section className={css.stagePicker} aria-label="Sales stage">
+        <span className={css.stagePickerLabel}>Sales stage</span>
+        <AdminSelect value={stageKey(lead)} onChange={(key) => void setStage(key)} label="Sales stage">
+          <option value="none">Not set</option>
+          {STAGE_CHOICES.map((c) => (
+            <option key={c.key} value={c.key}>
+              {c.label}
+            </option>
+          ))}
+        </AdminSelect>
+        {busy === 'stage' ? <span className={css.stagePickerLabel}>Saving…</span> : null}
+        {lead.needsReview ? (
+          <button
+            type="button"
+            className={cx(rep.btnSecondary, u.sm)}
+            disabled={busy !== null}
+            onClick={() => void markReviewed()}
+          >
+            {busy === 'review' ? 'Saving…' : 'Mark reviewed'}
+          </button>
+        ) : null}
+        {lead.stageHistory.length ? (
+          <ol className={css.stageHistory} aria-label="Stage history">
+            {[...lead.stageHistory].reverse().slice(0, 8).map((entry, i) => (
+              <li key={`${entry.at}-${i}`}>
+                {entry.stage ? stageText(entry.stage, entry.outcome ?? null) : 'Stage cleared'} · {savedDate(entry.at)}
+              </li>
+            ))}
+          </ol>
+        ) : null}
+      </section>
       <LeadDetail lead={lead} />
     </AdminSheet>
   );

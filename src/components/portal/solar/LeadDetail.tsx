@@ -15,9 +15,12 @@ import {
   STATUS_TONE,
   billLine,
   consultTime,
+  kwhLine,
   leadAddress,
   modeLabel,
+  roofLabel,
   savedDate,
+  stageLine,
 } from './leadDisplay';
 import css from './solar-leads.module.css';
 
@@ -61,7 +64,7 @@ function usePhotoUrls(photos: SolarLeadView['photos']) {
 }
 
 /**
- * A solar lead's details: contact, bill, the three photos (tap to view), the
+ * A solar lead's details: contact, bill, stage, roof and usage, the photos (tap to view), the
  * consultation and who saved it. Read only; the admin sheet adds the status
  * actions in its footer.
  */
@@ -71,15 +74,27 @@ export function LeadDetail({ lead, showRep = true }: { lead: SolarLeadView; show
   const address = leadAddress(lead);
   const bill = billLine(lead.monthlyBill);
   const booking = lead.booking;
+  const stage = stageLine(lead);
+  const kwh = kwhLine(lead.monthlyKwh);
 
   return (
     <div className={ops.detail}>
+      {lead.needsReview && showRep ? (
+        <p className={css.reviewNote} role="note">
+          <span className={css.reviewBadge}>Needs review</span>
+          {lead.heavyShade ? 'Heavy shade on the roof. Look before the consultation.' : 'Look before the consultation.'}
+        </p>
+      ) : null}
       <dl className={ops.fields}>
         <div>
           <dt>Status</dt>
           <dd>
             <StatusDot tone={STATUS_TONE[lead.status]}>{STATUS_LABEL[lead.status]}</StatusDot>
           </dd>
+        </div>
+        <div>
+          <dt>Stage</dt>
+          <dd>{stage ? <StatusDot tone={stage.tone}>{stage.text}</StatusDot> : 'Not set'}</dd>
         </div>
         <div>
           <dt>Phone</dt>
@@ -100,6 +115,18 @@ export function LeadDetail({ lead, showRep = true }: { lead: SolarLeadView; show
         <div>
           <dt>Credit</dt>
           <dd>{lead.creditTier ? CREDIT_LABEL[lead.creditTier] : 'Not picked'}</dd>
+        </div>
+        <div>
+          <dt>Usage</dt>
+          <dd>{kwh || 'Not entered'}</dd>
+        </div>
+        <div>
+          <dt>Roof</dt>
+          <dd>{roofLabel(lead.roofType) || 'Not entered'}</dd>
+        </div>
+        <div>
+          <dt>Heavy shade</dt>
+          <dd>{lead.heavyShade === null ? 'Not asked' : lead.heavyShade ? 'Yes' : 'No'}</dd>
         </div>
       </dl>
 

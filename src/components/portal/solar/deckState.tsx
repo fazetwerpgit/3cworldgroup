@@ -10,6 +10,7 @@ import {
   type PhotoSlot,
   type SolarMode,
 } from './solarClient';
+import type { RoofChoice } from './RoofTypeField';
 
 // One deck session: what the homeowner typed, carried across slides. Kept in
 // sessionStorage so a reload mid-pitch keeps the same clientId (the lead POST
@@ -25,6 +26,8 @@ export type DeckState = {
   years: number;
   lead: LeadFields;
   photos: Partial<Record<PhotoSlot, string>>;
+  /** The roof answer on the lead form; a blocked roof stops the lead. */
+  roofType: RoofChoice | null;
   leadId: string | null;
   creditTier: CreditTier | null;
   booking: Booking | null;
@@ -41,6 +44,7 @@ function freshState(): DeckState {
     years: 25,
     lead: { ...EMPTY_LEAD },
     photos: {},
+    roofType: null,
     leadId: null,
     creditTier: null,
     booking: null,

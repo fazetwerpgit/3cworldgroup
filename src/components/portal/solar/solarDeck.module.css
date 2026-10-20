@@ -1625,3 +1625,16 @@
     transform: none;
   }
 }
+
+/* Lead form: the roof question on the Home step (RoofTypeField). */
+.fieldRoof {
+  grid-column: 1 / -1;
+}
+.fieldRoof .chips {
+  margin-top: 0;
+}
+.fieldRoofLabel {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}

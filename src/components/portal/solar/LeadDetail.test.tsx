@@ -42,6 +42,14 @@ const lead: SolarLeadView = {
   createdAt: null,
   updatedAt: null,
   booking: null,
+  stage: null,
+  stageOutcome: null,
+  stageHistory: [],
+  roofType: null,
+  heavyShade: null,
+  needsReview: false,
+  monthlyKwh: null,
+  usage: null,
 };
 
 describe('LeadDetail attachments', () => {
@@ -76,5 +84,41 @@ describe('LeadDetail attachments', () => {
     const img = container.querySelector<HTMLImageElement>('img');
     expect(img?.src).toBe(urls.byPath[PANEL]);
     expect(container.querySelectorAll('a[aria-label$="(PDF)"]')).toHaveLength(1);
+  });
+
+  it('shows the stage, the app fields, the review badge and the meter slot', async () => {
+    const METER = 'form-attachments/rep1/solar-lead/up1/meter/';
+    urls.byPath[METER] = `https://signed.example/${METER}meter.jpg?sig=1`;
+    await act(async () => {
+      root.render(
+        <LeadDetail
+          lead={{
+            ...lead,
+            photos: { ...lead.photos, meter: METER },
+            stage: 'appointment_demoed',
+            stageOutcome: 'proposal_sent',
+            roofType: 'concrete_tile',
+            heavyShade: true,
+            needsReview: true,
+            monthlyKwh: 1250,
+          }}
+        />
+      );
+    });
+    const text = container.textContent ?? '';
+    expect(text).toContain('Needs review');
+    expect(text).toContain('Appointment demoed: Proposal sent');
+    expect(text).toContain('Concrete tile');
+    expect(text).toContain('1,250 kWh/mo');
+    expect(text).toContain('Electric meter');
+    expect(container.querySelector<HTMLImageElement>(`img[src="${urls.byPath[METER]}"]`)).not.toBeNull();
+  });
+
+  it('renders a lead with none of the new fields set', async () => {
+    await act(async () => {
+      root.render(<LeadDetail lead={lead} />);
+    });
+    expect(container.textContent).toContain('Not set');
+    expect(container.textContent).not.toContain('Needs review');
   });
 });
