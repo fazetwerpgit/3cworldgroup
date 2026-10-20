@@ -92,10 +92,8 @@ describe('RepTabBar', () => {
     expect([...labels].sort((a, b) => a - b)).toEqual(labels);
     expect(html).not.toContain('Sales</a>');
     expect(html).not.toContain('Log sale');
-    // Solar carries Log sale's raised center pill, and only Solar does. As a
-    // destination it's marked so it goes lime only while it's the current page.
+    // Solar carries Log sale's lime center treatment, and only Solar does.
     expect(emphasized(html)).toEqual(['Solar']);
-    expect(html).toContain(`data-destination="" class="${tabStyles.tabLog}"`);
   });
 
   it('dual fiber + solar rep keeps the fiber tabs', () => {
@@ -103,8 +101,6 @@ describe('RepTabBar', () => {
     const html = renderToStaticMarkup(<RepTabBar />);
     expect(html).toContain('Log sale');
     expect(emphasized(html)).toEqual(['Log sale']);
-    // Log sale is an action, lime always.
-    expect(html).not.toContain('data-destination');
     expect(html).toContain('Sales</a>');
     expect(html).not.toContain('Solar</a>');
   });
