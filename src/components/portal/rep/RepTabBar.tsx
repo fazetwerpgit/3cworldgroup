@@ -83,7 +83,10 @@ export function RepTabBar({
                   onPointerDown={current ? undefined : () => prefetchTab(tab.href)}
                 >
                   {tab.emphasis ? (
-                    <span className={s.tabLog}>
+                    // Log sale is an action, lime always. A destination in the center
+                    // (a solar-only rep's Solar) is lime only while it's the current
+                    // page, so the bar never shows two active tabs.
+                    <span data-destination={tab.log ? undefined : ''} className={s.tabLog}>
                       <Icon size={20} strokeWidth={2.5} aria-hidden="true" />
                     </span>
                   ) : (

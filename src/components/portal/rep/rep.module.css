@@ -822,6 +822,13 @@
   color: var(--c-on-lime);
 }
 
+/* A destination in the center slot keeps its raised pill but goes lime only
+   as the current page; elsewhere it sits quiet like the other tabs. */
+.tab:not([aria-current='page']) .tabLog[data-destination] {
+  background: var(--c-panel-hi);
+  color: var(--c-text-2);
+}
+
 /* ---------- overlays (portaled to <body>) ---------- */
 .backdrop {
   position: fixed;
