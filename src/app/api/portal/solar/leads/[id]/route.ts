@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { loadAvailability, requireSolarUser } from '@/lib/solar/server';
 import { hasLeadContact, hasLeadExtras, isCreditTier, isSolarLeadStatus, parseLeadContact, parseLeadExtras } from '@/lib/solar/leadFields';
@@ -121,6 +122,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const extras = parseLeadExtras(body);
     if (!extras.ok) return NextResponse.json({ error: extras.error }, { status: 400 });
     Object.assign(patch, extras.extras);
+    // monthlyKwh null: the usage helper was cleared, so the stored figure goes.
+    if (patch.monthlyKwh === null) patch.monthlyKwh = FieldValue.delete();
     if (contactAsked) {
       const contact = parseLeadContact(body);
       if (!contact.ok) return NextResponse.json({ error: contact.error }, { status: 400 });

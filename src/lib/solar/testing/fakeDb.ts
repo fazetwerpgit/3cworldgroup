@@ -100,7 +100,12 @@ export function createFakeDb(seed: Record<string, Record<string, Data>> = {}) {
         update: async (data: Data) => {
           const cur = coll(name).get(id);
           if (!cur) throw Object.assign(new Error('not found'), { code: 5 });
-          coll(name).set(id, { ...cur, ...data });
+          const next: Data = { ...cur, ...data };
+          // FieldValue.delete() removes the field, as Firestore does.
+          for (const [key, value] of Object.entries(data)) {
+            if ((value as { methodName?: string } | null)?.methodName === 'FieldValue.delete') delete next[key];
+          }
+          coll(name).set(id, next);
         },
         delete: async () => {
           coll(name).delete(id);

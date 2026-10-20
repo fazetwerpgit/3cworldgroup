@@ -72,7 +72,8 @@ export type LeadExtras = {
   roofType?: RoofType;
   heavyShade?: boolean;
   needsReview?: boolean;
-  monthlyKwh?: number;
+  /** null on PATCH clears the stored value (the usage helper was emptied). */
+  monthlyKwh?: number | null;
   usage?: Record<string, unknown>;
 };
 
@@ -102,7 +103,7 @@ const EXTRA_KEYS = ['roofType', 'heavyShade', 'needsReview', 'monthlyKwh', 'usag
 
 /** Whether the body carries any of the extras (PATCH picks its branch on it). */
 export function hasLeadExtras(body: Record<string, unknown>): boolean {
-  return EXTRA_KEYS.some((k) => body[k] !== undefined && body[k] !== null);
+  return body.monthlyKwh === null || EXTRA_KEYS.some((k) => body[k] !== undefined && body[k] !== null);
 }
 
 /**
@@ -113,6 +114,7 @@ export function hasLeadExtras(body: Record<string, unknown>): boolean {
 export function parseLeadExtras(body: Record<string, unknown>): { ok: true; extras: LeadExtras } | { ok: false; error: string } {
   const picked: Record<string, unknown> = {};
   for (const k of EXTRA_KEYS) if (body[k] !== undefined && body[k] !== null) picked[k] = body[k];
+  const clearsKwh = body.monthlyKwh === null;
   const res = extrasSchema.safeParse(picked);
   if (!res.success) {
     const issue = res.error.issues[0];
@@ -129,6 +131,7 @@ export function parseLeadExtras(body: Record<string, unknown>): { ok: true; extr
   if (v.needsReview !== undefined) extras.needsReview = v.needsReview;
   if (v.heavyShade === true) extras.needsReview = true;
   if (v.monthlyKwh !== undefined) extras.monthlyKwh = Math.round(v.monthlyKwh);
+  else if (clearsKwh) extras.monthlyKwh = null;
   // A JSON round trip keeps only plain data (no undefined, no prototypes).
   if (v.usage !== undefined) extras.usage = JSON.parse(JSON.stringify(v.usage)) as Record<string, unknown>;
   return { ok: true, extras };
@@ -262,7 +265,9 @@ export function parseLead(body: Record<string, unknown>, uid: string): { ok: tru
 
   const parsedExtras = parseLeadExtras(body);
   if (!parsedExtras.ok) return parsedExtras;
-  const { needsReview, ...extras } = parsedExtras.extras;
+  // A new lead has nothing to clear: monthlyKwh null just means none.
+  const { needsReview, monthlyKwh, ...rest } = parsedExtras.extras;
+  const extras = typeof monthlyKwh === 'number' ? { ...rest, monthlyKwh } : rest;
 
   const doorId = str(body.doorId, 128) || null;
   const campaignId = str(body.campaignId, 128) || null;

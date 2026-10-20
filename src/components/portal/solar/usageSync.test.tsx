@@ -24,7 +24,10 @@ const empty = () => ({ ...EMPTY_USAGE, months: [...EMPTY_USAGE.months] });
 
 describe('usagePatch / usageNeedsSave', () => {
   it('sends the entry, and monthlyKwh only once there is an estimate', () => {
-    expect(usagePatch(empty())).toEqual({ usage: { mode: 'monthly', monthly: null, daily: null, months: Array(12).fill(null) } });
+    expect(usagePatch(empty())).toEqual({
+      usage: { mode: 'monthly', monthly: null, daily: null, months: Array(12).fill(null) },
+      monthlyKwh: null,
+    });
     expect(usagePatch({ ...empty(), mode: 'daily', daily: 30 })).toMatchObject({ monthlyKwh: 913, usage: { mode: 'daily', daily: 30 } });
   });
 
@@ -121,6 +124,17 @@ describe('UsageSlide saves to the lead', () => {
     await act(async () => vi.advanceTimersByTime(USAGE_SAVE_DELAY_MS * 2));
     expect(api.updateLeadExtras).toHaveBeenCalledTimes(1);
     expect(deck.state.usageSaved).toBe(usageSaveKey('L1', deck.state.usage));
+  });
+
+  it('clearing the usage after a save sends monthlyKwh null', async () => {
+    render(true);
+    act(() => deck.update({ leadId: 'L1' }));
+    type('900');
+    await act(async () => vi.advanceTimersByTime(USAGE_SAVE_DELAY_MS));
+    type('');
+    await act(async () => vi.advanceTimersByTime(USAGE_SAVE_DELAY_MS));
+    expect(api.updateLeadExtras).toHaveBeenCalledTimes(2);
+    expect(api.updateLeadExtras).toHaveBeenLastCalledWith('L1', expect.objectContaining({ monthlyKwh: null }));
   });
 
   it('a failed save shows a quiet note, keeps the input, and retries on the next change', async () => {

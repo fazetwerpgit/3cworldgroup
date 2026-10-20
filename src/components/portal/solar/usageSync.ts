@@ -14,12 +14,12 @@ import { estimateUsage, type UsageEntry } from './usage';
 
 export const USAGE_SAVE_DELAY_MS = 1200;
 
-/** The lead fields for what was entered. monthlyKwh only once there is an estimate. */
+/** The lead fields for what was entered. monthlyKwh null (cleared on the lead) until there is an estimate. */
 export function usagePatch(entry: UsageEntry): Pick<LeadExtras, 'monthlyKwh' | 'usage'> {
   const estimate = estimateUsage(entry);
   return {
     usage: { mode: entry.mode, monthly: entry.monthly, daily: entry.daily, months: [...entry.months] },
-    ...(estimate ? { monthlyKwh: estimate.monthlyKwh } : {}),
+    monthlyKwh: estimate ? estimate.monthlyKwh : null,
   };
 }
 

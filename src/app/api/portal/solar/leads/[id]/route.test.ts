@@ -144,6 +144,17 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       expect(lead().monthlyKwh).toBeUndefined();
     });
 
+    it('monthlyKwh null removes the stored figure', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', monthlyKwh: 900, usage: USAGE, creditTier: null });
+      const res = await patch('rep1_c1', { monthlyKwh: null, usage: { mode: 'monthly', months: [] } });
+      expect(res.status).toBe(200);
+      expect('monthlyKwh' in lead()).toBe(false);
+      expect(lead()).toMatchObject({ usage: { mode: 'monthly', months: [] }, creditTier: null });
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', monthlyKwh: 900 });
+      expect((await patch('rep1_c1', { monthlyKwh: null })).status).toBe(200);
+      expect('monthlyKwh' in lead()).toBe(false);
+    });
+
     it('400s a bad monthlyKwh or a usage over 4KB', async () => {
       expect((await patch('rep1_c1', { monthlyKwh: -1 })).status).toBe(400);
       expect((await patch('rep1_c1', { monthlyKwh: 'lots' })).status).toBe(400);
