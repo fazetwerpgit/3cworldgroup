@@ -5,6 +5,13 @@ import { hasLeadContact, hasLeadExtras, isCreditTier, isSolarLeadStatus, parseLe
 import { SOLAR_STAGE_ROLES, readStage, stagePatchForStatus } from '@/lib/solar/leadStage';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
 
+const LEAD_CLOSED_ERROR = 'This lead is closed. Ask an admin to change its contact details.';
+
+/** Contact fixes stop once the lead has a stage or is sold / lost. */
+function leadIsClosed(data: Record<string, unknown>): boolean {
+  return readStage(data).stage !== null || data.status === 'sold' || data.status === 'lost';
+}
+
 /** What the deck's usage slide saves after the lead exists. */
 const USAGE_KEYS = ['monthlyKwh', 'usage'] as const;
 
@@ -127,9 +134,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (snap.get('repUid') !== gate.uid) {
         return NextResponse.json({ error: 'Only the rep who added this lead can change its contact details' }, { status: 403 });
       }
-      const data = (snap.data() ?? {}) as Record<string, unknown>;
-      if (readStage(data).stage !== null || data.status === 'sold' || data.status === 'lost') {
-        return NextResponse.json({ error: 'This lead is closed. Ask an admin to change its contact details.' }, { status: 409 });
+      if (leadIsClosed((snap.data() ?? {}) as Record<string, unknown>)) {
+        return NextResponse.json({ error: LEAD_CLOSED_ERROR }, { status: 409 });
       }
     }
     if (snap.get('repUid') !== gate.uid && !gate.isAdmin) {
@@ -139,7 +145,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
     }
-    await ref.update({ ...patch, updatedAt: new Date() });
+    if (!contactAsked) {
+      await ref.update({ ...patch, updatedAt: new Date() });
+      return NextResponse.json({ success: true, id });
+    }
+
+    // A contact fix on a booked lead also fixes the name and email its live
+    // booking carries (the consultant's notices and reminders read them), in
+    // one transaction with the lead.
+    const closedNow = await db.runTransaction(async (tx) => {
+      const lead = await tx.get(ref);
+      if (!lead.exists) return 'missing' as const;
+      const data = (lead.data() ?? {}) as Record<string, unknown>;
+      if (leadIsClosed(data)) return 'closed' as const;
+      const bookingId = typeof data.bookingId === 'string' ? data.bookingId : '';
+      const bookingRef = bookingId ? db.collection('solarBookings').doc(bookingId) : null;
+      const booking = bookingRef ? await tx.get(bookingRef) : null;
+      tx.update(ref, { ...patch, updatedAt: new Date() });
+      if (bookingRef && isLiveBooking(booking)) {
+        tx.update(bookingRef, {
+          customerName: `${patch.first ?? ''} ${patch.last ?? ''}`.trim(),
+          customerEmail: typeof patch.email === 'string' ? patch.email : '',
+        });
+      }
+      return 'ok' as const;
+    });
+    if (closedNow === 'missing') return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+    if (closedNow === 'closed') return NextResponse.json({ error: LEAD_CLOSED_ERROR }, { status: 409 });
     return NextResponse.json({ success: true, id });
   } catch (error) {
     console.error('Error updating solar lead:', error);

@@ -175,10 +175,23 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       });
     });
 
-    it('still open while booked', async () => {
+    it('still open while booked: the live booking gets the new name and email in the same write', async () => {
       db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'booked', bookingId: 'b1' });
+      db.store.set('solarBookings', new Map([['b1', {
+        leadId: 'rep1_c1', status: 'booked', customerName: 'Anna Ruis', customerEmail: 'old@example.com', consultantUid: 'con',
+      }]]));
       expect((await patch('rep1_c1', CONTACT)).status).toBe(200);
       expect(lead().first).toBe('Ana');
+      expect(db.store.get('solarBookings')!.get('b1')).toMatchObject({
+        customerName: 'Ana Ruiz', customerEmail: 'ana@example.com', status: 'booked', consultantUid: 'con',
+      });
+    });
+
+    it('leaves a cancelled booking alone', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'new', bookingId: 'b1' });
+      db.store.set('solarBookings', new Map([['b1', { status: 'cancelled', customerName: 'Anna Ruis', customerEmail: 'old@example.com' }]]));
+      expect((await patch('rep1_c1', CONTACT)).status).toBe(200);
+      expect(db.store.get('solarBookings')!.get('b1')).toMatchObject({ customerName: 'Anna Ruis', customerEmail: 'old@example.com' });
     });
 
     it('403s another rep, and an admin (owner rep only)', async () => {
