@@ -3,7 +3,13 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveSubject } from '@/lib/auth/viewAs';
 import { permissionsFor } from '@/types/auth';
-import { chicagoMonthBounds, formatMonthParam, parseLeaderboardMonth, periodBounds } from '@/lib/leaderboard/periods';
+import {
+  chicagoMonthBounds,
+  formatMonthParam,
+  parseLeaderboardMonth,
+  parseLeaderboardRange,
+  periodBounds,
+} from '@/lib/leaderboard/periods';
 import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
 import {
   bookingEvents,
@@ -24,6 +30,8 @@ import { LEGACY_CLOSED_STATUSES, leadMilestones } from '@/lib/solar/leadMileston
 const LIMIT_CAP = 100;
 // ?include=team: the solar team at 0, bounded like the fiber board's.
 const UNRANKED_CAP = 200;
+// ?campaignId=: the 3C Doors campaign id, capped as POST leads stores it.
+const CAMPAIGN_ID_MAX = 128;
 
 type Data = Record<string, unknown>;
 type Db = NonNullable<typeof adminDb>;
@@ -32,12 +40,19 @@ type Doc = { id: string; data: Data };
 const docsOf = (snap: { docs: { id: string; data: () => Data | undefined }[] }): Doc[] =>
   snap.docs.map((doc) => ({ id: doc.id, data: (doc.data() ?? {}) as Data }));
 
-/** Booked consults: every solarBookings doc, credited to its lead's owner (booking.repUid only without one). */
-async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>): Promise<SolarEvent[]> {
-  const bookings = docsOf(await db.collection('solarBookings').get());
+/** The lead's 3C Doors campaign, as POST leads stores it ('' when none). */
+const campaignOf = (data: Data): string => (typeof data.campaignId === 'string' ? data.campaignId.trim() : '');
+
+/**
+ * Booked consults: every solarBookings doc, credited to its lead's owner
+ * (booking.repUid only without one). With a campaign, only bookings whose lead
+ * was created under it (a booking with no lead doc is left out).
+ */
+async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>, campaignId: string | null): Promise<SolarEvent[]> {
+  const all = docsOf(await db.collection('solarBookings').get());
   const leadIds = [
     ...new Set(
-      bookings
+      all
         .filter(({ data }) => data.status !== 'cancelled')
         .map(({ data }) => bookingLeadId(data))
         .filter(Boolean)
@@ -45,10 +60,13 @@ async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>): P
   ];
   const leadSnaps = await Promise.all(leadIds.map((id) => db.collection('solarLeads').doc(id).get()));
   const leadRepUid = new Map<string, string>();
+  const leadCampaign = new Map<string, string>();
   leadSnaps.forEach((snap, index) => {
     const repUid = snap.exists ? snap.get('repUid') : null;
     if (typeof repUid === 'string' && repUid) leadRepUid.set(leadIds[index], repUid);
+    if (snap.exists) leadCampaign.set(leadIds[index], campaignOf({ campaignId: snap.get('campaignId') }));
   });
+  const bookings = campaignId ? all.filter(({ data }) => leadCampaign.get(bookingLeadId(data)) === campaignId) : all;
   return bookingEvents(countedBookings(bookings, leadRepUid, await names));
 }
 
@@ -57,20 +75,28 @@ async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>): P
  * queries (a stage at/after the demo, or an old sold/lost status), never the
  * whole solarLeads collection.
  */
-async function stageLeads(db: Db): Promise<Doc[]> {
+async function stageLeads(db: Db, campaignId: string | null): Promise<Doc[]> {
   const leadsRef = db.collection('solarLeads');
   const [byStage, byStatus] = await Promise.all([
     leadsRef.where('stage', 'in', [...SOLAR_LEAD_STAGES]).get(),
     leadsRef.where('status', 'in', [...LEGACY_CLOSED_STATUSES]).get(),
   ]);
   const leads = new Map<string, Doc>();
-  for (const doc of [...docsOf(byStage), ...docsOf(byStatus)]) leads.set(doc.id, doc);
+  for (const doc of [...docsOf(byStage), ...docsOf(byStatus)]) {
+    // The campaign filter runs here, in memory: no extra index.
+    if (!campaignId || campaignOf(doc.data) === campaignId) leads.set(doc.id, doc);
+  }
   return [...leads.values()];
 }
 
 /** Demoed or Closed: one event per lead that stands there (see stageLeads). */
-async function stageEvents(db: Db, metric: 'demoed' | 'closed', names: Promise<ReadonlyMap<string, string>>): Promise<SolarEvent[]> {
-  return leadEvents(await stageLeads(db), metric, await names, leadMilestones);
+async function stageEvents(
+  db: Db,
+  metric: 'demoed' | 'closed',
+  names: Promise<ReadonlyMap<string, string>>,
+  campaignId: string | null
+): Promise<SolarEvent[]> {
+  return leadEvents(await stageLeads(db, campaignId), metric, await names, leadMilestones);
 }
 
 /** The viewer's own count in the window, counted exactly as their row on that board (rankSolarBoard). */
@@ -80,6 +106,7 @@ function countFor(uid: string, events: SolarEvent[], window: { start: Date | nul
 
 /**
  * GET /api/portal/solar/leaderboard?period=week|month|year|all[&metric=set|demoed|closed][&month=YYYY-MM][&limit=N][&include=team]
+ *   [&from=YYYY-MM-DD&to=YYYY-MM-DD][&campaignId=ID]
  *
  * The solar board, by `metric` (default set):
  *  - set: booked consults (non-cancelled solarBookings, credited to the lead's
@@ -94,6 +121,13 @@ function countFor(uid: string, events: SolarEvent[], window: { start: Date | nul
  * `&view=mine` answers only the viewer's own Set, Demoed and Closed counts for
  * the period, in one request ({ period, mine: { set, demoed, closed } }), each
  * the number their row on that board shows (Home's solar numbers).
+ *
+ * `from` + `to` (both or neither, office clock: America/Chicago) replace
+ * `period` with a custom range: Chicago midnight starting `from` through the end
+ * of `to`, at most 366 days, `from` not after today. The answer then reads
+ * period 'range' with `from` and `to` echoed (no month stepper). `campaignId`
+ * counts only leads created under that 3C Doors campaign (Set: bookings on
+ * such leads). Both apply to every metric and to view=mine.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -117,22 +151,41 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(1, Number.isFinite(parsedLimit) ? parsedLimit : 100), LIMIT_CAP);
 
     const now = new Date();
+    const parsedRange = parseLeaderboardRange(params.get('from'), params.get('to'), now);
+    if (!parsedRange.ok) return NextResponse.json({ error: parsedRange.error }, { status: 400 });
+    const range = parsedRange.range;
+    const rawCampaign = params.get('campaignId');
+    const campaignId = rawCampaign === null ? null : rawCampaign.trim();
+    if (campaignId !== null && (!campaignId || campaignId.length > CAMPAIGN_ID_MAX)) {
+      return NextResponse.json({ error: `campaignId must be 1 to ${CAMPAIGN_ID_MAX} characters` }, { status: 400 });
+    }
+
     let monthView: { key: { year: number; month: number }; current: boolean } | null = null;
-    if (period === 'month') {
+    if (!range && period === 'month') {
       const parsed = parseLeaderboardMonth(params.get('month'), now);
       if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
       monthView = { key: parsed.month, current: parsed.current };
     }
-    const pastMonth = monthView !== null && !monthView.current;
-    const bounds = monthView ? chicagoMonthBounds(monthView.key) : periodBounds(period, now);
+    // A board that is over (a past month, a range ended before now) has no movement, spark or team.
+    const pastMonth = (monthView !== null && !monthView.current) || (range !== null && range.end <= now);
+    const bounds = range
+      ? { start: range.start, end: range.end }
+      : monthView
+        ? chicagoMonthBounds(monthView.key)
+        : periodBounds(period, now);
+    const echo = {
+      period: range ? ('range' as const) : period,
+      ...(range ? { from: range.from, to: range.to } : {}),
+      ...(campaignId ? { campaignId } : {}),
+    };
 
     if (params.get('view') === 'mine') {
       // Names never change a count: no users read.
       const noNames = Promise.resolve(new Map<string, string>());
       const window = { start: bounds?.start ?? null, end: bounds?.end ?? null };
-      const [setList, leads] = await Promise.all([setEvents(db, noNames), stageLeads(db)]);
+      const [setList, leads] = await Promise.all([setEvents(db, noNames, campaignId), stageLeads(db, campaignId)]);
       return NextResponse.json({
-        period,
+        ...echo,
         mine: {
           set: countFor(youUid, setList, window, now),
           demoed: countFor(youUid, leadEvents(leads, 'demoed', new Map(), leadMilestones), window, now),
@@ -155,7 +208,7 @@ export async function GET(request: NextRequest) {
     namesRead.catch(() => {});
     const [users, counted] = await Promise.all([
       usersRead,
-      metric === 'set' ? setEvents(db, namesRead) : stageEvents(db, metric, namesRead),
+      metric === 'set' ? setEvents(db, namesRead, campaignId) : stageEvents(db, metric, namesRead, campaignId),
     ]);
     const rankedRows = rankSolarBoard(
       counted,
@@ -193,9 +246,10 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({
-      period,
+      ...echo,
       metric: metric === 'set' ? 'booked' : metric,
       startDate: bounds?.start ?? new Date(0),
+      ...(range ? { endDate: range.end } : {}),
       ...(monthView && bounds
         ? { month: formatMonthParam(monthView.key), firstMonth: firstBookedMonth(counted), endDate: bounds.end }
         : {}),

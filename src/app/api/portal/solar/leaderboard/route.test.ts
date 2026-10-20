@@ -283,3 +283,127 @@ describe('GET /api/portal/solar/leaderboard — metric=set|demoed|closed', () =>
     expect((await (await get('?period=week&view=mine')).json()).mine).toEqual({ set: 0, demoed: 1, closed: 1 });
   });
 });
+
+describe('GET /api/portal/solar/leaderboard — from/to range and campaignId', () => {
+  const at = (iso: string) => new Date(iso);
+  // from=2026-10-01&to=2026-10-10 on the office clock (CDT, UTC-5):
+  // [2026-10-01T05:00:00Z, 2026-10-11T05:00:00Z).
+  const FIRST_MS = '2026-10-01T05:00:00.000Z';
+  const BEFORE = '2026-10-01T04:59:59.999Z';
+  const LAST_MS = '2026-10-11T04:59:59.999Z';
+  const AFTER = '2026-10-11T05:00:00.000Z';
+  const RANGE = '?from=2026-10-01&to=2026-10-10';
+
+  beforeEach(() => {
+    db.store.set('solarLeads', new Map(Object.entries({
+      // Set leads (booked only), one per campaign.
+      SA: { repUid: 'ana', status: 'booked', campaignId: 'camp-1' },
+      SC: { repUid: 'cy', status: 'booked', campaignId: 'camp-2' },
+      // Ana: demoed with a sale at the first instant of `from`.
+      D1: { repUid: 'ana', stage: 'appointment_demoed', stageOutcome: 'sale', campaignId: 'camp-1',
+        stageHistory: [{ stage: 'appointment_demoed', outcome: 'sale', at: at(FIRST_MS) }] },
+      // Cy: demoed (proposal sent) at the last instant of `to`.
+      D3: { repUid: 'cy', stage: 'appointment_demoed', stageOutcome: 'proposal_sent', campaignId: 'camp-2',
+        stageHistory: [{ stage: 'appointment_demoed', outcome: 'proposal_sent', at: at(LAST_MS) }] },
+      // Ben: a sale just after `to`, and an old sold lead just before `from`.
+      D2: { repUid: 'ben', stage: 'appointment_demoed', stageOutcome: 'sale',
+        stageHistory: [{ stage: 'appointment_demoed', outcome: 'sale', at: at(AFTER) }] },
+      D4: { repUid: 'ben', status: 'sold', statusChangedAt: at(BEFORE) },
+    })));
+    db.store.set('solarBookings', new Map(Object.entries({
+      inFirst: booking('ana', FIRST_MS, { leadId: 'SA' }),
+      outBefore: booking('ben', BEFORE),
+      inLast: booking('cy', LAST_MS, { leadId: 'SC' }),
+      outAfter: booking('ben', AFTER),
+    })));
+  });
+  const rows = async (q: string) =>
+    (await (await get(q)).json()).leaderboard.map((r: { uid: string; count: number }) => [r.uid, r.count]);
+
+  it('set: counts from the start of the from day through the end of the to day (Chicago)', async () => {
+    expect(await rows(RANGE)).toEqual([['ana', 1], ['cy', 1]]);
+    // One day either side lets the outside ones in.
+    expect(await rows('?from=2026-09-30&to=2026-10-11')).toEqual([['ben', 2], ['ana', 1], ['cy', 1]]);
+  });
+
+  it('demoed and closed: the same boundaries', async () => {
+    expect(await rows(`${RANGE}&metric=demoed`)).toEqual([['ana', 1], ['cy', 1]]);
+    expect(await rows(`${RANGE}&metric=closed`)).toEqual([['ana', 1]]);
+    expect(await rows('?from=2026-09-30&to=2026-10-11&metric=closed')).toEqual([['ben', 2], ['ana', 1]]);
+  });
+
+  it('overrides period and month, and answers period "range" with from, to and both bounds', async () => {
+    const body = await (await get(`${RANGE}&period=month&month=garbage&metric=demoed`)).json();
+    expect(body).toMatchObject({
+      period: 'range',
+      from: '2026-10-01',
+      to: '2026-10-10',
+      metric: 'demoed',
+      startDate: FIRST_MS,
+      endDate: AFTER,
+      totalRanked: 2,
+      currentUser: expect.objectContaining({ uid: 'ana', count: 1 }),
+    });
+    expect(body).not.toHaveProperty('month');
+    expect(body).not.toHaveProperty('firstMonth');
+    expect(body).not.toHaveProperty('campaignId');
+    expect(await rows(`${RANGE}&period=week`)).toEqual(await rows(RANGE));
+  });
+
+  it('a range that already ended has no team extras; one running through today keeps them', async () => {
+    const past = await (await get(`${RANGE}&include=team`)).json();
+    expect(past).not.toHaveProperty('unranked');
+    expect(past.leaderboard[0].spark).toEqual([]);
+    const live = await (await get('?from=2026-10-01&to=2026-10-15&include=team')).json();
+    expect(live).toHaveProperty('unranked');
+  });
+
+  it('view=mine: the same range for all three counts, matching the boards', async () => {
+    const body = await (await get(`${RANGE}&view=mine`)).json();
+    expect(body).toEqual({ period: 'range', from: '2026-10-01', to: '2026-10-10', mine: { set: 1, demoed: 1, closed: 1 } });
+    mockGate.mockResolvedValue({ ...solarRep, uid: 'ben' });
+    expect((await (await get(`${RANGE}&view=mine`)).json()).mine).toEqual({ set: 0, demoed: 0, closed: 0 });
+  });
+
+  it('refuses a bad range with 400 and a message', async () => {
+    const error = async (q: string) => {
+      const res = await get(q);
+      return [res.status, (await res.json()).error];
+    };
+    expect(await error('?from=2026-10-01')).toEqual([400, 'from and to are both required for a date range']);
+    expect(await error('?to=2026-10-01&view=mine')).toEqual([400, 'from and to are both required for a date range']);
+    expect(await error('?from=2026-13-01&to=2026-10-01')).toEqual([400, 'from must be a date as YYYY-MM-DD']);
+    expect(await error('?from=2026-10-01&to=tomorrow')).toEqual([400, 'to must be a date as YYYY-MM-DD']);
+    expect(await error('?from=2026-10-10&to=2026-10-01')).toEqual([400, 'from must be on or before to']);
+    expect(await error('?from=2025-01-01&to=2026-10-01')).toEqual([400, 'A date range can span at most 366 days']);
+    expect(await error('?from=2026-10-16&to=2026-10-20')).toEqual([400, 'from cannot be in the future']);
+  });
+
+  it('keeps the same gating', async () => {
+    mockGate.mockResolvedValue(fiberRep);
+    expect((await get(RANGE)).status).toBe(403);
+    mockGate.mockResolvedValue({ ok: false, error: 'Unauthorized', status: 401 });
+    expect((await get(`${RANGE}&view=mine`)).status).toBe(401);
+  });
+
+  it('campaignId: counts only leads created under that campaign, on every metric and view=mine', async () => {
+    expect(await rows(`${RANGE}&campaignId=camp-1`)).toEqual([['ana', 1]]);
+    expect(await rows(`${RANGE}&campaignId=camp-2`)).toEqual([['cy', 1]]);
+    expect(await rows(`${RANGE}&campaignId=camp-1&metric=demoed`)).toEqual([['ana', 1]]);
+    expect(await rows(`${RANGE}&campaignId=camp-2&metric=demoed`)).toEqual([['cy', 1]]);
+    expect(await rows(`${RANGE}&campaignId=camp-2&metric=closed`)).toEqual([]);
+    expect(await rows('?period=all&campaignId=nope')).toEqual([]);
+    const board = await (await get(`${RANGE}&campaignId=camp-1&metric=closed`)).json();
+    expect(board).toMatchObject({ campaignId: 'camp-1', leaderboard: [expect.objectContaining({ uid: 'ana', count: 1 })] });
+    expect((await (await get(`${RANGE}&campaignId=camp-2&view=mine`)).json())).toEqual({
+      period: 'range', from: '2026-10-01', to: '2026-10-10', campaignId: 'camp-2', mine: { set: 0, demoed: 0, closed: 0 },
+    });
+    // Without a range: the period still applies.
+    expect((await (await get('?period=week&campaignId=camp-1&view=mine')).json()).mine).toEqual({ set: 0, demoed: 0, closed: 0 });
+  });
+
+  it('campaignId: refuses an empty or oversized id', async () => {
+    expect((await get('?campaignId=')).status).toBe(400);
+    expect((await get(`?campaignId=${'x'.repeat(129)}`)).status).toBe(400);
+  });
+});
