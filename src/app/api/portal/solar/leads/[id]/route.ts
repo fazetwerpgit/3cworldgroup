@@ -51,6 +51,8 @@ async function isSolarConsultant(gate: { uid: string; solarRole?: string | null 
 //     slot, else 'new'. 'lost' also cancels the lead's live booking in the
 //     same transaction (slot freed, bookingId cleared, rep and consultant
 //     notified) and answers its id as cancelledBookingId. 'sold' keeps it.
+//     'lost' on a lead already closed for low credit is a no-op (no stage
+//     written, so it stays a pre-qualification decline) answering its status.
 //     The sales-dept stage follows (lib/solar/leadStage stagePatchForStatus):
 //     sold = appointment_demoed + sale, lost = appointment_demoed + no_sale,
 //     reopen clears a closing stage. Finer stages: PATCH .../{id}/stage.
@@ -88,12 +90,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         const cancelled = await db.runTransaction(async (tx) => {
           const lead = await tx.get(ref);
           if (!lead.exists) return undefined;
+          const data = (lead.data() ?? {}) as Record<string, unknown>;
+          // Already closed at pre-qualification: it stays a low-credit decline
+          // (no stage written, so it never counts as Demoed).
+          if (isLowCreditDecline(data)) return { unchanged: String(data.status ?? 'lost') } as const;
           const statusPatch = {
             status: 'lost',
             statusChangedAt: now,
             statusChangedBy: gate.uid,
             updatedAt: now,
-            ...stagePatchForStatus((lead.data() ?? {}) as Record<string, unknown>, 'lost', gate.uid, now),
+            ...stagePatchForStatus(data, 'lost', gate.uid, now),
           };
           const bookingId = typeof lead.get('bookingId') === 'string' ? (lead.get('bookingId') as string) : '';
           const bookingRef = bookingId ? db.collection('solarBookings').doc(bookingId) : null;
@@ -107,6 +113,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           return null;
         });
         if (cancelled === undefined) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+        if (cancelled && 'unchanged' in cancelled) {
+          return NextResponse.json({ success: true, id, status: cancelled.unchanged });
+        }
         if (cancelled) await announceBookingCancel(cancelled, gate.uid, 'lost');
         return NextResponse.json({
           success: true, id, status: 'lost', ...(cancelled ? { cancelledBookingId: cancelled.id } : {}),

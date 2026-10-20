@@ -404,6 +404,16 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       expect(lead()).toEqual({ repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit', statusChangedBy: 'rep1' });
     });
 
+    it("an admin's Mark lost on it is a no-op: no stage, so it never counts as Demoed", async () => {
+      const before = { repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit', statusChangedBy: 'rep1' };
+      db.store.get('solarLeads')!.set('rep1_c1', { ...before });
+      mockGate.mockResolvedValue(ADMIN);
+      const res = await patch('rep1_c1', { status: 'lost' });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true, id: 'rep1_c1', status: 'lost' });
+      expect(lead()).toEqual(before);
+    });
+
     it('keeps a demo account lead as demo', async () => {
       db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'demo', creditTier: 'purchase_600' });
       expect(await (await patch('rep1_c1', { noSaleReason: 'low_credit' })).json()).toMatchObject({ status: 'demo' });
