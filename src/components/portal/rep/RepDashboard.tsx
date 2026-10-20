@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
-import { ChevronRight, CircleHelp, Plus, RotateCw, Timer, Video } from 'lucide-react';
+import { ChevronRight, CircleHelp, Plus, RotateCw, Sun, Timer, Video } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAsReadOnly } from '@/contexts/ViewAsContext';
-import { isSolarOnlyUser } from '@/types';
+import { isDualRoleUser, isSolarOnlyUser } from '@/types';
 import { OpsQueuesPanel } from '@/components/portal/admin-d/OpsQueuesPanel';
 import { useCountUp } from '@/hooks/useCountUp';
 import { useRepDashboard, type RepChallenge, type RepSectionKey, type Section } from '@/hooks/useRepDashboard';
@@ -34,8 +34,10 @@ import { CalloutNudge } from './CalloutNudge';
 import type { CarrierReportStamp } from '@/lib/fiberReport/reportFreshness';
 import { PayHelpSheet } from './PayHelpSheet';
 import { AskEntryCard } from './AskEntryCard';
-import { SolarEntryCard } from './SolarEntryCard';
+import { SOLAR_DECK_HREF, SolarEntryCard } from './SolarEntryCard';
 import { SolarHomeNextConsult } from '@/components/portal/solar/SolarMyLeads';
+import { useSolarWeek, type SolarWeekState } from '@/components/portal/solar/useSolarWeek';
+import type { SolarWeekCounts } from '@/components/portal/solar/solarClient';
 import { InstallDateSheet } from './InstallDateSheet';
 import { ScanIntroCard } from './ScanIntroCard';
 import { LOG_SALE_HREF } from './repNav';
@@ -455,6 +457,107 @@ function WeekStrip({
   );
 }
 
+// ---------------------------------------------------------------- solar
+
+const SOLAR_WEEK_CELLS: { key: keyof SolarWeekCounts; label: string; noun: string }[] = [
+  { key: 'set', label: 'Set', noun: 'appointments set' },
+  { key: 'demoed', label: 'Demoed', noun: 'demoed' },
+  { key: 'closed', label: 'Closed', noun: 'closed' },
+];
+
+/**
+ * Solar this week: Set | Demoed | Closed, the numbers the solar board counts
+ * (its "Your week" card). A dual rep's version sits under pay as "Solar", with
+ * the next consultation (`next`) and Open deck; a solar-only rep's is "This
+ * week" under the deck, which already carries both.
+ */
+export function SolarWeekSection({
+  variant,
+  state,
+  timeLeft,
+  onRetry,
+  next,
+}: {
+  variant: 'dual' | 'solarOnly';
+  state: SolarWeekState;
+  timeLeft: string;
+  onRetry: () => void;
+  next?: ReactNode;
+}) {
+  const dual = variant === 'dual';
+  const id = dual ? 'solar-week-h' : 'week-h';
+  return (
+    <section
+      className={d.card}
+      style={rise(dual ? 2 : 1)}
+      aria-labelledby={id}
+      aria-busy={state.status === 'loading' || undefined}
+      data-part="solar-week"
+    >
+      <SectionHead id={id} title={dual ? 'Solar' : 'This week'}>
+        <span className={d.clock}>
+          <Timer size={17} aria-hidden="true" />
+          {timeLeft}
+        </span>
+      </SectionHead>
+
+      {state.status === 'error' ? (
+        <div className={`${d.surface} ${d.half}`}>
+          <Failed what="your solar numbers" onRetry={onRetry} className={d.cellFailed} />
+        </div>
+      ) : (
+        <div className={`${d.halves} ${d.thirds}`}>
+          {SOLAR_WEEK_CELLS.map((cell) => (
+            <div key={cell.key} className={`${d.surface} ${d.half}`}>
+              {state.status === 'loading' ? (
+                <span className={`${s.skel} ${d.skelStat}`} aria-label={`Loading ${cell.noun}`} />
+              ) : (
+                <p className={`${d.big} ${d.statBig}`} aria-label={`${state.data[cell.key]} ${cell.noun} this week`}>
+                  {state.data[cell.key]}
+                </p>
+              )}
+              <p className={d.cap} aria-hidden={state.status === 'ready' || undefined}>
+                {cell.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {dual ? (
+        <div className={d.solarMore}>
+          {next}
+          <Link href={SOLAR_DECK_HREF} className={`${s.btnSecondary} ${d.solarDeck}`}>
+            <Sun size={18} aria-hidden="true" />
+            Open deck
+          </Link>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/** The live section: one read for all three numbers. */
+function SolarWeekSlot({ variant, timeLeft }: { variant: 'dual' | 'solarOnly'; timeLeft: string }) {
+  const { state, retry } = useSolarWeek();
+  return (
+    <SolarWeekSection
+      variant={variant}
+      state={state}
+      timeLeft={timeLeft}
+      onRetry={retry}
+      next={
+        variant === 'dual' ? (
+          <SolarHomeNextConsult
+            pending={<span className={`${s.skel} ${d.skelNext}`} aria-label="Loading your next consultation" />}
+            empty={<p className={d.solarQuiet}>No consultation booked yet.</p>}
+          />
+        ) : null
+      }
+    />
+  );
+}
+
 // ---------------------------------------------------------------- today
 
 export type TodayItem =
@@ -641,6 +744,8 @@ export interface RepHomeViewProps {
   solarEntry?: ReactNode;
   /** A solar-only rep's next consultation (SolarHomeNextConsult), under the deck; renders nothing when none is ahead. */
   solarNext?: ReactNode;
+  /** Solar this week (SolarWeekSection): under pay for a dual rep, under the deck for a solar-only rep. */
+  solarWeek?: ReactNode;
   /**
    * A solar-only rep (a solar role, no fiber role): Home leads with Solar and
    * drops every fiber part (pay, the week, recent sales). The fiber props are
@@ -709,8 +814,10 @@ export function RepHomeView(p: RepHomeViewProps) {
             ) : null}
           </div>
 
-          {/* Ask 3C right under pay: on a phone that is the first screen, where a
-              rep stuck at a door sees it without scrolling. Solar beside it. */}
+          {/* A dual rep's solar section directly under pay, then Ask 3C: on a
+              phone still near the first screen, where a rep stuck at a door
+              sees it. Anyone else with solar:read keeps the Solar row. */}
+          {p.solarWeek}
           {p.askEntry}
           {p.solarEntry}
 
@@ -769,6 +876,7 @@ function SolarHomeView(p: RepHomeViewProps) {
           {p.solarEntry}
           {/* Close under the deck (one Solar group); empty when none is ahead. */}
           {p.solarNext ? <div className={d.solarNext}>{p.solarNext}</div> : null}
+          {p.solarWeek}
           {p.askEntry}
         </div>
 
@@ -805,6 +913,8 @@ export function RepDashboard() {
   // A solar rep with no fiber role (and no platform role): Home is about
   // solar, and the fiber sections are neither fetched nor shown.
   const solarOnly = isSolarOnlyUser(user);
+  // A fiber rep who also sells solar: a solar section under pay, not the Solar row.
+  const dual = !readOnly && isDualRoleUser(user) && hasPermission('solar:read');
   const data = useRepDashboard({ fiber: !solarOnly });
   const { retry } = data;
   const [helpOpen, setHelpOpen] = useState(false);
@@ -933,9 +1043,15 @@ export function RepDashboard() {
         solarOnly={solarOnly}
         // Solar-only: the lead block even while viewing as the rep (Open deck,
         // a write, drops out on its own). Otherwise the row, never in view-as.
-        solarEntry={solarOnly ? <SolarEntryCard variant="lead" /> : readOnly ? null : <SolarEntryCard />}
+        solarEntry={solarOnly ? <SolarEntryCard variant="lead" /> : readOnly || dual ? null : <SolarEntryCard />}
         // The viewer's own leads, so never in view-as (they would be the owner's).
         solarNext={solarOnly && !readOnly ? <SolarHomeNextConsult /> : null}
+        // The viewer's own numbers, so never in view-as.
+        solarWeek={
+          readOnly ? null : dual ? (
+            <SolarWeekSlot variant="dual" timeLeft={weekTimeLeft(now)} />
+          ) : null
+        }
         queues={showQueues ? <OpsQueuesPanel title="Needs attention" /> : null}
         onHelp={() => setHelpOpen(true)}
         onRetry={onRetry}

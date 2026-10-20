@@ -281,6 +281,14 @@ export function fetchLeads({ mine = false }: { mine?: boolean } = {}) {
   return call<{ leads: SolarLeadView[] }>(`/api/portal/solar/leads${mine ? '?mine=1' : ''}`);
 }
 
+/** The viewer's solar numbers this week: Set, Demoed, Closed, each as the solar board counts it. */
+export type SolarWeekCounts = { set: number; demoed: number; closed: number };
+
+/** One request for all three (the solar board's view=mine), the numbers its "Your week" card shows one at a time. */
+export function fetchSolarWeek() {
+  return call<{ mine: SolarWeekCounts }>('/api/portal/solar/leaderboard?period=week&view=mine');
+}
+
 /** Admin only. Reopening ('new') comes back as 'booked' while a booking holds a slot. */
 /** Admin only. 'lost' also cancels the lead's live booking (answered as cancelledBookingId). */
 export function setLeadStatus(id: string, status: SolarLeadStatus) {

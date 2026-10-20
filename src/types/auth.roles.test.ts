@@ -14,6 +14,7 @@ import {
   RolePermissions,
   permissionsFor,
   isSolarOnlyUser,
+  isDualRoleUser,
 } from './auth';
 import type { FieldRole, PlatformRole } from './auth';
 
@@ -179,6 +180,21 @@ describe('permissionsFor (solar)', () => {
     expect(isSolarOnlyUser({ fieldRole: 'entry_rep' })).toBe(false);
     expect(isSolarOnlyUser({ solarRole: 'bogus' })).toBe(false);
     expect(isSolarOnlyUser(null)).toBe(false);
+  });
+
+  it('isDualRoleUser: both / fiber-only / solar-only', () => {
+    const both = { solarRole: 'virtual_closer', fieldRole: 'entry_rep' } as const;
+    const fiberOnly = { fieldRole: 'entry_rep' } as const;
+    const solarOnly = { solarRole: 'virtual_closer' } as const;
+    expect([both, fiberOnly, solarOnly].map((u) => [isDualRoleUser(u), isSolarOnlyUser(u)])).toEqual([
+      [true, false],
+      [false, false],
+      [false, true],
+    ]);
+    expect(isDualRoleUser({ solarRole: 'virtual_closer', role: 'admin' })).toBe(true);
+    expect(isDualRoleUser({ solarRole: 'bogus', fieldRole: 'entry_rep' })).toBe(false);
+    expect(isDualRoleUser({ solarRole: null, fieldRole: 'entry_rep' })).toBe(false);
+    expect(isDualRoleUser(null)).toBe(false);
   });
 
   it('keeps solar off every field role', () => {

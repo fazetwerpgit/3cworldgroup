@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AdminFailed, StatusDot } from '@/components/portal/admin-d/AdminUi';
 import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
@@ -61,14 +61,17 @@ export function SolarNextConsult({ leads, onOpen }: { leads: SolarLeadView[] | n
 }
 
 /**
- * Home's next consultation for a solar-only rep: the Solar page's own block
- * and data (useMyLeads), its tap opening the same read-only sheet. Nothing
- * while loading, on a failed read, or with no consultation ahead.
+ * Home's next consultation: the Solar page's own block and data (useMyLeads),
+ * its tap opening the same read-only sheet. Nothing on a failed read. A
+ * solar-only rep's Home shows nothing else either; a dual rep's solar section
+ * passes `pending` (shown while loading) and `empty` (no consultation ahead).
  */
-export function SolarHomeNextConsult() {
-  const { leads } = useMyLeads();
+export function SolarHomeNextConsult({ pending = null, empty = null }: { pending?: ReactNode; empty?: ReactNode } = {}) {
+  const { leads, failed } = useMyLeads();
   const [openId, setOpenId] = useState<string | null>(null);
   const open = openId ? (leads?.find((lead) => lead.id === openId) ?? null) : null;
+  if (!leads) return failed ? null : <>{pending}</>;
+  if (!nextConsult(leads)?.booking) return <>{empty}</>;
   return (
     <>
       <SolarNextConsult leads={leads} onOpen={setOpenId} />

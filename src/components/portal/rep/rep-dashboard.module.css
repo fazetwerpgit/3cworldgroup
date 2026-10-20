@@ -442,6 +442,46 @@
   margin-top: var(--s1);
 }
 
+/* ---------- solar this week: Set | Demoed | Closed ---------- */
+/* The week's halves, three across, the numbers a size down so the section
+   stays smaller than the fiber week under it. */
+.thirds {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.big.statBig {
+  font-size: 56px;
+}
+
+.skelStat {
+  display: block;
+  width: 60%;
+  height: 48px;
+}
+
+.solarMore {
+  display: grid;
+  gap: var(--s2);
+  margin-top: var(--s2);
+}
+
+.solarDeck {
+  width: 100%;
+}
+
+.skelNext {
+  display: block;
+  height: 112px;
+  border-radius: 16px;
+}
+
+.solarQuiet {
+  margin: var(--s1) 0;
+  color: var(--c-text-2);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
 /* ---------- this week: rank | challenge ---------- */
 .clock {
   display: inline-flex;

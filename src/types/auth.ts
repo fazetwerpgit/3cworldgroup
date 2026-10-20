@@ -421,6 +421,17 @@ export function isSolarOnlyUser(
   return !!user && isSolarRole(user.solarRole) && !user.fieldRole && !user.role;
 }
 
+/**
+ * A rep on both sides: a solar role plus a fiber field role (or a platform
+ * role). Home carries a solar section, the + offers fiber or solar, and the
+ * Board and Sales remember the last side picked.
+ */
+export function isDualRoleUser(
+  user: { role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown } | null | undefined
+): boolean {
+  return !!user && isSolarRole(user.solarRole) && !!(user.fieldRole || user.role);
+}
+
 // User document type
 export interface User {
   uid: string;

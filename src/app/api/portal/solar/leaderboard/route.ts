@@ -53,11 +53,11 @@ async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>): P
 }
 
 /**
- * Demoed or Closed: only the leads at or past the demo are read (two
- * single-field `in` queries: a stage at/after the demo, or an old sold/lost
- * status), never the whole solarLeads collection.
+ * The leads at or past the demo, for Demoed and Closed: two single-field `in`
+ * queries (a stage at/after the demo, or an old sold/lost status), never the
+ * whole solarLeads collection.
  */
-async function stageEvents(db: Db, metric: 'demoed' | 'closed', names: Promise<ReadonlyMap<string, string>>): Promise<SolarEvent[]> {
+async function stageLeads(db: Db): Promise<Doc[]> {
   const leadsRef = db.collection('solarLeads');
   const [byStage, byStatus] = await Promise.all([
     leadsRef.where('stage', 'in', [...SOLAR_LEAD_STAGES]).get(),
@@ -65,7 +65,17 @@ async function stageEvents(db: Db, metric: 'demoed' | 'closed', names: Promise<R
   ]);
   const leads = new Map<string, Doc>();
   for (const doc of [...docsOf(byStage), ...docsOf(byStatus)]) leads.set(doc.id, doc);
-  return leadEvents([...leads.values()], metric, await names, leadMilestones);
+  return [...leads.values()];
+}
+
+/** Demoed or Closed: one event per lead that stands there (see stageLeads). */
+async function stageEvents(db: Db, metric: 'demoed' | 'closed', names: Promise<ReadonlyMap<string, string>>): Promise<SolarEvent[]> {
+  return leadEvents(await stageLeads(db), metric, await names, leadMilestones);
+}
+
+/** The viewer's own count in the window, counted exactly as their row on that board (rankSolarBoard). */
+function countFor(uid: string, events: SolarEvent[], window: { start: Date | null; end: Date | null }, now: Date): number {
+  return rankSolarBoard(events, window, { now, withHistory: false }).find((row) => row.uid === uid)?.count ?? 0;
 }
 
 /**
@@ -80,6 +90,10 @@ async function stageEvents(db: Db, metric: 'demoed' | 'closed', names: Promise<R
  * lead got there. solar:read only (a solar role, or admin/owner): 403 for
  * everyone else. Same periods and month stepper as GET /api/portal/leaderboard.
  * Each row carries `count` (and `booked`, the same number, on the Set board).
+ *
+ * `&view=mine` answers only the viewer's own Set, Demoed and Closed counts for
+ * the period, in one request ({ period, mine: { set, demoed, closed } }), each
+ * the number their row on that board shows (Home's solar numbers).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -111,6 +125,21 @@ export async function GET(request: NextRequest) {
     }
     const pastMonth = monthView !== null && !monthView.current;
     const bounds = monthView ? chicagoMonthBounds(monthView.key) : periodBounds(period, now);
+
+    if (params.get('view') === 'mine') {
+      // Names never change a count: no users read.
+      const noNames = Promise.resolve(new Map<string, string>());
+      const window = { start: bounds?.start ?? null, end: bounds?.end ?? null };
+      const [setList, leads] = await Promise.all([setEvents(db, noNames), stageLeads(db)]);
+      return NextResponse.json({
+        period,
+        mine: {
+          set: countFor(youUid, setList, window, now),
+          demoed: countFor(youUid, leadEvents(leads, 'demoed', new Map(), leadMilestones), window, now),
+          closed: countFor(youUid, leadEvents(leads, 'closed', new Map(), leadMilestones), window, now),
+        },
+      });
+    }
 
     // Users and the board's own reads go out together; names join at the end.
     const usersRead = db.collection('users').where('status', '==', 'active').get().then(docsOf);

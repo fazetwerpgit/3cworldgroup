@@ -255,4 +255,31 @@ describe('GET /api/portal/solar/leaderboard — metric=set|demoed|closed', () =>
     vi.mocked(resolveSubject).mockResolvedValueOnce({ ok: true, viewing: true, uid: 'ben', ownerUid: 'own', target: {} as never });
     expect((await (await get('?period=week&metric=closed')).json()).currentUser).toMatchObject({ uid: 'ben', count: 1 });
   });
+
+  it('view=mine: the viewer\'s Set, Demoed and Closed in one answer, each matching their row on that board', async () => {
+    db.store.set('solarBookings', new Map(Object.entries({
+      b1: booking('cy', '2026-10-12T15:00:00Z'),
+      b2: booking('ana', '2026-10-13T15:00:00Z'),
+      b3: booking('ana', '2026-10-14T15:00:00Z', { status: 'cancelled' }),
+    })));
+    const body = await (await get('?period=week&view=mine')).json();
+    expect(body).toEqual({ period: 'week', mine: { set: 1, demoed: 2, closed: 1 } });
+    for (const [metric, key] of [['set', 'set'], ['demoed', 'demoed'], ['closed', 'closed']] as const) {
+      const board = await (await get(`?period=week&metric=${metric}`)).json();
+      expect(board.currentUser?.count ?? 0).toBe(body.mine[key]);
+    }
+  });
+
+  it('view=mine: zeros for a rep with nothing this week, never reads users, and keeps gating and view-as', async () => {
+    mockGate.mockResolvedValue({ ...solarRep, uid: 'cy' });
+    const spy = vi.spyOn(db, 'collection');
+    spy.mockClear();
+    expect((await (await get('?period=week&view=mine')).json()).mine).toEqual({ set: 1, demoed: 0, closed: 0 });
+    expect(spy.mock.calls.map(([name]) => name)).not.toContain('users');
+    mockGate.mockResolvedValue(fiberRep);
+    expect((await get('?period=week&view=mine')).status).toBe(403);
+    mockGate.mockResolvedValue({ ok: true, uid: 'own', name: 'Owner', role: 'owner', solarRole: null, demoAccount: false, isAdmin: true, isOwner: true });
+    vi.mocked(resolveSubject).mockResolvedValueOnce({ ok: true, viewing: true, uid: 'ben', ownerUid: 'own', target: {} as never });
+    expect((await (await get('?period=week&view=mine')).json()).mine).toEqual({ set: 0, demoed: 1, closed: 1 });
+  });
 });
