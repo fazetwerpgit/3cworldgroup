@@ -33,8 +33,9 @@ export function LeaderboardRoute() {
   // solar board alone, a fiber rep with no solar role never sees solar.
   const boards = boardsFor({ solarRead: hasPermission('solar:read'), solarOnly: isSolarOnlyUser(user) });
   // A viewer with both boards reopens on the side they last picked (stored on
-  // this device; Fiber when there is none or storage is blocked). A viewer
-  // with one board never reads it: `boards` alone decides.
+  // this device; Fiber when there is none or storage is blocked). The stored
+  // side is always read, but a viewer with one board ignores it: `boards`
+  // alone decides.
   const [picked, setPicked] = useRememberedSide(BOARD_SIDE_KEY);
   const board: LeaderboardBoard = boards.includes(picked) ? picked : boards[0];
   const solar = board === 'solar';
