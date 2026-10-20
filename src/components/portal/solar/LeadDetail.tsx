@@ -71,10 +71,13 @@ function usePhotoUrls(photos: SolarLeadView['photos']) {
 export function LeadDetail({
   lead,
   showRep = true,
+  showStage = true,
   reviewAction,
 }: {
   lead: SolarLeadView;
   showRep?: boolean;
+  /** Off where the stage is already shown as a picker (the admin sheet). */
+  showStage?: boolean;
   /** The admin sheet's Mark reviewed, set beside the reason it needs review. */
   reviewAction?: ReactNode;
 }) {
@@ -106,10 +109,12 @@ export function LeadDetail({
             <StatusDot tone={STATUS_TONE[lead.status]}>{STATUS_LABEL[lead.status]}</StatusDot>
           </dd>
         </div>
-        <div>
-          <dt>Stage</dt>
-          <dd>{stage ? <StatusDot tone={stage.tone}>{stage.text}</StatusDot> : 'Not set'}</dd>
-        </div>
+        {showStage ? (
+          <div>
+            <dt>Stage</dt>
+            <dd>{stage ? <StatusDot tone={stage.tone}>{stage.text}</StatusDot> : 'Not set'}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Phone</dt>
           <dd>{lead.phone ? <a className={css.link} href={`tel:${lead.phone.replace(/[^\d+]/g, '')}`}>{lead.phone}</a> : 'None'}</dd>

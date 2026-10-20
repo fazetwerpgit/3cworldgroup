@@ -48,7 +48,6 @@ import {
 } from '@/lib/solar/leadStage';
 import rep from '@/components/portal/rep/rep.module.css';
 import ops from '@/components/portal/admin-ops/admin-ops.module.css';
-import u from '@/components/portal/admin-d/admin-ui.module.css';
 import css from '@/components/portal/solar/solar-leads.module.css';
 
 type View = 'open' | 'sold' | 'lost' | 'all';
@@ -621,7 +620,7 @@ export function LeadSheet({
         {closed ? (
           <button
             type="button"
-            className={cx(rep.btnSecondary, u.sm)}
+            className={ops.btn}
             disabled={busy !== null}
             onClick={() => void setStatus('new', 'reopen')}
           >
@@ -631,7 +630,7 @@ export function LeadSheet({
           <div className={css.footRow}>
             <button
               type="button"
-              className={cx(rep.btnSecondary, u.sm)}
+              className={ops.btn}
               disabled={busy !== null}
               onClick={() => {
                 if (lead.booking) {
@@ -644,7 +643,7 @@ export function LeadSheet({
             </button>
             <button
               type="button"
-              className={cx(rep.btnPrimary, u.primarySm)}
+              className={ops.btnLime}
               disabled={busy !== null}
               onClick={() => void setStatus('sold', 'sold')}
             >
@@ -707,10 +706,11 @@ export function LeadSheet({
       </section>
       <LeadDetail
         lead={lead}
+        showStage={false}
         reviewAction={
           <button
             type="button"
-            className={cx(rep.btnSecondary, u.sm)}
+            className={ops.btn}
             disabled={busy !== null}
             onClick={() => void markReviewed()}
           >
