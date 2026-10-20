@@ -43,17 +43,24 @@ describe('GET /api/portal/solar/consultants', () => {
 
   it('serves the saved consultants by name once any exist', async () => {
     db.store.set('solarAvailability', new Map(Object.entries({
-      zed: { name: 'Zed', tz: 'America/Denver', slotMin: 30, modes: { virtual: [{ day: 1, start: '09:00', end: '10:00' }] } },
+      zed: {
+        name: 'Zed', tz: 'America/Denver', slotMin: 30, modes: { virtual: [{ day: 1, start: '09:00', end: '10:00' }] },
+        meetLink: 'https://meet.google.com/abc-defg-hij', phone: '+15125550142',
+      },
       amy: { name: 'Amy', tz: 'America/New_York', slotMin: 90, modes: {} },
     })));
     const body = await (await get()).json();
     expect(body).toEqual({
       seeded: false,
       consultants: [
-        { consultantUid: 'amy', name: 'Amy', tz: 'America/New_York', slotMin: 90, modes: { virtual: [], in_person: [] } },
+        {
+          consultantUid: 'amy', name: 'Amy', tz: 'America/New_York', slotMin: 90, modes: { virtual: [], in_person: [] },
+          meetLink: '', phone: '',
+        },
         {
           consultantUid: 'zed', name: 'Zed', tz: 'America/Denver', slotMin: 30,
           modes: { virtual: [{ day: 1, start: '09:00', end: '10:00' }], in_person: [] },
+          meetLink: 'https://meet.google.com/abc-defg-hij', phone: '+15125550142',
         },
       ],
     });

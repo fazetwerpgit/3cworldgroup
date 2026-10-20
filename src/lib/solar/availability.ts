@@ -36,6 +36,10 @@ export interface SolarAvailability {
   tz: string;
   slotMin: number;
   modes: Partial<Record<SolarMode, WeeklyWindow[]>>;
+  /** "https://meet.google.com/abc-defg-hij", or '' / absent when not set (lib/solar/consultantContact). */
+  meetLink?: string;
+  /** "+15125550142", or '' / absent when not set. */
+  phone?: string;
 }
 
 /** A taken slot. `end` defaults to start + 60 min. Cancelled bookings never block. */

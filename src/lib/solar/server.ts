@@ -13,6 +13,7 @@ import {
   type WeeklyWindow,
 } from '@/lib/solar/availability';
 import { LEGACY_TZ } from '@/lib/solar/timezones';
+import { storedConsultantPhone, storedMeetLink } from '@/lib/solar/consultantContact';
 
 export const JACOB_EMAIL = 'jmyers@3cworldgroup.com';
 
@@ -88,6 +89,8 @@ export function availabilityOf(id: string, data: Record<string, unknown>): Solar
     tz: typeof data.tz === 'string' && data.tz ? data.tz : LEGACY_TZ,
     slotMin: Number(data.slotMin) > 0 ? Number(data.slotMin) : SOLAR_SLOT_MIN,
     modes: { virtual: cleanWindows(modes.virtual), in_person: cleanWindows(modes.in_person) },
+    meetLink: storedMeetLink(data.meetLink),
+    phone: storedConsultantPhone(data.phone),
   };
 }
 

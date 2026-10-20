@@ -60,7 +60,7 @@ describe('PUT /api/portal/solar/consultants/[uid]', () => {
   it('first save writes every seed consultant, so saving one keeps the others', async () => {
     const res = await put('jac', HOURS);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ consultant: { consultantUid: 'jac', name: 'Jacob', ...HOURS } });
+    expect(await res.json()).toEqual({ consultant: { consultantUid: 'jac', name: 'Jacob', ...HOURS, meetLink: '', phone: '' } });
     expect([...saved().keys()].sort()).toEqual(['jac', 'own']);
     expect(saved().get('jac')).toMatchObject({ name: 'Jacob', ...HOURS, updatedBy: 'adm' });
     // The owner keeps the seed hours, now saved.
@@ -89,6 +89,52 @@ describe('PUT /api/portal/solar/consultants/[uid]', () => {
   it('names the consultant from the users doc, never the body', async () => {
     await put('sam', { ...HOURS, name: 'Mallory' });
     expect(saved().get('sam')!.name).toBe('Sam Closer');
+  });
+});
+
+describe('PUT /api/portal/solar/consultants/[uid]: Meet link and phone', () => {
+  const MEET = 'https://meet.google.com/abc-defg-hij';
+
+  it('normalizes and saves both, and answers the stored values', async () => {
+    const res = await put('sam', { ...HOURS, meetLink: '  Meet.Google.com/ABC-DEFG-HIJ?authuser=0 ', phone: '(512) 555-0142' });
+    expect(res.status).toBe(200);
+    expect((await res.json()).consultant).toMatchObject({ meetLink: MEET, phone: '+15125550142' });
+    expect(saved().get('sam')).toMatchObject({ meetLink: MEET, phone: '+15125550142' });
+  });
+
+  it('refuses a link that is not Google Meet, with the field and a clear message, and writes nothing', async () => {
+    for (const meetLink of ['https://zoom.us/j/123', 'https://meet.google.com.evil.co/abc-defg-hij', 'javascript:alert(1)']) {
+      const res = await put('sam', { ...HOURS, meetLink });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: 'Paste a Google Meet link, like https://meet.google.com/abc-defg-hij',
+        field: 'meetLink',
+      });
+    }
+    expect(saved().size).toBe(0);
+  });
+
+  it('refuses a phone that is not phone-shaped', async () => {
+    const res = await put('sam', { ...HOURS, phone: 'call me maybe' });
+    expect(res.status).toBe(400);
+    expect((await res.json()).field).toBe('phone');
+    expect(saved().size).toBe(0);
+  });
+
+  it('keeps saved values when the keys are left out, and clears them on empty', async () => {
+    await put('sam', { ...HOURS, meetLink: MEET, phone: '512-555-0142' });
+    await put('sam', { ...HOURS, tz: 'America/New_York' });
+    expect(saved().get('sam')).toMatchObject({ tz: 'America/New_York', meetLink: MEET, phone: '+15125550142' });
+    const res = await put('sam', { ...HOURS, meetLink: '', phone: null });
+    expect((await res.json()).consultant).toMatchObject({ meetLink: '', phone: '' });
+    expect(saved().get('sam')).not.toHaveProperty('meetLink');
+    expect(saved().get('sam')).not.toHaveProperty('phone');
+  });
+
+  it('is admin only for contact details too', async () => {
+    mockGate.mockResolvedValue({ ok: false, error: 'Forbidden: admin access required', status: 403 });
+    expect((await put('sam', { ...HOURS, meetLink: MEET })).status).toBe(403);
+    expect(saved().size).toBe(0);
   });
 });
 

@@ -3,27 +3,40 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
 import { parseAvailability, type SolarAvailability } from '@/lib/solar/availability';
 import { availabilityOf, loadConsultants } from '@/lib/solar/server';
+import { parseConsultantContact, storedConsultantPhone, storedMeetLink } from '@/lib/solar/consultantContact';
 
 const COLLECTION = 'solarAvailability';
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
 
 type Params = { params: Promise<{ uid: string }> };
 
-/** The stored shape of one consultant (the doc id is the uid). */
-function docOf(a: Pick<SolarAvailability, 'name' | 'tz' | 'slotMin' | 'modes'>, by: string, at: Date) {
+/**
+ * The stored shape of one consultant (the doc id is the uid). meetLink and
+ * phone are written only when set, so a consultant without them has no keys.
+ */
+function docOf(
+  a: Pick<SolarAvailability, 'name' | 'tz' | 'slotMin' | 'modes' | 'meetLink' | 'phone'>,
+  by: string,
+  at: Date
+) {
   return {
     name: a.name,
     tz: a.tz,
     slotMin: a.slotMin,
     modes: { virtual: a.modes.virtual ?? [], in_person: a.modes.in_person ?? [] },
+    ...(a.meetLink ? { meetLink: a.meetLink } : {}),
+    ...(a.phone ? { phone: a.phone } : {}),
     updatedBy: by,
     updatedAt: at,
   };
 }
 
-// PUT /api/portal/solar/consultants/{uid} {tz, slotMin, modes} -> 200
-// {consultant}. Admin only. Adds or replaces that person's hours; the name is
-// read from their users doc, never from the body. While the collection is
+// PUT /api/portal/solar/consultants/{uid} {tz, slotMin, modes[, meetLink][, phone]}
+// -> 200 {consultant}. Admin only. Adds or replaces that person's hours; the
+// name is read from their users doc, never from the body. meetLink (a Google
+// Meet link only) and phone go in the homeowner's confirmation email: each is
+// normalized (lib/solar/consultantContact), '' or null clears it, and a key
+// left out keeps what is saved. 400 {error, field} when one is not valid. While the collection is
 // empty the GET serves the seed, so this write also saves every other seed
 // consultant: saving one must not drop the rest.
 export async function PUT(request: NextRequest, { params }: Params) {
@@ -34,8 +47,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
   const { uid } = await params;
   if (!UID.test(uid)) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-  const parsed = parseAvailability(await request.json().catch(() => null));
+  const body: unknown = await request.json().catch(() => null);
+  const parsed = parseAvailability(body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  const contact = parseConsultantContact(body);
+  if (!contact.ok) return NextResponse.json({ error: contact.error, field: contact.field }, { status: 400 });
 
   try {
     const user = await db.collection('users').doc(uid).get();
@@ -46,16 +62,25 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // Resolved before the transaction: the seed needs the owner/Jacob lookup.
     const { consultants: seed, seeded } = await loadConsultants();
     const now = new Date();
-    const consultant = { consultantUid: uid, name, ...parsed.value };
     const coll = db.collection(COLLECTION);
-    await db.runTransaction(async (tx) => {
+    const consultant = await db.runTransaction(async (tx) => {
       const existing = await tx.get(coll.limit(1));
+      const mine = await tx.get(coll.doc(uid));
+      const kept = mine.exists ? mine.data() ?? {} : {};
+      const next = {
+        consultantUid: uid,
+        name,
+        ...parsed.value,
+        meetLink: contact.value.meetLink ?? storedMeetLink(kept.meetLink),
+        phone: contact.value.phone ?? storedConsultantPhone(kept.phone),
+      };
       if (seeded && existing.empty) {
         for (const s of seed) {
           if (s.consultantUid !== uid) tx.set(coll.doc(s.consultantUid), docOf(s, gate.uid, now));
         }
       }
-      tx.set(coll.doc(uid), docOf(consultant, gate.uid, now));
+      tx.set(coll.doc(uid), docOf(next, gate.uid, now));
+      return next;
     });
     return NextResponse.json({ consultant });
   } catch (error) {
