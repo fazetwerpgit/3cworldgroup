@@ -374,10 +374,19 @@ function Deck() {
           <ChevronLeft size={20} aria-hidden />
           Back
         </button>
-        <button type="button" className={s.navNext} onClick={next} disabled={index === ORDER.length - 1}>
-          Next
-          <ChevronRight size={20} aria-hidden />
-        </button>
+        {editing ? (
+          // Opened from the review's Edit: the way back, for the slides with no
+          // save of their own (usage, the bill calculator) as much as the rest.
+          <button type="button" className={s.navNext} onClick={() => afterEdit('review')}>
+            Back to review
+            <ChevronRight size={20} aria-hidden />
+          </button>
+        ) : (
+          <button type="button" className={s.navNext} onClick={next} disabled={index === ORDER.length - 1}>
+            Next
+            <ChevronRight size={20} aria-hidden />
+          </button>
+        )}
       </nav>
     </div>
   );
