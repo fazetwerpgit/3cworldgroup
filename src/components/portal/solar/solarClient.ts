@@ -3,10 +3,12 @@ import { randomHex } from '@/lib/randomHex';
 import type { SolarLeadView } from '@/lib/solar/leadView';
 import type { LeadExtras, SolarLeadStatus } from '@/lib/solar/leadFields';
 import type { SolarDemoOutcome, SolarLeadStage, SolarStageEntry } from '@/lib/solar/leadStage';
+import { dayKeyIn, dayLabelIn, timeIn, withinBookingWindow, zoneAbbr } from '@/lib/solar/timezones';
 
 // Client half of the solar deck: the authed calls to /api/portal/solar/** and
 // the pure formatting helpers the slides share (tested in solarClient.test.ts).
 
+/** The default zone for the helpers below; the booking slide passes the customer's. */
 export const SOLAR_TZ = 'America/Los_Angeles';
 
 export type SolarMode = 'virtual' | 'in_person';
@@ -53,52 +55,34 @@ export function formatWholeDollars(value: number): string {
   return wholeDollars.format(Math.round(Number.isFinite(value) ? value : 0));
 }
 
-const dayKeyFmt = new Intl.DateTimeFormat('en-CA', {
-  timeZone: SOLAR_TZ,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-const dayLabelFmt = new Intl.DateTimeFormat('en-US', {
-  timeZone: SOLAR_TZ,
-  weekday: 'long',
-  month: 'short',
-  day: 'numeric',
-});
-const timeFmt = new Intl.DateTimeFormat('en-US', {
-  timeZone: SOLAR_TZ,
-  hour: 'numeric',
-  minute: '2-digit',
-});
-
-/** 2026-10-20 for the Pacific calendar day the instant falls on. */
-export function pacificDayKey(iso: string): string {
-  return dayKeyFmt.format(new Date(iso));
+/** 2026-10-20 for the calendar day the instant falls on in `tz` (Pacific by default). */
+export function pacificDayKey(iso: string, tz: string = SOLAR_TZ): string {
+  return dayKeyIn(iso, tz);
 }
 
-/** "9:00 AM" in Pacific time. */
-export function formatSlotTime(iso: string): string {
-  return timeFmt.format(new Date(iso));
+/** "9:00 AM" in `tz` (the customer's zone on the booking slide). */
+export function formatSlotTime(iso: string, tz: string = SOLAR_TZ): string {
+  return timeIn(iso, tz);
 }
 
-/** "Tuesday, Oct 20 at 9:00 AM PT". */
-export function formatSlotLong(iso: string): string {
-  return `${dayLabelFmt.format(new Date(iso))} at ${formatSlotTime(iso)} PT`;
+/** "Tuesday, Oct 20 at 9:00 AM ET" in `tz`, with its zone label. */
+export function formatSlotLong(iso: string, tz: string = SOLAR_TZ): string {
+  return `${dayLabelIn(iso, tz)} at ${timeIn(iso, tz)} ${zoneAbbr(tz, iso)}`;
 }
 
 /**
- * Slots grouped by Pacific day, then by start: each time shows once. The sort
- * is stable, so consultants that share a start keep the server's preference
- * order.
+ * Slots grouped by calendar day in `tz` (the customer's zone), then by start:
+ * each time shows once. The sort is stable, so consultants that share a start
+ * keep the server's preference order.
  */
-export function groupSlotsByDay(slots: SolarSlot[]): SlotDay[] {
+export function groupSlotsByDay(slots: SolarSlot[], tz: string = SOLAR_TZ): SlotDay[] {
   const sorted = [...slots].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   const days: SlotDay[] = [];
   for (const slot of sorted) {
-    const key = pacificDayKey(slot.start);
+    const key = dayKeyIn(slot.start, tz);
     let day = days[days.length - 1];
     if (!day || day.key !== key) {
-      day = { key, label: dayLabelFmt.format(new Date(slot.start)), times: [] };
+      day = { key, label: dayLabelIn(slot.start, tz), times: [] };
       days.push(day);
     }
     const time = day.times[day.times.length - 1];
@@ -106,6 +90,11 @@ export function groupSlotsByDay(slots: SolarSlot[]): SlotDay[] {
     else day.times.push({ start: slot.start, candidates: [slot] });
   }
   return days;
+}
+
+/** Only slots inside the booking window (through day 14 in `tz`); the server enforces it too. */
+export function slotsInWindow(slots: SolarSlot[], tz: string, now: Date = new Date()): SolarSlot[] {
+  return slots.filter((x) => withinBookingWindow(new Date(x.start), now, tz));
 }
 
 export type LeadFields = {
@@ -181,8 +170,9 @@ export function setCreditTier(id: string, creditTier: CreditTier) {
   });
 }
 
-export function fetchAvailability(mode: SolarMode, from: Date, to: Date) {
-  const q = new URLSearchParams({ mode, from: from.toISOString(), to: to.toISOString() });
+/** `tz`: the customer's zone, which the server's 14-day window counts days in. */
+export function fetchAvailability(mode: SolarMode, from: Date, to: Date, tz?: string) {
+  const q = new URLSearchParams({ mode, from: from.toISOString(), to: to.toISOString(), ...(tz ? { tz } : {}) });
   return call<{ slots: SolarSlot[] }>(`/api/portal/solar/availability?${q}`);
 }
 
@@ -193,10 +183,17 @@ export type BookingResponse = {
   consultantName?: string;
   start?: string;
   mode?: SolarMode;
+  customerTz?: string;
   duplicate?: boolean;
 };
 
-export function createBooking(payload: { leadId: string; mode: SolarMode; consultantUid: string; start: string }) {
+export function createBooking(payload: {
+  leadId: string;
+  mode: SolarMode;
+  consultantUid: string;
+  start: string;
+  customerTz?: string;
+}) {
   return call<BookingResponse>('/api/portal/solar/bookings', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -204,7 +201,7 @@ export function createBooking(payload: { leadId: string; mode: SolarMode; consul
 }
 
 export type BookTimeResult =
-  | { ok: true; id: string; slot: SolarSlot }
+  | { ok: true; id: string; slot: SolarSlot; customerTz?: string }
   | { ok: false; taken: boolean; error: string };
 
 /**
@@ -216,10 +213,17 @@ export async function bookTime(
   time: SlotTime,
   leadId: string,
   mode: SolarMode,
-  book: typeof createBooking = createBooking
+  book: typeof createBooking = createBooking,
+  customerTz?: string
 ): Promise<BookTimeResult> {
   for (const slot of time.candidates.slice(0, 2)) {
-    const res = await book({ leadId, mode, consultantUid: slot.consultantUid, start: slot.start });
+    const res = await book({
+      leadId,
+      mode,
+      consultantUid: slot.consultantUid,
+      start: slot.start,
+      ...(customerTz ? { customerTz } : {}),
+    });
     if (res.ok) {
       // A retry answers the lead's existing booking: show that one.
       const d = res.data;
@@ -227,7 +231,10 @@ export async function bookTime(
         d.start && d.consultantUid
           ? { consultantUid: d.consultantUid, name: d.consultantName || slot.name, start: d.start, end: d.start === slot.start ? slot.end : '' }
           : slot;
-      return { ok: true, id: d.id, slot: held };
+      return { ok: true, id: d.id, slot: held, ...(d.customerTz ? { customerTz: d.customerTz } : {}) };
+    }
+    if (res.status === 400 && res.error === 'slot_unavailable') {
+      return { ok: false, taken: false, error: 'That time is no longer offered. Pick another within the next 14 days.' };
     }
     if (res.status !== 409) return { ok: false, taken: false, error: res.error };
   }

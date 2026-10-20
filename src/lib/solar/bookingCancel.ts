@@ -3,7 +3,7 @@
 // follow. Server only (admin SDK).
 import { createNotification } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
-import { formatSlotPT } from '@/lib/solar/availability';
+import { bookingZones, formatWhen, formatWhenForConsultant } from '@/lib/solar/timezones';
 import { solarLeadHref } from '@/lib/solar/leadView';
 import { consultantNotice, ownerNotificationsEnabled, resolveConsultants } from '@/lib/solar/server';
 
@@ -23,6 +23,9 @@ export interface CancelledBooking {
   customerName: string;
   start: string;
   mode: 'virtual' | 'in_person';
+  /** The booking's zones (old bookings: consultant America/Chicago, customer the same). */
+  consultantTz: string;
+  customerTz: string;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -54,6 +57,7 @@ export function stageBookingCancel(
   }
 ): CancelledBooking {
   const { id, booking, lead, by, now, leadPatch } = args;
+  const zones = bookingZones({ consultantTz: booking.get('consultantTz'), customerTz: booking.get('customerTz') });
   tx.update(args.bookingRef as never, { status: 'cancelled', cancelledAt: now, cancelledBy: by });
   if (args.leadRef && lead?.exists && lead.get('bookingId') === id) {
     tx.update(args.leadRef as never, {
@@ -72,6 +76,7 @@ export function stageBookingCancel(
     customerName: str(booking.get('customerName')),
     start: str(booking.get('start')),
     mode: booking.get('mode') === 'virtual' ? 'virtual' : 'in_person',
+    ...zones,
   };
 }
 
@@ -94,24 +99,30 @@ export async function announceBookingCancel(
       ownerNotificationsEnabled(),
       resolveConsultants(),
     ]);
-    const when = c.start ? `${formatSlotPT(c.start)} PT` : 'its time';
     const how = c.mode === 'virtual' ? 'virtual' : 'in-person';
     const who = c.customerName || 'A customer';
     const why = reason === 'lost' ? ' The lead was marked lost.' : '';
-    const message = `${who}: ${how}, ${when} with ${c.consultantName}. The time is open again.${why}`;
+    // The consultant reads the time in their zone, the rep in the customer's.
+    const messageAt = (when: string) => `${who}: ${how}, ${when} with ${c.consultantName}. The time is open again.${why}`;
+    const consultantMessage = messageAt(c.start ? formatWhenForConsultant(c.start, c.consultantTz, c.customerTz) : 'its time');
+    const repMessage = messageAt(c.start ? formatWhen(c.start, c.customerTz) : 'its time');
 
-    const sends = new Map<string, { title: string; link: string }>();
+    const sends = new Map<string, { title: string; link: string; message: string }>();
     if (notice?.to) {
-      sends.set(notice.to.uid, { title: `${notice.titlePrefix}Solar consult cancelled`, link: solarLeadHref(c.leadId) });
+      sends.set(notice.to.uid, {
+        title: `${notice.titlePrefix}Solar consult cancelled`,
+        link: solarLeadHref(c.leadId),
+        message: consultantMessage,
+      });
     }
     if (c.repUid && !sends.has(c.repUid)) {
-      sends.set(c.repUid, { title: 'Solar consult cancelled', link: '/portal/solar' });
+      sends.set(c.repUid, { title: 'Solar consult cancelled', link: '/portal/solar', message: repMessage });
     }
     sends.delete(cancelledBy);
     if (!notifyOwner && owner) sends.delete(owner.uid);
 
     await Promise.all(
-      [...sends].map(async ([uid, { title, link }]) => {
+      [...sends].map(async ([uid, { title, link, message }]) => {
         await createNotification({
           userId: uid,
           type: 'solar_booking',

@@ -6,6 +6,9 @@
 // by the window's end. A booking blocks its consultant in every mode (one
 // person can't be on a virtual call and at a door at the same time).
 
+import { LEGACY_TZ, US_TIMEZONES } from './timezones';
+
+/** The owner's (Jeremy's) zone: his seed hours and the per-day booking load. */
 export const SOLAR_TZ = 'America/Los_Angeles';
 export const SOLAR_SLOT_MIN = 60;
 /** A slot must start at least this long after now (bookable and listed). */
@@ -196,7 +199,7 @@ export function openSlots(
   for (const a of availability) {
     const windows = a.modes[mode] ?? [];
     if (windows.length === 0) continue;
-    const tz = a.tz || SOLAR_TZ;
+    const tz = a.tz || LEGACY_TZ;
     const slotMin = a.slotMin > 0 ? a.slotMin : SOLAR_SLOT_MIN;
     const busy = taken.get(a.consultantUid) ?? [];
 
@@ -283,7 +286,7 @@ export function bookingDocId(consultantUid: string, startISO: string): string {
   return `${consultantUid}_${startISO}`;
 }
 
-/** "Tuesday, October 20, 3:00 PM" in Pacific Time. */
+/** "Tuesday, October 20, 3:00 PM" in Pacific Time. Notices use formatWhen (lib/solar/timezones) instead. */
 export function formatSlotPT(startISO: string): string {
   return new Intl.DateTimeFormat('en-US', {
     timeZone: SOLAR_TZ,
@@ -296,12 +299,10 @@ export function formatSlotPT(startISO: string): string {
 }
 
 /** The time zones a consultant's hours can be set in (Admin > Solar > Setup). */
-export const SOLAR_TIMEZONES = [
-  { value: 'America/Los_Angeles', label: 'Pacific' },
-  { value: 'America/Denver', label: 'Mountain' },
-  { value: 'America/Chicago', label: 'Central' },
-  { value: 'America/New_York', label: 'Eastern' },
-] as const;
+export const SOLAR_TIMEZONES: readonly { value: string; label: string }[] = US_TIMEZONES.map(({ value, label }) => ({
+  value,
+  label,
+}));
 
 /** Slot lengths a consultant can offer, in minutes. */
 export const SOLAR_SLOT_LENGTHS = [30, 60, 90] as const;

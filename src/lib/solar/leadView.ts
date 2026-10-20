@@ -12,8 +12,10 @@ export interface SolarLeadBooking {
   mode: 'virtual' | 'in_person';
   consultantUid: string;
   consultantName: string;
-  /** The consultant's own time zone (their availability), for showing the time. */
+  /** The consultant's own time zone (stored on the booking, else their availability), for showing the time. */
   tz: string;
+  /** The customer's time zone (stored on the booking; older bookings: the consultant's). */
+  customerTz: string;
 }
 
 export interface SolarLeadView {
@@ -78,7 +80,8 @@ export function bookingView(id: string, data: Record<string, unknown> | undefine
     mode: data.mode === 'virtual' ? 'virtual' : 'in_person',
     consultantUid: text(data.consultantUid),
     consultantName: text(data.consultantName) || 'Consultant',
-    tz,
+    tz: text(data.consultantTz) || tz,
+    customerTz: text(data.customerTz) || text(data.consultantTz) || tz,
   };
 }
 

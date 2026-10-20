@@ -7,7 +7,7 @@ import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { permissionsFor } from '@/types/auth';
 import { loadAvailability, requireSolarUser } from '@/lib/solar/server';
 import { parseLead } from '@/lib/solar/leadFields';
-import { SOLAR_TZ } from '@/lib/solar/availability';
+import { LEGACY_TZ } from '@/lib/solar/timezones';
 import { DEMO_ACCOUNT_FIELD } from '@/lib/users/demoAccount';
 import { bookingView, leadView, type SolarLeadBooking } from '@/lib/solar/leadView';
 
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
     const bookings = new Map<string, SolarLeadBooking | null>();
     for (const b of bookingSnaps) {
       const data = b.exists ? ((b.data() ?? {}) as Record<string, unknown>) : undefined;
-      const tz = tzOf.get(String(data?.consultantUid ?? '')) ?? SOLAR_TZ;
+      const tz = tzOf.get(String(data?.consultantUid ?? '')) ?? LEGACY_TZ;
       bookings.set(b.id, bookingView(b.id, data, tz));
     }
 

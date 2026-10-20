@@ -8,6 +8,7 @@ import {
   formatWholeDollars,
   groupSlotsByDay,
   newDeckClientId,
+  slotsInWindow,
   validateLead,
   type SolarSlot,
 } from './solarClient';
@@ -82,11 +83,60 @@ describe('solar deck helpers', () => {
       expect(book).toHaveBeenCalledTimes(1);
     });
 
+    it("sends the customer's zone and keeps the one the server stored", async () => {
+      const book = vi.fn(async () => ({ ok: true as const, data: { id: 'b1', customerTz: 'America/New_York' } }));
+      const res = await bookTime(time, 'L', 'virtual', book, 'America/New_York');
+      expect(book).toHaveBeenCalledWith({
+        leadId: 'L', mode: 'virtual', consultantUid: 'own', start: time.start, customerTz: 'America/New_York',
+      });
+      expect(res).toEqual({ ok: true, id: 'b1', slot: time.candidates[0], customerTz: 'America/New_York' });
+    });
+
+    it('words a slot the server no longer offers (past the window) for the rep', async () => {
+      const book = vi.fn().mockResolvedValue({ ok: false, status: 400, error: 'slot_unavailable' });
+      const res = await bookTime(time, 'L', 'virtual', book);
+      expect(res).toMatchObject({ ok: false, taken: false });
+      expect(!res.ok && res.error).toContain('within the next 14 days');
+    });
+
     it('does not retry other errors', async () => {
       const book = vi.fn().mockResolvedValue({ ok: false, status: 500, error: 'Failed to book' });
       expect(await bookTime(time, 'L', 'virtual', book)).toEqual({ ok: false, taken: false, error: 'Failed to book' });
       expect(book).toHaveBeenCalledTimes(1);
     });
+  });
+
+  describe("in the customer's zone", () => {
+    it('groups and shows times in Eastern for a Florida customer', () => {
+      // 04:00Z Oct 21 is 9 PM Oct 20 Pacific but 12 AM Oct 21 Eastern.
+      const days = groupSlotsByDay(
+        [slot('2026-10-21T04:00:00.000Z'), slot('2026-10-20T15:00:00.000Z')],
+        'America/New_York'
+      );
+      expect(days.map((d) => d.key)).toEqual(['2026-10-20', '2026-10-21']);
+      expect(days[0].times.map((t) => formatSlotTime(t.start, 'America/New_York'))).toEqual(['11:00 AM']);
+      expect(days[1].label).toBe('Wednesday, Oct 21');
+      expect(formatSlotLong('2026-10-20T15:00:00.000Z', 'America/New_York')).toBe('Tuesday, Oct 20 at 11:00 AM ET');
+      expect(formatSlotLong('2026-10-20T15:00:00.000Z', 'America/Chicago')).toBe('Tuesday, Oct 20 at 10:00 AM CT');
+    });
+
+    it('keeps the same wall time across the fall-back change', () => {
+      // 8 AM Pacific: 15:00Z on Oct 30 (PDT), 16:00Z on Nov 2 (PST).
+      expect(formatSlotTime('2026-10-30T15:00:00.000Z', 'America/Los_Angeles')).toBe('8:00 AM');
+      expect(formatSlotTime('2026-11-02T16:00:00.000Z', 'America/Los_Angeles')).toBe('8:00 AM');
+      expect(formatSlotTime('2026-11-02T16:00:00.000Z', 'America/New_York')).toBe('11:00 AM');
+    });
+  });
+
+  it("drops slots past day 14 in the customer's zone", () => {
+    // 8 PM Oct 19 ET: the Eastern window ends Nov 3 00:00 EST (05:00Z).
+    const now = new Date('2026-10-20T00:00:00Z');
+    const kept = slotsInWindow(
+      [slot('2026-11-02T16:00:00.000Z'), slot('2026-11-03T04:59:00.000Z'), slot('2026-11-03T05:00:00.000Z'), slot('2026-11-09T16:00:00.000Z')],
+      'America/New_York',
+      now
+    );
+    expect(kept.map((x) => x.start)).toEqual(['2026-11-02T16:00:00.000Z', '2026-11-03T04:59:00.000Z']);
   });
 
   it('makes a clientId the API accepts', () => {

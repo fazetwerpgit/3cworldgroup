@@ -6,10 +6,19 @@ import { createNotification } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { appBaseUrl, managerAlertEmail, solarBookingConfirmationEmail } from '@/lib/email/templates';
-import { bookingDocId, formatSlotPT, isSolarMode, openSlots, type SolarMode } from '@/lib/solar/availability';
+import { bookingDocId, isSolarMode, openSlots, type SolarMode } from '@/lib/solar/availability';
 import { consultantNotice, loadAvailability, loadBookings, requireSolarUser } from '@/lib/solar/server';
 import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
 import { solarLeadHref } from '@/lib/solar/leadView';
+import {
+  LEGACY_TZ,
+  SOLAR_MAX_DAYS_OUT,
+  formatWhen,
+  formatWhenForConsultant,
+  isValidTimeZone,
+  withinBookingWindow,
+  zoneForState,
+} from '@/lib/solar/timezones';
 
 const SLOT_TAKEN = { error: 'slot_taken' };
 
@@ -23,13 +32,17 @@ type Booking = {
   customerName: string;
   customerEmail: string;
   repName: string;
+  customerTz: string;
+  consultantTz: string;
 };
 
 // Customer confirmation + consultant notice. Best-effort: the booking stands
 // even when a message fails. consultantNotice() keeps the owner out of it
-// while owner notifications are off (Jacob gets the notice instead).
+// while owner notifications are off (Jacob gets the notice instead). The
+// customer reads the time in their zone, the consultant in theirs.
 async function announceBooking(b: Booking) {
-  const when = formatSlotPT(b.start);
+  const when = formatWhen(b.start, b.customerTz);
+  const consultantWhen = formatWhenForConsultant(b.start, b.consultantTz, b.customerTz);
   const how = b.mode === 'virtual' ? 'virtual' : 'in-person';
   try {
     const notice = await consultantNotice(b.consultantUid);
@@ -49,7 +62,7 @@ async function announceBooking(b: Booking) {
     const to = notice.to;
     if (!to) return;
     const title = `${notice.titlePrefix}Solar consult booked`;
-    const message = `${b.customerName || 'A customer'}: ${how}, ${when} PT with ${b.consultantName} (booked by ${b.repName}).`;
+    const message = `${b.customerName || 'A customer'}: ${how}, ${consultantWhen} with ${b.consultantName} (booked by ${b.repName}).`;
     const link = solarLeadHref(b.leadId);
     await createNotification({
       userId: to.uid,
@@ -85,12 +98,18 @@ function bookedBody(id: string, b: Record<string, unknown>, duplicate: boolean) 
     consultantName: String(b.consultantName ?? ''),
     start: String(b.start ?? ''),
     mode: b.mode === 'virtual' ? 'virtual' : 'in_person',
+    ...(typeof b.customerTz === 'string' && b.customerTz ? { customerTz: b.customerTz } : {}),
   };
 }
 
-// POST /api/portal/solar/bookings {leadId, mode, consultantUid, start}
-// -> 200 {success, id, consultantUid, consultantName, start, mode[, duplicate]}
-//  | 409 {error: 'slot_taken'} | 400 {error: 'slot_unavailable'}.
+// POST /api/portal/solar/bookings {leadId, mode, consultantUid, start[, customerTz]}
+// -> 200 {success, id, consultantUid, consultantName, start, mode[, customerTz][, duplicate]}
+//  | 409 {error: 'slot_taken'} | 400 {error: 'slot_unavailable'[, reason: 'too_far']}.
+// `start` is an absolute instant. The booking stores it with the customer's
+// zone (customerTz from the body when it is a real IANA zone, else the lead's
+// state, else the consultant's) and the consultant's zone, for the notices.
+// A slot must start within the booking window: through the 14th calendar day
+// after today in the customer's zone.
 // ONE active booking per lead: when lead.bookingId already holds a live
 // (not cancelled) booking, any POST for that lead answers that booking with
 // duplicate: true, whatever slot or consultant it asked for, and sends nothing
@@ -123,6 +142,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid start' }, { status: 400 });
     }
     const start = startDate.toISOString();
+    const askedTz = isValidTimeZone(body?.customerTz) ? (body.customerTz as string) : '';
 
     const leadRef = db.collection('solarLeads').doc(leadId);
     const lead = await leadRef.get();
@@ -141,10 +161,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // The slot must be one the consultant offers in this mode, and still open.
+    // The slot must be inside the booking window, one the consultant offers in
+    // this mode, and still open.
     const now = new Date();
-    const windowEnd = new Date(startDate.getTime() + 60_000);
     const availability = (await loadAvailability()).filter((a) => a.consultantUid === consultantUid);
+    const consultantTz = availability[0]?.tz || LEGACY_TZ;
+    const customerTz = askedTz || zoneForState(lead.get('state')) || consultantTz;
+    if (!withinBookingWindow(startDate, now, customerTz)) {
+      return NextResponse.json(
+        { error: 'slot_unavailable', reason: 'too_far', message: `Book within ${SOLAR_MAX_DAYS_OUT} days.` },
+        { status: 400 }
+      );
+    }
+    const windowEnd = new Date(startDate.getTime() + 60_000);
     const offered = openSlots(availability, [], mode, startDate, windowEnd, now).find((s) => s.start === start);
     if (!offered) return NextResponse.json({ error: 'slot_unavailable' }, { status: 400 });
     const bookings = await loadBookings(startDate, new Date(startDate.getTime() + 86_400_000));
@@ -178,6 +207,8 @@ export async function POST(request: NextRequest) {
           end: offered.end,
           startAt: startDate,
           endAt: new Date(offered.end),
+          customerTz,
+          consultantTz,
           repUid: gate.uid,
           repName: gate.name,
           customerName,
@@ -214,6 +245,8 @@ export async function POST(request: NextRequest) {
       customerName: String(b.customerName ?? ''),
       customerEmail: String(b.customerEmail ?? ''),
       repName: gate.name,
+      customerTz: String(b.customerTz ?? consultantTz),
+      consultantTz,
     });
     await sendLeadAlertOnce(leadId).catch((error) => console.error('solar lead alert failed:', error));
     return NextResponse.json(bookedBody(id, b, false));

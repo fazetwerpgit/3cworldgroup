@@ -1537,6 +1537,18 @@
   font-weight: 600;
   color: var(--ink-3);
 }
+/* Customer zone switcher (only when the lead's state gives no zone). */
+.zoneSelect {
+  min-height: 32px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 16px; /* under 16px, iOS zooms the page on focus */
+}
 .times {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));

@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isSolarMode, openSlots, orderByPreference } from '@/lib/solar/availability';
 import { loadAvailability, loadBookings, requireSolarUser, resolveConsultants } from '@/lib/solar/server';
+import { bookingWindowEnd, isValidTimeZone, LEGACY_TZ, SOLAR_MAX_DAYS_OUT } from '@/lib/solar/timezones';
 
 const DAY = 86_400_000;
-const MAX_RANGE = 31 * DAY;
 
-// GET /api/portal/solar/availability?mode=virtual|in_person&from=ISO&to=ISO
+// GET /api/portal/solar/availability?mode=virtual|in_person&from=ISO&to=ISO[&tz=IANA]
 // -> 200 {slots: [{consultantUid, name, start, end}]} (ISO UTC). from defaults
-// to now, to to from + 14 days; the range is capped at 31 days. Only slots at
-// least 2 hours out are listed. Slots that share a start come in booking
+// to now, to to from + 14 days. Nothing past the booking window (the end of
+// the 14th calendar day after today in the customer's zone `tz`, Pacific when
+// absent or invalid; SOLAR_MAX_DAYS_OUT) is listed, whatever `to` asks for, and only slots
+// at least 2 hours out. Times are absolute; the deck shows them in the
+// customer's zone. Slots that share a start come in booking
 // preference order (orderByPreference): the first is the one to book.
 export async function GET(request: NextRequest) {
   try {
@@ -22,11 +25,15 @@ export async function GET(request: NextRequest) {
     const fromRaw = params.get('from');
     const toRaw = params.get('to');
     const from = fromRaw ? new Date(fromRaw) : now;
-    const to = toRaw ? new Date(toRaw) : new Date(from.getTime() + 14 * DAY);
+    const to = toRaw ? new Date(toRaw) : new Date(from.getTime() + SOLAR_MAX_DAYS_OUT * DAY);
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) {
       return NextResponse.json({ error: 'Invalid from/to' }, { status: 400 });
     }
-    const cappedTo = to.getTime() - from.getTime() > MAX_RANGE ? new Date(from.getTime() + MAX_RANGE) : to;
+    const tzRaw = params.get('tz');
+    const windowEnd = bookingWindowEnd(now, isValidTimeZone(tzRaw) ? tzRaw : LEGACY_TZ);
+    // Past the window there is nothing to list (openSlots answers [] for an empty range).
+    const cappedTo = to > windowEnd ? windowEnd : to;
+    if (cappedTo <= from) return NextResponse.json({ slots: [] });
 
     const [availability, bookings, { owner }] = await Promise.all([
       loadAvailability(),

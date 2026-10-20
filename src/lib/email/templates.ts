@@ -272,13 +272,14 @@ export function solarLeadAlertEmail(p: {
   monthlyKwh?: string;
   /** e.g. "Yes: heavy shade on the roof"; '' when the lead doesn't need review. */
   needsReview?: string;
+  /** `when` carries its zone label(s). */
   booking: { when: string; mode: string; consultantName: string } | null;
   photos: { label: string; url: string }[];
   link: string;
 }): EmailContent {
   const subject = p.booking ? `Solar appointment set: ${p.customerName}` : `New solar lead: ${p.customerName}`;
   const appointment = p.booking
-    ? `${p.booking.when} PT, ${p.booking.mode}, with ${p.booking.consultantName}`
+    ? `${p.booking.when}, ${p.booking.mode}, with ${p.booking.consultantName}`
     : 'No appointment booked';
   const rows: [string, string][] = [
     ['Customer', p.customerName],
@@ -316,20 +317,21 @@ export function solarLeadAlertEmail(p: {
 
 export function solarBookingConfirmationEmail(p: {
   customerName: string;
+  /** With its zone, in the customer's time ("Tuesday, October 20, 3:00 PM ET"). */
   when: string;
   mode: 'virtual' | 'in_person';
   consultantName: string;
 }): EmailContent {
   const subject = 'Your solar consultation is booked';
   const how = p.mode === 'virtual' ? 'a virtual consultation' : 'an in-person consultation';
-  const line = `You are booked for ${how} with ${p.consultantName} on ${p.when} (Pacific Time).`;
+  const line = `You are booked for ${how} with ${p.consultantName} on ${p.when}.`;
   const greeting = p.customerName ? `Hi ${p.customerName},` : 'Hi,';
   return {
     subject,
     textBody: `${greeting}\n\n${line}\n\nIf you need to change the time, reply to this email.\n\n3C World Group\n`,
     htmlBody: layout(
       subject,
-      `<p>${esc(greeting)}</p><p>You are booked for <strong>${esc(how)}</strong> with <strong>${esc(p.consultantName)}</strong> on <strong>${esc(p.when)}</strong> (Pacific Time).</p><p>If you need to change the time, reply to this email.</p>`
+      `<p>${esc(greeting)}</p><p>You are booked for <strong>${esc(how)}</strong> with <strong>${esc(p.consultantName)}</strong> on <strong>${esc(p.when)}</strong>.</p><p>If you need to change the time, reply to this email.</p>`
     ),
   };
 }
