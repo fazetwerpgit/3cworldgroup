@@ -110,4 +110,10 @@ describe('leadEvents', () => {
       { repUid: 'ana', repName: 'Ana Rivera', at: d('2026-10-02'), kind: 'Sale' },
     ]);
   });
+
+  it('a lead lost at pre-qualification (low credit) never counts as Demoed', () => {
+    expect(
+      leadMilestones({ status: 'lost', noSaleReason: 'low_credit', statusChangedAt: d('2026-10-20T10:00:00Z') })
+    ).toEqual({ demoedAt: null, outcome: null, closedAt: null });
+  });
 });

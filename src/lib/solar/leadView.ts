@@ -2,7 +2,17 @@
 // stored lead with its live booking joined. Pure: the route builds it, the
 // admin Leads tab and the rep Solar page read it.
 import { SOLAR_HUB, hubTabHref } from '@/components/portal/admin-d/adminHubs';
-import { CREDIT_TIERS, PHOTO_SLOTS, isRoofType, type CreditTier, type PhotoSlot, type RoofType, type SolarLeadStatus } from './leadFields';
+import {
+  CREDIT_TIERS,
+  PHOTO_SLOTS,
+  isNoSaleReason,
+  isRoofType,
+  type CreditTier,
+  type NoSaleReason,
+  type PhotoSlot,
+  type RoofType,
+  type SolarLeadStatus,
+} from './leadFields';
 import { readStage, readStageHistory, type SolarDemoOutcome, type SolarLeadStage, type SolarStageEntry } from './leadStage';
 
 export interface SolarLeadBooking {
@@ -43,6 +53,8 @@ export interface SolarLeadView {
   /** Only with stage 'appointment_demoed'. */
   stageOutcome: SolarDemoOutcome | null;
   stageHistory: SolarStageEntry[];
+  /** Why it closed before a demo (the deck's Under 600: 'low_credit'), only while it is lost with no stage; else null. */
+  noSaleReason?: NoSaleReason | null;
   roofType: RoofType | null;
   heavyShade: boolean | null;
   needsReview: boolean;
@@ -125,6 +137,7 @@ export function leadView(id: string, data: Record<string, unknown>, booking: Sol
     stage,
     stageOutcome: outcome,
     stageHistory: readStageHistory(data.stageHistory),
+    noSaleReason: status === 'lost' && stage === null && isNoSaleReason(data.noSaleReason) ? data.noSaleReason : null,
     roofType: isRoofType(data.roofType) ? data.roofType : null,
     heavyShade: typeof data.heavyShade === 'boolean' ? data.heavyShade : null,
     needsReview: data.needsReview === true,

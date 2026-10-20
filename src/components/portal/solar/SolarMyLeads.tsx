@@ -6,7 +6,17 @@ import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import rep from '@/components/portal/rep/rep.module.css';
 import { LeadDetail } from './LeadDetail';
-import { STATUS_LABEL, STATUS_TONE, consultTime, leadName, modeLabel, nextConsult, savedDate, stageLine } from './leadDisplay';
+import {
+  STATUS_LABEL,
+  STATUS_TONE,
+  consultTime,
+  leadName,
+  modeLabel,
+  nextConsult,
+  noSaleLine,
+  savedDate,
+  stageLine,
+} from './leadDisplay';
 import { fetchLeads, type SolarLeadView } from './solarClient';
 import css from './solar-leads.module.css';
 
@@ -146,9 +156,11 @@ export function SolarMyLeads({
   );
 }
 
-/** The sales-dept stage once one is set (read only), else the lead status. */
+/** The sales-dept stage once one is set (read only), else the lead status ("No sale: low credit" after Under 600). */
 function LeadStatus({ lead }: { lead: SolarLeadView }) {
   const stage = stageLine(lead);
+  const noSale = noSaleLine(lead);
+  if (!stage && noSale) return <StatusDot tone={STATUS_TONE[lead.status]}>{noSale}</StatusDot>;
   return stage ? (
     <span title={stage.text}>
       <StatusDot tone={stage.tone}>{stage.short}</StatusDot>

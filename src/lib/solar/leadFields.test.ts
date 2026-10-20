@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { hasLeadExtras, parseLead, parseLeadExtras } from './leadFields';
+import {
+  CREDIT_TIER_LABELS,
+  NO_SALE_REASON_LABELS,
+  hasLeadExtras,
+  isLowCreditDecline,
+  isNoSaleReason,
+  parseLead,
+  parseLeadExtras,
+} from './leadFields';
 
 const LEAD = { first: 'Ana', last: 'Ruiz', email: 'ana@example.com' };
 
@@ -29,5 +37,20 @@ describe('usage shape', () => {
     expect(parseLeadExtras({ usage: { '': 1 } }).ok).toBe(false);
     expect(parseLeadExtras({ usage: [1, 2] }).ok).toBe(false);
     expect(parseLeadExtras({ usage: { note: 'x'.repeat(5000) } })).toEqual({ ok: false, error: 'usage is too large' });
+  });
+
+  it('noSaleReason: only low_credit, and the decline it marks', () => {
+    expect(isNoSaleReason('low_credit')).toBe(true);
+    expect(isNoSaleReason('other')).toBe(false);
+    expect(NO_SALE_REASON_LABELS.low_credit).toBe('No sale: low credit');
+    expect(isLowCreditDecline({ status: 'lost', noSaleReason: 'low_credit' })).toBe(true);
+    expect(isLowCreditDecline({ status: 'demo', noSaleReason: 'low_credit' })).toBe(true);
+    expect(isLowCreditDecline({ status: 'lost' })).toBe(false);
+    expect(isLowCreditDecline({ status: 'new', noSaleReason: 'low_credit' })).toBe(false);
+    expect(isLowCreditDecline({ status: 'lost', noSaleReason: 'low_credit', stage: 'appointment_demoed' })).toBe(false);
+  });
+
+  it('credit tier labels match the prequal cards', () => {
+    expect(CREDIT_TIER_LABELS).toEqual({ purchase_600: 'Purchase (600–679)', lease_ppa_680: 'Lease, PPA or Purchase (680+)' });
   });
 });

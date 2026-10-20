@@ -114,7 +114,12 @@ export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
       phone: text(lead.get('phone')),
       email: text(lead.get('email')),
       monthlyBill: typeof monthlyBill === 'number' ? `$${monthlyBill.toFixed(2)}` : '',
-      creditTier: isCreditTier(creditTier) ? CREDIT_TIER_LABELS[creditTier] : 'Not picked',
+      creditTier:
+        lead.get('noSaleReason') === 'low_credit'
+          ? 'Under 600 (no sale: low credit)'
+          : isCreditTier(creditTier)
+            ? CREDIT_TIER_LABELS[creditTier]
+            : 'Not picked',
       roofType: isRoofType(roofType) ? ROOF_TYPE_LABELS[roofType] : '',
       monthlyKwh:
         typeof monthlyKwh === 'number' && Number.isFinite(monthlyKwh)

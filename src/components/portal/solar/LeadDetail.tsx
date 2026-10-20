@@ -20,6 +20,7 @@ import {
   modeLabel,
   roofLabel,
   savedDate,
+  noSaleLine,
   stageLine,
 } from './leadDisplay';
 import css from './solar-leads.module.css';
@@ -106,7 +107,7 @@ export function LeadDetail({
         <div>
           <dt>Status</dt>
           <dd>
-            <StatusDot tone={STATUS_TONE[lead.status]}>{STATUS_LABEL[lead.status]}</StatusDot>
+            <StatusDot tone={STATUS_TONE[lead.status]}>{noSaleLine(lead) ?? STATUS_LABEL[lead.status]}</StatusDot>
           </dd>
         </div>
         {showStage ? (
@@ -133,7 +134,7 @@ export function LeadDetail({
         </div>
         <div>
           <dt>Credit</dt>
-          <dd>{lead.creditTier ? CREDIT_LABEL[lead.creditTier] : 'Not picked'}</dd>
+          <dd>{lead.noSaleReason === 'low_credit' ? 'Under 600' : lead.creditTier ? CREDIT_LABEL[lead.creditTier] : 'Not picked'}</dd>
         </div>
         <div>
           <dt>Usage</dt>

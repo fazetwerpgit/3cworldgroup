@@ -9,6 +9,7 @@ import { appBaseUrl, managerAlertEmail, solarBookingConfirmationEmail } from '@/
 import { bookingDocId, isSolarMode, openSlots, type SolarMode } from '@/lib/solar/availability';
 import { consultantNotice, loadAvailability, loadBookings, requireSolarUser } from '@/lib/solar/server';
 import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
+import { isLowCreditDecline } from '@/lib/solar/leadFields';
 import { consultantBookingAttachment, customerBookingAttachment, type BookingInviteInput } from '@/lib/solar/bookingInvite';
 import { solarLeadHref } from '@/lib/solar/leadView';
 import {
@@ -167,6 +168,7 @@ function bookedBody(id: string, b: Record<string, unknown>, duplicate: boolean) 
 // one slot get exactly one booking (the other 409s), and two requests for one
 // lead get one booking. A fresh booking sends the lead alert (once per lead,
 // see lib/solar/leadAlert.ts). Cancelling (PATCH bookings/{id}) frees both.
+// A lead closed at pre-qualification (noSaleReason 'low_credit') 409s.
 export async function POST(request: NextRequest) {
   try {
     const gate = await requireSolarUser(request);
@@ -197,6 +199,10 @@ export async function POST(request: NextRequest) {
     if (!lead.exists) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     if (lead.get('repUid') !== gate.uid && !gate.isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    // Closed at pre-qualification (Under 600): pick a credit tier first, which reopens it.
+    if (isLowCreditDecline((lead.data() ?? {}) as Record<string, unknown>)) {
+      return NextResponse.json({ error: "This homeowner didn't pre-qualify. Change the credit answer first." }, { status: 409 });
     }
 
     // A retry after success answers the booking it made, before the slot checks

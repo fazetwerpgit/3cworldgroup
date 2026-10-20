@@ -8,7 +8,8 @@
 //   stageOutcome: SolarDemoOutcome | absent (only with stage 'appointment_demoed')
 //   stageHistory: SolarStageEntry[] (oldest first, capped at STAGE_HISTORY_MAX)
 // Old leads have none of these; a closed one reads its stage from status
-// (sold -> appointment_demoed + sale, lost -> appointment_demoed + no_sale).
+// (sold -> appointment_demoed + sale, lost -> appointment_demoed + no_sale),
+// except a lead lost at pre-qualification (noSaleReason 'low_credit'): no stage.
 
 /** In order. Every stage after 'appointment_demoed' implies the sale. */
 export const SOLAR_LEAD_STAGES = [
@@ -98,6 +99,9 @@ export function readStage(data: Record<string, unknown>): { stage: SolarLeadStag
     return { stage: data.stage, outcome };
   }
   if (data.status === 'sold') return { stage: 'appointment_demoed', outcome: 'sale' };
+  // Closed at pre-qualification (low credit): no demo happened, so no stage
+  // (the board's Demoed count skips it).
+  if (data.status === 'lost' && data.noSaleReason === 'low_credit') return { stage: null, outcome: null };
   if (data.status === 'lost') return { stage: 'appointment_demoed', outcome: 'no_sale' };
   return { stage: null, outcome: null };
 }

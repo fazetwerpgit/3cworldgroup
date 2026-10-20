@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { loadAvailability, requireSolarUser } from '@/lib/solar/server';
-import { hasLeadContact, hasLeadExtras, isCreditTier, isSolarLeadStatus, parseLeadContact, parseLeadExtras } from '@/lib/solar/leadFields';
+import {
+  hasLeadContact,
+  hasLeadExtras,
+  isCreditTier,
+  isLowCreditDecline,
+  isNoSaleReason,
+  isSolarLeadStatus,
+  parseLeadContact,
+  parseLeadExtras,
+} from '@/lib/solar/leadFields';
 import { SOLAR_STAGE_ROLES, readStage, stagePatchForStatus } from '@/lib/solar/leadStage';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
 
@@ -25,7 +34,17 @@ async function isSolarConsultant(gate: { uid: string; solarRole?: string | null 
 
 // PATCH /api/portal/solar/leads/{id}
 //   {creditTier: 'purchase_600' | 'lease_ppa_680'} -> 200 {success, id}.
-//     The rep who created the lead, or an admin.
+//     The rep who created the lead, or an admin. On a lead the deck closed
+//     at pre-qualification (noSaleReason 'low_credit', no stage) it also
+//     reopens it: noSaleReason cleared, status back to 'new' ('booked' while
+//     a live booking holds a slot; a demo account's lead stays 'demo').
+//   {noSaleReason: 'low_credit'} (alone) -> 200 {success, id, status: 'lost'
+//     [, cancelledBookingId]}. The deck's "Under 600": the rep who created the
+//     lead, or an admin. The lead closes as lost with that reason, its
+//     creditTier is removed and no stage is written (it was never demoed).
+//     A live booking is cancelled in the same transaction, as Mark lost does.
+//     409 once the lead has a stage or is sold / lost for another reason;
+//     repeating it is a no-op.
 //   {status: 'new' | 'booked' | 'sold' | 'lost'} -> 200 {success, id, status}.
 //     Admins only. 'sold' and 'lost' close the lead; 'new' or 'booked' reopen
 //     it, and the server picks which: 'booked' while a live booking holds its
@@ -35,6 +54,7 @@ async function isSolarConsultant(gate: { uid: string; solarRole?: string | null 
 //     The sales-dept stage follows (lib/solar/leadStage stagePatchForStatus):
 //     sold = appointment_demoed + sale, lost = appointment_demoed + no_sale,
 //     reopen clears a closing stage. Finer stages: PATCH .../{id}/stage.
+//     Any status but 'lost' also clears a pre-qualification noSaleReason.
 //   {creditTier?, roofType?, heavyShade?, needsReview?, monthlyKwh?, usage?}
 //     -> 200 {success, id}. The creator or an admin; validated as on create
 //     (a blocked roof is refused; monthlyKwh rounded; usage 4KB of JSON max).
@@ -109,8 +129,51 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         statusChangedBy: gate.uid,
         updatedAt: now,
         ...stagePatchForStatus((snap.data() ?? {}) as Record<string, unknown>, status, gate.uid, now),
+        ...(snap.get('noSaleReason') !== undefined ? { noSaleReason: FieldValue.delete() } : {}),
       });
       return NextResponse.json({ success: true, id, status });
+    }
+
+    if ('noSaleReason' in body) {
+      if (!isNoSaleReason(body.noSaleReason)) return NextResponse.json({ error: 'Invalid noSaleReason' }, { status: 400 });
+      if (Object.keys(body).length !== 1) {
+        return NextResponse.json({ error: 'noSaleReason is sent on its own' }, { status: 400 });
+      }
+      const reason = body.noSaleReason;
+      const ref = db.collection('solarLeads').doc(id);
+      const now = new Date();
+      const result = await db.runTransaction(async (tx) => {
+        const lead = await tx.get(ref);
+        if (!lead.exists) return { code: 404, error: 'Lead not found' } as const;
+        if (lead.get('repUid') !== gate.uid && !gate.isAdmin) return { code: 403, error: 'Forbidden' } as const;
+        const data = (lead.data() ?? {}) as Record<string, unknown>;
+        if (isLowCreditDecline(data)) return { status: data.status as string, cancelled: null } as const;
+        if (leadIsClosed(data)) return { code: 409, error: 'This lead is already closed.' } as const;
+        // A demo account's lead keeps its 'demo' status so it stays off the admin lists.
+        const status = data.status === 'demo' ? 'demo' : 'lost';
+        const leadPatch = {
+          noSaleReason: reason,
+          creditTier: FieldValue.delete(),
+          ...(status !== data.status ? { status, statusChangedAt: now, statusChangedBy: gate.uid } : {}),
+          updatedAt: now,
+        };
+        const bookingId = typeof data.bookingId === 'string' ? data.bookingId : '';
+        const bookingRef = bookingId ? db.collection('solarBookings').doc(bookingId) : null;
+        const booking = bookingRef ? await tx.get(bookingRef) : null;
+        if (bookingRef && booking && isLiveBooking(booking)) {
+          const cancelled = stageBookingCancel(tx, {
+            id: bookingId, bookingRef, booking, leadRef: ref, lead, by: gate.uid, now, leadPatch,
+          });
+          return { status, cancelled } as const;
+        }
+        tx.update(ref, leadPatch);
+        return { status, cancelled: null } as const;
+      });
+      if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.code });
+      if (result.cancelled) await announceBookingCancel(result.cancelled, gate.uid, 'lost');
+      return NextResponse.json({
+        success: true, id, status: result.status, ...(result.cancelled ? { cancelledBookingId: result.cancelled.id } : {}),
+      });
     }
 
     const patch: Record<string, unknown> = {};
@@ -152,8 +215,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // only an admin's Mark reviewed clears it.
     const heavyShade = patch.heavyShade ?? snap.get('heavyShade');
     if (patch.needsReview === false && heavyShade === true && !gate.isAdmin) patch.needsReview = true;
-    if (!contactAsked) {
+    if (!contactAsked && patch.creditTier === undefined) {
       await ref.update({ ...patch, updatedAt: new Date() });
+      return NextResponse.json({ success: true, id });
+    }
+    if (!contactAsked) {
+      // A credit tier on a lead closed at pre-qualification (Under 600 tapped
+      // by mistake) reopens it in the same write.
+      const now = new Date();
+      const found = await db.runTransaction(async (tx) => {
+        const lead = await tx.get(ref);
+        if (!lead.exists) return false;
+        const data = (lead.data() ?? {}) as Record<string, unknown>;
+        let reopen: Record<string, unknown> = {};
+        if (isLowCreditDecline(data)) {
+          reopen = { noSaleReason: FieldValue.delete() };
+          if (data.status === 'lost') {
+            const bookingId = typeof data.bookingId === 'string' ? data.bookingId : '';
+            const booking = bookingId ? await tx.get(db.collection('solarBookings').doc(bookingId)) : null;
+            Object.assign(reopen, {
+              status: isLiveBooking(booking) ? 'booked' : 'new',
+              statusChangedAt: now,
+              statusChangedBy: gate.uid,
+            });
+          }
+        }
+        tx.update(ref, { ...patch, ...reopen, updatedAt: now });
+        return true;
+      });
+      if (!found) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
       return NextResponse.json({ success: true, id });
     }
 

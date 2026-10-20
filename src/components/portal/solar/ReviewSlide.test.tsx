@@ -51,7 +51,7 @@ describe('reviewSections', () => {
       bill: ['Monthly bill: $212.50/mo'],
       usage: ['Monthly average: 950 kWh', 'Annual (est.): 11,400 kWh'],
       photos: ['Photos: 2 of 3: Bill, first page; Electric panel'],
-      program: ['Credit range: Lease or PPA, 680+'],
+      program: ['Credit range: Lease, PPA or Purchase, 680+'],
     });
     expect(sections.map((sec) => sec.edit)).toEqual([
       { slide: 'lead', step: 'owner' },

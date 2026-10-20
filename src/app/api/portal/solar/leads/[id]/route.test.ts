@@ -381,4 +381,109 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       expect((await patch('nope', { status: 'lost' })).status).toBe(404);
     });
   });
+
+  describe('Under 600 on the prequal slide (noSaleReason low_credit) and its reversal', () => {
+    const ADMIN = { ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null };
+    const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;
+
+    it('lets the owner rep close the lead as no sale (low credit): status lost, no tier, no stage', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'new', creditTier: 'purchase_600' });
+      const res = await patch('rep1_c1', { noSaleReason: 'low_credit' });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ success: true, id: 'rep1_c1', status: 'lost' });
+      expect(lead()).toMatchObject({ status: 'lost', noSaleReason: 'low_credit', statusChangedBy: 'rep1' });
+      expect('creditTier' in lead()).toBe(false);
+      expect(lead().stage).toBeUndefined();
+      expect(lead().stageHistory).toBeUndefined();
+    });
+
+    it('repeating it is a no-op', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit', statusChangedBy: 'rep1' });
+      const res = await patch('rep1_c1', { noSaleReason: 'low_credit' });
+      expect(res.status).toBe(200);
+      expect(lead()).toEqual({ repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit', statusChangedBy: 'rep1' });
+    });
+
+    it('keeps a demo account lead as demo', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'demo', creditTier: 'purchase_600' });
+      expect(await (await patch('rep1_c1', { noSaleReason: 'low_credit' })).json()).toMatchObject({ status: 'demo' });
+      expect(lead()).toMatchObject({ status: 'demo', noSaleReason: 'low_credit' });
+      expect((await patch('rep1_c1', { creditTier: 'purchase_600' })).status).toBe(200);
+      expect(lead()).toMatchObject({ status: 'demo', creditTier: 'purchase_600' });
+      expect('noSaleReason' in lead()).toBe(false);
+    });
+
+    it('403s another rep; an admin may', async () => {
+      mockGate.mockResolvedValue({ ...REP, uid: 'rep2' });
+      expect((await patch('rep1_c1', { noSaleReason: 'low_credit' })).status).toBe(403);
+      expect(lead().status).toBeUndefined();
+      mockGate.mockResolvedValue(ADMIN);
+      expect((await patch('rep1_c1', { noSaleReason: 'low_credit' })).status).toBe(200);
+      expect(lead()).toMatchObject({ status: 'lost', noSaleReason: 'low_credit' });
+    });
+
+    it('400s an unknown reason or extra fields; 404s a missing lead', async () => {
+      expect((await patch('rep1_c1', { noSaleReason: 'rude' })).status).toBe(400);
+      expect((await patch('rep1_c1', { noSaleReason: 'low_credit', creditTier: 'purchase_600' })).status).toBe(400);
+      expect((await patch('nope', { noSaleReason: 'low_credit' })).status).toBe(404);
+      expect(lead().status).toBeUndefined();
+    });
+
+    it('409s a lead that already has a stage or is sold / lost', async () => {
+      for (const closed of [
+        { status: 'booked', stage: 'appointment_demoed', stageOutcome: 'proposal_sent' },
+        { status: 'sold' },
+        { status: 'lost' },
+      ]) {
+        db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', ...closed });
+        expect((await patch('rep1_c1', { noSaleReason: 'low_credit' })).status).toBe(409);
+        expect(lead().noSaleReason).toBeUndefined();
+      }
+    });
+
+    it('cancels a live booking in the same write, as Mark lost does', async () => {
+      const B = 'jac_2026-10-26T15:00:00.000Z';
+      db.store.set('solarBookings', new Map([[B, {
+        leadId: 'rep1_c1', consultantUid: 'jac', consultantName: 'Jacob', repUid: 'rep1', customerName: 'Ana',
+        mode: 'virtual', start: '2026-10-26T15:00:00.000Z', status: 'booked',
+      }]]));
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'booked', bookingId: B, creditTier: 'purchase_600' });
+      const res = await patch('rep1_c1', { noSaleReason: 'low_credit' });
+      expect(await res.json()).toEqual({ success: true, id: 'rep1_c1', status: 'lost', cancelledBookingId: B });
+      expect(lead()).toMatchObject({ status: 'lost', bookingId: null, noSaleReason: 'low_credit' });
+      expect('creditTier' in lead()).toBe(false);
+      expect(db.store.get('solarBookings')!.get(B)).toMatchObject({ status: 'cancelled', cancelledBy: 'rep1' });
+      // The rep made the change, so only the consultant hears of it.
+      expect(mockNotify.mock.calls.map((c) => c[0].userId)).toEqual(['jac']);
+    });
+
+    it('a credit tier from the owner rep reopens it: no_sale cleared, tier set, status new', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit' });
+      const res = await patch('rep1_c1', { creditTier: 'purchase_600' });
+      expect(res.status).toBe(200);
+      expect(lead()).toMatchObject({ status: 'new', creditTier: 'purchase_600', statusChangedBy: 'rep1' });
+      expect('noSaleReason' in lead()).toBe(false);
+    });
+
+    it('another rep cannot reopen it', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit' });
+      mockGate.mockResolvedValue({ ...REP, uid: 'rep2' });
+      expect((await patch('rep1_c1', { creditTier: 'purchase_600' })).status).toBe(403);
+      expect(lead()).toEqual({ repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit' });
+    });
+
+    it('a credit tier does not reopen a lead an admin marked lost', async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'lost' });
+      expect((await patch('rep1_c1', { creditTier: 'purchase_600' })).status).toBe(200);
+      expect(lead()).toMatchObject({ status: 'lost', creditTier: 'purchase_600' });
+    });
+
+    it("an admin's reopen clears the reason too", async () => {
+      mockGate.mockResolvedValue(ADMIN);
+      db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit' });
+      expect((await patch('rep1_c1', { status: 'new' })).status).toBe(200);
+      expect(lead().status).toBe('new');
+      expect('noSaleReason' in lead()).toBe(false);
+    });
+  });
 });

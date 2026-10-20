@@ -474,4 +474,12 @@ describe('POST /api/portal/solar/bookings', () => {
     mockGate.mockResolvedValue({ ok: false, error: 'Missing authentication token', status: 401 });
     expect((await post(BODY)).status).toBe(401);
   });
+
+  it('409s a lead closed at pre-qualification (Under 600) and books nothing', async () => {
+    db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', first: 'Ana', status: 'lost', noSaleReason: 'low_credit' });
+    const res = await post(BODY);
+    expect(res.status).toBe(409);
+    expect(db.store.get('solarBookings')?.size ?? 0).toBe(0);
+    expect(db.store.get('solarLeads')!.get('rep1_c1')!.status).toBe('lost');
+  });
 });

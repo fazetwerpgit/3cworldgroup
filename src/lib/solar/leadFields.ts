@@ -7,12 +7,37 @@ export const CREDIT_TIERS = ['purchase_600', 'lease_ppa_680'] as const;
 export type CreditTier = (typeof CREDIT_TIERS)[number];
 
 export const CREDIT_TIER_LABELS: Record<CreditTier, string> = {
-  purchase_600: 'Purchase (600+)',
-  lease_ppa_680: 'Lease / PPA (680+)',
+  purchase_600: 'Purchase (600–679)',
+  lease_ppa_680: 'Lease, PPA or Purchase (680+)',
 };
 
 export function isCreditTier(value: unknown): value is CreditTier {
   return typeof value === 'string' && (CREDIT_TIERS as readonly string[]).includes(value);
+}
+
+/**
+ * Why a lead closed as no sale before any demo. 'low_credit': the homeowner
+ * picked "Under 600" on the deck's pre-qualification slide (Jeremy's slide 73).
+ * Stored on solarLeads/{id}.noSaleReason with status 'lost' and no creditTier.
+ */
+export const NO_SALE_REASONS = ['low_credit'] as const;
+export type NoSaleReason = (typeof NO_SALE_REASONS)[number];
+
+export const NO_SALE_REASON_LABELS: Record<NoSaleReason, string> = {
+  low_credit: 'No sale: low credit',
+};
+
+export function isNoSaleReason(value: unknown): value is NoSaleReason {
+  return typeof value === 'string' && (NO_SALE_REASONS as readonly string[]).includes(value);
+}
+
+/**
+ * A lead the deck closed at pre-qualification (Under 600): status 'lost' (or a
+ * demo account's 'demo') with noSaleReason 'low_credit' and no sales stage.
+ * Picking a credit tier again reopens it.
+ */
+export function isLowCreditDecline(data: Record<string, unknown>): boolean {
+  return data.noSaleReason === 'low_credit' && (data.status === 'lost' || data.status === 'demo') && data.stage == null;
 }
 
 /**

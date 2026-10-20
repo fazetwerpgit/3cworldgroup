@@ -213,4 +213,13 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
     expect((await patch('nope', { stage: 'pto' })).status).toBe(404);
     expect((await patch('bad id!', { stage: 'pto' })).status).toBe(404);
   });
+
+  it('a sales stage on a lead closed at pre-qualification clears its no-sale reason', async () => {
+    mockGate.mockResolvedValue(CLOSER);
+    db.store.get('solarLeads')!.set('l1', { repUid: 'rep1', status: 'lost', noSaleReason: 'low_credit' });
+    const res = await patch('l1', { stage: 'appointment_demoed', outcome: 'proposal_sent' });
+    expect(res.status).toBe(200);
+    expect(lead()).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'proposal_sent', status: 'new' });
+    expect('noSaleReason' in lead()).toBe(false);
+  });
 });

@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
@@ -84,6 +85,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         stageChangedBy: gate.uid,
         status,
         ...(statusChanged ? { statusChangedAt: now, statusChangedBy: gate.uid } : {}),
+        // A sales stage supersedes a pre-qualification no sale.
+        ...(data.noSaleReason !== undefined ? { noSaleReason: FieldValue.delete() } : {}),
         updatedAt: now,
       };
       // Lost, as Mark lost does it: the live booking is cancelled in this same

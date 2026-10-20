@@ -188,6 +188,17 @@ export function setCreditTier(id: string, creditTier: CreditTier) {
   });
 }
 
+/**
+ * The deck's "Under 600": the lead closes as no sale (low credit) with no
+ * credit tier; a live booking is cancelled with it. setCreditTier reopens it.
+ */
+export function markLowCredit(id: string) {
+  return call<{ success?: boolean; status?: string; cancelledBookingId?: string }>(
+    `/api/portal/solar/leads/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify({ noSaleReason: 'low_credit' }) }
+  );
+}
+
 /** `tz`: the customer's zone, which the server's 14-day window counts days in. */
 export function fetchAvailability(mode: SolarMode, from: Date, to: Date, tz?: string) {
   const q = new URLSearchParams({ mode, from: from.toISOString(), to: to.toISOString(), ...(tz ? { tz } : {}) });

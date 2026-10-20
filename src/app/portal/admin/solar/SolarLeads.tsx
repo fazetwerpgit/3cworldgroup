@@ -10,11 +10,11 @@ import { SOLAR_HUB, hubTabHref } from '@/components/portal/admin-d/adminHubs';
 import { useOpsQueues } from '@/components/portal/admin-d/opsQueues';
 import { LeadDetail } from '@/components/portal/solar/LeadDetail';
 import {
-  CREDIT_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
   billLine,
   consultTime,
+  creditLine,
   kwhLine,
   leadName,
   leadPlace,
@@ -134,7 +134,7 @@ function csvRow(lead: SolarLeadView): Record<string, unknown> {
     ...lead,
     monthlyBill: lead.monthlyBill ?? '',
     monthlyKwh: lead.monthlyKwh ?? '',
-    credit: lead.creditTier ? CREDIT_LABEL[lead.creditTier] : '',
+    credit: creditLine(lead, ''),
     roof: roofLabel(lead.roofType),
     heavyShadeText: lead.heavyShade === null ? '' : lead.heavyShade ? 'Yes' : 'No',
     needsReviewText: lead.needsReview ? 'Yes' : '',
@@ -446,7 +446,7 @@ function LeadRow({ lead, onOpen }: { lead: SolarLeadView; onOpen: () => void }) 
       <span className={cx(css.cell, css.bill)}>
         <span className={css.main}>{bill || 'No bill'}</span>
         <span className={css.sub}>
-          {[kwhLine(lead.monthlyKwh), lead.creditTier ? CREDIT_LABEL[lead.creditTier] : 'Credit not picked']
+          {[kwhLine(lead.monthlyKwh), creditLine(lead, 'Credit not picked')]
             .filter(Boolean)
             .join(' · ')}
         </span>

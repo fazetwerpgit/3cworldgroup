@@ -65,4 +65,9 @@ describe('leadStage', () => {
     });
     expect(stagePatchForStatus({ stage: 'appointment_demoed', stageOutcome: 'proposal_sent' }, 'new', 'a', now)).toEqual({});
   });
+
+  it('a lead lost at pre-qualification (low credit) has no stage: it was never demoed', () => {
+    expect(readStage({ status: 'lost', noSaleReason: 'low_credit' })).toEqual({ stage: null, outcome: null });
+    expect(readStage({ status: 'lost' })).toEqual({ stage: 'appointment_demoed', outcome: 'no_sale' });
+  });
 });

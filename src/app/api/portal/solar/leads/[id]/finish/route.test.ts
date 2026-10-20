@@ -105,7 +105,7 @@ describe('POST /api/portal/solar/leads/{id}/finish', () => {
       'Phone: (559) 555-0101',
       'Email: ana@example.com',
       'Monthly bill: $212.50',
-      'Credit: Lease / PPA (680+)',
+      'Credit: Lease, PPA or Purchase (680+)',
       'Appointment: No appointment booked',
       `Bill (first page): https://signed.example/form-attachments/rep1/solar-lead/${UP}/billPage1/file.jpg?v=v4&a=1`,
       'Electric panel: https://signed.example/',

@@ -1,7 +1,7 @@
 // How a solar lead reads on screen (admin Leads tab, rep Solar page). Pure.
 import type { Tone } from '@/components/portal/admin-d/AdminUi';
 import type { SolarLeadBooking, SolarLeadStatus, SolarLeadView } from './solarClient';
-import { ROOF_TYPE_LABELS, type RoofType } from '@/lib/solar/leadFields';
+import { NO_SALE_REASON_LABELS, ROOF_TYPE_LABELS, type RoofType } from '@/lib/solar/leadFields';
 import { OUTCOME_LABEL, STAGE_LABEL, stageText, type SolarDemoOutcome, type SolarLeadStage } from '@/lib/solar/leadStage';
 
 export const STATUS_LABEL: Record<SolarLeadStatus, string> = {
@@ -20,9 +20,19 @@ export const STATUS_TONE: Record<SolarLeadStatus, Tone> = {
 };
 
 export const CREDIT_LABEL: Record<string, string> = {
-  purchase_600: 'Purchase, 600+',
-  lease_ppa_680: 'Lease or PPA, 680+',
+  purchase_600: 'Purchase, 600–679',
+  lease_ppa_680: 'Lease, PPA or Purchase, 680+',
 };
+
+/** "No sale: low credit" for a lead closed at pre-qualification, else null. */
+export function noSaleLine(lead: Pick<SolarLeadView, 'noSaleReason'>): string | null {
+  return lead.noSaleReason ? NO_SALE_REASON_LABELS[lead.noSaleReason] : null;
+}
+
+/** The credit answer: its tier, "No sale: low credit" (Under 600), or `none`. */
+export function creditLine(lead: Pick<SolarLeadView, 'creditTier' | 'noSaleReason'>, none: string): string {
+  return noSaleLine(lead) ?? (lead.creditTier ? CREDIT_LABEL[lead.creditTier] : none);
+}
 
 export const PHOTO_LABELS: { slot: 'billPage1' | 'billGraph' | 'panel' | 'meter'; label: string }[] = [
   { slot: 'billPage1', label: 'Bill, first page' },
