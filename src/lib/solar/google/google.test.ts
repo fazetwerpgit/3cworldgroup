@@ -174,7 +174,7 @@ describe('event payload', () => {
     );
     // Google adds its own Meet line; the booking id rides only in private properties.
     expect(e.description).not.toMatch(/meet\.google|portal|12 Elm|sam_2026/i);
-    expect(e.extendedProperties).toEqual({ private: { solarBookingId: VIRTUAL.bookingId } });
+    expect(e.extendedProperties).toEqual({ private: { solarBookingId: VIRTUAL.bookingId, solarHomeownerEmail: 'ana@example.com' } });
   });
 
   it('no consultant phone: the call-or-text line is left out', () => {

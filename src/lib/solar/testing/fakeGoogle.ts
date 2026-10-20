@@ -25,6 +25,8 @@ export interface FakeGoogle {
   freeBusy: { start: string; end: string }[] | 'error';
   /** events.delete status. */
   deleteStatus: number;
+  /** The events Google holds, by id (tests may edit them, e.g. add an attendee). */
+  events: Map<string, Record<string, unknown>>;
   find: (method: string, pattern: string | RegExp) => GoogleRequest | undefined;
   all: (method: string, pattern: string | RegExp) => GoogleRequest[];
   fetch: ReturnType<typeof vi.fn>;
@@ -52,6 +54,7 @@ export function createFakeGoogle(): FakeGoogle {
     meetLink: 'https://meet.google.com/new-meet-abc',
     freeBusy: [],
     deleteStatus: 204,
+    events: new Map(),
     find: (method, pattern) => g.all(method, pattern)[0],
     all: (method, pattern) =>
       g.requests.filter(
@@ -59,7 +62,7 @@ export function createFakeGoogle(): FakeGoogle {
       ),
     fetch: vi.fn(),
   };
-  const events = new Map<string, Record<string, unknown>>();
+  const events = g.events;
 
   g.fetch.mockImplementation(async (input: string | URL, init?: RequestInit) => {
     const url = String(input);

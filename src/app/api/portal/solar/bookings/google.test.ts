@@ -312,9 +312,12 @@ describe('cancelling deletes the Google event (Google tells the homeowner)', () 
 });
 
 describe('a contact fix on a booked lead follows to the event', () => {
-  it('patches the title and invitee with sendUpdates=all', async () => {
+  it('patches the title and swaps only the homeowner invitee (sendUpdates=all)', async () => {
     sam(LIVE);
     await book('virtual');
+    // The consultant added a colleague to the event by hand.
+    const event = google.events.get(bookingEventId(ID, NOW.getTime()))!;
+    event.attendees = [...(event.attendees as object[]), { email: 'helper@3cworldgroup.com', responseStatus: 'accepted' }];
     const res = await patchLead(
       new NextRequest('http://localhost/api/portal/solar/leads/rep1_c1', {
         method: 'PATCH',
@@ -327,7 +330,11 @@ describe('a contact fix on a booked lead follows to the event', () => {
     expect(patch.url).toContain('sendUpdates=all');
     expect(patch.body).toEqual({
       summary: 'Solar consultation: Ana Lopez-Diaz',
-      attendees: [{ email: 'ana.lopez@example.com', displayName: 'Ana Lopez-Diaz' }],
+      attendees: [
+        { email: 'helper@3cworldgroup.com', responseStatus: 'accepted' },
+        { email: 'ana.lopez@example.com', displayName: 'Ana Lopez-Diaz' },
+      ],
+      extendedProperties: { private: { solarBookingId: ID, solarHomeownerEmail: 'ana.lopez@example.com' } },
     });
   });
 });

@@ -78,7 +78,9 @@ export function buildBookingEvent(i: BookingEventInput): Record<string, unknown>
         : {}),
     guestsCanModify: false,
     guestsCanInviteOthers: false,
-    extendedProperties: { private: { solarBookingId: i.bookingId } },
+    // Private: on the consultant's copy only. The homeowner's address is kept
+    // so a contact fix replaces that one invitee and no one else.
+    extendedProperties: { private: { solarBookingId: i.bookingId, ...(email ? { solarHomeownerEmail: email } : {}) } },
   };
 }
 
@@ -203,9 +205,13 @@ export async function deleteBookingEvent(
   return false;
 }
 
+type Attendee = { email?: string; displayName?: string; [key: string]: unknown };
+
 /**
- * A homeowner name/email fix after booking: the event's title and invitee
- * follow it (Google invites the new address and tells a replaced one).
+ * A homeowner name/email fix after booking: the event's title and homeowner
+ * invitee follow it (Google invites the new address and tells a replaced
+ * one). Anyone the consultant added to the event themselves is kept: the
+ * event is read first and only the homeowner we invited is swapped.
  */
 export async function patchBookingEventContact(
   uid: string,
@@ -214,9 +220,26 @@ export async function patchBookingEventContact(
 ): Promise<boolean> {
   const email = contact.customerEmail.trim();
   const name = contact.customerName.trim();
-  const res = await call(uid, 'PATCH', `${EVENTS}/${encodeURIComponent(eventId)}?sendUpdates=all`, {
+  const url = `${EVENTS}/${encodeURIComponent(eventId)}`;
+  const current = await call(uid, 'GET', url);
+  if (current.status !== 200) {
+    console.error('google calendar: event read before contact update failed', errorCode(current));
+    return false;
+  }
+  const props = (current.data.extendedProperties ?? {}) as { private?: Record<string, string> };
+  const priv = props.private ?? {};
+  const previous = String(priv.solarHomeownerEmail ?? '').toLowerCase();
+  const same = (a: Attendee, address: string) => !!address && String(a.email ?? '').toLowerCase() === address.toLowerCase();
+  const existing = Array.isArray(current.data.attendees) ? (current.data.attendees as Attendee[]) : [];
+  const others = existing.filter((a) => !same(a, previous) && !same(a, email));
+  const kept = existing.find((a) => same(a, email));
+  const attendees = email ? [...others, { ...(kept ?? {}), email, ...(name ? { displayName: name } : {}) }] : others;
+  const { solarHomeownerEmail: _old, ...rest } = priv;
+  void _old;
+  const res = await call(uid, 'PATCH', `${url}?sendUpdates=all`, {
     summary: eventSummary(name),
-    attendees: email ? [{ email, ...(name ? { displayName: name } : {}) }] : [],
+    attendees,
+    extendedProperties: { private: { ...rest, ...(email ? { solarHomeownerEmail: email } : {}) } },
   });
   if (res.status === 200) return true;
   console.error('google calendar: event contact update failed', errorCode(res));
