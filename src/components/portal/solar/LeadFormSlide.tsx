@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Check, ChevronRight, FileText, RotateCcw } from 'lucide-react';
 import { resolveUploadMime } from '@/lib/forms/formUploads';
-import { isRoofType } from '@/lib/solar/leadFields';
+import { isBlockedRoofType, isRoofType } from '@/lib/solar/leadFields';
 import {
   FormUploadError,
   isUploadCancelled,
@@ -283,6 +283,7 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
     STEPS[i].fields.some((k) => (tried || touched[k]) && errors[k]) ||
     (STEPS[i].id === 'home' && (tried || roofTouched) && Boolean(roofProblem));
   const last = step === STEPS.length - 1;
+  const roofBlocksStep = !saved && current.id === 'home' && isBlockedRoofType(state.roofType);
 
   return (
     <>
@@ -452,7 +453,8 @@ export function LeadFormSlide({ onSaved, startStep }: { onSaved: () => void; sta
               {sending ? 'Saving...' : 'Save and continue'}
             </button>
           ) : (
-            <button key="next" className={s.primary} type="button" onClick={advance}>
+            // A blocked roof ends the lead here (the roof error says why): no way on to Photos.
+            <button key="next" className={s.primary} type="button" onClick={advance} disabled={roofBlocksStep}>
               Next: {STEPS[step + 1].label}
               <ChevronRight size={18} aria-hidden />
             </button>

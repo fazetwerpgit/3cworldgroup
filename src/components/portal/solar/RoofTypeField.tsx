@@ -17,7 +17,10 @@ const CHOICES: RoofChoice[] = [...ROOF_TYPES, ...BLOCKED_ROOF_TYPES];
 /** Inline error for the roof question, or '' when the lead may go on. */
 export function roofError(roof: RoofChoice | null): string {
   if (!roof) return 'Pick the roof type';
-  if (isBlockedRoofType(roof)) return `${ROOF_TYPE_LABELS[roof]} roofs don't qualify, so this lead stops here.`;
+  // Read by the homeowner too (the deck is handed over): say what it means for them.
+  if (isBlockedRoofType(roof)) {
+    return `${ROOF_TYPE_LABELS[roof]} roofs don't qualify for solar right now, so we can't book a consultation for this home.`;
+  }
   return '';
 }
 
