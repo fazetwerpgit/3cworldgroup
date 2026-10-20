@@ -15,3 +15,19 @@ describe('monthlyKwh null', () => {
     expect(res.ok && 'monthlyKwh' in res.fields).toBe(false);
   });
 });
+
+describe('usage shape', () => {
+  it('takes primitives and flat arrays of primitives', () => {
+    const usage = { mode: 'months', monthly: null, daily: 30.5, ok: true, months: [900, null, 1000] };
+    expect(parseLeadExtras({ usage })).toEqual({ ok: true, extras: { usage } });
+  });
+
+  it('refuses nesting, empty keys, and over 4KB', () => {
+    expect(parseLeadExtras({ usage: { deep: { x: 1 } } }).ok).toBe(false);
+    expect(parseLeadExtras({ usage: { months: [[1]] } }).ok).toBe(false);
+    expect(parseLeadExtras({ usage: { months: [{ x: 1 }] } }).ok).toBe(false);
+    expect(parseLeadExtras({ usage: { '': 1 } }).ok).toBe(false);
+    expect(parseLeadExtras({ usage: [1, 2] }).ok).toBe(false);
+    expect(parseLeadExtras({ usage: { note: 'x'.repeat(5000) } })).toEqual({ ok: false, error: 'usage is too large' });
+  });
+});

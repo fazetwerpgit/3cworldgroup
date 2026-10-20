@@ -77,8 +77,11 @@ export type LeadExtras = {
   usage?: Record<string, unknown>;
 };
 
+// One level deep: each key maps to a primitive or a flat array of primitives
+// (the deck sends {mode, monthly, daily, months: [...]}).
+const usagePrimitive = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 const usageSchema = z
-  .record(z.string(), z.unknown())
+  .record(z.string().min(1), z.union([usagePrimitive, z.array(usagePrimitive)]))
   .refine((v) => {
     try {
       return new TextEncoder().encode(JSON.stringify(v)).length <= USAGE_MAX_BYTES;
