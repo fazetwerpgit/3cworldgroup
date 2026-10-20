@@ -302,7 +302,7 @@ describe('fiber and solar boards', () => {
     for (const call of testState.fetchLeaderboard.mock.calls) expect(call[4]).not.toHaveProperty('source');
   });
 
-  it('gives a solar-only rep the solar board alone: booked consults, no switches', async () => {
+  it('gives a solar-only rep the solar board alone: Set (booked consults) first, a Set | Demoed | Closed switch', async () => {
     testState.user = { uid: 'current', displayName: 'Ada Lovelace', solarRole: 'entry_canvasser' };
     testState.permissions = ['leaderboard:read', 'solar:read', 'solar:write'];
     testState.leaderboard = board();
@@ -311,11 +311,25 @@ describe('fiber and solar boards', () => {
     expect(container.textContent).toContain('Weekly booked consults · resets Sunday');
     expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 consults this week');
     expect(container.querySelector('[aria-label="Leaderboard"]')).toBeNull();
-    expect(container.querySelector('[aria-label="Leaderboard metric"]')).toBeNull();
+    const metricGroup = container.querySelector('[aria-label="Leaderboard metric"]');
+    expect(metricGroup?.textContent).toBe('SetDemoedClosed');
+    expect(metricGroup?.querySelector('[aria-pressed="true"]')?.textContent).toBe('Set');
 
     const month = buttonsIn().find((b) => b.textContent === 'Month');
     await act(async () => month?.click());
     expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'bookedConsults', 100, 'approved', { team: true, source: 'solar' });
+
+    // Demoed and Closed keep the period and the same board.
+    const demoed = buttonsIn().find((b) => b.textContent === 'Demoed');
+    await act(async () => demoed?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'solarDemoed', 100, 'approved', { team: true, source: 'solar' });
+    expect(container.textContent).toContain('Monthly demoed appointments · resets on the 1st');
+    expect(container.querySelector('[data-testid="standing-copy"]')?.textContent).toBe('You · unranked · 0 demos this month');
+
+    const closed = buttonsIn().find((b) => b.textContent === 'Closed');
+    await act(async () => closed?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('month', 'solarClosed', 100, 'approved', { team: true, source: 'solar' });
+    expect(container.textContent).toContain('Monthly closed sales · resets on the 1st');
   });
 
   it('gives a dual rep (and an admin) a Fiber | Solar switch, fiber first', async () => {
@@ -330,10 +344,17 @@ describe('fiber and solar boards', () => {
     const solar = buttonsIn().find((b) => b.textContent === 'Solar');
     await act(async () => solar?.click());
     expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'bookedConsults', 100, 'approved', { team: true, source: 'solar' });
-    expect(container.querySelector('[aria-label="Leaderboard metric"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Leaderboard metric"]')?.textContent).toBe('SetDemoedClosed');
+    const closed = buttonsIn().find((b) => b.textContent === 'Closed');
+    await act(async () => closed?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'solarClosed', 100, 'approved', { team: true, source: 'solar' });
 
+    // Each board keeps its own pick: back on fiber it is points, back on solar it is Closed.
     const fiber = buttonsIn().find((b) => b.textContent === 'Fiber');
     await act(async () => fiber?.click());
     expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'totalPoints', 100, 'approved', { team: true });
+    expect(container.querySelector('[aria-label="Leaderboard metric"]')?.textContent).toBe('PointsSales');
+    await act(async () => buttonsIn().find((b) => b.textContent === 'Solar')?.click());
+    expect(testState.fetchLeaderboard).toHaveBeenLastCalledWith('week', 'solarClosed', 100, 'approved', { team: true, source: 'solar' });
   });
 });

@@ -15,6 +15,7 @@ import { ArrowDown, ArrowUp, Crown, Flame } from 'lucide-react';
 import { LegacySparkline } from './LegacySparkline';
 import d from './leaderboard-desk.module.css';
 import type { LeaderboardEntry, LeaderboardMetric } from '../LeaderboardTable';
+import { SOLAR_COPY, isSolarMetric } from '../solarMetrics';
 import { recentSaleLabel, recentSaleWhen, spotLine, useMinuteClock, zeroEntries } from '../belowPodium';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
@@ -51,14 +52,16 @@ function metricValue(entry: LeaderboardEntry, metric: Metric) {
 }
 
 function metricUnit(metric: Metric) {
-  return metric === 'totalPoints' ? 'pts' : metric === 'bookedConsults' ? 'consults' : 'sales';
+  return metric === 'totalPoints' ? 'pts' : isSolarMetric(metric) ? SOLAR_COPY[metric].unit : 'sales';
 }
 
-/** The board's counted thing in copy: "approved sales" on fiber, "booked consults" on solar. */
+/** The board's counted thing in copy: "approved sales" on fiber, "booked consults" (etc.) on solar. */
 function counted(metric: Metric) {
-  return metric === 'bookedConsults'
-    ? { adj: 'booked', Adj: 'Booked', things: 'consults', thing: 'consult', head: 'Booked' }
-    : { adj: 'approved', Adj: 'Approved', things: 'sales', thing: 'sale', head: metric === 'totalPoints' ? 'Points' : 'Sales' };
+  if (isSolarMetric(metric)) {
+    const c = SOLAR_COPY[metric];
+    return { adj: c.adj, Adj: c.adj[0].toUpperCase() + c.adj.slice(1), things: c.things, thing: c.things.replace(/s$/, ''), head: c.head };
+  }
+  return { adj: 'approved', Adj: 'Approved', things: 'sales', thing: 'sale', head: metric === 'totalPoints' ? 'Points' : 'Sales' };
 }
 
 function periodLabel(period: Period, pastMonth: MonthKey | null = null) {
@@ -175,7 +178,7 @@ function AcrossTheBoard({ entries, currentUser, metric, period, pastMonth }: { e
   return (
     <section className={d.pulse} aria-label="Team pulse">
       <div className={d.stat}>
-        <span className={d.statLabel}>{metric === 'bookedConsults' ? 'Most booked' : 'Top closer'}</span>
+        <span className={d.statLabel}>{isSolarMetric(metric) ? SOLAR_COPY[metric].topLabel : 'Top closer'}</span>
         <strong className={d.statValue}>{topCloser?.salesRepName ?? '--'}</strong>
         <span className={d.statSub}>{topCloser ? `${formatNumber(topCloser.totalSales)} ${c.adj} ${c.things}` : `No ${c.adj} ${c.things} yet`}</span>
       </div>
@@ -191,7 +194,7 @@ function AcrossTheBoard({ entries, currentUser, metric, period, pastMonth }: { e
       </div>
       <div className={d.stat}>
         <span className={d.statLabel}>Team pulse</span>
-        <strong className={d.statValue}>{formatNumber(totalPoints)} {metric === 'bookedConsults' ? unit : 'pts'}</strong>
+        <strong className={d.statValue}>{formatNumber(totalPoints)} {isSolarMetric(metric) ? unit : 'pts'}</strong>
         <span className={d.statSub}>{entries.length} reps, {pastMonth ? monthLabel(pastMonth) : daysLeft ? `${daysLeft} days left` : 'all time'}</span>
       </div>
     </section>
@@ -345,9 +348,9 @@ export function LegacyLeaderboardTable({ entries, currentUser, metric, period, u
       <ChaseTable entries={ordered} zeros={zeros} currentUser={mine} metric={metric} pastMonth={pastMonth} />
       <RecentSales sales={recent} metric={metric} />
       <footer className={d.foot}>
-        {metric === 'bookedConsults' ? (
+        {isSolarMetric(metric) ? (
           <>
-            <span>Rankings count consults booked in the selected period; cancelled ones drop off.</span>
+            <span>{SOLAR_COPY[metric].footer}</span>
             <span>Credited to the rep who owns the lead · refreshed moments ago.</span>
           </>
         ) : (

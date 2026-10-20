@@ -4,6 +4,7 @@ import { MetricValue } from './MetricValue';
 import { PlanMixLine } from './PlanMixLine';
 import { leaderboardMixLabel, type LeaderboardEntry, type LeaderboardMetric } from './LeaderboardTable';
 import styles from './leaderboard.module.css';
+import { SOLAR_COPY, isSolarMetric } from './solarMetrics';
 
 interface LeaderboardRowsProps {
   entries: LeaderboardEntry[];
@@ -14,7 +15,7 @@ interface LeaderboardRowsProps {
 }
 
 function metricHead(metric: LeaderboardMetric) {
-  return metric === 'totalPoints' ? 'Points' : metric === 'bookedConsults' ? 'Booked' : 'Sales';
+  return metric === 'totalPoints' ? 'Points' : isSolarMetric(metric) ? SOLAR_COPY[metric].head : 'Sales';
 }
 
 /** The ranked list below the podium: rank four down, as one scoreboard panel.

@@ -132,8 +132,14 @@ export async function GET(request: NextRequest) {
       { start: bounds?.start ?? null, end: bounds?.end ?? null },
       { now, withHistory: !pastMonth }
     );
-    // `booked` stays on the Set board's rows for clients that read it.
-    const ranked = metric === 'set' ? rankedRows.map((row) => ({ ...row, booked: row.count })) : rankedRows;
+    // `booked` stays on the Set board's rows for clients that read it. Closed
+    // has no mix line: every close is a sale.
+    const ranked =
+      metric === 'set'
+        ? rankedRows.map((row) => ({ ...row, booked: row.count }))
+        : metric === 'closed'
+          ? rankedRows.map((row) => ({ ...row, mix: [] }))
+          : rankedRows;
 
     // A demo account (App Review) sees aliases for everyone but itself.
     const redact = createDemoRedactor({ uid: youUid, demoAccount: gate.demoAccount === true });

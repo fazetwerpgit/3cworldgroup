@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { LegacyLeaderboardTable } from './LegacyLeaderboardTable';
+import { SOLAR_COPY, SOLAR_METRIC_OPTIONS, isSolarMetric } from '../solarMetrics';
 import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLeaderboard } from '@/hooks/useLeaderboard';
@@ -90,22 +91,20 @@ function LegacyLeaderboardFilters({
             </button>
           ))}
       </div>
-      {/* The solar board ranks by booked consults alone: no metric switch. */}
-      {metric === 'bookedConsults' ? null : (
-        <div className={tx.seg} role="group" aria-label="Leaderboard metric">
-          {metricOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              aria-pressed={metric === option.value}
-              onClick={() => setMetric(option.value)}
-              className={tx.segBtn}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Points | Sales on fiber, Set | Demoed | Closed on solar. */}
+      <div className={tx.seg} role="group" aria-label="Leaderboard metric">
+        {(isSolarMetric(metric) ? SOLAR_METRIC_OPTIONS : metricOptions).map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={metric === option.value}
+            onClick={() => setMetric(option.value)}
+            className={tx.segBtn}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
       {/* Earlier months on This Month: the Sales page's stepper. */}
       {period === 'month' && monthNav ? (
         <MonthPicker month={monthNav.month} min={monthNav.min} max={monthNav.max} onChange={monthNav.onChange} />
@@ -231,7 +230,8 @@ function SolarWeek({ booked, loading, failed, onRetry }: { booked: number | null
 }
 
 function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardEntry | null; userName: string; metric: Metric }) {
-  const unit = metric === 'totalPoints' ? 'pts' : metric === 'bookedConsults' ? 'consults' : 'sales';
+  const solarCopy = isSolarMetric(metric) ? SOLAR_COPY[metric] : null;
+  const unit = metric === 'totalPoints' ? 'pts' : solarCopy ? solarCopy.unit : 'sales';
 
   return (
     <aside className={d.card}>
@@ -243,8 +243,8 @@ function ArenaStanding({ userRank, userName, metric }: { userRank?: LeaderboardE
       <div className={d.standingFoot}>
         <strong>{userName}</strong>
         <span>
-          {metric === 'bookedConsults'
-            ? `${formatNumber(userRank?.totalSales ?? 0)} booked consults`
+          {solarCopy
+            ? `${formatNumber(userRank?.totalSales ?? 0)} ${solarCopy.adj} ${solarCopy.things}`
             : `${formatNumber(userRank?.totalPoints ?? 0)} pts, ${userRank?.totalSales ?? 0} sales`}
         </span>
       </div>
@@ -318,7 +318,8 @@ export function LegacyLeaderboardPage({
   onRetry,
   boardSwitch = null,
 }: LegacyLeaderboardPageProps) {
-  const solar = metric === 'bookedConsults';
+  // The weekly slot on the solar board stays booked consults, whichever count ranks the board.
+  const solar = isSolarMetric(metric);
   const {
     currentUser: weeklyCurrentUser,
     loading: weeklyLoading,

@@ -10,6 +10,7 @@ import type { RecentSale, UnrankedRep } from '@/lib/leaderboard/team';
 import type { PlanMixEntry } from '@/lib/sales/planMix';
 import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import styles from './leaderboard.module.css';
+import { SOLAR_COPY, isSolarMetric, type SolarMetric } from './solarMetrics';
 
 export interface LeaderboardEntry {
   rank: number;
@@ -25,9 +26,9 @@ export interface LeaderboardEntry {
   planMix?: PlanMixEntry[];
 }
 
-/** 'bookedConsults' is the solar board's one metric (GET /api/portal/solar/leaderboard):
- *  the count rides in totalSales (and totalPoints), so every piece reads it as is. */
-export type LeaderboardMetric = 'totalPoints' | 'totalSales' | 'bookedConsults';
+/** The solar board's metrics (Set | Demoed | Closed, GET /api/portal/solar/leaderboard,
+ *  see ./solarMetrics): the count rides in totalSales (and totalPoints), so every piece reads it as is. */
+export type LeaderboardMetric = 'totalPoints' | 'totalSales' | SolarMetric;
 export type LeaderboardPeriod = 'week' | 'month' | 'year' | 'all';
 
 export interface LeaderboardProps {
@@ -55,18 +56,18 @@ export function leaderboardValue(entry: LeaderboardEntry, metric: LeaderboardMet
 }
 
 export function leaderboardUnit(metric: LeaderboardMetric) {
-  return metric === 'totalPoints' ? 'pts' : metric === 'bookedConsults' ? 'consults' : 'sales';
+  return metric === 'totalPoints' ? 'pts' : isSolarMetric(metric) ? SOLAR_COPY[metric].unit : 'sales';
 }
 
 /** What one counted unit is called in a sentence: "1 sale passes …", "1 consult passes …". */
 export function leaderboardNoun(metric: LeaderboardMetric, count: number) {
-  const one = metric === 'bookedConsults' ? 'consult' : 'sale';
-  return count === 1 ? one : `${one}s`;
+  if (isSolarMetric(metric)) return count === 1 ? SOLAR_COPY[metric].one : SOLAR_COPY[metric].many;
+  return count === 1 ? 'sale' : 'sales';
 }
 
 /** The screen-reader name of the line under a rep: plans on fiber, consult modes on solar. */
 export function leaderboardMixLabel(metric: LeaderboardMetric) {
-  return metric === 'bookedConsults' ? 'Consults by type' : 'Plan mix';
+  return isSolarMetric(metric) ? SOLAR_COPY[metric].mixLabel : 'Plan mix';
 }
 
 export function formatLeaderboardValue(value: number) {
@@ -74,19 +75,19 @@ export function formatLeaderboardValue(value: number) {
 }
 
 function EmptyState({ pastMonth, metric }: { pastMonth: MonthKey | null; metric: LeaderboardMetric }) {
-  const solar = metric === 'bookedConsults';
+  const solar = isSolarMetric(metric) ? SOLAR_COPY[metric] : null;
   if (pastMonth) {
     return (
       <div className={styles.empty}>
-        <p className="portal-display">{solar ? 'No booked consults' : 'No approved sales'}</p>
-        <span>{solar ? 'Nothing was booked' : 'Nothing was approved'} in {monthLabel(pastMonth)}.</span>
+        <p className="portal-display">{solar ? solar.emptyTitle : 'No approved sales'}</p>
+        <span>{solar ? solar.emptyPast : 'Nothing was approved'} in {monthLabel(pastMonth)}.</span>
       </div>
     );
   }
   return (
     <div className={styles.empty}>
       <p className="portal-display">The board is open</p>
-      <span>{solar ? 'Booked consults will appear here.' : 'Approved activity will appear here.'}</span>
+      <span>{solar ? solar.emptyOpen : 'Approved activity will appear here.'}</span>
     </div>
   );
 }
@@ -168,7 +169,7 @@ export function LeaderboardTable({
       {spot ? <p className={styles.spot} data-testid="spot-line"><SpotText text={spot} /></p> : null}
       {entries.length === 0 ? <EmptyState pastMonth={pastMonth} metric={metric} /> : null}
       <LeaderboardRows entries={rowEntries} zeros={zeros} currentUser={effectiveCurrentUser} metric={metric} />
-      <RecentSales sales={recent} title={metric === 'bookedConsults' ? 'Recent consults' : undefined} />
+      <RecentSales sales={recent} title={isSolarMetric(metric) ? SOLAR_COPY[metric].recentTitle : undefined} />
       {showsStandingBar ? (
         <div className={styles.standing} aria-label="Your standing">
           <Avatar entry={standingEntry} size="row" decorative={false} />

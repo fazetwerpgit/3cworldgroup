@@ -227,6 +227,7 @@ describe('GET /api/portal/solar/leaderboard — metric=set|demoed|closed', () =>
   it('closed: sales only, by when the sale showed', async () => {
     const body = await (await get('?period=week&metric=closed')).json();
     expect(body.metric).toBe('closed');
+    expect(body.leaderboard[0].mix).toEqual([]);
     expect(body.leaderboard.map((r: { uid: string; count: number }) => [r.uid, r.count])).toEqual([['ana', 1], ['ben', 1]]);
     expect(await rows('?period=month&month=2026-09&metric=closed')).toEqual([['ana', 1]]);
     expect(await rows('?period=all&metric=solarClosed')).toEqual([['ana', 2], ['ben', 1]]);

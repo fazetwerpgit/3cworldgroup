@@ -26,7 +26,8 @@ interface LeaderboardEntry {
 }
 
 type Period = 'week' | 'month' | 'year' | 'all';
-type Metric = 'totalPoints' | 'totalSales' | 'bookedConsults';
+// The solar board's Set | Demoed | Closed: bookedConsults | solarDemoed | solarClosed.
+type Metric = 'totalPoints' | 'totalSales' | 'bookedConsults' | 'solarDemoed' | 'solarClosed';
 /** Which board: GET /api/portal/leaderboard (fiber) or /api/portal/solar/leaderboard. */
 export type LeaderboardSource = 'fiber' | 'solar';
 
@@ -94,6 +95,8 @@ type SolarRow = {
   rank?: unknown;
   uid?: unknown;
   name?: unknown;
+  /** The board's count (consults, demos or closes); older answers carry `booked` only. */
+  count?: unknown;
   booked?: unknown;
   mix?: unknown;
   movement?: unknown;
@@ -103,9 +106,9 @@ type SolarRow = {
 
 const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
-/** One solar row in the fiber board's shape: booked consults ride in totalSales and totalPoints. */
+/** One solar row in the fiber board's shape: the count rides in totalSales and totalPoints. */
 function solarEntry(row: SolarRow): LeaderboardEntry {
-  const booked = num(row.booked);
+  const booked = num(row.count ?? row.booked);
   return {
     rank: num(row.rank),
     salesRepId: typeof row.uid === 'string' ? row.uid : '',

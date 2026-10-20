@@ -6,6 +6,7 @@ import type { LeaderboardMetric, LeaderboardPeriod } from './LeaderboardTable';
 import { periodBounds as sharedPeriodBounds } from '@/lib/leaderboard/periods';
 import { monthLabel, type MonthKey } from '@/lib/sales/monthWindow';
 import styles from './leaderboard.module.css';
+import { SOLAR_COPY, isSolarMetric } from './solarMetrics';
 
 const DAY_MS = 86_400_000;
 
@@ -14,7 +15,8 @@ export function periodLabel(
   metric: LeaderboardMetric = 'totalPoints',
   pastMonth: MonthKey | null = null,
 ) {
-  const subject = metric === 'totalPoints' ? 'points' : metric === 'bookedConsults' ? 'booked consults' : 'sales';
+  const subject =
+    metric === 'totalPoints' ? 'points' : isSolarMetric(metric) ? `${SOLAR_COPY[metric].adj} ${SOLAR_COPY[metric].things}` : 'sales';
 
   if (period === 'month' && pastMonth) return `Monthly ${subject} · ${monthLabel(pastMonth)}`;
 
