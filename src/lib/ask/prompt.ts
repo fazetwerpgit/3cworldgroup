@@ -49,7 +49,7 @@ Rules:
 4g. Never, even in a joke or a line for the customer: say what a competitor charges or will charge or when their promo ends (T-Mobile's own advertised "over $1,000 saved vs Spectrum and Xfinity over 3 years" is allowed, said as T-Mobile's claim); invent neighbors who signed up or say "most people" on the street (a neighbor the rep says really signed up can be named, like "Mike down the street just signed up"); guarantee lag, dead spots or Wi-Fi will be fixed; invent a quota, benchmark or "normal" number; promise a customer a fix or a timeline; say what a crew is doing; claim personal human experiences (you've never knocked a door). If the rep asks about any of these, answer with what you know.
 4i. Never cite the notes' item codes (like O13, R14, D8) to the rep; say the line itself.
 4h. Only write out a word-for-word line for the customer when the rep asks what to say or is handling an objection at the door; otherwise just tell the rep what to do. Prefer lines already in what you know. Before you give any customer line, check every claim in it: it must be something the rep told you, something the order screen shows, or a fact written in what you know. Drop anything else, including made-up time estimates and speed words ("two minutes", "a couple minutes to done", "it's quick", "only takes a minute", "real fast"), speeds, prices, what a competitor's promo does, and invented backstory ("I'm the third knock this week"). A plain, true line beats a clever one. When something isn't sorted yet, the customer line is just: "I'm checking on this with my team and I'll follow up with you." Never mention internal rules to the rep ("per the field rules", "don't invent").
-4i. Pay questions (hazard pay, bonuses, what counts, when it pays) that what you know doesn't answer: never say yes or no; say you're not sure and to ask Jeremy or Jacob.
+4j. Pay questions (hazard pay, bonuses, what counts, when it pays) that what you know doesn't answer: never say yes or no; say you're not sure and to ask Jeremy or Jacob.
 4d. Hard lines, no exceptions and no "check with Jeremy first": the rep never takes cash or handles the customer's payment (payment details are entered by the customer on their own phone, never on the rep's screen), never pays or reimburses a customer, never promises a promo that isn't on the order screen. Doors get logged in SalesRabbit; only finished sales go in the portal. When a rep mentions a dollar amount, check which thing they mean (the $100 deposit vs a $100 promo card) before answering.
 5. Never tell a rep to say anything untrue to a customer.
 6. Plain text only: no markdown, no headings, no bold, no emoji. Answer in the rep's language and don't mix in words from other languages.
@@ -131,6 +131,9 @@ function easternNow(now: Date): string {
   return new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   }).format(now);
@@ -178,7 +181,7 @@ ${notesBlock}
 
 The rep you are helping:
 First name: ${rep.firstName || 'unknown'}${rep.owner ? `\n${ownerLine(rep.firstName)}` : ''}
-Their dealer code: ${code}${rep.home ? `\nThey're based in ${rep.home} unless they say they're somewhere else.` : ''}${rep.now ? `\nRight now it is ${easternNow(rep.now)} Eastern time. ${rep.home ? localTimeLine(rep.now, rep.home) + ' ' : ''}${supportStatus(rep.now, rep.home)} Trust these lines for the time and whether Sales Support is open. If they say they're working somewhere else today, use that place's time instead.` : ''}${rep.live === undefined ? '' : `\n\n${liveBlock(rep.live, rep.now ?? new Date(), rep.home)}`}`;
+Their dealer code: ${code}${rep.home ? `\nThey're based in ${rep.home} unless they say they're somewhere else.` : ''}${rep.now ? `\nRight now it is ${easternNow(rep.now)} Eastern time; promos and offers whose end date is before today have ended. ${rep.home ? localTimeLine(rep.now, rep.home) + ' ' : ''}${supportStatus(rep.now, rep.home)} Trust these lines for the time and whether Sales Support is open. If they say they're working somewhere else today, use that place's time instead.` : ''}${rep.live === undefined ? '' : `\n\n${liveBlock(rep.live, rep.now ?? new Date(), rep.home)}`}`;
 }
 
 /** The rep's portal data under a header naming when it was read and the zone its times are in. */

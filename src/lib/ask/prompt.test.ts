@@ -56,6 +56,14 @@ describe('localTimeLine', () => {
   });
 });
 
+describe('buildSystemPrompt date', () => {
+  it("states today's full date so dated promos can be called ended", () => {
+    const prompt = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [], now: et('2026-09-29T15:05') });
+    expect(prompt).toContain('Right now it is Tuesday, September 29, 2026 at 3:05 PM Eastern time');
+    expect(prompt).toContain('promos and offers whose end date is before today have ended');
+  });
+});
+
 describe('buildSystemPrompt order fixes', () => {
   it('knows an auto-filled payment card can break a T-Fiber order, and the fix', () => {
     const prompt = buildSystemPrompt([], { firstName: 'Braeden', dealerCodes: [] });
