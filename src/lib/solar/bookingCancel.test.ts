@@ -89,6 +89,13 @@ describe('announceBookingCancel emails', () => {
     expect(mockEmail).not.toHaveBeenCalled();
   });
 
+  it('with an unconfirmed Google event (our .ics went out instead): the event is deleted and the homeowner still gets the CANCEL .ics', async () => {
+    await announceBookingCancel({ ...CANCELLED, googleEventId: 'evt1', googleEventUnconfirmed: true }, 'rep1');
+    expect(mockRemove).toHaveBeenCalledWith('con', 'evt1');
+    const toHomeowner = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
+    expect(icsOf(toHomeowner)).toContain('METHOD:CANCEL');
+  });
+
   it("with Google on the owner's calendar: Jacob's notice copy (his own .ics) is still cancelled; the homeowner is not emailed", async () => {
     mockNotice.mockResolvedValue({
       to: { uid: 'jac', email: 'jmyers@3cworldgroup.com' },

@@ -41,6 +41,8 @@ export interface CancelledBooking {
   customerTz: string;
   /** The booking's event on the consultant's Google Calendar ('' when none). */
   googleEventId: string;
+  /** true when googleEventState is 'unconfirmed': the insert timed out, so our .ics went out instead of Google's invite. */
+  googleEventUnconfirmed?: boolean;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -95,6 +97,7 @@ export function stageBookingCancel(
     mode: booking.get('mode') === 'virtual' ? 'virtual' : 'in_person',
     ...zones,
     googleEventId: str(booking.get('googleEventId')),
+    googleEventUnconfirmed: booking.get('googleEventState') === 'unconfirmed',
   };
 }
 
@@ -170,7 +173,8 @@ export async function announceBookingCancel(
     if (!notifyOwner && owner) sends.delete(owner.uid);
 
     const invite = cancelInvite(c);
-    const onGoogle = Boolean(c.googleEventId);
+    // Only a confirmed Google event means Google sent the invite (and now the cancel).
+    const onGoogle = Boolean(c.googleEventId) && !c.googleEventUnconfirmed;
     if (invite && !onGoogle && c.customerEmail) {
       await sendEmail({
         to: c.customerEmail,
