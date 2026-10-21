@@ -12,7 +12,7 @@
  */
 import { AREA_PROPERTY_TYPES, areaDoorId, packAreaHouses, splitCondoUnit, type AreaUseCode } from './areaImport';
 import type { GeoBox } from './geohash';
-import { dedupeLeads, leadHouseDoc, normalizeAddress, titleCase, type LeadHouse } from './leadImport';
+import { dedupeLeads, leadHouseDoc, normalizeAddress, titleCase, type LeadHouse } from '@/lib/knock/leadImport';
 import type { ParcelTileRecord } from './parcelTiles';
 import type { House, HouseDoc, PropertyType } from './types';
 

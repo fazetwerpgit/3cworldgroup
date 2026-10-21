@@ -8,7 +8,7 @@
  * formats stay outside the planner: `parcelFromNal` maps one NAL record (+ its parcel centroid,
  * read by scripts/parcelShapes.ts) to a `ParcelRow`; `planAreaImport` turns rows into houses.
  */
-import { dedupeLeads, leadDocId, leadHouseDoc, normalizeAddress, titleCase, type LeadHouse } from './leadImport';
+import { dedupeLeads, leadDocId, leadHouseDoc, normalizeAddress, titleCase, type LeadHouse } from '@/lib/knock/leadImport';
 import type { House, PropertyType } from './types';
 
 /** One tax-roll parcel, independent of the file it came from. */
