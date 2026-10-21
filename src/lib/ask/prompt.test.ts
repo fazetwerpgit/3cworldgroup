@@ -56,6 +56,14 @@ describe('localTimeLine', () => {
   });
 });
 
+describe('buildSystemPrompt rule labels', () => {
+  it('never gives two rules the same label', () => {
+    const labels = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [] }).match(/^\d+[a-z]?(?=\. )/gm) ?? [];
+    expect(labels.length).toBeGreaterThan(10);
+    expect(labels.filter((label, i) => labels.indexOf(label) !== i)).toEqual([]);
+  });
+});
+
 describe('buildSystemPrompt date', () => {
   it("states today's full date so dated promos can be called ended", () => {
     const prompt = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [], now: et('2026-09-29T15:05') });
