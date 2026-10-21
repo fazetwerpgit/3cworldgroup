@@ -1,5 +1,5 @@
 // Minimal in-memory stand-in for the admin Firestore calls the solar routes
-// make (doc get/create/update, add, where/limit/get, collection get, and a
+// make (doc get/create/update, add, where/orderBy/limit/get, collection get, and a
 // runTransaction whose writes apply when the callback resolves). Tests only.
 type Data = Record<string, unknown>;
 type Filter = { field: string; op: string; value: unknown };
@@ -34,12 +34,25 @@ export function createFakeDb(seed: Record<string, Record<string, Data>> = {}) {
     return store.get(name)!;
   };
 
-  function query(name: string, filters: Filter[], max?: number) {
+  type Order = { field: string; dir: 'asc' | 'desc' };
+  function query(name: string, filters: Filter[], max?: number, order?: Order) {
     return {
-      where: (field: string, op: string, value: unknown) => query(name, [...filters, { field, op, value }], max),
-      limit: (n: number) => query(name, filters, n),
+      where: (field: string, op: string, value: unknown) => query(name, [...filters, { field, op, value }], max, order),
+      limit: (n: number) => query(name, filters, n, order),
+      // One field, as Firestore's single-field indexes allow; docs without it are left out.
+      orderBy: (field: string, dir: 'asc' | 'desc' = 'asc') => query(name, filters, max, { field, dir }),
       get: async () => {
         let docs = [...coll(name).entries()].filter(([, d]) => filters.every((f) => matches(d, f)));
+        if (order) {
+          const sign = order.dir === 'desc' ? -1 : 1;
+          docs = docs
+            .filter(([, d]) => d[order.field] !== undefined && d[order.field] !== null)
+            .sort(([, a], [, b]) => {
+              const x = a[order.field] as never;
+              const y = b[order.field] as never;
+              return x < y ? -sign : x > y ? sign : 0;
+            });
+        }
         if (max !== undefined) docs = docs.slice(0, max);
         const out = docs.map(([id, d]) => snap(id, d));
         return { empty: out.length === 0, size: out.length, docs: out };

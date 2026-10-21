@@ -407,3 +407,93 @@ describe('GET /api/portal/solar/leaderboard — from/to range and campaignId', (
     expect((await get(`?campaignId=${'x'.repeat(129)}`)).status).toBe(400);
   });
 });
+
+describe('GET /api/portal/solar/leaderboard — Set reads only the bookings it can show', () => {
+  // The unspied collection(), taken before any test spies on it.
+  const real = db.collection.bind(db);
+
+  // Records every where() on solarBookings, passing the fake query through.
+  function recordBookingFilters() {
+    const filters: unknown[][] = [];
+    type Q = { where: (field: string, op: string, value: unknown) => Q };
+    const wrap = <T extends Q>(q: T): T => ({
+      ...q,
+      where: (field: string, op: string, value: unknown) => {
+        filters.push([field, op, value]);
+        return wrap(q.where(field, op, value) as T);
+      },
+    });
+    vi.spyOn(db, 'collection').mockImplementation((name: string) => (name === 'solarBookings' ? wrap(real(name)) : real(name)));
+    return filters;
+  }
+
+  beforeEach(() => {
+    db.store.set('solarBookings', new Map(Object.entries({
+      ancient: booking('cy', '2024-03-04T15:00:00Z'),
+      // Last Friday: before this week, inside Ana's streak.
+      lastFri: booking('ana', '2026-10-09T15:00:00Z'),
+      mon: booking('ana', '2026-10-12T15:00:00Z'),
+      tue: booking('ana', '2026-10-13T15:00:00Z'),
+      wed: booking('ana', '2026-10-14T15:00:00Z'),
+      thu: booking('ben', '2026-10-15T15:00:00Z'),
+      gone: booking('ben', '2023-01-02T15:00:00Z', { status: 'cancelled' }),
+    })));
+  });
+
+  it('view=mine: a createdAt range on the window, same count', async () => {
+    const filters = recordBookingFilters();
+    expect((await (await get('?period=week&view=mine')).json()).mine.set).toBe(3);
+    expect(filters).toEqual([
+      ['createdAt', '>=', new Date('2026-10-11T05:00:00Z')],
+      ['createdAt', '<', new Date('2026-10-18T05:00:00Z')],
+    ]);
+  });
+
+  it('a past month: just that month', async () => {
+    const filters = recordBookingFilters();
+    const body = await (await get('?period=month&month=2024-03')).json();
+    expect(body.leaderboard.map((r: { uid: string }) => r.uid)).toEqual(['cy']);
+    expect(body.firstMonth).toBe('2024-03');
+    expect(filters).toEqual([
+      ['createdAt', '>=', new Date('2024-03-01T06:00:00Z')],
+      ['createdAt', '<', new Date('2024-04-01T05:00:00Z')],
+    ]);
+  });
+
+  it('a live board: from a year back (the streak), no upper bound; streak, recent and firstMonth unchanged', async () => {
+    const filters = recordBookingFilters();
+    const body = await (await get('?period=month&include=team')).json();
+    expect(filters).toEqual([['createdAt', '>=', new Date(NOW.getTime() - 367 * 24 * 60 * 60 * 1000)]]);
+    // Fri, (the weekend), Mon, Tue, Wed: the streak reaches back before this week.
+    expect(body.leaderboard.find((r: { uid: string }) => r.uid === 'ana')).toMatchObject({ count: 4, streakDays: 4 });
+    expect(body.recent.map((r: { at: string }) => r.at)).toEqual([
+      '2026-10-15T15:00:00.000Z',
+      '2026-10-14T15:00:00.000Z',
+      '2026-10-13T15:00:00.000Z',
+      '2026-10-12T15:00:00.000Z',
+      '2026-10-09T15:00:00.000Z',
+    ]);
+    // The cancelled 2023 booking is older, but never counted.
+    expect(body.firstMonth).toBe('2024-03');
+  });
+
+  it('fewer consults since the window start than the recent list holds: older ones fill it', async () => {
+    db.store.get('solarBookings')!.delete('lastFri');
+    db.store.get('solarBookings')!.delete('mon');
+    const body = await (await get('?period=week&include=team')).json();
+    expect(body.recent.map((r: { at: string }) => r.at)).toEqual([
+      '2026-10-15T15:00:00.000Z',
+      '2026-10-14T15:00:00.000Z',
+      '2026-10-13T15:00:00.000Z',
+      '2024-03-04T15:00:00.000Z',
+    ]);
+  });
+
+  it('firstMonth: a full batch of uncounted oldest bookings falls back to every booking', async () => {
+    const bookings = db.store.get('solarBookings')!;
+    for (let i = 0; i < 30; i++) {
+      bookings.set(`c${i}`, booking('ben', `2022-01-${String((i % 28) + 1).padStart(2, '0')}T15:00:00Z`, { status: 'cancelled' }));
+    }
+    expect((await (await get('?period=month')).json()).firstMonth).toBe('2024-03');
+  });
+});

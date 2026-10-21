@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Query } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveSubject } from '@/lib/auth/viewAs';
@@ -30,6 +31,8 @@ import { LEGACY_CLOSED_STATUSES, leadMilestones } from '@/lib/solar/leadMileston
 const LIMIT_CAP = 100;
 // ?include=team: the solar team at 0, bounded like the fiber board's.
 const UNRANKED_CAP = 200;
+// ?include=team: how many of the newest consults it lists.
+const RECENT_COUNT = 5;
 // ?campaignId=: the 3C Doors campaign id, capped as POST leads stores it.
 const CAMPAIGN_ID_MAX = 128;
 
@@ -43,13 +46,39 @@ const docsOf = (snap: { docs: { id: string; data: () => Data | undefined }[] }):
 /** The lead's 3C Doors campaign, as POST leads stores it ('' when none). */
 const campaignOf = (data: Data): string => (typeof data.campaignId === 'string' ? data.campaignId.trim() : '');
 
+/** A createdAt window on solarBookings: [since, until), either end open. */
+type BookingWindow = { since: Date | null; until: Date | null };
+const ALL_BOOKINGS: BookingWindow = { since: null, until: null };
+
+// The streak walks back at most 365 Chicago days from today (computeStreak):
+// 367 days of bookings always cover it.
+const STREAK_LOOKBACK_MS = 367 * 24 * 60 * 60 * 1000;
+// The oldest bookings read for the month stepper's first month before falling
+// back to reading them all.
+const FIRST_MONTH_BATCH = 25;
+
 /**
- * Booked consults: every solarBookings doc, credited to its lead's owner
+ * The solarBookings docs booked (createdAt) in the window. A single-field
+ * range on createdAt: Firestore's automatic index serves it, no composite one.
+ */
+async function bookingDocs(db: Db, window: BookingWindow): Promise<Doc[]> {
+  let query: Query = db.collection('solarBookings');
+  if (window.since) query = query.where('createdAt', '>=', window.since);
+  if (window.until) query = query.where('createdAt', '<', window.until);
+  return docsOf(await query.get());
+}
+
+/**
+ * Booked consults among these bookings, credited to the lead's owner
  * (booking.repUid only without one). With a campaign, only bookings whose lead
  * was created under it (a booking with no lead doc is left out).
  */
-async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>, campaignId: string | null): Promise<SolarEvent[]> {
-  const all = docsOf(await db.collection('solarBookings').get());
+async function bookingDocEvents(
+  db: Db,
+  all: Doc[],
+  names: Promise<ReadonlyMap<string, string>>,
+  campaignId: string | null
+): Promise<SolarEvent[]> {
   const leadIds = [
     ...new Set(
       all
@@ -68,6 +97,30 @@ async function setEvents(db: Db, names: Promise<ReadonlyMap<string, string>>, ca
   });
   const bookings = campaignId ? all.filter(({ data }) => leadCampaign.get(bookingLeadId(data)) === campaignId) : all;
   return bookingEvents(countedBookings(bookings, leadRepUid, await names));
+}
+
+/** Booked consults in the window (default: every booking). */
+async function setEvents(
+  db: Db,
+  names: Promise<ReadonlyMap<string, string>>,
+  campaignId: string | null,
+  window: BookingWindow = ALL_BOOKINGS
+): Promise<SolarEvent[]> {
+  return bookingDocEvents(db, await bookingDocs(db, window), names, campaignId);
+}
+
+/**
+ * The Set board's first month (the month stepper's floor) without reading
+ * every booking: the oldest few by createdAt, whose earliest counted one is
+ * the earliest overall. Only when none of a full batch counts (all cancelled,
+ * or off the campaign) does it read them all.
+ */
+async function firstSetMonth(db: Db, campaignId: string | null): Promise<string | null> {
+  const noNames = Promise.resolve(new Map<string, string>());
+  const oldest = docsOf(await db.collection('solarBookings').orderBy('createdAt').limit(FIRST_MONTH_BATCH).get());
+  const events = await bookingDocEvents(db, oldest, noNames, campaignId);
+  if (events.length > 0 || oldest.length < FIRST_MONTH_BATCH) return firstBookedMonth(events);
+  return firstBookedMonth(await setEvents(db, noNames, campaignId));
 }
 
 /**
@@ -183,7 +236,11 @@ export async function GET(request: NextRequest) {
       // Names never change a count: no users read.
       const noNames = Promise.resolve(new Map<string, string>());
       const window = { start: bounds?.start ?? null, end: bounds?.end ?? null };
-      const [setList, leads] = await Promise.all([setEvents(db, noNames, campaignId), stageLeads(db, campaignId)]);
+      // Only the window's bookings: a booking outside it never counts here.
+      const [setList, leads] = await Promise.all([
+        setEvents(db, noNames, campaignId, { since: window.start, until: window.end }),
+        stageLeads(db, campaignId),
+      ]);
       return NextResponse.json({
         ...echo,
         mine: {
@@ -206,9 +263,18 @@ export async function GET(request: NextRequest) {
     );
     // A failed users read surfaces through usersRead; don't also leave this one unhandled.
     namesRead.catch(() => {});
+    // The Set board reads only the bookings it can show: a finished board its
+    // window; a live one from the window's start or the year back the streak
+    // walks, whichever is earlier, with no upper bound (the newest consults).
+    const wantTeam = params.get('include') === 'team' && !pastMonth;
+    const setWindow: BookingWindow = !bounds?.start
+      ? ALL_BOOKINGS
+      : pastMonth
+        ? { since: bounds.start, until: bounds.end ?? null }
+        : { since: new Date(Math.min(bounds.start.getTime(), now.getTime() - STREAK_LOOKBACK_MS)), until: null };
     const [users, counted] = await Promise.all([
       usersRead,
-      metric === 'set' ? setEvents(db, namesRead, campaignId) : stageEvents(db, metric, namesRead, campaignId),
+      metric === 'set' ? setEvents(db, namesRead, campaignId, setWindow) : stageEvents(db, metric, namesRead, campaignId),
     ]);
     const rankedRows = rankSolarBoard(
       counted,
@@ -230,7 +296,7 @@ export async function GET(request: NextRequest) {
     const mine = ranked.find((row) => row.uid === youUid) ?? null;
 
     let team: { unranked: { uid: string; name: string }[]; recent: { repName: string; plan: string; at: string }[] } | null = null;
-    if (params.get('include') === 'team' && !pastMonth) {
+    if (wantTeam) {
       team = { unranked: [], recent: [] };
       if (ranked.length <= limit) {
         team.unranked = redactPeople(
@@ -239,7 +305,10 @@ export async function GET(request: NextRequest) {
           { idKey: 'uid', nameKey: 'name' }
         );
       }
-      team.recent = recentConsults(counted).map(({ repKey, ...consult }) => ({
+      // Fewer consults since the window's start than the list holds: older ones fill it.
+      const recentPool =
+        metric === 'set' && setWindow.since && counted.length < RECENT_COUNT ? await setEvents(db, namesRead, campaignId) : counted;
+      team.recent = recentConsults(recentPool, RECENT_COUNT).map(({ repKey, ...consult }) => ({
         ...consult,
         repName: redact.active ? redact.name(repKey ?? null, consult.repName) : consult.repName,
       }));
@@ -251,7 +320,11 @@ export async function GET(request: NextRequest) {
       startDate: bounds?.start ?? new Date(0),
       ...(range ? { endDate: range.end } : {}),
       ...(monthView && bounds
-        ? { month: formatMonthParam(monthView.key), firstMonth: firstBookedMonth(counted), endDate: bounds.end }
+        ? {
+            month: formatMonthParam(monthView.key),
+            firstMonth: metric === 'set' ? await firstSetMonth(db, campaignId) : firstBookedMonth(counted),
+            endDate: bounds.end,
+          }
         : {}),
       leaderboard,
       totalRanked: ranked.length,
