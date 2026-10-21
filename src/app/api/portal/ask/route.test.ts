@@ -273,14 +273,14 @@ describe('POST /api/portal/ask', () => {
     });
   });
 
-  it('sends a photo as a base64 data URL and never stores it', async () => {
+  it('sends a photo as a base64 data URL at high detail and never stores it', async () => {
     modelAnswers();
     const photo = new File([Buffer.from('fake-jpeg')], 'IMG_1.jpg', { type: 'image/jpeg' });
     await POST(req({ question: 'What does this mean?', photo }));
     const content = sentBody().messages.at(-1).content;
     expect(content[1]).toEqual({
       type: 'image_url',
-      image_url: { url: `data:image/jpeg;base64,${Buffer.from('fake-jpeg').toString('base64')}` },
+      image_url: { url: `data:image/jpeg;base64,${Buffer.from('fake-jpeg').toString('base64')}`, detail: 'high' },
     });
     const [logged] = logs();
     expect(logged.hadPhoto).toBe(true);

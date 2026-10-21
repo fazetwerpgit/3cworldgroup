@@ -113,7 +113,11 @@ export async function POST(request: NextRequest) {
   } else {
     const content: AskContentPart[] = [{ type: 'text', text: redacted || PHOTO_ONLY_QUESTION }];
     if (image) {
-      content.push({ type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.bytes.toString('base64')}` } });
+      // Order screens are dense small text: ask for full-resolution reading explicitly.
+      content.push({
+        type: 'image_url',
+        image_url: { url: `data:${image.mime};base64,${image.bytes.toString('base64')}`, detail: 'high' },
+      });
     }
     const messages: AskMessage[] = [
       { role: 'system', content: buildSystemPrompt(notes, { firstName, dealerCodes, now, home, live, owner: gate.isOwner }) },

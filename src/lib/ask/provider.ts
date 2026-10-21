@@ -2,7 +2,8 @@
 // chosen by env only. Defaults are DeepSeek (https://api-docs.deepseek.com):
 //   ASK_API_KEY   the provider key (required unless the E2E sandbox stub runs)
 //   ASK_BASE_URL  default https://api.deepseek.com  (POST {base}/chat/completions)
-//   ASK_MODEL     default deepseek-flash (DeepSeek-V4.1-Flash, reads images)
+//   ASK_MODEL     default deepseek-flash (reads images): DeepSeek-V4.1-Flash-1017 since 10/17;
+//                 legacy v4-flash names rerouted
 
 export const DEFAULT_ASK_BASE_URL = 'https://api.deepseek.com';
 export const DEFAULT_ASK_MODEL = 'deepseek-flash';
@@ -30,7 +31,7 @@ export interface AskCallOptions {
 
 export type AskContentPart =
   | { type: 'text'; text: string }
-  | { type: 'image_url'; image_url: { url: string } };
+  | { type: 'image_url'; image_url: { url: string; detail?: 'low' | 'high' | 'auto' } };
 
 export interface AskMessage {
   role: 'system' | 'user' | 'assistant';
