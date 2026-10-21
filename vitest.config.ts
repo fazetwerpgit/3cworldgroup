@@ -7,6 +7,7 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.{ts,tsx}'],
+    // scripts/ask-eval-score.test.ts: the Ask eval's scorer, no key needed (the eval itself never runs here).
+    include: ['src/**/*.test.{ts,tsx}', 'scripts/**/*.test.ts'],
   },
 });
