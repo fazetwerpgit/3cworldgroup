@@ -3,6 +3,8 @@ import { portalNavGroups } from '@/components/portal/CommandPalette';
 import { REP_FORMS } from '@/components/portal/rep/repForms';
 import { REP_PRIMARY_HREFS, REP_TABS } from '@/components/portal/rep/repNav';
 import { EXPEDITE_REASONS, LEADS_REASONS } from '@/lib/forms/formOptions';
+import { BULK_MAX_FILES } from '@/lib/sales/bulk/batch';
+import { MAX_PROOF_SCREENSHOTS } from '@/lib/sales/proofPaths';
 import { PORTAL_GUIDE } from './portalGuide';
 
 // Ask 3C's portal guide is hand-written, so it goes stale the day a tab, menu
@@ -26,6 +28,12 @@ describe('PORTAL_GUIDE', () => {
   it('names every form on the Forms page and every reason a rep can pick', () => {
     expect(missing(REP_FORMS.map((form) => form.title))).toEqual([]);
     expect(missing([...EXPEDITE_REASONS, ...LEADS_REASONS])).toEqual([]);
+  });
+
+  it('gives the real screenshot limits for one sale and for bulk logging', () => {
+    expect(PORTAL_GUIDE).toContain(`up to ${MAX_PROOF_SCREENSHOTS} screenshots`);
+    expect(PORTAL_GUIDE).toContain(`up to ${BULK_MAX_FILES} order screenshots at once`);
+    expect(PORTAL_GUIDE).toContain('Log several from screenshots');
   });
 
   it('sends reps to the short videos where they are, and never promises Practice to everyone', () => {
