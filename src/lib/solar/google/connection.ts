@@ -5,7 +5,8 @@
 // Firestore:
 //   solarGoogleTokens/{uid}        refreshToken (AES-256-GCM, lib/solar/google/crypto),
 //                                  email, scopes, connectedAt, updatedAt, status 'ok' | 'broken'
-//   solarGoogleOAuthStates/{nonce} uid, from 'app' | 'web', redirectUri, expiresAt, createdAt
+//   solarGoogleOAuthStates/{nonce} uid, from 'app' | 'web', returnTo 'setup' | 'availability',
+//                                  redirectUri, expiresAt, createdAt
 //                                  (deleted when the callback uses it: single use)
 // Both are closed to clients in firestore.rules. The refresh token never
 // leaves this module in plain text except in the request to Google.
@@ -21,12 +22,25 @@ const AVAILABILITY = 'solarAvailability';
 
 export type ConnectFrom = 'app' | 'web';
 
+/**
+ * Which portal page started the sign-in, so the callback lands back on it:
+ * Admin > Solar > Setup, or the consultant's own My availability. A fixed
+ * name, never a path: the callback maps it to one of two fixed paths.
+ */
+export type ConnectReturn = 'setup' | 'availability';
+export const connectReturnOf = (value: unknown): ConnectReturn => (value === 'availability' ? 'availability' : 'setup');
+
 // ---------- connect ----------
 
 export type StartConnect = { ok: true; url: string } | { ok: false; error: string; status: number };
 
 /** A fresh Google consent URL for `uid`, with its state stored for one use. */
-export async function startConnect(uid: string, requestUrl: string, from: ConnectFrom): Promise<StartConnect> {
+export async function startConnect(
+  uid: string,
+  requestUrl: string,
+  from: ConnectFrom,
+  returnTo: ConnectReturn = 'setup'
+): Promise<StartConnect> {
   const client = googleClient();
   if (!client) return { ok: false, error: "Google Calendar isn't set up on the server yet.", status: 503 };
   if (!adminDb) return { ok: false, error: 'Database not configured', status: 500 };
@@ -42,12 +56,12 @@ export async function startConnect(uid: string, requestUrl: string, from: Connec
   } catch (error) {
     console.error('google calendar: stale state cleanup failed', error instanceof Error ? error.message : '');
   }
-  await states.doc(nonce).set({ uid, from, redirectUri, expiresAt: new Date(exp), createdAt: new Date(now) });
+  await states.doc(nonce).set({ uid, from, returnTo, redirectUri, expiresAt: new Date(exp), createdAt: new Date(now) });
   return { ok: true, url: authUrl(client, redirectUri, signState({ uid, nonce, exp })) };
 }
 
 export type ConsumedState =
-  | { ok: true; uid: string; from: ConnectFrom; redirectUri: string }
+  | { ok: true; uid: string; from: ConnectFrom; returnTo: ConnectReturn; redirectUri: string }
   | { ok: false; reason: 'bad_state' | 'expired' | 'reused' };
 
 /**
@@ -67,7 +81,13 @@ export async function consumeState(state: unknown, now: number = Date.now()): Pr
     if (snap.get('uid') !== check.uid) return { ok: false, reason: 'bad_state' };
     const redirectUri = snap.get('redirectUri');
     if (typeof redirectUri !== 'string' || !redirectUri) return { ok: false, reason: 'bad_state' };
-    return { ok: true, uid: check.uid, from: snap.get('from') === 'app' ? 'app' : 'web', redirectUri };
+    return {
+      ok: true,
+      uid: check.uid,
+      from: snap.get('from') === 'app' ? 'app' : 'web',
+      returnTo: connectReturnOf(snap.get('returnTo')),
+      redirectUri,
+    };
   });
 }
 

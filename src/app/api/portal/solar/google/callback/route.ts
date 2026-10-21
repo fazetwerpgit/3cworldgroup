@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { consumeState, isConsultant, saveConnection, type ConnectFrom } from '@/lib/solar/google/connection';
+import { consumeState, isConsultant, saveConnection, type ConnectFrom, type ConnectReturn } from '@/lib/solar/google/connection';
 import { SCOPE_EVENTS, exchangeCode, googleClient, revokeToken } from '@/lib/solar/google/oauth';
 import type { ConnectError } from '@/lib/solar/google/status';
 
-// Where the browser lands. Web: back on Setup, which shows a banner. App: the
-// flow finished in the app's browser sheet (Google refuses sign-in inside the
-// app's WebView), so a small page there says to go back to the app. Unknown
-// (a bad state): that same small page, which links to Setup on the web.
-function landing(request: NextRequest, from: ConnectFrom | null, outcome: { ok: true; freeBusy: boolean } | { ok: false; reason: ConnectError }) {
+// The only pages a web sign-in returns to: a fixed path per name, so the
+// stored state can never send the browser anywhere else.
+const RETURN_PATHS: Record<ConnectReturn, string> = {
+  setup: '/portal/admin/solar?tab=setup&',
+  availability: '/portal/solar/availability?',
+};
+
+// Where the browser lands. Web: back on the page that started it (Setup or My
+// availability), which shows a banner. App: the flow finished in the app's
+// browser sheet (Google refuses sign-in inside the app's WebView), so a small
+// page there says to go back to the app (`back=availability` tells it which
+// page to forward to if it is opened inside the app). Unknown (a bad state):
+// that same small page.
+function landing(
+  request: NextRequest,
+  from: ConnectFrom | null,
+  returnTo: ConnectReturn,
+  outcome: { ok: true; freeBusy: boolean } | { ok: false; reason: ConnectError }) {
   const params = new URLSearchParams();
   if (outcome.ok) {
     params.set('google', 'connected');
@@ -16,7 +29,8 @@ function landing(request: NextRequest, from: ConnectFrom | null, outcome: { ok: 
     params.set('google', 'error');
     params.set('reason', outcome.reason);
   }
-  const path = from === 'web' ? `/portal/admin/solar?tab=setup&${params}` : `/portal/google-calendar?${params}`;
+  if (from !== 'web' && returnTo === 'availability') params.set('back', 'availability');
+  const path = from === 'web' ? `${RETURN_PATHS[returnTo]}${params}` : `/portal/google-calendar?${params}`;
   const res = NextResponse.redirect(new URL(path, request.nextUrl.origin), 303);
   // The callback URL carries Google's one-time code: never send it on as a referrer, never cache.
   res.headers.set('Referrer-Policy', 'no-referrer');
@@ -43,35 +57,37 @@ function landing(request: NextRequest, from: ConnectFrom | null, outcome: { ok: 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
   let from: ConnectFrom | null = null;
+  let returnTo: ConnectReturn = 'setup';
   try {
     const state = await consumeState(q.get('state'));
-    if (!state.ok) return landing(request, null, { ok: false, reason: state.reason });
+    if (!state.ok) return landing(request, null, returnTo, { ok: false, reason: state.reason });
     from = state.from;
+    returnTo = state.returnTo;
 
-    if (q.get('error')) return landing(request, from, { ok: false, reason: 'denied' });
+    if (q.get('error')) return landing(request, from, returnTo, { ok: false, reason: 'denied' });
     const code = q.get('code');
     const client = googleClient();
-    if (!code || !client) return landing(request, from, { ok: false, reason: code ? 'server' : 'denied' });
-    if (!(await isConsultant(state.uid))) return landing(request, from, { ok: false, reason: 'not_consultant' });
+    if (!code || !client) return landing(request, from, returnTo, { ok: false, reason: code ? 'server' : 'denied' });
+    if (!(await isConsultant(state.uid))) return landing(request, from, returnTo, { ok: false, reason: 'not_consultant' });
 
     const grant = await exchangeCode(client, code, state.redirectUri);
     if (!grant.ok) {
       if (grant.accessToken) await revokeToken(grant.accessToken);
-      return landing(request, from, { ok: false, reason: 'exchange' });
+      return landing(request, from, returnTo, { ok: false, reason: 'exchange' });
     }
     if (!grant.scopes.includes(SCOPE_EVENTS)) {
       // Calendar access unticked on the consent screen: nothing to use, so let go of the grant.
       await revokeToken(grant.refreshToken);
-      return landing(request, from, { ok: false, reason: 'scope' });
+      return landing(request, from, returnTo, { ok: false, reason: 'scope' });
     }
     const status = await saveConnection(state.uid, {
       refreshToken: grant.refreshToken,
       scopes: grant.scopes,
       email: grant.email,
     });
-    return landing(request, from, { ok: true, freeBusy: status.freeBusy });
+    return landing(request, from, returnTo, { ok: true, freeBusy: status.freeBusy });
   } catch (error) {
     console.error('Google Calendar callback failed:', error instanceof Error ? error.message : '');
-    return landing(request, from, { ok: false, reason: 'server' });
+    return landing(request, from, returnTo, { ok: false, reason: 'server' });
   }
 }

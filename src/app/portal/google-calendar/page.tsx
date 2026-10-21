@@ -13,8 +13,10 @@ import s from './google-calendar.module.css';
 // Where Google's sign-in lands when it was started in the 3C iOS app. Google
 // refuses sign-in inside the app's WebView, so it ran in the app's browser
 // sheet; this page (no sign-in needed: it shows only the outcome in the URL)
-// says to go back to the app, where Setup picks the connection up. Opened
-// inside the app itself, it forwards to Setup with the same outcome.
+// says to go back to the app, where Setup (or My availability) picks the
+// connection up. Opened inside the app itself, it forwards there with the same
+// outcome: `back=availability` picks My availability, anything else Setup
+// (fixed paths only, never one from the URL).
 function Outcome() {
   const params = useSearchParams();
   const router = useRouter();
@@ -23,7 +25,11 @@ function Outcome() {
   const connected = outcome === 'connected';
 
   useEffect(() => {
-    if (inApp) router.replace(`/portal/admin/solar?tab=setup&${params.toString()}`);
+    if (!inApp) return;
+    const next = new URLSearchParams(params.toString());
+    const mine = next.get('back') === 'availability';
+    next.delete('back');
+    router.replace(mine ? `/portal/solar/availability?${next}` : `/portal/admin/solar?tab=setup&${next}`);
   }, [inApp, params, router]);
   if (inApp) return <RepBoot />;
 
@@ -45,7 +51,7 @@ function Outcome() {
               <p className={s.lead}>You can go back to the app.</p>
               {params.get('freebusy') === 'off' ? (
                 <p className={s.note}>
-                  Free/busy wasn’t allowed, so homeowners still see every open time. Reconnect from Solar setup and allow
+                  Free/busy wasn’t allowed, so homeowners still see every open time. Reconnect from the portal and allow
                   it to hide busy times.
                 </p>
               ) : (

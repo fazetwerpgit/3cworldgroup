@@ -45,9 +45,11 @@ function grant(scopes: string[], extra: Record<string, unknown> = {}) {
   };
 }
 
-async function startFlow(from: 'app' | 'web' = 'web'): Promise<string> {
+async function startFlow(from: 'app' | 'web' = 'web', returnTo?: unknown): Promise<string> {
   mockGate.mockResolvedValue(SAM);
-  const res = await connectRoute(new NextRequest(`${BASE}/connect`, { method: 'POST', body: JSON.stringify({ from }) }));
+  const res = await connectRoute(
+    new NextRequest(`${BASE}/connect`, { method: 'POST', body: JSON.stringify({ from, returnTo }) })
+  );
   expect(res.status).toBe(200);
   const { url } = await res.json();
   return new URL(url).searchParams.get('state')!;
@@ -132,6 +134,32 @@ describe('GET /api/portal/solar/google/callback', () => {
     const at = landedAt(await back({ state, code: 'auth-code' }));
     expect(at.pathname).toBe('/portal/google-calendar');
     expect(at.searchParams.get('google')).toBe('connected');
+  });
+
+  it('started on My availability: the web lands back there, the app page is told to', async () => {
+    const web = await startFlow('web', 'availability');
+    google.exchange = grant([EVENTS, FREEBUSY]);
+    const at = landedAt(await back({ state: web, code: 'auth-code' }));
+    expect(at.origin).toBe('https://www.3cworldgroup.com');
+    expect(at.pathname).toBe('/portal/solar/availability');
+    expect(at.searchParams.get('google')).toBe('connected');
+    expect(at.searchParams.has('tab')).toBe(false);
+
+    const app = await startFlow('app', 'availability');
+    const inApp = landedAt(await back({ state: app, code: 'auth-code' }));
+    expect(inApp.pathname).toBe('/portal/google-calendar');
+    expect(inApp.searchParams.get('back')).toBe('availability');
+  });
+
+  it('any other return value is Setup: never a path from the body', async () => {
+    for (const returnTo of ['https://evil.example/x', '//evil.example', '/portal/admin/users', 'Availability']) {
+      const state = await startFlow('web', returnTo);
+      google.exchange = grant([EVENTS, FREEBUSY]);
+      const at = landedAt(await back({ state, code: 'auth-code' }));
+      expect(at.origin).toBe('https://www.3cworldgroup.com');
+      expect(at.pathname).toBe('/portal/admin/solar');
+      expect(at.searchParams.get('tab')).toBe('setup');
+    }
   });
 
   it('a bad or forged state saves nothing and never calls Google', async () => {

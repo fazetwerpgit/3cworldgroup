@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { userRateLimited } from '@/lib/userRateLimits';
-import { disconnect, isConsultant, startConnect } from '@/lib/solar/google/connection';
+import { connectReturnOf, disconnect, isConsultant, startConnect } from '@/lib/solar/google/connection';
 import { googleStatusOf } from '@/lib/solar/google/status';
 
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
@@ -19,12 +19,13 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ googleCalendar: snap.exists ? googleStatusOf(snap.get('googleCalendar')) ?? null : null });
 }
 
-// POST /api/portal/solar/google/connect {from?: 'app' | 'web'} -> 200 {url}.
+// POST /api/portal/solar/google/connect {from?: 'app' | 'web', returnTo?: 'setup' | 'availability'} -> 200 {url}.
 // The caller connects THEIR OWN Google account, so the uid is the verified
 // caller's, never the body's. Only a consultant (a solarAvailability doc,
 // admin/owner or not) may. `url` is Google's consent page; its `state` is
 // HMAC-signed, expires in 10 minutes and works once. `from` only decides
-// where the callback lands ('app': a page that says to go back to the app).
+// where the callback lands ('app': a page that says to go back to the app), and
+// `returnTo` which page that is (anything else is 'setup'; never a free path).
 export async function POST(request: NextRequest) {
   const gate = await requireVerifiedUser(request);
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
@@ -33,7 +34,12 @@ export async function POST(request: NextRequest) {
   try {
     if (!(await isConsultant(gate.uid))) return NextResponse.json({ error: NOT_CONSULTANT }, { status: 403 });
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
-    const started = await startConnect(gate.uid, request.url, body?.from === 'app' ? 'app' : 'web');
+    const started = await startConnect(
+      gate.uid,
+      request.url,
+      body?.from === 'app' ? 'app' : 'web',
+      connectReturnOf(body?.returnTo)
+    );
     if (!started.ok) return NextResponse.json({ error: started.error }, { status: started.status });
     return NextResponse.json({ url: started.url }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
