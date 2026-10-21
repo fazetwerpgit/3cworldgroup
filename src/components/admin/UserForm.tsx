@@ -23,8 +23,10 @@ import {
   graduatedFieldRole,
   SOLAR_ROLES,
   SolarRoleDisplayNames,
+  MAIN_LINES,
+  MainLineDisplayNames,
 } from '@/types';
-import type { FieldRole } from '@/types';
+import type { FieldRole, MainLine } from '@/types';
 
 interface UserFormProps {
   user: User;
@@ -121,8 +123,14 @@ export function UserForm({ user }: UserFormProps) {
     managerId: user.reportsToId || '',
     status: (user.status || 'active') as 'pending' | 'active' | 'inactive',
     solarRole: (user.solarRole ?? '') as string,
+    mainLine: (user.mainLine ?? 'fiber') as MainLine,
   });
   const loadedSolarRole = user.solarRole ?? '';
+  // Unset reads as fiber, so an unset main line loads as Fiber.
+  const loadedMainLine = user.mainLine ?? 'fiber';
+  // A solar role plus a fiber or platform role makes them dual (isDualRoleUser):
+  // only then does their Sales tab have a side to open on.
+  const wouldBeDual = !!formData.solarRole && !!formData.role;
 
   // Real name-search picker, backed by the EXISTING GET /api/portal/auth/users
   // endpoint — no new route. Filtered client-side to manager-eligible people.
@@ -176,6 +184,7 @@ export function UserForm({ user }: UserFormProps) {
           ...(formData.managerId !== loadedManagerId ? { managerId: formData.managerId || null } : {}),
           ...(formData.status !== loadedStatus ? { status: formData.status } : {}),
           ...(formData.solarRole !== loadedSolarRole ? { solarRole: formData.solarRole || null } : {}),
+          ...(wouldBeDual && formData.mainLine !== loadedMainLine ? { mainLine: formData.mainLine } : {}),
         }),
       });
 
@@ -464,6 +473,29 @@ export function UserForm({ user }: UserFormProps) {
               <ChevronDown size={18} aria-hidden="true" />
             </span>
           </div>
+
+          {wouldBeDual ? (
+            <div className={u.field}>
+              <label className={u.label} htmlFor="person-main-line">
+                Main line
+              </label>
+              <span className={u.selectWrap}>
+                <select
+                  id="person-main-line"
+                  className={u.input}
+                  value={formData.mainLine}
+                  onChange={(e) => handleChange('mainLine', e.target.value)}
+                >
+                  {MAIN_LINES.map((line) => (
+                    <option key={line} value={line}>
+                      {MainLineDisplayNames[line]}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={18} aria-hidden="true" />
+              </span>
+            </div>
+          ) : null}
 
           <div className={u.field}>
             <label className={u.label} htmlFor="manager-search">

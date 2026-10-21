@@ -212,3 +212,54 @@ describe('UserForm role and actions', () => {
     expect(putBody()).toEqual({ status: 'active', fieldRole: graduatedFieldRole('entry_rep') });
   });
 });
+
+describe('UserForm main line', () => {
+  async function pick(id: string, value: string) {
+    const select = container.querySelector(`#${id}`) as HTMLSelectElement;
+    await act(async () => {
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+  const mainLine = () => container.querySelector('#person-main-line') as HTMLSelectElement | null;
+
+  it('shows only for someone with a solar role and a fiber or platform role', async () => {
+    await mount({ solarRole: 'entry_canvasser' });
+    expect(mainLine()).toBeNull();
+    act(() => root.unmount());
+    root = createRoot(container);
+    await mount({ fieldRole: 'entry_rep' });
+    expect(mainLine()).toBeNull();
+    await pick('person-solar-role', 'entry_canvasser');
+    expect(mainLine()?.value).toBe('fiber');
+    expect([...mainLine()!.options].map((o) => o.textContent)).toEqual(['Fiber', 'Solar']);
+  });
+
+  it('loads the stored main line and does not re-send it unchanged', async () => {
+    await mount({ fieldRole: 'entry_rep', solarRole: 'entry_canvasser', mainLine: 'solar' });
+    expect(mainLine()?.value).toBe('solar');
+    await type(container.querySelector('#person-name') as HTMLInputElement, 'Dual Rep');
+    await act(async () => {
+      button('Save changes')!.click();
+    });
+    expect(putBody()).not.toHaveProperty('mainLine');
+  });
+
+  it('sends a changed main line', async () => {
+    await mount({ fieldRole: 'entry_rep', solarRole: 'entry_canvasser', mainLine: 'solar' });
+    await pick('person-main-line', 'fiber');
+    await act(async () => {
+      button('Save changes')!.click();
+    });
+    expect(putBody()).toMatchObject({ mainLine: 'fiber' });
+  });
+
+  it('sends solar for a dual rep with no main line yet', async () => {
+    await mount({ fieldRole: 'entry_rep', solarRole: 'entry_canvasser' });
+    await pick('person-main-line', 'solar');
+    await act(async () => {
+      button('Save changes')!.click();
+    });
+    expect(putBody()).toMatchObject({ mainLine: 'solar' });
+  });
+});

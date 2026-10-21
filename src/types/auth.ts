@@ -383,6 +383,11 @@ export function isSolarRole(value: unknown): value is SolarRole {
 export const MAIN_LINES = ['fiber', 'solar'] as const;
 export type MainLine = (typeof MAIN_LINES)[number];
 
+export const MainLineDisplayNames: Record<MainLine, string> = {
+  fiber: 'Fiber',
+  solar: 'Solar',
+};
+
 export function isMainLine(value: unknown): value is MainLine {
   return typeof value === 'string' && (MAIN_LINES as readonly string[]).includes(value);
 }
