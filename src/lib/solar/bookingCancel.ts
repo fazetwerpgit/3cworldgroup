@@ -8,6 +8,13 @@ import { bookingZones, formatWhen, formatWhenForConsultant } from '@/lib/solar/t
 import { solarLeadHref } from '@/lib/solar/leadView';
 import { consultantNotice, ownerNotificationsEnabled, resolveConsultants } from '@/lib/solar/server';
 import { removeBookingFromGoogle } from '@/lib/solar/google/bookingEvents';
+import { sendEmail } from '@/lib/email/sendEmail';
+import { appBaseUrl, managerAlertEmail, solarBookingCancelledEmail } from '@/lib/email/templates';
+import {
+  consultantBookingCancelAttachment,
+  customerBookingCancelAttachment,
+  type BookingCancelInput,
+} from '@/lib/solar/bookingInvite';
 
 type Data = Record<string, unknown>;
 type Snap = { exists: boolean; get: (field: string) => unknown; data: () => Data | undefined };
@@ -24,6 +31,10 @@ export interface CancelledBooking {
   repUid: string;
   customerName: string;
   start: string;
+  /** UTC ISO end; '' on a booking without one (the cancel .ics then assumes an hour). */
+  end: string;
+  /** The homeowner's email as booked (who got the confirmation); '' when none. */
+  customerEmail: string;
   mode: 'virtual' | 'in_person';
   /** The booking's zones (old bookings: consultant America/Chicago, customer the same). */
   consultantTz: string;
@@ -79,9 +90,27 @@ export function stageBookingCancel(
     repUid: str(booking.get('repUid')),
     customerName: str(booking.get('customerName')),
     start: str(booking.get('start')),
+    end: str(booking.get('end')),
+    customerEmail: str(booking.get('customerEmail')).trim(),
     mode: booking.get('mode') === 'virtual' ? 'virtual' : 'in_person',
     ...zones,
     googleEventId: str(booking.get('googleEventId')),
+  };
+}
+
+const HOUR = 3_600_000;
+
+/** The cancel .ics input; null when the booking has no usable start. */
+function cancelInvite(c: CancelledBooking): BookingCancelInput | null {
+  const start = Date.parse(c.start);
+  if (Number.isNaN(start)) return null;
+  const end = Date.parse(c.end);
+  return {
+    bookingId: c.id,
+    start: new Date(start).toISOString(),
+    end: new Date(Number.isNaN(end) || end <= start ? start + HOUR : end).toISOString(),
+    consultantName: c.consultantName,
+    customerName: c.customerName,
   };
 }
 
@@ -90,12 +119,21 @@ export function stageBookingCancel(
  * Google Calendar event is deleted with sendUpdates=all, so Google emails the
  * homeowner the cancellation (best effort, lib/solar/google/bookingEvents).
  *
+ * Without a Google event the confirmation carried our own .ics, so the cancel
+ * emails one back with METHOD:CANCEL (same UID, SEQUENCE 1): to the homeowner
+ * (when they have an email on the booking) and to whoever got the booking
+ * notice's .ics (the consultant, or Jacob for the owner's calendar). This
+ * mirrors announceBooking: a Google-connected consultant gets no .ics either
+ * way, but Jacob's owner-calendar copy always carried one, so it is always
+ * cancelled. These go out even when the reader cancelled it themselves: the
+ * calendar entry still has to go.
+ *
  * The cancel notice: a portal notification plus a best-effort push to the rep
  * who booked it and to the consultant. The owner rule holds (see
  * consultantNotice): while settings/solar.notifyOwner is off the owner gets
  * nothing, and the owner's own consultations notify Jacob as
- * "[Owner's calendar]". Whoever cancelled is never notified, and nobody is
- * emailed (the homeowner included). Never throws.
+ * "[Owner's calendar]". Whoever cancelled gets no portal notification or
+ * push. Never throws.
  */
 export async function announceBookingCancel(
   c: CancelledBooking,
@@ -130,6 +168,33 @@ export async function announceBookingCancel(
     }
     sends.delete(cancelledBy);
     if (!notifyOwner && owner) sends.delete(owner.uid);
+
+    const invite = cancelInvite(c);
+    const onGoogle = Boolean(c.googleEventId);
+    if (invite && !onGoogle && c.customerEmail) {
+      await sendEmail({
+        to: c.customerEmail,
+        ...solarBookingCancelledEmail({
+          customerName: c.customerName,
+          when: formatWhen(c.start, c.customerTz),
+          mode: c.mode,
+          consultantName: c.consultantName,
+        }),
+        ...(notice?.replyTo ? { replyTo: notice.replyTo } : {}),
+        attachments: [customerBookingCancelAttachment(invite)],
+        tag: 'solar-booking',
+      }).catch((error) => console.error('solar cancel email (homeowner) failed:', error));
+    }
+    const to = notice?.to;
+    if (notice && invite && to?.email && !(onGoogle && to.uid === c.consultantUid)) {
+      const title = `${notice.titlePrefix}Solar consult cancelled`;
+      await sendEmail({
+        to: to.email,
+        ...managerAlertEmail({ title, message: consultantMessage, link: `${appBaseUrl()}${solarLeadHref(c.leadId)}` }),
+        attachments: [consultantBookingCancelAttachment(invite)],
+        tag: 'solar-booking',
+      }).catch((error) => console.error('solar cancel email (consultant) failed:', error));
+    }
 
     await Promise.all(
       [...sends].map(async ([uid, { title, link, message }]) => {

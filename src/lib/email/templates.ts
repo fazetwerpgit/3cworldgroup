@@ -411,3 +411,36 @@ export function solarBookingConfirmationEmail(p: {
     htmlBody: layout(subject, html.join('')),
   };
 }
+
+/**
+ * The homeowner's cancel notice, sent only when the booking was not on the
+ * consultant's Google Calendar (Google sends its own then). Short and plain:
+ * no portal links, no reason, no internal details. The attached .ics
+ * (METHOD:CANCEL, same UID) takes the confirmation's invite off their calendar.
+ */
+export function solarBookingCancelledEmail(p: {
+  customerName: string;
+  /** With its zone, in the customer's time. */
+  when: string;
+  mode: 'virtual' | 'in_person';
+  consultantName: string;
+}): EmailContent {
+  const subject = 'Your solar consultation is cancelled';
+  const how = p.mode === 'virtual' ? 'virtual consultation' : 'in-person consultation';
+  const greeting = p.customerName ? `Hi ${p.customerName},` : 'Hi,';
+  const line = `Your ${how} with ${p.consultantName} on ${p.when} is cancelled.`;
+  const cal = 'The attached update removes it from your calendar.';
+  const again = 'If you would like a new time, reply to this email.';
+  const para = 'margin:0 0 16px;font-size:16px;line-height:1.5';
+  const html = [
+    `<p style="${para}">${esc(greeting)}</p>`,
+    `<p style="${para}">Your ${esc(how)} with <strong>${esc(p.consultantName)}</strong> on <strong>${esc(p.when)}</strong> is cancelled.</p>`,
+    `<p style="${para}">${cal}</p>`,
+    `<p style="${para}">${again}</p>`,
+  ];
+  return {
+    subject,
+    textBody: `${[greeting, line, cal, again, '3C World Group'].join('\n\n')}\n`,
+    htmlBody: layout(subject, html.join('')),
+  };
+}

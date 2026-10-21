@@ -311,7 +311,8 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       expect(mockNotify.mock.calls.map((c) => c[0].userId).sort()).toEqual(['jac', 'rep1']);
       expect(mockNotify.mock.calls[0][0].message).toContain('The lead was marked lost.');
       expect(mockPush.mock.calls.map((c) => c[0]).sort()).toEqual(['jac', 'rep1']);
-      expect(mockEmail).not.toHaveBeenCalled();
+      // Only the consultant's .ics cancel: no homeowner email on this booking.
+      expect(mockEmail.mock.calls.map((c) => c[0].to)).toEqual(['jmyers@3cworldgroup.com']);
     });
 
     it('mark lost with no live booking only closes the lead and notifies nobody', async () => {

@@ -109,7 +109,7 @@ describe('PATCH /api/portal/solar/bookings/[id]', () => {
   });
 
   describe('cancel notices', () => {
-    it('notifies the rep and the consultant (portal + push), and emails nobody', async () => {
+    it('notifies the rep and the consultant (portal + push); no homeowner email without one on the booking', async () => {
       expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
       expect(notified()).toEqual(expect.arrayContaining([
         ['jac', 'Solar consult cancelled'],
@@ -123,7 +123,9 @@ describe('PATCH /api/portal/solar/bookings/[id]', () => {
       });
       // No zones stored on this (older) booking: Pacific, as the old notices read.
       expect(mockNotify.mock.calls[0][0].message).toContain('Ana Lopez: virtual, Monday, October 26 at 8:00 AM PT with Jacob');
-      expect(mockEmail).not.toHaveBeenCalled();
+      // Not on Google: only the consultant's .ics cancel (the booking has no customerEmail).
+      expect(mockEmail.mock.calls.map((c) => c[0].to)).toEqual(['jmyers@3cworldgroup.com']);
+      expect(mockEmail.mock.calls[0][0].attachments[0].contentType).toContain('method=CANCEL');
     });
 
     it("tells the consultant in their zone and the rep in the customer's", async () => {
@@ -154,7 +156,9 @@ describe('PATCH /api/portal/solar/bookings/[id]', () => {
       ]));
       expect(notified().map(([uid]) => uid)).not.toContain('own');
       expect(pushed()).not.toContain('own');
-      expect(mockEmail).not.toHaveBeenCalled();
+      // Jacob got the owner-calendar .ics, so he gets its cancel; the owner gets nothing.
+      expect(mockEmail.mock.calls.map((c) => c[0].to)).toEqual(['jmyers@3cworldgroup.com']);
+      expect(mockEmail.mock.calls[0][0].subject).toBe("[Portal] [Owner's calendar] Solar consult cancelled");
     });
 
     it('sends the owner nothing when the owner booked it either', async () => {

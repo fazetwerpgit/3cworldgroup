@@ -289,7 +289,12 @@ describe('POST /api/portal/solar/bookings', () => {
       expect(history).toHaveLength(1);
       expect(history[0][1]).toMatchObject({ status: 'cancelled', leadId: 'rep1_c1' });
       expect(db.store.get('solarLeads')!.get('rep1_c1')).toMatchObject({ status: 'booked', bookingId: first.id });
-      expect(emailsTo('ana@example.com')).toBe(2);
+      // Booked, cancelled (no Google: the .ics cancel), booked again.
+      expect(mockEmail.mock.calls.filter((c) => c[0].to === 'ana@example.com').map((c) => c[0].subject)).toEqual([
+        'Your solar consultation is booked',
+        'Your solar consultation is cancelled',
+        'Your solar consultation is booked',
+      ]);
       // Still one lead alert per lead.
       expect(mockNotifyMany).toHaveBeenCalledTimes(1);
     });
