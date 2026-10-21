@@ -15,6 +15,7 @@ import {
   permissionsFor,
   isSolarOnlyUser,
   isDualRoleUser,
+  isMainLine,
 } from './auth';
 import type { FieldRole, PlatformRole } from './auth';
 
@@ -195,6 +196,16 @@ describe('permissionsFor (solar)', () => {
     expect(isDualRoleUser({ solarRole: 'bogus', fieldRole: 'entry_rep' })).toBe(false);
     expect(isDualRoleUser({ solarRole: null, fieldRole: 'entry_rep' })).toBe(false);
     expect(isDualRoleUser(null)).toBe(false);
+  });
+
+  it('isMainLine: fiber and solar only', () => {
+    expect(isMainLine('fiber')).toBe(true);
+    expect(isMainLine('solar')).toBe(true);
+    expect(isMainLine('Solar')).toBe(false);
+    expect(isMainLine('')).toBe(false);
+    expect(isMainLine(null)).toBe(false);
+    expect(isMainLine(undefined)).toBe(false);
+    expect(isMainLine(1)).toBe(false);
   });
 
   it('keeps solar off every field role', () => {

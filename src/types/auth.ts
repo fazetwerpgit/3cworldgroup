@@ -378,6 +378,15 @@ export function isSolarRole(value: unknown): value is SolarRole {
   return typeof value === 'string' && (SOLAR_ROLES as readonly string[]).includes(value);
 }
 
+// A dual rep's main line (users/{uid}.mainLine), set by an admin: the side
+// their Sales tab opens on. Unset reads as fiber.
+export const MAIN_LINES = ['fiber', 'solar'] as const;
+export type MainLine = (typeof MAIN_LINES)[number];
+
+export function isMainLine(value: unknown): value is MainLine {
+  return typeof value === 'string' && (MAIN_LINES as readonly string[]).includes(value);
+}
+
 /**
  * solar:read opens the Solar page and Home card; solar:write the deck, lead
  * submit and booking. The base rep permissions ride along so a solar-only rep
@@ -423,8 +432,8 @@ export function isSolarOnlyUser(
 
 /**
  * A rep on both sides: a solar role plus a fiber field role (or a platform
- * role). Home carries a solar section, the + offers fiber or solar, and the
- * Board and Sales remember the last side picked.
+ * role). Home carries a solar section, the + offers fiber or solar, the Board
+ * remembers the last side picked and Sales opens on their mainLine.
  */
 export function isDualRoleUser(
   user: { role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown } | null | undefined
@@ -441,6 +450,8 @@ export interface User {
   fieldRole?: FieldRole;     // Field sales users only
   // Solar sales role, independent of the fiber FieldRole. Null/absent = no solar access.
   solarRole?: SolarRole | null;
+  // A dual rep's main line (the side Sales opens on). Null/absent = fiber.
+  mainLine?: MainLine | null;
   // Set by signup-notify's bot heuristic; the admin pending queue hides these
   // from the "needs a decision" list (they remain findable via status filters).
   suspectedBot?: boolean;

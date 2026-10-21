@@ -22,6 +22,8 @@ const PERSISTED_FIELDS = [
   // Solar is a second role axis: without it a solar rep's cold open paints
   // the shell with no Solar nav until the profile read lands.
   'solarRole',
+  // A dual rep's Sales opens on it; without it a cold open paints Fiber first.
+  'mainLine',
   'isIBO',
   'status',
   'avatarUrl',
