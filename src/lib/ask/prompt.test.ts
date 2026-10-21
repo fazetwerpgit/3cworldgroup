@@ -58,7 +58,7 @@ describe('localTimeLine', () => {
 
 describe('buildSystemPrompt rule labels', () => {
   it('never gives two rules the same label', () => {
-    const labels = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [] }).match(/^\d+[a-z]?(?=\. )/gm) ?? [];
+    const labels: string[] = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [] }).match(/^\d+[a-z]?(?=\. )/gm) ?? [];
     expect(labels.length).toBeGreaterThan(10);
     expect(labels.filter((label, i) => labels.indexOf(label) !== i)).toEqual([]);
   });
