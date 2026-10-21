@@ -1,0 +1,11 @@
+/* The way into My availability: a single row. On a wide screen it keeps the
+   width of a short list row, so its chevron stays beside what it opens. */
+.entry {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .entry {
+    max-width: 560px;
+  }
+}

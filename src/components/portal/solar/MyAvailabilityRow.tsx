@@ -6,6 +6,7 @@ import { googleStatusOf } from '@/lib/solar/google/status';
 import rep from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import { useMyConsultant } from './useMyConsultant';
+import css from './my-availability-row.module.css';
 
 export const MY_AVAILABILITY_HREF = '/portal/solar/availability';
 
@@ -27,7 +28,7 @@ export function MyAvailabilityRow() {
   const needs = !google?.connected;
 
   return (
-    <nav className={rep.panel} aria-label="Consultant">
+    <nav className={`${rep.panel} ${css.entry}`} aria-label="Consultant">
       <Link href={MY_AVAILABILITY_HREF} className={p.row}>
         <span className={`${p.tile} ${needs ? p.tileAmber : p.tileLime}`} aria-hidden="true">
           <CalendarClock size={20} strokeWidth={2} />
