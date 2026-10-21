@@ -283,14 +283,15 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
 
   describe('status', () => {
     const ADMIN = { ...REP, uid: 'adm', isAdmin: true, role: 'admin', solarRole: null };
+    const OWNER = { ...REP, uid: 'own', isAdmin: true, isOwner: true, role: 'owner', solarRole: null };
     const lead = () => db.store.get('solarLeads')!.get('rep1_c1')!;
 
-    it('lets an admin mark a lead sold or lost', async () => {
-      mockGate.mockResolvedValue(ADMIN);
+    it('lets an owner mark a lead sold, then lost', async () => {
+      mockGate.mockResolvedValue(OWNER);
       const res = await patch('rep1_c1', { status: 'sold' });
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ success: true, id: 'rep1_c1', status: 'sold' });
-      expect(lead()).toMatchObject({ status: 'sold', statusChangedBy: 'adm' });
+      expect(lead()).toMatchObject({ status: 'sold', statusChangedBy: 'own' });
       expect((await patch('rep1_c1', { status: 'lost' })).status).toBe(200);
       expect(lead().status).toBe('lost');
     });
@@ -326,7 +327,7 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
     });
 
     it('mark sold keeps the booking', async () => {
-      mockGate.mockResolvedValue(ADMIN);
+      mockGate.mockResolvedValue(OWNER);
       db.store.set('solarBookings', new Map([['b1', { status: 'booked', consultantUid: 'jac', repUid: 'rep1' }]]));
       db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'booked', bookingId: 'b1' });
       expect((await patch('rep1_c1', { status: 'sold' })).status).toBe(200);
@@ -337,20 +338,22 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
 
     it('reopens to booked while a live booking holds the slot, else to new', async () => {
       mockGate.mockResolvedValue(ADMIN);
+      // Reopening a lost lead stays an admin action; a sold one is owners' only.
       db.store.set('solarBookings', new Map([['b1', { status: 'booked' }]]));
       db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'lost', bookingId: 'b1' });
       expect(await (await patch('rep1_c1', { status: 'new' })).json()).toMatchObject({ status: 'booked' });
 
       db.store.get('solarBookings')!.set('b1', { status: 'cancelled' });
       db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold', bookingId: 'b1' });
+      mockGate.mockResolvedValue(OWNER);
       expect(await (await patch('rep1_c1', { status: 'booked' })).json()).toMatchObject({ status: 'new' });
       expect(lead().status).toBe('new');
     });
 
     it('moves the stage with the status: sold, lost, reopen (history kept)', async () => {
-      mockGate.mockResolvedValue(ADMIN);
+      mockGate.mockResolvedValue(OWNER);
       await patch('rep1_c1', { status: 'sold' });
-      expect(lead()).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'sale', stageChangedBy: 'adm' });
+      expect(lead()).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'sale', stageChangedBy: 'own' });
       await patch('rep1_c1', { status: 'lost' });
       expect(lead()).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'no_sale' });
       await patch('rep1_c1', { status: 'new' });
@@ -364,7 +367,7 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
     });
 
     it('mark sold keeps a later stage', async () => {
-      mockGate.mockResolvedValue(ADMIN);
+      mockGate.mockResolvedValue(OWNER);
       db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold', stage: 'site_survey', stageHistory: [] });
       await patch('rep1_c1', { status: 'sold' });
       expect(lead()).toMatchObject({ stage: 'site_survey', stageHistory: [] });
@@ -375,10 +378,67 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
       expect(lead().status).toBeUndefined();
     });
 
+    describe('closing a deal is owners only', () => {
+      const NON_OWNERS = [
+        ['an admin', ADMIN],
+        ['a closer', { ...REP, uid: 'clo', solarRole: 'virtual_closer' }],
+        ['a Setup consultant', { ...REP, uid: 'jac', solarRole: null }],
+        ['the setter rep', REP],
+      ] as const;
+
+      it.each(NON_OWNERS)('403s %s marking a lead sold, and writes nothing', async (_, gate) => {
+        mockGate.mockResolvedValue(gate);
+        db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'booked' });
+        expect((await patch('rep1_c1', { status: 'sold' })).status).toBe(403);
+        expect(lead()).toEqual({ repUid: 'rep1', status: 'booked' });
+      });
+
+      it('403s an admin changing a sold lead: lost, reopen, sold again', async () => {
+        mockGate.mockResolvedValue(ADMIN);
+        db.store.set('solarBookings', new Map([['b1', { status: 'booked', consultantUid: 'jac', repUid: 'rep1' }]]));
+        const sold = { repUid: 'rep1', status: 'sold', bookingId: 'b1', stage: 'site_survey' };
+        db.store.get('solarLeads')!.set('rep1_c1', { ...sold });
+        for (const status of ['lost', 'new', 'booked', 'sold']) {
+          const res = await patch('rep1_c1', { status });
+          expect(res.status).toBe(403);
+          expect((await res.json()).error).toMatch(/Only an owner/);
+        }
+        expect(lead()).toEqual(sold);
+        expect(db.store.get('solarBookings')!.get('b1')!.status).toBe('booked');
+        expect(mockNotify).not.toHaveBeenCalled();
+      });
+
+      it('403s an admin un-selling an old sold lead (status only, no stage)', async () => {
+        mockGate.mockResolvedValue(ADMIN);
+        db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold' });
+        expect((await patch('rep1_c1', { status: 'lost' })).status).toBe(403);
+        expect((await patch('rep1_c1', { status: 'new' })).status).toBe(403);
+        expect(lead()).toEqual({ repUid: 'rep1', status: 'sold' });
+      });
+
+      it('lets an owner mark a sold lead lost or reopen it', async () => {
+        mockGate.mockResolvedValue(OWNER);
+        db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold' });
+        expect((await patch('rep1_c1', { status: 'lost' })).status).toBe(200);
+        expect(lead().status).toBe('lost');
+        db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold' });
+        expect((await patch('rep1_c1', { status: 'new' })).status).toBe(200);
+        expect(lead().status).toBe('new');
+      });
+
+      it('still lets an admin mark an open lead lost and reopen a lost one', async () => {
+        mockGate.mockResolvedValue(ADMIN);
+        db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'new' });
+        expect((await patch('rep1_c1', { status: 'lost' })).status).toBe(200);
+        expect((await patch('rep1_c1', { status: 'new' })).status).toBe(200);
+        expect(lead().status).toBe('new');
+      });
+    });
+
     it('400s an unknown status and 404s a missing lead', async () => {
       mockGate.mockResolvedValue(ADMIN);
       expect((await patch('rep1_c1', { status: 'won' })).status).toBe(400);
-      expect((await patch('nope', { status: 'sold' })).status).toBe(404);
+      expect((await patch('nope', { status: 'new' })).status).toBe(404);
       expect((await patch('nope', { status: 'lost' })).status).toBe(404);
     });
   });

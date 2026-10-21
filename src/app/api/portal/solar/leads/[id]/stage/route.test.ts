@@ -96,18 +96,18 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: who', () => {
 
 describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
   it('records history and keeps status in step', async () => {
-    mockGate.mockResolvedValue(CLOSER);
+    mockGate.mockResolvedValue(OWNER);
     const first = await patch('l1', { stage: 'appointment_demoed', outcome: 'proposal_sent' });
     expect(await first.json()).toMatchObject({
       success: true, id: 'l1', stage: 'appointment_demoed', outcome: 'proposal_sent', status: 'booked',
-      entry: { stage: 'appointment_demoed', outcome: 'proposal_sent', byUid: 'clo' },
+      entry: { stage: 'appointment_demoed', outcome: 'proposal_sent', byUid: 'own' },
     });
     expect(lead().status).toBe('booked'); // proposal sent: still open, the booking holds
 
     await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' });
     expect(lead().status).toBe('sold');
     await patch('l1', { stage: 'site_survey' });
-    expect(lead()).toMatchObject({ stage: 'site_survey', stageOutcome: null, status: 'sold', stageChangedBy: 'clo' });
+    expect(lead()).toMatchObject({ stage: 'site_survey', stageOutcome: null, status: 'sold', stageChangedBy: 'own' });
 
     const history = lead().stageHistory as { stage: string; outcome?: string; at: string; byUid: string }[];
     expect(history.map((e) => [e.stage, e.outcome ?? null])).toEqual([
@@ -116,7 +116,7 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
       ['site_survey', null],
     ]);
     history.forEach((e) => {
-      expect(e.byUid).toBe('clo');
+      expect(e.byUid).toBe('own');
       expect(Number.isNaN(Date.parse(e.at))).toBe(false);
     });
   });
@@ -147,6 +147,7 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
   });
 
   it('a sale keeps the booking', async () => {
+    mockGate.mockResolvedValue(OWNER);
     await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' });
     expect(db.store.get('solarBookings')!.get('b1')!.status).toBe('booked');
     expect(lead()).toMatchObject({ status: 'sold', bookingId: 'b1' });
@@ -154,6 +155,7 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
   });
 
   it("refuses a closer's move from sale to no sale: the lead stays sold and the booking stays", async () => {
+    mockGate.mockResolvedValue(OWNER);
     await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' });
     mockGate.mockResolvedValue(CLOSER);
     const res = await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' });
@@ -162,6 +164,8 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
     expect(db.store.get('solarBookings')!.get('b1')!.status).toBe('booked');
     expect(mockNotify).not.toHaveBeenCalled();
     mockGate.mockResolvedValue(ADMIN);
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(403);
+    mockGate.mockResolvedValue(OWNER);
     expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(200);
   });
 
@@ -170,17 +174,22 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
     expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'proposal_sent' })).status).toBe(200);
     expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(403);
     expect(lead()).toMatchObject({ stageOutcome: 'proposal_sent', status: 'booked' });
-    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' })).status).toBe(200);
+    // Up to sale is a close: owners only.
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' })).status).toBe(403);
   });
 
-  it("refuses a non-admin's move back, lets an admin move back and clear", async () => {
-    mockGate.mockResolvedValue(CLOSER);
+  it("refuses a non-owner's change to a sold lead, lets an owner move back and clear", async () => {
+    mockGate.mockResolvedValue(OWNER);
     await patch('l1', { stage: 'permit_approved' });
-    expect((await patch('l1', { stage: 'site_survey' })).status).toBe(403);
-    expect((await patch('l1', { stage: null })).status).toBe(403);
-    expect(lead().stage).toBe('permit_approved');
+    for (const gate of [CLOSER, ADMIN]) {
+      mockGate.mockResolvedValue(gate);
+      expect((await patch('l1', { stage: 'site_survey' })).status).toBe(403);
+      expect((await patch('l1', { stage: 'install_scheduled' })).status).toBe(403);
+      expect((await patch('l1', { stage: null })).status).toBe(403);
+      expect(lead().stage).toBe('permit_approved');
+    }
 
-    mockGate.mockResolvedValue(ADMIN);
+    mockGate.mockResolvedValue(OWNER);
     expect((await patch('l1', { stage: 'site_survey' })).status).toBe(200);
     const cleared = await patch('l1', { stage: null });
     expect(await cleared.json()).toMatchObject({ stage: null, outcome: null, status: 'booked' });
@@ -188,11 +197,13 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
     expect((lead().stageHistory as unknown[]).length).toBe(3);
   });
 
-  it('reads an old sold lead as demoed + sale, so a closer can move it on but not off the sale', async () => {
+  it('reads an old sold lead as sold: only an owner moves it on', async () => {
     mockGate.mockResolvedValue(CLOSER);
     expect((await patch('old_sold', { stage: 'appointment_demoed', outcome: 'proposal_sent' })).status).toBe(403);
     expect((await patch('old_sold', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(403);
+    expect((await patch('old_sold', { stage: 'install_scheduled' })).status).toBe(403);
     expect(lead('old_sold').status).toBe('sold');
+    mockGate.mockResolvedValue(OWNER);
     expect((await patch('old_sold', { stage: 'install_scheduled' })).status).toBe(200);
     expect(lead('old_sold')).toMatchObject({ stage: 'install_scheduled', status: 'sold' });
   });
@@ -221,5 +232,72 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: what', () => {
     expect(res.status).toBe(200);
     expect(lead()).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'proposal_sent', status: 'new' });
     expect('noSaleReason' in lead()).toBe(false);
+  });
+});
+
+describe('PATCH /api/portal/solar/leads/[id]/stage: closing a deal is owners only', () => {
+  const SOLD_MOVES = [
+    { stage: 'appointment_demoed', outcome: 'sale' },
+    { stage: 'site_survey' },
+    { stage: 'permit_approved' },
+    { stage: 'install_scheduled' },
+    { stage: 'install_complete' },
+    { stage: 'pto' },
+  ];
+  const NON_OWNERS = [
+    ['an admin', ADMIN],
+    ['a closer', CLOSER],
+    ['a Setup consultant', CONSULTANT],
+    ['a setter rep', REP],
+  ] as const;
+
+  for (const [who, gate] of NON_OWNERS) {
+    it.each(SOLD_MOVES)(`403s ${who} on %j and writes nothing`, async (body) => {
+      mockGate.mockResolvedValue(gate);
+      const res = await patch('l1', body);
+      expect(res.status).toBe(403);
+      if (gate !== REP) expect((await res.json()).error).toMatch(/Only an owner/);
+      expect(lead()).toMatchObject({ status: 'booked' });
+      expect(lead().stage).toBeUndefined();
+    });
+  }
+
+  it.each(SOLD_MOVES)('lets the owner make %j', async (body) => {
+    mockGate.mockResolvedValue(OWNER);
+    const res = await patch('l1', body);
+    expect(res.status).toBe(200);
+    expect(lead()).toMatchObject({ stage: body.stage, status: 'sold' });
+  });
+
+  it.each([
+    ['an admin', ADMIN],
+    ['a closer', CLOSER],
+    ['a Setup consultant', CONSULTANT],
+  ])('still lets %s record no sale and proposal sent', async (_, gate) => {
+    mockGate.mockResolvedValue(gate);
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'proposal_sent' })).status).toBe(200);
+    // Proposal sent -> no sale is a worse outcome (admins' only, as before), so start fresh.
+    db.store.get('solarLeads')!.set('l1', { repUid: 'rep1', status: 'booked', bookingId: 'b1' });
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(200);
+    expect(lead()).toMatchObject({ status: 'lost', stageOutcome: 'no_sale' });
+  });
+
+  it('403s a non-owner un-selling a sold lead (no sale, proposal sent, clear)', async () => {
+    db.store.get('solarLeads')!.set('l1', {
+      repUid: 'rep1', status: 'sold', bookingId: 'b1', stage: 'appointment_demoed', stageOutcome: 'sale',
+    });
+    for (const gate of [ADMIN, CLOSER, CONSULTANT]) {
+      mockGate.mockResolvedValue(gate);
+      for (const body of [
+        { stage: 'appointment_demoed', outcome: 'no_sale' },
+        { stage: 'appointment_demoed', outcome: 'proposal_sent' },
+        { stage: 'appointment_demoed', outcome: 'sale' },
+        { stage: null },
+      ]) {
+        expect((await patch('l1', body)).status).toBe(403);
+      }
+    }
+    expect(lead()).toMatchObject({ status: 'sold', stageOutcome: 'sale' });
+    expect(db.store.get('solarBookings')!.get('b1')!.status).toBe('booked');
   });
 });

@@ -15,6 +15,7 @@ import {
   statusForStage,
   type SolarStageEntry,
 } from '@/lib/solar/leadStage';
+import { SOLAR_CLOSE_FORBIDDEN, canCloseSolarLead, isSoldLead, isSoldStage } from '@/lib/solar/closePermission';
 
 type VerifiedGate = Extract<Awaited<ReturnType<typeof requireVerifiedUser>>, { ok: true }>;
 
@@ -35,7 +36,9 @@ async function maySetStage(gate: VerifiedGate): Promise<boolean> {
 // -> 200 {success, id, stage, outcome, status, entry, cancelledBookingId?}
 // Who: admins/owners (any move, back too, and stage null to clear it), the
 // closer solar roles and Setup consultants (forward moves, or another outcome
-// on the same stage). Reps get 403. Every change appends to stageHistory
+// on the same stage). Reps get 403. A sale (appointment_demoed + sale or any
+// later stage), and any write to a lead that is already sold, is owners' only
+// (canCloseSolarLead): everyone else gets 403. Every change appends to stageHistory
 // ({stage, outcome?, at, byUid}) and keeps status in step: a sale or any later
 // stage reads 'sold', no sale 'lost', otherwise open ('booked' while a live
 // booking holds a slot, else 'new'). No sale also cancels a live booking
@@ -62,6 +65,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (!snap.exists) return { error: 'Lead not found', code: 404 } as const;
       const data = (snap.data() ?? {}) as Record<string, unknown>;
       const current = readStage(data);
+      // Selling a lead, or any change to a sold one (another sold stage,
+      // un-selling it, no sale), is owners' only (lib/solar/closePermission).
+      if ((isSoldLead(data) || isSoldStage(stage, outcome)) && !canCloseSolarLead(gate, data)) {
+        return { error: SOLAR_CLOSE_FORBIDDEN, code: 403 } as const;
+      }
       if (!gate.isAdmin && !isForwardMove(current, { stage, outcome }, data.status)) {
         return { error: 'Only an admin can move a lead back a stage or change a closed outcome', code: 403 } as const;
       }

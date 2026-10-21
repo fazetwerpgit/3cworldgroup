@@ -13,6 +13,7 @@ import {
   parseLeadExtras,
 } from '@/lib/solar/leadFields';
 import { SOLAR_STAGE_ROLES, readStage, stagePatchForStatus } from '@/lib/solar/leadStage';
+import { SOLAR_CLOSE_FORBIDDEN, canCloseSolarLead, isSoldLead } from '@/lib/solar/closePermission';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
 import { syncBookingContactToGoogle } from '@/lib/solar/google/bookingEvents';
 
@@ -58,6 +59,8 @@ async function isSolarConsultant(gate: { uid: string; solarRole?: string | null 
 //     sold = appointment_demoed + sale, lost = appointment_demoed + no_sale,
 //     reopen clears a closing stage. Finer stages: PATCH .../{id}/stage.
 //     Any status but 'lost' also clears a pre-qualification noSaleReason.
+//     'sold', and any status on a lead that is already sold (lost, reopen,
+//     sold again), is owners' only (canCloseSolarLead): other admins get 403.
 //   {creditTier?, roofType?, heavyShade?, needsReview?, monthlyKwh?, usage?}
 //     -> 200 {success, id}. The creator or an admin; validated as on create
 //     (a blocked roof is refused; monthlyKwh rounded; usage 4KB of JSON max).
@@ -92,6 +95,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           const lead = await tx.get(ref);
           if (!lead.exists) return undefined;
           const data = (lead.data() ?? {}) as Record<string, unknown>;
+          if (isSoldLead(data) && !canCloseSolarLead(gate, data)) return { forbidden: true } as const;
           // Already closed at pre-qualification: it stays a low-credit decline
           // (no stage written, so it never counts as Demoed).
           if (isLowCreditDecline(data)) return { unchanged: String(data.status ?? 'lost') } as const;
@@ -114,6 +118,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           return null;
         });
         if (cancelled === undefined) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+        if (cancelled && 'forbidden' in cancelled) return NextResponse.json({ error: SOLAR_CLOSE_FORBIDDEN }, { status: 403 });
         if (cancelled && 'unchanged' in cancelled) {
           return NextResponse.json({ success: true, id, status: cancelled.unchanged });
         }
@@ -124,6 +129,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
       const snap = await ref.get();
       if (!snap.exists) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+      const leadData = (snap.data() ?? {}) as Record<string, unknown>;
+      if ((asked === 'sold' || isSoldLead(leadData)) && !canCloseSolarLead(gate, leadData)) {
+        return NextResponse.json({ error: SOLAR_CLOSE_FORBIDDEN }, { status: 403 });
+      }
       let status = asked;
       if (asked === 'new' || asked === 'booked') {
         const bookingId = snap.get('bookingId');
@@ -138,7 +147,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         statusChangedAt: now,
         statusChangedBy: gate.uid,
         updatedAt: now,
-        ...stagePatchForStatus((snap.data() ?? {}) as Record<string, unknown>, status, gate.uid, now),
+        ...stagePatchForStatus(leadData, status, gate.uid, now),
         ...(snap.get('noSaleReason') !== undefined ? { noSaleReason: FieldValue.delete() } : {}),
       });
       return NextResponse.json({ success: true, id, status });
