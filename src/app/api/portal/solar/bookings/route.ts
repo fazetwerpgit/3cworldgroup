@@ -7,7 +7,7 @@ import { sendPushToUser } from '@/lib/push/sendPush';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { appBaseUrl, managerAlertEmail, solarBookingConfirmationEmail } from '@/lib/email/templates';
 import { bookingDocId, isSolarMode, openSlots, type SolarMode } from '@/lib/solar/availability';
-import { consultantNotice, loadAvailability, loadBookings, requireSolarUser } from '@/lib/solar/server';
+import { consultantNotice, loadAvailability, loadBookings, loadContacts, requireSolarUser } from '@/lib/solar/server';
 import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
 import { isLowCreditDecline } from '@/lib/solar/leadFields';
 import { isSoldLead } from '@/lib/solar/closePermission';
@@ -15,6 +15,8 @@ import { consultantBookingAttachment, customerBookingAttachment, type BookingInv
 import { solarLeadHref } from '@/lib/solar/leadView';
 import { addBookingToGoogle, type GoogleBookingEvent } from '@/lib/solar/google/bookingEvents';
 import { googleSlotBusy } from '@/lib/solar/google/freeBusy';
+import { bookingAudience, isTestAccountUid, type BookingAudience } from '@/lib/solar/testAccount';
+import { TEST_ACCOUNT_FIELD, isTestAccount } from '@/lib/users/demoAccount';
 import {
   LEGACY_TZ,
   SOLAR_MAX_DAYS_OUT,
@@ -53,6 +55,8 @@ type Booking = {
   consultantTz: string;
   /** The event on the consultant's Google Calendar, or null (not connected, or Google failed). */
   google: GoogleBookingEvent | null;
+  /** Who the messages may reach (lib/solar/testAccount: a test booking reaches nobody real). */
+  audience: BookingAudience;
 };
 
 /** The lead's address on one line: "12 Elm St, Austin, TX, 78701". */
@@ -95,8 +99,13 @@ async function announceBooking(b: Booking) {
     leadUrl: `${appBaseUrl()}${link}`,
   };
   try {
-    const notice = await consultantNotice(b.consultantUid);
-    if (b.customerEmail) {
+    const notice =
+      b.audience.consultant === 'normal'
+        ? await consultantNotice(b.consultantUid)
+        : b.audience.consultant === 'consultant'
+          ? { to: (await loadContacts([b.consultantUid]))[0] ?? null, titlePrefix: '', replyTo: '' }
+          : { to: null, titlePrefix: '', replyTo: '' };
+    if (b.customerEmail && b.audience.homeowner) {
       await sendEmail({
         to: b.customerEmail,
         ...solarBookingConfirmationEmail({
@@ -285,6 +294,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(SLOT_TAKEN, { status: 409 });
     }
 
+    // A QA test account's booking (or one on its lead) is stamped and reaches
+    // nobody real: no homeowner email, no Google event, and the consultant's
+    // notice only when the consultant is a test account too.
+    const testRecord = gate.testAccount === true || isTestAccount(lead.data());
+    const audience = bookingAudience(testRecord, testRecord && (await isTestAccountUid(consultantUid)));
+
     const id = bookingDocId(consultantUid, start);
     const slotRef = db.collection('solarBookings').doc(id);
     let outcome:
@@ -335,6 +350,7 @@ export async function POST(request: NextRequest) {
           ...(customerAddress ? { customerAddress } : {}),
           status: 'booked',
           createdAt: now,
+          ...(testRecord ? { [TEST_ACCOUNT_FIELD]: true } : {}),
         };
         if (slot.exists) {
           // A cancelled booking held this slot: keep it as history under its
@@ -358,7 +374,7 @@ export async function POST(request: NextRequest) {
     const b = outcome.booking;
     // After the commit, outside the transaction: the Google event (best
     // effort, ~10s budget; null falls back to the .ics emails).
-    const google = await addBookingToGoogle(consultantUid, availability[0]?.googleCalendar, {
+    const google = !audience.google ? null : await addBookingToGoogle(consultantUid, availability[0]?.googleCalendar, {
       bookingId: id,
       createdAtMs: now.getTime(),
       mode,
@@ -389,6 +405,7 @@ export async function POST(request: NextRequest) {
       customerTz: String(b.customerTz ?? consultantTz),
       consultantTz,
       google,
+      audience,
     });
     await sendLeadAlertOnce(leadId).catch((error) => console.error('solar lead alert failed:', error));
     return NextResponse.json(bookedBody(id, b, false, google?.meetLink));

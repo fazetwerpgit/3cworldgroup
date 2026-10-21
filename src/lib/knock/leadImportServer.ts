@@ -10,6 +10,7 @@ import {
   type LeadRep,
 } from './leadImport';
 import type { Disposition, House, HouseDoc } from './types';
+import { isHiddenUser } from '@/lib/users/demoAccount';
 
 // Server side of the owner's lead-list upload (Admin settings > Lead lists): reads the request,
 // plans the import with the app's own planner (leadImport.ts, copied from 3c-knock-logic) against
@@ -172,6 +173,8 @@ export async function planLeadsOnServer(
     const reps: LeadRep[] = [];
     for (const doc of users.docs) {
       const user = doc.data();
+      // Demo and test accounts never get doors from a file.
+      if (isHiddenUser(user)) continue;
       if (typeof user.email !== 'string' || !user.email) continue;
       reps.push({ uid: doc.id, email: user.email, managerId: typeof user.managerId === 'string' ? user.managerId : null });
       names[doc.id] = nameOf(doc.id, user);
@@ -180,7 +183,9 @@ export async function planLeadsOnServer(
   } else if (input.assignTo) {
     const userSnap = await db.collection('users').doc(input.assignTo).get();
     const user = userSnap.data();
-    if (!userSnap.exists || !user || user.status !== 'active') return fail(400, 'unknown-rep', 'Pick the rep again.');
+    if (!userSnap.exists || !user || user.status !== 'active' || isHiddenUser(user)) {
+      return fail(400, 'unknown-rep', 'Pick the rep again.');
+    }
     assignee = { uid: input.assignTo, name: nameOf(input.assignTo, user) };
     assignTo = { repId: input.assignTo, managerId: typeof user.managerId === 'string' ? user.managerId : null };
   }

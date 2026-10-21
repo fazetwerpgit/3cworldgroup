@@ -8,7 +8,7 @@ import {
   roleRequiresOnboarding,
 } from '@/types';
 import { resolveRoles, PlatformRole, FieldRole } from '@/types';
-import { isDemoAccount } from '@/lib/users/demoAccount';
+import { isDemoAccount, isTestAccount } from '@/lib/users/demoAccount';
 import { emailFromUserDoc } from '@/lib/email/userEmail';
 import { isSandboxStaff } from '@/lib/chat/sandboxStaff';
 
@@ -163,6 +163,9 @@ export function belongsInChannelDoc(
   if (isDemoSandboxChannel(channelData)) return !!toChatChannel(typeof channelData.id === 'string' ? channelData.id : '', channelData);
   const channel = toChatChannel(typeof channelData.id === 'string' ? channelData.id : '', channelData);
   if (!channel) return false;
+  // A QA test account joins no channel by role or audience (All Company and
+  // the role channels stay free of its posts and pushes): only manual extras.
+  if (isTestAccount(userData)) return readExtraMemberIds(channelData).includes(uid);
   const { role, fieldRole } = resolveRoles(userData.role, userData.fieldRole);
   return (
     canAccessChatChannel({ ...channel, active: true }, role, fieldRole, userData.solarRole) ||
@@ -199,7 +202,8 @@ export async function getMemberIdsForAudience(
   };
 
   return users
-    .filter((doc) => isEligibleChatMember(doc.data()))
+    // Test accounts never join by audience (manual extras only; see belongsInChannelDoc).
+    .filter((doc) => isEligibleChatMember(doc.data()) && !isTestAccount(doc.data()))
     .map((doc) => {
       const data = doc.data();
       const { role, fieldRole } = resolveRoles(data.role, data.fieldRole);

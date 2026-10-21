@@ -76,7 +76,7 @@ const remove = (id: string) =>
   DELETE(new NextRequest(`${URL_BASE}/${id}`, { method: 'DELETE' }), { params: Promise.resolve({ id }) });
 
 const asRep = (uid = 'r1') =>
-  mockUser.mockResolvedValue({ ok: true, uid, name: 'Wil Teasdale', email: 'w@x.com', isOwner: false, isAdmin: false, demoAccount: false, aiConsent: { deepseek: false, gemini: false, gemini_voice: false }, solarRole: null });
+  mockUser.mockResolvedValue({ ok: true, uid, name: 'Wil Teasdale', email: 'w@x.com', isOwner: false, isAdmin: false, demoAccount: false, testAccount: false, aiConsent: { deepseek: false, gemini: false, gemini_voice: false }, solarRole: null });
 
 const soldAt = Date.now() - 60 * 60 * 1000;
 const sold = { clientId: 'sold-1', address: '1 Main St, Springfield, MO', soldAt, source: 'knock', houseId: 'h1' };

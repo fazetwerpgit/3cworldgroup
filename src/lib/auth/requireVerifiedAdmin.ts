@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { aiConsentOf, type AiConsentState } from '@/lib/ai/consent';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { isOnboardingAllowedApi } from '@/lib/auth/onboardingAccess';
-import { isDemoAccount } from '@/lib/users/demoAccount';
+import { isDemoAccount, isTestAccount } from '@/lib/users/demoAccount';
 import {
   isAdminLevel,
   isManagementRole,
@@ -116,6 +116,8 @@ export async function requireVerifiedUser(
       isAdmin: boolean;
       /** users/{uid}.demoAccount === true (lib/demo/redact hides other reps from it). */
       demoAccount: boolean;
+      /** users/{uid}.testAccount === true (QA login: its sales/solar records are stamped and hidden). */
+      testAccount: boolean;
       /** The AI providers the caller has agreed to (lib/ai/consent). */
       aiConsent: AiConsentState;
       /** The resolved roles, for permissionsFor (the solar gate) without a second users read. */
@@ -140,6 +142,7 @@ export async function requireVerifiedUser(
     // Admin or owner: may open any sale (same rule as GET /api/portal/sales/[id]).
     isAdmin: isAdminLevel(role),
     demoAccount: isDemoAccount(c.data),
+    testAccount: isTestAccount(c.data),
     aiConsent: aiConsentOf(c.data),
   };
 }

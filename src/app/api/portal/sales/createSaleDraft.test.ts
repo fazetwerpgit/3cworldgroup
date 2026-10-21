@@ -59,7 +59,7 @@ const sale = {
 
 beforeEach(() => {
   mockUser.mockReset();
-  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Wil Teasdale', email: 'w@x.com', isOwner: false, isAdmin: false, demoAccount: false, aiConsent: { deepseek: false, gemini: false, gemini_voice: false }, solarRole: null });
+  mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Wil Teasdale', email: 'w@x.com', isOwner: false, isAdmin: false, demoAccount: false, testAccount: false, aiConsent: { deepseek: false, gemini: false, gemini_voice: false }, solarRole: null });
   drafts.clear();
   drafts.set('r1_sold-1', { salesRepId: 'r1', status: 'open', saleId: null });
   drafts.set('r2_sold-1', { salesRepId: 'r2', status: 'open', saleId: null });

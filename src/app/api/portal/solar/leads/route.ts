@@ -8,12 +8,13 @@ import { permissionsFor } from '@/types/auth';
 import { loadAvailability, requireSolarUser } from '@/lib/solar/server';
 import { parseLead } from '@/lib/solar/leadFields';
 import { LEGACY_TZ } from '@/lib/solar/timezones';
-import { DEMO_ACCOUNT_FIELD } from '@/lib/users/demoAccount';
+import { isHiddenUser } from '@/lib/users/demoAccount';
 import { bookingView, leadView, type SolarLeadBooking } from '@/lib/solar/leadView';
 
 // GET /api/portal/solar/leads -> 200 {leads: SolarLeadView[]}, newest first,
 // each with its live booking joined (booking: null when there is none or it
-// was cancelled). An admin (or the owner) gets every lead but demo accounts';
+// was cancelled). An admin (or the owner) gets every lead but demo and test
+// accounts' (stamped demoAccount / testAccount);
 // anyone else with solar:read gets only their own. ?mine=1 asks for one's own
 // leads as an admin too (the rep Solar page's My leads).
 export async function GET(request: NextRequest) {
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     const snap = await leads.get();
     const docs = snap.docs
       .map((d) => ({ id: d.id, data: (d.data() ?? {}) as Record<string, unknown> }))
-      .filter(({ data }) => !all || data[DEMO_ACCOUNT_FIELD] !== true);
+      .filter(({ data }) => !all || !isHiddenUser(data));
 
     const bookingIds = [
       ...new Set(docs.map(({ data }) => (typeof data.bookingId === 'string' ? data.bookingId : '')).filter(Boolean)),
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
 
     const { id } = await submitFormRecord(
       'solarLeads',
-      { uid: gate.uid, name: gate.name, email: gate.email },
+      { uid: gate.uid, name: gate.name, email: gate.email, testAccount: gate.testAccount },
       parsed.fields,
       { clientId: idem.clientId }
     );

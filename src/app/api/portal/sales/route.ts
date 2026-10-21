@@ -18,7 +18,7 @@ import {
   orderNumberRawVariants,
   type OrderDuplicate,
 } from '@/lib/sales/orderNumber';
-import { isDemoAccount, saleVisibleTo } from '@/lib/users/demoAccount';
+import { isDemoAccount, isTestAccount, saleVisibleTo } from '@/lib/users/demoAccount';
 import { SALE_DRAFTS_COLLECTION, isDraftId } from '@/lib/sales/knockDrafts';
 
 // Helper function to create a notification
@@ -157,8 +157,8 @@ export async function GET(request: NextRequest) {
       if (status && data.status !== status) {
         return;
       }
-      // A demo account's sales stay out of everyone else's book; an admin who
-      // filters to that account by id still reads them.
+      // A demo or test account's sales stay out of everyone else's book; an
+      // admin who filters to that account by id still reads them.
       if (!saleVisibleTo(data, gate.uid) && data.salesRepId !== salesRepId) {
         return;
       }
@@ -338,6 +338,8 @@ export async function POST(request: NextRequest) {
     const managerId = repSnap.data()?.reportsToId || null;
     // A demo account's sales are stamped so every cross-user view can drop them.
     const demoAccount = isDemoAccount(repSnap.data());
+    // A QA test account's sales are stamped too: same cross-user hiding (isDemoSale).
+    const testAccount = isTestAccount(repSnap.data());
 
     const body = await request.json();
     const {
@@ -546,6 +548,7 @@ export async function POST(request: NextRequest) {
       createdAt: new Date(),
       updatedAt: new Date(),
       ...(demoAccount ? { demoAccount: true as const } : {}),
+      ...(testAccount ? { testAccount: true as const } : {}),
     };
 
     let docRef: FirebaseFirestore.DocumentReference;

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { isOnboardingUser } from '@/lib/auth/onboardingAccess';
-import { isDemoAccount } from '@/lib/users/demoAccount';
+import { isDemoAccount, isTestAccount } from '@/lib/users/demoAccount';
 import { memberName } from '@/lib/chat/memberDisplay';
 import { getEffectiveRole, isManagementRole, isSolarRole, resolveRoles, PlatformRole, FieldRole, SolarRole } from '@/types';
 
@@ -51,7 +51,12 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
   // can read or post in is a demo sandbox (userCanAccessChannelDoc), which no
   // real user other than Jacob ever sees.
   const demoAccount = isDemoAccount(data);
-  const { role, fieldRole } = demoAccount ? {} : resolveRoles(data.role, data.fieldRole);
+  // A QA test account chats with no role either, so no audience reaches it:
+  // it gets in only where it was added by hand (extraMemberIds), and nobody in
+  // the company gets its posts in All Company or a role channel. Not the demo
+  // sandbox: that stays demo accounts plus Jacob.
+  const roleless = demoAccount || isTestAccount(data);
+  const { role, fieldRole } = roleless ? {} : resolveRoles(data.role, data.fieldRole);
 
   return {
     ok: true,
@@ -63,7 +68,7 @@ export async function getVerifiedChatUser(request: NextRequest): Promise<ChatUse
       displayName: memberName({ displayName: data.displayName, email: data.email || gate.email }),
       role,
       fieldRole,
-      ...(!demoAccount && isSolarRole(data.solarRole) ? { solarRole: data.solarRole } : {}),
+      ...(!roleless && isSolarRole(data.solarRole) ? { solarRole: data.solarRole } : {}),
       effectiveRole: getEffectiveRole({ role, fieldRole }),
       canModerate: isManagementRole(role),
       demoAccount,

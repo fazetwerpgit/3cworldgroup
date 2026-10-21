@@ -7,6 +7,7 @@ import {
   MAX_LEAD_ROWS,
   leadImportLive,
 } from '@/lib/knock/leadImportServer';
+import { withoutHiddenUserDocs } from '@/lib/users/demoAccount';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,8 @@ const NO_STORE = { 'Cache-Control': 'private, no-store' };
 
 // GET /api/portal/knock/leads - what the owner's Lead lists page needs before a file is chosen:
 // the 3C Doors campaigns, the active people doors can go to, whether imports are switched on
-// (KNOCK_LEAD_IMPORT_LIVE) and the file limits. OWNER ONLY.
+// (KNOCK_LEAD_IMPORT_LIVE) and the file limits. OWNER ONLY. Demo and test accounts are never
+// offered (lib/users/demoAccount).
 export async function GET(request: NextRequest) {
   const gate = await requireOwner(request);
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status, headers: NO_STORE });
@@ -29,7 +31,7 @@ export async function GET(request: NextRequest) {
     const campaigns = campaignSnap.docs
       .map((doc) => ({ id: doc.id, name: String(doc.data().name || doc.id), type: String(doc.data().type ?? '') }))
       .sort(byName);
-    const people = userSnap.docs
+    const people = withoutHiddenUserDocs(userSnap.docs)
       .map((doc) => ({ uid: doc.id, name: String(doc.data().displayName || doc.data().email || doc.id) }))
       .sort(byName);
     return NextResponse.json(

@@ -30,8 +30,23 @@
 // Un-flagging (removing demoAccount from users/{uid}) does NOT un-hide its
 // sales: they keep their stamp and stay hidden until it is removed by hand.
 
+// TEST ACCOUNTS (owner-approved QA logins on prod): users/{uid}.testAccount ===
+// true, set only by the Admin SDK (scripts/create-test-accounts.mjs; firestore
+// rules deny every client write to users docs). Unlike a demo account, a test
+// account is a normal user for its own screens (real roles, real chat access
+// through manual additions, its forms behave normally); only its DATA stays out
+// of everyone else's views. Its sales and solar leads/bookings carry
+// `testAccount: true`, and every reader that drops a demo sale drops a test sale
+// too (isDemoSale / saleVisibleTo). isHiddenUser (demo or test) keeps both out
+// of rosters, and automatic chat membership skips a test account
+// (lib/chat/channels). Chat redaction, forms and fiber report matching are
+// demo-only on purpose.
+
 /** The users/{uid} field that marks a demo account (also stamped on its sales). */
 export const DEMO_ACCOUNT_FIELD = 'demoAccount';
+
+/** The users/{uid} field that marks a QA test account (also stamped on its sales and solar records). */
+export const TEST_ACCOUNT_FIELD = 'testAccount';
 
 type DocData = Record<string, unknown> | null | undefined;
 
@@ -39,20 +54,38 @@ export function isDemoAccount(data: DocData): boolean {
   return data?.[DEMO_ACCOUNT_FIELD] === true;
 }
 
+/** A QA test account (users/{uid}.testAccount === true), or a record one created. */
+export function isTestAccount(data: DocData): boolean {
+  return data?.[TEST_ACCOUNT_FIELD] === true;
+}
+
+/** A users doc nobody else should see in a roster: a demo account or a test account. */
+export function isHiddenUser(data: DocData): boolean {
+  return isDemoAccount(data) || isTestAccount(data);
+}
+
+/** Snapshot-shaped convenience: drops demo and test account docs from a query result. */
+export function withoutHiddenUserDocs<T extends { data(): DocData }>(docs: readonly T[]): T[] {
+  return docs.filter((doc) => !isHiddenUser(doc.data()));
+}
+
 /** Snapshot-shaped convenience: drops demo-account docs from a query result. */
 export function withoutDemoDocs<T extends { data(): DocData }>(docs: readonly T[]): T[] {
   return docs.filter((doc) => !isDemoAccount(doc.data()));
 }
 
-/** A sales doc logged by a demo account (stamped by the sales POST). */
+/**
+ * A sales doc logged by a demo account or a test account (the sales POST
+ * stamps `demoAccount: true` / `testAccount: true`): hidden from everyone else.
+ */
 export function isDemoSale(data: DocData): boolean {
-  return data?.[DEMO_ACCOUNT_FIELD] === true;
+  return data?.[DEMO_ACCOUNT_FIELD] === true || data?.[TEST_ACCOUNT_FIELD] === true;
 }
 
 /**
  * Whether a sale belongs in a view built for `viewerUid`: every real sale, and
- * a demo sale only for the demo account that logged it. Pass no viewer for a
- * view nobody owns (owner book, alert jobs, carrier sync): demo sales drop.
+ * a demo or test sale only for the account that logged it. Pass no viewer for a
+ * view nobody owns (owner book, alert jobs, carrier sync): demo and test sales drop.
  */
 export function saleVisibleTo(data: DocData, viewerUid?: string | null): boolean {
   if (!isDemoSale(data)) return true;

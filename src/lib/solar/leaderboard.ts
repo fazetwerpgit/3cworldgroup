@@ -14,7 +14,7 @@ import { computeHistory, dayKey, type SaleRecord } from '@/lib/leaderboard/histo
 import { boardOrder } from '@/lib/leaderboard/order';
 import { formatMonthParam } from '@/lib/leaderboard/periods';
 import { isSolarRole } from '@/types/auth';
-import { isDemoAccount } from '@/lib/users/demoAccount';
+import { isHiddenUser } from '@/lib/users/demoAccount';
 import { chicagoMonthKey } from '@/lib/sales/monthWindow';
 import type { PlanMixEntry } from '@/lib/sales/planMix';
 
@@ -239,7 +239,7 @@ export function unrankedSolarReps(
 ): SolarUnrankedRep[] {
   return users
     .filter(({ id, data }) =>
-      data.status === 'active' && !rankedIds.has(id) && !isDemoAccount(data) && isSolarRole(data.solarRole) && !!text(data.displayName)
+      data.status === 'active' && !rankedIds.has(id) && !isHiddenUser(data) && isSolarRole(data.solarRole) && !!text(data.displayName)
     )
     .map(({ id, data }) => ({ uid: id, name: text(data.displayName) }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.uid.localeCompare(b.uid));

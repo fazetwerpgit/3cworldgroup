@@ -6,7 +6,9 @@ import { createNotification } from '@/lib/notifications/createNotification';
 import { sendPushToUser } from '@/lib/push/sendPush';
 import { bookingZones, formatWhen, formatWhenForConsultant } from '@/lib/solar/timezones';
 import { solarLeadHref } from '@/lib/solar/leadView';
-import { consultantNotice, ownerNotificationsEnabled, resolveConsultants } from '@/lib/solar/server';
+import { consultantNotice, loadContacts, ownerNotificationsEnabled, resolveConsultants } from '@/lib/solar/server';
+import { bookingAudience, isTestAccountUid } from '@/lib/solar/testAccount';
+import { isTestAccount } from '@/lib/users/demoAccount';
 import { removeBookingFromGoogle } from '@/lib/solar/google/bookingEvents';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { appBaseUrl, managerAlertEmail, solarBookingCancelledEmail } from '@/lib/email/templates';
@@ -43,6 +45,8 @@ export interface CancelledBooking {
   googleEventId: string;
   /** true when googleEventState is 'unconfirmed': the insert timed out, so our .ics went out instead of Google's invite. */
   googleEventUnconfirmed?: boolean;
+  /** A QA test account's booking (`testAccount: true`): no homeowner email, consultant notice only to a test consultant. */
+  testAccount?: boolean;
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
@@ -98,6 +102,7 @@ export function stageBookingCancel(
     ...zones,
     googleEventId: str(booking.get('googleEventId')),
     googleEventUnconfirmed: booking.get('googleEventState') === 'unconfirmed',
+    ...(isTestAccount(booking.data()) ? { testAccount: true } : {}),
   };
 }
 
@@ -137,6 +142,10 @@ function cancelInvite(c: CancelledBooking): BookingCancelInput | null {
  * nothing, and the owner's own consultations notify Jacob as
  * "[Owner's calendar]". Whoever cancelled gets no portal notification or
  * push. Never throws.
+ *
+ * A QA test account's booking (lib/solar/testAccount) emails no homeowner, and
+ * its consultant notice goes to the consultant only when they are a test
+ * account too (never Jacob or the owner); the rep's notice stands.
  */
 export async function announceBookingCancel(
   c: CancelledBooking,
@@ -145,8 +154,14 @@ export async function announceBookingCancel(
 ): Promise<void> {
   const google = c.googleEventId ? removeBookingFromGoogle(c.consultantUid, c.googleEventId) : Promise.resolve(false);
   try {
+    const test = c.testAccount === true;
+    const audience = bookingAudience(test, test && (await isTestAccountUid(c.consultantUid)));
     const [notice, notifyOwner, { owner }] = await Promise.all([
-      c.consultantUid ? consultantNotice(c.consultantUid) : Promise.resolve(null),
+      !c.consultantUid || audience.consultant === 'none'
+        ? Promise.resolve(null)
+        : audience.consultant === 'consultant'
+          ? loadContacts([c.consultantUid]).then(([to]) => ({ to: to ?? null, titlePrefix: '', replyTo: '' }))
+          : consultantNotice(c.consultantUid),
       ownerNotificationsEnabled(),
       resolveConsultants(),
     ]);
@@ -175,7 +190,7 @@ export async function announceBookingCancel(
     const invite = cancelInvite(c);
     // Only a confirmed Google event means Google sent the invite (and now the cancel).
     const onGoogle = Boolean(c.googleEventId) && !c.googleEventUnconfirmed;
-    if (invite && !onGoogle && c.customerEmail) {
+    if (invite && !onGoogle && c.customerEmail && audience.homeowner) {
       await sendEmail({
         to: c.customerEmail,
         ...solarBookingCancelledEmail({

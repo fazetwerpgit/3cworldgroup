@@ -12,6 +12,7 @@ import {
   periodBounds,
 } from '@/lib/leaderboard/periods';
 import { createDemoRedactor, redactPeople } from '@/lib/demo/redact';
+import { solarRecordVisibleTo } from '@/lib/solar/testAccount';
 import {
   bookingEvents,
   bookingLeadId,
@@ -61,11 +62,16 @@ const FIRST_MONTH_BATCH = 25;
  * The solarBookings docs booked (createdAt) in the window. A single-field
  * range on createdAt: Firestore's automatic index serves it, no composite one.
  */
-async function bookingDocs(db: Db, window: BookingWindow): Promise<Doc[]> {
+async function bookingDocs(db: Db, window: BookingWindow, viewer: string): Promise<Doc[]> {
   let query: Query = db.collection('solarBookings');
   if (window.since) query = query.where('createdAt', '>=', window.since);
   if (window.until) query = query.where('createdAt', '<', window.until);
-  return docsOf(await query.get());
+  return visibleTo(docsOf(await query.get()), viewer);
+}
+
+/** Drops a test account's stamped bookings/leads, except for that account itself (lib/solar/testAccount). */
+function visibleTo(docs: Doc[], viewer: string): Doc[] {
+  return docs.filter(({ data }) => solarRecordVisibleTo(data, viewer));
 }
 
 /**
@@ -104,9 +110,10 @@ async function setEvents(
   db: Db,
   names: Promise<ReadonlyMap<string, string>>,
   campaignId: string | null,
+  viewer: string,
   window: BookingWindow = ALL_BOOKINGS
 ): Promise<SolarEvent[]> {
-  return bookingDocEvents(db, await bookingDocs(db, window), names, campaignId);
+  return bookingDocEvents(db, await bookingDocs(db, window, viewer), names, campaignId);
 }
 
 /**
@@ -115,12 +122,12 @@ async function setEvents(
  * the earliest overall. Only when none of a full batch counts (all cancelled,
  * or off the campaign) does it read them all.
  */
-async function firstSetMonth(db: Db, campaignId: string | null): Promise<string | null> {
+async function firstSetMonth(db: Db, campaignId: string | null, viewer: string): Promise<string | null> {
   const noNames = Promise.resolve(new Map<string, string>());
-  const oldest = docsOf(await db.collection('solarBookings').orderBy('createdAt').limit(FIRST_MONTH_BATCH).get());
-  const events = await bookingDocEvents(db, oldest, noNames, campaignId);
-  if (events.length > 0 || oldest.length < FIRST_MONTH_BATCH) return firstBookedMonth(events);
-  return firstBookedMonth(await setEvents(db, noNames, campaignId));
+  const batch = docsOf(await db.collection('solarBookings').orderBy('createdAt').limit(FIRST_MONTH_BATCH).get());
+  const events = await bookingDocEvents(db, visibleTo(batch, viewer), noNames, campaignId);
+  if (events.length > 0 || batch.length < FIRST_MONTH_BATCH) return firstBookedMonth(events);
+  return firstBookedMonth(await setEvents(db, noNames, campaignId, viewer));
 }
 
 /**
@@ -128,14 +135,14 @@ async function firstSetMonth(db: Db, campaignId: string | null): Promise<string 
  * queries (a stage at/after the demo, or an old sold/lost status), never the
  * whole solarLeads collection.
  */
-async function stageLeads(db: Db, campaignId: string | null): Promise<Doc[]> {
+async function stageLeads(db: Db, campaignId: string | null, viewer: string): Promise<Doc[]> {
   const leadsRef = db.collection('solarLeads');
   const [byStage, byStatus] = await Promise.all([
     leadsRef.where('stage', 'in', [...SOLAR_LEAD_STAGES]).get(),
     leadsRef.where('status', 'in', [...LEGACY_CLOSED_STATUSES]).get(),
   ]);
   const leads = new Map<string, Doc>();
-  for (const doc of [...docsOf(byStage), ...docsOf(byStatus)]) {
+  for (const doc of visibleTo([...docsOf(byStage), ...docsOf(byStatus)], viewer)) {
     // The campaign filter runs here, in memory: no extra index.
     if (!campaignId || campaignOf(doc.data) === campaignId) leads.set(doc.id, doc);
   }
@@ -147,9 +154,10 @@ async function stageEvents(
   db: Db,
   metric: 'demoed' | 'closed',
   names: Promise<ReadonlyMap<string, string>>,
-  campaignId: string | null
+  campaignId: string | null,
+  viewer: string
 ): Promise<SolarEvent[]> {
-  return leadEvents(await stageLeads(db, campaignId), metric, await names, leadMilestones);
+  return leadEvents(await stageLeads(db, campaignId, viewer), metric, await names, leadMilestones);
 }
 
 /** The viewer's own count in the window, counted exactly as their row on that board (rankSolarBoard). */
@@ -238,8 +246,8 @@ export async function GET(request: NextRequest) {
       const window = { start: bounds?.start ?? null, end: bounds?.end ?? null };
       // Only the window's bookings: a booking outside it never counts here.
       const [setList, leads] = await Promise.all([
-        setEvents(db, noNames, campaignId, { since: window.start, until: window.end }),
-        stageLeads(db, campaignId),
+        setEvents(db, noNames, campaignId, youUid, { since: window.start, until: window.end }),
+        stageLeads(db, campaignId, youUid),
       ]);
       return NextResponse.json({
         ...echo,
@@ -274,7 +282,7 @@ export async function GET(request: NextRequest) {
         : { since: new Date(Math.min(bounds.start.getTime(), now.getTime() - STREAK_LOOKBACK_MS)), until: null };
     const [users, counted] = await Promise.all([
       usersRead,
-      metric === 'set' ? setEvents(db, namesRead, campaignId, setWindow) : stageEvents(db, metric, namesRead, campaignId),
+      metric === 'set' ? setEvents(db, namesRead, campaignId, youUid, setWindow) : stageEvents(db, metric, namesRead, campaignId, youUid),
     ]);
     const rankedRows = rankSolarBoard(
       counted,
@@ -307,7 +315,7 @@ export async function GET(request: NextRequest) {
       }
       // Fewer consults since the window's start than the list holds: older ones fill it.
       const recentPool =
-        metric === 'set' && setWindow.since && counted.length < RECENT_COUNT ? await setEvents(db, namesRead, campaignId) : counted;
+        metric === 'set' && setWindow.since && counted.length < RECENT_COUNT ? await setEvents(db, namesRead, campaignId, youUid) : counted;
       team.recent = recentConsults(recentPool, RECENT_COUNT).map(({ repKey, ...consult }) => ({
         ...consult,
         repName: redact.active ? redact.name(repKey ?? null, consult.repName) : consult.repName,
@@ -322,7 +330,7 @@ export async function GET(request: NextRequest) {
       ...(monthView && bounds
         ? {
             month: formatMonthParam(monthView.key),
-            firstMonth: metric === 'set' ? await firstSetMonth(db, campaignId) : firstBookedMonth(counted),
+            firstMonth: metric === 'set' ? await firstSetMonth(db, campaignId, youUid) : firstBookedMonth(counted),
             endDate: bounds.end,
           }
         : {}),

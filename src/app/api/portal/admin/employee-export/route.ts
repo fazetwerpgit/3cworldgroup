@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireOwner } from '@/lib/announcements/requireOwner';
-import { withoutDemoDocs } from '@/lib/users/demoAccount';
+import { withoutHiddenUserDocs } from '@/lib/users/demoAccount';
 import {
   buildExportRows,
   buildExportWorkbook,
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
   let filename: string;
   try {
     const usersSnap = await db.collection('users').where('status', '==', 'active').get();
-    const users = withoutDemoDocs(usersSnap.docs).map((doc) => ({ uid: doc.id, data: doc.data() }));
+    const users = withoutHiddenUserDocs(usersSnap.docs).map((doc) => ({ uid: doc.id, data: doc.data() }));
     const sensitiveSnaps = users.length
       ? await db.getAll(...users.map((user) => db.collection('userSensitive').doc(user.uid)))
       : [];

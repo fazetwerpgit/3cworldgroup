@@ -10,6 +10,7 @@ import { bookingZones, formatWhen, timeIn, zoneAbbr } from '@/lib/solar/timezone
 import { CREDIT_TIER_LABELS, PHOTO_SLOTS, PHOTO_SLOT_LABELS, ROOF_TYPE_LABELS, isCreditTier, isRoofType } from '@/lib/solar/leadFields';
 import { leadAlertUids, loadContacts } from '@/lib/solar/server';
 import { solarLeadHref } from '@/lib/solar/leadView';
+import { isTestAccount } from '@/lib/users/demoAccount';
 
 /** V4 signed URLs max out at 7 days; a minute of slack keeps the signer happy. */
 const PHOTO_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000 - 60_000;
@@ -68,7 +69,9 @@ async function bookingFor(bookingId: string) {
 /**
  * Sends the lead alert (notification, push, email) unless it already went out.
  * Returns whether this call sent it. Best-effort past the stamp: a failed
- * message never fails the caller's request.
+ * message never fails the caller's request. A QA test account's lead
+ * (`testAccount: true`, lib/solar/testAccount) is claimed like any other but
+ * alerts nobody.
  */
 export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
   if (!adminDb) return false;
@@ -81,6 +84,7 @@ export async function sendLeadAlertOnce(leadId: string): Promise<boolean> {
     return snap;
   });
   if (!lead) return false;
+  if (isTestAccount(lead.data())) return true;
 
   try {
     const uids = await leadAlertUids();

@@ -11,7 +11,7 @@ import {
   type LoggedSale,
 } from '@/lib/sales/calloutNudge';
 import { chicagoDayKey, chicagoHour } from '@/lib/weeklyInstalls/week';
-import { DEMO_ACCOUNT_FIELD, isDemoSale, withoutDemoDocs } from '@/lib/users/demoAccount';
+import { DEMO_ACCOUNT_FIELD, TEST_ACCOUNT_FIELD, isDemoSale, withoutHiddenUserDocs } from '@/lib/users/demoAccount';
 
 // The reads behind the callout nudge (lib/sales/calloutNudge.ts has the rule and
 // the words), and the 9 PM push.
@@ -83,8 +83,8 @@ export async function loadDaySales(db: Db, day: string): Promise<LoggedSale[]> {
   const to = new Date(end.getTime() + DAY_MS);
   const sales = db.collection('sales');
   const [bySaleDate, byCreated] = await Promise.all([
-    sales.where('saleDate', '>=', from).where('saleDate', '<', to).select('salesRepId', 'saleDate', 'createdAt', DEMO_ACCOUNT_FIELD).get(),
-    sales.where('createdAt', '>=', from).where('createdAt', '<', to).select('salesRepId', 'saleDate', 'createdAt', DEMO_ACCOUNT_FIELD).get(),
+    sales.where('saleDate', '>=', from).where('saleDate', '<', to).select('salesRepId', 'saleDate', 'createdAt', DEMO_ACCOUNT_FIELD, TEST_ACCOUNT_FIELD).get(),
+    sales.where('createdAt', '>=', from).where('createdAt', '<', to).select('salesRepId', 'saleDate', 'createdAt', DEMO_ACCOUNT_FIELD, TEST_ACCOUNT_FIELD).get(),
   ]);
   const byId = new Map<string, LoggedSale>();
   for (const doc of [...bySaleDate.docs, ...byCreated.docs]) {
@@ -211,11 +211,11 @@ export async function runCalloutNudges(deps: CalloutRunDeps): Promise<CalloutRun
 
   const [short, usersSnap] = await Promise.all([
     calloutGapsFor(db, day),
-    db.collection('users').where('status', '==', 'active').select('status', DEMO_ACCOUNT_FIELD).get(),
+    db.collection('users').where('status', '==', 'active').select('status', DEMO_ACCOUNT_FIELD, TEST_ACCOUNT_FIELD).get(),
   ]);
   summary.short = short.length;
   // Active users only, as the overdue alerts do: a rep who left is not nudged.
-  const active = new Set(withoutDemoDocs(usersSnap.docs).map((doc) => doc.id));
+  const active = new Set(withoutHiddenUserDocs(usersSnap.docs).map((doc) => doc.id));
 
   for (const entry of short) {
     if (!active.has(entry.repId)) {

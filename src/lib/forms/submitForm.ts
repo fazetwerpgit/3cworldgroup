@@ -1,6 +1,6 @@
 import { adminDb } from '@/lib/firebase/admin';
 import { isAlreadyExists } from '@/lib/forms/idempotency';
-import { DEMO_ACCOUNT_FIELD } from '@/lib/users/demoAccount';
+import { DEMO_ACCOUNT_FIELD, TEST_ACCOUNT_FIELD } from '@/lib/users/demoAccount';
 
 /**
  * Status of a form a demo account (App Review) sends. Not 'new', so it never
@@ -13,7 +13,9 @@ export const DEMO_FORM_STATUS = 'demo';
 // Writes a rep-form submission, stamped with the VERIFIED rep identity (uid/name/
 // email come from a verified Firebase token via the route, never from client input)
 // and a 'new' status. A demo account's form is stamped `demoAccount: true` with
-// DEMO_FORM_STATUS instead, so nobody else ever sees it.
+// DEMO_FORM_STATUS instead, so nobody else ever sees it. A QA test account's
+// record (solar leads) gets `testAccount: true` and keeps the normal status: it
+// behaves like a real one for its rep, and the readers drop the stamp.
 //
 // With `clientId` (already validated, see lib/forms/idempotency.ts) the record's
 // doc id is `${uid}_${clientId}` and it is written with create(), which Firestore
@@ -22,7 +24,7 @@ export const DEMO_FORM_STATUS = 'demo';
 // original id, and the route skips the second notification.
 export async function submitFormRecord(
   collection: string,
-  rep: { uid: string; name: string; email: string; demoAccount?: boolean },
+  rep: { uid: string; name: string; email: string; demoAccount?: boolean; testAccount?: boolean },
   fields: Record<string, unknown>,
   options: { clientId?: string } = {}
 ): Promise<{ id: string; duplicate: boolean }> {
@@ -36,6 +38,7 @@ export async function submitFormRecord(
     repName: rep.name,
     repEmail: rep.email,
     ...(demo ? { [DEMO_ACCOUNT_FIELD]: true } : {}),
+    ...(rep.testAccount === true ? { [TEST_ACCOUNT_FIELD]: true } : {}),
     status: demo ? DEMO_FORM_STATUS : 'new',
     createdAt: now,
     updatedAt: now,
