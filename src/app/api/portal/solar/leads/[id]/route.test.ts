@@ -426,6 +426,21 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
         expect(lead().status).toBe('new');
       });
 
+      it("403s an admin's reopen when an owner sells the lead first: the sale stands", async () => {
+        mockGate.mockResolvedValue(ADMIN);
+        db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'lost' });
+        const real = db.runTransaction.bind(db);
+        // The owner's sale lands between the request and the write.
+        const spy = vi.spyOn(db, 'runTransaction').mockImplementation(((fn: Parameters<typeof real>[0]) => {
+          Object.assign(db.store.get('solarLeads')!.get('rep1_c1')!, { status: 'sold' });
+          return real(fn);
+        }) as typeof real);
+        const res = await patch('rep1_c1', { status: 'new' });
+        spy.mockRestore();
+        expect(res.status).toBe(403);
+        expect(lead().status).toBe('sold');
+      });
+
       it('still lets an admin mark an open lead lost and reopen a lost one', async () => {
         mockGate.mockResolvedValue(ADMIN);
         db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'new' });
