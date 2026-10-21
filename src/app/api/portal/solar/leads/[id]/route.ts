@@ -127,29 +127,36 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           success: true, id, status: 'lost', ...(cancelled ? { cancelledBookingId: cancelled.id } : {}),
         });
       }
-      const snap = await ref.get();
-      if (!snap.exists) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
-      const leadData = (snap.data() ?? {}) as Record<string, unknown>;
-      if ((asked === 'sold' || isSoldLead(leadData)) && !canCloseSolarLead(gate, leadData)) {
-        return NextResponse.json({ error: SOLAR_CLOSE_FORBIDDEN }, { status: 403 });
-      }
-      let status = asked;
-      if (asked === 'new' || asked === 'booked') {
-        const bookingId = snap.get('bookingId');
-        const booking = typeof bookingId === 'string' && bookingId
-          ? await db.collection('solarBookings').doc(bookingId).get()
-          : null;
-        status = booking?.exists && booking.get('status') !== 'cancelled' ? 'booked' : 'new';
-      }
+      // One transaction: the owner check and the write see the same lead, so a
+      // sale that lands in between can't be undone by a non-owner's reopen.
       const now = new Date();
-      await ref.update({
-        status,
-        statusChangedAt: now,
-        statusChangedBy: gate.uid,
-        updatedAt: now,
-        ...stagePatchForStatus(leadData, status, gate.uid, now),
-        ...(snap.get('noSaleReason') !== undefined ? { noSaleReason: FieldValue.delete() } : {}),
+      const outcome = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) return { code: 404, error: 'Lead not found' } as const;
+        const leadData = (snap.data() ?? {}) as Record<string, unknown>;
+        if ((asked === 'sold' || isSoldLead(leadData)) && !canCloseSolarLead(gate, leadData)) {
+          return { code: 403, error: SOLAR_CLOSE_FORBIDDEN } as const;
+        }
+        let next = asked;
+        if (asked === 'new' || asked === 'booked') {
+          const bookingId = leadData.bookingId;
+          const booking = typeof bookingId === 'string' && bookingId
+            ? await tx.get(db.collection('solarBookings').doc(bookingId))
+            : null;
+          next = booking?.exists && booking.get('status') !== 'cancelled' ? 'booked' : 'new';
+        }
+        tx.update(ref, {
+          status: next,
+          statusChangedAt: now,
+          statusChangedBy: gate.uid,
+          updatedAt: now,
+          ...stagePatchForStatus(leadData, next, gate.uid, now),
+          ...(leadData.noSaleReason !== undefined ? { noSaleReason: FieldValue.delete() } : {}),
+        });
+        return { status: next } as const;
       });
+      if ('error' in outcome) return NextResponse.json({ error: outcome.error }, { status: outcome.code });
+      const status = outcome.status;
       return NextResponse.json({ success: true, id, status });
     }
 
