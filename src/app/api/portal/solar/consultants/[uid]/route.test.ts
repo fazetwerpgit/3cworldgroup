@@ -6,9 +6,9 @@ vi.mock('@/lib/firebase/admin', async () => ({
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedAdmin: vi.fn(), requireVerifiedUser: vi.fn() }));
 
-import { DELETE, PUT } from './route';
+import { DELETE, GET, PUT } from './route';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedAdmin, requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { JACOB_VIRTUAL, OWNER_IN_PERSON, OWNER_VIRTUAL } from '@/lib/solar/availability';
 import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
 import { createFakeGoogle } from '@/lib/solar/testing/fakeGoogle';
@@ -16,6 +16,9 @@ import { encryptToken } from '@/lib/solar/google/crypto';
 
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedAdmin as unknown as ReturnType<typeof vi.fn>;
+const mockUser = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
+/** The PUT/GET caller: an admin by default; `as('sam')` is a consultant who isn't one. */
+const as = (uid: string, isAdmin = false) => mockUser.mockResolvedValue({ ok: true, uid, name: uid, isAdmin });
 
 const HOURS = {
   tz: 'America/Denver',
@@ -25,6 +28,7 @@ const HOURS = {
 const url = (uid: string) => `http://localhost/api/portal/solar/consultants/${uid}`;
 const put = (uid: string, body: unknown) =>
   PUT(new NextRequest(url(uid), { method: 'PUT', body: JSON.stringify(body) }), { params: Promise.resolve({ uid }) });
+const get = (uid: string) => GET(new NextRequest(url(uid)), { params: Promise.resolve({ uid }) });
 const del = (uid: string) => DELETE(new NextRequest(url(uid), { method: 'DELETE' }), { params: Promise.resolve({ uid }) });
 const saved = () => db.store.get('solarAvailability') ?? new Map();
 
@@ -37,13 +41,21 @@ beforeEach(() => {
     sam: { displayName: 'Sam Closer', email: 'sam@x.com', solarRole: 'closer' },
   })));
   mockGate.mockReset().mockResolvedValue({ ok: true, uid: 'adm', name: 'Admin' });
+  mockUser.mockReset();
+  as('adm', true);
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 
 describe('PUT /api/portal/solar/consultants/[uid]', () => {
-  it('is admin only and writes nothing otherwise', async () => {
-    mockGate.mockResolvedValue({ ok: false, error: 'Forbidden: admin access required', status: 403 });
-    expect((await put('sam', HOURS)).status).toBe(403);
+  it("refuses someone else's card to a non-admin and writes nothing", async () => {
+    as('sam');
+    expect((await put('jac', HOURS)).status).toBe(403);
+    expect(saved().size).toBe(0);
+  });
+
+  it('refuses a signed-out caller', async () => {
+    mockUser.mockResolvedValue({ ok: false, error: 'Unauthorized', status: 401 });
+    expect((await put('sam', HOURS)).status).toBe(401);
     expect(saved().size).toBe(0);
   });
 
@@ -133,10 +145,80 @@ describe('PUT /api/portal/solar/consultants/[uid]: Meet link and phone', () => {
     expect(saved().get('sam')).not.toHaveProperty('phone');
   });
 
-  it('is admin only for contact details too', async () => {
+  it("refuses someone else's contact details to a non-admin", async () => {
+    await put('sam', HOURS);
+    as('sam');
+    expect((await put('jac', { ...HOURS, meetLink: MEET })).status).toBe(403);
+    expect(saved().get('jac')).not.toHaveProperty('meetLink');
+  });
+});
+
+describe('a consultant on their own card (My availability)', () => {
+  const MEET = 'https://meet.google.com/abc-defg-hij';
+
+  it('saves their own hours, Meet link and phone, stamped with their uid, keeping Google', async () => {
+    await put('sam', HOURS);
+    const google = { connected: true, email: 'sam@gmail.com', freeBusy: true, connectedAt: '2026-10-01T00:00:00.000Z' };
+    saved().set('sam', { ...saved().get('sam'), googleCalendar: google });
+    as('sam');
+    const res = await put('sam', { ...HOURS, tz: 'America/New_York', meetLink: MEET, phone: '512-555-0142' });
+    expect(res.status).toBe(200);
+    expect(saved().get('sam')).toMatchObject({
+      tz: 'America/New_York',
+      meetLink: MEET,
+      phone: '+15125550142',
+      updatedBy: 'sam',
+      googleCalendar: google,
+    });
+  });
+
+  it('can save their own seed card while the seed is served', async () => {
+    as('jac');
+    expect((await put('jac', HOURS)).status).toBe(200);
+    expect([...saved().keys()].sort()).toEqual(['jac', 'own']);
+  });
+
+  it('cannot add themselves as a consultant', async () => {
+    await put('jac', HOURS);
+    as('sam');
+    const res = await put('sam', HOURS);
+    expect(res.status).toBe(403);
+    expect(saved().has('sam')).toBe(false);
+  });
+
+  it('reads their own card, with the Google status', async () => {
+    await put('sam', { ...HOURS, meetLink: MEET });
+    as('sam');
+    const res = await get('sam');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ seeded: false, consultant: { consultantUid: 'sam', name: 'Sam Closer', meetLink: MEET } });
+  });
+
+  it("gets 403 for someone else's card, before any lookup", async () => {
+    await put('sam', HOURS);
+    as('sam');
+    expect((await get('jac')).status).toBe(403);
+    expect((await get('nobody')).status).toBe(403);
+  });
+
+  it('gets 404 when they take no consultations', async () => {
+    await put('jac', HOURS);
+    as('sam');
+    expect((await get('sam')).status).toBe(404);
+  });
+
+  it('an admin reads any card, the seed included', async () => {
+    const res = await get('own');
+    expect(res.status).toBe(200);
+    expect((await res.json()).seeded).toBe(true);
+  });
+
+  it('cannot remove their own card: DELETE stays admin only', async () => {
+    await put('sam', HOURS);
+    as('sam');
     mockGate.mockResolvedValue({ ok: false, error: 'Forbidden: admin access required', status: 403 });
-    expect((await put('sam', { ...HOURS, meetLink: MEET })).status).toBe(403);
-    expect(saved().size).toBe(0);
+    expect((await del('sam')).status).toBe(403);
+    expect(saved().has('sam')).toBe(true);
   });
 });
 

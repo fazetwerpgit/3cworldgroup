@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireVerifiedAdmin } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedAdmin, requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { parseAvailability, type SolarAvailability } from '@/lib/solar/availability';
 import { availabilityOf, loadConsultants } from '@/lib/solar/server';
 import { disconnect as disconnectGoogle } from '@/lib/solar/google/connection';
@@ -10,6 +10,41 @@ const COLLECTION = 'solarAvailability';
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
 
 type Params = { params: Promise<{ uid: string }> };
+
+const NOT_CONSULTANT = 'Only a saved consultant can edit their hours.';
+
+/**
+ * Who may read or write `uid`'s card: an admin (the owner passes) any card, a
+ * consultant their own card only. The uid compared is the verified caller's.
+ */
+async function cardGate(request: NextRequest, uid: string) {
+  const gate = await requireVerifiedUser(request);
+  if (!gate.ok) return { ok: false as const, res: NextResponse.json({ error: gate.error }, { status: gate.status }) };
+  if (!gate.isAdmin && gate.uid !== uid) {
+    return { ok: false as const, res: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
+  }
+  return { ok: true as const, uid: gate.uid, isAdmin: gate.isAdmin };
+}
+
+// GET /api/portal/solar/consultants/{uid} -> 200 {consultant, seeded}. The
+// consultant's own card (My availability), or any card for an admin. 403 for
+// someone else's card, checked before any lookup; 404 when `uid` takes no
+// consultations. Carries the Google status, never a token.
+export async function GET(request: NextRequest, { params }: Params) {
+  const { uid } = await params;
+  const gate = await cardGate(request, uid);
+  if (!gate.ok) return gate.res;
+  if (!UID.test(uid)) return NextResponse.json({ error: 'Consultant not found' }, { status: 404 });
+  try {
+    const { consultants, seeded } = await loadConsultants();
+    const consultant = consultants.find((c) => c.consultantUid === uid);
+    if (!consultant) return NextResponse.json({ error: 'Consultant not found' }, { status: 404 });
+    return NextResponse.json({ consultant, seeded }, { headers: { 'Cache-Control': 'no-store' } });
+  } catch (error) {
+    console.error('Error loading solar consultant:', error);
+    return NextResponse.json({ error: 'Failed to load consultant' }, { status: 500 });
+  }
+}
 
 /**
  * The stored shape of one consultant (the doc id is the uid). meetLink and
@@ -33,7 +68,9 @@ function docOf(
 }
 
 // PUT /api/portal/solar/consultants/{uid} {tz, slotMin, modes[, meetLink][, phone]}
-// -> 200 {consultant}. Admin only. Adds or replaces that person's hours; the
+// -> 200 {consultant}. An admin adds or replaces anyone's hours; a consultant
+// may replace their own (My availability), never add themselves (403 when they
+// take no consultations yet) or touch anyone else's (403). The
 // name is read from their users doc, never from the body. meetLink (a Google
 // Meet link only) and phone go in the homeowner's confirmation email: each is
 // normalized (lib/solar/consultantContact), '' or null clears it, and a key
@@ -41,12 +78,12 @@ function docOf(
 // empty the GET serves the seed, so this write also saves every other seed
 // consultant: saving one must not drop the rest.
 export async function PUT(request: NextRequest, { params }: Params) {
-  const gate = await requireVerifiedAdmin(request);
-  if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
+  const { uid } = await params;
+  const gate = await cardGate(request, uid);
+  if (!gate.ok) return gate.res;
   if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
   const db = adminDb;
 
-  const { uid } = await params;
   if (!UID.test(uid)) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   const body: unknown = await request.json().catch(() => null);
   const parsed = parseAvailability(body);
@@ -67,6 +104,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const consultant = await db.runTransaction(async (tx) => {
       const existing = await tx.get(coll.limit(1));
       const mine = await tx.get(coll.doc(uid));
+      // Not an admin: only an existing consultant (a saved doc, or one of the seed while it is served).
+      if (!gate.isAdmin && !mine.exists && !(seeded && existing.empty && seed.some((s) => s.consultantUid === uid))) {
+        return null;
+      }
       const kept = mine.exists ? mine.data() ?? {} : {};
       const next = {
         consultantUid: uid,
@@ -87,6 +128,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       });
       return next;
     });
+    if (!consultant) return NextResponse.json({ error: NOT_CONSULTANT }, { status: 403 });
     return NextResponse.json({ consultant });
   } catch (error) {
     console.error('Error saving solar consultant:', error);
