@@ -1,6 +1,7 @@
 // A one-event iCalendar file (RFC 5545) for "Add to calendar" attachments.
 // METHOD:PUBLISH: the file adds the event to the reader's calendar; it is not
 // a meeting invitation that asks for a reply (that would be REQUEST).
+// METHOD:CANCEL (with the same UID and a higher SEQUENCE) takes it back off.
 
 export interface IcsEvent {
   /** Globally unique and stable for the event, e.g. "<booking id>@3cworldgroup.com". */
@@ -15,9 +16,16 @@ export interface IcsEvent {
   url?: string;
   /** When the file was made (DTSTAMP). Defaults to now. */
   stamp?: Date;
+  /** PUBLISH (default) adds the event; CANCEL removes the event with this UID. */
+  method?: IcsMethod;
+  /** Revision number; a cancel must be higher than the file it replaces (0). */
+  sequence?: number;
 }
 
+export type IcsMethod = 'PUBLISH' | 'CANCEL';
+
 export const ICS_CONTENT_TYPE = 'text/calendar; charset=utf-8; method=PUBLISH';
+export const ICS_CANCEL_CONTENT_TYPE = 'text/calendar; charset=utf-8; method=CANCEL';
 
 const CRLF = '\r\n';
 const MAX_OCTETS = 75;
@@ -64,12 +72,13 @@ export function icsUtc(date: Date): string {
 const uri = (value: string) => value.replace(/[\r\n]/g, '');
 
 export function buildIcs(event: IcsEvent): string {
+  const method = event.method ?? 'PUBLISH';
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
     'PRODID:-//3C World Group//Solar Booking//EN',
     'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
+    `METHOD:${method}`,
     'BEGIN:VEVENT',
     `UID:${escapeIcsText(event.uid)}`,
     `DTSTAMP:${icsUtc(event.stamp ?? new Date())}`,
@@ -79,8 +88,8 @@ export function buildIcs(event: IcsEvent): string {
     ...(event.location ? [`LOCATION:${escapeIcsText(event.location)}`] : []),
     ...(event.description ? [`DESCRIPTION:${escapeIcsText(event.description)}`] : []),
     ...(event.url ? [`URL:${uri(event.url)}`] : []),
-    'STATUS:CONFIRMED',
-    'SEQUENCE:0',
+    method === 'CANCEL' ? 'STATUS:CANCELLED' : 'STATUS:CONFIRMED',
+    `SEQUENCE:${Math.max(0, Math.trunc(event.sequence ?? 0))}`,
     'TRANSP:OPAQUE',
     'END:VEVENT',
     'END:VCALENDAR',
@@ -89,6 +98,10 @@ export function buildIcs(event: IcsEvent): string {
 }
 
 /** The file as a sendEmail attachment. */
-export function icsAttachment(name: string, ics: string) {
-  return { name, contentBase64: Buffer.from(ics, 'utf8').toString('base64'), contentType: ICS_CONTENT_TYPE };
+export function icsAttachment(name: string, ics: string, method: IcsMethod = 'PUBLISH') {
+  return {
+    name,
+    contentBase64: Buffer.from(ics, 'utf8').toString('base64'),
+    contentType: method === 'CANCEL' ? ICS_CANCEL_CONTENT_TYPE : ICS_CONTENT_TYPE,
+  };
 }

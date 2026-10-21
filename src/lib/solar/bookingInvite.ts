@@ -73,6 +73,49 @@ export function consultantBookingIcs(b: BookingInviteInput): string {
   return buildIcs({ ...base(b), summary: `Solar consult: ${homeowner}`, description: lines.join('\n') });
 }
 
+/** What a cancel file needs: the booking's id (its UID), time and names. */
+export interface BookingCancelInput {
+  bookingId: string;
+  /** UTC ISO instants. */
+  start: string;
+  end: string;
+  consultantName: string;
+  customerName: string;
+  stamp?: Date;
+}
+
+/**
+ * The invites went out at SEQUENCE:0 (they are never re-sent), so the cancel
+ * is SEQUENCE:1: same UID, METHOD:CANCEL, and the reader's calendar drops it.
+ */
+export const BOOKING_CANCEL_SEQUENCE = 1;
+
+function cancelIcs(b: BookingCancelInput, summary: string): string {
+  return buildIcs({
+    uid: bookingIcsUid(b.bookingId),
+    start: new Date(b.start),
+    end: new Date(b.end),
+    summary,
+    stamp: b.stamp,
+    method: 'CANCEL',
+    sequence: BOOKING_CANCEL_SEQUENCE,
+  });
+}
+
+/** Takes the homeowner's copy (customerBookingIcs) off their calendar. */
+export const customerBookingCancelIcs = (b: BookingCancelInput) =>
+  cancelIcs(b, `Solar consultation with ${b.consultantName}`);
+
+/** Takes the consultant's copy (consultantBookingIcs) off their calendar. */
+export const consultantBookingCancelIcs = (b: BookingCancelInput) =>
+  cancelIcs(b, `Solar consult: ${b.customerName || 'Homeowner'}`);
+
+export const customerBookingCancelAttachment = (b: BookingCancelInput) =>
+  icsAttachment('solar-consultation-cancelled.ics', customerBookingCancelIcs(b), 'CANCEL');
+
+export const consultantBookingCancelAttachment = (b: BookingCancelInput) =>
+  icsAttachment('solar-consult-cancelled.ics', consultantBookingCancelIcs(b), 'CANCEL');
+
 export const customerBookingAttachment = (b: BookingInviteInput) =>
   icsAttachment('solar-consultation.ics', customerBookingIcs(b));
 

@@ -99,3 +99,35 @@ describe('buildIcs', () => {
     expect(Buffer.from(a.contentBase64, 'base64').toString('utf8')).toBe(ics);
   });
 });
+
+describe('buildIcs METHOD:CANCEL', () => {
+  const EVENT = {
+    uid: 'b1@3cworldgroup.com',
+    start: new Date('2026-10-26T15:00:00.000Z'),
+    end: new Date('2026-10-26T16:00:00.000Z'),
+    summary: 'Solar consultation with Sam',
+    stamp: new Date('2026-10-21T00:00:00.000Z'),
+  };
+  const lines = (ics: string) => unfold(ics).split('\r\n');
+
+  it('defaults to PUBLISH, CONFIRMED, SEQUENCE:0', () => {
+    const l = lines(buildIcs(EVENT));
+    expect(l).toContain('METHOD:PUBLISH');
+    expect(l).toContain('STATUS:CONFIRMED');
+    expect(l).toContain('SEQUENCE:0');
+  });
+
+  it('writes METHOD:CANCEL, STATUS:CANCELLED and the given SEQUENCE with the same UID', () => {
+    const l = lines(buildIcs({ ...EVENT, method: 'CANCEL', sequence: 1 }));
+    expect(l).toContain('METHOD:CANCEL');
+    expect(l).toContain('STATUS:CANCELLED');
+    expect(l).toContain('SEQUENCE:1');
+    expect(l).toContain('UID:b1@3cworldgroup.com');
+    expect(l).not.toContain('METHOD:PUBLISH');
+  });
+
+  it('labels a cancel attachment method=CANCEL', () => {
+    expect(icsAttachment('x.ics', 'X', 'CANCEL').contentType).toBe('text/calendar; charset=utf-8; method=CANCEL');
+    expect(icsAttachment('x.ics', 'X').contentType).toBe(ICS_CONTENT_TYPE);
+  });
+});

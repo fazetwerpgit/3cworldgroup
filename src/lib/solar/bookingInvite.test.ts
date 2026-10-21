@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { bookingIcsUid, consultantBookingAttachment, consultantBookingIcs, customerBookingAttachment, customerBookingIcs } from './bookingInvite';
+import {
+  bookingIcsUid,
+  consultantBookingAttachment,
+  consultantBookingCancelAttachment,
+  consultantBookingCancelIcs,
+  consultantBookingIcs,
+  customerBookingAttachment,
+  customerBookingCancelAttachment,
+  customerBookingCancelIcs,
+  customerBookingIcs,
+} from './bookingInvite';
 
 const unfold = (ics: string) => ics.replace(/\r\n[ \t]/g, '');
 const prop = (ics: string, name: string) =>
@@ -83,5 +93,40 @@ describe('attachments', () => {
       contentType: 'text/calendar; charset=utf-8; method=PUBLISH',
     });
     expect(consultantBookingAttachment(BASE).name).toBe('solar-consult.ics');
+  });
+});
+
+describe('booking cancel .ics', () => {
+  const CANCEL = {
+    bookingId: BASE.bookingId,
+    start: BASE.start,
+    end: BASE.end,
+    consultantName: BASE.consultantName,
+    customerName: BASE.customerName,
+    stamp: BASE.stamp,
+  };
+
+  it("homeowner's cancel: same UID as the invite, METHOD:CANCEL, SEQUENCE above the invite's", () => {
+    const invite = customerBookingIcs(BASE);
+    const cancel = customerBookingCancelIcs(CANCEL);
+    expect(prop(cancel, 'UID')).toBe(prop(invite, 'UID'));
+    expect(prop(cancel, 'METHOD')).toBe('CANCEL');
+    expect(prop(cancel, 'STATUS')).toBe('CANCELLED');
+    expect(prop(invite, 'SEQUENCE')).toBe('0');
+    expect(prop(cancel, 'SEQUENCE')).toBe('1');
+    expect(prop(cancel, 'DTSTART')).toBe(prop(invite, 'DTSTART'));
+    expect(prop(cancel, 'SUMMARY')).toBe('Solar consultation with Sam Closer');
+  });
+
+  it("consultant's cancel matches the consultant invite's UID", () => {
+    const cancel = consultantBookingCancelIcs(CANCEL);
+    expect(prop(cancel, 'UID')).toBe(prop(consultantBookingIcs(BASE), 'UID'));
+    expect(prop(cancel, 'METHOD')).toBe('CANCEL');
+    expect(prop(cancel, 'SEQUENCE')).toBe('1');
+  });
+
+  it('attachments are labelled method=CANCEL', () => {
+    expect(customerBookingCancelAttachment(CANCEL).contentType).toContain('method=CANCEL');
+    expect(consultantBookingCancelAttachment(CANCEL).contentType).toContain('method=CANCEL');
   });
 });
