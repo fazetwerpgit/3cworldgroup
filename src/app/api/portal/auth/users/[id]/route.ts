@@ -13,6 +13,7 @@ import {
   roleRequiresOnboarding,
   resolveRoles,
   isSolarRole,
+  isMainLine,
 } from '@/types';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { validateAddress } from '@/lib/validation/address';
@@ -93,6 +94,7 @@ export async function GET(
       zip: data?.zip,
       shirtSize: data?.shirtSize,
       solarRole: isSolarRole(data?.solarRole) ? data?.solarRole : null,
+      mainLine: isMainLine(data?.mainLine) ? data?.mainLine : null,
       avatarUrl: data?.avatarUrl,
       status: data?.status,
       hireDate: data?.hireDate?.toDate(),
@@ -137,6 +139,11 @@ export async function PUT(
     const solarRole: unknown = body?.solarRole;
     if (solarRole !== undefined && solarRole !== null && solarRole !== '' && !isSolarRole(solarRole)) {
       return NextResponse.json({ error: 'Invalid solarRole' }, { status: 400 });
+    }
+    // mainLine: 'fiber' or 'solar' sets it, null or '' clears it, absent leaves it.
+    const mainLine: unknown = body?.mainLine;
+    if (mainLine !== undefined && mainLine !== null && mainLine !== '' && !isMainLine(mainLine)) {
+      return NextResponse.json({ error: 'Invalid mainLine' }, { status: 400 });
     }
 
     const docRef = adminDb.collection('users').doc(id);
@@ -318,6 +325,9 @@ export async function PUT(
     }
     if (solarRole !== undefined) {
       updateData.solarRole = isSolarRole(solarRole) ? solarRole : FieldValue.delete();
+    }
+    if (mainLine !== undefined) {
+      updateData.mainLine = isMainLine(mainLine) ? mainLine : FieldValue.delete();
     }
     if (territoryId !== undefined) updateData.territoryId = territoryId;
     if (phone !== undefined) updateData.phone = phone;

@@ -85,7 +85,7 @@ vi.mock('@/lib/chat/restampAuthor', () => ({ restampAuthor: vi.fn(async () => un
 vi.mock('@/lib/users/restampDisplayName', () => ({ restampDisplayName: vi.fn(async () => undefined) }));
 vi.mock('@/lib/chat/channels', () => ({ reconcileChatMembershipForUser: vi.fn(async () => []) }));
 
-import { DELETE, PUT } from './route';
+import { DELETE, GET, PUT } from './route';
 import { after } from 'next/server';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { resolveAlertTasks } from '@/lib/alerts/alertTasks';
@@ -640,6 +640,61 @@ describe('PUT /api/portal/auth/users/[id] input validation', () => {
     const response = await PUT(request(body), params());
 
     expect(response.status).toBe(400);
+    expect(firestore.updates).toHaveLength(0);
+  });
+});
+
+describe('/api/portal/auth/users/[id] mainLine', () => {
+  beforeEach(() => {
+    firestore.users.set('pending-user', { status: 'active', fieldRole: 'entry_rep', solarRole: 'entry_canvasser' });
+  });
+
+  async function getUser() {
+    const response = await GET(new NextRequest('http://localhost/api/portal/auth/users/pending-user'), params());
+    return (await response.json()).user as Record<string, unknown>;
+  }
+
+  it('GET returns a valid mainLine, else null', async () => {
+    expect((await getUser()).mainLine).toBeNull();
+    firestore.users.set('pending-user', { status: 'active', fieldRole: 'entry_rep', mainLine: 'solar' });
+    expect((await getUser()).mainLine).toBe('solar');
+    firestore.users.set('pending-user', { status: 'active', fieldRole: 'entry_rep', mainLine: 'wind' });
+    expect((await getUser()).mainLine).toBeNull();
+  });
+
+  it('GET keeps the management gate', async () => {
+    mockGate.mockResolvedValue({ ok: false, error: 'Forbidden', status: 403 });
+    const response = await GET(new NextRequest('http://localhost/api/portal/auth/users/pending-user'), params());
+    expect(response.status).toBe(403);
+  });
+
+  it.each(['fiber', 'solar'])('PUT sets mainLine %s', async (line) => {
+    const response = await PUT(request({ mainLine: line }), params());
+    expect(response.status).toBe(200);
+    expect(firestore.updates.at(-1)?.data.mainLine).toBe(line);
+  });
+
+  it.each([null, ''])('PUT clears mainLine on %j', async (value) => {
+    const response = await PUT(request({ mainLine: value }), params());
+    expect(response.status).toBe(200);
+    expect(firestore.updates.at(-1)?.data.mainLine).toBe('__DELETE__');
+  });
+
+  it('PUT leaves mainLine alone when absent', async () => {
+    await PUT(request({ displayName: 'Dual Rep' }), params());
+    expect(firestore.updates.at(-1)?.data).not.toHaveProperty('mainLine');
+  });
+
+  it.each(['Solar', 'wind', 1, true, { line: 'solar' }])('PUT rejects mainLine %j with 400 and writes nothing', async (value) => {
+    const response = await PUT(request({ mainLine: value }), params());
+    expect(response.status).toBe(400);
+    expect(firestore.updates).toHaveLength(0);
+  });
+
+  it('PUT keeps the management gate', async () => {
+    mockGate.mockResolvedValue({ ok: false, error: 'Forbidden', status: 403 });
+    const response = await PUT(request({ mainLine: 'solar' }), params());
+    expect(response.status).toBe(403);
     expect(firestore.updates).toHaveLength(0);
   });
 });
