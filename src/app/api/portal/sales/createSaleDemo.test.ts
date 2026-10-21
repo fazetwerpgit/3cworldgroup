@@ -107,6 +107,33 @@ describe('POST /api/portal/sales — demo accounts', () => {
     expect(state.added[0]).not.toHaveProperty('demoAccount');
   });
 
+  it('stamps testAccount: true (and no demo stamp) on a sale logged by a test account', async () => {
+    state.user = { reportsToId: 'qa-mgr', testAccount: true };
+    mockUser.mockResolvedValue({ ok: true, uid: 'qa', name: 'Test Rep', email: 'q@x.com', isAdmin: false });
+
+    const response = await POST(post(baseBody));
+
+    expect(response.status).toBe(200);
+    expect(state.added[0]).toMatchObject({ salesRepId: 'qa', managerId: 'qa-mgr', testAccount: true });
+    expect(state.added[0]).not.toHaveProperty('demoAccount');
+  });
+
+  it('writes no test stamp for a real rep (nor for a non-boolean flag)', async () => {
+    state.user = { reportsToId: 'm1', testAccount: 'true' };
+
+    await POST(post(baseBody));
+
+    expect(state.added[0]).not.toHaveProperty('testAccount');
+  });
+
+  it("never reports a test account's sale as a real rep's duplicate", async () => {
+    existing('s-qa', { salesRepId: 'qa', salesRepName: 'Test Rep', testAccount: true });
+
+    const response = await POST(post(baseBody));
+
+    expect(response.status).toBe(200);
+  });
+
   it("never reports a demo account's sale as a real rep's duplicate", async () => {
     existing('s-demo', { salesRepId: 'demo', salesRepName: 'App Review', demoAccount: true });
 

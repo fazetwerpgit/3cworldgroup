@@ -177,6 +177,41 @@ describe('GET /api/portal/solar/leaderboard — counting', () => {
   });
 });
 
+describe('GET /api/portal/solar/leaderboard — test accounts', () => {
+  const qaRep = { ...solarRep, uid: 'qa', name: 'Test Setter', testAccount: true };
+  beforeEach(() => {
+    db.store.get('users')!.set('qa', { status: 'active', displayName: 'Test Setter', solarRole: 'entry_canvasser', testAccount: true });
+    db.store.set('solarBookings', new Map(Object.entries({
+      b1: booking('ana', '2026-10-12T15:00:00Z'),
+      q1: booking('qa', '2026-10-13T15:00:00Z', { testAccount: true }),
+      q2: booking('qa', '2026-10-13T16:00:00Z', { testAccount: true }),
+    })));
+    db.store.set('solarLeads', new Map(Object.entries({
+      L1: { repUid: 'ana', stage: 'appointment_demoed', stageOutcome: 'sale',
+        stageHistory: [{ stage: 'appointment_demoed', outcome: 'sale', at: new Date('2026-10-13T15:00:00Z') }] },
+      Q1: { repUid: 'qa', testAccount: true, stage: 'appointment_demoed', stageOutcome: 'sale',
+        stageHistory: [{ stage: 'appointment_demoed', outcome: 'sale', at: new Date('2026-10-13T15:00:00Z') }] },
+    })));
+  });
+  const ids = async (q: string) =>
+    (await (await get(q)).json()).leaderboard.map((r: { uid: string }) => r.uid);
+
+  it("keeps a test account's bookings and leads off everyone else's board, and out of the team roster", async () => {
+    expect(await ids('?period=week')).toEqual(['ana']);
+    expect(await ids('?period=week&metric=demoed')).toEqual(['ana']);
+    expect(await ids('?period=week&metric=closed')).toEqual(['ana']);
+    const body = await (await get('?period=week&include=team')).json();
+    expect(JSON.stringify(body)).not.toContain('Test Setter');
+  });
+
+  it('shows the test account its own numbers', async () => {
+    mockGate.mockResolvedValue(qaRep);
+    expect(await ids('?period=week')).toEqual(['qa', 'ana']);
+    const mine = await (await get('?period=week&view=mine')).json();
+    expect(mine.mine).toEqual({ set: 2, demoed: 1, closed: 1 });
+  });
+});
+
 describe('GET /api/portal/solar/leaderboard — metric=set|demoed|closed', () => {
   const at = (iso: string) => new Date(iso);
   beforeEach(() => {

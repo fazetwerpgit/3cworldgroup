@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { isDemoAccount, isDemoSale, saleVisibleTo, withoutDemoDocs } from './demoAccount';
+import {
+  isDemoAccount,
+  isDemoSale,
+  isHiddenUser,
+  isTestAccount,
+  saleVisibleTo,
+  withoutDemoDocs,
+  withoutHiddenUserDocs,
+} from './demoAccount';
 
 describe('isDemoAccount', () => {
   it('is true only for demoAccount === true', () => {
@@ -40,5 +48,41 @@ describe('isDemoSale / saleVisibleTo', () => {
     expect(saleVisibleTo(demo)).toBe(false);
     expect(saleVisibleTo(demo, null)).toBe(false);
     expect(saleVisibleTo({ demoAccount: true }, '')).toBe(false);
+  });
+});
+
+describe('test accounts', () => {
+  it('isTestAccount is true only for testAccount === true', () => {
+    expect(isTestAccount({ testAccount: true })).toBe(true);
+    for (const value of [false, 'true', 1, null, undefined]) expect(isTestAccount({ testAccount: value })).toBe(false);
+    expect(isTestAccount(null)).toBe(false);
+  });
+
+  it('isHiddenUser covers demo and test accounts, nothing else', () => {
+    expect(isHiddenUser({ demoAccount: true })).toBe(true);
+    expect(isHiddenUser({ testAccount: true })).toBe(true);
+    expect(isHiddenUser({ testAccount: 'true', demoAccount: false })).toBe(false);
+    expect(isHiddenUser({})).toBe(false);
+    expect(isHiddenUser(undefined)).toBe(false);
+  });
+
+  it('withoutHiddenUserDocs drops demo and test docs; withoutDemoDocs still drops demo only', () => {
+    const doc = (id: string, data: Record<string, unknown>) => ({ id, data: () => data });
+    const docs = [doc('a', {}), doc('demo', { demoAccount: true }), doc('test', { testAccount: true })];
+    expect(withoutHiddenUserDocs(docs).map((d) => d.id)).toEqual(['a']);
+    expect(withoutDemoDocs(docs).map((d) => d.id)).toEqual(['a', 'test']);
+  });
+
+  it('hides a test sale from everyone but the test account that logged it', () => {
+    const test = { salesRepId: 'qa', testAccount: true };
+    expect(isDemoSale(test)).toBe(true);
+    expect(isDemoSale({ salesRepId: 'r1', testAccount: 'true' })).toBe(false);
+    expect(saleVisibleTo(test, 'qa')).toBe(true);
+    expect(saleVisibleTo(test, 'r1')).toBe(false);
+    expect(saleVisibleTo(test)).toBe(false);
+  });
+
+  it('leaves the demo account rule alone', () => {
+    expect(isDemoAccount({ testAccount: true })).toBe(false);
   });
 });

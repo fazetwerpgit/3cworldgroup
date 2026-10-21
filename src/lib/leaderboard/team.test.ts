@@ -30,6 +30,16 @@ describe('unrankedReps', () => {
   });
 });
 
+describe('unrankedReps — test accounts', () => {
+  it('never lists a test account', () => {
+    const users = [
+      { id: 'qa', data: { status: 'active', role: 'rep', fieldRole: 'ae_tier_1', displayName: 'Test Rep', testAccount: true } },
+      { id: 'b', data: { status: 'active', role: 'rep', fieldRole: 'entry_level_rep', displayName: 'Ben' } },
+    ];
+    expect(unrankedReps(users, new Set())).toEqual([{ salesRepId: 'b', salesRepName: 'Ben' }]);
+  });
+});
+
 describe('recentSales', () => {
   const logged = new Date('2026-09-16T17:00:00.000Z');
 

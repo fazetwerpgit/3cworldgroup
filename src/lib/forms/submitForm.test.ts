@@ -88,6 +88,13 @@ describe('submitFormRecord', () => {
     expect(doc?.status).not.toBe('new');
   });
 
+  it("stamps a test account's record testAccount: true and keeps the normal 'new' status", async () => {
+    await submitFormRecord('solarLeads', { uid: 'qa', name: 'Test', email: 'q@x.com', testAccount: true }, { testAccount: false });
+    const doc = fake.docs.get('solarLeads/auto1');
+    expect(doc).toMatchObject({ repUid: 'qa', testAccount: true, status: 'new' });
+    expect(doc).not.toHaveProperty('demoAccount');
+  });
+
   it('ignores the field-level form data trying to set status or the stamp', async () => {
     await submitFormRecord('payrollDisputes', { uid: 'd1', name: 'Sam', email: 's@x.com', demoAccount: true }, { status: 'new', demoAccount: false });
     expect(fake.docs.get('payrollDisputes/auto1')).toMatchObject({ demoAccount: true, status: DEMO_FORM_STATUS });

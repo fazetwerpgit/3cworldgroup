@@ -28,6 +28,18 @@ describe('gatherAllReps', () => {
     expect(reps.map((rep) => rep.uid).sort()).toEqual(['notdemo', 'rep']);
   });
 
+  it('never gathers a test account', async () => {
+    const { db } = createFakeDb({
+      users: {
+        rep: { status: 'active', displayName: 'Rep', fieldRole: 'entry_level_rep' },
+        qa: { status: 'active', displayName: 'Test Rep', fieldRole: 'ae_tier_1', testAccount: true },
+      },
+      sales: { s1: sale('rep'), s2: sale('qa') },
+      fiberOrders: {},
+    });
+    expect((await gatherAllReps(db)).map((rep) => rep.uid)).toEqual(['rep']);
+  });
+
   it('carries the carrier report stamp to every rep, null when absent', async () => {
     const seed = {
       users: { rep: { status: 'active', displayName: 'Rep', fieldRole: 'entry_level_rep' } },

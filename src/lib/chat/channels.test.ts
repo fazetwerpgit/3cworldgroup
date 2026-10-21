@@ -131,6 +131,21 @@ describe('syncChatChannels', () => {
     expect(belongsInChannelDoc(channel, 'demo', firestore.users.get('demo')!)).toBe(false);
   });
 
+  it('keeps a test account out of every audience; only a manual extra brings it in', async () => {
+    firestore.users.set('active-rep', { status: 'active', fieldRole: 'entry_rep' });
+    firestore.users.set('qa', { status: 'active', role: 'rep', fieldRole: 'l1_manager', solarRole: 'canvass_closer', testAccount: true });
+
+    for (const audience of ['all', 'field', 'managers', 'solar'] as const) {
+      expect(await getMemberIdsForAudience(audience)).not.toContain('qa');
+    }
+    const qa = firestore.users.get('qa')!;
+    const general = { id: 'all-company', name: 'All Company', audience: 'all', order: 0, active: true };
+    expect(belongsInChannelDoc(general, 'qa', qa)).toBe(false);
+    expect(belongsInChannelDoc({ ...general, id: 'qa-room', extraMemberIds: ['qa'] }, 'qa', qa)).toBe(true);
+    // Never the App Review sandbox.
+    expect(belongsInChannelDoc({ ...general, id: 'app-review', demoSandbox: true }, 'qa', qa)).toBe(false);
+  });
+
   it('unions audience-derived members with surviving extras, dropping deleted and deactivated extras', async () => {
     firestore.channelDocs.push({
       id: 'managers',

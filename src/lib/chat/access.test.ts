@@ -53,6 +53,19 @@ describe('getVerifiedChatUser', () => {
     }
   });
 
+  it('gives a test account no chat role (no audience reaches it) and no demo flag', async () => {
+    mockVerify.mockResolvedValue({ ok: true, uid: 'qa', name: 'Test Rep', email: 'q@x.com' });
+    userDoc('qa', { status: 'active', role: 'rep', fieldRole: 'ae_tier_1', solarRole: 'canvass_closer', testAccount: true });
+    const res = await getVerifiedChatUser(req());
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.user.role).toBeUndefined();
+      expect(res.user.fieldRole).toBeUndefined();
+      expect(res.user.solarRole).toBeUndefined();
+      expect(res.user.demoAccount).toBe(false);
+    }
+  });
+
   it('keeps the field role of an ordinary active rep', async () => {
     mockVerify.mockResolvedValue({ ok: true, uid: 'u2', name: 'Rep', email: 'r@x.com' });
     userDoc('u2', { status: 'active', fieldRole: 'entry_level_rep', demoAccount: false });

@@ -287,6 +287,33 @@ describe('loadDaySales — demo accounts', () => {
   });
 });
 
+describe('test accounts', () => {
+  it("drops a test account's sale from the day's sales", async () => {
+    const data = seed();
+    (data.sales as Record<string, Data>).s3 = {
+      salesRepId: 'qa',
+      saleDate: saleNoon('2026-10-09'),
+      createdAt: chicago('2026-10-09', '13:00'),
+      testAccount: true,
+    };
+    const { db } = fakeDb(data);
+    expect((await loadDaySales(db, '2026-10-09')).map((sale) => sale.salesRepId).sort()).toEqual(['mason', 'miles']);
+  });
+
+  it('never nudges a test account, as if it were not active', async () => {
+    const data = seed();
+    (data.users as Record<string, Data>).qa = { displayName: 'Test Rep', status: 'active', testAccount: true };
+    (data['chatChannels/all-company/messages'] as Record<string, Data>).m9 = msg('qa', 'Test Rep', '1 gig', chicago('2026-10-09', '13:30'));
+    const { db } = fakeDb(data);
+    const dispatch = vi.fn(async () => {});
+
+    const summary = await runCalloutNudges({ db, now: NINE_PM, dispatch });
+
+    expect(summary).toMatchObject({ short: 3, skippedInactiveRep: 2, sent: 1 });
+    expect(dispatch.mock.calls.map((call) => (call as unknown as [{ userId: string }])[0].userId)).toEqual(['miles']);
+  });
+});
+
 describe('isCalloutNudgeHour', () => {
   it('is 9 PM Chicago in summer and winter time', () => {
     expect(isCalloutNudgeHour(new Date('2026-10-10T02:00:00Z'))).toBe(true); // CDT

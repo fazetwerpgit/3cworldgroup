@@ -50,4 +50,17 @@ describe('GET /api/portal/knock/leads', () => {
       maxRows: 20_000,
     });
   });
+
+  it('never offers a demo or test account', async () => {
+    const seed = leadSeed();
+    seed.users = {
+      ...seed.users,
+      qa: { status: 'active', displayName: 'Test Rep', email: 'qa@example.test', testAccount: true },
+      demo: { status: 'active', displayName: 'App Review', email: 'demo@example.test', demoAccount: true },
+    };
+    holder.db = createFakeLeadDb(seed).db;
+    mockGate.mockResolvedValue({ ok: true, uid: 'owner-1', name: 'Owner', isAdmin: true, isOwner: true });
+    const body = await (await GET(req())).json();
+    expect(body.people.map((p: { uid: string }) => p.uid)).toEqual(['owner-1', 'rep-1']);
+  });
 });

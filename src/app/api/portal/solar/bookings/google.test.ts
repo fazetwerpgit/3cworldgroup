@@ -22,6 +22,7 @@ import { PATCH as patchLead } from '../leads/[id]/route';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { sendEmail } from '@/lib/email/sendEmail';
+import { createNotification, createNotificationForMany } from '@/lib/notifications/createNotification';
 import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
 import { createFakeGoogle, type FakeGoogle } from '@/lib/solar/testing/fakeGoogle';
 import { encryptToken } from '@/lib/solar/google/crypto';
@@ -424,3 +425,68 @@ describe('slots filtered by Google free/busy', () => {
     expect(await starts()).toHaveLength(4);
   });
 });
+
+describe('a QA test account booking (testAccount)', () => {
+  const QA = { ...REP, uid: 'qa', name: 'Test Closer', testAccount: true };
+  const mockNotify = createNotification as unknown as ReturnType<typeof vi.fn>;
+  const mockNotifyMany = createNotificationForMany as unknown as ReturnType<typeof vi.fn>;
+  const bookQa = (consultantUid = 'sam') =>
+    POST(
+      new NextRequest('http://localhost/api/portal/solar/bookings', {
+        method: 'POST',
+        body: JSON.stringify({ leadId: 'qa_c1', mode: 'virtual', consultantUid, start: SLOT }),
+      })
+    );
+
+  beforeEach(() => {
+    mockGate.mockResolvedValue(QA);
+    mockNotify.mockClear();
+    mockNotifyMany.mockClear();
+    db.store.get('users')!.set('qa', { displayName: 'Test Closer', Email: 'qa@example.test', solarRole: 'canvass_closer', testAccount: true });
+    db.store.get('solarLeads')!.set('qa_c1', {
+      repUid: 'qa', first: 'Ann', last: 'Test', email: 'homeowner@example.com', state: 'TX', status: 'new', testAccount: true,
+    });
+  });
+
+  it('with a real consultant: stamped, no Google event, no homeowner email, no consultant notice, no lead alert', async () => {
+    sam(LIVE);
+    const res = await bookQa();
+    expect(res.status).toBe(200);
+    expect(db.store.get('solarBookings')!.get(ID)).toMatchObject({ repUid: 'qa', testAccount: true, status: 'booked' });
+    expect(google.find('POST', '/calendars/primary/events')).toBeUndefined();
+    expect(mockEmail).not.toHaveBeenCalled();
+    expect(mockNotify).not.toHaveBeenCalled();
+    expect(mockNotifyMany).not.toHaveBeenCalled();
+    // Claimed once, so a later finish sends nothing either.
+    expect(db.store.get('solarLeads')!.get('qa_c1')!.alertSentAt).toBeInstanceOf(Date);
+  });
+
+  it('with a test consultant: only the consultant notice, straight to them', async () => {
+    sam();
+    db.store.get('users')!.set('sam', { displayName: 'Sam Closer', Email: 'sam-qa@example.test', testAccount: true });
+    expect((await bookQa()).status).toBe(200);
+    expect(mockEmail.mock.calls.map((c) => c[0].to)).toEqual(['sam-qa@example.test']);
+    expect(mockNotify.mock.calls.map((c) => c[0].userId)).toEqual(['sam']);
+    expect(mockNotifyMany).not.toHaveBeenCalled();
+  });
+
+  it('a cancel emails no homeowner and notifies no real consultant', async () => {
+    sam();
+    expect((await bookQa()).status).toBe(200);
+    mockEmail.mockClear();
+    mockNotify.mockClear();
+    mockGate.mockResolvedValue({ ...QA, uid: 'boss', isAdmin: true });
+    const res = await PATCH(
+      new NextRequest(`http://localhost/api/portal/solar/bookings/${ID}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'cancelled' }),
+      }),
+      { params: Promise.resolve({ id: ID }) }
+    );
+    expect(res.status).toBe(200);
+    expect(mockEmail).not.toHaveBeenCalled();
+    // Only the test rep who booked it hears about it.
+    expect(mockNotify.mock.calls.map((c) => c[0].userId)).toEqual(['qa']);
+  });
+});
+

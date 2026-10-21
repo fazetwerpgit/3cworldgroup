@@ -115,6 +115,18 @@ describe('POST /api/portal/solar/leads', () => {
     expect(mockEmail).not.toHaveBeenCalled();
   });
 
+  it("stamps a test account's lead testAccount: true and keeps the normal status", async () => {
+    mockGate.mockResolvedValue({ ...REP, testAccount: true });
+    const { id } = await (await POST(req(VALID))).json();
+    expect(db.store.get('solarLeads')!.get(id)).toMatchObject({ repUid: 'rep1', status: 'new', testAccount: true });
+  });
+
+  it('writes no test stamp for a real rep', async () => {
+    mockGate.mockResolvedValue({ ...REP, testAccount: false });
+    const { id } = await (await POST(req(VALID))).json();
+    expect(db.store.get('solarLeads')!.get(id)).not.toHaveProperty('testAccount');
+  });
+
   it('dedupes on clientId: same id back, one record', async () => {
     const a = await (await POST(req({ ...VALID, clientId: 'c-1' }))).json();
     const b = await (await POST(req({ ...VALID, clientId: 'c-1' }))).json();
@@ -217,6 +229,7 @@ describe('GET /api/portal/solar/leads', () => {
         rep2_a: { repUid: 'rep2', repName: 'Rep Two', first: 'Cy', last: 'Ng', status: 'sold', source: 'knock',
           createdAt: new Date('2026-10-17T10:00:00Z') },
         demo_a: { repUid: 'demo', first: 'Demo', last: 'Lead', status: 'demo', demoAccount: true, createdAt: new Date('2026-10-19T12:00:00Z') },
+        qa_a: { repUid: 'qa', first: 'Test', last: 'Lead', status: 'new', testAccount: true, createdAt: new Date('2026-10-19T13:00:00Z') },
       },
       solarBookings: {
         [BOOKED]: { leadId: 'rep1_a', consultantUid: 'jac', consultantName: 'Jacob', mode: 'virtual',
@@ -259,7 +272,13 @@ describe('GET /api/portal/solar/leads', () => {
     expect(lead).toMatchObject({ stage: 'appointment_demoed', stageOutcome: 'proposal_sent' });
   });
 
-  it("gives an admin every lead but demo accounts'", async () => {
+  it("gives a test account its own stamped leads", async () => {
+    mockGate.mockResolvedValue({ ...REP, uid: 'qa', testAccount: true });
+    const { leads } = await (await get()).json();
+    expect(leads.map((l: { id: string }) => l.id)).toEqual(['qa_a']);
+  });
+
+  it("gives an admin every lead but demo and test accounts'", async () => {
     mockGate.mockResolvedValue(ADMIN);
     const { leads } = await (await get()).json();
     expect(leads.map((l: { id: string }) => l.id)).toEqual(['rep1_b', 'rep1_a', 'rep2_a']);

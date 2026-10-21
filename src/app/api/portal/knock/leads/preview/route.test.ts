@@ -200,6 +200,22 @@ describe('POST /api/portal/knock/leads/preview', () => {
     }
   });
 
+  it('never gives doors to a test account, picked or matched from the file', async () => {
+    const seed = leadSeed();
+    seed.users = { ...seed.users, 'rep-1': { ...seed.users['rep-1'], testAccount: true } };
+    fake = createFakeLeadDb(seed);
+    holder.db = fake.db;
+    mockGate.mockResolvedValue(OWNER);
+
+    const picked = await POST(req({ csvText: ATT_CSV, campaignId: 'camp-1', assignTo: 'rep-1' }));
+    expect(picked.status).toBe(400);
+    expect(await picked.json()).toEqual({ error: 'Pick the rep again.', code: 'unknown-rep' });
+
+    const fromFile = await (await POST(req({ csvText: SR_PLUS_CSV, campaignId: 'camp-1', assignTo: 'file' }))).json();
+    expect(fromFile.assignees).toEqual([]);
+    expect(fromFile.unmatchedAssignees).toContainEqual({ email: 'rep1@example.test', count: 3 });
+  });
+
   it('explains files and campaigns it cannot use', async () => {
     mockGate.mockResolvedValue(OWNER);
     const cases: [unknown, number, string][] = [

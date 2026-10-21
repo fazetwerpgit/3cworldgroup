@@ -109,3 +109,15 @@ it('leaves a demo account out of the pipeline roster', async () => {
   expect(rep('rep')).toBeDefined();
   expect(rep('demo')).toBeUndefined();
 });
+
+it('leaves a test account out of the pipeline roster', async () => {
+  state.users = [
+    { id: 'rep', fieldRole: 'entry_level_rep', status: 'active' },
+    { id: 'qa', fieldRole: 'ae_tier_1', status: 'active', displayName: 'Test Rep', testAccount: true },
+  ];
+
+  const rep = await pipeline();
+
+  expect(rep('rep')).toBeDefined();
+  expect(rep('qa')).toBeUndefined();
+});

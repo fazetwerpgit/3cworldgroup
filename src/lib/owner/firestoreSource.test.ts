@@ -159,6 +159,34 @@ describe('owner counts leave demo accounts out', () => {
   });
 });
 
+describe('owner counts leave test accounts out', () => {
+  it('countPendingSignups and loadActivatedSince skip a test account', async () => {
+    const after = new Date('2026-10-05T00:00:00Z');
+    userRows.set('real', { status: 'pending' });
+    userRows.set('qa-pending', { status: 'pending', testAccount: true });
+    expect(await createFirestoreOwnerSource().countPendingSignups()).toBe(1);
+    userRows.set('rep', { status: 'active', fieldRole: 'entry_level_rep', activatedAt: after });
+    userRows.set('qa', { status: 'active', fieldRole: 'ae_tier_1', activatedAt: after, testAccount: true });
+    const users = await createFirestoreOwnerSource().loadActivatedSince(new Date('2026-10-01T00:00:00Z'));
+    expect(users.map((u) => u.fieldRole)).toEqual(['entry_level_rep']);
+  });
+});
+
+describe('owner book leaves test-account sales out', () => {
+  it('projects the test stamp and drops stamped sales from the book', async () => {
+    const base = { products: [], status: 'approved', totalValue: 60, saleDate: new Date('2026-10-05T17:00:00Z') };
+    saleDocs.push(
+      { id: 'real', data: () => ({ ...base, salesRepId: 'miles', salesRepName: 'Miles Scoonover' }) },
+      { id: 'qa', data: () => ({ ...base, salesRepId: 'qa', salesRepName: 'Test Rep', testAccount: true }) },
+    );
+
+    const book = await createFirestoreOwnerSource().loadBook();
+
+    expect(selectMock.mock.calls.at(-1)).toContain('testAccount');
+    expect(book.sales.map((sale) => sale.id)).toEqual(['real']);
+  });
+});
+
 describe('owner book leaves demo-account sales out', () => {
   it('projects the demo stamp and drops stamped sales from the book', async () => {
     const base = { products: [], status: 'approved', totalValue: 60, saleDate: new Date('2026-10-05T17:00:00Z') };
