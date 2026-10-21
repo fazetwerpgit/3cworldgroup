@@ -5,6 +5,7 @@ import { CalendarDays } from 'lucide-react';
 import { isNativeApp } from '@/lib/app/isNativeApp';
 import { firstName } from '@/lib/solar/consultantContact';
 import { googleStatusOf, type GoogleCalendarStatus } from '@/lib/solar/google/status';
+import type { ConnectReturn } from '@/lib/solar/google/connectReturn';
 import { StatusDot } from '@/components/portal/admin-d/AdminUi';
 import { ConfirmStrip, cx } from '@/components/portal/admin-ops/AdminKit';
 import ops from '@/components/portal/admin-ops/admin-ops.module.css';
@@ -34,6 +35,7 @@ export function GoogleCalendarRow({
   canConnect,
   status,
   onChange,
+  returnTo = 'setup',
 }: {
   uid: string;
   name: string;
@@ -43,6 +45,8 @@ export function GoogleCalendarRow({
   canConnect: boolean;
   status: GoogleCalendarStatus | undefined;
   onChange: (uid: string, status: GoogleCalendarStatus | undefined) => void;
+  /** The page a web sign-in comes back to (the server maps the name to a fixed path). */
+  returnTo?: ConnectReturn;
 }) {
   const [busy, setBusy] = useState<'connect' | 'disconnect' | null>(null);
   const [waiting, setWaiting] = useState(false);
@@ -97,7 +101,7 @@ export function GoogleCalendarRow({
     setError('');
     const inApp = isNativeApp();
     try {
-      const data = await api(CONNECT_URL, { method: 'POST', body: JSON.stringify({ from: inApp ? 'app' : 'web' }) });
+      const data = await api(CONNECT_URL, { method: 'POST', body: JSON.stringify({ from: inApp ? 'app' : 'web', returnTo }) });
       const url = typeof data.url === 'string' ? data.url : '';
       if (!url) throw new Error('');
       if (inApp) {
@@ -106,7 +110,7 @@ export function GoogleCalendarRow({
         setWaiting(true);
         setBusy(null);
       } else {
-        // Leaves the page; Google sends the browser back to Setup.
+        // Leaves the page; Google sends the browser back to the page that started it.
         window.location.assign(url);
       }
     } catch (err) {

@@ -15,20 +15,15 @@ import { adminDb } from '@/lib/firebase/admin';
 import { STATE_TTL_MS, decryptToken, encryptToken, newNonce, signState, verifyState } from './crypto';
 import { SCOPE_FREEBUSY, authUrl, googleClient, redirectUriFor, refreshAccessToken, revokeToken } from './oauth';
 import type { GoogleCalendarStatus } from './status';
+import { connectReturnOf, type ConnectReturn } from './connectReturn';
+
+export { connectReturnOf, type ConnectReturn };
 
 export const TOKENS = 'solarGoogleTokens';
 export const STATES = 'solarGoogleOAuthStates';
 const AVAILABILITY = 'solarAvailability';
 
 export type ConnectFrom = 'app' | 'web';
-
-/**
- * Which portal page started the sign-in, so the callback lands back on it:
- * Admin > Solar > Setup, or the consultant's own My availability. A fixed
- * name, never a path: the callback maps it to one of two fixed paths.
- */
-export type ConnectReturn = 'setup' | 'availability';
-export const connectReturnOf = (value: unknown): ConnectReturn => (value === 'availability' ? 'availability' : 'setup');
 
 // ---------- connect ----------
 

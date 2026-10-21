@@ -29,6 +29,7 @@ import st from './solar-setup.module.css';
 import { api, failure } from './setupApi';
 import { GoogleCalendarRow } from './GoogleCalendarRow';
 import { connectErrorText, googleStatusOf, type GoogleCalendarStatus } from '@/lib/solar/google/status';
+import type { ConnectReturn } from '@/lib/solar/google/connectReturn';
 
 // Admin > Solar > Setup: who takes consultations and when (solarAvailability,
 // one panel each), and who hears about new leads (settings/solar). Both are
@@ -76,7 +77,7 @@ const hoursPart = (h: SolarHours): SolarHours => ({ tz: h.tz, slotMin: h.slotMin
 
 // ---------- consultants ----------
 
-interface ConsultantDoc {
+export interface ConsultantDoc {
   consultantUid: string;
   name: string;
   tz: string;
@@ -91,9 +92,9 @@ interface ConsultantDoc {
  * A consultant's hours plus what the homeowner's confirmation email shows.
  * Saved: meetLink and phone as stored ("+15125550142"). Draft: as typed.
  */
-type ConsultantSettings = SolarHours & { meetLink: string; phone: string };
+export type ConsultantSettings = SolarHours & { meetLink: string; phone: string };
 
-interface Consultant {
+export interface Consultant {
   uid: string;
   name: string;
   /** What the server has; null for one added here and not saved yet. */
@@ -102,7 +103,7 @@ interface Consultant {
   google?: GoogleCalendarStatus;
 }
 
-function hoursOf(c: Pick<ConsultantDoc, 'tz' | 'slotMin' | 'modes' | 'meetLink' | 'phone'>): ConsultantSettings {
+export function hoursOf(c: Pick<ConsultantDoc, 'tz' | 'slotMin' | 'modes' | 'meetLink' | 'phone'>): ConsultantSettings {
   return {
     tz: c.tz,
     slotMin: c.slotMin,
@@ -346,7 +347,7 @@ function WeekStrip({ hours, mode, focusDay }: { hours: SolarHours; mode: SolarMo
   );
 }
 
-function ConsultantPanel({
+export function ConsultantPanel({
   consultant,
   seeded,
   removable,
@@ -354,6 +355,7 @@ function ConsultantPanel({
   onSaved,
   onRemoved,
   onGoogle,
+  returnTo = 'setup',
 }: {
   consultant: Consultant;
   seeded: boolean;
@@ -363,6 +365,8 @@ function ConsultantPanel({
   onSaved: (uid: string, settings: ConsultantSettings) => void;
   onRemoved: (uid: string, futureBookings: number | null) => void;
   onGoogle: (uid: string, status: GoogleCalendarStatus | undefined) => void;
+  /** The page the Google sign-in comes back to: Setup, or the consultant's own My availability. */
+  returnTo?: ConnectReturn;
 }) {
   const { uid, name, saved, google } = consultant;
   const [draft, setDraft] = useState<ConsultantSettings>(() =>
@@ -588,6 +592,7 @@ function ConsultantPanel({
             canConnect={Boolean(saved) && !seeded}
             status={google}
             onChange={onGoogle}
+            returnTo={returnTo}
           />
           <div className={st.contact}>
             <ContactInput
@@ -661,7 +666,7 @@ function ConsultantPanel({
  * ?google=connected|error[&reason][&freebusy=off]. Shown once as a banner, then
  * dropped from the address so a reload doesn't repeat it.
  */
-type GoogleNotice = { tone: 'ok' | 'warn' | 'error'; text: string };
+export type GoogleNotice = { tone: 'ok' | 'warn' | 'error'; text: string };
 
 function googleReturnNotice(search: string): GoogleNotice | null {
   const params = new URLSearchParams(search);
@@ -680,7 +685,7 @@ function googleReturnNotice(search: string): GoogleNotice | null {
   return null;
 }
 
-function useGoogleReturn() {
+export function useGoogleReturn() {
   // Read once, from the address the page opened with (Setup renders on the client, after sign-in).
   const [notice, setNotice] = useState<GoogleNotice | null>(() =>
     typeof window === 'undefined' ? null : googleReturnNotice(window.location.search)
