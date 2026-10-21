@@ -23,9 +23,10 @@ import {
   SOLAR_REP_PRIMARY_HREFS,
   SOLAR_TAB,
   activeRepHref,
+  repNavKind,
   repTabsFor,
 } from './repNav';
-import { isOwner, isSolarOnlyUser } from '@/types';
+import { useViewAs } from '@/contexts/ViewAsContext';
 import type { PortalNavGroup, PortalNavItem } from '@/components/portal/CommandPalette';
 import s from './rep.module.css';
 
@@ -225,16 +226,19 @@ export function RepTopBar({
     }
   };
 
-  const active = activeRepHref(pathname);
-  const owner = isOwner(user?.role ?? undefined);
-  const solarOnly = !owner && isSolarOnlyUser(user);
+  const { viewing } = useViewAs();
+  const kind = repNavKind(user, viewing);
+  const active = activeRepHref(pathname, kind.solarOnly || kind.dual);
+  const owner = kind.owner;
+  const solarOnly = !owner && kind.solarOnly;
   const deskLinks = (solarOnly ? repTabsFor(false, true) : REP_TABS).filter((tab) => !tab.log && canAccess(tab));
-  // Owners do not sell: no primary Log sale button, just a menu entry for the rare case.
-  const canLog = !owner && REP_TABS.some((tab) => tab.log && canAccess(tab));
+  // Owners do not sell: no primary Log sale button, just a menu entry for the
+  // rare case. A dual owner (a solarRole too) keeps it, as every dual rep does.
+  const canLog = (!owner || kind.dual) && REP_TABS.some((tab) => tab.log && canAccess(tab));
   // A solar-only rep's equivalent: the deck, as on their phone bar's center tab.
   const canDeck = solarOnly && canAccess(SOLAR_TAB);
   const baseGroups = sheetGroups(solarOnly ? SOLAR_REP_PRIMARY_HREFS : REP_PRIMARY_HREFS);
-  const groups: PortalNavGroup[] = owner
+  const groups: PortalNavGroup[] = owner && !canLog
     ? baseGroups.length
       ? [{ ...baseGroups[0], items: [OWNER_LOG_SALE, ...baseGroups[0].items] }, ...baseGroups.slice(1)]
       : [{ items: [OWNER_LOG_SALE] }]

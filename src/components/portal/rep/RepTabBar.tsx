@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAs } from '@/contexts/ViewAsContext';
 import { useNavAccess } from '@/components/portal/NavSheet';
-import { isDualRoleUser, isOwner, isSolarOnlyUser } from '@/types';
 import { useIsNativeApp } from '@/lib/app/isNativeApp';
 import { nativeHaptic } from '@/lib/app/bridge';
 import { scrollPageToTop } from '@/lib/app/scrollToTop';
@@ -14,14 +13,15 @@ import { BodyLayer } from './BodyLayer';
 import { LogChooserSheet } from './LogChooserSheet';
 import { markTabNavigation } from './tabNav';
 import { usePrefetchTabOnTouch } from './useTabPrefetch';
-import { activeRepHref, LOG_SALE_HREF, repTabsFor, viewAsTabs } from './repNav';
+import { activeRepHref, LOG_SALE_HREF, repNavKind, repTabsFor, viewAsTabs } from './repNav';
 import s from './rep.module.css';
 import t from './rep-tabbar.module.css';
 
 /**
  * Phone bottom bar: Home / Sales / Log sale / Board / Chat, each gated by the
  * portal's canAccess. Owners do not sell, so theirs is Home / Sales / Board /
- * Chat / Admin, the Admin tab carrying the open-items count. A solar-only rep
+ * Chat / Admin, the Admin tab carrying the open-items count (a dual owner keeps
+ * the center + as well). A solar-only rep
  * gets Home / Sales / Solar / Board / Chat, the center Solar opening the deck.
  * A dual (fiber + solar) rep's center + opens a chooser (LogChooserSheet): Log
  * fiber sale, or Open solar deck. Portaled to
@@ -43,16 +43,18 @@ export function RepTabBar({
   const pathname = usePathname();
   const { user } = useAuth();
   const { canAccess } = useNavAccess();
-  const active = activeRepHref(pathname);
   // Viewing as a rep (read only): just the rep screens the owner can see.
   const { viewing } = useViewAs();
-  const tabs = (viewing ? viewAsTabs() : repTabsFor(isOwner(user?.role ?? undefined), isSolarOnlyUser(user))).filter(canAccess);
+  const kind = repNavKind(user, viewing);
+  const active = activeRepHref(pathname, kind.solarOnly || kind.dual);
+  const tabs = (viewing ? viewAsTabs() : repTabsFor(kind.owner, kind.solarOnly, kind.dual)).filter(canAccess);
   const waiting = Object.values(navCounts).reduce((sum, n) => sum + n, 0);
   // A finger on a tab starts its data read before the tap lands.
   const prefetchTab = usePrefetchTabOnTouch();
   const inApp = useIsNativeApp();
-  // A dual rep's + asks fiber or solar first; everyone else's goes straight to its page.
-  const chooser = !viewing && !isOwner(user?.role ?? undefined) && isDualRoleUser(user);
+  // A dual rep's + (an admin's or owner's with a solarRole too) asks fiber or
+  // solar first; everyone else's goes straight to its page.
+  const chooser = kind.dual;
   const [choosing, setChoosing] = useState(false);
   const chooserBtn = useRef<HTMLButtonElement | null>(null);
   const closeChooser = (navigated?: boolean) => {

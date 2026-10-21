@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NavSheet, isNavItemActive, useNavAccess } from '@/components/portal/NavSheet';
 import { RepTabBar } from './RepTabBar';
 import { RepTopBar, repSheetClasses } from './RepTopBar';
-import { REP_PRIMARY_HREFS, activeRepHref } from './repNav';
+import { REP_PRIMARY_HREFS, activeRepHref, repNavKind, repTabsFor } from './repNav';
 import tabStyles from './rep.module.css';
 
 type TestUser = { status?: string; fieldRole?: string; role?: string; solarRole?: string; uid?: string; displayName?: string; email?: string };
@@ -178,6 +178,49 @@ describe('RepTabBar', () => {
     expect(html).toContain('Log sale</a>');
     expect(html).not.toContain('Admin');
   });
+
+  const ADMIN_PERMISSIONS = [...REP_PERMISSIONS, 'users:read', 'solar:read', 'solar:write'];
+  const chooserBtn = /<button[^>]*aria-haspopup="dialog"[^>]*>(?:(?!<\/button>).)*Log sale<\/button>/;
+
+  it('an admin with a solarRole is dual, as on Sales and Home: the center + opens the chooser', () => {
+    setUser({ status: 'active', role: 'admin', solarRole: 'entry_canvasser', uid: 'a-1' }, ADMIN_PERMISSIONS);
+    const html = renderToStaticMarkup(<RepTabBar />);
+    expect(html).toMatch(chooserBtn);
+    expect(emphasized(html)).toEqual(['Log sale']);
+  });
+
+  it('an admin with no solarRole keeps the plain Log sale link', () => {
+    setUser({ status: 'active', role: 'admin', uid: 'a-1' }, ADMIN_PERMISSIONS);
+    const html = renderToStaticMarkup(<RepTabBar />);
+    expect(html).toContain('Log sale</a>');
+    expect(html).not.toMatch(chooserBtn);
+  });
+
+  it('an owner with a solarRole is dual too: the center + (the chooser) and Admin, with its count, kept', () => {
+    setUser({ status: 'active', role: 'owner', solarRole: 'virtual_closer', uid: 'o-1' }, ADMIN_PERMISSIONS);
+    const html = renderToStaticMarkup(<RepTabBar navCounts={{ '/portal/admin/onboarding': 2 }} />);
+    const labels = ['Home<', 'Sales<', 'Log sale</button>', 'Board<', 'Chat<', 'Admin<'].map((label) => html.indexOf(label));
+    expect(labels.every((index) => index > 0)).toBe(true);
+    expect([...labels].sort((a, b) => a - b)).toEqual(labels);
+    expect(html).toMatch(chooserBtn);
+    expect(html).toContain(', 2 waiting');
+  });
+
+  it('the owner viewing as a rep never gets the dual center, solarRole or not', () => {
+    state.viewing = true;
+    setUser({ status: 'active', role: 'owner', solarRole: 'virtual_closer', uid: 'o-1' }, ADMIN_PERMISSIONS);
+    const html = renderToStaticMarkup(<RepTabBar />);
+    expect(html).not.toContain('Log sale');
+    expect(html).not.toMatch(chooserBtn);
+  });
+
+  it('the Solar page: Sales for a dual admin (their Sales holds solar leads), no tab for an admin without a solarRole', () => {
+    state.pathname = '/portal/solar';
+    setUser({ status: 'active', role: 'admin', solarRole: 'entry_canvasser', uid: 'a-1' }, ADMIN_PERMISSIONS);
+    expect(renderToStaticMarkup(<RepTabBar />)).toMatch(/aria-current="page" href="\/portal\/sales"/);
+    setUser({ status: 'active', role: 'admin', uid: 'a-2' }, ADMIN_PERMISSIONS);
+    expect(renderToStaticMarkup(<RepTabBar />)).not.toContain('aria-current="page"');
+  });
 });
 
 describe('RepTopBar', () => {
@@ -312,5 +355,39 @@ describe('activeRepHref', () => {
     expect(activeRepHref('/portal/solarish')).toBeNull();
     expect(activeRepHref('/portal/admin/requests')).toBe('/portal/admin/onboarding');
     expect(activeRepHref('/portal/admin')).toBe('/portal/admin/onboarding');
+  });
+
+  it('gives the Solar page to Sales only when Sales holds solar leads; the deck stays the Solar center', () => {
+    expect(activeRepHref('/portal/solar', true)).toBe('/portal/sales');
+    expect(activeRepHref('/portal/solar/leads/x', false)).toBeNull();
+    expect(activeRepHref('/portal/solar/present', false)).toBe('/portal/solar/present');
+    expect(activeRepHref('/portal/sales', false)).toBe('/portal/sales');
+  });
+});
+
+describe('repNavKind / repTabsFor', () => {
+  const hrefs = (tabs: { href: string }[]) => tabs.map((tab) => tab.href);
+
+  it('reads admins and owners with a solarRole as dual, as isDualRoleUser does; never while viewing as a rep', () => {
+    expect(repNavKind({ role: 'admin', solarRole: 'entry_canvasser' })).toEqual({ owner: false, solarOnly: false, dual: true });
+    expect(repNavKind({ role: 'owner', solarRole: 'entry_canvasser' })).toEqual({ owner: true, solarOnly: false, dual: true });
+    expect(repNavKind({ role: 'owner', solarRole: 'entry_canvasser' }, true)).toEqual({ owner: true, solarOnly: false, dual: false });
+    expect(repNavKind({ role: 'admin' })).toEqual({ owner: false, solarOnly: false, dual: false });
+    expect(repNavKind({ fieldRole: 'entry_rep', solarRole: 'entry_canvasser' }).dual).toBe(true);
+    expect(repNavKind({ solarRole: 'entry_canvasser' })).toEqual({ owner: false, solarOnly: true, dual: false });
+  });
+
+  it('an owner keeps Admin; only a dual owner keeps the center + as well', () => {
+    expect(hrefs(repTabsFor(true))).toEqual(['/portal/dashboard', '/portal/sales', '/portal/leaderboard', '/portal/chat', '/portal/admin/onboarding']);
+    expect(hrefs(repTabsFor(true, false, true))).toEqual([
+      '/portal/dashboard',
+      '/portal/sales',
+      '/portal/sales/new',
+      '/portal/leaderboard',
+      '/portal/chat',
+      '/portal/admin/onboarding',
+    ]);
+    // An admin (not owner), dual or not, has the fiber bar: the center + is there either way.
+    expect(hrefs(repTabsFor(false, false, true))).toEqual(hrefs(repTabsFor(false)));
   });
 });

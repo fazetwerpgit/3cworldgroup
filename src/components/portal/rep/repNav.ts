@@ -1,6 +1,7 @@
 import { House, MessageSquare, Plus, ReceiptText, Shield, Sun, Trophy } from 'lucide-react';
 import type { PortalNavItem } from '@/components/portal/CommandPalette';
 import { ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
+import { isDualRoleUser, isOwner, isSolarOnlyUser, type FieldRole, type PlatformRole } from '@/types';
 
 // The D shell's primary destinations. Gates match portalNavGroups so a tab is
 // never shown to someone the page would turn away.
@@ -74,13 +75,39 @@ export const SOLAR_REP_TABS: RepTab[] = [
   ...REP_TABS.filter((tab) => tab.href === '/portal/leaderboard' || tab.href === '/portal/chat'),
 ];
 
+/** Which nav a viewer gets: the shell's one reading of their roles. */
+export interface RepNavKind {
+  owner: boolean;
+  /** isSolarOnlyUser: a solar role and no fiber or platform role. */
+  solarOnly: boolean;
+  /**
+   * isDualRoleUser, as Sales and Home read it: a solar role plus a fiber or
+   * platform role (an admin or owner with a solarRole is dual too). Never
+   * while the owner views as a rep (read only).
+   */
+  dual: boolean;
+}
+
+export function repNavKind(
+  user: { role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown } | null | undefined,
+  viewing = false
+): RepNavKind {
+  return {
+    owner: isOwner(user?.role ?? undefined),
+    solarOnly: isSolarOnlyUser(user),
+    dual: !viewing && isDualRoleUser(user),
+  };
+}
+
 /**
  * The phone tab bar's destinations for this viewer (before the permission
  * gate). `solarOnly` is isSolarOnlyUser: a solar role and no fiber or platform
- * role. Fiber and dual (fiber + solar) reps keep the fiber set.
+ * role. Fiber and dual (fiber + solar) reps keep the fiber set. An owner gets
+ * Admin in place of Log sale, unless they are dual: then they keep the center
+ * + (the fiber-or-solar chooser), as every dual rep does, and Admin after Chat.
  */
-export function repTabsFor(owner: boolean, solarOnly = false): RepTab[] {
-  if (owner) return [...REP_TABS.filter((tab) => !tab.log), ADMIN_TAB];
+export function repTabsFor(owner: boolean, solarOnly = false, dual = false): RepTab[] {
+  if (owner) return dual ? [...REP_TABS, ADMIN_TAB] : [...REP_TABS.filter((tab) => !tab.log), ADMIN_TAB];
   return solarOnly ? SOLAR_REP_TABS : REP_TABS;
 }
 
@@ -91,15 +118,19 @@ export function viewAsTabs(): RepTab[] {
 
 /**
  * Which primary destination the current path belongs to. Log sale wins over
- * Sales; every admin page is Admin. The Solar page (My leads and the deck's
- * way back) belongs to Sales; the deck itself to the Solar center tab.
+ * Sales; every admin page is Admin. The deck itself belongs to the Solar
+ * center tab. The Solar page (My leads and the deck's way back) belongs to
+ * Sales only when the viewer's Sales holds their solar leads (`solarInSales`:
+ * a solar-only or dual rep, admins and owners with a solarRole included);
+ * for anyone else (an admin with no solarRole) no tab owns it, since their
+ * Sales is fiber only.
  */
-export function activeRepHref(pathname: string): string | null {
+export function activeRepHref(pathname: string, solarInSales = true): string | null {
   if (pathname.startsWith(LOG_SALE_HREF)) return LOG_SALE_HREF;
   if (pathname === '/portal/dashboard') return '/portal/dashboard';
   if (pathname === '/portal/admin' || pathname.startsWith('/portal/admin/')) return ADMIN_TAB.href;
   if (pathname === SOLAR_DECK_HREF || pathname.startsWith(`${SOLAR_DECK_HREF}/`)) return SOLAR_DECK_HREF;
-  if (pathname === SOLAR_HREF || pathname.startsWith(`${SOLAR_HREF}/`)) return '/portal/sales';
+  if (pathname === SOLAR_HREF || pathname.startsWith(`${SOLAR_HREF}/`)) return solarInSales ? '/portal/sales' : null;
   const match = REP_TABS.find((tab) => tab.href !== '/portal/dashboard' && pathname.startsWith(tab.href));
   return match?.href ?? null;
 }
