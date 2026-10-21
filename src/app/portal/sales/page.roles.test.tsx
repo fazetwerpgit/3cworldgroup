@@ -2,7 +2,7 @@
 //
 // The Sales tab by role: a fiber rep gets today's Sales list under sales:read;
 // a solar-only rep gets My leads plus the next consultation under solar:read;
-// a dual rep gets a remembered Fiber | Solar switch.
+// a dual rep gets a Fiber | Solar switch that opens on their main line.
 
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -145,20 +145,45 @@ describe('the Sales tab by role', () => {
     expect(container.querySelector('h1')?.textContent).toBe('Sales');
   });
 
-  it('a dual rep reopens on the side last picked', () => {
-    env.user = DUAL;
+  it('a dual rep with main line solar opens on Solar every visit; a flip lasts the visit and is not stored', () => {
+    env.user = { ...DUAL, mainLine: 'solar' };
     act(() => root.render(<SalesPage />));
-    tap('Solar');
-    expect(window.localStorage.getItem('3c-sales-side')).toBe('solar');
-    reload();
     expect(pressed()).toBe('Solar');
     expect(q('my-leads')).not.toBeNull();
+    expect(q('fiber-sales')).toBeNull();
     tap('Fiber');
+    expect(pressed()).toBe('Fiber');
+    expect(q('fiber-sales')).not.toBeNull();
+    expect(window.localStorage.length).toBe(0);
+    reload();
+    expect(pressed()).toBe('Solar');
+  });
+
+  it('a dual rep with no main line opens on Fiber, whatever an old device pick said', () => {
+    window.localStorage.setItem('3c-sales-side', 'solar');
+    env.user = DUAL;
+    act(() => root.render(<SalesPage />));
+    expect(pressed()).toBe('Fiber');
+    tap('Solar');
+    expect(pressed()).toBe('Solar');
     reload();
     expect(pressed()).toBe('Fiber');
   });
 
-  it('a dual rep falls back to Fiber when storage throws, and the switch still works', () => {
+  it('a main line that lands after the first paint still decides, until the rep flips', () => {
+    env.user = DUAL;
+    act(() => root.render(<SalesPage />));
+    expect(pressed()).toBe('Fiber');
+    env.user = { ...DUAL, mainLine: 'solar' };
+    act(() => root.render(<SalesPage />));
+    expect(pressed()).toBe('Solar');
+    tap('Fiber');
+    env.user = { ...DUAL, mainLine: 'solar', displayName: 'x' };
+    act(() => root.render(<SalesPage />));
+    expect(pressed()).toBe('Fiber');
+  });
+
+  it('the switch works when storage throws', () => {
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('blocked');
     });
@@ -172,13 +197,14 @@ describe('the Sales tab by role', () => {
     expect(pressed()).toBe('Solar');
   });
 
-  it('a link into the fiber list (a sale just logged) opens on Fiber even when Solar was last', () => {
-    window.localStorage.setItem('3c-sales-side', 'solar');
-    env.user = DUAL;
-    env.search = 'logged=s1';
+  it.each(['logged=s1', 'month=2026-09', 'view=pay'])('a fiber-list link (%s) opens on Fiber even on a solar main line', (search) => {
+    env.user = { ...DUAL, mainLine: 'solar' };
+    env.search = search;
     act(() => root.render(<SalesPage />));
     expect(pressed()).toBe('Fiber');
     expect(q('fiber-sales')).not.toBeNull();
+    tap('Solar');
+    expect(pressed()).toBe('Solar');
   });
 
   it('the owner viewing as a rep gets no switch', () => {

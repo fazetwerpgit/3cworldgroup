@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BOARD_SIDE_KEY, SALES_SIDE_KEY, readSide, writeSide } from './rememberedSide';
+import { BOARD_SIDE_KEY, readSide, writeSide } from './rememberedSide';
 
 beforeEach(() => window.localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
@@ -11,7 +11,7 @@ describe('remembered Fiber | Solar side', () => {
     expect(readSide(BOARD_SIDE_KEY)).toBe('fiber');
     writeSide(BOARD_SIDE_KEY, 'solar');
     expect(readSide(BOARD_SIDE_KEY)).toBe('solar');
-    expect(readSide(SALES_SIDE_KEY)).toBe('fiber');
+    expect(readSide('3c-other-side')).toBe('fiber');
     writeSide(BOARD_SIDE_KEY, 'fiber');
     expect(readSide(BOARD_SIDE_KEY)).toBe('fiber');
   });

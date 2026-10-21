@@ -7,8 +7,6 @@ export type RememberedSide = 'fiber' | 'solar';
 
 /** The Board's Fiber | Solar switch. */
 export const BOARD_SIDE_KEY = '3c-board-side';
-/** The Sales tab's Fiber | Solar switch. */
-export const SALES_SIDE_KEY = '3c-sales-side';
 
 /**
  * The side last stored under `key`, or 'fiber' when there is none, it is not a

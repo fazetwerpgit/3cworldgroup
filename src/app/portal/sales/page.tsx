@@ -19,8 +19,8 @@ import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { useAuth } from '@/contexts/AuthContext';
 import { useViewAs } from '@/contexts/ViewAsContext';
 import { BOARD_OPTIONS } from '@/components/leaderboard/BoardSwitch';
-import { SALES_SIDE_KEY, useRememberedSide, type RememberedSide } from '@/lib/portal/rememberedSide';
-import { isDualRoleUser, isOwner, isSolarOnlyUser } from '@/types';
+import type { RememberedSide } from '@/lib/portal/rememberedSide';
+import { isDualRoleUser, isOwner, isSolarOnlyUser, type MainLine } from '@/types';
 import { datedSales, undatedSales } from '@/lib/pay/payGroups';
 import { isTFiberSale, payoutsInMonth } from '@/lib/pay/payoutWindow';
 import { countedSales } from '@/lib/sales/installBucket';
@@ -449,18 +449,21 @@ function SalesContent({ sideSwitch = null }: { sideSwitch?: ReactNode }) {
   );
 }
 
-// A dual (fiber + solar) rep's Sales: a Fiber | Solar switch, remembered on
-// this device like the Board's. A link into the fiber list (a sale just
-// logged, a month, the pay view) opens on Fiber whatever was last picked.
-function DualSales() {
+// A dual (fiber + solar) rep's Sales: a Fiber | Solar switch that opens on
+// their main line (users/{uid}.mainLine, set by an admin; unset is fiber) on
+// every visit. A flip lasts this visit only. A link into the fiber list (a sale
+// just logged, a month, the pay view) opens on Fiber whatever the main line.
+function DualSales({ mainLine }: { mainLine: MainLine }) {
   const params = useSearchParams();
   const fiberLink = ['logged', 'month', 'view'].some((key) => params.has(key));
-  const [remembered, setSide] = useRememberedSide(SALES_SIDE_KEY);
+  // null until the rep flips the switch, so a main line that lands after the
+  // first paint (the cached profile, then the real read) still decides.
+  const [picked, setPicked] = useState<RememberedSide | null>(null);
   const [linkedFiber, setLinkedFiber] = useState(fiberLink);
-  const side: RememberedSide = linkedFiber ? 'fiber' : remembered;
+  const side: RememberedSide = linkedFiber ? 'fiber' : (picked ?? mainLine);
   const pick = (next: RememberedSide) => {
     setLinkedFiber(false);
-    setSide(next);
+    setPicked(next);
   };
   const sideSwitch = <SalesSideSwitch side={side} onChange={pick} />;
   return side === 'solar' ? (
@@ -490,7 +493,7 @@ export default function SalesPage() {
       {solarOnly ? (
         <SolarSales head={<PageHead />} />
       ) : (
-        <Suspense fallback={<SalesSkeleton />}>{dual ? <DualSales /> : <SalesContent />}</Suspense>
+        <Suspense fallback={<SalesSkeleton />}>{dual ? <DualSales mainLine={user?.mainLine ?? 'fiber'} /> : <SalesContent />}</Suspense>
       )}
     </RepShell>
   );
