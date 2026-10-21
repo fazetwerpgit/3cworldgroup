@@ -20,7 +20,7 @@ export interface AskCallOptions {
   /** Thinking on (DeepSeek). Off skips the empty or cut-off answer retry: there's nothing to fall back to. */
   think?: boolean;
   /** DeepSeek's reasoning effort while thinking. */
-  effort?: 'low' | 'high';
+  effort?: 'low' | 'high' | 'max';
   /** Used whenever thinking is off (DeepSeek ignores it while thinking). */
   temperature?: number;
   maxTokens?: number;
