@@ -32,6 +32,7 @@ import {
   type SolarLeadStatus,
   type SolarLeadView,
 } from '@/components/portal/solar/solarClient';
+import { useAuth } from '@/contexts/AuthContext';
 import { useFirstReveal } from '@/hooks/useFirstReveal';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { downloadCsv, toCsv } from '@/lib/export/csv';
@@ -46,6 +47,8 @@ import {
   type SolarDemoOutcome,
   type SolarLeadStage,
 } from '@/lib/solar/leadStage';
+import { canCloseSolarLead, isSoldLead, isSoldStage } from '@/lib/solar/closePermission';
+import { isOwner } from '@/types';
 import rep from '@/components/portal/rep/rep.module.css';
 import ops from '@/components/portal/admin-ops/admin-ops.module.css';
 import css from '@/components/portal/solar/solar-leads.module.css';
@@ -157,13 +160,15 @@ function haystack(lead: SolarLeadView): string {
 /**
  * Admin Solar > Leads: every homeowner a rep saved from the deck or 3C Doors,
  * with the consultation. Open (not booked + booked) by default; a row opens the
- * lead's sheet, which marks it sold or lost, reopens it, or cancels the
- * booking. ?lead={id} (the lead alert's link) opens that lead's sheet.
+ * lead's sheet, which marks it sold (owners only) or lost, reopens it, or
+ * cancels the booking. ?lead={id} (the lead alert's link) opens that lead's sheet.
  */
 export default function SolarLeads() {
   const router = useRouter();
   const linkedLead = useSearchParams().get('lead');
   const { refresh: refreshBadges } = useOpsQueues();
+  const { user } = useAuth();
+  const ownerViewer = isOwner(user?.role);
 
   const [leads, setLeads] = useState<SolarLeadView[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -413,6 +418,7 @@ export default function SolarLeads() {
         <LeadSheet
           key={openLead.id}
           lead={openLead}
+          ownerViewer={ownerViewer}
           onClose={closeSheet}
           onChanged={patchLead}
           onReload={() => void load(true)}
@@ -480,11 +486,14 @@ type Busy = null | 'sold' | 'lost' | 'reopen' | 'cancel' | 'stage' | 'review';
 
 export function LeadSheet({
   lead,
+  ownerViewer,
   onClose,
   onChanged,
   onReload,
 }: {
   lead: SolarLeadView;
+  /** Owners alone mark a lead sold or change a sold one (lib/solar/closePermission). */
+  ownerViewer: boolean;
   onClose: () => void;
   onChanged: (id: string, patch: Partial<SolarLeadView>) => void;
   /** Re-reads the list (a status change also moves the stage on the server). */
@@ -498,6 +507,12 @@ export function LeadSheet({
   // No sale on a booked lead cancels its consultation too: the picked key waits here for a confirm.
   const [confirmStage, setConfirmStage] = useState<string | null>(null);
   const closed = lead.status === 'sold' || lead.status === 'lost';
+  // Selling, and changing a sold lead, is owners' only: everyone else gets
+  // the stage read-only on a sold lead, and no sale choices otherwise.
+  const canClose = canCloseSolarLead({ isOwner: ownerViewer }, lead);
+  const soldLocked = !canClose && isSoldLead(lead);
+  const stageChoices = canClose ? STAGE_CHOICES : STAGE_CHOICES.filter((c) => !isSoldStage(c.stage, c.outcome));
+  const lockedStage = soldLocked ? stageLine(lead) : null;
 
   const setStage = async (key: string) => {
     const next = parseStageKey(key);
@@ -617,7 +632,7 @@ export function LeadSheet({
   } else {
     actions = (
       <>
-        {closed ? (
+        {closed && soldLocked ? null : closed ? (
           <button
             type="button"
             className={ops.btn}
@@ -641,14 +656,16 @@ export function LeadSheet({
             >
               {busy === 'lost' ? 'Saving…' : 'Mark lost'}
             </button>
-            <button
-              type="button"
-              className={ops.btnLime}
-              disabled={busy !== null}
-              onClick={() => void setStatus('sold', 'sold')}
-            >
-              {busy === 'sold' ? 'Saving…' : 'Mark sold'}
-            </button>
+            {canClose ? (
+              <button
+                type="button"
+                className={ops.btnLime}
+                disabled={busy !== null}
+                onClick={() => void setStatus('sold', 'sold')}
+              >
+                {busy === 'sold' ? 'Saving…' : 'Mark sold'}
+              </button>
+            ) : null}
           </div>
         )}
         {lead.booking ? (
@@ -685,14 +702,21 @@ export function LeadSheet({
     >
       <section className={css.stagePicker} aria-label="Sales stage">
         <span className={css.stagePickerLabel}>Sales stage</span>
-        <AdminSelect value={stageKey(lead)} onChange={pickStage} label="Sales stage">
-          <option value="none">Not set</option>
-          {STAGE_CHOICES.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
-            </option>
-          ))}
-        </AdminSelect>
+        {soldLocked ? (
+          <>
+            <span>{lockedStage ? <StatusDot tone={lockedStage.tone}>{lockedStage.text}</StatusDot> : STATUS_LABEL.sold}</span>
+            <span className={css.stagePickerLabel}>Only an owner can change a sold deal.</span>
+          </>
+        ) : (
+          <AdminSelect value={stageKey(lead)} onChange={pickStage} label="Sales stage">
+            <option value="none">Not set</option>
+            {stageChoices.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.label}
+              </option>
+            ))}
+          </AdminSelect>
+        )}
         {busy === 'stage' ? <span className={css.stagePickerLabel}>Saving…</span> : null}
         {lead.stageHistory.length ? (
           <ol className={css.stageHistory} aria-label="Stage history">

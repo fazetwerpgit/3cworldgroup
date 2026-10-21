@@ -55,8 +55,12 @@ describe('LeadSheet stage picker', () => {
   let root: Root;
   const onChanged = vi.fn();
 
-  const render = (l: SolarLeadView) =>
-    act(() => root.render(<LeadSheet lead={l} onClose={vi.fn()} onChanged={onChanged} onReload={vi.fn()} />));
+  const render = (l: SolarLeadView, ownerViewer = false) =>
+    act(() =>
+      root.render(<LeadSheet lead={l} ownerViewer={ownerViewer} onClose={vi.fn()} onChanged={onChanged} onReload={vi.fn()} />)
+    );
+  const options = () =>
+    [...document.querySelectorAll<HTMLOptionElement>('select[aria-label="Sales stage"] option')].map((o) => o.value);
   const pick = (value: string) => {
     const select = document.querySelector<HTMLSelectElement>('select[aria-label="Sales stage"]')!;
     act(() => {
@@ -121,5 +125,43 @@ describe('LeadSheet stage picker', () => {
     await act(async () => pick('appointment_demoed:no_sale'));
     expect(api.setLeadStage).toHaveBeenLastCalledWith('L1', 'appointment_demoed', 'no_sale');
     expect(confirmStrip()).toBeNull();
+  });
+
+  it('a non-owner admin gets no sale choices and no Mark sold on an open lead', () => {
+    render(lead());
+    expect(options()).toEqual(['none', 'appointment_demoed:no_sale', 'appointment_demoed:proposal_sent']);
+    expect(button('Mark sold')).toBeUndefined();
+    expect(button('Mark lost')).toBeDefined();
+  });
+
+  it('an owner gets every stage and Mark sold', () => {
+    render(lead(), true);
+    expect(options()).toEqual([
+      'none', 'appointment_demoed:sale', 'appointment_demoed:no_sale', 'appointment_demoed:proposal_sent',
+      'site_survey', 'permit_approved', 'install_scheduled', 'install_complete', 'pto',
+    ]);
+    expect(button('Mark sold')).toBeDefined();
+  });
+
+  it('a non-owner sees a sold lead read-only: no picker, no Reopen', () => {
+    render(lead({ status: 'sold', stage: 'site_survey' }));
+    expect(document.querySelector('select[aria-label="Sales stage"]')).toBeNull();
+    expect(document.body.textContent).toContain('Site survey');
+    expect(document.body.textContent).toContain('Only an owner can change a sold deal.');
+    expect(button('Reopen')).toBeUndefined();
+    // The booking is not a closing action: it can still be cancelled.
+    expect(button('Cancel booking')).toBeDefined();
+  });
+
+  it('an owner can still change and reopen a sold lead', () => {
+    render(lead({ status: 'sold', stage: 'site_survey' }), true);
+    expect(document.querySelector('select[aria-label="Sales stage"]')).not.toBeNull();
+    expect(button('Reopen')).toBeDefined();
+  });
+
+  it('a non-owner can still reopen a lost lead', () => {
+    render(lead({ status: 'lost', stage: 'appointment_demoed', stageOutcome: 'no_sale', booking: null }));
+    expect(button('Reopen')).toBeDefined();
+    expect(options()).not.toContain('appointment_demoed:sale');
   });
 });
