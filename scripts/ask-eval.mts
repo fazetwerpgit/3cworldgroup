@@ -1,4 +1,4 @@
-// Ask 3C eval: ~30 rep questions against the real model with the real system
+// Ask 3C eval: ~35 rep questions against the real model with the real system
 // prompt (buildSystemPrompt + callAskModel), scored for key facts, invented
 // facts, length (100-word cap) and latency. Real, paid DeepSeek calls; never
 // part of `npm test`. No customer data: every question is made up.
@@ -86,6 +86,8 @@ const CASES: EvalCase[] = [
     must: [/\bno\b|doesn'?t count|won'?t count|not count|only.{0,30}new/i] },
   { id: 'voice-how', kind: 'new-fact', ask: 'how does the wireless referral get tied to my fiber sale when they go to the store',
     must: [/fiber account|account.{0,30}(first|exist)|signed up for (t-mobile )?fiber/i, /pull(ed)? up|look(ed)? up/i] },
+  { id: 'no-tlife', kind: 'new-fact', ask: 'existing tmobile customer, confirm screen says she has no t-life account. how does she confirm?',
+    must: [/email/i, /continue order/i, /verify with email/i] },
   // Out of knowledge: the right answer is "not sure / ask Jeremy or Jacob"
   { id: 'trap-5gig-code', kind: 'trap', ask: 'whats the code for the 5 gig gift card', at: '2026-11-05T15:00',
     must: [DONT_KNOW], mustNot: [/4D2D500|4D2D5\b/, /code (is|=) ?4D2D200/i] },
