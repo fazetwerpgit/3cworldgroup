@@ -299,3 +299,44 @@ export async function requireVerifiedRequester(
     demoAccount: isDemoAccount(c.data),
   };
 }
+
+// Verifies a real token and returns what the knock area routes (/api/portal/knock/area/*)
+// need to scope a campaign: the knock-app role (owner = admin or owner, manager =
+// operations or a management field role, rep = anyone else; the app's appRoleFor)
+// and the caller's turned-on campaigns (users/{uid}.campaignIds). It never refuses
+// a rep itself: those routes check the body and the campaign before the role
+// (AREA_IMPORT_API.md in 3c-knock), so that 403 is theirs to give.
+export async function requireVerifiedKnockCaller(
+  request: NextRequest
+): Promise<
+  | {
+      ok: true;
+      uid: string;
+      /** users/{uid}.displayName (email, then uid, when there is none). */
+      name: string;
+      knockRole: 'owner' | 'manager' | 'rep';
+      campaignIds: string[];
+    }
+  | { ok: false; error: string; status: number }
+> {
+  const c = await verifyCaller(request);
+  if (!c.ok) return c;
+  const { role, fieldRole } = resolveRoles(c.data.role, c.data.fieldRole);
+  const isFieldManager = fieldRole ? MANAGEMENT_FIELD_ROLES.includes(fieldRole) : false;
+  const knockRole = isAdminLevel(role)
+    ? 'owner'
+    : isManagementRole(role) || isFieldManager
+      ? 'manager'
+      : 'rep';
+  const campaignIds = Array.isArray(c.data.campaignIds)
+    ? (c.data.campaignIds as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [];
+  const displayName = typeof c.data.displayName === 'string' ? c.data.displayName.trim() : '';
+  return {
+    ok: true,
+    uid: c.uid,
+    name: displayName || callerEmail(c.data) || c.uid,
+    knockRole,
+    campaignIds,
+  };
+}

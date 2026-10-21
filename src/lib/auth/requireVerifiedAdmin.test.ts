@@ -26,6 +26,7 @@ import {
   requireVerifiedFieldManagerOrManagement,
   requireVerifiedAdmin,
   requireVerifiedRequester,
+  requireVerifiedKnockCaller,
 } from './requireVerifiedAdmin';
 
 // A request carrying a Bearer token, unless a raw header is supplied.
@@ -564,5 +565,40 @@ describe('legacy capital-E Email field', () => {
     userDoc({ status: 'active', fieldRole: 'entry_rep', displayName: 'Rep' });
     const res = await requireVerifiedUser(req());
     expect(res.ok && res.email).toBe('');
+  });
+});
+
+describe('requireVerifiedKnockCaller', () => {
+  const knockReq = () => req('Bearer good-token', '/api/portal/knock/area/preview');
+
+  it('maps admin and owner to owner, operations and field managers to manager, others to rep', async () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ role: 'owner' }, 'owner'],
+      [{ role: 'admin' }, 'owner'],
+      [{ role: 'operations' }, 'manager'],
+      [{ fieldRole: 'l1_manager' }, 'manager'],
+      [{ fieldRole: 'director' }, 'manager'],
+      [{ fieldRole: 'entry_level_rep' }, 'rep'],
+      [{}, 'rep'],
+    ];
+    for (const [roles, knockRole] of cases) {
+      userDoc({ status: 'active', displayName: 'Pat', ...roles });
+      const res = await requireVerifiedKnockCaller(knockReq());
+      expect(res.ok && res.knockRole).toBe(knockRole);
+    }
+  });
+
+  it('returns the string campaignIds and the display name', async () => {
+    userDoc({ status: 'active', displayName: ' Pat Lee ', role: 'operations', campaignIds: ['solar', 7, 'fiber'] });
+    const res = await requireVerifiedKnockCaller(knockReq());
+    expect(res).toMatchObject({ ok: true, uid: 'u1', name: 'Pat Lee', campaignIds: ['solar', 'fiber'] });
+  });
+
+  it('keeps the shared status gate: inactive and unapproved pending are 403, no token 401', async () => {
+    userDoc({ status: 'inactive', role: 'owner' });
+    expect(await requireVerifiedKnockCaller(knockReq())).toMatchObject({ ok: false, status: 403 });
+    userDoc({ status: 'pending', fieldRole: 'l1_manager' });
+    expect(await requireVerifiedKnockCaller(knockReq())).toMatchObject({ ok: false, status: 403 });
+    expect(await requireVerifiedKnockCaller(req(null, '/api/portal/knock/area/preview'))).toMatchObject({ ok: false, status: 401 });
   });
 });
