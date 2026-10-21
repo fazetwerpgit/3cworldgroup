@@ -10,6 +10,7 @@ import { bookingDocId, isSolarMode, openSlots, type SolarMode } from '@/lib/sola
 import { consultantNotice, loadAvailability, loadBookings, requireSolarUser } from '@/lib/solar/server';
 import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
 import { isLowCreditDecline } from '@/lib/solar/leadFields';
+import { isSoldLead } from '@/lib/solar/closePermission';
 import { consultantBookingAttachment, customerBookingAttachment, type BookingInviteInput } from '@/lib/solar/bookingInvite';
 import { solarLeadHref } from '@/lib/solar/leadView';
 import { addBookingToGoogle, type GoogleBookingEvent } from '@/lib/solar/google/bookingEvents';
@@ -29,6 +30,7 @@ export const maxDuration = 30;
 
 const SLOT_TAKEN = { error: 'slot_taken' };
 const LOW_CREDIT_BOOK_ERROR = "This homeowner didn't pre-qualify. Change the credit answer first.";
+const SOLD_BOOK_ERROR = 'This deal is already sold.';
 
 type Booking = {
   id: string;
@@ -244,6 +246,8 @@ export async function POST(request: NextRequest) {
     if (isLowCreditDecline((lead.data() ?? {}) as Record<string, unknown>)) {
       return NextResponse.json({ error: LOW_CREDIT_BOOK_ERROR }, { status: 409 });
     }
+    // A sold deal takes no new consultation: booking would set it back to 'booked'.
+    if (isSoldLead(lead.data() ?? {})) return NextResponse.json({ error: SOLD_BOOK_ERROR }, { status: 409 });
 
     // A retry after success answers the booking it made, before the slot checks
     // (its own booking now fills the slot it asked for).
@@ -295,6 +299,8 @@ export async function POST(request: NextRequest) {
         if (isLowCreditDecline((leadNow.data() ?? {}) as Record<string, unknown>)) {
           throw new Answer({ error: LOW_CREDIT_BOOK_ERROR }, 409);
         }
+        // Re-check: an owner may have marked it sold since.
+        if (isSoldLead(leadNow.data() ?? {})) throw new Answer({ error: SOLD_BOOK_ERROR }, 409);
         const nowHeld = typeof leadNow.get('bookingId') === 'string' ? (leadNow.get('bookingId') as string) : '';
         const heldSnap = nowHeld ? await tx.get(db.collection('solarBookings').doc(nowHeld)) : null;
         const slot = await tx.get(slotRef);

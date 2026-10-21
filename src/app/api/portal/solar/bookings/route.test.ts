@@ -503,4 +503,31 @@ describe('POST /api/portal/solar/bookings', () => {
     expect(db.store.get('solarLeads')!.get('rep1_c1')).toMatchObject({ status: 'lost', noSaleReason: 'low_credit' });
     expect(mockEmail).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['status sold', { status: 'sold' }],
+    ['a sold stage', { status: 'booked', stage: 'site_survey' }],
+  ])('409s a sold deal (%s) and books nothing', async (_, sold) => {
+    db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', first: 'Ana', ...sold });
+    const res = await post(BODY);
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('This deal is already sold.');
+    expect(db.store.get('solarBookings')?.size ?? 0).toBe(0);
+    expect(db.store.get('solarLeads')!.get('rep1_c1')).toMatchObject(sold);
+  });
+
+  it('409s a lead marked sold after the pre-check, inside the transaction', async () => {
+    const real = db.runTransaction.bind(db);
+    const spy = vi.spyOn(db, 'runTransaction').mockImplementation(((fn: Parameters<typeof real>[0]) => {
+      Object.assign(db.store.get('solarLeads')!.get('rep1_c1')!, { status: 'sold' });
+      return real(fn);
+    }) as typeof real);
+    const res = await post(BODY);
+    spy.mockRestore();
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe('This deal is already sold.');
+    expect(db.store.get('solarBookings')?.size ?? 0).toBe(0);
+    expect(db.store.get('solarLeads')!.get('rep1_c1')!.status).toBe('sold');
+    expect(mockEmail).not.toHaveBeenCalled();
+  });
 });
