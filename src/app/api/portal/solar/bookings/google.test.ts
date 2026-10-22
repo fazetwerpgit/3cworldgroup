@@ -40,7 +40,9 @@ const ADMIN = { ...REP, uid: 'boss', name: 'Boss', isAdmin: true };
 const SLOT = '2026-10-26T15:00:00.000Z'; // Monday 8:00 AM PDT
 const ID = `sam_${SLOT}`;
 const NOW = new Date('2026-10-20T00:00:00Z');
-const MON = 'from=2026-10-26T07:00:00.000Z&to=2026-10-27T07:00:00.000Z';
+// A Mountain homeowner (PT + 1): every Pacific 8 AM - 7 PM start lands in the
+// 9 AM - 8 PM homeowner cap, so these tests see each consultant's full hours.
+const MON = 'from=2026-10-26T07:00:00.000Z&to=2026-10-27T07:00:00.000Z&tz=America/Denver';
 const HOURS = [{ day: 1, start: '08:00', end: '12:00' }];
 const LIVE = { connected: true, email: 'sam@gmail.com', connectedAt: new Date('2026-10-19T00:00:00Z'), freeBusy: true };
 

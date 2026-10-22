@@ -32,7 +32,7 @@ const mockPush = sendPushToUser as unknown as ReturnType<typeof vi.fn>;
 const mockEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 
 const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false, solarRole: 'canvass_closer' };
-const SLOT = '2026-10-26T15:00:00.000Z'; // Monday 8:00 AM PDT
+const SLOT = '2026-10-26T16:00:00.000Z'; // Monday 9:00 AM PDT (8 AM is before homeowner hours in PT)
 const BODY = { leadId: 'rep1_c1', mode: 'in_person', consultantUid: 'own', start: SLOT };
 
 function post(body: unknown) {
@@ -75,7 +75,7 @@ describe('POST /api/portal/solar/bookings', () => {
     // No state on the lead and no customerTz in the body: the consultant's zone.
     expect(db.store.get('solarBookings')!.get(id)).toMatchObject({
       leadId: 'rep1_c1', mode: 'in_person', consultantUid: 'own', consultantName: 'Owner',
-      start: SLOT, end: '2026-10-26T16:00:00.000Z', repUid: 'rep1', status: 'booked',
+      start: SLOT, end: '2026-10-26T17:00:00.000Z', repUid: 'rep1', status: 'booked',
       customerTz: 'America/Los_Angeles', consultantTz: 'America/Los_Angeles',
     });
     expect(db.store.get('solarLeads')!.get('rep1_c1')).toMatchObject({ status: 'booked', bookingId: id });
@@ -83,7 +83,7 @@ describe('POST /api/portal/solar/bookings', () => {
 
     const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
     expect(toCustomer.subject).toBe('Your solar consultation is booked');
-    expect(toCustomer.textBody).toContain('Monday, October 26 at 8:00 AM');
+    expect(toCustomer.textBody).toContain('Monday, October 26 at 9:00 AM');
     expect(toCustomer.textBody).toContain('in-person consultation with Owner');
 
     expect(mockNotifyMany).toHaveBeenCalledTimes(1);
@@ -92,7 +92,7 @@ describe('POST /api/portal/solar/bookings', () => {
     const alert = mockEmail.mock.calls.find((c) => c[0].tag === 'solar-lead')![0];
     expect(alert.to).toBe('jmyers@3cworldgroup.com');
     expect(alert.subject).toBe('Solar appointment set: Ana Lopez');
-    expect(alert.textBody).toContain('Appointment: Monday, October 26 at 8:00 AM PT, in-person, with Owner');
+    expect(alert.textBody).toContain('Appointment: Monday, October 26 at 9:00 AM PT, in-person, with Owner');
   });
 
   it("sends the owner nothing by default: the owner's booking notice goes to Jacob", async () => {
@@ -175,8 +175,8 @@ describe('POST /api/portal/solar/bookings', () => {
       const ics = icsOf(toCustomer);
       expect(prop(ics, 'METHOD')).toBe('PUBLISH');
       expect(prop(ics, 'UID')).toBe(`${id}@3cworldgroup.com`);
-      expect(prop(ics, 'DTSTART')).toBe('20261026T150000Z');
-      expect(prop(ics, 'DTEND')).toBe('20261026T160000Z');
+      expect(prop(ics, 'DTSTART')).toBe('20261026T160000Z');
+      expect(prop(ics, 'DTEND')).toBe('20261026T170000Z');
       expect(prop(ics, 'SUMMARY')).toBe('Solar consultation with Jacob Myers');
       expect(prop(ics, 'LOCATION')).toBe(MEET);
     });
@@ -342,11 +342,11 @@ describe('POST /api/portal/solar/bookings', () => {
   });
 
   it('400s a slot less than 2 hours out', async () => {
-    vi.setSystemTime(new Date('2026-10-26T13:30:00Z')); // 6:30 AM PDT; 8:00 AM is 1.5h away
+    vi.setSystemTime(new Date('2026-10-26T14:30:00Z')); // 7:30 AM PDT; 9:00 AM is 1.5h away
     const res = await post(BODY);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: 'slot_unavailable' });
-    vi.setSystemTime(new Date('2026-10-26T13:00:00Z')); // exactly 2h
+    vi.setSystemTime(new Date('2026-10-26T14:00:00Z')); // exactly 2h
     expect((await post(BODY)).status).toBe(200);
   });
 
@@ -361,10 +361,10 @@ describe('POST /api/portal/solar/bookings', () => {
       });
       // Customer (Florida): Eastern.
       const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
-      expect(toCustomer.textBody).toContain('on Monday, October 26 at 11:00 AM ET.');
+      expect(toCustomer.textBody).toContain('on Monday, October 26 at 12:00 PM ET.');
       // Consultant (Jacob, Iowa): Central, with the customer's time beside it.
       const notice = mockNotify.mock.calls.find((c) => c[0].type === 'solar_booking')![0];
-      expect(notice.message).toContain('virtual, Monday, October 26 at 10:00 AM CT (11:00 AM ET for the customer) with Jacob');
+      expect(notice.message).toContain('virtual, Monday, October 26 at 11:00 AM CT (12:00 PM ET for the customer) with Jacob');
     });
 
     it("the lead's state beats the body's customerTz, so the client can't widen the window", async () => {
@@ -391,28 +391,60 @@ describe('POST /api/portal/solar/bookings', () => {
       expect(db.store.get('solarBookings')!.get(`own_${SLOT}`)!.customerTz).toBe('America/Denver');
 
       db.store.get('solarLeads')!.set('rep1_c2', { ...db.store.get('solarLeads')!.get('rep1_c2'), state: '' });
-      const SLOT2 = '2026-10-26T16:00:00.000Z';
+      const SLOT2 = '2026-10-26T17:00:00.000Z';
       // A real IANA zone outside the US list falls back to the consultant's.
       expect((await post({ ...BODY, leadId: 'rep1_c2', start: SLOT2, customerTz: 'Asia/Tokyo' })).status).toBe(200);
       expect(db.store.get('solarBookings')!.get(`own_${SLOT2}`)!.customerTz).toBe('America/Los_Angeles');
     });
 
     it('books across the fall-back DST change at the right instant', async () => {
-      // Sun Nov 1 2026 US clocks fall back. Monday Nov 2, 8:00 AM PST = 16:00Z
-      // (a week earlier, 8:00 AM PDT was 15:00Z).
+      // Sun Nov 1 2026 US clocks fall back. Monday Nov 2, 9:00 AM PST = 17:00Z
+      // (a week earlier, 9:00 AM PDT was 16:00Z).
       vi.setSystemTime(new Date('2026-10-30T00:00:00Z'));
-      expect((await post({ ...BODY, start: '2026-11-02T15:00:00.000Z' })).status).toBe(400);
-      const res = await post({ ...BODY, start: '2026-11-02T16:00:00.000Z' });
+      expect((await post({ ...BODY, start: '2026-11-02T16:00:00.000Z' })).status).toBe(400);
+      const res = await post({ ...BODY, start: '2026-11-02T17:00:00.000Z' });
       expect(res.status).toBe(200);
       const toCustomer = mockEmail.mock.calls.find((c) => c[0].to === 'ana@example.com')![0];
-      expect(toCustomer.textBody).toContain('Monday, November 2 at 8:00 AM PT');
+      expect(toCustomer.textBody).toContain('Monday, November 2 at 9:00 AM PT');
+    });
+  });
+
+  describe('homeowner hours (9:00 AM - 8:00 PM start, homeowner local time)', () => {
+    // Tue Oct 27, 7 PM PDT: inside the owner's virtual hours (Tue 8-8 PT), 10 PM in Florida.
+    const SEVEN_PM_PT = '2026-10-28T02:00:00.000Z';
+    const LATE = { ...BODY, mode: 'virtual', start: SEVEN_PM_PT };
+
+    it("rejects a slot past 8 PM in the lead's zone (a stale list can't book it)", async () => {
+      db.store.get('solarLeads')!.set('rep1_c1', { ...db.store.get('solarLeads')!.get('rep1_c1'), state: 'FL' });
+      const res = await post(LATE);
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'slot_unavailable' });
+      expect(db.store.get('solarBookings')).toBeUndefined();
+      expect(mockEmail).not.toHaveBeenCalled();
+    });
+
+    it("rejects it by the body's customerTz for a lead without a state", async () => {
+      const res = await post({ ...LATE, customerTz: 'America/New_York' });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'slot_unavailable' });
+    });
+
+    it("books it for a Pacific homeowner, and with no zone at all on the consultant's (Pacific)", async () => {
+      expect((await post({ ...LATE, customerTz: 'America/Los_Angeles' })).status).toBe(200);
+      expect((await post({ ...LATE, leadId: 'rep1_c2', start: '2026-10-28T01:00:00.000Z' })).status).toBe(200);
+    });
+
+    it("rejects 8 AM in the consultant's zone when the homeowner's is unknown", async () => {
+      const res = await post({ ...BODY, start: '2026-10-26T15:00:00.000Z' }); // Mon 8 AM PDT
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'slot_unavailable' });
     });
   });
 
   describe('booking window (14 days)', () => {
     it('400s a slot more than 14 days out, before any slot math', async () => {
-      // Now is Tue Oct 20 00:00Z; Monday Nov 9 8:00 AM PST is ~20 days out.
-      const res = await post({ ...BODY, start: '2026-11-09T16:00:00.000Z' });
+      // Now is Tue Oct 20 00:00Z; Monday Nov 9 9:00 AM PST is ~20 days out.
+      const res = await post({ ...BODY, start: '2026-11-09T17:00:00.000Z' });
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ error: 'slot_unavailable', reason: 'too_far' });
       expect(db.store.get('solarBookings')).toBeUndefined();
@@ -421,28 +453,28 @@ describe('POST /api/portal/solar/bookings', () => {
     it("counts 14 calendar days in the customer's zone, through the end of day 14", async () => {
       // Now: Mon Oct 19, 5 PM Pacific (the customer's zone: no state, the owner's).
       // Day 14 is Mon Nov 2, so the window ends Nov 3 00:00 PST (08:00Z).
-      expect((await post({ ...BODY, start: '2026-11-02T16:00:00.000Z' })).status).toBe(200);
-      const tue = await post({ ...BODY, leadId: 'rep1_c2', start: '2026-11-03T16:00:00.000Z' });
+      expect((await post({ ...BODY, start: '2026-11-02T17:00:00.000Z' })).status).toBe(200);
+      const tue = await post({ ...BODY, leadId: 'rep1_c2', start: '2026-11-03T17:00:00.000Z' });
       expect(tue.status).toBe(400);
       expect(await tue.json()).toMatchObject({ reason: 'too_far' });
       // Just after midnight Pacific on Oct 20, day 14 is Tue Nov 3: bookable,
       // though a rolling 336 hours (to Nov 3 07:30Z) would refuse it.
       vi.setSystemTime(new Date('2026-10-20T07:30:00Z'));
-      expect((await post({ ...BODY, leadId: 'rep1_c2', start: '2026-11-03T16:00:00.000Z' })).status).toBe(200);
+      expect((await post({ ...BODY, leadId: 'rep1_c2', start: '2026-11-03T17:00:00.000Z' })).status).toBe(200);
     });
 
     it("ends the window at midnight in a Florida customer's zone", async () => {
       db.store.get('solarLeads')!.set('rep1_c1', { ...db.store.get('solarLeads')!.get('rep1_c1'), state: 'FL' });
       // Now: Mon Oct 19, 8 PM ET, so the window ends Nov 3 00:00 EST (05:00Z).
-      // Tue Nov 3 8 AM PST (16:00Z) is day 15 in Florida.
-      const res = await post({ ...BODY, start: '2026-11-03T16:00:00.000Z' });
+      // Tue Nov 3 9 AM PST (17:00Z) is day 15 in Florida.
+      const res = await post({ ...BODY, start: '2026-11-03T17:00:00.000Z' });
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ reason: 'too_far' });
     });
 
     it('still answers a retry for a held booking whatever it asks for', async () => {
       expect((await post(BODY)).status).toBe(200);
-      const res = await post({ ...BODY, start: '2026-12-07T16:00:00.000Z' });
+      const res = await post({ ...BODY, start: '2026-12-07T17:00:00.000Z' });
       expect(res.status).toBe(200);
       expect((await res.json()).duplicate).toBe(true);
     });

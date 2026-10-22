@@ -14,7 +14,9 @@ import type { createFakeDb } from '@/lib/solar/testing/fakeDb';
 const db = adminDb as unknown as ReturnType<typeof createFakeDb>;
 const mockGate = requireVerifiedUser as unknown as ReturnType<typeof vi.fn>;
 const REP = { ok: true, uid: 'rep1', name: 'Rep One', email: 'rep@x.com', isAdmin: false, isOwner: false, solarRole: 'virtual_closer' };
-const MON = 'from=2026-10-26T07:00:00.000Z&to=2026-10-27T07:00:00.000Z';
+// A Mountain homeowner (PT + 1): every Pacific 8 AM - 7 PM start lands in the
+// 9 AM - 8 PM homeowner cap, so these tests see each consultant's full hours.
+const MON = 'from=2026-10-26T07:00:00.000Z&to=2026-10-27T07:00:00.000Z&tz=America/Denver';
 
 function get(query: string) {
   return GET(new NextRequest(`http://localhost/api/portal/solar/availability?${query}`));
@@ -89,6 +91,24 @@ describe('GET /api/portal/solar/availability', () => {
       'c9@2026-10-26T16:00:00.000Z',
       'c9@2026-10-26T17:00:00.000Z',
     ]);
+  });
+
+  it("caps starts to 9 AM - 8 PM in the homeowner's zone `tz`, else each consultant's", async () => {
+    // Tue Oct 27: the owner's virtual hours run 8 AM - 8 PM PT. 7 PM PT = 02:00Z = 10 PM ET.
+    const TUE = 'from=2026-10-27T07:00:00.000Z&to=2026-10-28T07:00:00.000Z';
+    const owner = async (q: string) =>
+      ((await (await get(`mode=virtual&${TUE}${q}`)).json()).slots as { consultantUid: string; start: string }[])
+        .filter((s) => s.consultantUid === 'own')
+        .map((s) => s.start);
+    const et = await owner('&tz=America/New_York');
+    expect(et).not.toContain('2026-10-28T02:00:00.000Z');
+    expect(et.at(-1)).toBe('2026-10-28T00:00:00.000Z'); // 5 PM PT = 8 PM ET
+    const pt = await owner('&tz=America/Los_Angeles');
+    expect(pt).toContain('2026-10-28T02:00:00.000Z');
+    expect(pt[0]).toBe('2026-10-27T16:00:00.000Z'); // 9 AM PT; 8 AM is hidden
+    // No tz (or a bogus one): the owner's own zone, Pacific.
+    expect(await owner('')).toEqual(pt);
+    expect(await owner('&tz=Mars/Olympus')).toEqual(pt);
   });
 
   it('400s on a bad mode or range, 403s without solar access', async () => {

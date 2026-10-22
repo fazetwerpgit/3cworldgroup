@@ -6,7 +6,7 @@
 // by the window's end. A booking blocks its consultant in every mode (one
 // person can't be on a virtual call and at a door at the same time).
 
-import { LEGACY_TZ, US_TIMEZONES } from './timezones';
+import { LEGACY_TZ, US_TIMEZONES, isValidTimeZone } from './timezones';
 import type { GoogleCalendarStatus } from './google/status';
 
 /** The owner's (Jeremy's) zone: his seed hours and the per-day booking load. */
@@ -168,6 +168,28 @@ function parseHm(value: string): number | null {
   return h * 60 + mi;
 }
 
+/**
+ * Homeowner-hours cap (Jacob): a slot is offered only when it STARTS between
+ * 9:00 AM and 8:00 PM, inclusive, in the homeowner's local time. It sits on
+ * top of each consultant's hours (still read in the consultant's zone), for
+ * every consultant and mode: a Pacific consultant's 7 PM PT slot is 10 PM for
+ * an Eastern homeowner, so it is hidden from them and kept for a Pacific one.
+ */
+export const HOMEOWNER_EARLIEST = '09:00';
+export const HOMEOWNER_LATEST_START = '20:00';
+
+/**
+ * Whether a slot starting at `start` falls inside HOMEOWNER_EARLIEST ..
+ * HOMEOWNER_LATEST_START (both inclusive) in `tz`, read from the instant's
+ * own wall clock, so DST is handled the same way as consultant hours.
+ */
+export function withinHomeownerHours(start: Date | number, tz: string): boolean {
+  const ms = typeof start === 'number' ? start : start.getTime();
+  const p = wallParts(ms, tz);
+  const minutes = p.h * 60 + p.mi + p.s / 60;
+  return minutes >= parseHm(HOMEOWNER_EARLIEST)! && minutes <= parseHm(HOMEOWNER_LATEST_START)!;
+}
+
 function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
   return aStart < bEnd && bStart < aEnd;
 }
@@ -176,7 +198,12 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
  * Open slots for `mode` whose start is in [from, to) and at least
  * SOLAR_MIN_LEAD_MIN after `now`, sorted by start then consultant name. Each
  * consultant's windows are read in that consultant's own `tz`. A slot is gone when any non-cancelled booking of
- * that consultant overlaps it.
+ * that consultant overlaps it, or when it starts outside homeowner hours
+ * (withinHomeownerHours) in `homeownerTz`.
+ *
+ * `homeownerTz` unknown or invalid: the cap reads in each consultant's own zone.
+ * With no better signal, the consultant's zone is the closest guess at where
+ * their homeowners are, and it keeps the cap on instead of silently dropping it.
  */
 export function openSlots(
   availability: SolarAvailability[],
@@ -184,7 +211,8 @@ export function openSlots(
   mode: SolarMode,
   from: Date,
   to: Date,
-  now: Date
+  now: Date,
+  homeownerTz?: string | null
 ): SolarSlot[] {
   const fromMs = Math.max(from.getTime(), now.getTime() + SOLAR_MIN_LEAD_MIN * MINUTE);
   const toMs = to.getTime();
@@ -209,6 +237,7 @@ export function openSlots(
     const tz = a.tz || LEGACY_TZ;
     const slotMin = a.slotMin > 0 ? a.slotMin : SOLAR_SLOT_MIN;
     const busy = taken.get(a.consultantUid) ?? [];
+    const capTz = homeownerTz && isValidTimeZone(homeownerTz) ? homeownerTz : tz;
 
     // Walk local calendar days from the day before `from` to the day after `to`
     // (calendar math in UTC fields, so DST never skips or repeats a day).
@@ -231,6 +260,7 @@ export function openSlots(
           if (startMs === null) continue;
           const endMs = startMs + slotMin * MINUTE;
           if (startMs < fromMs || startMs >= toMs) continue;
+          if (!withinHomeownerHours(startMs, capTz)) continue;
           if (busy.some((b) => overlaps(startMs, endMs, b.start, b.end))) continue;
           slots.push({
             consultantUid: a.consultantUid,

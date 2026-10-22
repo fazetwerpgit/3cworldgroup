@@ -208,8 +208,8 @@ function bookedBody(
 // (not cancelled) booking, any POST for that lead answers that booking with
 // duplicate: true, whatever slot or consultant it asked for, and sends nothing
 // (the 3C Doors app retries after a lost response, possibly on the next
-// consultant). Otherwise the slot must start at least 2 hours out and still be
-// open. The slot doc id is `${consultantUid}_${startISO}`, created in one
+// consultant). Otherwise the slot must start at least 2 hours out, between
+// 9:00 AM and 8:00 PM in the customer's zone, and still be open. The slot doc id is `${consultantUid}_${startISO}`, created in one
 // transaction with the lead's bookingId/status stamp, so two leads racing for
 // one slot get exactly one booking (the other 409s), and two requests for one
 // lead get one booking. A fresh booking sends the lead alert (once per lead,
@@ -282,11 +282,13 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    // Capped to 9 AM - 8 PM in the customer's zone too (withinHomeownerHours),
+    // so a stale list can't book a slot the deck no longer shows: slot_unavailable.
     const windowEnd = new Date(startDate.getTime() + 60_000);
-    const offered = openSlots(availability, [], mode, startDate, windowEnd, now).find((s) => s.start === start);
+    const offered = openSlots(availability, [], mode, startDate, windowEnd, now, customerTz).find((s) => s.start === start);
     if (!offered) return NextResponse.json({ error: 'slot_unavailable' }, { status: 400 });
     const bookings = await loadBookings(startDate, new Date(startDate.getTime() + 86_400_000));
-    const open = openSlots(availability, bookings, mode, startDate, windowEnd, now).some((s) => s.start === start);
+    const open = openSlots(availability, bookings, mode, startDate, windowEnd, now, customerTz).some((s) => s.start === start);
     if (!open) return NextResponse.json(SLOT_TAKEN, { status: 409 });
     // Their Google Calendar, asked fresh (no cache): busy there since the list
     // loaded is taken too. Google not answering doesn't block the booking.

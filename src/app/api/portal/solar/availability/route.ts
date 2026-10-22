@@ -11,7 +11,8 @@ const DAY = 86_400_000;
 // to now, to to from + 14 days. Nothing past the booking window (the end of
 // the 14th calendar day after today in the customer's zone `tz`, Pacific when
 // absent or invalid; SOLAR_MAX_DAYS_OUT) is listed, whatever `to` asks for, and only slots
-// at least 2 hours out. Times are absolute; the deck shows them in the
+// at least 2 hours out, and only slots that start 9:00 AM - 8:00 PM in the
+// homeowner's zone `tz` (withinHomeownerHours). Times are absolute; the deck shows them in the
 // customer's zone. Slots that share a start come in booking
 // preference order (orderByPreference): the first is the one to book.
 // Consultants with Google Calendar connected (and free/busy granted) lose the
@@ -33,7 +34,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid from/to' }, { status: 400 });
     }
     const tzRaw = params.get('tz');
-    const windowEnd = bookingWindowEnd(now, isValidTimeZone(tzRaw) ? tzRaw : LEGACY_TZ);
+    // The homeowner's zone (the deck sends the lead's state's, else the rep's
+    // device zone). Absent or invalid: the 14-day window counts in Pacific, and
+    // the 9 AM - 8 PM homeowner cap reads in each consultant's own zone.
+    const homeownerTz = isValidTimeZone(tzRaw) ? tzRaw : null;
+    const windowEnd = bookingWindowEnd(now, homeownerTz ?? LEGACY_TZ);
     // Past the window there is nothing to list (openSlots answers [] for an empty range).
     const cappedTo = to > windowEnd ? windowEnd : to;
     if (cappedTo <= from) return NextResponse.json({ slots: [] });
@@ -52,7 +57,7 @@ export async function GET(request: NextRequest) {
       cappedTo,
       now.getTime()
     );
-    const open = openSlots(availability, busy.length > 0 ? [...bookings, ...busy] : bookings, mode, from, cappedTo, now);
+    const open = openSlots(availability, busy.length > 0 ? [...bookings, ...busy] : bookings, mode, from, cappedTo, now, homeownerTz);
     const slots = orderByPreference(open, bookings, mode, owner?.uid ?? null);
     return NextResponse.json({ slots });
   } catch (error) {
