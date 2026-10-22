@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
-import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
+import { activateUser, getActivationReadiness, sendOnboardingPacketOnce } from '@/lib/onboarding/activation';
 import { getRecruitingRequester } from '@/lib/recruiting/requester';
 import { canHireAtFieldRole } from '@/lib/recruiting/roleCeiling';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
@@ -145,9 +145,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const activation = await activateUser(invite.convertedUserId);
+    const activation = await activateUser(invite.convertedUserId, { deferPacket: true });
     if (!activation) {
       return NextResponse.json({ error: 'user not found' }, { status: 404 });
+    }
+    // Owner packet after the response; its stamp keeps it to one per rep.
+    if (activation.packetDue) {
+      const hireId = invite.convertedUserId as string;
+      after(() => sendOnboardingPacketOnce(hireId));
     }
 
     await Promise.all([

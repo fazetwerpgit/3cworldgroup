@@ -64,9 +64,18 @@ vi.mock('@/lib/firebase/admin', () => ({ adminDb: firestore.adminDb }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedUser: vi.fn(),
 }));
+const { packetOnceMock, afterMock } = vi.hoisted(() => ({
+  packetOnceMock: vi.fn<(userId: string) => Promise<boolean>>(async () => true),
+  afterMock: vi.fn((callback: () => unknown) => void callback()),
+}));
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: afterMock,
+}));
 vi.mock('@/lib/onboarding/activation', () => ({
   activateUser: vi.fn(),
   getActivationReadiness: vi.fn(),
+  sendOnboardingPacketOnce: packetOnceMock,
 }));
 vi.mock('@/lib/chat/channels', () => ({ reconcileChatMembershipForUser: vi.fn(async () => []) }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: vi.fn(async () => undefined) }));
@@ -118,7 +127,23 @@ beforeEach(() => {
     if (!user) return null;
     if (user.status === 'active') return { alreadyActive: true };
     firestore.users.set(userId, { ...user, status: 'active' });
-    return { alreadyActive: false };
+    return { alreadyActive: false, packetDue: true };
+  });
+});
+
+describe('POST /api/portal/recruiting/convert - owner packet', () => {
+  it('sends the packet once, after the response, on the converting activation only', async () => {
+    seedRecruit();
+
+    const first = await POST(request({ inviteId: 'invite-1', action: 'approved' }));
+    expect(first.status).toBe(200);
+    expect(afterMock).toHaveBeenCalledOnce();
+    expect(packetOnceMock).toHaveBeenCalledTimes(1);
+    expect(packetOnceMock).toHaveBeenCalledWith('recruit-1');
+
+    // A repeat convert is refused; an already-active recruit is not due a packet.
+    await POST(request({ inviteId: 'invite-1', action: 'approved' }));
+    expect(packetOnceMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -146,7 +171,7 @@ describe('POST /api/portal/recruiting/convert', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true, status: 'converted' });
     expect(mockReadiness).toHaveBeenCalledWith('recruit-1');
-    expect(mockActivateUser).toHaveBeenCalledWith('recruit-1');
+    expect(mockActivateUser).toHaveBeenCalledWith('recruit-1', { deferPacket: true });
     expect(firestore.users.get('recruit-1')).toMatchObject({ status: 'active' });
     expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'converted' });
     expect(firestore.candidateOnboarding.get('invite-1')).toMatchObject({ status: 'approved' });
@@ -165,7 +190,7 @@ describe('POST /api/portal/recruiting/convert', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true, status: 'converted' });
     expect(mockReadiness).not.toHaveBeenCalled();
-    expect(mockActivateUser).toHaveBeenCalledWith('recruit-1');
+    expect(mockActivateUser).toHaveBeenCalledWith('recruit-1', { deferPacket: true });
     expect(firestore.invites.get('invite-1')).toMatchObject({ status: 'converted' });
   });
 
@@ -252,7 +277,7 @@ describe('POST /api/portal/recruiting/convert', () => {
       firestore.invites.set('invite-1', { ...firestore.invites.get('invite-1'), intendedFieldRole: 'director' });
       firestore.users.set('recruit-1', { ...firestore.users.get('recruit-1'), fieldRole: 'director' });
       expect((await POST(request({ inviteId: 'invite-1', action: 'approved' }))).status).toBe(200);
-      expect(mockActivateUser).toHaveBeenCalledWith('recruit-1');
+      expect(mockActivateUser).toHaveBeenCalledWith('recruit-1', { deferPacket: true });
     });
   });
 

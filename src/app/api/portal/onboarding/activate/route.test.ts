@@ -34,9 +34,18 @@ vi.mock('firebase-admin/firestore', () => ({
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedManagement: vi.fn(),
 }));
+const { packetOnceMock, afterMock } = vi.hoisted(() => ({
+  packetOnceMock: vi.fn<(userId: string) => Promise<boolean>>(async () => true),
+  afterMock: vi.fn((callback: () => unknown) => void callback()),
+}));
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: afterMock,
+}));
 vi.mock('@/lib/onboarding/activation', () => ({
   activateUser: vi.fn(),
   getActivationReadiness: vi.fn(),
+  sendOnboardingPacketOnce: packetOnceMock,
 }));
 vi.mock('@/lib/alerts/alertTasks', () => ({ resolveAlertTasks: vi.fn(async () => undefined) }));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: vi.fn(async () => undefined) }));
@@ -65,9 +74,32 @@ beforeEach(() => {
   mockActivateUser.mockReset();
   mockGate.mockResolvedValue({ ok: true, uid: 'admin-1', name: 'Admin', isAdmin: true });
   mockReadiness.mockResolvedValue({ ready: true, missing: [] });
+  packetOnceMock.mockClear();
+  afterMock.mockClear();
 });
 
 describe('POST /api/portal/onboarding/activate', () => {
+  it('sends the owner packet once, after the response, when the activation makes it due', async () => {
+    mockActivateUser.mockResolvedValue({ alreadyActive: false, packetDue: true });
+
+    const res = await POST(req('hire-1'));
+
+    expect(res.status).toBe(200);
+    expect(afterMock).toHaveBeenCalledOnce();
+    expect(packetOnceMock).toHaveBeenCalledTimes(1);
+    expect(packetOnceMock).toHaveBeenCalledWith('hire-1');
+  });
+
+  it('sends no packet for an already-active user or one with no checklist', async () => {
+    mockActivateUser.mockResolvedValueOnce({ alreadyActive: true });
+    await POST(req('already-active'));
+    mockActivateUser.mockResolvedValueOnce({ alreadyActive: false, packetDue: false });
+    await POST(req('no-checklist'));
+
+    expect(afterMock).not.toHaveBeenCalled();
+    expect(packetOnceMock).not.toHaveBeenCalled();
+  });
+
   it('activates an invited L1 manager without demoting the field role', async () => {
     firestore.users.set('l1-manager', { status: 'pending', fieldRole: 'l1_manager', displayName: 'Manager' });
     mockActivateUser.mockResolvedValue({ alreadyActive: false });
@@ -76,7 +108,7 @@ describe('POST /api/portal/onboarding/activate', () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });
-    expect(mockActivateUser).toHaveBeenCalledWith('l1-manager');
+    expect(mockActivateUser).toHaveBeenCalledWith('l1-manager', { deferPacket: true });
   });
 
   it('does not add a field role when the target has none', async () => {
@@ -87,7 +119,7 @@ describe('POST /api/portal/onboarding/activate', () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true });
-    expect(mockActivateUser).toHaveBeenCalledWith('no-field-role');
+    expect(mockActivateUser).toHaveBeenCalledWith('no-field-role', { deferPacket: true });
   });
 
   it('returns alreadyActive when the helper reports an already-active user', async () => {
@@ -97,7 +129,7 @@ describe('POST /api/portal/onboarding/activate', () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ ok: true, alreadyActive: true });
-    expect(mockActivateUser).toHaveBeenCalledWith('already-active');
+    expect(mockActivateUser).toHaveBeenCalledWith('already-active', { deferPacket: true });
   });
 
   it('returns 404 when the helper cannot find the target user', async () => {
@@ -107,7 +139,7 @@ describe('POST /api/portal/onboarding/activate', () => {
 
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toEqual({ error: 'user not found' });
-    expect(mockActivateUser).toHaveBeenCalledWith('missing-user');
+    expect(mockActivateUser).toHaveBeenCalledWith('missing-user', { deferPacket: true });
   });
 
   it('preserves the readiness response and does not activate an incomplete hire', async () => {

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
-import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
+import { activateUser, getActivationReadiness, sendOnboardingPacketOnce } from '@/lib/onboarding/activation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,9 +33,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const activation = await activateUser(userId);
+    const activation = await activateUser(userId, { deferPacket: true });
     if (!activation) {
       return NextResponse.json({ error: 'user not found' }, { status: 404 });
+    }
+    // The owner packet (attachments, several sends) goes out after the
+    // response; its stamp keeps it to one per rep.
+    if (activation.packetDue) {
+      after(() => sendOnboardingPacketOnce(userId));
     }
 
     return NextResponse.json({ ok: true, ...(activation.alreadyActive ? { alreadyActive: true } : {}) });

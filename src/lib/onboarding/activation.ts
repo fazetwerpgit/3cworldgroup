@@ -5,7 +5,7 @@ import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { activationEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
 import { sendOnboardingPacket } from '@/lib/onboarding/ownerNotify';
-import { TEST_ACCOUNT_FIELD } from '@/lib/users/demoAccount';
+import { DEMO_ACCOUNT_FIELD, isHiddenUser, TEST_ACCOUNT_FIELD } from '@/lib/users/demoAccount';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import {
   getOnboardingItemsForUser,
@@ -105,8 +105,10 @@ export const PACKET_EMAILED_FIELD = 'onboardingPacketEmailedAt';
  * Sends the owner onboarding packet at most once per rep, whichever activation
  * path gets there (automatic, manual Activate, recruiting convert, Accept on
  * the user page). The stamp is claimed in a transaction BEFORE sending, so
- * concurrent or repeated paths cannot double-send; a send that fails after the
- * claim is logged, not retried. Test accounts get no packet. Never throws.
+ * concurrent or repeated paths cannot double-send. When nothing went out (no
+ * recipients, or every send failed) the stamp is released so the next
+ * activation path retries; a partial failure keeps it. Demo and test accounts
+ * get no packet. Never throws. True when at least one copy was sent.
  */
 export async function sendOnboardingPacketOnce(userId: string): Promise<boolean> {
   try {
@@ -116,12 +118,21 @@ export async function sendOnboardingPacketOnce(userId: string): Promise<boolean>
     const claimed = await db.runTransaction(async (tx) => {
       const snap = await tx.get(userRef);
       if (!snap.exists) return false;
-      if (snap.get(TEST_ACCOUNT_FIELD) === true || snap.get(PACKET_EMAILED_FIELD)) return false;
+      const hidden = isHiddenUser({
+        [DEMO_ACCOUNT_FIELD]: snap.get(DEMO_ACCOUNT_FIELD),
+        [TEST_ACCOUNT_FIELD]: snap.get(TEST_ACCOUNT_FIELD),
+      });
+      if (hidden || snap.get(PACKET_EMAILED_FIELD)) return false;
       tx.update(userRef, { [PACKET_EMAILED_FIELD]: FieldValue.serverTimestamp() });
       return true;
     });
     if (!claimed) return false;
-    await sendOnboardingPacket({ userId });
+    const { attempted, ok } = await sendOnboardingPacket({ userId });
+    if (attempted === 0 || ok === 0) {
+      console.error('[onboarding] owner packet not delivered; stamp released', { userId, attempted });
+      await userRef.update({ [PACKET_EMAILED_FIELD]: FieldValue.delete() });
+      return false;
+    }
     return true;
   } catch (error) {
     console.error('[onboarding] owner packet failed', { userId, error });
@@ -129,10 +140,16 @@ export async function sendOnboardingPacketOnce(userId: string): Promise<boolean>
   }
 }
 
-/** Activate a ready user and send the single active-account notification. */
+/**
+ * Activate a ready user and send the single active-account notification.
+ * The owner packet is sent here too, unless `deferPacket` is set: then
+ * `packetDue` says whether the caller should send it (routes do so with
+ * after(() => sendOnboardingPacketOnce(userId)) so the response isn't held).
+ */
 export async function activateUser(
-  userId: string
-): Promise<{ alreadyActive: boolean } | null> {
+  userId: string,
+  options: { deferPacket?: boolean } = {}
+): Promise<{ alreadyActive: boolean; packetDue?: boolean } | null> {
   if (!adminDb) throw new Error('Database not configured');
 
   const db = adminDb;
@@ -207,9 +224,9 @@ export async function activateUser(
   // checklist role would get an empty packet, so none is sent. The stamp in
   // sendOnboardingPacketOnce keeps it to one per rep, even across a later
   // deactivate -> reactivate. It never throws.
-  if (fieldRole && roleRequiresOnboarding(fieldRole)) {
-    await sendOnboardingPacketOnce(userId);
-  }
+  const packetDue = !!fieldRole && roleRequiresOnboarding(fieldRole);
+  if (options.deferPacket) return { alreadyActive: false, packetDue };
+  if (packetDue) await sendOnboardingPacketOnce(userId);
 
   return { alreadyActive: false };
 }

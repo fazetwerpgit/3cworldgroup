@@ -35,7 +35,9 @@ const { store, updates, sets, db, dispatchMock, resolveMock, sendPacketMock } = 
       get: async () => get(path),
       update: async (data: Record<string, unknown>) => {
         updates.push({ path, data });
-        store.set(path, { ...(store.get(path) ?? {}), ...data });
+        const next: Record<string, unknown> = { ...(store.get(path) ?? {}), ...data };
+        for (const key of Object.keys(data)) if (data[key] === '__DELETE__') delete next[key];
+        store.set(path, next);
       },
     })),
     collection: vi.fn((name: string) => ({
@@ -62,7 +64,9 @@ const { store, updates, sets, db, dispatchMock, resolveMock, sendPacketMock } = 
     db,
     dispatchMock: vi.fn(async () => undefined),
     resolveMock: vi.fn(async () => undefined),
-    sendPacketMock: vi.fn(async () => undefined),
+    sendPacketMock: vi.fn<(opts: { userId: string }) => Promise<{ attempted: number; ok: number }>>(
+      async () => ({ attempted: 1, ok: 1 })
+    ),
   };
 });
 
@@ -91,7 +95,7 @@ beforeEach(() => {
   sets.length = 0;
   dispatchMock.mockReset();
   resolveMock.mockReset();
-  sendPacketMock.mockReset();
+  sendPacketMock.mockReset().mockResolvedValue({ attempted: 2, ok: 2 });
   reconcileMock.mockClear();
 });
 
@@ -444,6 +448,61 @@ describe('activation side effects', () => {
 
     expect(results.sort()).toEqual([false, true]);
     expect(sendPacketMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['no recipients (or the lookup failed)', { attempted: 0, ok: 0 }],
+    ['every send failed', { attempted: 2, ok: 0 }],
+  ])('releases the stamp when %s, so the next activation path retries', async (_label, tally) => {
+    seedReady('retry-rep');
+    sendPacketMock.mockResolvedValueOnce(tally);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await activateUser('retry-rep');
+    expect(store.get('users/retry-rep')).not.toHaveProperty(PACKET_EMAILED_FIELD);
+
+    await expect(sendOnboardingPacketOnce('retry-rep')).resolves.toBe(true);
+    expect(sendPacketMock).toHaveBeenCalledTimes(2);
+    expect(store.get('users/retry-rep')?.[PACKET_EMAILED_FIELD]).toBe('__SERVER_TS__');
+    errSpy.mockRestore();
+  });
+
+  it('keeps the stamp when only some packet sends failed', async () => {
+    seedReady('partial-rep');
+    sendPacketMock.mockResolvedValueOnce({ attempted: 2, ok: 1 });
+
+    await activateUser('partial-rep');
+    await sendOnboardingPacketOnce('partial-rep');
+
+    expect(sendPacketMock).toHaveBeenCalledTimes(1);
+    expect(store.get('users/partial-rep')?.[PACKET_EMAILED_FIELD]).toBe('__SERVER_TS__');
+  });
+
+  it('with deferPacket, activates and reports the packet due without sending it', async () => {
+    seedReady('deferred-rep');
+
+    await expect(activateUser('deferred-rep', { deferPacket: true })).resolves.toEqual({
+      alreadyActive: false,
+      packetDue: true,
+    });
+
+    expect(store.get('users/deferred-rep')?.status).toBe('active');
+    expect(sendPacketMock).not.toHaveBeenCalled();
+    store.set('users/no-role', { status: 'pending' });
+    await expect(activateUser('no-role', { deferPacket: true })).resolves.toEqual({
+      alreadyActive: false,
+      packetDue: false,
+    });
+  });
+
+  it('activates a demo account but sends it no packet', async () => {
+    seedReady('demo-rep');
+    store.set('users/demo-rep', { ...(store.get('users/demo-rep') ?? {}), demoAccount: true });
+
+    await activateUser('demo-rep');
+
+    expect(store.get('users/demo-rep')?.status).toBe('active');
+    expect(sendPacketMock).not.toHaveBeenCalled();
   });
 
   it('activates a test account but sends it no packet', async () => {

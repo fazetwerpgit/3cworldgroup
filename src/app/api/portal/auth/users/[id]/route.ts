@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { DISPLAY_NAME_TAKEN_ERROR, displayNameKey, isDisplayNameTaken } from '@/lib/users/displayNameTaken';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
@@ -536,9 +536,10 @@ export async function PUT(
     }
 
     // Accepting a checklist hire here activates them without activateUser, so
-    // the owner packet goes out from here; the stamp keeps it to one per rep.
+    // the owner packet goes out from here, after the response (the status
+    // write above is committed); the stamp keeps it to one per rep.
     if (becomingActive && resultingFieldRole && roleRequiresOnboarding(resultingFieldRole)) {
-      await sendOnboardingPacketOnce(id);
+      after(() => sendOnboardingPacketOnce(id));
     }
 
     // Chat channel memberIds gate the Firestore reads and pushes, so a role or

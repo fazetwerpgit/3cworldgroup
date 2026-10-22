@@ -167,6 +167,8 @@ describe('PUT /api/portal/auth/users/[id] activation readiness gate', () => {
     const response = await PUT(request({ status: 'active' }), params());
 
     expect(response.status).toBe(200);
+    // Deferred past the response via after().
+    expect(after).toHaveBeenCalledOnce();
     expect(packetOnceMock).toHaveBeenCalledTimes(1);
     expect(packetOnceMock).toHaveBeenCalledWith('pending-user');
   });
