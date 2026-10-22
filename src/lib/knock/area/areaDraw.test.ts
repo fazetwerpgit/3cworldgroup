@@ -38,6 +38,7 @@ function lassoPointInPolygon(p: LatLng, polygon: readonly LatLng[]): boolean {
   return winding !== 0;
 }
 import type { House } from './types';
+import { areaDoorId } from './areaImport';
 
 // Synthetic records only (made-up parcel ids, streets and owners).
 
@@ -325,5 +326,67 @@ describe('areaDraw remove', () => {
     );
     assert.deepEqual(removable, ['a']);
     assert.deepEqual(kept, ['b', 'c']);
+  });
+});
+
+describe('areaHomes / markInCampaign / areaImportDocs: multi-state record ids', () => {
+  // Florida ids start with a digit; Cook and Los Angeles ids carry `<state>-<county>-`. Made-up
+  // PINs / AINs at one test spot so a single polygon holds all three kinds.
+  const records: ParcelTileRecord[] = [
+    rec(1),
+    rec(2, { id: 'il-cook-17060000010000', address: '102 TEST ST' }),
+    rec(3, { id: 'ca-los-angeles-5070000001', address: '103 TEST ST', owner: '' }),
+    // A Cook condo building (3 units, one without a name) and a Los Angeles one (no names at all).
+    rec(4, { id: 'il-cook-17060000031002', address: '500 BAY ST 2', use: '004', owner: 'UNIT B OWNER' }),
+    rec(4, { id: 'il-cook-17060000031001', address: '500 BAY ST 1', use: '004', owner: 'UNIT A OWNER' }),
+    rec(4, { id: 'il-cook-17060000031003', address: '500 BAY ST G', use: '004', owner: '' }),
+    rec(5, { id: 'ca-los-angeles-5070000102', address: '300 S SAMPLE ST 8', use: '004', owner: '' }),
+    rec(5, { id: 'ca-los-angeles-5070000101', address: '300 S SAMPLE ST 7', use: '004', owner: '' }),
+    // The same Cook record from two tiles (a cell on a county line): used once.
+    rec(2, { id: 'il-cook-17060000010000', address: '102 TEST ST' }),
+  ];
+  const homes = areaHomes(records, SQUARE, 'solar');
+
+  test('door ids follow the record id; no two collide', () => {
+    assert.deepEqual(
+      homes.map((h) => h.id),
+      [
+        'solar__area-99-0001',
+        'solar__area-ca-los-angeles-5070000001',
+        'solar__area-il-cook-17060000010000',
+        'solar__area-mdu-ca-los-angeles-5070000101',
+        'solar__area-mdu-il-cook-17060000031001',
+      ],
+    );
+    assert.equal(new Set(homes.map((h) => h.id)).size, homes.length);
+    assert.equal(areaDoorId('solar', 'il-cook-14053060201005'), 'solar__area-il-cook-14053060201005');
+  });
+
+  test('owner names are optional: Los Angeles doors and units have none', () => {
+    const byId = (id: string) => homes.find((h) => h.id === id) as AreaHome;
+    assert.equal(byId('solar__area-ca-los-angeles-5070000001').ownerName, null);
+    assert.equal(byId('solar__area-il-cook-17060000010000').ownerName, 'Owner Number 2');
+    const cook = byId('solar__area-mdu-il-cook-17060000031001');
+    assert.deepEqual(cook.unitOrder, ['1', '2', 'G']);
+    assert.deepEqual(cook.unitOwnerNames, { '1': 'Unit A Owner', '2': 'Unit B Owner' });
+    const la = byId('solar__area-mdu-ca-los-angeles-5070000101');
+    assert.deepEqual(la.unitOrder, ['7', '8']);
+    assert.deepEqual(la.unitOwnerNames, {});
+    const { houses } = areaImportDocs(homes, OFF, { campaignId: 'solar', areaImportId: 'ai_x', now: 1, existingPacks: [] });
+    const doc = (id: string) => houses.find((h) => h.id === id) as unknown as Record<string, unknown>;
+    assert.equal('ownerName' in doc('solar__area-ca-los-angeles-5070000001'), false);
+    assert.equal('unitOwnerNames' in doc('solar__area-mdu-ca-los-angeles-5070000101'), false);
+    assert.equal(doc('solar__area-il-cook-17060000010000').ownerName, 'Owner Number 2');
+  });
+
+  test('already in campaign works by the new ids, and a re-import is all duplicates', () => {
+    const marked = markInCampaign(homes, [existing('solar__area-il-cook-17060000010000'), existing('solar__area-mdu-ca-los-angeles-5070000101')], 'solar');
+    assert.deepEqual(
+      marked.filter((h) => h.inCampaign).map((h) => h.id),
+      ['solar__area-il-cook-17060000010000', 'solar__area-mdu-ca-los-angeles-5070000101'],
+    );
+    const { houses } = areaImportDocs(homes, OFF, { campaignId: 'solar', areaImportId: 'ai_x', now: 1, existingPacks: [] });
+    const again = markInCampaign(areaHomes(records, SQUARE, 'solar'), houses, 'solar');
+    assert.equal(again.every((h) => h.inCampaign), true);
   });
 });

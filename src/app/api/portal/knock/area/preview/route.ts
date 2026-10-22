@@ -13,6 +13,9 @@ import {
   readJsonObject,
 } from '@/lib/knock/area/server';
 
+// A dense area (Chicago) can read several large tiles; the target stays ~1.5 s, this is the ceiling.
+export const maxDuration = 30;
+
 // POST /api/portal/knock/area/preview (3c-knock docs/AREA_IMPORT_API.md section 2).
 // Body: { campaignId, polygon: LatLng[], housesOnly, ownerOccupiedOnly }
 // -> 200 { campaignId, counts, homes: PreviewHome[], sources, maxHomes }. Writes nothing.

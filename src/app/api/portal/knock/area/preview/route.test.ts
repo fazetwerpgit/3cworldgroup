@@ -16,16 +16,24 @@ import { tilePath } from '@/lib/knock/area/parcelTiles';
 import { geohashEncode } from '@/lib/knock/area/geohash';
 import type { FakeKnockDb } from '@/lib/knock/area/testing/fakeKnockDb';
 import {
+  CA_LAT,
+  CA_LNG,
+  IL_LAT,
+  IL_LNG,
   LAT,
   LNG,
   MANAGER,
   OWNER,
+  REAL_STATE_BOXES,
   REP,
   SQUARE,
+  buildMultiStateFiles,
   buildTileFiles,
   createFakeStorage,
   postReq,
   rec,
+  squareAt,
+  statesFile,
 } from '@/lib/knock/area/testing/fixtures';
 
 const db = adminDb as unknown as FakeKnockDb;
@@ -121,7 +129,7 @@ describe('POST /api/portal/knock/area/preview: homes', () => {
     expect(r.status).toBe(200);
     expect(r.json.campaignId).toBe('solar');
     expect(r.json.maxHomes).toBe(2000);
-    expect(r.json.sources).toEqual([{ county: 'duval', roll: '2026F' }]);
+    expect(r.json.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F' }]);
     expect(r.json.counts).toEqual({ inside: 6, add: 3, skipRented: 1, skipType: 2, alreadyInCampaign: 0 });
     const ids = r.json.homes.map((h: { id: string }) => h.id);
     expect(ids).toEqual([...ids].sort());
@@ -213,7 +221,7 @@ describe('POST /api/portal/knock/area/preview: homes', () => {
     for (const [k, v] of files) storage.files.set(k, v);
     const r = await call(body(OFF));
     expect(r.json.counts.inside).toBe(7);
-    expect(r.json.sources).toEqual([{ county: 'clay', roll: '2026P' }, { county: 'duval', roll: '2026F' }]);
+    expect(r.json.sources).toEqual([{ state: 'fl', county: 'clay', roll: '2026P' }, { state: 'fl', county: 'duval', roll: '2026F' }]);
   });
 });
 
@@ -254,5 +262,75 @@ describe('POST /api/portal/knock/area/preview: 422 and 503', () => {
     resetTileCaches();
     storage.files.delete(tilePath('fl', 'duval', gh));
     expect((await call(body())).status).toBe(503);
+  });
+});
+
+describe('POST /api/portal/knock/area/preview: Illinois and California tiles', () => {
+  const multi = (withStates = true) => {
+    storage.files.clear();
+    for (const [k, v] of buildMultiStateFiles()) storage.files.set(k, v);
+    if (withStates) storage.files.set(...statesFile(REAL_STATE_BOXES));
+  };
+
+  it('a Cook polygon: Cook doors with state in sources, the estimated owner-occupied flag as is', async () => {
+    multi();
+    const r = await call(body({ polygon: squareAt(IL_LAT, IL_LNG), ...OFF }));
+    expect(r.status).toBe(200);
+    expect(r.json.sources).toEqual([{ state: 'il', county: 'cook', roll: '2026' }]);
+    expect(r.json.homes.map((h: { id: string }) => h.id)).toEqual([
+      areaDoorId('solar', 'il-cook-17060000010000'),
+      areaDoorId('solar', 'il-cook-17060000020000'),
+      areaDoorId('solar', 'il-cook-17060000031001', true),
+    ]);
+    const flat = r.json.homes.find((h: { id: string }) => h.id === areaDoorId('solar', 'il-cook-17060000020000'));
+    expect(flat).toMatchObject({ address: '1202 N Test Ave', city: 'Chicago', propertyType: 'multi-family', homestead: false, ownerName: 'Flat Holdings LLC' });
+    const condo = r.json.homes.find((h: { unitOrder: string[] | null }) => h.unitOrder);
+    expect(condo).toMatchObject({ address: '5876 N Sample Ave', unitOrder: ['1', '2', 'G'], unitOwnerNames: { '1': 'Unit A Owner', '2': 'Unit B Owner' }, homestead: true });
+    expect(storage.downloads).not.toContain('parcels/fl/index.json');
+    const on = await call(body({ polygon: squareAt(IL_LAT, IL_LNG) }));
+    expect(on.json.counts).toEqual({ inside: 3, add: 1, skipRented: 0, skipType: 2, alreadyInCampaign: 0 });
+  });
+
+  it('a Los Angeles polygon: doors without owner names', async () => {
+    multi();
+    const r = await call(body({ polygon: squareAt(CA_LAT, CA_LNG), ...OFF }));
+    expect(r.status).toBe(200);
+    expect(r.json.sources).toEqual([{ state: 'ca', county: 'los-angeles', roll: '2026' }]);
+    expect(r.json.counts).toEqual({ inside: 3, add: 3, skipRented: 0, skipType: 0, alreadyInCampaign: 0 });
+    for (const h of r.json.homes) expect(h.ownerName).toBeNull();
+    expect(r.json.homes.find((h: { unitOrder: string[] | null }) => h.unitOrder)).toMatchObject({ unitOrder: ['7', '8'], unitOwnerNames: {} });
+    expect(r.json.homes.find((h: { address: string }) => h.address === '2212 1/2 Test Blvd')).toMatchObject({ homestead: false });
+  });
+
+  it('a Florida polygon is unchanged with states.json present', async () => {
+    multi();
+    const r = await call(body());
+    expect(r.json.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F' }]);
+    expect(r.json.counts).toEqual({ inside: 6, add: 3, skipRented: 1, skipType: 2, alreadyInCampaign: 0 });
+  });
+
+  it('marks a Cook door already in the campaign by its id', async () => {
+    multi();
+    db.seed('houses', {
+      [areaDoorId('solar', 'il-cook-17060000010000')]: { campaignId: 'solar', address: 'Elsewhere', city: 'Chicago', lat: IL_LAT + 0.004, lng: IL_LNG, packId: 'p', packName: 'P' },
+    });
+    const r = await call(body({ polygon: squareAt(IL_LAT, IL_LNG), ...OFF }));
+    expect(r.json.counts.alreadyInCampaign).toBe(1);
+    expect(r.json.homes.find((h: { id: string }) => h.id === areaDoorId('solar', 'il-cook-17060000010000')).status).toBe('already-in-campaign');
+  });
+
+  it('422 no_data_for_area: a Cook polygon before states.json exists, or where no picked state has a tile', async () => {
+    multi(false);
+    expect(await call(body({ polygon: squareAt(IL_LAT, IL_LNG) }))).toEqual({ status: 422, json: { error: 'no_data_for_area' } });
+    resetTileCaches();
+    multi();
+    expect(await call(body({ polygon: squareAt(41.5, -88.2) }))).toEqual({ status: 422, json: { error: 'no_data_for_area' } });
+    expect(await call(body({ polygon: squareAt(40, -100) }))).toEqual({ status: 422, json: { error: 'no_data_for_area' } });
+  });
+
+  it('503 tiles_unavailable when a picked state has no index', async () => {
+    multi();
+    storage.files.delete('parcels/ca/index.json');
+    expect(await call(body({ polygon: squareAt(CA_LAT, CA_LNG) }))).toEqual({ status: 503, json: { error: 'tiles_unavailable' } });
   });
 });

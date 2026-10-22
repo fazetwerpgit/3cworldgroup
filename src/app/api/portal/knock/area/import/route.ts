@@ -9,7 +9,7 @@ import {
   type AreaPreviewCounts,
   type LatLng,
 } from '@/lib/knock/area/areaDraw';
-import { TilesUnavailableError } from '@/lib/knock/area/tiles';
+import { TilesUnavailableError, type AreaSource } from '@/lib/knock/area/tiles';
 import {
   AreaFailure,
   IMPORT_RETRY_AFTER_MS,
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
     // over); on a resume it puts startedAt back so the next retry resumes at once.
     let counts: AreaPreviewCounts;
     let packs: AreaPackCount[];
-    let sources: { county: string; roll: string }[];
+    let sources: AreaSource[];
     let houses: ({ id: string } & Record<string, unknown>)[];
     let plan: AreaPlan | null = null;
     try {

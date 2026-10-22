@@ -16,7 +16,7 @@ import {
 } from './areaDraw';
 import { geohashesCoveringBox } from './geohash';
 import { TILE_PRECISION } from './parcelTiles';
-import { loadAreaTileRecords } from './tiles';
+import { loadAreaTileRecords, type AreaSource } from './tiles';
 import type { House } from './types';
 
 // Shared pieces of the knock area routes (/api/portal/knock/area/{preview,import,list,remove}),
@@ -128,7 +128,8 @@ export async function campaignAccess(
 export interface AreaPlan {
   /** Every door inside the polygon, `inCampaign` set, sorted by id. */
   homes: AreaHome[];
-  sources: { county: string; roll: string }[];
+  /** The tiles read: one entry per state + county + roll. */
+  sources: AreaSource[];
   /** The campaign's doors inside the polygon's box padded by AREA_EXISTING_PAD_DEG. */
   existing: House[];
 }
@@ -157,13 +158,15 @@ async function existingDoorsNear(db: Firestore, campaignId: string, polygon: rea
 
 /**
  * Section 1 "Finding the homes inside a polygon": the cells (422 too_big, inside null), the tiles
- * and the campaign's nearby doors in parallel (503 tiles_unavailable, 422 no_data_for_area), the
- * doors inside (422 too_big with the count), marked against the campaign. Throws AreaFailure.
+ * of every state under it and the campaign's nearby doors in parallel (503 tiles_unavailable;
+ * 422 no_data_for_area when no picked state has a cell), the doors inside (422 too_big with the
+ * count), marked against the campaign. Throws AreaFailure.
  */
 export async function planArea(db: Firestore, campaignId: string, polygon: readonly LatLng[]): Promise<AreaPlan> {
-  const cells = geohashesCoveringBox(polygonBox(polygon), TILE_PRECISION, AREA_MAX_CELLS);
+  const box = polygonBox(polygon);
+  const cells = geohashesCoveringBox(box, TILE_PRECISION, AREA_MAX_CELLS);
   if (!cells) throw new AreaFailure(422, 'too_big', { inside: null, max: AREA_MAX_HOMES });
-  const [tiles, existing] = await Promise.all([loadAreaTileRecords(cells), existingDoorsNear(db, campaignId, polygon)]);
+  const [tiles, existing] = await Promise.all([loadAreaTileRecords(cells, box), existingDoorsNear(db, campaignId, polygon)]);
   if (!tiles.indexed) throw new AreaFailure(422, 'no_data_for_area');
   const inside = areaHomes(tiles.records, polygon, campaignId);
   if (inside.length > AREA_MAX_HOMES) throw new AreaFailure(422, 'too_big', { inside: inside.length, max: AREA_MAX_HOMES });

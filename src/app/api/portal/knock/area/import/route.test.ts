@@ -12,7 +12,25 @@ import { requireVerifiedKnockCaller } from '@/lib/auth/requireVerifiedAdmin';
 import { resetTileCaches } from '@/lib/knock/area/tiles';
 import { areaDoorId } from '@/lib/knock/area/areaImport';
 import type { FakeKnockDb } from '@/lib/knock/area/testing/fakeKnockDb';
-import { LAT, LNG, MANAGER, OWNER, REP, SQUARE, buildTileFiles, createFakeStorage, postReq } from '@/lib/knock/area/testing/fixtures';
+import {
+  CA_LAT,
+  CA_LNG,
+  IL_LAT,
+  IL_LNG,
+  LAT,
+  LNG,
+  MANAGER,
+  OWNER,
+  REAL_STATE_BOXES,
+  REP,
+  SQUARE,
+  buildMultiStateFiles,
+  buildTileFiles,
+  createFakeStorage,
+  postReq,
+  squareAt,
+  statesFile,
+} from '@/lib/knock/area/testing/fixtures';
 
 const db = adminDb as unknown as FakeKnockDb;
 const storage = adminStorage as unknown as ReturnType<typeof createFakeStorage>;
@@ -35,6 +53,8 @@ beforeEach(() => {
   db.store.clear();
   db.queries.length = 0;
   db.failNext.clear();
+  // A test below swaps failNext.get for one id; put the Map's own method back.
+  delete (db.failNext as unknown as { get?: unknown }).get;
   db.seed('campaigns', { solar: { name: 'Solar', type: 'solar' }, fiber: { name: 'Fiber', type: 'fiber' } });
   storage.files.clear();
   storage.setFailing(false);
@@ -145,7 +165,7 @@ describe('POST /api/portal/knock/area/import: writing', () => {
       doorCount: 3,
       createdBy: 'own',
       createdByName: 'Olive Owner',
-      sources: [{ county: 'duval', roll: '2026F' }],
+      sources: [{ state: 'fl', county: 'duval', roll: '2026F' }],
       result: { ...r.json, duplicate: false },
       removedAt: null,
     });
@@ -289,5 +309,42 @@ describe('POST /api/portal/knock/area/import: idempotency', () => {
     const r = await call(body());
     expect(r).toEqual({ status: 500, json: { error: 'internal' } });
     expect(record()!.status).toBe('writing');
+  });
+});
+
+describe('POST /api/portal/knock/area/import: Illinois and California tiles', () => {
+  beforeEach(() => {
+    storage.files.clear();
+    for (const [k, v] of buildMultiStateFiles()) storage.files.set(k, v);
+    storage.files.set(...statesFile(REAL_STATE_BOXES));
+  });
+
+  it('imports Los Angeles doors without owner names; sources carry the state', async () => {
+    const r = await call(body({ requestId: 'la-1', polygon: squareAt(CA_LAT, CA_LNG), ...OFF }));
+    expect(r.status).toBe(200);
+    expect(r.json.added).toBe(3);
+    const door = houses().get(areaDoorId('solar', 'ca-los-angeles-5070000001'))!;
+    expect(door).toMatchObject({ address: '2212 Test Blvd', city: 'Los Angeles', areaImportId: 'ai_la-1', useType: '001', homestead: true });
+    expect(door).not.toHaveProperty('ownerName');
+    const mdu = houses().get(areaDoorId('solar', 'ca-los-angeles-5070000101', true))!;
+    expect(mdu).toMatchObject({ unitOrder: ['7', '8'], propertyType: 'condo' });
+    expect(mdu).not.toHaveProperty('unitOwnerNames');
+    expect(record('ai_la-1')).toMatchObject({ status: 'done', sources: [{ state: 'ca', county: 'los-angeles', roll: '2026' }] });
+  });
+
+  it('imports Cook doors by PIN ids; a second Cook import of the same area is nothing_to_add', async () => {
+    const r = await call(body({ requestId: 'il-1', polygon: squareAt(IL_LAT, IL_LNG), ...OFF }));
+    expect(r.json.added).toBe(3);
+    expect(houses().get(areaDoorId('solar', 'il-cook-17060000010000'))).toMatchObject({ ownerName: 'Pat Sample', ownerOccupied: true });
+    expect(houses().get(areaDoorId('solar', 'il-cook-17060000020000'))).toMatchObject({ ownerOccupied: false, propertyType: 'multi-family' });
+    expect(record('ai_il-1')).toMatchObject({ sources: [{ state: 'il', county: 'cook', roll: '2026' }] });
+    const again = await call(body({ requestId: 'il-2', polygon: squareAt(IL_LAT, IL_LNG), ...OFF }));
+    expect(again).toMatchObject({ status: 422, json: { error: 'nothing_to_add', counts: { inside: 3, alreadyInCampaign: 3 } } });
+  });
+
+  it('a Florida import next to them is unchanged', async () => {
+    const r = await call(body());
+    expect(r).toMatchObject({ status: 200, json: { added: 3 } });
+    expect(record()).toMatchObject({ sources: [{ state: 'fl', county: 'duval', roll: '2026F' }] });
   });
 });
