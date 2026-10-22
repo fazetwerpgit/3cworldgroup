@@ -33,6 +33,7 @@ const ACCOUNTS = [
   { key: 'rep', email: 'jacobmyers692+chompen-rep@gmail.com', displayName: 'Test Rep', fieldRole: 'ae_tier_1', reportsTo: 'mgr' },
   { key: 'setter', email: 'jacobmyers692+chompen-setter@gmail.com', displayName: 'Test Setter', solarRole: 'entry_canvasser' },
   { key: 'closer', email: 'jacobmyers692+chompen-closer@gmail.com', displayName: 'Test Closer', solarRole: 'canvass_closer' },
+  { key: 'owner', email: 'jacobmyers692+chompen-owner@gmail.com', displayName: 'Test Owner', role: 'owner' },
 ];
 
 const argv = process.argv.slice(2);
@@ -133,6 +134,7 @@ for (const account of ACCOUNTS) {
     displayName: account.displayName,
     status: 'active',
     // Approval fields.
+    ...(account.role ? { role: account.role } : {}),
     ...(account.fieldRole ? { fieldRole: account.fieldRole } : {}),
     ...(account.solarRole ? { solarRole: account.solarRole } : {}),
     ...(account.reportsTo ? { managerId: managerUid ?? null, reportsToId: managerUid ?? null } : {}),
@@ -145,7 +147,11 @@ for (const account of ACCOUNTS) {
 
   if (apply) await docRef.set(doc, { merge: true });
 
-  const roleText = account.fieldRole ? `fieldRole ${account.fieldRole}` : `solarRole ${account.solarRole}`;
+  const roleText = account.role
+    ? `role ${account.role}`
+    : account.fieldRole
+      ? `fieldRole ${account.fieldRole}`
+      : `solarRole ${account.solarRole}`;
   const managerText = account.reportsTo ? `, reports to ${short(managerUid)}` : '';
   console.log(`${short(uid)}  ${account.email}  ${roleText}${managerText}  [${action}${existingDoc?.exists ? ', doc exists' : ''}]`);
 }
