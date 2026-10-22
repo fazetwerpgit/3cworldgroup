@@ -1,8 +1,10 @@
 /**
  * Parcel tiles for the drawn-area import (docs/AREA_IMPORT_API.md "Tiles"): every home of a
  * county's tax roll, split by the geohash-5 cell of its point, one gzipped JSON file per cell:
- * `parcels/fl/<county>/<geohash5>.json.gz`. scripts/build-parcel-tiles.ts builds them from the FDOR
- * NAL file + parcel shapefile; the portal reads them to preview and import a drawn area.
+ * `parcels/<state>/<county>/<geohash5>.json.gz`, a per-state index `parcels/<state>/index.json` and
+ * the list of states `parcels/states.json`. scripts/build-parcel-tiles.ts builds them (Florida: the
+ * FDOR NAL file + parcel shapefile; other states: parcelSources.ts); the portal reads them to preview
+ * and import a drawn area.
  *
  * Pure (no Node, React Native or Firebase imports): the portal can copy this file with
  * geohash.ts, areaImport.ts and leadImport.ts.
@@ -30,6 +32,19 @@ export const FL_COUNTY_NUMBERS: Readonly<Record<string, string>> = Object.fromEn
   ].map((slug, i) => [slug, String(11 + i)]),
 );
 
+/**
+ * The parcel id column of a parcel shapefile's .dbf, from its field names (any case), or null:
+ * PARCELNO in FDOR's PIN maps, else PARCEL_ID / PARCELID, else FOLIO (Miami-Dade's condo-unit
+ * points, whose FOLIO is the roll's PARCEL_ID). Returns the name as the file spells it.
+ */
+export function parcelIdColumn(fieldNames: readonly string[]): string | null {
+  for (const want of ['PARCELNO', 'PARCEL_ID', 'PARCELID', 'FOLIO']) {
+    const hit = fieldNames.find((f) => f.trim().toUpperCase() === want);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 /** A county name as a tile path slug: "St. Johns" -> "st-johns", "Miami-Dade" -> "miami-dade". */
 export function countySlug(name: string): string {
   return name
@@ -48,10 +63,15 @@ export function countyManifestPath(state: string, county: string): string {
 export function parcelIndexPath(state: string): string {
   return `parcels/${state}/index.json`;
 }
+/** The list of tiled states (`ParcelStates`). */
+export const PARCEL_STATES_PATH = 'parcels/states.json';
 
 /** One home in a tile. */
 export interface ParcelTileRecord {
-  /** `<CO_NO>-<PARCEL_ID>` ("26-1272000000R"): unique statewide. */
+  /**
+   * Unique nationwide. Florida: `<CO_NO>-<PARCEL_ID>` ("26-1272000000R", starts with a digit); other
+   * states: `<state>-<county>-<parcel id>` ("il-cook-14053060201005", parcelSources.ts `stateRecordId`).
+   */
   id: string;
   /** Parcel polygon centroid, 6 decimals (WGS84 within ~1 m). */
   lat: number;
@@ -64,9 +84,9 @@ export interface ParcelTileRecord {
   zip: string;
   /** DOR use code: '001' single family, '002' mobile home, '004' condo, '008' multi-family 2-9 units. */
   use: AreaUseCode;
-  /** Homestead exemption: the owner lives there. */
+  /** The owner lives there: Florida homestead, California homeowners' exemption, Cook (IL) mailing-address estimate (`CountyFields`). */
   homestead: boolean;
-  /** First owner name as on the roll (`OWN_NAME`, upper case, spaces collapsed; '' when none). */
+  /** Owner name as on the roll (FL `OWN_NAME`; upper case, spaces collapsed; '' when none, e.g. Los Angeles without the purchased file). */
   owner: string;
 }
 
@@ -74,7 +94,7 @@ export interface ParcelTile {
   v: typeof TILE_FORMAT_VERSION;
   state: string;
   county: string;
-  /** FDOR county number, two digits ("26"). */
+  /** FDOR county number, two digits ("26"); outside Florida the 3-digit county FIPS ("031"). */
   countyNo: string;
   geohash: string;
   /** Tax roll the records come from ("2026F": final 2026 NAL). */
@@ -83,6 +103,17 @@ export interface ParcelTile {
   builtAt: string;
   /** Sorted by `id`. */
   records: ParcelTileRecord[];
+}
+
+/**
+ * What a county's `homestead` and `owner` mean, when it is not Florida's default (absent =
+ * `{ ownerOccupied: 'exemption', ownerNames: true }`).
+ */
+export interface CountyFields {
+  /** 'exemption': a homestead / homeowners' exemption on the roll; 'mailing-match': ESTIMATE, the tax-bill mailing address is the property address. */
+  ownerOccupied: 'exemption' | 'mailing-match';
+  /** Records carry owner names (false: `owner` is ''). */
+  ownerNames: boolean;
 }
 
 export interface CountyManifest {
@@ -97,6 +128,8 @@ export interface CountyManifest {
   /** Records per tile, by geohash (sorted). */
   tiles: Record<string, number>;
   bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number } | null;
+  /** Only outside Florida's default meaning (see `CountyFields`). */
+  fields?: CountyFields;
 }
 
 /** Which counties have a tile for each cell (a cell on a county line has two or more). */
@@ -104,8 +137,18 @@ export interface ParcelIndex {
   v: typeof TILE_FORMAT_VERSION;
   state: string;
   builtAt: string;
-  counties: Record<string, { countyNo: string; roll: string; builtAt: string; homes: number; tiles: number }>;
+  counties: Record<string, { countyNo: string; roll: string; builtAt: string; homes: number; tiles: number; fields?: CountyFields }>;
   cells: Record<string, string[]>;
+}
+
+/**
+ * Which states have tiles (`parcels/states.json`): the reader loads the index of each state whose
+ * box overlaps the drawn polygon's box. Built from every state's county manifests.
+ */
+export interface ParcelStates {
+  v: typeof TILE_FORMAT_VERSION;
+  builtAt: string;
+  states: Record<string, { builtAt: string; counties: number; homes: number; bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number } | null }>;
 }
 
 /** Why a roll row is not in any tile. */
@@ -151,8 +194,9 @@ export interface CountyTileBuild {
 /** All tiles of one county from its roll rows (row + `OWN_NAME`). */
 export function buildCountyTiles(
   rows: readonly { row: ParcelRow; owner: string }[],
-  meta: { state: string; county: string; countyNo: string; roll: string; builtAt: string },
+  meta: { state: string; county: string; countyNo: string; roll: string; builtAt: string; fields?: CountyFields },
 ): CountyTileBuild {
+  const { fields, ...tileMeta } = meta;
   const skipped: Record<TileSkipReason, number> = { 'not-home': 0, 'no-street-number': 0, 'no-coordinates': 0, repeated: 0 };
   const byUse: Record<AreaUseCode, number> = { '001': 0, '002': 0, '004': 0, '008': 0 };
   const seen = new Set<string>();
@@ -185,12 +229,12 @@ export function buildCountyTiles(
   const tiles = [...cells.keys()].sort().map(
     (geohash): ParcelTile => ({
       v: TILE_FORMAT_VERSION,
-      state: meta.state,
-      county: meta.county,
-      countyNo: meta.countyNo,
+      state: tileMeta.state,
+      county: tileMeta.county,
+      countyNo: tileMeta.countyNo,
       geohash,
-      roll: meta.roll,
-      builtAt: meta.builtAt,
+      roll: tileMeta.roll,
+      builtAt: tileMeta.builtAt,
       records: (cells.get(geohash) as ParcelTileRecord[]).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
     }),
   );
@@ -198,10 +242,11 @@ export function buildCountyTiles(
     tiles,
     manifest: {
       v: TILE_FORMAT_VERSION,
-      ...meta,
+      ...tileMeta,
       homes: seen.size,
       tiles: Object.fromEntries(tiles.map((t) => [t.geohash, t.records.length])),
       bbox,
+      ...(fields ? { fields } : {}),
     },
     rows: rows.length,
     skipped,
@@ -217,7 +262,7 @@ export function mergeParcelIndex(state: string, manifests: readonly CountyManife
   const cells = new Map<string, string[]>();
   for (const m of [...manifests].sort((a, b) => (a.county < b.county ? -1 : 1))) {
     if (m.state !== state) continue;
-    counties[m.county] = { countyNo: m.countyNo, roll: m.roll, builtAt: m.builtAt, homes: m.homes, tiles: Object.keys(m.tiles).length };
+    counties[m.county] = { countyNo: m.countyNo, roll: m.roll, builtAt: m.builtAt, homes: m.homes, tiles: Object.keys(m.tiles).length, ...(m.fields ? { fields: m.fields } : {}) };
     for (const gh of Object.keys(m.tiles)) {
       const list = cells.get(gh);
       if (list) list.push(m.county);
@@ -231,6 +276,24 @@ export function mergeParcelIndex(state: string, manifests: readonly CountyManife
     counties,
     cells: Object.fromEntries([...cells.keys()].sort().map((gh) => [gh, (cells.get(gh) as string[]).sort()])),
   };
+}
+
+/** `parcels/states.json` from every state's county manifests (states sorted). */
+export function mergeParcelStates(manifests: readonly CountyManifest[], builtAt: string): ParcelStates {
+  const states: ParcelStates['states'] = {};
+  for (const m of [...manifests].sort((a, b) => (a.state < b.state ? -1 : a.state > b.state ? 1 : 0))) {
+    const s = states[m.state] ?? { builtAt: m.builtAt, counties: 0, homes: 0, bbox: null };
+    s.counties++;
+    s.homes += m.homes;
+    if (m.builtAt > s.builtAt) s.builtAt = m.builtAt;
+    if (m.bbox) {
+      s.bbox = s.bbox
+        ? { minLat: Math.min(s.bbox.minLat, m.bbox.minLat), minLng: Math.min(s.bbox.minLng, m.bbox.minLng), maxLat: Math.max(s.bbox.maxLat, m.bbox.maxLat), maxLng: Math.max(s.bbox.maxLng, m.bbox.maxLng) }
+        : { ...m.bbox };
+    }
+    states[m.state] = s;
+  }
+  return { v: TILE_FORMAT_VERSION, builtAt, states };
 }
 
 const USE_CODES = new Set(Object.keys(AREA_PROPERTY_TYPES));
