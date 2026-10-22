@@ -111,6 +111,11 @@ async function loadStates(now: number): Promise<StateBoxes | null> {
     if (!json || typeof json !== 'object' || !json.states || typeof json.states !== 'object' || Array.isArray(json.states)) {
       throw new TilesUnavailableError('Not a parcel states list');
     }
+    // Florida is live: a states.json without a usable FL box would quietly turn every FL request
+    // into no_data. Fail as 503 instead (not cached, so the next request reads it again).
+    if (!isBox(json.states.fl?.bbox)) {
+      throw new TilesUnavailableError('states.json lacks fl (or its bbox)');
+    }
     states = json.states;
   }
   statesCache = { states, at: now };

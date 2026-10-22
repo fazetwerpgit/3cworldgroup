@@ -129,6 +129,21 @@ describe('loadAreaTileRecords: states', () => {
     await expect(load()).rejects.toBeInstanceOf(TilesUnavailableError);
   });
 
+  it('states.json without a usable Florida box is 503 and not cached', async () => {
+    storage.files.set(...statesFile({ ca: REAL_STATE_BOXES.ca, il: REAL_STATE_BOXES.il }));
+    await expect(load()).rejects.toThrow(TilesUnavailableError);
+    await expect(load()).rejects.toThrow(/lacks fl/);
+    storage.files.set(...statesFile({ ...REAL_STATE_BOXES, fl: { ...REAL_STATE_BOXES.fl, maxLat: NaN } }));
+    await expect(load()).rejects.toBeInstanceOf(TilesUnavailableError);
+    storage.files.set(PARCEL_STATES_PATH, Buffer.from(JSON.stringify({ v: 1, builtAt: '', states: { ...REAL, fl: { builtAt: '', counties: 1, homes: 1 } } })));
+    await expect(load()).rejects.toBeInstanceOf(TilesUnavailableError);
+    // Fixed states.json: the very next request (no cache reset) succeeds.
+    storage.files.set(...statesFile(REAL_STATE_BOXES));
+    const result = await load();
+    expect(result.indexed).toBe(true);
+    expect(result.records.length).toBeGreaterThan(0);
+  });
+
   it('Storage down while reading states.json is 503, never the Florida fallback', async () => {
     storage.setFailing(true);
     await expect(load()).rejects.toBeInstanceOf(TilesUnavailableError);
