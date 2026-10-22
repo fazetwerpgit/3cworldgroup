@@ -136,6 +136,8 @@ vi.mock('@/lib/onboarding/sensitiveFields', () => ({
   buildSensitiveDoc: vi.fn(() => ({ ok: true, doc: { dlNumberEncrypted: 'enc', dlLast4: '4567' } })),
 }));
 vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendPendingEsignDocsMock }));
+const notifySubmittedMock = vi.hoisted(() => vi.fn<(opts: Record<string, unknown>) => Promise<void>>(async () => undefined));
+vi.mock('@/lib/onboarding/ownerNotify', () => ({ notifyOnboardingSubmitted: notifySubmittedMock }));
 
 import { NextRequest } from 'next/server';
 import { getOnboardingItemsForUser, requiresHeavyVetting } from '@/types';
@@ -555,6 +557,32 @@ describe('POST /api/public/onboarding/[token]', () => {
       { merge: true }
     );
     expect(batchCommitMock).toHaveBeenCalled();
+    // The owners get one "submitted onboarding" alert for the new hire.
+    expect(notifySubmittedMock).toHaveBeenCalledTimes(1);
+    expect(notifySubmittedMock).toHaveBeenCalledWith({
+      userId: 'user-1',
+      user: expect.objectContaining({ displayName: 'Candidate', fieldRole: 'entry_level_rep' }),
+      submittedAt: expect.any(Date),
+    });
+  });
+
+  it('keeps a claimed test account silent and alerts nobody on a refused or repeat submit', async () => {
+    const headers = signedInAs('qa-user');
+    getUserByEmailMock.mockResolvedValue({ uid: 'qa-user' });
+    userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ testAccount: true }) });
+
+    const claimed = await POST(request({ onboarding_submission: 'completed' }, 'password', {}, headers), params());
+    expect(claimed.status).toBe(200);
+    // The route passes the old doc's flag through (the new profile replaces the
+    // doc); notifyOnboardingSubmitted then sends nothing for it.
+    expect(notifySubmittedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'qa-user', user: expect.objectContaining({ testAccount: true }) })
+    );
+
+    notifySubmittedMock.mockClear();
+    inviteData.status = 'submitted';
+    await POST(request({ onboarding_submission: 'completed' }), params());
+    expect(notifySubmittedMock).not.toHaveBeenCalled();
   });
 
   it('returns success when notification creation fails', async () => {

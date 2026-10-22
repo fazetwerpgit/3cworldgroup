@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import {
   ONBOARDING_ITEMS,
@@ -11,6 +11,7 @@ import { isStorageItem } from '@/lib/onboarding/uploads';
 import { verifyStorageReference } from '@/lib/onboarding/verifyStorageReference';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { buildSensitiveDoc } from '@/lib/onboarding/sensitiveFields';
+import { notifyOnboardingSubmitted } from '@/lib/onboarding/ownerNotify';
 import type { SensitiveDoc } from '@/types/sensitive';
 
 // POST /api/portal/onboarding/submit - Rep submits an onboarding item for review.
@@ -161,37 +162,49 @@ export async function POST(request: NextRequest) {
     }
 
     const docRef = adminDb.collection('userOnboarding').doc(`${userId}_${itemId}`);
-    const existing = await docRef.get();
-    const currentStatus = existing.exists ? existing.data()?.status : 'not_started';
+    const now = new Date();
+    // Read the status and write in one transaction, so two concurrent saves
+    // cannot both move the item into 'submitted' (and both alert the owners).
+    const blockedStatus = await adminDb.runTransaction(async (tx) => {
+      const existing = await tx.get(docRef);
+      const currentStatus = existing.exists ? existing.data()?.status : 'not_started';
+      // Only not_started or rejected items can be (re)submitted
+      if (currentStatus === 'submitted' || currentStatus === 'approved') {
+        return currentStatus as 'submitted' | 'approved';
+      }
+      tx.set(
+        docRef,
+        {
+          userId,
+          itemId,
+          status: 'submitted',
+          // Reference only - never raw sensitive data
+          reference: typeof reference === 'string' ? reference.trim().slice(0, 500) : '',
+          rejectionReason: null,
+          submittedAt: now,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+      if (dlDoc) {
+        tx.set(sensitiveRef, { ...dlDoc, updatedAt: now, updatedBy: gate.uid }, { merge: true });
+      }
+      return null;
+    });
 
-    // Only not_started or rejected items can be (re)submitted
-    if (currentStatus === 'submitted' || currentStatus === 'approved') {
+    if (blockedStatus) {
       return NextResponse.json(
-        { error: `Item is already ${currentStatus === 'submitted' ? 'under review' : 'approved'}` },
+        { error: `Item is already ${blockedStatus === 'submitted' ? 'under review' : 'approved'}` },
         { status: 400 }
       );
     }
 
-    const now = new Date();
-    const batch = adminDb.batch();
-    batch.set(
-      docRef,
-      {
-        userId,
-        itemId,
-        status: 'submitted',
-        // Reference only - never raw sensitive data
-        reference: typeof reference === 'string' ? reference.trim().slice(0, 500) : '',
-        rejectionReason: null,
-        submittedAt: now,
-        updatedAt: now,
-      },
-      { merge: true }
-    );
-    if (dlDoc) {
-      batch.set(sensitiveRef, { ...dlDoc, updatedAt: now, updatedBy: gate.uid }, { merge: true });
+    // The onboarding form moved INTO 'submitted' (first time, or again after a
+    // send-back): tell the owners once the save is in. notifyOnboardingSubmitted
+    // never throws, so an email problem never fails the rep's submission.
+    if (itemId === 'onboarding_submission') {
+      after(() => notifyOnboardingSubmitted({ userId, user: userData, submittedAt: now }));
     }
-    await batch.commit();
 
     return NextResponse.json({
       success: true,

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
+import { notifyOnboardingSubmitted } from '@/lib/onboarding/ownerNotify';
 import { DISPLAY_NAME_TAKEN_ERROR, isDisplayNameTaken } from '@/lib/users/displayNameTaken';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
@@ -489,6 +490,15 @@ export async function POST(
       // something is still unsigned later. Failure-contained: the step's load
       // call retries whatever did not go out.
       await sendPendingEsignDocs(userRecord.uid, { deferReadyEmail: true });
+    }
+
+    // The website form is the hire's onboarding submission: its item just went
+    // into 'submitted', and the invite's 'submitted' status (checked above)
+    // stops a second POST. Owners get one email; a failure never fails this.
+    // The old doc is folded in so a claimed test/demo account stays silent.
+    if (candidateItems.some((item) => item.itemId === 'onboarding_submission' && item.status === 'submitted')) {
+      const alertUser = { ...existingUserData, ...userProfile };
+      after(() => notifyOnboardingSubmitted({ userId: userRecord.uid, user: alertUser, submittedAt: now }));
     }
 
     try {

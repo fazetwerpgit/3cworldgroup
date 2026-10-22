@@ -20,7 +20,15 @@ const {
   batchCommitMock: vi.fn(),
   verifyStorageReferenceMock: vi.fn(),
 }));
+const { sendEmailMock, afterTasks } = vi.hoisted(() => ({
+  sendEmailMock: vi.fn<(input: Record<string, unknown>) => Promise<{ ok: boolean; error?: string }>>(async () => ({ ok: true })),
+  afterTasks: [] as Promise<unknown>[],
+}));
 
+vi.mock('next/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return { ...actual, after: vi.fn((callback: () => unknown) => void afterTasks.push(Promise.resolve(callback()))) };
+});
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: {
     collection: vi.fn((name: string) => ({
@@ -29,9 +37,24 @@ vi.mock('@/lib/firebase/admin', () => ({
         const path = `${name}/${id}`;
         return { path, get: name === 'userSensitive' ? sensitiveGetMock : progressGetMock };
       }),
+      // Owner recipients (lib/onboarding/ownerNotify).
+      where: vi.fn(() => ({
+        get: async () => ({ docs: [{ data: () => ({ email: 'owner@example.com', role: 'owner' }) }] }),
+      })),
     })),
+    doc: vi.fn(() => ({ get: async () => ({ data: () => ({ extraEmails: ['extra@example.com'] }) }) })),
     batch: () => ({ set: batchSetMock, commit: batchCommitMock }),
+    // The item's status read and the writes run in one transaction.
+    runTransaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      const result = await fn({ get: (ref: { get: () => Promise<unknown> }) => ref.get(), set: batchSetMock });
+      if (batchSetMock.mock.calls.length) await batchCommitMock();
+      return result;
+    }),
   },
+}));
+vi.mock('@/lib/email/sendEmail', () => ({
+  sendEmail: sendEmailMock,
+  onboardingFrom: vi.fn(() => 'onboarding@example.com'),
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
   requireVerifiedSelfOrManagement: gateMock,
@@ -70,7 +93,14 @@ beforeEach(() => {
   sensitiveGetMock.mockResolvedValue({ exists: false, data: () => undefined });
   verifyStorageReferenceMock.mockResolvedValue({ ok: true });
   batchCommitMock.mockResolvedValue(undefined);
+  sendEmailMock.mockResolvedValue({ ok: true });
+  afterTasks.length = 0;
+  vi.stubEnv('APP_BASE_URL', 'https://portal.example');
 });
+
+async function flushAfter() {
+  await Promise.all(afterTasks);
+}
 
 describe('POST /api/portal/onboarding/submit', () => {
   it('rejects a typed reference for a signature item', async () => {
@@ -194,5 +224,104 @@ describe('POST /api/portal/onboarding/submit - driver license', () => {
     expect(response.status).toBe(200);
     expect(writeTo('userSensitive/u1')).toBeUndefined();
     expect(writeTo('userOnboarding/u1_dl_photos')).toBeDefined();
+  });
+});
+
+describe('POST /api/portal/onboarding/submit - owner alert', () => {
+  const rep = (extra: Record<string, unknown> = {}) => ({
+    exists: true,
+    data: () => ({
+      displayName: 'Sam Rep',
+      email: 'sam@example.com',
+      fieldRole: 'entry_level_rep',
+      isIBO: false,
+      status: 'pending',
+      address: '12 Hidden Lane',
+      dateOfBirth: '1990-04-05',
+      ssnLast4: '6789',
+      ...extra,
+    }),
+  });
+  const submitForm = () =>
+    POST(request({ userId: 'u1', itemId: 'onboarding_submission', reference: 'Start date 10/1' }));
+  const sent = () => sendEmailMock.mock.calls.map(([input]) => input as Record<string, string>);
+
+  beforeEach(() => {
+    userDocGetMock.mockResolvedValue(rep());
+  });
+
+  it('emails each owner recipient once, with name, role, time and the review link only', async () => {
+    const response = await submitForm();
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(sent().map((email) => email.to).sort()).toEqual(['extra@example.com', 'owner@example.com']);
+    for (const email of sent()) {
+      expect(email.subject).toBe('Sam Rep submitted onboarding');
+      expect(email.from).toBe('onboarding@example.com');
+      expect(email.textBody).toContain('Role: Entry Level Rep');
+      expect(email.textBody).toMatch(/Submitted: \w{3} \d{1,2}, \d{4}, \d{1,2}:\d{2}\s[AP]M CT/);
+      expect(email.textBody).toContain('https://portal.example/portal/admin/onboarding?tab=todo&person=u1');
+      const all = `${email.subject}${email.textBody}${email.htmlBody}`;
+      for (const secret of ['12 Hidden Lane', '1990-04-05', '6789', 'sam@example.com', 'Start date 10/1']) {
+        expect(all).not.toContain(secret);
+      }
+    }
+  });
+
+  it('sends nothing when an already-submitted form is saved again', async () => {
+    progressGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'submitted' }) });
+
+    const response = await submitForm();
+    await flushAfter();
+
+    expect(response.status).toBe(400);
+    expect(batchSetMock).not.toHaveBeenCalled();
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('alerts again when the form is resubmitted after being sent back', async () => {
+    progressGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'rejected' }) });
+
+    const response = await submitForm();
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends nothing for a test account', async () => {
+    userDocGetMock.mockResolvedValue(rep({ testAccount: true }));
+
+    const response = await submitForm();
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing for any other checklist item', async () => {
+    const response = await POST(request({ userId: 'u1', itemId: 'background_check', reference: 'VENDOR-REF-1' }));
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it('still saves the submission when the email fails', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    sendEmailMock.mockResolvedValueOnce({ ok: false, error: 'postmark_500' });
+    sendEmailMock.mockRejectedValueOnce(new Error('network down'));
+
+    const response = await submitForm();
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(writeTo('userOnboarding/u1_onboarding_submission')?.[1]).toMatchObject({ status: 'submitted' });
+    expect(errSpy).toHaveBeenCalledWith(
+      '[onboarding owner notify] email failed',
+      expect.objectContaining({ kind: 'onboarding_submitted', userId: 'u1' })
+    );
+    errSpy.mockRestore();
   });
 });
