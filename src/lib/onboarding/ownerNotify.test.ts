@@ -177,6 +177,26 @@ describe('notifyOnboardingSubmitted', () => {
     }));
   });
 
+  it("falls back to 'A new hire', never the rep's email, when there is no name", async () => {
+    await notifyOnboardingSubmitted({ userId: 'u1', user: { displayName: '  ', email: 'sam@example.com' }, submittedAt });
+
+    const email = (sendEmailMock.mock.calls as unknown as Array<[Record<string, string>]>)[0]![0];
+    expect(email.subject).toBe('A new hire submitted onboarding');
+    expect(`${email.textBody}${email.htmlBody}`).not.toContain('sam@example.com');
+  });
+
+  it('labels the role from the resolved fieldRole the caller passes', async () => {
+    await notifyOnboardingSubmitted({
+      userId: 'u1',
+      user: { displayName: 'Legacy Rep', role: 'entry_level_rep' },
+      submittedAt,
+      fieldRole: 'entry_level_rep',
+    });
+
+    const email = (sendEmailMock.mock.calls as unknown as Array<[Record<string, string>]>)[0]![0];
+    expect(email.textBody).toContain('Role: Entry Level Rep');
+  });
+
   it.each([['test', { testAccount: true }], ['demo', { demoAccount: true }]])(
     'sends nothing for a %s account',
     async (_label, flag) => {
@@ -184,6 +204,25 @@ describe('notifyOnboardingSubmitted', () => {
       expect(sendEmailMock).not.toHaveBeenCalled();
     }
   );
+});
+
+describe('sendOnboardingPacket tally', () => {
+  it('counts every attempted and delivered copy', async () => {
+    sendEmailMock.mockResolvedValueOnce({ ok: false, error: 'postmark_500' } as never);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(sendOnboardingPacket({ userId: 'u1' })).resolves.toEqual({ attempted: 2, ok: 1 });
+    errSpy.mockRestore();
+  });
+
+  it('reports nothing attempted when there are no recipients or the lookup failed', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    ownerQueryGetMock.mockRejectedValue(new Error('firestore down'));
+
+    await expect(sendOnboardingPacket({ userId: 'u1' })).resolves.toEqual({ attempted: 0, ok: 0 });
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
 });
 
 describe('sendEach failure logging', () => {

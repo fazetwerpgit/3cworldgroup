@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
     // send-back): tell the owners once the save is in. notifyOnboardingSubmitted
     // never throws, so an email problem never fails the rep's submission.
     if (itemId === 'onboarding_submission') {
-      after(() => notifyOnboardingSubmitted({ userId, user: userData, submittedAt: now }));
+      after(() => notifyOnboardingSubmitted({ userId, user: userData, submittedAt: now, fieldRole }));
     }
 
     return NextResponse.json({

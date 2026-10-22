@@ -566,7 +566,7 @@ describe('POST /api/public/onboarding/[token]', () => {
     });
   });
 
-  it('keeps a claimed test account silent and alerts nobody on a refused or repeat submit', async () => {
+  it("passes the old doc's test flag through to the alert", async () => {
     const headers = signedInAs('qa-user');
     getUserByEmailMock.mockResolvedValue({ uid: 'qa-user' });
     userDocGetMock.mockResolvedValue({ exists: true, data: () => ({ testAccount: true }) });

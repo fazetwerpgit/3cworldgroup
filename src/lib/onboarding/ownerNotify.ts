@@ -115,22 +115,27 @@ type AlertContext = { kind: AlertKind; userId: string };
 // sendEmail reports failures in its result (it only throws on a bug), so the
 // result is checked too. Logs carry the alert kind, the recipient (an owner or
 // configured address) and the rep's uid only: not the subject, which holds the
-// rep's name. Never throws.
-async function sendEach(recipients: string[], content: EmailContent, context: AlertContext): Promise<void> {
-  await Promise.all(recipients.map(async (to) => {
+// rep's name. Never throws; returns how many sends were tried and how many went out.
+export type SendTally = { attempted: number; ok: number };
+
+async function sendEach(recipients: string[], content: EmailContent, context: AlertContext): Promise<SendTally> {
+  const results = await Promise.all(recipients.map(async (to) => {
     try {
       const result = await sendEmail({ ...content, to, from: onboardingFrom() });
       if (!result.ok) {
         console.error('[onboarding owner notify] email failed', { ...context, to, error: result.error });
       }
+      return result.ok;
     } catch (error) {
       console.error('[onboarding owner notify] email failed', { ...context, to, error });
+      return false;
     }
   }));
+  return { attempted: results.length, ok: results.filter(Boolean).length };
 }
 
-async function sendToRecipients(content: EmailContent, context: AlertContext): Promise<void> {
-  await sendEach(await getOwnerRecipients(), content, context);
+async function sendToRecipients(content: EmailContent, context: AlertContext): Promise<SendTally> {
+  return sendEach(await getOwnerRecipients(), content, context);
 }
 
 export async function notifyDocSigned(opts: { userId: string; repName: string; itemLabel: string }): Promise<void> {
@@ -155,7 +160,7 @@ function submittedText(date: Date): string {
     timeZone: PACKET_TZ,
   });
   // Newer ICU puts a narrow no-break space before AM/PM; plain text mail gets a plain space.
-  return `${when.replace(/ /g, ' ')} CT`;
+  return `${when.replace(/\u202f/g, ' ')} CT`;
 }
 
 /**
@@ -169,13 +174,17 @@ export async function notifyOnboardingSubmitted(opts: {
   userId: string;
   user: Record<string, unknown> | undefined;
   submittedAt: Date;
+  /** The rep's resolved field role (resolveRoles), so legacy docs read right. */
+  fieldRole?: FieldRole;
 }): Promise<void> {
   try {
     if (isHiddenUser(opts.user)) return;
     const user = opts.user ?? {};
+    const name = typeof user.displayName === 'string' ? user.displayName.trim() : '';
     await sendToRecipients(ownerOnboardingSubmittedEmail({
-      repName: String(user.displayName || user.email || opts.userId),
-      roleLabel: displayRole(user.fieldRole) ?? '—',
+      // Never the rep's email: the alert carries a name or nothing personal.
+      repName: name || 'A new hire',
+      roleLabel: displayRole(opts.fieldRole ?? user.fieldRole) ?? '—',
       submittedOn: submittedText(opts.submittedAt),
       link: `${appBaseUrl()}/portal/admin/onboarding?tab=todo&person=${encodeURIComponent(opts.userId)}`,
     }), { kind: 'onboarding_submitted', userId: opts.userId });
@@ -199,9 +208,12 @@ function checklistRow(item: OnboardingItem, progress: Record<string, unknown> | 
   };
 }
 
-export async function sendOnboardingPacket(opts: { userId: string }): Promise<void> {
+const NOTHING_SENT: SendTally = { attempted: 0, ok: 0 };
+
+/** Never throws. The tally lets sendOnboardingPacketOnce release its stamp when nothing went out. */
+export async function sendOnboardingPacket(opts: { userId: string }): Promise<SendTally> {
   try {
-    if (!adminDb) return;
+    if (!adminDb) return NOTHING_SENT;
     const userDoc = await adminDb.doc(`users/${opts.userId}`).get();
     const user = userDoc.data?.() ?? {};
     const fieldRole = user.fieldRole as FieldRole | undefined;
@@ -285,8 +297,13 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
     };
     const { owners, extras } = await getOwnerRecipientGroups();
     const context: AlertContext = { kind: 'onboarding_packet', userId: opts.userId };
-    await Promise.all([sendEach(owners, packet(true), context), sendEach(extras, packet(false), context)]);
+    const [toOwners, toExtras] = await Promise.all([
+      sendEach(owners, packet(true), context),
+      sendEach(extras, packet(false), context),
+    ]);
+    return { attempted: toOwners.attempted + toExtras.attempted, ok: toOwners.ok + toExtras.ok };
   } catch (error) {
     console.error('[onboarding owner notify] packet failed', { userId: opts.userId, error });
+    return NOTHING_SENT;
   }
 }

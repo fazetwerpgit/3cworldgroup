@@ -269,6 +269,16 @@ describe('POST /api/portal/onboarding/submit - owner alert', () => {
     }
   });
 
+  it('labels a legacy doc (field role stored under role) with the resolved role', async () => {
+    userDocGetMock.mockResolvedValue(rep({ role: 'entry_level_rep', fieldRole: undefined }));
+
+    const response = await submitForm();
+    await flushAfter();
+
+    expect(response.status).toBe(200);
+    expect(sent()[0]?.textBody).toContain('Role: Entry Level Rep');
+  });
+
   it('sends nothing when an already-submitted form is saved again', async () => {
     progressGetMock.mockResolvedValue({ exists: true, data: () => ({ status: 'submitted' }) });
 
