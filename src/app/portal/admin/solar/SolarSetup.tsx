@@ -298,7 +298,7 @@ function Preview({ name, hours, mode, focusDay }: { name: string; hours: SolarHo
           <strong>
             {MODE_LABEL[mode]} {total === 1 ? 'slot' : 'slots'} a week
           </strong>
-          <span className={st.previewSub}>Homeowners see them in their own time zone.</span>
+          <span className={st.previewSub}>Homeowners see them in their own time zone, 9 AM to 8 PM their time.</span>
         </span>
       </p>
       <p className={st.previewDay}>
@@ -623,7 +623,7 @@ export function ConsultantPanel({
         </div>
 
         {error ? <AdminNotice tone="error">{error}</AdminNotice> : null}
-        {justSaved && !dirty ? <AdminNotice tone="ok">Saved. Homeowners see these hours now.</AdminNotice> : null}
+        {justSaved && !dirty ? <AdminNotice tone="ok">Saved. Homeowners see these hours now (9 AM to 8 PM their time).</AdminNotice> : null}
 
         {confirming ? (
           <ConfirmStrip
