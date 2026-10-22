@@ -5,6 +5,7 @@ import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { activationEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
 import { sendOnboardingPacket } from '@/lib/onboarding/ownerNotify';
+import { TEST_ACCOUNT_FIELD } from '@/lib/users/demoAccount';
 import { reconcileChatMembershipForUser } from '@/lib/chat/channels';
 import {
   getOnboardingItemsForUser,
@@ -97,6 +98,37 @@ export async function getActivationReadinessForRole(
   return computeReadiness(getOnboardingItemsForUser(fieldRole, isIBO), await loadStatuses(userId));
 }
 
+/** users/{uid} field stamped when the rep's owner packet email is claimed (Admin SDK only). */
+export const PACKET_EMAILED_FIELD = 'onboardingPacketEmailedAt';
+
+/**
+ * Sends the owner onboarding packet at most once per rep, whichever activation
+ * path gets there (automatic, manual Activate, recruiting convert, Accept on
+ * the user page). The stamp is claimed in a transaction BEFORE sending, so
+ * concurrent or repeated paths cannot double-send; a send that fails after the
+ * claim is logged, not retried. Test accounts get no packet. Never throws.
+ */
+export async function sendOnboardingPacketOnce(userId: string): Promise<boolean> {
+  try {
+    if (!adminDb) return false;
+    const db = adminDb;
+    const userRef = db.doc(`users/${userId}`);
+    const claimed = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(userRef);
+      if (!snap.exists) return false;
+      if (snap.get(TEST_ACCOUNT_FIELD) === true || snap.get(PACKET_EMAILED_FIELD)) return false;
+      tx.update(userRef, { [PACKET_EMAILED_FIELD]: FieldValue.serverTimestamp() });
+      return true;
+    });
+    if (!claimed) return false;
+    await sendOnboardingPacket({ userId });
+    return true;
+  } catch (error) {
+    console.error('[onboarding] owner packet failed', { userId, error });
+    return false;
+  }
+}
+
 /** Activate a ready user and send the single active-account notification. */
 export async function activateUser(
   userId: string
@@ -170,6 +202,15 @@ export async function activateUser(
     console.error('[onboarding] activation notice failed', { userId, error });
   }
 
+  // Every activation path (automatic, manual Activate, recruiting convert)
+  // lands here, so the owner packet goes out from one place. A hire with no
+  // checklist role would get an empty packet, so none is sent. The stamp in
+  // sendOnboardingPacketOnce keeps it to one per rep, even across a later
+  // deactivate -> reactivate. It never throws.
+  if (fieldRole && roleRequiresOnboarding(fieldRole)) {
+    await sendOnboardingPacketOnce(userId);
+  }
+
   return { alreadyActive: false };
 }
 
@@ -187,12 +228,6 @@ export async function maybeFlagActivationReady(userId: string): Promise<void> {
   const { ready } = await getActivationReadiness(userId);
   if (!ready) return;
 
-  const activation = await activateUser(userId);
-  // Another approval path already activated this user and sent the packet.
-  if (!activation || activation.alreadyActive) return;
-  try {
-    await sendOnboardingPacket({ userId });
-  } catch (error) {
-    console.error('[onboarding] owner packet failed', { userId, error });
-  }
+  // activateUser sends the owner packet on the winning flip.
+  await activateUser(userId);
 }

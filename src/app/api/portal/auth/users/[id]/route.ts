@@ -27,7 +27,7 @@ import { purgeSensitiveUserData } from '@/lib/users/purgeSensitiveUserData';
 import { revokeAppleSignIn } from '@/lib/auth/appleSignIn';
 import { hasOtherActiveOwner } from '@/lib/users/accountClosure';
 import { writeAdminAudit } from '@/lib/audit/adminAudit';
-import { getActivationReadinessForRole } from '@/lib/onboarding/activation';
+import { getActivationReadinessForRole, sendOnboardingPacketOnce } from '@/lib/onboarding/activation';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
 
 const VALID_STATUSES = ['active', 'inactive', 'pending'];
@@ -533,6 +533,12 @@ export async function PUT(
       } catch (error) {
         console.error('[users] Failed to resolve open alert tasks', id, error);
       }
+    }
+
+    // Accepting a checklist hire here activates them without activateUser, so
+    // the owner packet goes out from here; the stamp keeps it to one per rep.
+    if (becomingActive && resultingFieldRole && roleRequiresOnboarding(resultingFieldRole)) {
+      await sendOnboardingPacketOnce(id);
     }
 
     // Chat channel memberIds gate the Firestore reads and pushes, so a role or

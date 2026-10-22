@@ -81,6 +81,8 @@ import {
   computeReadiness,
   getActivationReadiness,
   maybeFlagActivationReady,
+  PACKET_EMAILED_FIELD,
+  sendOnboardingPacketOnce,
 } from './activation';
 
 beforeEach(() => {
@@ -103,7 +105,9 @@ describe('activateUser', () => {
 
     await expect(activateUser('l1-manager')).resolves.toEqual({ alreadyActive: false });
 
-    expect(updates).toHaveLength(1);
+    // The status flip, then the owner-packet stamp.
+    expect(updates).toHaveLength(2);
+    expect(updates[1]?.data).toEqual({ [PACKET_EMAILED_FIELD]: '__SERVER_TS__' });
     expect(updates[0]?.data).toMatchObject({
       status: 'active',
       fieldRole: 'l1_manager',
@@ -363,7 +367,8 @@ describe('activation side effects', () => {
     await Promise.all([maybeFlagActivationReady('race-rep'), maybeFlagActivationReady('race-rep')]);
 
     expect(store.get('users/race-rep')?.status).toBe('active');
-    expect(updates.filter((u) => u.path === 'users/race-rep')).toHaveLength(1);
+    const flips = updates.filter((u) => u.path === 'users/race-rep' && u.data.status === 'active');
+    expect(flips).toHaveLength(1);
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(sendPacketMock).toHaveBeenCalledTimes(1);
   });
@@ -394,6 +399,70 @@ describe('activation side effects', () => {
     expect(dispatchMock).toHaveBeenCalledTimes(1);
     expect(sendPacketMock).toHaveBeenCalledWith({ userId: 'flaky-rep' });
     errSpy.mockRestore();
+  });
+
+  // Manual Activate (onboarding/activate) and recruiting convert both call
+  // activateUser directly, so these cover those routes.
+  it('sends the packet on a direct activateUser (manual Activate / recruiting convert) and stamps the user', async () => {
+    seedReady('manual-rep');
+
+    await activateUser('manual-rep');
+
+    expect(sendPacketMock).toHaveBeenCalledTimes(1);
+    expect(sendPacketMock).toHaveBeenCalledWith({ userId: 'manual-rep' });
+    expect(store.get('users/manual-rep')?.[PACKET_EMAILED_FIELD]).toBe('__SERVER_TS__');
+  });
+
+  it('sends one packet when activation runs twice, or auto runs before manual', async () => {
+    seedReady('twice-rep');
+    await activateUser('twice-rep');
+    await activateUser('twice-rep');
+    seedReady('auto-then-manual');
+    await maybeFlagActivationReady('auto-then-manual');
+    await activateUser('auto-then-manual');
+
+    expect(sendPacketMock).toHaveBeenCalledTimes(2);
+    expect(sendPacketMock).toHaveBeenCalledWith({ userId: 'twice-rep' });
+    expect(sendPacketMock).toHaveBeenCalledWith({ userId: 'auto-then-manual' });
+  });
+
+  it('sends no second packet when a rep is deactivated and activated again', async () => {
+    seedReady('again-rep');
+    await activateUser('again-rep');
+    store.set('users/again-rep', { ...(store.get('users/again-rep') ?? {}), status: 'pending' });
+
+    await activateUser('again-rep');
+
+    expect(dispatchMock).toHaveBeenCalledTimes(2);
+    expect(sendPacketMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends one packet when sendOnboardingPacketOnce races itself', async () => {
+    seedReady('race-claim');
+
+    const results = await Promise.all([sendOnboardingPacketOnce('race-claim'), sendOnboardingPacketOnce('race-claim')]);
+
+    expect(results.sort()).toEqual([false, true]);
+    expect(sendPacketMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('activates a test account but sends it no packet', async () => {
+    seedReady('qa-rep');
+    store.set('users/qa-rep', { ...(store.get('users/qa-rep') ?? {}), testAccount: true });
+
+    await activateUser('qa-rep');
+
+    expect(store.get('users/qa-rep')?.status).toBe('active');
+    expect(sendPacketMock).not.toHaveBeenCalled();
+    expect(store.get('users/qa-rep')?.[PACKET_EMAILED_FIELD]).toBeUndefined();
+  });
+
+  it('sends no packet for a user with no checklist role', async () => {
+    store.set('users/no-role', { status: 'pending' });
+
+    await activateUser('no-role');
+
+    expect(sendPacketMock).not.toHaveBeenCalled();
   });
 
   it('still sends the owner packet when the activation notice fails', async () => {

@@ -109,7 +109,11 @@ const readinessMock = vi.hoisted(() =>
     async () => ({ ready: true, missing: [] })
   )
 );
-vi.mock('@/lib/onboarding/activation', () => ({ getActivationReadinessForRole: readinessMock }));
+const packetOnceMock = vi.hoisted(() => vi.fn<(userId: string) => Promise<boolean>>(async () => true));
+vi.mock('@/lib/onboarding/activation', () => ({
+  getActivationReadinessForRole: readinessMock,
+  sendOnboardingPacketOnce: packetOnceMock,
+}));
 
 const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
 const mockResolveAlertTasks = resolveAlertTasks as unknown as ReturnType<typeof vi.fn>;
@@ -155,6 +159,26 @@ describe('PUT /api/portal/auth/users/[id] activation readiness gate', () => {
     expect(readinessMock).toHaveBeenCalledWith('pending-user', 'ae_tier_1', false);
     expect(firestore.updates).toHaveLength(0);
     expect(firestore.adminAuth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('sends the owner packet (once-guarded) when Accept activates a complete checklist hire', async () => {
+    pendingHire();
+
+    const response = await PUT(request({ status: 'active' }), params());
+
+    expect(response.status).toBe(200);
+    expect(packetOnceMock).toHaveBeenCalledTimes(1);
+    expect(packetOnceMock).toHaveBeenCalledWith('pending-user');
+  });
+
+  it('sends no packet for a refused Accept or a promotion to a no-checklist role', async () => {
+    pendingHire();
+    readinessMock.mockResolvedValue({ ready: false, missing: ['w9'] });
+    await PUT(request({ status: 'active' }), params());
+    pendingHire();
+    await PUT(request({ fieldRole: 'general_manager' }), params());
+
+    expect(packetOnceMock).not.toHaveBeenCalled();
   });
 
   it('refuses a plain status flip to active the same way', async () => {
