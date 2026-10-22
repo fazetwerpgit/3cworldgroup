@@ -4,7 +4,9 @@ import {
   appBaseUrl,
   onboardingPacketEmail,
   ownerDocSignedEmail,
+  ownerOnboardingSubmittedEmail,
 } from '@/lib/email/templates';
+import { isHiddenUser } from '@/lib/users/demoAccount';
 import { RoleDisplayNames, type FieldRole } from '@/types/auth';
 import { getOnboardingItemsForUser, isOwnerOnlyOnboardingDocument, type OnboardingItem } from '@/types/onboarding';
 
@@ -107,18 +109,28 @@ type EmailContent = {
   attachments?: { name: string; contentBase64: string; contentType: string }[];
 };
 
-async function sendEach(recipients: string[], content: EmailContent): Promise<void> {
+type AlertKind = 'doc_signed' | 'onboarding_submitted' | 'onboarding_packet';
+type AlertContext = { kind: AlertKind; userId: string };
+
+// sendEmail reports failures in its result (it only throws on a bug), so the
+// result is checked too. Logs carry the alert kind, the recipient (an owner or
+// configured address) and the rep's uid only: not the subject, which holds the
+// rep's name. Never throws.
+async function sendEach(recipients: string[], content: EmailContent, context: AlertContext): Promise<void> {
   await Promise.all(recipients.map(async (to) => {
     try {
-      await sendEmail({ ...content, to, from: onboardingFrom() });
+      const result = await sendEmail({ ...content, to, from: onboardingFrom() });
+      if (!result.ok) {
+        console.error('[onboarding owner notify] email failed', { ...context, to, error: result.error });
+      }
     } catch (error) {
-      console.error('[onboarding owner notify] email failed', { to, subject: content.subject, error });
+      console.error('[onboarding owner notify] email failed', { ...context, to, error });
     }
   }));
 }
 
-async function sendToRecipients(content: EmailContent): Promise<void> {
-  await sendEach(await getOwnerRecipients(), content);
+async function sendToRecipients(content: EmailContent, context: AlertContext): Promise<void> {
+  await sendEach(await getOwnerRecipients(), content, context);
 }
 
 export async function notifyDocSigned(opts: { userId: string; repName: string; itemLabel: string }): Promise<void> {
@@ -127,9 +139,48 @@ export async function notifyDocSigned(opts: { userId: string; repName: string; i
       repName: opts.repName,
       itemLabel: opts.itemLabel,
       link: PACKET_URL(),
-    }));
+    }), { kind: 'doc_signed', userId: opts.userId });
   } catch (error) {
     console.error('[onboarding owner notify] signed notification failed', { userId: opts.userId, error });
+  }
+}
+
+function submittedText(date: Date): string {
+  const when = date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZone: PACKET_TZ,
+  });
+  // Newer ICU puts a narrow no-break space before AM/PM; plain text mail gets a plain space.
+  return `${when.replace(/ /g, ' ')} CT`;
+}
+
+/**
+ * Owner alert: a rep submitted their onboarding form (the onboarding_submission
+ * item moved INTO 'submitted'). Callers fire it only on that transition, so a
+ * retried or repeated save sends nothing and a resubmission after a send-back
+ * alerts again. Name, role and time only, never a sensitive field. Demo and
+ * test accounts alert nobody. Never throws.
+ */
+export async function notifyOnboardingSubmitted(opts: {
+  userId: string;
+  user: Record<string, unknown> | undefined;
+  submittedAt: Date;
+}): Promise<void> {
+  try {
+    if (isHiddenUser(opts.user)) return;
+    const user = opts.user ?? {};
+    await sendToRecipients(ownerOnboardingSubmittedEmail({
+      repName: String(user.displayName || user.email || opts.userId),
+      roleLabel: displayRole(user.fieldRole) ?? '—',
+      submittedOn: submittedText(opts.submittedAt),
+      link: `${appBaseUrl()}/portal/admin/onboarding?tab=todo&person=${encodeURIComponent(opts.userId)}`,
+    }), { kind: 'onboarding_submitted', userId: opts.userId });
+  } catch (error) {
+    console.error('[onboarding owner notify] submitted notification failed', { userId: opts.userId, error });
   }
 }
 
@@ -233,7 +284,8 @@ export async function sendOnboardingPacket(opts: { userId: string }): Promise<vo
       };
     };
     const { owners, extras } = await getOwnerRecipientGroups();
-    await Promise.all([sendEach(owners, packet(true)), sendEach(extras, packet(false))]);
+    const context: AlertContext = { kind: 'onboarding_packet', userId: opts.userId };
+    await Promise.all([sendEach(owners, packet(true), context), sendEach(extras, packet(false), context)]);
   } catch (error) {
     console.error('[onboarding owner notify] packet failed', { userId: opts.userId, error });
   }

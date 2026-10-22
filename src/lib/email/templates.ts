@@ -149,6 +149,26 @@ Review onboarding: ${p.link}
   };
 }
 
+export function ownerOnboardingSubmittedEmail(p: {
+  repName: string;
+  roleLabel: string;
+  submittedOn: string;
+  link: string;
+}): EmailContent {
+  const subject = `${p.repName} submitted onboarding`;
+  return {
+    subject,
+    textBody: `${p.repName} submitted onboarding.
+
+Role: ${p.roleLabel}
+Submitted: ${p.submittedOn}
+
+Review onboarding: ${p.link}
+`,
+    htmlBody: layout(subject, `<p><strong>${esc(p.repName)}</strong> submitted onboarding.</p><p>Role: ${esc(p.roleLabel)}<br>Submitted: ${esc(p.submittedOn)}</p><p><a href="${esc(p.link)}">Review onboarding</a></p>`),
+  };
+}
+
 export interface OnboardingPacketData {
   repName: string;
   completedOn: string;

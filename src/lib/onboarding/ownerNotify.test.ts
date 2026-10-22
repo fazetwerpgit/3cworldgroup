@@ -47,7 +47,7 @@ vi.mock('@/lib/email/sendEmail', () => ({
   onboardingFrom: vi.fn(() => 'onboarding@example.com'),
 }));
 
-import { getOwnerRecipients, notifyDocSigned, sendOnboardingPacket } from './ownerNotify';
+import { getOwnerRecipients, notifyDocSigned, notifyOnboardingSubmitted, sendOnboardingPacket } from './ownerNotify';
 
 const ownerDoc = (email: string) => ({ data: () => ({ email }) });
 const progressDoc = (data: Record<string, unknown>) => ({
@@ -154,5 +154,67 @@ describe('sendOnboardingPacket', () => {
     expect(extra.textBody).not.toContain('direct.pdf');
     expect(extra.textBody).not.toContain('SSN');
     expect(extra.textBody).toContain('DL: ********9876');
+  });
+});
+
+describe('notifyOnboardingSubmitted', () => {
+  const submittedAt = new Date('2026-10-22T20:05:00Z');
+
+  it('sends the short owner alert with name, role, time and the review link', async () => {
+    await notifyOnboardingSubmitted({
+      userId: 'u 1',
+      user: { displayName: 'Sam Rep', fieldRole: 'entry_level_rep', email: 'sam@example.com' },
+      submittedAt,
+    });
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(2);
+    expect(sendEmailMock).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'owner@example.com',
+      from: 'onboarding@example.com',
+      subject: 'Sam Rep submitted onboarding',
+      textBody: 'Sam Rep submitted onboarding.\n\nRole: Entry Level Rep\nSubmitted: Oct 22, 2026, 3:05 PM CT\n\n'
+        + 'Review onboarding: https://portal.example/portal/admin/onboarding?tab=todo&person=u%201\n',
+    }));
+  });
+
+  it.each([['test', { testAccount: true }], ['demo', { demoAccount: true }]])(
+    'sends nothing for a %s account',
+    async (_label, flag) => {
+      await notifyOnboardingSubmitted({ userId: 'u1', user: { displayName: 'QA', ...flag }, submittedAt });
+      expect(sendEmailMock).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('sendEach failure logging', () => {
+  it('logs each failed recipient with the alert kind and uid, never the subject, and does not throw', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    sendEmailMock
+      .mockResolvedValueOnce({ ok: false, error: 'postmark_422' } as never)
+      .mockRejectedValueOnce(new Error('boom'));
+
+    await expect(notifyDocSigned({ userId: 'u1', repName: 'Sam Rep', itemLabel: 'Contract' })).resolves.toBeUndefined();
+
+    expect(errSpy).toHaveBeenCalledTimes(2);
+    expect(errSpy).toHaveBeenCalledWith('[onboarding owner notify] email failed', {
+      kind: 'doc_signed',
+      userId: 'u1',
+      to: 'owner@example.com',
+      error: 'postmark_422',
+    });
+    expect(errSpy).toHaveBeenCalledWith('[onboarding owner notify] email failed', expect.objectContaining({
+      kind: 'doc_signed',
+      userId: 'u1',
+      to: 'extra@example.com',
+    }));
+    expect(JSON.stringify(errSpy.mock.calls)).not.toContain('Sam Rep');
+    errSpy.mockRestore();
+  });
+
+  it('logs nothing when every send succeeds', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await notifyDocSigned({ userId: 'u1', repName: 'Sam Rep', itemLabel: 'Contract' });
+    expect(errSpy).not.toHaveBeenCalled();
+    errSpy.mockRestore();
   });
 });
