@@ -16,6 +16,7 @@ import { SOLAR_STAGE_ROLES, readStage, stagePatchForStatus } from '@/lib/solar/l
 import { SOLAR_CLOSE_FORBIDDEN, canCloseSolarLead, isSoldLead } from '@/lib/solar/closePermission';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel } from '@/lib/solar/bookingCancel';
 import { syncBookingContactToGoogle } from '@/lib/solar/google/bookingEvents';
+import { applyProofPinChange, proofPinChangeForLead, type ProofPinChange } from '@/lib/solar/proofPins';
 
 const LEAD_CLOSED_ERROR = 'This lead is closed, so its contact details can no longer be changed.';
 
@@ -81,6 +82,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params;
     if (!/^[A-Za-z0-9_-]{1,300}$/.test(id)) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
     const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+    // The door's proof pin follows a status change, after the commit (lib/solar/proofPins).
+    // (Set inside the transactions; `as` keeps TS from narrowing it to null.)
+    let pin = null as { lead: Record<string, unknown>; change: ProofPinChange | null } | null;
 
     if ('status' in body) {
       if (!gate.isAdmin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -106,6 +110,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             updatedAt: now,
             ...stagePatchForStatus(data, 'lost', gate.uid, now),
           };
+          pin = { lead: data, change: proofPinChangeForLead(data, { ...data, ...statusPatch }) };
           const bookingId = typeof lead.get('bookingId') === 'string' ? (lead.get('bookingId') as string) : '';
           const bookingRef = bookingId ? db.collection('solarBookings').doc(bookingId) : null;
           const booking = bookingRef ? await tx.get(bookingRef) : null;
@@ -122,6 +127,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         if (cancelled && 'unchanged' in cancelled) {
           return NextResponse.json({ success: true, id, status: cancelled.unchanged });
         }
+        if (pin) await applyProofPinChange(db, pin.lead, pin.change, now.getTime());
         if (cancelled) await announceBookingCancel(cancelled, gate.uid, 'lost');
         return NextResponse.json({
           success: true, id, status: 'lost', ...(cancelled ? { cancelledBookingId: cancelled.id } : {}),
@@ -145,17 +151,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             : null;
           next = booking?.exists && booking.get('status') !== 'cancelled' ? 'booked' : 'new';
         }
-        tx.update(ref, {
+        const statusPatch = {
           status: next,
           statusChangedAt: now,
           statusChangedBy: gate.uid,
           updatedAt: now,
           ...stagePatchForStatus(leadData, next, gate.uid, now),
           ...(leadData.noSaleReason !== undefined ? { noSaleReason: FieldValue.delete() } : {}),
-        });
+        };
+        tx.update(ref, statusPatch);
+        pin = { lead: leadData, change: proofPinChangeForLead(leadData, { ...leadData, ...statusPatch }) };
         return { status: next } as const;
       });
       if ('error' in outcome) return NextResponse.json({ error: outcome.error }, { status: outcome.code });
+      if (pin) await applyProofPinChange(db, pin.lead, pin.change, now.getTime());
       const status = outcome.status;
       return NextResponse.json({ success: true, id, status });
     }
@@ -186,7 +195,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         const bookingId = typeof data.bookingId === 'string' ? data.bookingId : '';
         const bookingRef = bookingId ? db.collection('solarBookings').doc(bookingId) : null;
         const booking = bookingRef ? await tx.get(bookingRef) : null;
-        if (bookingRef && booking && isLiveBooking(booking)) {
+        const live = !!(bookingRef && booking && isLiveBooking(booking));
+        // Closed (or its booking cancelled): the pin goes.
+        pin = {
+          lead: data,
+          change: proofPinChangeForLead(data, { ...data, ...leadPatch }) ?? (live ? 'delete' : null),
+        };
+        if (live && bookingRef && booking) {
           const cancelled = stageBookingCancel(tx, {
             id: bookingId, bookingRef, booking, leadRef: ref, lead, by: gate.uid, now, leadPatch,
           });
@@ -196,6 +211,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return { status, cancelled: null } as const;
       });
       if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.code });
+      if (pin) await applyProofPinChange(db, pin.lead, pin.change, now.getTime());
       if (result.cancelled) await announceBookingCancel(result.cancelled, gate.uid, 'lost');
       return NextResponse.json({
         success: true, id, status: result.status, ...(result.cancelled ? { cancelledBookingId: result.cancelled.id } : {}),
@@ -267,9 +283,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           }
         }
         tx.update(ref, { ...patch, ...reopen, updatedAt: now });
+        pin = { lead: data, change: proofPinChangeForLead(data, { ...data, ...reopen }) };
         return true;
       });
       if (!found) return NextResponse.json({ error: 'Lead not found' }, { status: 404 });
+      if (pin) await applyProofPinChange(db, pin.lead, pin.change, now.getTime());
       return NextResponse.json({ success: true, id });
     }
 

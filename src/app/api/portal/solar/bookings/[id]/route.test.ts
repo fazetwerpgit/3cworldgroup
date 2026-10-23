@@ -191,3 +191,23 @@ describe('PATCH /api/portal/solar/bookings/[id]', () => {
     });
   });
 });
+
+describe('PATCH /api/portal/solar/bookings/[id]: proof pins', () => {
+  const PIN = { campaignId: 'solar-1', cell: 'dr4hq', lat: 40.123, lng: -75.654, kind: 'booked', at: 1_760_000_000_000 };
+  beforeEach(() => {
+    db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'booked', bookingId: ID, doorId: 'h1' });
+    db.store.set('proofPins', new Map([['h1', { ...PIN }]]));
+  });
+
+  it('a cancel deletes the door pin', async () => {
+    expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+    expect(db.store.get('proofPins')!.has('h1')).toBe(false);
+  });
+
+  it('a sold lead keeps its solar pin', async () => {
+    db.store.get('solarLeads')!.set('rep1_c1', { repUid: 'rep1', status: 'sold', bookingId: ID, doorId: 'h1' });
+    db.store.get('proofPins')!.set('h1', { ...PIN, kind: 'solar' });
+    expect((await patch(ID, { status: 'cancelled' })).status).toBe(200);
+    expect(db.store.get('proofPins')!.get('h1')!.kind).toBe('solar');
+  });
+});

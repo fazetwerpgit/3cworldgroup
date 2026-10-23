@@ -11,6 +11,7 @@ import { consultantNotice, loadAvailability, loadBookings, loadContacts, require
 import { sendLeadAlertOnce } from '@/lib/solar/leadAlert';
 import { isLowCreditDecline } from '@/lib/solar/leadFields';
 import { isSoldLead } from '@/lib/solar/closePermission';
+import { applyProofPinChange } from '@/lib/solar/proofPins';
 import { consultantBookingAttachment, customerBookingAttachment, type BookingInviteInput } from '@/lib/solar/bookingInvite';
 import { solarLeadHref } from '@/lib/solar/leadView';
 import { addBookingToGoogle, type GoogleBookingEvent } from '@/lib/solar/google/bookingEvents';
@@ -372,6 +373,9 @@ export async function POST(request: NextRequest) {
       throw error;
     }
     if (!outcome.fresh) return NextResponse.json(bookedBody(outcome.id, outcome.booking, true));
+    // Booked again after a cancel: its door's "Booked nearby" pin comes back
+    // while the door is still marked Appointment Booked (lib/solar/proofPins).
+    await applyProofPinChange(db, lead.data(), 'restore', now.getTime());
 
     const b = outcome.booking;
     // After the commit, outside the transaction: the Google event (best

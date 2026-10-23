@@ -301,3 +301,64 @@ describe('PATCH /api/portal/solar/leads/[id]/stage: closing a deal is owners onl
     expect(db.store.get('solarBookings')!.get('b1')!.status).toBe('booked');
   });
 });
+
+describe('PATCH /api/portal/solar/leads/[id]/stage: proof pins', () => {
+  const HOUSE = {
+    campaignId: 'solar-1', lat: 40.123456, lng: -75.65421,
+    last: { dispositionId: 'appointment_set', at: 1_760_000_000_000, repId: 'rep1', knockId: 'k1' },
+  };
+  const pins = () => db.store.get('proofPins') ?? new Map<string, Record<string, unknown>>();
+  beforeEach(() => {
+    db.store.get('solarLeads')!.set('l1', { ...lead('l1'), doorId: 'h1', campaignId: 'solar-1' });
+    db.store.set('houses', new Map([['h1', { ...HOUSE }]]));
+    db.store.set('proofPins', new Map([['h1', {
+      campaignId: 'solar-1', cell: 'dr4hq', lat: 40.123, lng: -75.654, kind: 'booked', at: HOUSE.last.at,
+    }]]));
+  });
+
+  it('a sale turns the door pin solar, at the sold time, with exactly six fields', async () => {
+    mockGate.mockResolvedValue(OWNER);
+    const before = Date.now();
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' })).status).toBe(200);
+    const pin = pins().get('h1')!;
+    expect(Object.keys(pin).sort()).toEqual(['at', 'campaignId', 'cell', 'kind', 'lat', 'lng']);
+    expect(pin).toMatchObject({ kind: 'solar', campaignId: 'solar-1', lat: 40.123, lng: -75.654 });
+    expect(pin.at).toBeGreaterThanOrEqual(before);
+  });
+
+  it('no sale deletes the pin', async () => {
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'no_sale' })).status).toBe(200);
+    expect(pins().has('h1')).toBe(false);
+  });
+
+  it('a stage that keeps the lead open leaves the pin alone', async () => {
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'proposal_sent' })).status).toBe(200);
+    expect(pins().get('h1')!.kind).toBe('booked');
+  });
+
+  it('a lead without a door writes no pin', async () => {
+    mockGate.mockResolvedValue(OWNER);
+    db.store.get('solarLeads')!.set('l1', { repUid: 'rep1', status: 'booked', bookingId: 'b1' });
+    expect((await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' })).status).toBe(200);
+    expect(pins().get('h1')!.kind).toBe('booked');
+  });
+
+  it('a failing pin write never fails the stage change', async () => {
+    mockGate.mockResolvedValue(OWNER);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const real = db.collection;
+    const spy = vi.spyOn(db, 'collection').mockImplementation((name: string) => {
+      if (name === 'proofPins') throw new Error('pins down');
+      return real(name);
+    });
+    try {
+      const res = await patch('l1', { stage: 'appointment_demoed', outcome: 'sale' });
+      expect(res.status).toBe(200);
+      expect(lead('l1').status).toBe('sold');
+      expect(errSpy).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+      errSpy.mockRestore();
+    }
+  });
+});

@@ -962,5 +962,75 @@ service cloud.firestore {
                                            'director'];
       }
     }
+
+    // "Booked nearby" / "Went solar" pins (3c-knock docs/design/NEARBY_LEADS.md option B,
+    // src/lib/proofPins.ts there). One doc per door, id = the house id, holding only what the pin needs:
+    //   { campaignId, cell (geohash-5), lat, lng (3 decimals), kind: 'booked' | 'solar', at (ms) }
+    // Positions are approximate on purpose (owner, 2026-10-22): a ~110 m grid, never the exact house.
+    // No name, phone, address, note or rep. Query this allows:
+    //   anyone on the campaign: proofPins where campaignId == X and cell in [<= 30 cells]
+    // Readers (Jacob 2026-10-22): reps on the campaign, their managers and owners. "Holds at least
+    // one door in it" and "within ~5 km of those doors" are enforced in the app; a pin shows only its
+    // status and age. The portal (admin SDK, past these rules; src/lib/solar/proofPins.ts) sets
+    // kind 'solar' on Sold and deletes the pin on No-Show / Cancelled. Clients may only ever write
+    // a 'booked' pin that matches their own Appointment Booked mark on the door; 'solar' pins and
+    // every delete are server-only.
+    match /proofPins/{houseId} {
+      // Signed in with the campaign turned on for them (owners / admins: every campaign).
+      allow read: if signedIn()
+        && (isOwner() || resource.data.campaignId in me().get('campaignIds', []));
+
+      // Set in the batched write of an Appointment Booked mark: only by the user whose own (not
+      // imported) mark the door holds once that batch lands, with that mark's time, at the door's
+      // position (rounded to 3 decimals), in the door's campaign, and only the pin's own fields.
+      // A 'solar' pin stays the portal's.
+      allow create, update: if signedIn()
+        && (resource == null || resource.data.kind == 'booked')
+        && proofPinShape()
+        && request.resource.data.kind == 'booked'
+        && bookedByMeAfter(houseId);
+
+      // Server-only (reviewer, 2026-10-22): the portal removes pins on No-Show / Cancelled.
+      allow delete: if false;
+
+      // Exactly the six fields, with their types and ranges; positions are on the 3-decimal (~110 m) grid.
+      function proofPinShape() {
+        let d = request.resource.data;
+        let fields = ['campaignId', 'cell', 'lat', 'lng', 'kind', 'at'];
+        return d.keys().hasOnly(fields) && d.keys().hasAll(fields)
+          && d.campaignId is string && d.campaignId.size() > 0 && d.campaignId.size() <= 200
+          && d.cell is string && d.cell.matches('[0-9b-hjkmnp-z]{5}')
+          && d.lat is number && d.lat >= -90 && d.lat <= 90
+          && d.lng is number && d.lng >= -180 && d.lng <= 180
+          && math.round(d.lat * 1000) / 1000.0 == d.lat
+          && math.round(d.lng * 1000) / 1000.0 == d.lng
+          && d.kind in ['booked', 'solar']
+          && d.at is number && d.at > 0 && d.at <= request.time.toMillis() + 60 * 60 * 1000;
+      }
+
+      // The door as the batch leaves it (null when there is none).
+      function doorAfter(id) {
+        return getAfter(/databases/$(database)/documents/houses/$(id));
+      }
+
+      // The door's own mark after the batch is the caller's Appointment Booked (not a lead-file
+      // import), in the pin's campaign, at the pin's time, on the grid point nearest the door:
+      // a 3-decimal value within 0.0006 of its
+      // position (the rounded value is at most 0.0005 away; rules cannot reproduce JS rounding of
+      // exact halves on negative longitudes, so the tolerance stands in for exact equality).
+      function bookedByMeAfter(id) {
+        let door = doorAfter(id);
+        let d = request.resource.data;
+        return door != null
+          && door.data.get('last', null) is map
+          && door.data.last.get('dispositionId', '') == 'appointment_set'
+          && door.data.last.get('imported', false) != true
+          && door.data.last.get('repId', '') == request.auth.uid
+          && door.data.get('campaignId', '') == d.campaignId
+          && door.data.last.get('at', null) == d.at
+          && math.abs(d.lat - door.data.lat) <= 0.0006
+          && math.abs(d.lng - door.data.lng) <= 0.0006;
+      }
+    }
   }
 }

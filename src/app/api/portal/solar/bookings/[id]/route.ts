@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { announceBookingCancel, isLiveBooking, stageBookingCancel, type CancelledBooking } from '@/lib/solar/bookingCancel';
+import { isSoldLead } from '@/lib/solar/closePermission';
+import { applyProofPinChange } from '@/lib/solar/proofPins';
 
 class Answer {
   constructor(readonly body: Record<string, unknown>, readonly status: number) {}
@@ -11,8 +13,9 @@ class Answer {
 // An admin, or the booking's own consultant. In one transaction the booking
 // reads 'cancelled' and its lead lets go of it (stageBookingCancel), so the
 // slot opens and the lead can be booked again. Then the rep and consultant get
-// the cancel notice (announceBookingCancel). Cancelling a cancelled booking is
-// a no-op 200 that notifies nobody.
+// the cancel notice (announceBookingCancel). The lead's door loses its proof
+// pin (lib/solar/proofPins) unless the lead is sold. Cancelling a cancelled
+// booking is a no-op 200 that notifies nobody.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const gate = await requireVerifiedUser(request);
@@ -31,6 +34,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const ref = db.collection('solarBookings').doc(id);
     const now = new Date();
     let cancelled: CancelledBooking | null = null;
+    // The lead as the cancel read it: its door's proof pin goes after the commit.
+    let pinLead = null as Record<string, unknown> | null;
     try {
       cancelled = await db.runTransaction(async (tx) => {
         const booking = await tx.get(ref);
@@ -40,12 +45,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         const leadId = typeof booking.get('leadId') === 'string' ? (booking.get('leadId') as string) : '';
         const leadRef = leadId ? db.collection('solarLeads').doc(leadId) : null;
         const lead = leadRef ? await tx.get(leadRef) : null;
+        pinLead = lead?.exists ? ((lead.data() ?? {}) as Record<string, unknown>) : null;
         return stageBookingCancel(tx, { id, bookingRef: ref, booking, leadRef, lead, by: gate.uid, now });
       });
     } catch (error) {
       if (error instanceof Answer) return NextResponse.json(error.body, { status: error.status });
       throw error;
     }
+    // A cancelled booking takes its "Booked nearby" pin with it (a sold lead keeps its solar pin).
+    if (cancelled && pinLead && !isSoldLead(pinLead)) await applyProofPinChange(db, pinLead, 'delete', now.getTime());
     if (cancelled) await announceBookingCancel(cancelled, gate.uid);
     return NextResponse.json({ success: true, id });
   } catch (error) {

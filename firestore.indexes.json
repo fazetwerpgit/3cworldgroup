@@ -323,6 +323,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "proofPins",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "campaignId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "cell",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

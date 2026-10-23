@@ -16,6 +16,7 @@ import {
   type SolarStageEntry,
 } from '@/lib/solar/leadStage';
 import { SOLAR_CLOSE_FORBIDDEN, canCloseSolarLead, isSoldLead, isSoldStage } from '@/lib/solar/closePermission';
+import { applyProofPinChange, proofPinChangeForLead } from '@/lib/solar/proofPins';
 
 type VerifiedGate = Extract<Awaited<ReturnType<typeof requireVerifiedUser>>, { ok: true }>;
 
@@ -97,19 +98,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         ...(data.noSaleReason !== undefined ? { noSaleReason: FieldValue.delete() } : {}),
         updatedAt: now,
       };
+      // The door's proof pin follows (Sold -> solar, lost -> gone), after the commit.
+      const pin = { lead: data, change: proofPinChangeForLead(data, { ...data, ...leadPatch }) };
       // Lost, as Mark lost does it: the live booking is cancelled in this same
       // transaction (slot freed, bookingId cleared) and announced after.
       if (status === 'lost' && live && bookingRef && booking) {
         const cancelled = stageBookingCancel(tx, {
           id: bookingId, bookingRef, booking, leadRef: ref, lead: snap, by: gate.uid, now, leadPatch,
         });
-        return { status, entry, cancelled } as const;
+        return { status, entry, cancelled, pin } as const;
       }
       tx.update(ref, leadPatch);
-      return { status, entry, cancelled: null } as const;
+      return { status, entry, cancelled: null, pin } as const;
     });
 
     if ('error' in result) return NextResponse.json({ error: result.error }, { status: result.code });
+    await applyProofPinChange(db, result.pin.lead, result.pin.change, now.getTime());
     if (result.cancelled) await announceBookingCancel(result.cancelled, gate.uid, 'lost');
     return NextResponse.json({
       success: true, id, stage, outcome, status: result.status, entry: result.entry,

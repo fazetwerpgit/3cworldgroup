@@ -573,3 +573,44 @@ describe('PATCH /api/portal/solar/leads/[id]', () => {
     });
   });
 });
+
+describe('PATCH /api/portal/solar/leads/[id]: proof pins', () => {
+  const OWNER = { ...REP, uid: 'own', isAdmin: true, isOwner: true, role: 'owner', solarRole: null };
+  const HOUSE = {
+    campaignId: 'solar-1', lat: 40.123456, lng: -75.65421,
+    last: { dispositionId: 'appointment_set', at: 1_760_000_000_000, repId: 'rep1', knockId: 'k1' },
+  };
+  const BOOKED = { campaignId: 'solar-1', cell: 'dr4hq', lat: 40.123, lng: -75.654, kind: 'booked', at: HOUSE.last.at };
+  const pins = () => db.store.get('proofPins')!;
+  beforeEach(() => {
+    db.store.set('solarLeads', new Map([['rep1_c1', { repUid: 'rep1', status: 'booked', doorId: 'h1', campaignId: 'solar-1' }]]));
+    db.store.set('houses', new Map([['h1', { ...HOUSE }]]));
+    db.store.set('proofPins', new Map([['h1', { ...BOOKED }]]));
+    mockGate.mockResolvedValue(OWNER);
+  });
+
+  it('Mark sold turns the pin solar; reopening puts it back to booked', async () => {
+    expect((await patch('rep1_c1', { status: 'sold' })).status).toBe(200);
+    expect(pins().get('h1')).toMatchObject({ kind: 'solar', campaignId: 'solar-1', lat: 40.123, lng: -75.654 });
+    expect(Object.keys(pins().get('h1')!).sort()).toEqual(['at', 'campaignId', 'cell', 'kind', 'lat', 'lng']);
+    expect((await patch('rep1_c1', { status: 'new' })).status).toBe(200);
+    expect(pins().get('h1')).toEqual(BOOKED);
+  });
+
+  it('creates the solar pin when the door had none', async () => {
+    pins().clear();
+    expect((await patch('rep1_c1', { status: 'sold' })).status).toBe(200);
+    expect(pins().get('h1')!.kind).toBe('solar');
+  });
+
+  it('Mark lost deletes the pin', async () => {
+    expect((await patch('rep1_c1', { status: 'lost' })).status).toBe(200);
+    expect(pins().has('h1')).toBe(false);
+  });
+
+  it('Under 600 (noSaleReason) deletes the pin', async () => {
+    mockGate.mockResolvedValue(REP);
+    expect((await patch('rep1_c1', { noSaleReason: 'low_credit' })).status).toBe(200);
+    expect(pins().has('h1')).toBe(false);
+  });
+});
