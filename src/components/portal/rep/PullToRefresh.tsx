@@ -8,7 +8,9 @@ import s from './rep.module.css';
 
 // Pull to refresh inside the rep shell's <main> scroller, in the iOS app only
 // (the shell's native pull to refresh is off; RepChrome mounts this only when
-// useIsNativeApp). A pull starts only from a touch that lands with the
+// useIsNativeApp). Below 1024px <main> is the scroller; at 1024px and up (an
+// iPad in landscape) the window scrolls instead, so "at the top" checks both.
+// A pull starts only from a touch that lands with the
 // scroller already at the top, so it never takes over a scroll or the tail of
 // a momentum fling. Releasing past the threshold asks every mounted screen to
 // refetch quietly (revalidateDataCache) and holds the spinner until they land.
@@ -23,6 +25,16 @@ const SETTLE_EASE = 'var(--ease-sheet, cubic-bezier(0.32, 0.72, 0, 1))';
 
 function reducedMotion(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * How far the page is scrolled: <main> on the phone shell, the window on the
+ * desktop layout (where <main> does not scroll). Whichever is not the scroller
+ * reads 0, so the sum works at any width and across a resize.
+ */
+function pageScrollTop(scroller: HTMLElement): number {
+  const doc = typeof document !== 'undefined' ? document.scrollingElement : null;
+  return Math.max(0, scroller.scrollTop) + Math.max(0, window.scrollY || doc?.scrollTop || 0);
 }
 
 /** True when `target` sits in a scroller inside `root` that is not at its top. */
@@ -161,8 +173,7 @@ export function PullToRefresh({
       armed = false;
       if (refreshing || event.touches.length !== 1) return;
       // Only from rest at the top: never mid-scroll or mid-fling.
-      if (scroller.scrollTop > 0) return;
-      if (!window.matchMedia?.('(max-width: 1023px)').matches) return;
+      if (pageScrollTop(scroller) > 0) return;
       if (!hasDataRevalidators()) return;
       const target = event.target instanceof Element ? event.target : null;
       if (target && scrolledWithin(target, scroller)) return;
@@ -179,7 +190,7 @@ export function PullToRefresh({
       const dy = touch.clientY - start.y;
       if (!pulling) {
         const intent = readPullIntent(dx, dy);
-        if (intent === 'scroll' || scroller.scrollTop > 0) {
+        if (intent === 'scroll' || pageScrollTop(scroller) > 0) {
           start = null;
           listenMoves(false);
           return;

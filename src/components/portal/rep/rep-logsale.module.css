@@ -1150,7 +1150,8 @@ span.thumbView {
   bottom: calc(0px - var(--pwa-bottom-gap, 0px));
   left: 0;
   z-index: 40;
-  padding: var(--s3) var(--gutter) calc(var(--s3) + env(safe-area-inset-bottom));
+  /* --col-inset: the iPad-portrait column (rep.module.css); 0 elsewhere. */
+  padding: var(--s3) calc(var(--gutter) + var(--col-inset, 0px)) calc(var(--s3) + env(safe-area-inset-bottom));
   background: var(--c-bar);
   transform: translateZ(0);
 }

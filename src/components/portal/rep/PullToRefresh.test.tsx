@@ -126,4 +126,24 @@ describe('PullToRefresh', () => {
     });
     expect(add.mock.calls.some(([type]) => type === 'touchmove')).toBe(false);
   });
+
+  it('also pulls on the desktop layout (an iPad in landscape, app only)', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query.includes('min-width') }));
+    await pullAndRelease();
+    expect(state()).toBe('refreshing');
+  });
+
+  it('never starts a pull while the window is scrolled (desktop layout)', async () => {
+    const scroller = document.getElementById('scroller')!;
+    const add = vi.spyOn(scroller, 'addEventListener');
+    vi.stubGlobal('scrollY', 400);
+    try {
+      await act(async () => {
+        touch('touchstart', 0);
+      });
+      expect(add.mock.calls.some(([type]) => type === 'touchmove')).toBe(false);
+    } finally {
+      vi.stubGlobal('scrollY', 0);
+    }
+  });
 });

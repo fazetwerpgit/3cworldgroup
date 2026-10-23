@@ -289,7 +289,11 @@ export interface NoticeEvent {
 export interface AppCapabilities {
   /** The shell has a native chat screen and accepts openNativeChat. */
   nativeChat?: boolean;
+  /** The device's biometric hardware (LocalAuthentication biometryType). Older builds leave it out. */
+  biometryType?: BiometryType;
 }
+export type BiometryType = 'faceId' | 'touchId' | 'opticId' | 'none';
+const BIOMETRY_TYPES: readonly BiometryType[] = ['faceId', 'touchId', 'opticId', 'none'];
 /** Unsolicited: what this shell build can do. May be sent again; the latest wins. */
 export interface CapabilitiesEvent {
   source: typeof NATIVE_SOURCE;
@@ -365,12 +369,15 @@ declare global {
   }
 }
 
-/** Keeps only the known boolean capability flags. Null if `raw` is not an object. */
+/** Keeps only the known capability keys with valid values. Null if `raw` is not an object. */
 export function parseCapabilities(raw: unknown): AppCapabilities | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const c = raw as Record<string, unknown>;
   const caps: AppCapabilities = {};
   if (typeof c.nativeChat === 'boolean') caps.nativeChat = c.nativeChat;
+  if (typeof c.biometryType === 'string' && (BIOMETRY_TYPES as readonly string[]).includes(c.biometryType)) {
+    caps.biometryType = c.biometryType as BiometryType;
+  }
   return caps;
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { NativeBridgeError } from '@/lib/app/bridge';
+import { biometryCopy, useBiometryType } from '@/lib/app/biometry';
 import { fetchBiometricLock, readStoredBiometricLock, setBiometricLock } from '@/lib/app/biometricLock';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
@@ -9,11 +10,13 @@ import st from '@/components/portal/rep/rep-settings.module.css';
 
 // Settings row, 3C iOS app only: "Require Face ID or passcode to open the
 // app". Off by default. Works with Face ID, or the passcode alone. The shell stores the setting per device and locks on resume.
+// The wording follows the device (Touch ID, Optic ID, passcode only); see biometry.ts.
 export default function FaceIdLockCard() {
   const [enabled, setEnabled] = useState(false);
   const [available, setAvailable] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+  const copy = biometryCopy(useBiometryType());
 
   useEffect(() => {
     setEnabled(readStoredBiometricLock());
@@ -45,7 +48,7 @@ export default function FaceIdLockCard() {
     } catch (err) {
       setError(
         err instanceof NativeBridgeError && err.code === 'canceled'
-          ? 'The Face ID or passcode check was cancelled, so nothing changed.'
+          ? copy.canceled
           : "Couldn't change the app lock setting. Try again."
       );
     } finally {
@@ -57,12 +60,10 @@ export default function FaceIdLockCard() {
     <div className={st.setting}>
       <div className={st.settingText}>
         <span className={st.settingTitle} id="face-id-lock-label">
-          Require Face ID or passcode to open the app
+          {copy.title}
         </span>
         <span className={st.settingSub}>
-          {available
-            ? 'Asks for Face ID or your passcode when you come back to the app.'
-            : 'Set a passcode on this iPhone to use this.'}
+          {available ? copy.sub : copy.unavailable}
         </span>
       </div>
       <button

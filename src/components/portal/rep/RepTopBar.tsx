@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { safeNotificationLink } from '@/lib/notifications/safeLink';
 import { usePathname, useRouter } from 'next/navigation';
 import { Bell, BellOff, Bug, ChevronDown, ChevronLeft, LogOut, Menu, MessageCircleQuestion, Plus, Settings, Sun, X } from 'lucide-react';
-import { isNativeApp } from '@/lib/app/isNativeApp';
+import { isNativeApp, useIsNativeApp } from '@/lib/app/isNativeApp';
 import { nativePushNotAskedYet } from '@/lib/app/nativePush';
 import { askOpenTo } from '@/lib/ask/flag';
 import { useAuth } from '@/contexts/AuthContext';
@@ -113,6 +113,10 @@ export function RepTopBar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  // In the app the desktop nav (an iPad in landscape) behaves like the phone
+  // tab bar: its links replace the history entry, so the iOS edge swipe goes
+  // back out of a page instead of stepping back through tabs. Web: plain links.
+  const inApp = useIsNativeApp();
   const { user, signOut } = useAuth();
   const { canAccess, sheetGroups } = useNavAccess();
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
@@ -271,7 +275,7 @@ export function RepTopBar({
           <ul className={s.deskNav}>
             {deskLinks.map((tab) => (
               <li key={tab.href}>
-                <Link href={tab.href} className={s.navLink} aria-current={tab.href === active ? 'page' : undefined}>
+                <Link href={tab.href} replace={inApp} className={s.navLink} aria-current={tab.href === active ? 'page' : undefined}>
                   {tab.label}
                   {tab.href === '/portal/chat' && chatUnread ? (
                     <>
@@ -352,13 +356,13 @@ export function RepTopBar({
           </button>
 
           {canLog && active !== LOG_SALE_HREF ? (
-            <Link href={LOG_SALE_HREF} className={`${s.btnPrimary} ${s.navCta}`}>
+            <Link href={LOG_SALE_HREF} replace={inApp} className={`${s.btnPrimary} ${s.navCta}`}>
               <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
               Log sale
             </Link>
           ) : null}
           {canDeck ? (
-            <Link href={SOLAR_TAB.href} className={`${s.btnPrimary} ${s.navCta}`}>
+            <Link href={SOLAR_TAB.href} replace={inApp} className={`${s.btnPrimary} ${s.navCta}`}>
               <Sun size={18} strokeWidth={2.5} aria-hidden="true" />
               {SOLAR_TAB.short}
             </Link>

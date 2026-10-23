@@ -1048,6 +1048,39 @@
   }
 }
 
+/* ---------- iPad portrait: the phone shell in a centred column ----------
+   744-1023px (an iPad in portrait, a Split View or Stage Manager window, any
+   browser that wide) keeps the phone layout above but holds it to a ~720px
+   column instead of stretching. --col-inset is the space either side of that
+   column: the fixed bars and sheets on <body> keep their full-width ground and
+   inset their contents by it. It is unset (0) below 744px and from 1024px. */
+@media (min-width: 744px) and (max-width: 1023px) {
+  .root,
+  .layer {
+    --col-inset: max(0px, calc((100vw - 720px) / 2));
+  }
+
+  .main,
+  .topbarInner {
+    max-width: 720px;
+  }
+
+  .tabs {
+    max-width: 720px;
+    margin-inline: auto;
+  }
+
+  .sheet {
+    right: var(--col-inset);
+    left: var(--col-inset);
+  }
+
+  .drop {
+    right: calc(var(--col-inset) + 8px);
+    left: calc(var(--col-inset) + 8px);
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
