@@ -213,3 +213,28 @@
   border-radius: var(--r-control);
   background: color-mix(in srgb, var(--c-amber) 10%, var(--c-well));
 }
+
+/* ---------- note audience ---------- */
+.audience {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.audienceChips {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+.noteTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+  margin: var(--s1) 0 2px;
+}
+
+.audienceTokens {
+  margin: 0;
+  padding: var(--s3) var(--s4) 0;
+}

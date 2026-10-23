@@ -19,8 +19,13 @@ import {
   estimateTokens,
   parseNoteFile,
   type KnowledgeNote,
-  type NoteDraft,
 } from '@/lib/ask/notes';
+import {
+  NOTE_AUDIENCES,
+  NOTE_AUDIENCE_LABELS,
+  normalizeAudience,
+  type NoteAudience,
+} from '@/lib/ask/audience';
 import { Seg } from '@/components/portal/admin-ops/AdminKit';
 import { PracticeFeedback } from '@/components/portal/rep/PracticeFeedback';
 import {
@@ -39,7 +44,7 @@ import k from './knowledge.module.css';
 // material, entered here and stored only in Firestore through /api/portal/knowledge.
 
 type Load<T> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
-type Editor = { id: string | null } & NoteDraft;
+type Editor = { id: string | null; title: string; body: string; audience: NoteAudience[] };
 type View = 'notes' | 'questions' | 'practice';
 
 const WHEN = new Intl.DateTimeFormat('en-US', {
@@ -54,6 +59,29 @@ const when = (iso: string | null) => (iso ? WHEN.format(new Date(iso)) : '');
 /** A practice score's color: 7 and up lime, 4 to 6 amber, 3 and under red. */
 const scoreTone = (score: number) => (score >= 7 ? u.toneLime : score >= 4 ? u.toneAmber : u.toneRed);
 const plural = (count: number, word: string) => `${count.toLocaleString('en-US')} ${word}${count === 1 ? '' : 's'}`;
+
+/** The audience chips' next value: Everyone stands alone; the others combine, and none left means Everyone. */
+export function toggleAudience(current: NoteAudience[], tag: NoteAudience): NoteAudience[] {
+  if (tag === 'all') return ['all'];
+  const rest = current.filter((t) => t !== 'all');
+  return normalizeAudience(rest.includes(tag) ? rest.filter((t) => t !== tag) : [...rest, tag]);
+}
+
+/**
+ * About how many tokens of notes each audience's prompt carries: the Everyone
+ * notes plus that tag's own. A person with several tags (a solar manager)
+ * gets the union, so this is a per-tag view, not a per-person one.
+ */
+export function tokensByAudience(notes: Pick<KnowledgeNote, 'title' | 'body' | 'audience'>[]): Record<NoteAudience, number> {
+  const chars = (tag: NoteAudience) =>
+    notes
+      .filter((note) => {
+        const tags = normalizeAudience(note.audience);
+        return tags.includes('all') || tags.includes(tag);
+      })
+      .reduce((sum, note) => sum + note.title.length + note.body.length, 0);
+  return Object.fromEntries(NOTE_AUDIENCES.map((tag) => [tag, estimateTokens(chars(tag))])) as Record<NoteAudience, number>;
+}
 
 async function api<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const token = await getIdToken();
@@ -107,7 +135,7 @@ export function KnowledgeManager() {
     setBusy('save');
     setError('');
     try {
-      const draft = { title: editor.title, body: editor.body };
+      const draft = { title: editor.title, body: editor.body, audience: normalizeAudience(editor.audience) };
       if (editor.id) await api(`/api/portal/knowledge/${editor.id}`, { method: 'PATCH', body: draft });
       else await api('/api/portal/knowledge', { method: 'POST', body: { notes: [draft] } });
       setDone(editor.id ? 'Note saved.' : 'Note added.');
@@ -165,6 +193,7 @@ export function KnowledgeManager() {
 
   const list = notes.status === 'ready' ? notes.data : [];
   const chars = list.reduce((sum, note) => sum + note.title.length + note.body.length, 0);
+  const byAudience = tokensByAudience(list);
 
   return (
     <div className={u.page}>
@@ -198,7 +227,7 @@ export function KnowledgeManager() {
                 type="button"
                 className={`${s.btnPrimary} ${u.primarySm}`}
                 disabled={busy !== null}
-                onClick={() => openEditor({ id: null, title: '', body: '' })}
+                onClick={() => openEditor({ id: null, title: '', body: '', audience: ['all'] })}
               >
                 Add note
               </button>
@@ -241,6 +270,7 @@ export function KnowledgeManager() {
               id: null,
               title: (row.question || 'Question with a photo').slice(0, 120),
               body: `${row.prevQuestion ? `Follow-up to: ${row.prevQuestion}\n` : ''}Question: ${row.question || '(photo only)'}\n\nAsk 3C answered:\n${row.answer}\n\nThe right answer:\n`,
+              audience: ['all'],
             })
           }
         />
@@ -279,6 +309,26 @@ export function KnowledgeManager() {
                   />
                   <p className={u.hint}>Plain text or markdown. Steps as numbered lines answer best.</p>
                 </div>
+                <fieldset className={`${u.field} ${k.audience}`} aria-describedby="note-audience-hint">
+                  <legend className={u.label}>Who sees it</legend>
+                  <div className={`${u.chips} ${k.audienceChips}`}>
+                    {NOTE_AUDIENCES.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={u.chip}
+                        aria-pressed={editor.audience.includes(tag)}
+                        onClick={() => setEditor({ ...editor, audience: toggleAudience(editor.audience, tag) })}
+                      >
+                        {NOTE_AUDIENCE_LABELS[tag]}
+                      </button>
+                    ))}
+                  </div>
+                  <p id="note-audience-hint" className={u.hint}>
+                    Everyone goes to every rep. Pick one or more of the others to keep a note to solar reps, people in the
+                    Chompen app, managers or owners. Admins see all but Owners.
+                  </p>
+                </fieldset>
 
                 {confirmingDelete ? (
                   <div className={u.confirm} role="alertdialog" aria-labelledby="note-delete-q">
@@ -345,6 +395,13 @@ export function KnowledgeManager() {
               </h2>
               <span className={u.panelMeta}>In the order Ask 3C reads them</span>
             </div>
+            {notes.status === 'ready' && list.some((note) => normalizeAudience(note.audience)[0] !== 'all') ? (
+              <p className={`${u.hint} ${k.audienceTokens}`}>
+                About{' '}
+                {NOTE_AUDIENCES.map((tag) => `${NOTE_AUDIENCE_LABELS[tag]} ${byAudience[tag].toLocaleString('en-US')}`).join(' · ')}{' '}
+                tokens per question (Everyone notes plus that group&apos;s own).
+              </p>
+            ) : null}
             {notes.status === 'loading' ? (
               <AdminSkeletonRows rows={3} label="Loading notes" />
             ) : notes.status === 'error' ? (
@@ -354,8 +411,8 @@ export function KnowledgeManager() {
             ) : list.length === 0 ? (
               <div className={u.panelBody}>
                 <AdminEmpty title="No notes yet">
-                  Add a note or upload .md / .txt files. Until there are notes, Ask 3C tells reps to call Jeremy or
-                  their manager.
+                  Add a note or upload .md / .txt files. Until there are notes, Ask 3C tells reps to ask their
+                  manager about T-Mobile questions.
                 </AdminEmpty>
               </div>
             ) : (
@@ -365,10 +422,20 @@ export function KnowledgeManager() {
                     <button
                       type="button"
                       className={u.row}
-                      onClick={() => openEditor({ id: note.id, title: note.title, body: note.body })}
+                      onClick={() =>
+                        openEditor({ id: note.id, title: note.title, body: note.body, audience: normalizeAudience(note.audience) })
+                      }
                     >
                       <span className={u.cellMain}>
                         <span className={k.noteTitle}>{note.title}</span>
+                        <span className={k.noteTags}>
+                          <span className={s.srOnly}>Who sees it: {audienceText(note.audience)}.</span>
+                          {normalizeAudience(note.audience).map((tag) => (
+                            <span key={tag} className={u.tag} aria-hidden="true">
+                              {NOTE_AUDIENCE_LABELS[tag]}
+                            </span>
+                          ))}
+                        </span>
                         <span className={u.cellSub}>
                           {note.body.length.toLocaleString('en-US')} characters
                           {note.updatedAt ? ` · ${when(note.updatedAt)}` : ''}
@@ -387,6 +454,11 @@ export function KnowledgeManager() {
     </div>
   );
 }
+
+const audienceText = (audience: NoteAudience[] | undefined) =>
+  normalizeAudience(audience)
+    .map((tag) => NOTE_AUDIENCE_LABELS[tag])
+    .join(', ');
 
 export function Questions({ onAddToKnowledge }: { onAddToKnowledge: (row: AskLogView) => void }) {
   const [filter, setFilter] = useState<'all' | 'down'>('all');

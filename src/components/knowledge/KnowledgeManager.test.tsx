@@ -7,7 +7,7 @@ import type { PracticeLogView } from '@/lib/ask/practice';
 
 vi.mock('@/lib/firebase/getIdToken', () => ({ getIdToken: async () => 'token' }));
 
-import { CoachWasWrong, Questions } from './KnowledgeManager';
+import { CoachWasWrong, Questions, toggleAudience, tokensByAudience } from './KnowledgeManager';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -93,5 +93,22 @@ describe('CoachWasWrong', () => {
 
     expect(onChange).not.toHaveBeenCalled();
     expect(button('Coach was wrong')).toBeTruthy();
+  });
+});
+
+describe('note audience chips', () => {
+  it('Everyone stands alone, the others combine, and clearing the last goes back to Everyone', () => {
+    expect(toggleAudience(['all'], 'solar')).toEqual(['solar']);
+    expect(toggleAudience(['solar'], 'manager')).toEqual(['solar', 'manager']);
+    expect(toggleAudience(['solar', 'manager'], 'all')).toEqual(['all']);
+    expect(toggleAudience(['solar'], 'solar')).toEqual(['all']);
+  });
+
+  it('estimates each audience as the Everyone notes plus its own', () => {
+    const notes = [
+      { title: 'aa', body: 'aaaaaa', audience: ['all' as const] },
+      { title: 'ss', body: 'ssssssssssssss', audience: ['solar' as const, 'owner' as const] },
+    ];
+    expect(tokensByAudience(notes)).toEqual({ all: 2, solar: 6, knock: 2, manager: 2, owner: 6 });
   });
 });
