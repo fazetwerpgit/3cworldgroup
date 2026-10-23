@@ -110,10 +110,33 @@ export interface ParcelTile {
  * `{ ownerOccupied: 'exemption', ownerNames: true }`).
  */
 export interface CountyFields {
-  /** 'exemption': a homestead / homeowners' exemption on the roll; 'mailing-match': ESTIMATE, the tax-bill mailing address is the property address. */
-  ownerOccupied: 'exemption' | 'mailing-match';
+  /**
+   * 'exemption': a homestead / homeowners' exemption on the roll; 'mailing-match': ESTIMATE, the
+   * tax-bill mailing address is the property address; 'none': no signal (Orange, CA): every
+   * `homestead` is false and means "unknown", not "rented" (Owner-occupied only does not apply).
+   */
+  ownerOccupied: OwnerOccupiedSignal;
   /** Records carry owner names (false: `owner` is ''). */
   ownerNames: boolean;
+}
+
+export type OwnerOccupiedSignal = 'exemption' | 'mailing-match' | 'none';
+
+const OWNER_OCCUPIED_SIGNALS: readonly OwnerOccupiedSignal[] = ['exemption', 'mailing-match', 'none'];
+
+/** Florida's meaning, used when a county has no `fields`. */
+export const DEFAULT_COUNTY_FIELDS: Readonly<CountyFields> = { ownerOccupied: 'exemption', ownerNames: true };
+
+/**
+ * A county's `fields` from an index or manifest (untrusted JSON), resolved: absent or malformed =
+ * Florida's default; an unknown `ownerOccupied` value = 'exemption' (today's behavior).
+ */
+export function resolveCountyFields(raw: unknown): CountyFields {
+  const f = raw as Partial<Record<keyof CountyFields, unknown>> | null | undefined;
+  if (!f || typeof f !== 'object' || Array.isArray(f)) return { ...DEFAULT_COUNTY_FIELDS };
+  const ownerOccupied = OWNER_OCCUPIED_SIGNALS.find((v) => v === f.ownerOccupied) ?? DEFAULT_COUNTY_FIELDS.ownerOccupied;
+  const ownerNames = typeof f.ownerNames === 'boolean' ? f.ownerNames : DEFAULT_COUNTY_FIELDS.ownerNames;
+  return { ownerOccupied, ownerNames };
 }
 
 export interface CountyManifest {

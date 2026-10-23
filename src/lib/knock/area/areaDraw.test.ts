@@ -390,3 +390,53 @@ describe('areaHomes / markInCampaign / areaImportDocs: multi-state record ids', 
     assert.equal(again.every((h) => h.inCampaign), true);
   });
 });
+
+describe('areaDraw: counties without an owner-occupied signal (ownerOccupiedUnknown)', () => {
+  const SQ: LatLng[] = [
+    { lat: 33.7, lng: -117.9 },
+    { lat: 33.7, lng: -117.8 },
+    { lat: 33.8, lng: -117.8 },
+    { lat: 33.8, lng: -117.9 },
+  ];
+  const r = (id: string, over: Partial<ParcelTileRecord>): ParcelTileRecord => ({
+    id, lat: 33.75, lng: -117.85, address: '1 TEST ST', city: 'SANTA ANA', zip: '92701', use: '001', homestead: false, owner: '', ...over,
+  });
+  const records = [
+    r('ca-orange-1', { address: '1 A ST' }),
+    r('ca-orange-2', { address: '2 B ST 1', use: '004', lng: -117.84 }),
+    r('ca-orange-3', { address: '2 B ST 2', use: '004', lng: -117.84 }),
+    r('ca-los-angeles-1', { address: '3 C ST', lat: 33.76 }),
+  ];
+  const unknown = new Set(['ca-orange-1', 'ca-orange-2', 'ca-orange-3']);
+  const ON = { housesOnly: false, ownerOccupiedOnly: true };
+
+  test('areaHomes flags homes (and condo buildings) from those counties only', () => {
+    const homes = areaHomes(records, SQ, 'solar', { ownerUnknownIds: unknown });
+    const byAddr = new Map(homes.map((h) => [h.address, h]));
+    assert.equal(byAddr.get('1 A St')!.ownerOccupiedUnknown, true);
+    assert.equal(byAddr.get('2 B St')!.ownerOccupiedUnknown, true);
+    assert.equal('ownerOccupiedUnknown' in byAddr.get('3 C St')!, false);
+    // Without the option nothing is flagged (Florida, every other caller).
+    assert.ok(areaHomes(records, SQ, 'solar').every((h) => !('ownerOccupiedUnknown' in h)));
+  });
+
+  test('Owner-occupied only skips known renters, never unknown homes', () => {
+    const homes = areaHomes(records, SQ, 'solar', { ownerUnknownIds: unknown });
+    assert.deepEqual(areaPreviewCounts(homes, ON), { inside: 3, add: 2, skipRented: 1, skipType: 0, alreadyInCampaign: 0 });
+    assert.equal(areaHomeStatus({ inCampaign: false, propertyType: 'single-family', homestead: false, ownerOccupiedUnknown: true }, ON), 'add');
+    assert.equal(areaHomeStatus({ inCampaign: false, propertyType: 'single-family', homestead: false }, ON), 'skip-rented');
+  });
+
+  test('areaImportDocs leaves ownerOccupied off unknown doors and keeps it elsewhere', () => {
+    const homes = areaHomes(records, SQ, 'solar', { ownerUnknownIds: unknown });
+    const { houses } = areaImportDocs(homes, { housesOnly: false, ownerOccupiedOnly: false }, { campaignId: 'solar', areaImportId: 'ai_x', now: 1, existingPacks: [] });
+    assert.equal(houses.length, 3);
+    for (const h of houses) {
+      if (h.address === '3 C St') assert.equal(h.ownerOccupied, false);
+      else {
+        assert.equal('ownerOccupied' in h, false);
+        assert.equal(h.homestead, false);
+      }
+    }
+  });
+});

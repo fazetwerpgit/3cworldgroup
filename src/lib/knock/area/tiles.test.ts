@@ -16,9 +16,12 @@ import {
   CA_LNG,
   IL_LAT,
   IL_LNG,
+  OC_LAT,
+  OC_LNG,
   REAL_STATE_BOXES,
   SQUARE,
   buildMultiStateFiles,
+  buildMultiStateFilesWithOrange,
   buildTileFiles,
   createFakeStorage,
   rec,
@@ -69,11 +72,11 @@ describe('loadAreaTileRecords: states', () => {
   it('without states.json reads Florida only (a Chicago polygon has no data)', async () => {
     const fl = await load();
     expect(fl.indexed).toBe(true);
-    expect(fl.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F' }]);
+    expect(fl.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F', ownerOccupied: 'exemption' }]);
     expect(storage.downloads).toContain(PARCEL_STATES_PATH);
     expect(storage.downloads).not.toContain(parcelIndexPath('il'));
     const il = await load(squareAt(IL_LAT, IL_LNG));
-    expect(il).toEqual({ indexed: false, records: [], sources: [] });
+    expect(il).toEqual({ indexed: false, records: [], sources: [], ownerUnknownIds: new Set() });
     expect(storage.downloads.filter((p) => p === PARCEL_STATES_PATH)).toHaveLength(1);
   });
 
@@ -81,7 +84,7 @@ describe('loadAreaTileRecords: states', () => {
     storage.files.set(...statesFile(REAL_STATE_BOXES));
     const il = await load(squareAt(IL_LAT, IL_LNG));
     expect(il.indexed).toBe(true);
-    expect(il.sources).toEqual([{ state: 'il', county: 'cook', roll: '2026' }]);
+    expect(il.sources).toEqual([{ state: 'il', county: 'cook', roll: '2026', ownerOccupied: 'mailing-match' }]);
     expect(il.records.every((r) => r.id.startsWith('il-cook-'))).toBe(true);
     expect(il.records).toHaveLength(5); // the far record is outside the box
     expect(storage.downloads).toContain(parcelIndexPath('il'));
@@ -89,7 +92,7 @@ describe('loadAreaTileRecords: states', () => {
     expect(storage.downloads).not.toContain(parcelIndexPath('ca'));
 
     const ca = await load(squareAt(CA_LAT, CA_LNG));
-    expect(ca.sources).toEqual([{ state: 'ca', county: 'los-angeles', roll: '2026' }]);
+    expect(ca.sources).toEqual([{ state: 'ca', county: 'los-angeles', roll: '2026', ownerOccupied: 'exemption' }]);
     expect(ca.records.every((r) => r.owner === '')).toBe(true);
   });
 
@@ -100,8 +103,8 @@ describe('loadAreaTileRecords: states', () => {
     useFiles(new Map([...flLake, ...ilLake, statesFile({ fl: REAL_STATE_BOXES.fl, il: REAL_STATE_BOXES.fl })]));
     const r = await load();
     expect(r.sources).toEqual([
-      { state: 'fl', county: 'lake', roll: '2026F' },
-      { state: 'il', county: 'lake', roll: '2026' },
+      { state: 'fl', county: 'lake', roll: '2026F', ownerOccupied: 'exemption' },
+      { state: 'il', county: 'lake', roll: '2026', ownerOccupied: 'exemption' },
     ]);
     expect(r.records.map((x) => x.id).sort()).toEqual(['35-0001', 'il-lake-01010000010000']);
     expect(tileCacheStats().paths.sort()).toEqual([...flLake.keys(), ...ilLake.keys()].filter((p) => p.endsWith('.gz')).sort());
@@ -113,7 +116,7 @@ describe('loadAreaTileRecords: states', () => {
     expect((await load(squareAt(41.5, -88.2))).indexed).toBe(false);
     // Outside every state's box: nothing is read beyond states.json.
     storage.downloads.length = 0;
-    expect(await load(squareAt(40, -100))).toEqual({ indexed: false, records: [], sources: [] });
+    expect(await load(squareAt(40, -100))).toEqual({ indexed: false, records: [], sources: [], ownerUnknownIds: new Set() });
     expect(storage.downloads).toEqual([]);
   });
 
@@ -260,5 +263,26 @@ describe('loadAreaTileRecords: tile cache by bytes', () => {
     } finally {
       storage.bucket = realBucket;
     }
+  });
+});
+
+describe('loadAreaTileRecords: county fields', () => {
+  beforeEach(() => {
+    resetTileCaches();
+    useFiles(new Map([...buildMultiStateFilesWithOrange(), statesFile(REAL_STATE_BOXES)]));
+  });
+
+  it("reports each source's resolved ownerOccupied and the ids of records from 'none' counties", async () => {
+    const mixed = await load(squareAt(CA_LAT, CA_LNG));
+    expect(mixed.sources).toEqual([
+      { state: 'ca', county: 'los-angeles', roll: '2026', ownerOccupied: 'exemption' },
+      { state: 'ca', county: 'orange', roll: '2026', ownerOccupied: 'none' },
+    ]);
+    expect([...mixed.ownerUnknownIds]).toEqual(['ca-orange-20000001']);
+    const oc = await load(squareAt(OC_LAT, OC_LNG));
+    expect(oc.ownerUnknownIds.size).toBe(5);
+    const fl = await load();
+    expect(fl.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F', ownerOccupied: 'exemption' }]);
+    expect(fl.ownerUnknownIds.size).toBe(0);
   });
 });

@@ -20,11 +20,14 @@ import {
   LAT,
   LNG,
   MANAGER,
+  OC_LAT,
+  OC_LNG,
   OWNER,
   REAL_STATE_BOXES,
   REP,
   SQUARE,
   buildMultiStateFiles,
+  buildMultiStateFilesWithOrange,
   buildTileFiles,
   createFakeStorage,
   postReq,
@@ -92,7 +95,8 @@ describe('POST /api/portal/knock/area/import: auth and validation', () => {
     ['a label over 60 chars', body({ label: 'L'.repeat(61) })],
     ['a blank label', body({ label: '   ' })],
     ['a numeric label', body({ label: 5 })],
-    ['a missing switch', body({ ownerOccupiedOnly: undefined })],
+    ['a missing housesOnly switch', body({ housesOnly: undefined })],
+    ['a string ownerOccupiedOnly switch', body({ ownerOccupiedOnly: 'yes' })],
   ])('400 invalid_request for %s', async (_name, b) => {
     expect(await call(b)).toMatchObject({ status: 400, json: { error: 'invalid_request' } });
   });
@@ -346,5 +350,52 @@ describe('POST /api/portal/knock/area/import: Illinois and California tiles', ()
     const r = await call(body());
     expect(r).toMatchObject({ status: 200, json: { added: 3 } });
     expect(record()).toMatchObject({ sources: [{ state: 'fl', county: 'duval', roll: '2026F' }] });
+  });
+});
+
+describe('POST /api/portal/knock/area/import: counties without an owner-occupied signal (Orange, CA)', () => {
+  beforeEach(() => {
+    storage.files.clear();
+    for (const [k, v] of buildMultiStateFilesWithOrange()) storage.files.set(k, v);
+    storage.files.set(...statesFile(REAL_STATE_BOXES));
+  });
+
+  it('imports Orange doors with Owner-occupied only on, without an ownerOccupied field', async () => {
+    const r = await call(body({ requestId: 'oc-1', polygon: squareAt(OC_LAT, OC_LNG) }));
+    expect(r).toMatchObject({ status: 200, json: { added: 2, counts: { inside: 4, add: 2, skipRented: 0, skipType: 2 } } });
+    for (const apn of ['10000001', '10000002']) {
+      const door = houses().get(areaDoorId('solar', `ca-orange-${apn}`))!;
+      expect(door).toMatchObject({ areaImportId: 'ai_oc-1', homestead: false, propertyType: 'single-family' });
+      expect(door).not.toHaveProperty('ownerOccupied');
+    }
+    expect(record('ai_oc-1')!.sources).toEqual([{ state: 'ca', county: 'orange', roll: '2026', ownerOccupied: 'none' }]);
+  });
+
+  it('a Los Angeles + Orange import skips only the Los Angeles renters and keeps ownerOccupied on LA doors', async () => {
+    const r = await call(body({ requestId: 'mix-1', polygon: squareAt(CA_LAT, CA_LNG) }));
+    expect(r).toMatchObject({ status: 200, json: { added: 2, counts: { inside: 4, add: 2, skipRented: 1, skipType: 1 } } });
+    expect(houses().get(areaDoorId('solar', 'ca-los-angeles-5070000001'))).toMatchObject({ ownerOccupied: true, homestead: true });
+    expect(houses().has(areaDoorId('solar', 'ca-los-angeles-5070000002'))).toBe(false);
+    expect(houses().get(areaDoorId('solar', 'ca-orange-20000001'))).not.toHaveProperty('ownerOccupied');
+    expect(record('ai_mix-1')!.sources).toEqual([
+      { state: 'ca', county: 'los-angeles', roll: '2026', ownerOccupied: 'exemption' },
+      { state: 'ca', county: 'orange', roll: '2026', ownerOccupied: 'none' },
+    ]);
+  });
+
+  it('Florida doors keep ownerOccupied; sources resolve the Florida default', async () => {
+    const r = await call(body());
+    expect(r).toMatchObject({ status: 200, json: { added: 3 } });
+    expect(houses().get(areaDoorId('solar', '26-0001'))).toMatchObject({ ownerOccupied: true });
+    expect(record()!.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F', ownerOccupied: 'exemption' }]);
+  });
+});
+
+describe('POST /api/portal/knock/area/import: an omitted ownerOccupiedOnly is false', () => {
+  it('imports renters too and stores ownerOccupiedOnly false', async () => {
+    const r = await call(body({ requestId: 'omit-1', ownerOccupiedOnly: undefined }));
+    expect(r).toMatchObject({ status: 200, json: { added: 4, counts: { skipRented: 0 }, area: { ownerOccupiedOnly: false } } });
+    expect(houses().get(areaDoorId('solar', '26-0002'))).toMatchObject({ ownerOccupied: false });
+    expect(record('ai_omit-1')).toMatchObject({ ownerOccupiedOnly: false });
   });
 });

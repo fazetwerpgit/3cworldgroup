@@ -17,8 +17,11 @@ import {
 export const maxDuration = 30;
 
 // POST /api/portal/knock/area/preview (3c-knock docs/AREA_IMPORT_API.md section 2).
-// Body: { campaignId, polygon: LatLng[], housesOnly, ownerOccupiedOnly }
+// Body: { campaignId, polygon: LatLng[], housesOnly, ownerOccupiedOnly? (omitted = false) }
 // -> 200 { campaignId, counts, homes: PreviewHome[], sources, maxHomes }. Writes nothing.
+// sources[i].ownerOccupied: 'exemption' | 'mailing-match' | 'none' (resolved; Florida = 'exemption').
+// 'none' = no owner-occupied signal: those homes carry ownerOccupiedUnknown: true and Owner-occupied
+// only does not skip them, so the app can hide or disable the switch.
 // Owner (admin/owner): any campaign; manager: their campaignIds; reps: 403 not_allowed.
 export async function POST(request: NextRequest) {
   try {
@@ -49,6 +52,8 @@ export async function POST(request: NextRequest) {
       unitOrder: h.unitOrder,
       unitOwnerNames: h.unitOwnerNames,
       homestead: h.homestead,
+      // Additive: only on doors whose county has no owner-occupied signal (sources[].ownerOccupied 'none').
+      ...(h.ownerOccupiedUnknown ? { ownerOccupiedUnknown: true } : {}),
       useType: h.useType,
       propertyType: h.propertyType,
       inCampaign: h.inCampaign,

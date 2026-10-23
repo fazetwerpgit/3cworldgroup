@@ -65,13 +65,18 @@ export class AreaFailure extends Error {
   }
 }
 
-/** `campaignId`, `polygon` and both switches of a preview or import body (400 invalid_request / invalid_polygon). */
+/**
+ * `campaignId`, `polygon` and both switches of a preview or import body (400 invalid_request /
+ * invalid_polygon). `housesOnly` is required; an omitted `ownerOccupiedOnly` is false (a county
+ * without an owner-occupied signal must not lose every door to a default); a non-boolean is 400.
+ */
 export function parseAreaBody(
   body: Record<string, unknown>
 ):
   | { ok: true; campaignId: string; polygon: LatLng[]; housesOnly: boolean; ownerOccupiedOnly: boolean }
   | { ok: false; response: NextResponse } {
-  const { campaignId, polygon, housesOnly, ownerOccupiedOnly } = body;
+  const { campaignId, polygon, housesOnly } = body;
+  const ownerOccupiedOnly = body.ownerOccupiedOnly === undefined ? false : body.ownerOccupiedOnly;
   if (!isDocId(campaignId) || !Array.isArray(polygon) || typeof housesOnly !== 'boolean' || typeof ownerOccupiedOnly !== 'boolean') {
     return { ok: false, response: areaError(400, 'invalid_request') };
   }
@@ -168,7 +173,7 @@ export async function planArea(db: Firestore, campaignId: string, polygon: reado
   if (!cells) throw new AreaFailure(422, 'too_big', { inside: null, max: AREA_MAX_HOMES });
   const [tiles, existing] = await Promise.all([loadAreaTileRecords(cells, box), existingDoorsNear(db, campaignId, polygon)]);
   if (!tiles.indexed) throw new AreaFailure(422, 'no_data_for_area');
-  const inside = areaHomes(tiles.records, polygon, campaignId);
+  const inside = areaHomes(tiles.records, polygon, campaignId, { ownerUnknownIds: tiles.ownerUnknownIds });
   if (inside.length > AREA_MAX_HOMES) throw new AreaFailure(422, 'too_big', { inside: inside.length, max: AREA_MAX_HOMES });
   return { homes: markInCampaign(inside, existing, campaignId), sources: tiles.sources, existing };
 }

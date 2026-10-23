@@ -6,7 +6,9 @@ import {
   PARCEL_STATES_PATH,
   parcelIndexPath,
   parseParcelTile,
+  resolveCountyFields,
   tilePath,
+  type OwnerOccupiedSignal,
   type ParcelIndex,
   type ParcelStates,
   type ParcelTile,
@@ -220,11 +222,13 @@ async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) 
   return out;
 }
 
-/** One tiled roll read for an area. Older areaImports docs have no `state` (= 'fl'). */
+/** One tiled roll read for an area. Older areaImports docs have no `state` (= 'fl') and no `ownerOccupied`. */
 export interface AreaSource {
   state: string;
   county: string;
   roll: string;
+  /** The county's owner-occupied signal (`CountyFields.ownerOccupied`, resolved: absent = 'exemption'). 'none' = unknown: Owner-occupied only does not apply. */
+  ownerOccupied: OwnerOccupiedSignal;
 }
 
 export interface AreaTileRecords {
@@ -234,6 +238,8 @@ export interface AreaTileRecords {
   records: ParcelTileRecord[];
   /** The tiles read, one entry per state + county + roll, sorted. */
   sources: AreaSource[];
+  /** Ids of the records from counties with no owner-occupied signal (`fields.ownerOccupied === 'none'`). */
+  ownerUnknownIds: Set<string>;
 }
 
 /**
@@ -243,31 +249,38 @@ export interface AreaTileRecords {
 export async function loadAreaTileRecords(cells: readonly string[], box: GeoBox, now = Date.now()): Promise<AreaTileRecords> {
   const states = pickStates(await loadStates(now), box);
   const indexes = await Promise.all(states.map((s) => loadIndex(s, now)));
-  const work: { state: string; path: string }[] = [];
+  const work: { state: string; path: string; ownerOccupied: OwnerOccupiedSignal }[] = [];
   states.forEach((state, i) => {
     const index = indexes[i];
     for (const cell of cells) {
       const counties = index.cells[cell];
       if (!Array.isArray(counties)) continue;
       for (const county of counties) {
-        if (typeof county === 'string' && county) work.push({ state, path: tilePath(state, county, cell) });
+        if (typeof county !== 'string' || !county) continue;
+        const ownerOccupied = resolveCountyFields(index.counties?.[county]?.fields).ownerOccupied;
+        work.push({ state, path: tilePath(state, county, cell), ownerOccupied });
       }
     }
   });
-  if (work.length === 0) return { indexed: false, records: [], sources: [] };
+  if (work.length === 0) return { indexed: false, records: [], sources: [], ownerUnknownIds: new Set() };
 
   const sources = new Map<string, AreaSource>();
   const records: ParcelTileRecord[] = [];
-  await mapLimit(work, TILE_READ_CONCURRENCY, async ({ state, path }) => {
+  const ownerUnknownIds = new Set<string>();
+  await mapLimit(work, TILE_READ_CONCURRENCY, async ({ state, path, ownerOccupied }) => {
     const t = await loadTile(path);
-    sources.set(`${state}\u0000${t.county}\u0000${t.roll}`, { state, county: t.county, roll: t.roll });
+    sources.set(`${state}\u0000${t.county}\u0000${t.roll}`, { state, county: t.county, roll: t.roll, ownerOccupied });
     for (const r of t.records) {
-      if (r.lat >= box.minLat && r.lat <= box.maxLat && r.lng >= box.minLng && r.lng <= box.maxLng) records.push(r);
+      if (r.lat >= box.minLat && r.lat <= box.maxLat && r.lng >= box.minLng && r.lng <= box.maxLng) {
+        records.push(r);
+        if (ownerOccupied === 'none') ownerUnknownIds.add(r.id);
+      }
     }
   });
   return {
     indexed: true,
     records,
+    ownerUnknownIds,
     sources: [...sources.values()].sort(
       (a, b) => a.state.localeCompare(b.state) || a.county.localeCompare(b.county) || a.roll.localeCompare(b.roll)
     ),

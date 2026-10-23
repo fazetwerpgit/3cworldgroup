@@ -120,6 +120,12 @@ export interface AreaHome {
   propertyType: PropertyType;
   /** Owner lives there (a condo building: more than half of its units). */
   homestead: boolean;
+  /**
+   * The county has no owner-occupied signal (`CountyFields.ownerOccupied === 'none'`, e.g. Orange,
+   * CA): `homestead` false means unknown, not rented. Owner-occupied only does not skip the door and
+   * an import leaves `ownerOccupied` off it. Absent = the signal is known.
+   */
+  ownerOccupiedUnknown?: true;
   /** Display-case owner name; null for a condo building (see `unitOwnerNames`) or none on the roll. */
   ownerName: string | null;
   /** Condo building: unit labels in natural order; null otherwise. */
@@ -139,7 +145,13 @@ const naturalCompare = new Intl.Collator('en', { numeric: true }).compare;
  * address before the unit) are one MDU door at their mean position, a lone unit a plain door; a
  * second parcel at the same address is dropped. Sorted by id. `inCampaign` is false (see `markInCampaign`).
  */
-export function areaHomes(records: readonly ParcelTileRecord[], polygon: readonly LatLng[], campaignId: string): AreaHome[] {
+export function areaHomes(
+  records: readonly ParcelTileRecord[],
+  polygon: readonly LatLng[],
+  campaignId: string,
+  opts: { ownerUnknownIds?: ReadonlySet<string> } = {},
+): AreaHome[] {
+  const unknown = (r: ParcelTileRecord) => opts.ownerUnknownIds?.has(r.id) === true;
   const byId = new Map<string, ParcelTileRecord>();
   for (const r of records) if (!byId.has(r.id) && AREA_PROPERTY_TYPES[r.use] && pointInPolygon(r, polygon)) byId.set(r.id, r);
   const inside = [...byId.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -155,6 +167,7 @@ export function areaHomes(records: readonly ParcelTileRecord[], polygon: readonl
     useType: r.use,
     propertyType: AREA_PROPERTY_TYPES[r.use],
     homestead: r.homestead,
+    ...(unknown(r) ? { ownerOccupiedUnknown: true as const } : {}),
     ownerName: formatOwnerName(r.owner),
     unitOrder: null,
     unitOwnerNames: null,
@@ -205,6 +218,8 @@ export function areaHomes(records: readonly ParcelTileRecord[], polygon: readonl
       useType: '004',
       propertyType: 'condo',
       homestead: units.filter((u) => u.r.homestead).length * 2 > units.length,
+      // Any unit without a signal makes the building's majority unknowable.
+      ...(units.some((u) => unknown(u.r)) ? { ownerOccupiedUnknown: true as const } : {}),
       ownerName: null,
       unitOrder: units.map((u) => u.unit),
       unitOwnerNames: owners,
@@ -242,11 +257,16 @@ export type AreaHomeStatus = 'add' | 'skip-rented' | 'skip-type' | 'already-in-c
 /** Kinds that count as houses for the Houses only switch. */
 export const AREA_HOUSE_TYPES: readonly PropertyType[] = ['single-family', 'mobile-home'];
 
-/** First match wins: already-in-campaign, skip-type (Houses only), skip-rented (Owner-occupied only), add. */
-export function areaHomeStatus(home: Pick<AreaHome, 'inCampaign' | 'propertyType' | 'homestead'>, s: AreaSwitches): AreaHomeStatus {
+type StatusFields = Pick<AreaHome, 'inCampaign' | 'propertyType' | 'homestead' | 'ownerOccupiedUnknown'>;
+
+/**
+ * First match wins: already-in-campaign, skip-type (Houses only), skip-rented (Owner-occupied only;
+ * never a door whose county has no owner-occupied signal), add.
+ */
+export function areaHomeStatus(home: StatusFields, s: AreaSwitches): AreaHomeStatus {
   if (home.inCampaign) return 'already-in-campaign';
   if (s.housesOnly && !AREA_HOUSE_TYPES.includes(home.propertyType)) return 'skip-type';
-  if (s.ownerOccupiedOnly && !home.homestead) return 'skip-rented';
+  if (s.ownerOccupiedOnly && !home.homestead && !home.ownerOccupiedUnknown) return 'skip-rented';
   return 'add';
 }
 
@@ -259,7 +279,7 @@ export interface AreaPreviewCounts {
   alreadyInCampaign: number;
 }
 
-export function areaPreviewCounts(homes: readonly Pick<AreaHome, 'inCampaign' | 'propertyType' | 'homestead'>[], s: AreaSwitches): AreaPreviewCounts {
+export function areaPreviewCounts(homes: readonly StatusFields[], s: AreaSwitches): AreaPreviewCounts {
   const c: AreaPreviewCounts = { inside: homes.length, add: 0, skipRented: 0, skipType: 0, alreadyInCampaign: 0 };
   for (const h of homes) {
     const status = areaHomeStatus(h, s);
@@ -283,6 +303,7 @@ export interface AreaPackCount {
  * (`packAreaHouses`: zip + ~1 km cell; `existingPacks` = the campaign's area packs so a cell it
  * already has keeps its name and new ones number on), plus `ownerOccupied` / `propertyType` (what
  * the app reads today) and `areaImportId`, `homestead`, `useType`, `ownerName` / `unitOwnerNames`.
+ * `ownerOccupied` is left off a door whose county has no signal (`ownerOccupiedUnknown`).
  */
 export function areaImportDocs(
   homes: readonly AreaHome[],
@@ -296,7 +317,7 @@ export function areaImportDocs(
   const houses: House[] = adding.map((h, i) => {
     const doc: HouseDoc = {
       ...leadHouseDoc(leads[i], docOpts),
-      ownerOccupied: h.homestead,
+      ...(h.ownerOccupiedUnknown ? {} : { ownerOccupied: h.homestead }),
       propertyType: h.propertyType,
       areaImportId: opts.areaImportId,
       homestead: h.homestead,

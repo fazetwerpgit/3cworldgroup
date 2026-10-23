@@ -9,6 +9,7 @@ import {
   FL_COUNTY_NUMBERS,
   mergeParcelIndex,
   parseParcelTile,
+  resolveCountyFields,
   tilePath,
   tileRecordFromParcel,
 } from './parcelTiles';
@@ -118,5 +119,20 @@ describe('parcelTiles', () => {
     assert.deepEqual(Object.keys(index.counties), ['clay', 'duval']);
     assert.equal(index.counties.clay.homes, 2);
     assert.equal(index.counties.clay.tiles, 2);
+  });
+});
+
+describe('resolveCountyFields', () => {
+  test('absent or malformed = the Florida default', () => {
+    assert.deepEqual(resolveCountyFields(undefined), { ownerOccupied: 'exemption', ownerNames: true });
+    assert.deepEqual(resolveCountyFields(null), { ownerOccupied: 'exemption', ownerNames: true });
+    assert.deepEqual(resolveCountyFields('x'), { ownerOccupied: 'exemption', ownerNames: true });
+    assert.deepEqual(resolveCountyFields({ ownerOccupied: 'bogus' }), { ownerOccupied: 'exemption', ownerNames: true });
+  });
+
+  test("accepts 'exemption', 'mailing-match' and 'none'", () => {
+    assert.deepEqual(resolveCountyFields({ ownerOccupied: 'mailing-match', ownerNames: true }), { ownerOccupied: 'mailing-match', ownerNames: true });
+    assert.deepEqual(resolveCountyFields({ ownerOccupied: 'none', ownerNames: false }), { ownerOccupied: 'none', ownerNames: false });
+    assert.deepEqual(resolveCountyFields({ ownerOccupied: 'exemption', ownerNames: false }), { ownerOccupied: 'exemption', ownerNames: false });
   });
 });

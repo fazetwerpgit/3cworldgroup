@@ -23,11 +23,14 @@ import {
   LAT,
   LNG,
   MANAGER,
+  OC_LAT,
+  OC_LNG,
   OWNER,
   REAL_STATE_BOXES,
   REP,
   SQUARE,
   buildMultiStateFiles,
+  buildMultiStateFilesWithOrange,
   buildTileFiles,
   createFakeStorage,
   postReq,
@@ -129,7 +132,7 @@ describe('POST /api/portal/knock/area/preview: homes', () => {
     expect(r.status).toBe(200);
     expect(r.json.campaignId).toBe('solar');
     expect(r.json.maxHomes).toBe(2000);
-    expect(r.json.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F' }]);
+    expect(r.json.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F', ownerOccupied: 'exemption' }]);
     expect(r.json.counts).toEqual({ inside: 6, add: 3, skipRented: 1, skipType: 2, alreadyInCampaign: 0 });
     const ids = r.json.homes.map((h: { id: string }) => h.id);
     expect(ids).toEqual([...ids].sort());
@@ -221,7 +224,7 @@ describe('POST /api/portal/knock/area/preview: homes', () => {
     for (const [k, v] of files) storage.files.set(k, v);
     const r = await call(body(OFF));
     expect(r.json.counts.inside).toBe(7);
-    expect(r.json.sources).toEqual([{ state: 'fl', county: 'clay', roll: '2026P' }, { state: 'fl', county: 'duval', roll: '2026F' }]);
+    expect(r.json.sources).toEqual([{ state: 'fl', county: 'clay', roll: '2026P', ownerOccupied: 'exemption' }, { state: 'fl', county: 'duval', roll: '2026F', ownerOccupied: 'exemption' }]);
   });
 });
 
@@ -276,7 +279,7 @@ describe('POST /api/portal/knock/area/preview: Illinois and California tiles', (
     multi();
     const r = await call(body({ polygon: squareAt(IL_LAT, IL_LNG), ...OFF }));
     expect(r.status).toBe(200);
-    expect(r.json.sources).toEqual([{ state: 'il', county: 'cook', roll: '2026' }]);
+    expect(r.json.sources).toEqual([{ state: 'il', county: 'cook', roll: '2026', ownerOccupied: 'mailing-match' }]);
     expect(r.json.homes.map((h: { id: string }) => h.id)).toEqual([
       areaDoorId('solar', 'il-cook-17060000010000'),
       areaDoorId('solar', 'il-cook-17060000020000'),
@@ -295,7 +298,7 @@ describe('POST /api/portal/knock/area/preview: Illinois and California tiles', (
     multi();
     const r = await call(body({ polygon: squareAt(CA_LAT, CA_LNG), ...OFF }));
     expect(r.status).toBe(200);
-    expect(r.json.sources).toEqual([{ state: 'ca', county: 'los-angeles', roll: '2026' }]);
+    expect(r.json.sources).toEqual([{ state: 'ca', county: 'los-angeles', roll: '2026', ownerOccupied: 'exemption' }]);
     expect(r.json.counts).toEqual({ inside: 3, add: 3, skipRented: 0, skipType: 0, alreadyInCampaign: 0 });
     for (const h of r.json.homes) expect(h.ownerName).toBeNull();
     expect(r.json.homes.find((h: { unitOrder: string[] | null }) => h.unitOrder)).toMatchObject({ unitOrder: ['7', '8'], unitOwnerNames: {} });
@@ -305,7 +308,7 @@ describe('POST /api/portal/knock/area/preview: Illinois and California tiles', (
   it('a Florida polygon is unchanged with states.json present', async () => {
     multi();
     const r = await call(body());
-    expect(r.json.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F' }]);
+    expect(r.json.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F', ownerOccupied: 'exemption' }]);
     expect(r.json.counts).toEqual({ inside: 6, add: 3, skipRented: 1, skipType: 2, alreadyInCampaign: 0 });
   });
 
@@ -332,5 +335,62 @@ describe('POST /api/portal/knock/area/preview: Illinois and California tiles', (
     multi();
     storage.files.delete('parcels/ca/index.json');
     expect(await call(body({ polygon: squareAt(CA_LAT, CA_LNG) }))).toEqual({ status: 503, json: { error: 'tiles_unavailable' } });
+  });
+});
+
+describe('POST /api/portal/knock/area/preview: counties without an owner-occupied signal (Orange, CA)', () => {
+  beforeEach(() => {
+    storage.files.clear();
+    for (const [k, v] of buildMultiStateFilesWithOrange()) storage.files.set(k, v);
+    storage.files.set(...statesFile(REAL_STATE_BOXES));
+  });
+  type Home = { id: string; status: string; homestead: boolean; ownerOccupiedUnknown?: boolean };
+
+  it('an Orange-only polygon with Owner-occupied only on still returns its homes', async () => {
+    const r = await call(body({ polygon: squareAt(OC_LAT, OC_LNG) }));
+    expect(r.status).toBe(200);
+    expect(r.json.sources).toEqual([{ state: 'ca', county: 'orange', roll: '2026', ownerOccupied: 'none' }]);
+    expect(r.json.counts).toEqual({ inside: 4, add: 2, skipRented: 0, skipType: 2, alreadyInCampaign: 0 });
+    for (const h of r.json.homes as Home[]) {
+      expect(h).toMatchObject({ homestead: false, ownerOccupiedUnknown: true });
+      expect(h.status).not.toBe('skip-rented');
+    }
+    const all = await call(body({ polygon: squareAt(OC_LAT, OC_LNG), housesOnly: false }));
+    expect(all.json.counts).toEqual({ inside: 4, add: 4, skipRented: 0, skipType: 0, alreadyInCampaign: 0 });
+  });
+
+  it('a Los Angeles + Orange polygon skips only the Los Angeles renters', async () => {
+    const r = await call(body({ polygon: squareAt(CA_LAT, CA_LNG) }));
+    expect(r.json.sources).toEqual([
+      { state: 'ca', county: 'los-angeles', roll: '2026', ownerOccupied: 'exemption' },
+      { state: 'ca', county: 'orange', roll: '2026', ownerOccupied: 'none' },
+    ]);
+    expect(r.json.counts).toEqual({ inside: 4, add: 2, skipRented: 1, skipType: 1, alreadyInCampaign: 0 });
+    const byId = new Map((r.json.homes as Home[]).map((h) => [h.id, h]));
+    expect(byId.get(areaDoorId('solar', 'ca-los-angeles-5070000002'))!.status).toBe('skip-rented');
+    expect(byId.get(areaDoorId('solar', 'ca-los-angeles-5070000002'))).not.toHaveProperty('ownerOccupiedUnknown');
+    expect(byId.get(areaDoorId('solar', 'ca-los-angeles-5070000001'))).not.toHaveProperty('ownerOccupiedUnknown');
+    expect(byId.get(areaDoorId('solar', 'ca-orange-20000001'))).toMatchObject({ status: 'add', homestead: false, ownerOccupiedUnknown: true });
+  });
+
+  it('Florida (no fields) is unchanged: exemption source, renters skipped, no unknown flag', async () => {
+    const r = await call(body());
+    expect(r.json.sources).toEqual([{ state: 'fl', county: 'duval', roll: '2026F', ownerOccupied: 'exemption' }]);
+    expect(r.json.counts).toEqual({ inside: 6, add: 3, skipRented: 1, skipType: 2, alreadyInCampaign: 0 });
+    for (const h of r.json.homes as Home[]) expect(h).not.toHaveProperty('ownerOccupiedUnknown');
+  });
+});
+
+describe('POST /api/portal/knock/area/preview: an omitted ownerOccupiedOnly is false', () => {
+  it('counts renters as add when the switch is left out; explicit true still skips them', async () => {
+    const omitted = await call(body({ ownerOccupiedOnly: undefined }));
+    expect(omitted.status).toBe(200);
+    expect(omitted.json.counts).toEqual({ inside: 6, add: 4, skipRented: 0, skipType: 2, alreadyInCampaign: 0 });
+    const on = await call(body({ ownerOccupiedOnly: true }));
+    expect(on.json.counts).toEqual({ inside: 6, add: 3, skipRented: 1, skipType: 2, alreadyInCampaign: 0 });
+  });
+
+  it('400 invalid_request for a non-boolean ownerOccupiedOnly', async () => {
+    expect(await call(body({ ownerOccupiedOnly: 'yes' }))).toMatchObject({ status: 400, json: { error: 'invalid_request' } });
   });
 });

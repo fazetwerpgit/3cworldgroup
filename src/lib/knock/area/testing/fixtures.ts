@@ -146,6 +146,56 @@ export function buildMultiStateFiles(): Map<string, Buffer> {
   ]);
 }
 
+// Orange, CA: no owner-occupied signal (`fields.ownerOccupied: 'none'`): every `homestead` is false
+// (unknown, not rented) and there are no owner names. Ids `ca-orange-<8-digit APN>` (made up).
+
+export const OC_LAT = 33.75;
+export const OC_LNG = -117.87;
+
+const oc = (apn: string, over: Partial<ParcelTileRecord>): ParcelTileRecord =>
+  rec(`ca-orange-${apn}`, { lat: OC_LAT, lng: OC_LNG, city: 'SANTA ANA', zip: '92701', homestead: false, owner: '', ...over });
+
+/**
+ * Inside squareAt(OC_LAT, OC_LNG): two houses, a 2-unit condo building, a duplex. Plus one house
+ * inside squareAt(CA_LAT, CA_LNG), so a polygon there covers Los Angeles and Orange (synthetic).
+ */
+export const OC_RECORDS: ParcelTileRecord[] = [
+  oc('10000001', { address: '10 ORANGE TEST AVE', lat: OC_LAT + 0.001, lng: OC_LNG + 0.001 }),
+  oc('10000002', { address: '12 ORANGE TEST AVE', lat: OC_LAT + 0.0012, lng: OC_LNG + 0.001 }),
+  oc('10000101', { address: '50 CITRUS ST 1', lat: OC_LAT - 0.002, lng: OC_LNG - 0.002, use: '004' }),
+  oc('10000102', { address: '50 CITRUS ST 2', lat: OC_LAT - 0.002, lng: OC_LNG - 0.0021, use: '004' }),
+  oc('10000201', { address: '70 GROVE ST', lat: OC_LAT - 0.003, lng: OC_LNG + 0.003, use: '008' }),
+  oc('20000001', { address: '400 BORDER TEST AVE', lat: CA_LAT + 0.003, lng: CA_LNG - 0.003 }),
+];
+
+/** Tile file maps merged: a state index written by more than one map gets the union of their counties and cells. */
+export function mergeTileFiles(...maps: Map<string, Buffer>[]): Map<string, Buffer> {
+  const out = new Map<string, Buffer>();
+  for (const m of maps) {
+    for (const [path, bytes] of m) {
+      const prev = out.get(path);
+      if (!prev || !/^parcels\/[a-z]{2}\/index\.json$/.test(path)) {
+        out.set(path, bytes);
+        continue;
+      }
+      const a = JSON.parse(prev.toString()) as ParcelIndex;
+      const b = JSON.parse(bytes.toString()) as ParcelIndex;
+      const cells: ParcelIndex['cells'] = { ...a.cells };
+      for (const [gh, counties] of Object.entries(b.cells)) cells[gh] = [...new Set([...(cells[gh] ?? []), ...counties])].sort();
+      out.set(path, Buffer.from(JSON.stringify({ ...a, counties: { ...a.counties, ...b.counties }, cells })));
+    }
+  }
+  return out;
+}
+
+/** buildMultiStateFiles plus Orange, CA (`fields.ownerOccupied: 'none'`) in the same California index. */
+export function buildMultiStateFilesWithOrange(): Map<string, Buffer> {
+  return mergeTileFiles(
+    buildMultiStateFiles(),
+    buildTileFiles(OC_RECORDS, 'orange', '2026', { state: 'ca', countyNo: '059', fields: { ownerOccupied: 'none', ownerNames: false } })
+  );
+}
+
 /** `parcels/states.json` bytes with each state's box (the real file's shape). */
 export function statesFile(boxes: Record<string, ParcelStates['states'][string]['bbox']>): [string, Buffer] {
   const states: ParcelStates = {

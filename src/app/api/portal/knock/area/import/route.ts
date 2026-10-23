@@ -29,7 +29,7 @@ import {
 } from '@/lib/knock/area/server';
 
 // POST /api/portal/knock/area/import (3c-knock docs/AREA_IMPORT_API.md section 3).
-// Body: { requestId, campaignId, polygon, housesOnly, ownerOccupiedOnly, label? } (+ header
+// Body: { requestId, campaignId, polygon, housesOnly, ownerOccupiedOnly? (omitted = false), label? } (+ header
 // Idempotency-Key: <requestId>; the body wins) -> 200 ImportResponse, the same body for every retry.
 // The homes are always planned again here from the polygon; a client list is never trusted.
 // Idempotent on areaImports/ai_<requestId>: done/removed replays the stored result, a live
