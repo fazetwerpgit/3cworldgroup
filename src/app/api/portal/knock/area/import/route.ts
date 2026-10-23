@@ -20,6 +20,7 @@ import {
   areaSummary,
   campaignAccess,
   grpcCode,
+  importManagerId,
   parseAreaBody,
   planArea,
   readJsonObject,
@@ -135,6 +136,8 @@ export async function POST(request: NextRequest) {
           status: 'writing',
           createdBy: caller.uid,
           createdByName: caller.name,
+          // Who imported, as the gate saw them (the backfill of manager doors reads it).
+          createdByRole: caller.knockRole,
           createdAt: now,
           startedAt: now,
           finishedAt: null,
@@ -189,7 +192,9 @@ export async function POST(request: NextRequest) {
         existingPacks: await existingPacks(db, campaignId, plan.existing),
       });
       packs = docs.packs;
-      houses = docs.houses as unknown as ({ id: string } & Record<string, unknown>)[];
+      // areaDraw.ts is the app's shared copy (always managerId null): a manager's doors get theirs here.
+      const managerId = importManagerId(caller);
+      houses = docs.houses.map((h) => ({ ...h, managerId })) as unknown as ({ id: string } & Record<string, unknown>)[];
       if (houses.length === 0) throw new AreaFailure(422, 'nothing_to_add', { counts });
     } catch (error) {
       const written = resume ? await areaDoorCount(db, campaignId, areaImportId) : 0;

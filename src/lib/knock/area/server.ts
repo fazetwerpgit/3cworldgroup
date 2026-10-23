@@ -104,6 +104,15 @@ export async function areaCaller(request: NextRequest): Promise<{ ok: true; call
   return { ok: true, caller: { uid, name, knockRole, campaignIds } };
 }
 
+/**
+ * `managerId` of the doors this caller's import writes: a manager's own uid, so the doors they add
+ * are theirs to see, lasso-assign, delete and restore under the houses rules (managerId == them);
+ * null for an owner (unassigned, as before). The doors stay unassigned (assignedRepId null) either way.
+ */
+export function importManagerId(caller: Pick<AreaCaller, 'uid' | 'knockRole'>): string | null {
+  return caller.knockRole === 'manager' ? caller.uid : null;
+}
+
 /** The body of a POST as a plain object, or null (400 invalid_request). */
 export async function readJsonObject(request: NextRequest): Promise<Record<string, unknown> | null> {
   const body = await request.json().catch(() => null);

@@ -88,6 +88,21 @@ describe('POST /api/portal/knock/area/import: auth and validation', () => {
     expect(r.json.area.createdBy).toEqual({ uid: 'mgr', name: 'Max Manager' });
   });
 
+  it("a manager's doors carry their managerId and stay unassigned; the record stores who imported", async () => {
+    gate.mockResolvedValue(MANAGER);
+    expect((await call(body())).status).toBe(200);
+    expect(houses().size).toBe(3);
+    for (const door of houses().values()) expect(door).toMatchObject({ managerId: 'mgr', assignedRepId: null });
+    expect(record()).toMatchObject({ createdBy: 'mgr', createdByName: 'Max Manager', createdByRole: 'manager' });
+  });
+
+  it("an owner's doors keep managerId null; the record stores the owner role", async () => {
+    expect((await call(body())).status).toBe(200);
+    expect(houses().size).toBe(3);
+    for (const door of houses().values()) expect(door).toMatchObject({ managerId: null, assignedRepId: null });
+    expect(record()).toMatchObject({ createdBy: 'own', createdByRole: 'owner' });
+  });
+
   it.each([
     ['a bad requestId', body({ requestId: 'has space' })],
     ['a requestId over 128 chars', body({ requestId: 'x'.repeat(129) })],
