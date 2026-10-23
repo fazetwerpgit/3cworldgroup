@@ -33,13 +33,17 @@ export function isNoteAudience(value: unknown): value is NoteAudience {
 }
 
 /**
- * A stored or sent audience in canonical form: missing, empty or unreadable
- * reads as ['all'] (every note written before tags existed); 'all' alongside
- * other tags is just ['all']; the rest deduplicated in NOTE_AUDIENCES order.
+ * A stored or sent audience in canonical form: missing or empty reads as
+ * ['all'] (every note written before tags existed); 'all' alongside other tags
+ * is just ['all']; the rest deduplicated in NOTE_AUDIENCES order. A value that
+ * is there but holds no known tag (a typo, a tag from a newer build, a bad
+ * write) fails closed to ['owner'], so it never reaches reps.
  */
 export function normalizeAudience(raw: unknown): NoteAudience[] {
+  if (raw === undefined || raw === null || (Array.isArray(raw) && raw.length === 0)) return ['all'];
   const tags = Array.isArray(raw) ? raw.filter(isNoteAudience) : [];
-  if (tags.length === 0 || tags.includes('all')) return ['all'];
+  if (tags.length === 0) return ['owner'];
+  if (tags.includes('all')) return ['all'];
   return NOTE_AUDIENCES.filter((tag) => tags.includes(tag));
 }
 

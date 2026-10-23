@@ -24,8 +24,8 @@ export type EvalUser = AudienceUser & { mainLine?: MainLine };
 
 /** The default asker: a fiber-only rep. */
 export const EVAL_FIBER_REP: EvalUser = { fieldRole: 'ae_tier_1' };
-/** The asker's manager in every eval prompt, so "ask Dana" counts as the right escalation. */
-export const EVAL_MANAGER = 'Dana';
+/** A "go ask someone" pointer: wrong by default (Jeremy or Jacob only for owner-only matters). */
+export const ASK_POINTER = /jeremy|jacob|your manager|\b(ask|call|check with|hit up|text|reach out to) (your|a|the) (manager|lead|upline|team lead|office)\b/i;
 
 /**
  * Made-up notes the harness adds to whatever notes it loads, tagged for one
@@ -42,7 +42,7 @@ export const SYNTHETIC_NOTES: { id: string; title: string; body: string; order: 
   },
 ];
 
-export const DONT_KNOW = /not sure|don'?t know|don'?t have|can'?t (say|tell|confirm)|no idea|isn'?t confirmed|not confirmed|(ask|call|check with|hit up|text) (jeremy|jacob|dana|your manager)|(jeremy|jacob)( (or|and) (jeremy|jacob))? (has|have|would have|would know|knows?) (that|it|those|the)/i;
+export const DONT_KNOW = /not sure|don'?t know|don'?t have|can'?t (say|tell|confirm)|no idea|isn'?t confirmed|not confirmed|(ask|call|check with) (jeremy|jacob)|(jeremy|jacob)( (or|and) (jeremy|jacob))? (has|have|would have|would know|knows?) (that|it|those|the)/i;
 // The 1 gig gift card code offered, not warned off ("don't enter 4D2D100").
 const OFFERS_4D2D100 = /(?<!\b(?:don['’]?t|do not|never|can['’]?t|cannot|won['’]?t|not|no need to)\s+(?:enter|use|put( in)?|apply|add|type( in)?)\s+(?:the\s+(?:code\s+)?)?)4D2D100/i;
 // A spouse or kid on the same T-Mobile account does not make them eligible.
@@ -115,12 +115,12 @@ export const CASES: EvalCase[] = [
   { id: 'tone-joke-spouse', kind: 'tone', ask: 'got chased by a chihuahua today lmao. anyway lady says she has to ask her husband, what do i say',
     must: [/husband|spouse|both|together|him/i] },
   { id: 'tone-down', kind: 'tone', ask: 'honestly 0 sales in 2 weeks im thinking about quitting',
-    must: [/dana|your manager/i], mustNot: [/\bha\b|lol|😂/i, /jeremy|jacob/i] },
-  // Escalation: the rep's own manager by default, not the owners
+    mustNot: [/\bha\b|lol|😂/i, ASK_POINTER] },
+  // Escalation: none by default; a plain "not sure" with no "ask X" pointer
   { id: 'escalate-who', kind: 'tone', ask: "who's ben? he said he's on the team",
-    must: [/dana|your manager|chat/i], mustNot: [/jeremy|jacob/i] },
+    must: [DONT_KNOW], mustNot: [ASK_POINTER] },
   { id: 'escalate-solar-page', kind: 'screen', ask: "where's the solar page",
-    mustNot: [/jeremy|jacob/i] },
+    mustNot: [ASK_POINTER] },
   // Audience: solar notes reach solar reps only (SYNTHETIC_NOTES)
   { id: 'audience-fiber-no-solar', kind: 'trap', ask: 'whats the code for the solar sit form',
     must: [DONT_KNOW], mustNot: [/SUNSIT77/, /48 hours/i] },

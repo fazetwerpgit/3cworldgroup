@@ -25,7 +25,7 @@ import { askLineFor, hasSolarNotes, notesForAudience } from '@/lib/ask/audience'
 import { sortNotes, type NoteDraft } from '@/lib/ask/notes';
 import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
 import { askProviderConfig, callAskModel, type AskMessage } from '@/lib/ask/provider';
-import { CASES, EVAL_FIBER_REP, EVAL_MANAGER, SYNTHETIC_NOTES, scoreAnswer, words } from './ask-eval-score';
+import { CASES, EVAL_FIBER_REP, SYNTHETIC_NOTES, scoreAnswer, words } from './ask-eval-score';
 
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ it('runs the Ask 3C eval', { timeout: 60 * 60_000 }, async () => {
     const seen = notesForAudience(notes, user);
     const system = buildSystemPrompt(seen, {
       firstName: 'Sam', dealerCodes: ['EVAL1234'], now: eastern(c.at ?? '2026-10-20T15:00'), home: 'Des Moines, IA',
-      line: askLineFor(user, user.mainLine), solarNotes: hasSolarNotes(seen), managerFirstName: EVAL_MANAGER,
+      line: askLineFor(user, user.mainLine), solarNotes: hasSolarNotes(seen),
     });
     const messages: AskMessage[] = [{ role: 'system', content: system }, ...(c.history ?? []), { role: 'user', content: c.ask }];
     const started = Date.now();

@@ -28,9 +28,7 @@ export const maxDuration = 45;
 
 const STUB_MODEL = 'sandbox-stub';
 const PHOTO_ONLY_QUESTION = 'Here is a photo. What should I do?';
-// Where a stuck rep goes next: their manager (the owners run 3C, so they get no pointer).
-const callForHelp = (owner: boolean) => (owner ? 'Try again in a moment.' : 'Try again, or ask your manager.');
-const askManager = (owner: boolean) => (owner ? '' : ' Ask your manager.');
+const TRY_AGAIN = 'Try again in a moment.';
 const PREV_QUESTION_CHARS = 200;
 
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
@@ -85,11 +83,11 @@ export async function POST(request: NextRequest) {
   const config = askProviderConfig();
   // The E2E sandbox answers without a key so the page can be tested; it never calls out.
   const stub = !config.apiKey && process.env.E2E_SANDBOX === '1';
-  if (!config.apiKey && !stub) return fail(`Ask 3C is not set up yet.${askManager(gate.isOwner)}`, 503);
+  if (!config.apiKey && !stub) return fail('Ask 3C is not set up yet.', 503);
 
   const now = new Date();
   if (!(await takeDailyAsk(db, gate.uid, now))) {
-    return fail(`You've asked ${ASK_DAILY_LIMIT} questions today, the daily limit.${askManager(gate.isOwner)}`, 429);
+    return fail(`You've asked ${ASK_DAILY_LIMIT} questions today, the daily limit. It resets tomorrow.`, 429);
   }
 
   // The rep's own portal data loads alongside the notes (it has its own time
@@ -97,12 +95,12 @@ export async function POST(request: NextRequest) {
   const [allNotes, dealerCodes, profile, live] = await Promise.all([
     loadNotes(db),
     ownDealerCodes(db, gate.uid),
-    loadAskProfile(db, gate.uid).catch(() => ({ home: '', mainLine: null, managerFirstName: '' })),
+    loadAskProfile(db, gate.uid).catch(() => ({ home: '', mainLine: null })),
     stub ? Promise.resolve('') : loadRepSnapshot(db, gate.uid, now),
   ]);
   // Only the notes this user's verified roles may see (audience.ts), never anything the client sent.
   const notes = notesForAudience(allNotes, gate);
-  const { home, managerFirstName } = profile;
+  const { home } = profile;
   const firstName = gate.name.includes('@') || gate.name === gate.uid ? '' : gate.name.split(/\s+/)[0];
   const redacted = redactContact(question);
   // A follow-up's log row shows what it followed, so the owner can read it in context.
@@ -133,10 +131,8 @@ export async function POST(request: NextRequest) {
           home,
           live,
           owner: gate.isOwner,
-          admin: gate.isAdmin && !gate.isOwner,
           line: askLineFor(gate, profile.mainLine),
           solarNotes: hasSolarNotes(notes),
-          managerFirstName,
         }) },
       ...history.map((turn) => ({
         role: turn.role,
@@ -153,7 +149,7 @@ export async function POST(request: NextRequest) {
       // Only an answered question counts against the day.
       await giveBackDailyAsk(db, gate.uid, now).catch(() => {});
       return fail(
-        kind === 'timeout' ? `Ask 3C took too long to answer. ${callForHelp(gate.isOwner)}` : `Ask 3C couldn't answer right now. ${callForHelp(gate.isOwner)}`,
+        kind === 'timeout' ? `Ask 3C took too long to answer. ${TRY_AGAIN}` : `Ask 3C couldn't answer right now. ${TRY_AGAIN}`,
         kind === 'timeout' ? 504 : 502
       );
     }

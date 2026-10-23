@@ -147,37 +147,16 @@ export interface AskProfile {
   home: string;
   /** A dual rep's main line (users/{uid}.mainLine), or null. */
   mainLine: MainLine | null;
-  /** Their manager's first name (users/{reportsToId ?? managerId}.displayName), or '' when none or unreadable. */
-  managerFirstName: string;
 }
 
-/** The first word of a display name, or '' when the name is missing or an email. */
-function firstNameOf(raw: unknown): string {
-  const name = typeof raw === 'string' ? raw.trim() : '';
-  if (!name || name.includes('@')) return '';
-  return name.split(/\s+/)[0].replace(/[^\p{L}'-]/gu, '').slice(0, 40);
-}
-
-/**
- * The asker's home, main line and manager's first name, from users/{uid} and
- * their manager's users doc (the manager link is reportsToId, older docs
- * managerId, as the admin user form reads it). Only the first name leaves here.
- */
+/** The asker's home and main line, from their own users/{uid} doc. */
 export async function loadAskProfile(db: FirebaseFirestore.Firestore, uid: string): Promise<AskProfile> {
   const data = (await db.collection('users').doc(uid).get()).data() ?? {};
   const city = typeof data.city === 'string' ? data.city.trim() : '';
   const state = typeof data.state === 'string' ? data.state.trim() : '';
-  const link = [data.reportsToId, data.managerId].find((value) => typeof value === 'string' && value.trim());
-  const managerUid = typeof link === 'string' ? link.trim() : '';
-  let managerFirstName = '';
-  if (managerUid && managerUid !== uid && /^[A-Za-z0-9_-]{1,128}$/.test(managerUid)) {
-    const manager = await db.collection('users').doc(managerUid).get().catch(() => null);
-    managerFirstName = firstNameOf(manager?.data()?.displayName);
-  }
   return {
     home: [city, state].filter(Boolean).join(', '),
     mainLine: isMainLine(data.mainLine) ? data.mainLine : null,
-    managerFirstName,
   };
 }
 

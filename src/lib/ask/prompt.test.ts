@@ -99,35 +99,28 @@ describe('buildSystemPrompt escalation', () => {
       )
       .join('\n');
 
-  it("names the rep's own manager and never the owners by default", () => {
-    const prompt = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [], managerFirstName: 'Dana' });
-    expect(prompt).toContain('Their manager: Dana. When they need a person (rule 1d), send them to Dana first.');
-    expect(prompt).toContain('send the rep to their own manager first');
-    expect(defaultLines(prompt)).not.toMatch(/Jeremy|Jacob/);
-    expect(prompt).not.toContain('Escalation is only Jeremy or Jacob');
-  });
-
-  it('says "your manager" when none is listed, without guessing a name', () => {
+  it('sends no one by default: no owners, no manager, a plain "not sure"', () => {
     const prompt = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [] });
-    expect(prompt).toContain('say "your manager" and never guess a name');
-    expect(prompt).toContain('unknown — tell them to ask their manager');
+    expect(defaultLines(prompt)).not.toMatch(/Jeremy|Jacob/);
+    // (The portal guide still says new sign-ups wait for "their manager to activate them": a fact, not a pointer.)
+    expect(prompt).not.toMatch(/ask their manager|point them to their manager|your manager|Their manager:|send the rep to their own manager/);
+    expect(prompt).not.toContain('Escalation is only Jeremy or Jacob');
+    const rule1d = prompt.match(/^1d\. .*$/m)?.[0] ?? '';
+    expect(rule1d).toContain('say so plainly in one short line ("not sure on that one"), with no "ask so-and-so" pointer');
+    expect(prompt).toContain('unknown — say you don\'t have it');
   });
 
-  it('keeps the owners only for what only they decide', () => {
+  it('keeps the owners only for what only they decide, and Chat only for teammates', () => {
     const rule1d = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [] }).match(/^1d\. .*$/m)?.[0] ?? '';
-    expect(rule1d).toContain('pay questions and payroll disputes');
-    expect(rule1d).toContain('team Chat');
+    expect(rule1d).toContain(
+      'pay questions and payroll disputes, changing or cancelling a logged sale, police, HOA, permit or legal trouble and danger (rule 1e), and threats (rule 2l)'
+    );
+    expect(rule1d).toContain('Mention team Chat only when the question is about coordinating with teammates, never as a fallback');
   });
 
-  it('never tells an owner to ask an owner or a manager', () => {
-    const prompt = buildSystemPrompt([], { firstName: 'Jacob', dealerCodes: [], owner: true, managerFirstName: 'Dana' });
-    expect(prompt).not.toContain('Their manager:');
-    expect(prompt).toContain("it's Jeremy.");
-    expect(prompt).toContain('Never tell them to ask themselves or "their manager"');
-  });
-
-  it('gives an admin with no manager the owners as the second opinion', () => {
-    expect(buildSystemPrompt([], { firstName: 'Alex', dealerCodes: [], admin: true })).toContain('3C admin with no manager listed');
+  it('never tells an owner to ask themselves', () => {
+    const prompt = buildSystemPrompt([], { firstName: 'Jacob', dealerCodes: [], owner: true });
+    expect(prompt).toContain("Never tell them to ask themselves; if something needs a second opinion, it's Jeremy.");
   });
 });
 

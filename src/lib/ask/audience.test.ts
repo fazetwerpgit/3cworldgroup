@@ -14,12 +14,19 @@ import {
 const tags = (user: AudienceUser) => [...audiencesFor(user)].sort();
 
 describe('normalizeAudience', () => {
-  it('reads missing, empty and junk as everyone, so untagged notes behave as before', () => {
+  it('reads missing and empty as everyone, so untagged notes behave as before', () => {
     expect(normalizeAudience(undefined)).toEqual(['all']);
     expect(normalizeAudience(null)).toEqual(['all']);
     expect(normalizeAudience([])).toEqual(['all']);
-    expect(normalizeAudience('solar')).toEqual(['all']);
-    expect(normalizeAudience(['nobody'])).toEqual(['all']);
+  });
+
+  it('fails closed to owners when tags are there but none is known', () => {
+    expect(normalizeAudience(['nobody'])).toEqual(['owner']);
+    expect(normalizeAudience(['nobody', 'vip'])).toEqual(['owner']);
+    expect(normalizeAudience('solar')).toEqual(['owner']);
+    expect(normalizeAudience(['nobody', 'solar'])).toEqual(['solar']);
+    expect(notesForAudience([{ id: 'x', title: 'X', order: 1, audience: ['typo'] }], { fieldRole: 'regional_manager', solarRole: 'sales_director' })).toEqual([]);
+    expect(notesForAudience([{ id: 'x', title: 'X', order: 1, audience: ['typo'] }], { role: 'owner' }).map((n) => n.id)).toEqual(['x']);
   });
 
   it("collapses 'all' with others to everyone and orders the rest canonically", () => {

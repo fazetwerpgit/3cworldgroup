@@ -231,7 +231,7 @@ describe('POST /api/portal/ask', () => {
     modelAnswers();
     await POST(req({ question: 'What is my dealer code?' }));
     const system: string = sentBody().messages[0].content;
-    expect(system).toContain('Their dealer code: unknown — tell them to ask their manager');
+    expect(system).toContain("Their dealer code: unknown — say you don't have it");
     expect(system).not.toMatch(/DLR-/);
   });
 
@@ -250,7 +250,7 @@ describe('POST /api/portal/ask', () => {
       state.db = fake.db;
     }
 
-    it('a fiber rep gets only the everyone notes, the fiber line and their manager by first name', async () => {
+    it('a fiber rep gets only the everyone notes and the fiber line, and no manager is read or named', async () => {
       seedTagged({ reportsToId: 'mgr' });
       mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: '', isOwner: false, isAdmin: false, fieldRole: 'ae_tier_1', solarRole: null, aiConsent: AGREED });
       modelAnswers();
@@ -260,8 +260,7 @@ describe('POST /api/portal/ask', () => {
       expect(system).not.toMatch(/SOLAR-FACT|MANAGER-FACT|OWNER-FACT/);
       expect(system).not.toMatch(/^3b\. /m);
       expect(system.split('\n')[0]).toContain('Reps sell T-Mobile Fiber (T-Fiber) door to door.');
-      expect(system).toContain('Their manager: Morgan.');
-      expect(system).not.toContain('Quillfeather');
+      expect(system).not.toMatch(/Morgan|Quillfeather|Their manager/);
     });
 
     it('roles come from the verified user, never the form', async () => {
@@ -275,10 +274,9 @@ describe('POST /api/portal/ask', () => {
       expect(system).not.toMatch(/MANAGER-FACT|OWNER-FACT/);
       expect(system).toMatch(/^3b\. Solar/m);
       expect(system.split('\n')[0]).toContain('sells solar door to door');
-      expect(system).toContain('say "your manager" and never guess a name');
     });
 
-    it('the owner gets every note, owner notes last, and no manager line', async () => {
+    it('the owner gets every note, owner notes last', async () => {
       seedTagged({ reportsToId: 'mgr' });
       mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Jacob Owner', email: '', isOwner: true, isAdmin: true, role: 'owner', solarRole: null, aiConsent: AGREED });
       modelAnswers();
@@ -288,7 +286,6 @@ describe('POST /api/portal/ask', () => {
       expect(at('EVERYONE-FACT')).toBeLessThan(at('SOLAR-FACT'));
       expect(at('SOLAR-FACT')).toBeLessThan(at('MANAGER-FACT'));
       expect(at('MANAGER-FACT')).toBeLessThan(at('OWNER-FACT'));
-      expect(system).not.toContain('Their manager:');
       expect(system.split('\n')[0]).toContain('sell T-Mobile Fiber (T-Fiber) and solar');
     });
   });
@@ -363,7 +360,7 @@ describe('POST /api/portal/ask', () => {
     const callsBefore = fetchMock.mock.calls.length;
     const res = await POST(req({ question: 'Number 61' }));
     expect(res.status).toBe(429);
-    expect((await res.json()).error).toMatch(/Ask your manager\./);
+    expect((await res.json()).error).toBe("You've asked 60 questions today, the daily limit. It resets tomorrow.");
     expect(fetchMock).toHaveBeenCalledTimes(callsBefore);
     // Another rep's count is their own.
     mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false, aiConsent: AGREED });
@@ -394,11 +391,11 @@ describe('POST /api/portal/ask', () => {
     fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
     const res = await POST(req({ question: 'Help' }));
     expect(res.status).toBe(502);
-    expect((await res.json()).error).toBe("Ask 3C couldn't answer right now. Try again, or ask your manager.");
+    expect((await res.json()).error).toBe("Ask 3C couldn't answer right now. Try again in a moment.");
     expect(logs()).toHaveLength(0);
   });
 
-  it('never points the owner at a manager in its error copy', async () => {
+  it('names no one in its error copy, owner or rep', async () => {
     mockUser.mockResolvedValue({ ok: true, uid: 'o1', name: 'Jacob Owner', email: '', isOwner: true, aiConsent: AGREED });
     fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
     const failed = await POST(req({ question: 'Help' }));
@@ -407,7 +404,7 @@ describe('POST /api/portal/ask', () => {
     fake.docs('askUsage').set(`o1_${chicagoDayKey(new Date())}`, { uid: 'o1', count: 60 });
     const limited = await POST(req({ question: 'Number 61' }));
     expect(limited.status).toBe(429);
-    expect((await limited.json()).error).toBe("You've asked 60 questions today, the daily limit.");
+    expect((await limited.json()).error).toBe("You've asked 60 questions today, the daily limit. It resets tomorrow.");
   });
 
   it('answers 504 when the provider times out', async () => {

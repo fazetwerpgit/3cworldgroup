@@ -325,8 +325,8 @@ export function KnowledgeManager() {
                     ))}
                   </div>
                   <p id="note-audience-hint" className={u.hint}>
-                    Everyone goes to every rep. Pick one or more of the others to keep a note to solar reps, people in the
-                    Chompen app, managers or owners. Admins see all but Owners.
+                    Everyone goes to every rep. Pick one or more of the others for solar reps, people in the
+                    Chompen app, managers or owners. Admins see every group except Owners.
                   </p>
                 </fieldset>
 

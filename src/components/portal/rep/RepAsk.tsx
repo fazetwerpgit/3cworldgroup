@@ -159,7 +159,7 @@ export function RepAsk() {
           <div className={p.empty}>
             <div>
               <strong>Ask 3C is not turned on yet.</strong>
-              {isOwner(user?.role ?? undefined) ? null : <p>Until it is, ask your manager when an order gets stuck.</p>}
+              <p>It will show up here once it&apos;s on.</p>
             </div>
           </div>
         </section>
@@ -188,7 +188,7 @@ export function RepAsk() {
         </div>
       )}
       <div className={a.mode} hidden={mode !== 'ask'}>
-        <AskChat uid={uid} owner={isOwner(user?.role ?? undefined)} />
+        <AskChat uid={uid} />
       </div>
       {canPractice && (
         <div className={a.mode} hidden={mode !== 'practice'}>
@@ -200,7 +200,7 @@ export function RepAsk() {
   );
 }
 
-function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
+function AskChat({ uid }: { uid: string }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState('');
   const [photo, setPhoto] = useState<{ file: File; url: string } | null>(null);
@@ -319,8 +319,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
     showComposer('smooth');
 
     let reply: AskReply | null = null;
-    const fallback = owner ? '' : ', or ask your manager';
-    let error = `No answer came back. Check your signal and try again${fallback}.`;
+    let error = 'No answer came back. Check your signal and try again.';
     let retry = true;
     let needsConsent = false;
     try {
@@ -339,7 +338,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
       if (res.ok && json.answer && json.id) reply = { id: json.id, answer: json.answer };
       else if (isAiConsentRefusal(res.status, json)) needsConsent = true;
       else {
-        error = json.error || `Ask 3C couldn't answer right now. Try again${fallback}.`;
+        error = json.error || "Ask 3C couldn't answer right now. Try again.";
         retry = res.status !== 429;
       }
     } catch {
@@ -389,8 +388,6 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
     setNotice('');
     setFailed(null);
   };
-
-  const answered = turns.some((turn) => turn.answer);
 
   return (
     <>
@@ -471,7 +468,6 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
         </ol>
       )}
 
-      {answered && !owner ? <p className={a.stuck}>Still stuck? Ask your manager.</p> : null}
 
       <BorderBeam size="line" active={sending && !reducedMotion} theme="dark" strength={0.7} className={a.composerBeam}>
         <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={send}>

@@ -5,27 +5,14 @@ import { MAX_KNOWLEDGE_NOTES, loadAskProfile, loadCountedSessions, loadNotes } f
 describe('loadAskProfile', () => {
   const db = (users: Record<string, Record<string, unknown>>) => createFakeAskDb({ users }).db as never;
 
-  it("gives the manager's first name only, from reportsToId or the older managerId", async () => {
+  it('reads home and main line from the asker\'s own doc, and never their manager\'s', async () => {
     const users = {
       rep: { city: 'Des Moines', state: 'IA', reportsToId: 'mgr', mainLine: 'solar' },
-      old: { managerId: 'mgr' },
-      mgr: { displayName: 'Dana Smith', email: 'dana@example.com' },
+      mgr: { displayName: 'Dana Smith' },
+      bare: { mainLine: 'wind' },
     };
-    expect(await loadAskProfile(db(users), 'rep')).toEqual({ home: 'Des Moines, IA', mainLine: 'solar', managerFirstName: 'Dana' });
-    expect((await loadAskProfile(db(users), 'old')).managerFirstName).toBe('Dana');
-  });
-
-  it('no manager, a missing manager doc, an email-only name or a self-link give no name', async () => {
-    const users = {
-      none: {},
-      gone: { reportsToId: 'nobody' },
-      mail: { reportsToId: 'm' },
-      m: { displayName: 'm@example.com' },
-      self: { reportsToId: 'self', displayName: 'Self Person' },
-    };
-    for (const uid of ['none', 'gone', 'mail', 'self']) {
-      expect(await loadAskProfile(db(users), uid)).toEqual({ home: '', mainLine: null, managerFirstName: '' });
-    }
+    expect(await loadAskProfile(db(users), 'rep')).toEqual({ home: 'Des Moines, IA', mainLine: 'solar' });
+    expect(await loadAskProfile(db(users), 'bare')).toEqual({ home: '', mainLine: null });
   });
 });
 

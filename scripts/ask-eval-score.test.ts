@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { askLineFor, hasSolarNotes, notesForAudience } from '@/lib/ask/audience';
 import { buildSystemPrompt } from '@/lib/ask/prompt';
-import { CASES, EVAL_FIBER_REP, EVAL_MANAGER, SYNTHETIC_NOTES, scoreAnswer, unbacked, type EvalCase } from './ask-eval-score';
+import { CASES, EVAL_FIBER_REP, SYNTHETIC_NOTES, scoreAnswer, unbacked, type EvalCase } from './ask-eval-score';
 
 const byId = (id: string): EvalCase => {
   const found = CASES.find((c) => c.id === id);
@@ -60,7 +60,7 @@ describe('ask eval audience cases (what the harness builds, no model call)', () 
     const user = c.user ?? EVAL_FIBER_REP;
     const seen = notesForAudience(SYNTHETIC_NOTES, user);
     return buildSystemPrompt(seen, {
-      firstName: 'Sam', dealerCodes: [], line: askLineFor(user, user.mainLine), solarNotes: hasSolarNotes(seen), managerFirstName: EVAL_MANAGER,
+      firstName: 'Sam', dealerCodes: [], line: askLineFor(user, user.mainLine), solarNotes: hasSolarNotes(seen),
     });
   };
 
@@ -77,15 +77,20 @@ describe('ask eval audience cases (what the harness builds, no model call)', () 
     expect(dual.split('\n')[0]).toContain('solar door to door as their main line');
   });
 
-  it('scores a leaked solar code as invented for the fiber rep, and "ask Dana" as the right not-sure', () => {
+  it('scores a leaked solar code as invented for the fiber rep, and a plain "not sure" as right', () => {
     const c = byId('audience-fiber-no-solar');
     const given = promptFor(c);
-    expect(scoreAnswer(c, 'Not sure on that one, ask Dana.', given)).toEqual({ facts: 1, factsMissed: [], invented: [] });
+    expect(scoreAnswer(c, 'Not sure on that one.', given)).toEqual({ facts: 1, factsMissed: [], invented: [] });
     expect(scoreAnswer(c, 'It is SUNSIT77.', given).invented).toEqual(['unbacked:SUNSIT77', 'banned:/SUNSIT77/']);
   });
 
-  it('escalation cases fail an answer that sends the rep to the owners', () => {
-    expect(scoreAnswer(byId('escalate-who'), 'Not sure who Ben is. Ask Jeremy or Jacob.', GIVEN).invented).toEqual(['banned:/jeremy|jacob/i']);
-    expect(scoreAnswer(byId('escalate-who'), 'Not sure on that one. Ask Dana, or try team Chat.', GIVEN)).toEqual({ facts: 1, factsMissed: [], invented: [] });
+  it('escalation cases fail any "ask X" pointer and pass a plain "not sure"', () => {
+    for (const id of ['escalate-who', 'escalate-solar-page', 'tone-down']) {
+      for (const pointer of ['Ask Jeremy or Jacob.', 'Ask your manager.', 'Check with your team lead.']) {
+        expect(scoreAnswer(byId(id), `Not sure on that one. ${pointer}`, GIVEN).invented, `${id}: ${pointer}`).toHaveLength(1);
+      }
+    }
+    expect(scoreAnswer(byId('escalate-who'), "Not sure who Ben is. The Board shows teammates' names.", GIVEN)).toEqual({ facts: 1, factsMissed: [], invented: [] });
+    expect(scoreAnswer(byId('tone-down'), "Two weeks dry is rough. Not sure what's off yet; what's happening at the doors?", GIVEN).invented).toEqual([]);
   });
 });
