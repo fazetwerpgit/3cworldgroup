@@ -48,6 +48,9 @@
   border-radius: var(--r-panel) var(--r-panel) 0 0;
   background: var(--c-raised);
   min-width: 0;
+  /* The glance below lays out by the card's width, not the viewport's: two
+     cards sit side by side on a wide desktop, each narrower than a phone. */
+  container: field / inline-size;
 }
 
 @media (min-width: 1024px) {
@@ -114,7 +117,8 @@
   font-weight: 650;
 }
 
-/* The figure and the drawn week: side by side wherever the week fits beside it. */
+/* The figure and the drawn week: side by side only where the card leaves the
+   sentence room beside the week; otherwise the week drops under it, full width. */
 .glance {
   display: grid;
   gap: var(--s4);
@@ -122,7 +126,7 @@
   min-width: 0;
 }
 
-@media (min-width: 560px) {
+@container field (min-width: 520px) {
   .glance {
     grid-template-columns: minmax(0, 1fr) minmax(196px, 252px);
     gap: var(--s5);
@@ -163,7 +167,6 @@
 
 .previewWords strong {
   color: var(--c-text);
-  white-space: nowrap;
   font-size: var(--t-body);
   font-weight: 650;
   line-height: 1.25;
