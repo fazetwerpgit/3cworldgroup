@@ -13,16 +13,19 @@
 // The key is ASK_API_KEY from .env.local (loaded with @next/env, never
 // printed). Notes come from ASK_EVAL_NOTES ([{ title, body, order }], e.g. a
 // proposed edit of the notes) or, without it, a read-only read of the live
-// knowledgeNotes collection.
+// knowledgeNotes collection. SYNTHETIC_NOTES are added either way, and each
+// case sees only the notes its asker's roles may (notesForAudience, as the
+// route does), with the matching line and solar rule.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { it } from 'vitest';
 import nextEnv from '@next/env';
+import { askLineFor, hasSolarNotes, notesForAudience } from '@/lib/ask/audience';
 import { sortNotes, type NoteDraft } from '@/lib/ask/notes';
 import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
 import { askProviderConfig, callAskModel, type AskMessage } from '@/lib/ask/provider';
-import { CASES, scoreAnswer, words } from './ask-eval-score';
+import { CASES, EVAL_FIBER_REP, EVAL_MANAGER, SYNTHETIC_NOTES, scoreAnswer, words } from './ask-eval-score';
 
 
 // ---------------------------------------------------------------------------
@@ -39,11 +42,16 @@ function loadKey(): void {
   (process.env as Record<string, string | undefined>).NODE_ENV = mode;
 }
 
-async function loadNotesForEval(): Promise<NoteDraft[]> {
+type EvalNote = Omit<NoteDraft, 'audience'> & { id: string; order: number; audience?: unknown };
+
+async function loadNotesForEval(): Promise<EvalNote[]> {
   const file = env('ASK_EVAL_NOTES');
   if (file) {
-    const raw = JSON.parse(readFileSync(file, 'utf8')) as { id?: string; title: string; body: string; order?: number }[];
-    return sortNotes(raw.map((n, i) => ({ id: n.id ?? String(i), title: n.title, body: n.body, order: n.order ?? i })));
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as { id?: string; title: string; body: string; order?: number; audience?: unknown }[];
+    return sortNotes([
+      ...raw.map((n, i) => ({ id: n.id ?? String(i), title: n.title, body: n.body, order: n.order ?? i, audience: n.audience })),
+      ...SYNTHETIC_NOTES,
+    ]);
   }
   const { initializeApp, cert } = await import('firebase-admin/app');
   const { getFirestore } = await import('firebase-admin/firestore');
@@ -51,7 +59,10 @@ async function loadNotesForEval(): Promise<NoteDraft[]> {
   if (!account) throw new Error('Set ASK_EVAL_NOTES or FIREBASE_SERVICE_ACCOUNT');
   const app = initializeApp({ credential: cert(JSON.parse(Buffer.from(account, 'base64').toString())) }, 'ask-eval');
   const snap = await getFirestore(app).collection('knowledgeNotes').get(); // read only
-  return sortNotes(snap.docs.map((d) => ({ id: d.id, title: String(d.get('title') ?? ''), body: String(d.get('body') ?? ''), order: Number(d.get('order') ?? 0) })));
+  return sortNotes([
+    ...snap.docs.map((d) => ({ id: d.id, title: String(d.get('title') ?? ''), body: String(d.get('body') ?? ''), order: Number(d.get('order') ?? 0), audience: d.get('audience') as unknown })),
+    ...SYNTHETIC_NOTES,
+  ]);
 }
 
 /** 'YYYY-MM-DDTHH:mm' Eastern wall time -> Date (EDT until Nov 1 2026, EST after). */
@@ -125,8 +136,11 @@ it('runs the Ask 3C eval', { timeout: 60 * 60_000 }, async () => {
   const jobs = Array.from({ length: runs }, (_, run) => cases.map((c) => ({ c, run }))).flat();
 
   const rows = await pool(jobs, 6, async ({ c, run }): Promise<Row> => {
-    const system = buildSystemPrompt(notes, {
+    const user = c.user ?? EVAL_FIBER_REP;
+    const seen = notesForAudience(notes, user);
+    const system = buildSystemPrompt(seen, {
       firstName: 'Sam', dealerCodes: ['EVAL1234'], now: eastern(c.at ?? '2026-10-20T15:00'), home: 'Des Moines, IA',
+      line: askLineFor(user, user.mainLine), solarNotes: hasSolarNotes(seen), managerFirstName: EVAL_MANAGER,
     });
     const messages: AskMessage[] = [{ role: 'system', content: system }, ...(c.history ?? []), { role: 'user', content: c.ask }];
     const started = Date.now();

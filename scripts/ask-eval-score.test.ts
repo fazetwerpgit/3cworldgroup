@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CASES, scoreAnswer, unbacked, type EvalCase } from './ask-eval-score';
+import { askLineFor, hasSolarNotes, notesForAudience } from '@/lib/ask/audience';
+import { buildSystemPrompt } from '@/lib/ask/prompt';
+import { CASES, EVAL_FIBER_REP, EVAL_MANAGER, SYNTHETIC_NOTES, scoreAnswer, unbacked, type EvalCase } from './ask-eval-score';
 
 const byId = (id: string): EvalCase => {
   const found = CASES.find((c) => c.id === id);
@@ -49,5 +51,41 @@ describe('ask eval scorer: invented facts', () => {
       ]);
       expect(scoreAnswer(c, "Not confirmed. Put it in another adult's own name.", GIVEN).invented).toEqual([]);
     }
+  });
+});
+
+describe('ask eval audience cases (what the harness builds, no model call)', () => {
+  /** The system prompt the harness builds for a case, from the synthetic notes only. */
+  const promptFor = (c: EvalCase) => {
+    const user = c.user ?? EVAL_FIBER_REP;
+    const seen = notesForAudience(SYNTHETIC_NOTES, user);
+    return buildSystemPrompt(seen, {
+      firstName: 'Sam', dealerCodes: [], line: askLineFor(user, user.mainLine), solarNotes: hasSolarNotes(seen), managerFirstName: EVAL_MANAGER,
+    });
+  };
+
+  it('a fiber rep never gets the solar note; a solar rep and a dual rep do, with the solar rule', () => {
+    const fiber = promptFor(byId('audience-fiber-no-solar'));
+    expect(fiber).not.toContain('SUNSIT77');
+    expect(fiber).not.toMatch(/^3b\. /m);
+    const solar = promptFor(byId('audience-solar-gets-solar'));
+    expect(solar).toContain('SUNSIT77');
+    expect(solar).toMatch(/^3b\. Solar/m);
+    expect(solar.split('\n')[0]).toContain('sells solar door to door');
+    const dual = promptFor(byId('audience-dual-solar-main'));
+    expect(dual).toContain('48 hours out');
+    expect(dual.split('\n')[0]).toContain('solar door to door as their main line');
+  });
+
+  it('scores a leaked solar code as invented for the fiber rep, and "ask Dana" as the right not-sure', () => {
+    const c = byId('audience-fiber-no-solar');
+    const given = promptFor(c);
+    expect(scoreAnswer(c, 'Not sure on that one, ask Dana.', given)).toEqual({ facts: 1, factsMissed: [], invented: [] });
+    expect(scoreAnswer(c, 'It is SUNSIT77.', given).invented).toEqual(['unbacked:SUNSIT77', 'banned:/SUNSIT77/']);
+  });
+
+  it('escalation cases fail an answer that sends the rep to the owners', () => {
+    expect(scoreAnswer(byId('escalate-who'), 'Not sure who Ben is. Ask Jeremy or Jacob.', GIVEN).invented).toEqual(['banned:/jeremy|jacob/i']);
+    expect(scoreAnswer(byId('escalate-who'), 'Not sure on that one. Ask Dana, or try team Chat.', GIVEN)).toEqual({ facts: 1, factsMissed: [], invented: [] });
   });
 });
