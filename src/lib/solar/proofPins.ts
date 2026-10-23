@@ -10,6 +10,10 @@
 //   - a lead goes lost, or its booking is cancelled (not on a sold lead) -> delete
 //   - a sold or lost lead reopened, or a lead booked again after a cancel -> back to
 //     'booked' while the door's own mark is still Appointment Booked, else delete
+// A solar pin is only ever removed or downgraded by a lead that WAS sold and
+// is now lost or reopened ('unsold-delete' / 'unsold-restore'). Every other
+// delete / restore reads the pin in the same transaction and leaves a solar one
+// alone, so a late cancel (or a second lead on the same door) can't undo a sale.
 // A lead links to its door through solarLeads.doorId (the knock house id the
 // app sends as `doorId`); a lead without one has no pin. Pin writes never fail
 // the action that triggers them: errors are logged and swallowed.
@@ -33,14 +37,24 @@ export interface ProofPinDoc {
   at: number;
 }
 
-/** What a lead write does to its door's pin. */
-export type ProofPinChange = 'solar' | 'delete' | 'restore';
+/**
+ * What a lead write does to its door's pin. 'delete' / 'restore' never touch a
+ * solar pin; 'unsold-delete' / 'unsold-restore' (a sold lead lost / reopened) may.
+ */
+export type ProofPinChange = 'solar' | 'delete' | 'restore' | 'unsold-delete' | 'unsold-restore';
 
 type Data = Record<string, unknown>;
 type Snap = { exists: boolean; data: () => Data | undefined };
-type Ref = { get: () => Promise<Snap>; set: (data: Data) => Promise<unknown>; delete: () => Promise<unknown> };
+type Tx = {
+  get: (ref: never) => Promise<Snap>;
+  set: (ref: never, data: Data) => unknown;
+  delete: (ref: never) => unknown;
+};
 /** The admin Firestore calls used here, typed loosely so the solar test fakeDb fits too. */
-export type PinDb = { collection: (name: string) => { doc: (id: string) => unknown } };
+export type PinDb = {
+  collection: (name: string) => { doc: (id: string) => unknown };
+  runTransaction: <T>(fn: (tx: Tx) => Promise<T>) => Promise<T>;
+};
 
 const DOC_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
@@ -89,8 +103,9 @@ export function bookedMarkAt(house: Data | null | undefined): number | null {
 
 /**
  * The pin change a lead write makes, from the lead as it was to the lead as
- * written: going sold -> 'solar'; going lost -> 'delete'; a sold or lost
- * lead reopened -> 'restore'; anything else -> null.
+ * written: going sold -> 'solar'; going lost -> 'delete' ('unsold-delete'
+ * when it was sold); a lost lead reopened -> 'restore', a sold one ->
+ * 'unsold-restore'; anything else -> null.
  */
 export function proofPinChangeForLead(before: Data, after: Data): ProofPinChange | null {
   const wasSold = isSoldLead(before);
@@ -98,8 +113,8 @@ export function proofPinChangeForLead(before: Data, after: Data): ProofPinChange
   const wasLost = before.status === 'lost';
   const isLost = after.status === 'lost';
   if (isSold && !wasSold) return 'solar';
-  if (isLost && !wasLost) return 'delete';
-  if ((wasSold || wasLost) && !isSold && !isLost) return 'restore';
+  if (isLost && !wasLost) return wasSold ? 'unsold-delete' : 'delete';
+  if ((wasSold || wasLost) && !isSold && !isLost) return wasSold ? 'unsold-restore' : 'restore';
   return null;
 }
 
@@ -118,9 +133,10 @@ export function toMillis(value: unknown): number | null {
 }
 
 /**
- * Apply `change` to the pin of `lead`'s door. `at` is the sold time for
- * 'solar'. Never throws: a lead without a door, a missing door, or a failed
- * write is logged (house id prefix only) and skipped.
+ * Apply `change` to the pin of `lead`'s door, in one transaction that reads
+ * the pin and the door first. `at` is the sold time for 'solar'. Never throws:
+ * a lead without a door, a missing door, or a failed write is logged (house id
+ * prefix only) and skipped.
  */
 export async function applyProofPinChange(
   db: PinDb | null | undefined,
@@ -132,34 +148,34 @@ export async function applyProofPinChange(
   const houseId = leadDoorId(lead);
   if (!houseId) return;
   const tag = houseId.slice(0, 6);
+  // Only a lead that was sold may remove or downgrade a solar pin.
+  const mayTouchSolar = change === 'unsold-delete' || change === 'unsold-restore';
   try {
-    const pinRef = db.collection(PROOF_PINS_COLLECTION).doc(houseId) as Ref;
-    if (change === 'delete') {
-      await pinRef.delete();
-      return;
-    }
-    const house = (await (db.collection('houses').doc(houseId) as Ref).get()).data();
-    if (!house) {
-      console.warn(`proof pin: door ${tag}… not found; skipped`);
-      return;
-    }
-    if (change === 'solar') {
-      // Created if missing; a solar pin already there keeps its sold time.
-      const existing = (await pinRef.get()).data();
-      if (existing?.kind === 'solar') return;
-      const pin = proofPinDoc(house, 'solar', at);
-      if (!pin) {
-        console.warn(`proof pin: door ${tag}… has no campaign or position; skipped`);
-        return;
+    const pinRef = db.collection(PROOF_PINS_COLLECTION).doc(houseId) as never;
+    const houseRef = db.collection('houses').doc(houseId) as never;
+    const note = await db.runTransaction(async (tx) => {
+      const existing = (await tx.get(pinRef)).data();
+      const house = (await tx.get(houseRef)).data();
+      if (existing?.kind === 'solar' && (change === 'solar' || !mayTouchSolar)) return null; // keeps its sold time
+      if (change === 'delete' || change === 'unsold-delete') {
+        if (existing) tx.delete(pinRef);
+        return null;
       }
-      await pinRef.set({ ...pin });
-      return;
-    }
-    // restore: 'booked' while the door's own mark is still Appointment Booked.
-    const bookedAt = bookedMarkAt(house);
-    const pin = bookedAt === null ? null : proofPinDoc(house, 'booked', bookedAt);
-    if (pin) await pinRef.set({ ...pin });
-    else await pinRef.delete();
+      if (!house) return 'not found';
+      if (change === 'solar') {
+        const pin = proofPinDoc(house, 'solar', at);
+        if (!pin) return 'has no campaign or position';
+        tx.set(pinRef, { ...pin });
+        return null;
+      }
+      // restore: 'booked' while the door's own mark is still Appointment Booked, else gone.
+      const bookedAt = bookedMarkAt(house);
+      const pin = bookedAt === null ? null : proofPinDoc(house, 'booked', bookedAt);
+      if (pin) tx.set(pinRef, { ...pin });
+      else if (existing) tx.delete(pinRef);
+      return null;
+    });
+    if (note) console.warn(`proof pin: door ${tag}… ${note}; skipped`);
   } catch (error) {
     console.error(`proof pin ${change} failed for door ${tag}…:`, error);
   }

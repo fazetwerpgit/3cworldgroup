@@ -74,8 +74,8 @@ describe('proofPinChangeForLead', () => {
     ['booked -> sold', { status: 'booked' }, { status: 'sold' }, 'solar'],
     ['booked -> sale stage', { status: 'booked' }, { status: 'sold', stage: 'appointment_demoed', stageOutcome: 'sale' }, 'solar'],
     ['booked -> lost', { status: 'booked' }, { status: 'lost' }, 'delete'],
-    ['sold -> lost', { status: 'sold' }, { status: 'lost' }, 'delete'],
-    ['sold -> reopened', { status: 'sold' }, { status: 'booked', stage: null }, 'restore'],
+    ['sold -> lost', { status: 'sold' }, { status: 'lost' }, 'unsold-delete'],
+    ['sold -> reopened', { status: 'sold' }, { status: 'booked', stage: null }, 'unsold-restore'],
     ['lost -> reopened', { status: 'lost' }, { status: 'new' }, 'restore'],
     ['sold -> later stage', { status: 'sold' }, { status: 'sold', stage: 'site_survey' }, null],
     ['proposal sent', { status: 'booked' }, { status: 'booked', stage: 'appointment_demoed', stageOutcome: 'proposal_sent' }, null],
@@ -106,7 +106,7 @@ describe('applyProofPinChange', () => {
   });
 
   it('deletes on delete, and restores booked only while the door is booked', async () => {
-    const db = seed({ h1: proofPinDoc(HOUSE, 'solar', SOLD_AT)! as never });
+    const db = seed({ h1: proofPinDoc(HOUSE, 'booked', 1)! as never });
     await applyProofPinChange(db, lead, 'restore', SOLD_AT);
     expect(db.store.get('proofPins')!.get('h1')).toMatchObject({ kind: 'booked', at: HOUSE.last.at });
     await applyProofPinChange(db, lead, 'delete', SOLD_AT);
@@ -114,6 +114,31 @@ describe('applyProofPinChange', () => {
     db.store.get('houses')!.set('h1', { ...HOUSE, last: { ...HOUSE.last, dispositionId: 'not_interested' } });
     db.store.get('proofPins')!.set('h1', proofPinDoc(HOUSE, 'booked', 1)! as never);
     await applyProofPinChange(db, lead, 'restore', SOLD_AT);
+    expect(db.store.get('proofPins')!.has('h1')).toBe(false);
+  });
+
+  it('race: a cancel\'s delete landing after a sale leaves the solar pin', async () => {
+    // The cancel read the lead before the owner sold it; the sale's solar pin is already written.
+    const db = seed();
+    await applyProofPinChange(db, lead, 'solar', SOLD_AT);
+    await applyProofPinChange(db, { doorId: 'h1', status: 'booked' }, 'delete', SOLD_AT + 1);
+    expect(db.store.get('proofPins')!.get('h1')).toMatchObject({ kind: 'solar', at: SOLD_AT });
+  });
+
+  it('race: a second lead on the same door cancelling or reopening leaves the solar pin', async () => {
+    const db = seed({ h1: proofPinDoc(HOUSE, 'solar', SOLD_AT)! as never });
+    const other = { doorId: 'h1', status: 'booked' };
+    await applyProofPinChange(db, other, 'delete', SOLD_AT + 1); // its booking cancelled / it went lost
+    await applyProofPinChange(db, other, 'restore', SOLD_AT + 2); // it was booked again / reopened
+    expect(db.store.get('proofPins')!.get('h1')).toEqual(proofPinDoc(HOUSE, 'solar', SOLD_AT));
+  });
+
+  it('only a lead that was sold removes or downgrades a solar pin', async () => {
+    const db = seed({ h1: proofPinDoc(HOUSE, 'solar', SOLD_AT)! as never });
+    await applyProofPinChange(db, lead, 'unsold-restore', SOLD_AT);
+    expect(db.store.get('proofPins')!.get('h1')).toMatchObject({ kind: 'booked', at: HOUSE.last.at });
+    db.store.get('proofPins')!.set('h1', proofPinDoc(HOUSE, 'solar', SOLD_AT)! as never);
+    await applyProofPinChange(db, lead, 'unsold-delete', SOLD_AT);
     expect(db.store.get('proofPins')!.has('h1')).toBe(false);
   });
 
@@ -127,7 +152,10 @@ describe('applyProofPinChange', () => {
 
   it('never throws when the write fails', async () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const broken = { collection: () => ({ doc: () => ({ get: async () => { throw new Error('down'); }, delete: async () => { throw new Error('down'); } }) }) };
+    const broken = {
+      collection: () => ({ doc: () => ({}) }),
+      runTransaction: async () => { throw new Error('down'); },
+    };
     await expect(applyProofPinChange(broken, lead, 'solar', SOLD_AT)).resolves.toBeUndefined();
     await expect(applyProofPinChange(broken, lead, 'delete', SOLD_AT)).resolves.toBeUndefined();
     expect(err).toHaveBeenCalledTimes(2);

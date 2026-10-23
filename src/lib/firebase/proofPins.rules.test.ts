@@ -187,24 +187,49 @@ describe.skipIf(!emulatorHost)('firestore.rules: proofPins', () => {
       await assertFails(bookAndPin(asUser('rep'), 'h1', 'rep', { ...PIN, lat: '40.123' }));
     });
 
+    it('denies a pin write when houses/{id} does not exist', async () => {
+      await assertFails(setDoc(doc(asUser('rep'), 'proofPins/no-such-house'), PIN));
+    });
+
     it("denies overwriting the portal's solar pin", async () => {
       await assertFails(setDoc(doc(asUser('rep'), 'proofPins/hs'), PIN));
     });
   });
 
   describe('client delete', () => {
-    it('denies deleting any pin, even my own booked door after a re-mark, and owners too', async () => {
-      await assertFails(deleteDoc(doc(asUser('rep2'), 'proofPins/h2')));
-      await assertFails(deleteDoc(doc(asUser('rep'), 'proofPins/hs')));
-      await assertFails(deleteDoc(doc(asUser('boss'), 'proofPins/p1')));
-      const db = asUser('rep2');
+    const remarkAndDelete = (uid: string, houseId: string, dispositionId = 'not_interested') => {
+      const db = asUser(uid);
       const batch = writeBatch(db);
-      batch.update(doc(db, 'houses/h2'), {
-        last: { ...bookedMark('rep2'), dispositionId: 'not_interested' },
-        updatedAt: BOOKED_AT,
+      batch.update(doc(db, 'houses', houseId), { last: { ...bookedMark(uid), dispositionId }, updatedAt: BOOKED_AT });
+      batch.delete(doc(db, 'proofPins', houseId));
+      return batch.commit();
+    };
+
+    it('allows a rep who re-marks their booked door to delete its pin in the same batch', async () => {
+      await assertSucceeds(remarkAndDelete('rep2', 'h2'));
+    });
+
+    it('denies a delete while the door is still booked (rep or owner, no re-mark)', async () => {
+      await assertFails(deleteDoc(doc(asUser('rep2'), 'proofPins/h2')));
+      await assertFails(deleteDoc(doc(asUser('boss'), 'proofPins/h2')));
+    });
+
+    it('denies deleting a solar pin, even once its door is no longer booked', async () => {
+      await assertFails(deleteDoc(doc(asUser('rep'), 'proofPins/hs')));
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'houses/hs'), { campaignId: CAMPAIGN, ...DOOR, assignedRepId: 'rep', last: null });
       });
-      batch.delete(doc(db, 'proofPins/h2'));
-      await assertFails(batch.commit());
+      await assertFails(deleteDoc(doc(asUser('rep'), 'proofPins/hs')));
+      await assertFails(deleteDoc(doc(asUser('boss'), 'proofPins/hs')));
+    });
+
+    it('allows deleting a pin that is not there, and a booked pin whose door is gone', async () => {
+      await assertSucceeds(deleteDoc(doc(asUser('rep'), 'proofPins/nothing-here')));
+      await assertSucceeds(deleteDoc(doc(asUser('rep'), 'proofPins/p1')));
+    });
+
+    it('denies a signed-out delete', async () => {
+      await assertFails(deleteDoc(doc(env.unauthenticatedContext().firestore(), 'proofPins/p1')));
     });
   });
 });

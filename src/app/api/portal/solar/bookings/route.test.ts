@@ -298,6 +298,34 @@ describe('POST /api/portal/solar/bookings', () => {
       // Still one lead alert per lead.
       expect(mockNotifyMany).toHaveBeenCalledTimes(1);
     });
+
+    it("a cancel removes the door's booked pin and booking again restores it", async () => {
+      const HOUSE = {
+        campaignId: 'solar-1', lat: 40.123456, lng: -75.654321,
+        last: { dispositionId: 'appointment_set', at: 1_760_000_000_000, repId: 'rep1', knockId: 'k1' },
+      };
+      const PIN = { campaignId: 'solar-1', cell: 'dr4hq', lat: 40.123, lng: -75.654, kind: 'booked', at: HOUSE.last.at };
+      db.store.get('solarLeads')!.set('rep1_c1', { ...db.store.get('solarLeads')!.get('rep1_c1')!, doorId: 'h1' });
+      db.store.set('houses', new Map([['h1', { ...HOUSE }]]));
+      db.store.set('proofPins', new Map([['h1', { ...PIN }]]));
+
+      const first = await (await post(BODY)).json();
+      expect(db.store.get('proofPins')!.get('h1')).toEqual(PIN);
+      mockGate.mockResolvedValue({ ...REP, uid: 'jac', isAdmin: true, role: 'owner', solarRole: null });
+      const cancel = await PATCH(
+        new NextRequest(`http://localhost/api/portal/solar/bookings/${first.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'cancelled' }),
+        }),
+        { params: Promise.resolve({ id: first.id }) }
+      );
+      expect(cancel.status).toBe(200);
+      expect(db.store.get('proofPins')!.has('h1')).toBe(false);
+
+      mockGate.mockResolvedValue(REP);
+      expect((await post(BODY)).status).toBe(200);
+      expect(db.store.get('proofPins')!.get('h1')).toEqual(PIN);
+    });
   });
 
   it('409s slot_taken on the second booking of the same slot', async () => {

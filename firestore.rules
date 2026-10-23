@@ -973,8 +973,8 @@ service cloud.firestore {
     // one door in it" and "within ~5 km of those doors" are enforced in the app; a pin shows only its
     // status and age. The portal (admin SDK, past these rules; src/lib/solar/proofPins.ts) sets
     // kind 'solar' on Sold and deletes the pin on No-Show / Cancelled. Clients may only ever write
-    // a 'booked' pin that matches their own Appointment Booked mark on the door; 'solar' pins and
-    // every delete are server-only.
+    // a 'booked' pin that matches their own Appointment Booked mark on the door, and delete a
+    // 'booked' pin once the door is no longer booked; 'solar' pins are server-only.
     match /proofPins/{houseId} {
       // Signed in with the campaign turned on for them (owners / admins: every campaign).
       allow read: if signedIn()
@@ -990,8 +990,11 @@ service cloud.firestore {
         && request.resource.data.kind == 'booked'
         && bookedByMeAfter(houseId);
 
-      // Server-only (reviewer, 2026-10-22): the portal removes pins on No-Show / Cancelled.
-      allow delete: if false;
+      // A booked door re-marked (or its booking undone): its pin goes in the same batch, once the
+      // door no longer carries an Appointment Booked mark (or is gone). A 'solar' pin is never
+      // client-deleted (the portal owns it). Deleting a pin that is not there is allowed.
+      allow delete: if signedIn()
+        && (resource == null || (resource.data.kind == 'booked' && !doorBookedAfter(houseId)));
 
       // Exactly the six fields, with their types and ranges; positions are on the 3-decimal (~110 m) grid.
       function proofPinShape() {
@@ -1008,24 +1011,39 @@ service cloud.firestore {
           && d.at is number && d.at > 0 && d.at <= request.time.toMillis() + 60 * 60 * 1000;
       }
 
-      // The door as the batch leaves it (null when there is none).
+      // The door as the batch leaves it. Call it only after existsAfter (doorExistsAfter): a get
+      // of a missing doc errors, which would refuse the write instead of answering false.
       function doorAfter(id) {
         return getAfter(/databases/$(database)/documents/houses/$(id));
       }
 
+      function doorExistsAfter(id) {
+        return existsAfter(/databases/$(database)/documents/houses/$(id));
+      }
+
+      // A houses doc's mark is a real (not imported) Appointment Booked.
+      function markBooked(door) {
+        return door.data.get('last', null) is map
+          && door.data.last.get('dispositionId', '') == 'appointment_set'
+          && door.data.last.get('imported', false) != true;
+      }
+
+      // The door, as the batch leaves it, exists and carries an Appointment Booked mark.
+      function doorBookedAfter(id) {
+        return doorExistsAfter(id) && markBooked(doorAfter(id));
+      }
+
       // The door's own mark after the batch is the caller's Appointment Booked (not a lead-file
       // import), in the pin's campaign, at the pin's time, on the grid point nearest the door:
-      // a 3-decimal value within 0.0006 of its
-      // position (the rounded value is at most 0.0005 away; rules cannot reproduce JS rounding of
-      // exact halves on negative longitudes, so the tolerance stands in for exact equality).
+      // a 3-decimal value within 0.0006 of its position (the rounded value is at most 0.0005
+      // away; rules cannot reproduce JS rounding of exact halves on negative longitudes, so the
+      // tolerance stands in for exact equality).
       function bookedByMeAfter(id) {
-        let door = doorAfter(id);
-        let d = request.resource.data;
-        return door != null
-          && door.data.get('last', null) is map
-          && door.data.last.get('dispositionId', '') == 'appointment_set'
-          && door.data.last.get('imported', false) != true
-          && door.data.last.get('repId', '') == request.auth.uid
+        return doorBookedAfter(id) && myPinFor(doorAfter(id), request.resource.data);
+      }
+
+      function myPinFor(door, d) {
+        return door.data.last.get('repId', '') == request.auth.uid
           && door.data.get('campaignId', '') == d.campaignId
           && door.data.last.get('at', null) == d.at
           && math.abs(d.lat - door.data.lat) <= 0.0006
