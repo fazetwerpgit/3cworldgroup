@@ -159,7 +159,7 @@ export function RepAsk() {
           <div className={p.empty}>
             <div>
               <strong>Ask 3C is not turned on yet.</strong>
-              <p>Until it is, call Jeremy or Jacob when an order gets stuck.</p>
+              {isOwner(user?.role ?? undefined) ? null : <p>Until it is, ask your manager when an order gets stuck.</p>}
             </div>
           </div>
         </section>
@@ -319,7 +319,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
     showComposer('smooth');
 
     let reply: AskReply | null = null;
-    const fallback = owner ? '' : ', or call Jeremy or Jacob';
+    const fallback = owner ? '' : ', or ask your manager';
     let error = `No answer came back. Check your signal and try again${fallback}.`;
     let retry = true;
     let needsConsent = false;
@@ -471,7 +471,7 @@ function AskChat({ uid, owner }: { uid: string; owner: boolean }) {
         </ol>
       )}
 
-      {answered && !owner ? <p className={a.stuck}>Still stuck? Call Jeremy or Jacob.</p> : null}
+      {answered && !owner ? <p className={a.stuck}>Still stuck? Ask your manager.</p> : null}
 
       <BorderBeam size="line" active={sending && !reducedMotion} theme="dark" strength={0.7} className={a.composerBeam}>
         <form ref={composerRef} className={`${s.panel} ${a.composer}`} onSubmit={send}>

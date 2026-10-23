@@ -363,7 +363,7 @@ describe('POST /api/portal/ask', () => {
     const callsBefore = fetchMock.mock.calls.length;
     const res = await POST(req({ question: 'Number 61' }));
     expect(res.status).toBe(429);
-    expect((await res.json()).error).toMatch(/Call Jeremy or Jacob/);
+    expect((await res.json()).error).toMatch(/Ask your manager\./);
     expect(fetchMock).toHaveBeenCalledTimes(callsBefore);
     // Another rep's count is their own.
     mockUser.mockResolvedValue({ ok: true, uid: 'r2', name: 'Other Rep', email: '', isOwner: false, aiConsent: AGREED });
@@ -394,8 +394,20 @@ describe('POST /api/portal/ask', () => {
     fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
     const res = await POST(req({ question: 'Help' }));
     expect(res.status).toBe(502);
-    expect((await res.json()).error).toBe("Ask 3C couldn't answer right now. Try again, or call Jeremy or Jacob.");
+    expect((await res.json()).error).toBe("Ask 3C couldn't answer right now. Try again, or ask your manager.");
     expect(logs()).toHaveLength(0);
+  });
+
+  it('never points the owner at a manager in its error copy', async () => {
+    mockUser.mockResolvedValue({ ok: true, uid: 'o1', name: 'Jacob Owner', email: '', isOwner: true, aiConsent: AGREED });
+    fetchMock.mockResolvedValueOnce(new Response('overloaded', { status: 503 }));
+    const failed = await POST(req({ question: 'Help' }));
+    expect((await failed.json()).error).toBe("Ask 3C couldn't answer right now. Try again in a moment.");
+
+    fake.docs('askUsage').set(`o1_${chicagoDayKey(new Date())}`, { uid: 'o1', count: 60 });
+    const limited = await POST(req({ question: 'Number 61' }));
+    expect(limited.status).toBe(429);
+    expect((await limited.json()).error).toBe("You've asked 60 questions today, the daily limit.");
   });
 
   it('answers 504 when the provider times out', async () => {

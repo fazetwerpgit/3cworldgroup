@@ -62,7 +62,7 @@ describe('RepAsk failures', () => {
   });
 
   it('shows the daily limit with no Try again', async () => {
-    fetchMock.mockResolvedValueOnce(json({ error: "You've asked 60 questions today, the daily limit. Call Jeremy or Jacob." }, 429));
+    fetchMock.mockResolvedValueOnce(json({ error: "You've asked 60 questions today, the daily limit. Ask your manager." }, 429));
     await ask('Where is my order?');
     expect(container.textContent).toContain('the daily limit');
     expect(hasTryAgain()).toBe(false);

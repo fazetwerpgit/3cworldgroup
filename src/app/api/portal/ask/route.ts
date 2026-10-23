@@ -28,7 +28,9 @@ export const maxDuration = 45;
 
 const STUB_MODEL = 'sandbox-stub';
 const PHOTO_ONLY_QUESTION = 'Here is a photo. What should I do?';
-const CALL_FOR_HELP = 'Try again, or call Jeremy or Jacob.';
+// Where a stuck rep goes next: their manager (the owners run 3C, so they get no pointer).
+const callForHelp = (owner: boolean) => (owner ? 'Try again in a moment.' : 'Try again, or ask your manager.');
+const askManager = (owner: boolean) => (owner ? '' : ' Ask your manager.');
 const PREV_QUESTION_CHARS = 200;
 
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });
@@ -83,11 +85,11 @@ export async function POST(request: NextRequest) {
   const config = askProviderConfig();
   // The E2E sandbox answers without a key so the page can be tested; it never calls out.
   const stub = !config.apiKey && process.env.E2E_SANDBOX === '1';
-  if (!config.apiKey && !stub) return fail('Ask 3C is not set up yet. Call Jeremy or Jacob.', 503);
+  if (!config.apiKey && !stub) return fail(`Ask 3C is not set up yet.${askManager(gate.isOwner)}`, 503);
 
   const now = new Date();
   if (!(await takeDailyAsk(db, gate.uid, now))) {
-    return fail(`You've asked ${ASK_DAILY_LIMIT} questions today, the daily limit. Call Jeremy or Jacob.`, 429);
+    return fail(`You've asked ${ASK_DAILY_LIMIT} questions today, the daily limit.${askManager(gate.isOwner)}`, 429);
   }
 
   // The rep's own portal data loads alongside the notes (it has its own time
@@ -151,7 +153,7 @@ export async function POST(request: NextRequest) {
       // Only an answered question counts against the day.
       await giveBackDailyAsk(db, gate.uid, now).catch(() => {});
       return fail(
-        kind === 'timeout' ? `Ask 3C took too long to answer. ${CALL_FOR_HELP}` : `Ask 3C couldn't answer right now. ${CALL_FOR_HELP}`,
+        kind === 'timeout' ? `Ask 3C took too long to answer. ${callForHelp(gate.isOwner)}` : `Ask 3C couldn't answer right now. ${callForHelp(gate.isOwner)}`,
         kind === 'timeout' ? 504 : 502
       );
     }
