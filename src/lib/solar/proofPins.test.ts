@@ -3,6 +3,7 @@ import { createFakeDb } from '@/lib/solar/testing/fakeDb';
 import {
   applyProofPinChange,
   bookedMarkAt,
+  isDeletedHouse,
   leadDoorId,
   proofPinChangeForLead,
   proofPinDoc,
@@ -84,6 +85,16 @@ describe('proofPinChangeForLead', () => {
   });
 });
 
+describe('isDeletedHouse', () => {
+  it('reads the _deleted campaign or a deleted stamp', () => {
+    expect(isDeletedHouse(HOUSE)).toBe(false);
+    expect(isDeletedHouse(null)).toBe(false);
+    expect(isDeletedHouse({ ...HOUSE, deleted: null })).toBe(false);
+    expect(isDeletedHouse({ ...HOUSE, campaignId: '_deleted' })).toBe(true);
+    expect(isDeletedHouse({ ...HOUSE, deleted: { by: 'u', at: 1, campaignId: 'solar-1' } })).toBe(true);
+  });
+});
+
 describe('applyProofPinChange', () => {
   const seed = (pins: Record<string, Record<string, unknown>> = {}) =>
     createFakeDb({ houses: { h1: { ...HOUSE } }, proofPins: pins });
@@ -148,6 +159,28 @@ describe('applyProofPinChange', () => {
     await applyProofPinChange(db, { status: 'sold' }, 'solar', SOLD_AT);
     await applyProofPinChange(db, { doorId: 'gone' }, 'solar', SOLD_AT);
     expect(db.store.get('proofPins')!.size).toBe(0);
+  });
+
+  it('writes no pin for a soft-deleted door, and drops the one it has', async () => {
+    const deleted = { ...HOUSE, campaignId: '_deleted', deleted: { by: 'mgr', at: 1, campaignId: 'solar-1' } };
+    const db = createFakeDb({ houses: { h1: deleted }, proofPins: {} });
+    await applyProofPinChange(db, lead, 'solar', SOLD_AT);
+    await applyProofPinChange(db, lead, 'restore', SOLD_AT);
+    await applyProofPinChange(db, lead, 'unsold-restore', SOLD_AT);
+    expect(db.store.get('proofPins')!.has('h1')).toBe(false);
+    for (const change of ['solar', 'restore', 'unsold-restore'] as const) {
+      for (const kind of ['booked', 'solar'] as const) {
+        db.store.get('proofPins')!.set('h1', proofPinDoc(HOUSE, kind, SOLD_AT)! as never);
+        await applyProofPinChange(db, lead, change, SOLD_AT);
+        expect(db.store.get('proofPins')!.has('h1')).toBe(false);
+      }
+    }
+  });
+
+  it('treats a door with only a deleted stamp as deleted too', async () => {
+    const db = createFakeDb({ houses: { h1: { ...HOUSE, deleted: { by: 'mgr', at: 1, campaignId: 'solar-1' } } }, proofPins: {} });
+    await applyProofPinChange(db, lead, 'solar', SOLD_AT);
+    expect(db.store.get('proofPins')!.has('h1')).toBe(false);
   });
 
   it('never throws when the write fails', async () => {

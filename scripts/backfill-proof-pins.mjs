@@ -23,7 +23,8 @@
 //
 // Skipped: doors of QA test / demo accounts (users/{uid}.testAccount or
 // demoAccount on the door's rep or the mark's rep; a lead stamped testAccount),
-// doors with no usable position, and doors on non-solar campaigns.
+// doors with no usable position, doors on non-solar campaigns, and doors the knock
+// app soft-deleted (campaignId '_deleted' or a `deleted` stamp).
 //
 // Idempotent: a pin that already matches is left alone; a 'solar' pin is never
 // turned back to 'booked' and keeps its time. Nothing is deleted.
@@ -177,7 +178,7 @@ for (let i = 0; i < missingHouseIds.length; i += 100) {
 
 // ---- Plan
 const counts = new Map(); // campaignId -> {booked:{create,update,same}, solar:{...}}
-const skipped = { testAccount: 0, noPosition: 0, notSolarCampaign: 0, soldLeadDoorMissing: 0, notBooked: 0, soldNoTime: 0 };
+const skipped = { deleted: 0, testAccount: 0, noPosition: 0, notSolarCampaign: 0, soldLeadDoorMissing: 0, notBooked: 0, soldNoTime: 0 };
 const bump = (campaignId, kind, what) => {
   if (!counts.has(campaignId)) counts.set(campaignId, { booked: { create: 0, update: 0, same: 0 }, solar: { create: 0, update: 0, same: 0 } });
   counts.get(campaignId)[kind][what]++;
@@ -193,6 +194,8 @@ for (let i = 0; i < ids.length; i += 100) {
 }
 
 for (const [id, house] of houses) {
+  // Soft-deleted by the knock app (campaignId '_deleted' / a `deleted` stamp; DELETE_DOORS.md): no pin.
+  if (house.campaignId === '_deleted' || house.deleted != null) { skipped.deleted++; continue; }
   if (!solarCampaigns.has(house.campaignId)) { skipped.notSolarCampaign++; continue; }
   const sold = soldByHouse.get(id);
   const repIds = [house.assignedRepId, house.last?.repId, house.createdBy].filter((v) => typeof v === 'string' && v);

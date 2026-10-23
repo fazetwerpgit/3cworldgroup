@@ -87,6 +87,15 @@ export function proofPinDoc(house: Data | null | undefined, kind: ProofPinKind, 
   };
 }
 
+/** The campaignId a soft-deleted door carries (3c-knock docs/design/DELETE_DOORS.md). */
+export const DELETED_CAMPAIGN_ID = '_deleted';
+
+/** A houses doc the knock app soft-deleted: parked in '_deleted', or carrying a `deleted` stamp. */
+export function isDeletedHouse(house: Data | null | undefined): boolean {
+  if (!house) return false;
+  return house.campaignId === DELETED_CAMPAIGN_ID || (house.deleted !== undefined && house.deleted !== null);
+}
+
 /** The knock house a solar lead came from (solarLeads.doorId), or null. */
 export function leadDoorId(lead: Data | null | undefined): string | null {
   const id = lead?.doorId;
@@ -156,6 +165,11 @@ export async function applyProofPinChange(
     const note = await db.runTransaction(async (tx) => {
       const existing = (await tx.get(pinRef)).data();
       const house = (await tx.get(houseRef)).data();
+      // A soft-deleted door gets no pin: drop any it has (even a solar one) instead of writing one.
+      if (change !== 'delete' && change !== 'unsold-delete' && isDeletedHouse(house)) {
+        if (existing) tx.delete(pinRef);
+        return null;
+      }
       if (existing?.kind === 'solar' && (change === 'solar' || !mayTouchSolar)) return null; // keeps its sold time
       if (change === 'delete' || change === 'unsold-delete') {
         if (existing) tx.delete(pinRef);

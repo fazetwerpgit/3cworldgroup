@@ -576,6 +576,14 @@ service cloud.firestore {
               || managerOf(request.resource.data.assignedRepId) == request.auth.uid)
             && request.resource.data.get('managerId', null)
               == managerOf(request.resource.data.assignedRepId))
+          // Delete door (3c-knock docs/design/DELETE_DOORS.md): a manager parks a door of their
+          // team (or their own) out of its campaign, or Undo puts it back. Nothing else changes.
+          || (signedIn()
+            && isManagerRole()
+            && (resource.data.get('managerId', null) == request.auth.uid
+              || resource.data.assignedRepId == request.auth.uid)
+            && changedKeys().hasOnly(['campaignId', 'deleted', 'updatedAt'])
+            && (doorDeleteValid() || doorRestoreValid()))
           // An open campaign's unassigned door (openToMe): fill its address, set up its units while
           // it has none (starting empty: no unit results without a knock, #39), add units after the
           // ones it has (Add units: the list only grows at its end, M15 bug hunt 2026-10-18), or
@@ -712,6 +720,35 @@ service cloud.firestore {
             || resource.data.get('managerId', null) == request.auth.uid)
           : was == null && n is map && n.keys().hasOnly(['by', 'at'])
             && n.get('by', null) == request.auth.uid && n.get('at', null) is number;
+      }
+
+      // Delete: a live door goes to '_deleted', stamped with the writer, a time and the campaign it was in.
+      function doorDeleteValid() {
+        let d = request.resource.data.get('deleted', null);
+        return resource.data.campaignId != '_deleted'
+          && resource.data.get('deleted', null) == null
+          && request.resource.data.campaignId == '_deleted'
+          && d is map && d.keys().hasOnly(['by', 'at', 'campaignId'])
+          && d.get('by', null) == request.auth.uid
+          && d.get('at', null) is number
+          && d.get('campaignId', null) == resource.data.campaignId;
+      }
+
+      // Undo: a deleted door goes back to the campaign its stamp names, and the stamp goes.
+      function doorRestoreValid() {
+        return resource.data.campaignId == '_deleted'
+          && resource.data.get('deleted', null) is map
+          && !('deleted' in request.resource.data)
+          && request.resource.data.campaignId == resource.data.deleted.campaignId;
+      }
+
+      // Mirrors appRoleFor's manager check (src/lib/roles.ts MANAGEMENT_FIELD_ROLES); the copy in
+      // `match /shoutouts` is scoped to that block.
+      function isManagerRole() {
+        return me().get('role', '') == 'operations'
+          || me().get('fieldRole', '') in ['l1_manager', 'l2_manager', 'ibo_level_1', 'ibo_level_2', 'ibo_level_3',
+                                           'ibo_level_4', 'general_manager', 'office_manager', 'regional_manager',
+                                           'director'];
       }
 
       allow delete: if isOwner();
@@ -1028,9 +1065,13 @@ service cloud.firestore {
           && door.data.last.get('imported', false) != true;
       }
 
-      // The door, as the batch leaves it, exists and carries an Appointment Booked mark.
+      // The door, as the batch leaves it, exists, is not soft-deleted (campaignId '_deleted',
+      // 3c-knock docs/design/DELETE_DOORS.md) and carries an Appointment Booked mark. So a
+      // delete batch may drop the door's booked pin, and no pin can be made for a deleted door.
       function doorBookedAfter(id) {
-        return doorExistsAfter(id) && markBooked(doorAfter(id));
+        return doorExistsAfter(id)
+          && doorAfter(id).data.get('campaignId', '') != '_deleted'
+          && markBooked(doorAfter(id));
       }
 
       // The door's own mark after the batch is the caller's Appointment Booked (not a lead-file

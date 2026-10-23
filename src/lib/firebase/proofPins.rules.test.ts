@@ -228,6 +228,37 @@ describe.skipIf(!emulatorHost)('firestore.rules: proofPins', () => {
       await assertSucceeds(deleteDoc(doc(asUser('rep'), 'proofPins/p1')));
     });
 
+    it('allows a manager soft-deleting a booked door to delete its booked pin in the same batch', async () => {
+      const db = asUser('mgr');
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'houses/h2'), {
+        campaignId: '_deleted',
+        deleted: { by: 'mgr', at: BOOKED_AT, campaignId: CAMPAIGN },
+        updatedAt: BOOKED_AT,
+      });
+      batch.delete(doc(db, 'proofPins/h2'));
+      await assertSucceeds(batch.commit());
+    });
+
+    it('still denies deleting the booked pin of a live booked door', async () => {
+      await assertFails(deleteDoc(doc(asUser('mgr'), 'proofPins/h2')));
+    });
+
+    it('denies a booked pin for a soft-deleted door, even with my own booked mark on it', async () => {
+      await env.withSecurityRulesDisabled(async (ctx) => {
+        await setDoc(doc(ctx.firestore(), 'houses/hd'), {
+          campaignId: '_deleted',
+          deleted: { by: 'mgr', at: BOOKED_AT, campaignId: CAMPAIGN },
+          ...DOOR,
+          managerId: 'mgr',
+          assignedRepId: 'rep',
+          last: bookedMark('rep'),
+        });
+      });
+      await assertFails(setDoc(doc(asUser('rep'), 'proofPins/hd'), { ...PIN, campaignId: '_deleted' }));
+      await assertFails(setDoc(doc(asUser('rep'), 'proofPins/hd'), PIN));
+    });
+
     it('denies a signed-out delete', async () => {
       await assertFails(deleteDoc(doc(env.unauthenticatedContext().firestore(), 'proofPins/p1')));
     });
