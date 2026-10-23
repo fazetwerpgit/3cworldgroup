@@ -3,7 +3,8 @@ import { adminDb } from '@/lib/firebase/admin';
 import { requireOwner } from '@/lib/announcements/requireOwner';
 import { KNOWLEDGE_NOTES, validateNoteDraft } from '@/lib/ask/notes';
 
-// PATCH  /api/portal/knowledge/{id} { title, body } — edit one Ask 3C note.
+// PATCH  /api/portal/knowledge/{id} { title, body, audience? } — edit one Ask 3C note
+//        (audience left out keeps the note's tags).
 // DELETE /api/portal/knowledge/{id}                — remove it. Owner only.
 
 const fail = (error: string, status: number) => NextResponse.json({ error }, { status });

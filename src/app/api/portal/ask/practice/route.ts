@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
+import { notesForAudience } from '@/lib/ask/audience';
 import { practiceAudience } from '@/lib/ask/flag';
 import {
   MAX_PRACTICE_TURNS,
@@ -603,7 +604,9 @@ export async function POST(request: NextRequest) {
   } else if (stub) {
     feedback = 'Score: 7/10\nResult: No sale\nSkills: Opener 7/10, Discovery 6/10, Objections 6/10, Close 5/10\nWhat worked:\n- "Sandbox: no model was called."\nFix next time: Nothing yet.\nTry this line: "Hi, I\'m with 3C."';
   } else {
-    const [notes, corrections] = await Promise.all([loadNotes(db), loadCorrections(db)]);
+    const [allNotes, corrections] = await Promise.all([loadNotes(db), loadCorrections(db)]);
+    // The coach reads only the notes this rep's verified roles may see (audience.ts).
+    const notes = notesForAudience(allNotes, gate);
     // A redo: the lines before the marker are the first try, replayed; the rep is graded on what follows.
     const redoFrom = redoOf && Number.isInteger(saved.redoFrom) ? Math.min(saved.redoFrom as number, turns.length) : 0;
     const transcript = redoFrom

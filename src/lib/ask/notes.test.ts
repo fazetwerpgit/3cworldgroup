@@ -46,6 +46,20 @@ describe('validateNoteDraft', () => {
     expect(validateNoteDraft({ title: 'T', body: 'x'.repeat(100_001) }).ok).toBe(false);
     expect(validateNoteDraft(null).ok).toBe(false);
   });
+
+  it('keeps a sent audience in canonical form and leaves it out when not sent', () => {
+    expect(validateNoteDraft({ title: 'T', body: 'b', audience: ['manager', 'solar'] })).toEqual({
+      ok: true,
+      note: { title: 'T', body: 'b', audience: ['solar', 'manager'] },
+    });
+    expect(validateNoteDraft({ title: 'T', body: 'b' })).toEqual({ ok: true, note: { title: 'T', body: 'b' } });
+  });
+
+  it('refuses an empty or unknown audience', () => {
+    expect(validateNoteDraft({ title: 'T', body: 'b', audience: [] }).ok).toBe(false);
+    expect(validateNoteDraft({ title: 'T', body: 'b', audience: ['vip'] }).ok).toBe(false);
+    expect(validateNoteDraft({ title: 'T', body: 'b', audience: 'solar' }).ok).toBe(false);
+  });
 });
 
 describe('sortNotes', () => {

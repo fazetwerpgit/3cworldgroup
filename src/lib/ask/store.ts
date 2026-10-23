@@ -1,4 +1,6 @@
 import { chicagoDayKey } from '@/lib/weeklyInstalls/week';
+import { isMainLine, type MainLine } from '@/types/auth';
+import { normalizeAudience } from './audience';
 import { KNOWLEDGE_NOTES, sortNotes, type KnowledgeNote } from './notes';
 import {
   ASSIGNMENT_MIN_LINES,
@@ -66,6 +68,7 @@ export async function loadNotes(db: FirebaseFirestore.Firestore): Promise<Knowle
         title: typeof data.title === 'string' ? data.title : '',
         body: typeof data.body === 'string' ? data.body : '',
         order: typeof data.order === 'number' ? data.order : 0,
+        audience: normalizeAudience(data.audience),
         updatedAt: isoTime(data.updatedAt),
         updatedBy: typeof data.updatedBy === 'string' ? data.updatedBy : '',
       };
@@ -138,12 +141,44 @@ async function takeDaily(
   });
 }
 
-/** "City, ST" from the rep's profile, or '' when neither is set. */
-export async function repHome(db: FirebaseFirestore.Firestore, uid: string): Promise<string> {
+/** What Ask 3C needs from the asker's own profile beyond the role gate. */
+export interface AskProfile {
+  /** "City, ST", or '' when neither is set. */
+  home: string;
+  /** A dual rep's main line (users/{uid}.mainLine), or null. */
+  mainLine: MainLine | null;
+  /** Their manager's first name (users/{reportsToId ?? managerId}.displayName), or '' when none or unreadable. */
+  managerFirstName: string;
+}
+
+/** The first word of a display name, or '' when the name is missing or an email. */
+function firstNameOf(raw: unknown): string {
+  const name = typeof raw === 'string' ? raw.trim() : '';
+  if (!name || name.includes('@')) return '';
+  return name.split(/\s+/)[0].replace(/[^\p{L}'-]/gu, '').slice(0, 40);
+}
+
+/**
+ * The asker's home, main line and manager's first name, from users/{uid} and
+ * their manager's users doc (the manager link is reportsToId, older docs
+ * managerId, as the admin user form reads it). Only the first name leaves here.
+ */
+export async function loadAskProfile(db: FirebaseFirestore.Firestore, uid: string): Promise<AskProfile> {
   const data = (await db.collection('users').doc(uid).get()).data() ?? {};
   const city = typeof data.city === 'string' ? data.city.trim() : '';
   const state = typeof data.state === 'string' ? data.state.trim() : '';
-  return [city, state].filter(Boolean).join(', ');
+  const link = [data.reportsToId, data.managerId].find((value) => typeof value === 'string' && value.trim());
+  const managerUid = typeof link === 'string' ? link.trim() : '';
+  let managerFirstName = '';
+  if (managerUid && managerUid !== uid && /^[A-Za-z0-9_-]{1,128}$/.test(managerUid)) {
+    const manager = await db.collection('users').doc(managerUid).get().catch(() => null);
+    managerFirstName = firstNameOf(manager?.data()?.displayName);
+  }
+  return {
+    home: [city, state].filter(Boolean).join(', '),
+    mainLine: isMainLine(data.mainLine) ? data.mainLine : null,
+    managerFirstName,
+  };
 }
 
 /** Every practice assignment the owner has set, newest first (a handful: the owner deletes old ones). */

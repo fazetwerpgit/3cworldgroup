@@ -80,3 +80,81 @@ describe('buildSystemPrompt order fixes', () => {
     );
   });
 });
+
+describe('buildSystemPrompt escalation', () => {
+  /**
+   * The prompt without the lines that name the owners for owner-only matters:
+   * rule 1d, legal and danger, pay, threats, injection, the humor rule's "never
+   * roast Jacob or Jeremy", and the portal guide's sale edits and lead approvals.
+   */
+  const defaultLines = (prompt: string) =>
+    prompt
+      .split('\n')
+      .filter(
+        (line) =>
+          !/^(1d|1e|2e|2i|2l|2m|4j|8)\. /.test(line) &&
+          !line.startsWith('Humor:') &&
+          !line.startsWith('- Sales:') &&
+          !line.startsWith('  Leads request:')
+      )
+      .join('\n');
+
+  it("names the rep's own manager and never the owners by default", () => {
+    const prompt = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [], managerFirstName: 'Dana' });
+    expect(prompt).toContain('Their manager: Dana. When they need a person (rule 1d), send them to Dana first.');
+    expect(prompt).toContain('send the rep to their own manager first');
+    expect(defaultLines(prompt)).not.toMatch(/Jeremy|Jacob/);
+    expect(prompt).not.toContain('Escalation is only Jeremy or Jacob');
+  });
+
+  it('says "your manager" when none is listed, without guessing a name', () => {
+    const prompt = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [] });
+    expect(prompt).toContain('say "your manager" and never guess a name');
+    expect(prompt).toContain('unknown — tell them to ask their manager');
+  });
+
+  it('keeps the owners only for what only they decide', () => {
+    const rule1d = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [] }).match(/^1d\. .*$/m)?.[0] ?? '';
+    expect(rule1d).toContain('pay questions and payroll disputes');
+    expect(rule1d).toContain('team Chat');
+  });
+
+  it('never tells an owner to ask an owner or a manager', () => {
+    const prompt = buildSystemPrompt([], { firstName: 'Jacob', dealerCodes: [], owner: true, managerFirstName: 'Dana' });
+    expect(prompt).not.toContain('Their manager:');
+    expect(prompt).toContain("it's Jeremy.");
+    expect(prompt).toContain('Never tell them to ask themselves or "their manager"');
+  });
+
+  it('gives an admin with no manager the owners as the second opinion', () => {
+    expect(buildSystemPrompt([], { firstName: 'Alex', dealerCodes: [], admin: true })).toContain('3C admin with no manager listed');
+  });
+});
+
+describe('buildSystemPrompt line', () => {
+  const intro = (rep: Partial<Parameters<typeof buildSystemPrompt>[1]>) =>
+    buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [], ...rep }).split('\n')[0];
+
+  it('fiber by default, as before', () => {
+    expect(intro({})).toContain('Reps sell T-Mobile Fiber (T-Fiber) door to door.');
+  });
+
+  it('solar only, both with the main line first, and admin/owner both', () => {
+    expect(intro({ line: 'solar' })).toContain('sells solar door to door for 3C, not T-Mobile Fiber');
+    expect(intro({ line: 'fiber+solar' })).toContain('T-Mobile Fiber (T-Fiber) door to door as their main line, and solar too');
+    expect(intro({ line: 'solar+fiber' })).toContain('solar door to door as their main line, and T-Mobile Fiber');
+    expect(intro({ line: 'all' })).toContain('sell T-Mobile Fiber (T-Fiber) and solar');
+    expect(buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [], line: 'solar' })).toContain("say you're with 3C selling solar,");
+  });
+
+  it('adds the solar number rule only when solar notes are in', () => {
+    const without = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [], line: 'solar' });
+    const withSolar = buildSystemPrompt([], { firstName: 'Sam', dealerCodes: [], line: 'solar', solarNotes: true });
+    expect(without).not.toMatch(/^3b\. /m);
+    expect(withSolar).toMatch(/^3b\. Solar: never quote savings, utility rates, APRs/m);
+    expect(withSolar).toContain('No tax or legal advice');
+    expect(withSolar).toContain('Rule 2i covers solar pay too.');
+    const labels: string[] = withSolar.match(/^\d+[a-z]?(?=\. )/gm) ?? [];
+    expect(labels.filter((label, i) => labels.indexOf(label) !== i)).toEqual([]);
+  });
+});

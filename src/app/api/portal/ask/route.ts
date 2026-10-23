@@ -5,12 +5,13 @@ import { isAllowedImageMime } from '@/lib/chat/media';
 import { MAX_FORM_FILE_BYTES, resolveUploadMime } from '@/lib/forms/formUploads';
 import { MAX_QUESTION_CHARS, parseHistory, type AskReply, type AskTurnMessage } from '@/lib/ask/chat';
 import { aiConsentRefusal } from '@/lib/ai/consent';
+import { askLineFor, hasSolarNotes, notesForAudience } from '@/lib/ask/audience';
 import { askAudience, askEarlyUids } from '@/lib/ask/flag';
 import { loadRepSnapshot } from '@/lib/ask/liveData';
 import { SELF_CHECK, buildSystemPrompt } from '@/lib/ask/prompt';
 import { AskProviderError, askProviderConfig, callAskModel, type AskContentPart, type AskMessage } from '@/lib/ask/provider';
 import { redactContact } from '@/lib/ask/redact';
-import { ASK_DAILY_LIMIT, ASK_LOG, giveBackDailyAsk, loadNotes, repHome, takeDailyAsk } from '@/lib/ask/store';
+import { ASK_DAILY_LIMIT, ASK_LOG, giveBackDailyAsk, loadAskProfile, loadNotes, takeDailyAsk } from '@/lib/ask/store';
 import { ownDealerCodes } from '@/lib/fiberReport/dealerCodes';
 
 // POST /api/portal/ask (multipart: question, history JSON, optional photo) —
@@ -91,12 +92,15 @@ export async function POST(request: NextRequest) {
 
   // The rep's own portal data loads alongside the notes (it has its own time
   // budget and fails soft); the sandbox stub never calls a model, so skips it.
-  const [notes, dealerCodes, home, live] = await Promise.all([
+  const [allNotes, dealerCodes, profile, live] = await Promise.all([
     loadNotes(db),
     ownDealerCodes(db, gate.uid),
-    repHome(db, gate.uid).catch(() => ''),
+    loadAskProfile(db, gate.uid).catch(() => ({ home: '', mainLine: null, managerFirstName: '' })),
     stub ? Promise.resolve('') : loadRepSnapshot(db, gate.uid, now),
   ]);
+  // Only the notes this user's verified roles may see (audience.ts), never anything the client sent.
+  const notes = notesForAudience(allNotes, gate);
+  const { home, managerFirstName } = profile;
   const firstName = gate.name.includes('@') || gate.name === gate.uid ? '' : gate.name.split(/\s+/)[0];
   const redacted = redactContact(question);
   // A follow-up's log row shows what it followed, so the owner can read it in context.
@@ -120,7 +124,18 @@ export async function POST(request: NextRequest) {
       });
     }
     const messages: AskMessage[] = [
-      { role: 'system', content: buildSystemPrompt(notes, { firstName, dealerCodes, now, home, live, owner: gate.isOwner }) },
+      { role: 'system', content: buildSystemPrompt(notes, {
+          firstName,
+          dealerCodes,
+          now,
+          home,
+          live,
+          owner: gate.isOwner,
+          admin: gate.isAdmin && !gate.isOwner,
+          line: askLineFor(gate, profile.mainLine),
+          solarNotes: hasSolarNotes(notes),
+          managerFirstName,
+        }) },
       ...history.map((turn) => ({
         role: turn.role,
         content: turn.role === 'user' ? redactContact(turn.text) : turn.text,

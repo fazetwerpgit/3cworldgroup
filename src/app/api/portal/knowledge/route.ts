@@ -5,7 +5,7 @@ import { KNOWLEDGE_NOTES, validateNoteDraft, type NoteDraft } from '@/lib/ask/no
 import { loadNotes } from '@/lib/ask/store';
 
 // GET  /api/portal/knowledge                 the owner's Ask 3C notes, in prompt order
-// POST /api/portal/knowledge { notes: [...] } adds one or more notes (a typed
+// POST /api/portal/knowledge { notes: [{ title, body, audience? }] } adds one or more notes (a typed
 //      note, or every file of an upload), all or none, at the end of the order.
 // Owner only. The notes are restricted carrier material: they live only here
 // in Firestore (no client rules) and never in the repo.
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   const batch = db.batch();
   const ids = drafts.map((draft, index) => {
     const ref = db.collection(KNOWLEDGE_NOTES).doc();
-    batch.set(ref, { ...draft, order: nextOrder + index, updatedAt: now, updatedBy: gate.name });
+    batch.set(ref, { ...draft, audience: draft.audience ?? ['all'], order: nextOrder + index, updatedAt: now, updatedBy: gate.name });
     return ref.id;
   });
   await batch.commit();

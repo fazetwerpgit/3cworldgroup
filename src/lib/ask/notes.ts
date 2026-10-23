@@ -3,6 +3,8 @@
 // rules), entered through the owner's Knowledge tab. Shared by the owner page
 // (upload parsing, size estimate) and the routes (validation, prompt order).
 
+import { parseAudience, type NoteAudience } from './audience';
+
 export const KNOWLEDGE_NOTES = 'knowledgeNotes';
 
 export const MAX_NOTE_TITLE = 200;
@@ -17,6 +19,8 @@ export interface KnowledgeNote {
   title: string;
   body: string;
   order: number;
+  /** Who the note is for (audience.ts); stored notes without one read as ['all']. */
+  audience: NoteAudience[];
   updatedAt: string | null;
   updatedBy: string;
 }
@@ -24,6 +28,8 @@ export interface KnowledgeNote {
 export interface NoteDraft {
   title: string;
   body: string;
+  /** Absent: not sent (a new note is then for everyone; an edit keeps its tags). */
+  audience?: NoteAudience[];
 }
 
 /**
@@ -42,9 +48,9 @@ export function estimateTokens(chars: number): number {
   return Math.ceil(chars / 4);
 }
 
-/** A trimmed, length-checked title and body, or an error for the owner. */
+/** A trimmed, length-checked title and body (and audience, when sent), or an error for the owner. */
 export function validateNoteDraft(input: unknown): { ok: true; note: NoteDraft } | { ok: false; error: string } {
-  const raw = (input ?? {}) as { title?: unknown; body?: unknown };
+  const raw = (input ?? {}) as { title?: unknown; body?: unknown; audience?: unknown };
   const title = typeof raw.title === 'string' ? raw.title.trim() : '';
   const body = typeof raw.body === 'string' ? raw.body.replace(/\r\n?/g, '\n').trim() : '';
   if (!title) return { ok: false, error: 'Give the note a title' };
@@ -53,7 +59,9 @@ export function validateNoteDraft(input: unknown): { ok: true; note: NoteDraft }
   if (body.length > MAX_NOTE_BODY) {
     return { ok: false, error: `"${title}" is too long. Split it into notes under ${MAX_NOTE_BODY.toLocaleString('en-US')} characters` };
   }
-  return { ok: true, note: { title, body } };
+  const audience = parseAudience(raw.audience);
+  if (!audience.ok) return audience;
+  return { ok: true, note: audience.audience ? { title, body, audience: audience.audience } : { title, body } };
 }
 
 /**

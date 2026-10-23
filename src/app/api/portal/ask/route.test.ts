@@ -231,8 +231,66 @@ describe('POST /api/portal/ask', () => {
     modelAnswers();
     await POST(req({ question: 'What is my dealer code?' }));
     const system: string = sentBody().messages[0].content;
-    expect(system).toContain('Their dealer code: unknown — tell them to ask Jeremy or Jacob');
+    expect(system).toContain('Their dealer code: unknown — tell them to ask their manager');
     expect(system).not.toMatch(/DLR-/);
+  });
+
+  describe('note audience and escalation', () => {
+    function seedTagged(rep: Record<string, unknown>) {
+      fake = createFakeAskDb({
+        knowledgeNotes: {
+          a1: { title: 'Everyone note', body: 'EVERYONE-FACT', order: 1 },
+          s1: { title: 'Solar note', body: 'SOLAR-FACT', order: 2, audience: ['solar'] },
+          m1: { title: 'Manager note', body: 'MANAGER-FACT', order: 3, audience: ['manager'] },
+          o1: { title: 'Owner note', body: 'OWNER-FACT', order: 4, audience: ['owner'] },
+        },
+        config: { fiberRepMap: { map: { 'DLR-OWN': 'r1' } } },
+        users: { r1: { status: 'active', ...rep }, mgr: { displayName: 'Morgan Quillfeather' } },
+      });
+      state.db = fake.db;
+    }
+
+    it('a fiber rep gets only the everyone notes, the fiber line and their manager by first name', async () => {
+      seedTagged({ reportsToId: 'mgr' });
+      mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: '', isOwner: false, isAdmin: false, fieldRole: 'ae_tier_1', solarRole: null, aiConsent: AGREED });
+      modelAnswers();
+      expect((await POST(req({ question: 'Hi' }))).status).toBe(200);
+      const system: string = sentBody().messages[0].content;
+      expect(system).toContain('EVERYONE-FACT');
+      expect(system).not.toMatch(/SOLAR-FACT|MANAGER-FACT|OWNER-FACT/);
+      expect(system).not.toMatch(/^3b\. /m);
+      expect(system.split('\n')[0]).toContain('Reps sell T-Mobile Fiber (T-Fiber) door to door.');
+      expect(system).toContain('Their manager: Morgan.');
+      expect(system).not.toContain('Quillfeather');
+    });
+
+    it('roles come from the verified user, never the form', async () => {
+      seedTagged({ mainLine: 'solar' });
+      mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Dana Rep', email: '', isOwner: false, isAdmin: false, solarRole: 'ae_canvasser', aiConsent: AGREED });
+      modelAnswers();
+      const request = req({ question: 'Hi' });
+      expect((await POST(request)).status).toBe(200);
+      const system: string = sentBody().messages[0].content;
+      expect(system).toContain('SOLAR-FACT');
+      expect(system).not.toMatch(/MANAGER-FACT|OWNER-FACT/);
+      expect(system).toMatch(/^3b\. Solar/m);
+      expect(system.split('\n')[0]).toContain('sells solar door to door');
+      expect(system).toContain('say "your manager" and never guess a name');
+    });
+
+    it('the owner gets every note, owner notes last, and no manager line', async () => {
+      seedTagged({ reportsToId: 'mgr' });
+      mockUser.mockResolvedValue({ ok: true, uid: 'r1', name: 'Jacob Owner', email: '', isOwner: true, isAdmin: true, role: 'owner', solarRole: null, aiConsent: AGREED });
+      modelAnswers();
+      expect((await POST(req({ question: 'Hi' }))).status).toBe(200);
+      const system: string = sentBody().messages[0].content;
+      const at = (fact: string) => system.indexOf(fact);
+      expect(at('EVERYONE-FACT')).toBeLessThan(at('SOLAR-FACT'));
+      expect(at('SOLAR-FACT')).toBeLessThan(at('MANAGER-FACT'));
+      expect(at('MANAGER-FACT')).toBeLessThan(at('OWNER-FACT'));
+      expect(system).not.toContain('Their manager:');
+      expect(system.split('\n')[0]).toContain('sell T-Mobile Fiber (T-Fiber) and solar');
+    });
   });
 
   it('redacts typed emails and phone numbers from the question and history, in the prompt and the log', async () => {
