@@ -18,6 +18,7 @@ import { geohashesCoveringBox } from './geohash';
 import { TILE_PRECISION } from './parcelTiles';
 import { loadAreaTileRecords, type AreaSource } from './tiles';
 import type { House } from './types';
+import { DELETED_CAMPAIGN_ID } from '@/lib/solar/proofPins';
 
 // Shared pieces of the knock area routes (/api/portal/knock/area/{preview,import,list,remove}),
 // contract: 3c-knock docs/AREA_IMPORT_API.md. Every non-2xx body is { error: <code>, message?, ...extra }.
@@ -130,21 +131,33 @@ export async function campaignAccess(
   return { ok: true, campaign: (snap.data() ?? {}) as Record<string, unknown> };
 }
 
+/**
+ * A home of a plan. `deleted`: the door it matches was soft-deleted from this campaign in the app
+ * (`inCampaign` is true, so it is never imported again). Absent = a live door matched, or none.
+ */
+export type PlannedHome = AreaHome & { deleted?: true };
+
 export interface AreaPlan {
-  /** Every door inside the polygon, `inCampaign` set, sorted by id. */
-  homes: AreaHome[];
+  /** Every door inside the polygon, `inCampaign` set (a soft-deleted match: also `deleted`), sorted by id. */
+  homes: PlannedHome[];
   /** The tiles read: one entry per state + county + roll. */
   sources: AreaSource[];
-  /** The campaign's doors inside the polygon's box padded by AREA_EXISTING_PAD_DEG. */
+  /** The campaign's live doors inside the polygon's box padded by AREA_EXISTING_PAD_DEG (soft-deleted ones left out). */
   existing: House[];
 }
 
-async function existingDoorsNear(db: Firestore, campaignId: string, polygon: readonly LatLng[]): Promise<House[]> {
+function paddedBox(polygon: readonly LatLng[]) {
   const box = polygonBox(polygon);
-  const minLat = box.minLat - AREA_EXISTING_PAD_DEG;
-  const maxLat = box.maxLat + AREA_EXISTING_PAD_DEG;
-  const minLng = box.minLng - AREA_EXISTING_PAD_DEG;
-  const maxLng = box.maxLng + AREA_EXISTING_PAD_DEG;
+  return {
+    minLat: box.minLat - AREA_EXISTING_PAD_DEG,
+    maxLat: box.maxLat + AREA_EXISTING_PAD_DEG,
+    minLng: box.minLng - AREA_EXISTING_PAD_DEG,
+    maxLng: box.maxLng + AREA_EXISTING_PAD_DEG,
+  };
+}
+
+async function existingDoorsNear(db: Firestore, campaignId: string, polygon: readonly LatLng[]): Promise<House[]> {
+  const { minLat, maxLat, minLng, maxLng } = paddedBox(polygon);
   // Index: houses (campaignId ASC, lat ASC). lng is filtered here: one range field per query.
   const snap = await db
     .collection('houses')
@@ -162,6 +175,38 @@ async function existingDoorsNear(db: Firestore, campaignId: string, polygon: rea
 }
 
 /**
+ * Doors the knock app soft-deleted out of the campaign (campaignId '_deleted', `deleted.campaignId`
+ * = campaignId) inside the same padded box. Equality on the nested field only (single-field index,
+ * no composite); the box is filtered here. Read only: an import never writes or restores them.
+ */
+export async function deletedDoorsNear(db: Firestore, campaignId: string, polygon: readonly LatLng[]): Promise<House[]> {
+  const { minLat, maxLat, minLng, maxLng } = paddedBox(polygon);
+  const snap = await db.collection('houses').where('deleted.campaignId', '==', campaignId).get();
+  const out: House[] = [];
+  for (const d of snap.docs) {
+    const data = d.data() as Partial<House>;
+    if (data.campaignId !== DELETED_CAMPAIGN_ID) continue;
+    if (typeof data.lat !== 'number' || typeof data.lng !== 'number') continue;
+    if (data.lat < minLat || data.lat > maxLat || data.lng < minLng || data.lng > maxLng) continue;
+    out.push({ ...(data as House), id: d.id });
+  }
+  return out;
+}
+
+/**
+ * `homes` (marked against the live doors) with the ones still new checked against the campaign's
+ * soft-deleted doors by the same rules (`markInCampaign`: same id, address or within 4 m): a match
+ * is already in the campaign, flagged `deleted`. A live match wins (no flag).
+ */
+export function markDeletedInCampaign(homes: readonly AreaHome[], deleted: readonly House[], campaignId: string): PlannedHome[] {
+  const open = homes.filter((h) => !h.inCampaign);
+  if (open.length === 0 || deleted.length === 0) return [...homes];
+  const parked = deleted.map((h) => ({ ...h, campaignId }));
+  const stillOpen = new Set(markInCampaign(open, parked, campaignId).filter((h) => !h.inCampaign).map((h) => h.id));
+  return homes.map((h) => (h.inCampaign || stillOpen.has(h.id) ? h : { ...h, inCampaign: true, deleted: true as const }));
+}
+
+/**
  * Section 1 "Finding the homes inside a polygon": the cells (422 too_big, inside null), the tiles
  * of every state under it and the campaign's nearby doors in parallel (503 tiles_unavailable;
  * 422 no_data_for_area when no picked state has a cell), the doors inside (422 too_big with the
@@ -171,11 +216,16 @@ export async function planArea(db: Firestore, campaignId: string, polygon: reado
   const box = polygonBox(polygon);
   const cells = geohashesCoveringBox(box, TILE_PRECISION, AREA_MAX_CELLS);
   if (!cells) throw new AreaFailure(422, 'too_big', { inside: null, max: AREA_MAX_HOMES });
-  const [tiles, existing] = await Promise.all([loadAreaTileRecords(cells, box), existingDoorsNear(db, campaignId, polygon)]);
+  const [tiles, existing, deleted] = await Promise.all([
+    loadAreaTileRecords(cells, box),
+    existingDoorsNear(db, campaignId, polygon),
+    deletedDoorsNear(db, campaignId, polygon),
+  ]);
   if (!tiles.indexed) throw new AreaFailure(422, 'no_data_for_area');
   const inside = areaHomes(tiles.records, polygon, campaignId, { ownerUnknownIds: tiles.ownerUnknownIds });
   if (inside.length > AREA_MAX_HOMES) throw new AreaFailure(422, 'too_big', { inside: inside.length, max: AREA_MAX_HOMES });
-  return { homes: markInCampaign(inside, existing, campaignId), sources: tiles.sources, existing };
+  const homes = markDeletedInCampaign(markInCampaign(inside, existing, campaignId), deleted, campaignId);
+  return { homes, sources: tiles.sources, existing };
 }
 
 export interface AreaSummary {

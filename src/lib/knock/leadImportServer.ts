@@ -11,6 +11,7 @@ import {
 } from './leadImport';
 import type { Disposition, House, HouseDoc } from './types';
 import { isHiddenUser } from '@/lib/users/demoAccount';
+import { DELETED_CAMPAIGN_ID } from '@/lib/solar/proofPins';
 
 // Server side of the owner's lead-list upload (Admin settings > Lead lists): reads the request,
 // plans the import with the app's own planner (leadImport.ts, copied from 3c-knock-logic) against
@@ -203,8 +204,20 @@ export async function planLeadsOnServer(
     geocoded = result.points;
   }
 
-  const snap = await db.collection(HOUSES_COLLECTION).where('campaignId', '==', input.campaignId).get();
+  // Soft-deleted doors of the campaign (campaignId '_deleted', `deleted.campaignId` = it; equality
+  // on the nested field, no composite index) count as already there, so an import never adds one
+  // again; restoring stays an app action. The planner (copied verbatim from the app) dedupes only
+  // against doors of the campaign, so they go in as such, with no pack so packing ignores them.
+  const [snap, deletedSnap] = await Promise.all([
+    db.collection(HOUSES_COLLECTION).where('campaignId', '==', input.campaignId).get(),
+    db.collection(HOUSES_COLLECTION).where('deleted.campaignId', '==', input.campaignId).get(),
+  ]);
   const existing = snap.docs.map((doc): House => ({ id: doc.id, ...(doc.data() as HouseDoc) }));
+  for (const doc of deletedSnap.docs) {
+    const data = doc.data() as HouseDoc;
+    if (data.campaignId !== DELETED_CAMPAIGN_ID) continue;
+    existing.push({ id: doc.id, ...data, campaignId: input.campaignId, packId: '', packName: '' });
+  }
   const result = planLeadImport(input.csvText, {
     campaignId: input.campaignId,
     existing,

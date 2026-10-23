@@ -199,6 +199,24 @@ describe('POST /api/portal/knock/area/import: writing', () => {
     expect(houses().get(id)).not.toHaveProperty('areaImportId');
   });
 
+  it("never adds, rewrites or restores a door soft-deleted from the campaign; another campaign's deleted door does not block", async () => {
+    const stamp = (campaignId: string) => ({ by: 'rep', at: 5, campaignId });
+    const seeded = {
+      [areaDoorId('solar', '26-0001')]: { campaignId: '_deleted', deleted: stamp('solar'), address: '101 Oak St', city: 'Jacksonville', lat: LAT + 0.001, lng: LNG + 0.001, notHomeCount: 1, last: { dispositionId: 'not_home' } },
+      repDropped: { campaignId: '_deleted', deleted: stamp('solar'), address: '104 Oak St', city: 'Jacksonville', lat: LAT + 0.0045, lng: LNG + 0.001, notHomeCount: 1 },
+      otherGone: { campaignId: '_deleted', deleted: stamp('fiber'), address: '103 Oak St', city: 'Jacksonville', lat: LAT + 0.002, lng: LNG + 0.001 },
+    };
+    db.seed('houses', structuredClone(seeded));
+    const r = await call(body());
+    expect(r.status).toBe(200);
+    expect(r.json.counts).toEqual({ inside: 6, add: 1, skipRented: 1, skipType: 2, alreadyInCampaign: 2 });
+    expect(r.json.added).toBe(1);
+    expect(houses().get(areaDoorId('solar', '26-0003'))).toMatchObject({ campaignId: 'solar', areaImportId: 'ai_req-1' });
+    expect(houses().has(areaDoorId('solar', '26-0007'))).toBe(false);
+    for (const [id, doc] of Object.entries(seeded)) expect(houses().get(id)).toEqual(doc);
+    expect(houses().size).toBe(4);
+  });
+
   it('a door created between the plan and the write (ALREADY_EXISTS) is left as it is', async () => {
     db.failNext.set(`houses/${areaDoorId('solar', '26-0003')}`, 6);
     const r = await call(body());

@@ -204,6 +204,39 @@ describe('POST /api/portal/knock/area/preview: homes', () => {
     expect(q.filters[1].value).toBeCloseTo(LAT - 0.01, 9);
   });
 
+  it('a door soft-deleted from the campaign (same id or same address) is already there, flagged deleted', async () => {
+    const stamp = (campaignId: string) => ({ by: 'rep', at: 5, campaignId });
+    db.seed('houses', {
+      // An area door the app deleted (same id), and a rep-dropped door deleted at 104 Oak St (same address).
+      [areaDoorId('solar', '26-0001')]: { campaignId: '_deleted', deleted: stamp('solar'), address: '101 Oak St', city: 'Jacksonville', lat: LAT + 0.001, lng: LNG + 0.001, notHomeCount: 1 },
+      repDropped: { campaignId: '_deleted', deleted: stamp('solar'), address: '104 Oak St', city: 'Jacksonville', lat: LAT + 0.0045, lng: LNG + 0.001 },
+      // Deleted from another campaign: does not block.
+      otherGone: { campaignId: '_deleted', deleted: stamp('fiber'), address: '103 Oak St', city: 'Jacksonville', lat: LAT + 0.002, lng: LNG + 0.001 },
+    });
+    const r = await call(body());
+    expect(r.json.counts).toEqual({ inside: 6, add: 1, skipRented: 1, skipType: 2, alreadyInCampaign: 2 });
+    const home = (pid: string) => r.json.homes.find((h: { id: string }) => h.id === areaDoorId('solar', pid));
+    expect(home('26-0001')).toMatchObject({ inCampaign: true, status: 'already-in-campaign', deleted: true });
+    expect(home('26-0007')).toMatchObject({ inCampaign: true, status: 'already-in-campaign', deleted: true });
+    expect(home('26-0003')).toMatchObject({ inCampaign: false, status: 'add' });
+    expect(home('26-0003')).not.toHaveProperty('deleted');
+    const q = db.queries.filter((x) => x.collection === 'houses').map((x) => x.filters.map((f) => `${f.field}${f.op}`));
+    expect(q).toContainEqual(['deleted.campaignId==']);
+  });
+
+  it('a live door wins over a deleted one at the same address: no deleted flag; live behavior unchanged', async () => {
+    db.seed('houses', {
+      live101: { campaignId: 'solar', address: '101 Oak St', city: 'Jacksonville', lat: LAT + 0.001, lng: LNG + 0.001, packId: 'p1', packName: 'P1' },
+      [areaDoorId('solar', '26-0001')]: { campaignId: '_deleted', deleted: { by: 'rep', at: 5, campaignId: 'solar' }, address: '101 Oak St', city: 'Jacksonville', lat: LAT + 0.001, lng: LNG + 0.001 },
+    });
+    const r = await call(body());
+    expect(r.json.counts).toEqual({ inside: 6, add: 2, skipRented: 1, skipType: 2, alreadyInCampaign: 1 });
+    const home = r.json.homes.find((h: { id: string }) => h.id === areaDoorId('solar', '26-0001'));
+    expect(home).toMatchObject({ inCampaign: true, status: 'already-in-campaign' });
+    expect(home).not.toHaveProperty('deleted');
+    expect(r.json.homes.some((h: Record<string, unknown>) => 'deleted' in h)).toBe(false);
+  });
+
   it('caches the index and the tiles between requests', async () => {
     await call(body());
     const first = storage.downloads.length;

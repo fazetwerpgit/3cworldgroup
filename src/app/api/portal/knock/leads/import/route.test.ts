@@ -130,6 +130,20 @@ describe('POST /api/portal/knock/leads/import', () => {
     expect(Object.fromEntries(fake.docs('houses'))).toEqual(before);
   });
 
+  it("a soft-deleted door of the campaign counts as already there and is never written; another campaign's does not block", async () => {
+    mockGate.mockResolvedValue(OWNER);
+    // A rep-dropped door at L1's address, deleted in the app; one deleted from another campaign at L2.
+    const gone = { campaignId: '_deleted', deleted: { by: 'rep-1', at: 5, campaignId: 'camp-1' }, packId: 'p', packName: 'P', address: '100 Oak St', city: 'Testville', lat: 35.1, lng: -97.1, notHomeCount: 1 };
+    const otherGone = { campaignId: '_deleted', deleted: { by: 'rep-1', at: 5, campaignId: 'camp-2' }, address: '102 N Oak St', city: 'Testville', lat: 35.101, lng: -97.1 };
+    fake.docs('houses').set('rep-dropped', structuredClone(gone));
+    fake.docs('houses').set('other-gone', structuredClone(otherGone));
+    const lines = await events(await POST(req({ csvText: ATT_CSV, campaignId: 'camp-1' })));
+    expect(lines.at(-1)).toMatchObject({ type: 'done', written: 3, alreadyThere: 0, summary: { doors: 3, duplicates: 2 } });
+    expect(fake.commits).toEqual([['camp-1__att-l2', 'camp-1__att-l9', 'camp-1__att-mdu-l3']]);
+    expect(fake.docs('houses').get('rep-dropped')).toEqual(gone);
+    expect(fake.docs('houses').get('other-gone')).toEqual(otherGone);
+  });
+
   it('leaves alone a door that appeared after planning and writes the rest', async () => {
     mockGate.mockResolvedValue(OWNER);
     const theirs = { campaignId: 'camp-1', packId: 'att-1111pa', address: 'someone else wrote this' };

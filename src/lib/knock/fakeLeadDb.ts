@@ -57,7 +57,9 @@ export function createFakeLeadDb(seed: Record<string, Record<string, DocData>> =
       get: docs(name),
       where: (field: string, op: string, value: unknown) => {
         if (op !== '==') throw new Error(`fakeLeadDb: unsupported op ${op}`);
-        return { get: docs(name, (data) => data[field] === value) };
+        // A dotted field ('deleted.campaignId') reads a nested map, as Firestore does.
+        const read = (data: DocData) => field.split('.').reduce<unknown>((v, k) => (v && typeof v === 'object' ? (v as DocData)[k] : undefined), data);
+        return { get: docs(name, (data) => read(data) === value) };
       },
       doc: (id: string) => docRef(name, id),
     }),

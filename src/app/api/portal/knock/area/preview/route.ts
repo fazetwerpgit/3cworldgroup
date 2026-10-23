@@ -57,6 +57,8 @@ export async function POST(request: NextRequest) {
       useType: h.useType,
       propertyType: h.propertyType,
       inCampaign: h.inCampaign,
+      // Additive: the matching door is soft-deleted from this campaign (status stays already-in-campaign).
+      ...(h.deleted ? { deleted: true } : {}),
       status: areaHomeStatus(h, switches),
     }));
     return areaOk({

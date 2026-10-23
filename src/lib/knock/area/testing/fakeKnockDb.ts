@@ -86,7 +86,8 @@ export function createFakeKnockDb() {
   }
 
   function matches(data: Data, f: Filter): boolean {
-    const v = data[f.field] as never;
+    // A dotted field ('deleted.campaignId') reads a nested map, as Firestore does.
+    const v = f.field.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Data)[k] : undefined), data) as never;
     const x = f.value as never;
     if (v === undefined) return false;
     switch (f.op) {
