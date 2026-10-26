@@ -37,13 +37,12 @@ async function passesSignupGate(body: GateBody): Promise<boolean> {
   }
 }
 
-// Called right after a self-signup writes its pending users doc: by
-// AuthContext.signUp with the team code in the body, and by the Google (web
-// or app) / Apple (app) first-sign-in bootstrap with no body. The uid comes from the caller's ID
+// Called right after a self-signup writes its pending users doc, by
+// AuthContext.signUp with the team code in the body. The uid comes from the caller's ID
 // token, so only the new account itself can raise its owner alert. A pending
 // caller is expected here, so this verifies the token directly instead of
 // using the requireVerified* gates. Accounts made straight through the public
-// Firebase API have neither the code nor a Google sign-in, so they raise no alert.
+// Firebase API have no code, so they raise no alert.
 export async function POST(request: Request) {
   if (!signupNotifyLimiter.take(clientIp(request))) {
     return NextResponse.json({ error: 'Too many attempts. Try again in a few minutes.' }, { status: 429 });
@@ -69,17 +68,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid authentication token' }, { status: 401 });
   }
 
-  // A first sign-in with Google, or Sign in with Apple in the 3C iOS app,
-  // creates the pending profile itself with no signup form and no team code.
-  // A password signup must carry the team code (or its open 3C invite token)
-  // and the captcha pass for its email: the client form checks both first,
-  // but the server is the gate. One that
-  // fails is flagged suspectedBot, which keeps it out of the admin pending
-  // queue and raises no alert, so skipping the form's check gets nowhere.
-  // Firebase verified this sign-in with Google or Apple (the token's own
-  // sign_in_provider claim), so it is a real account at that provider.
-  const providerVerified = signInProvider === 'google.com' || signInProvider === 'apple.com';
-  if (!providerVerified) {
+  // Every self-signup is a password signup carrying the team code (or its
+  // open 3C invite token) and the captcha pass for its email: the client form
+  // checks both first, but the server is the gate. Sign in with Apple / Google
+  // never creates an account (AuthContext rejects a social sign-in with no
+  // profile; see /api/portal/auth/unlinked-social), so a social token here
+  // is refused outright. A password signup that fails is flagged
+  // suspectedBot, which keeps it out of the admin pending queue and raises no
+  // alert, so skipping the form's check gets nowhere.
+  if (signInProvider !== 'password') {
+    return NextResponse.json({ error: 'Sign up with your email and team code' }, { status: 403 });
+  }
+  {
     let body: GateBody;
     try {
       body = (await request.json()) as GateBody;
@@ -107,9 +107,7 @@ export async function POST(request: Request) {
 
     const email = (snap.get('email') as string | undefined) ?? '';
     const displayName = (snap.get('displayName') as string | undefined) ?? '';
-    // Owner's call: no bot scoring at all for a provider-verified Apple/Google
-    // sign-in (Hide My Email and gamer-style addresses read as gibberish).
-    if (!providerVerified && looksLikeBotSignup(email, displayName)) {
+    if (looksLikeBotSignup(email, displayName)) {
       await adminDb.doc(`users/${uid}`).update({ suspectedBot: true, updatedAt: new Date() });
       return NextResponse.json({ ok: true });
     }

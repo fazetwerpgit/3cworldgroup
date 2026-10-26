@@ -73,9 +73,14 @@ service cloud.firestore {
     // (signUp() deletes the just-created auth user if the profile write fails).
     // The email must be the account's own sign-in address, so a signup cannot
     // point admins and portal mail at someone else's inbox.
+    // Only a password signup (the team-code form) creates a profile: Sign in
+    // with Apple / Google never starts an account (AuthContext rejects a
+    // social sign-in with no profile and /api/portal/auth/unlinked-social
+    // deletes the Auth user it made).
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
+        && request.auth.token.firebase.sign_in_provider == 'password'
         && request.resource.data.status == 'pending'
         && request.resource.data.keys().hasOnly(['email', 'displayName', 'status', 'createdAt'])
         && request.resource.data.email is string

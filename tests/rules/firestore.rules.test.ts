@@ -322,6 +322,22 @@ describe('Campaign soft delete (archive)', () => {
   });
 });
 
+describe('Self-signup profile create', () => {
+  const pending = (email: string) => ({ email, displayName: 'New Hire', status: 'pending', createdAt: serverTimestamp() });
+  const signedIn = (uid: string, email: string, provider: string) =>
+    testEnv.authenticatedContext(uid, { email, firebase: { sign_in_provider: provider } }).firestore();
+
+  it('lets a password signup create its own pending profile', async () => {
+    await assertSucceeds(setDoc(doc(signedIn('new-pw', 'new@example.com', 'password'), 'users/new-pw'), pending('new@example.com')));
+  });
+
+  it.each(['apple.com', 'google.com'])('refuses a profile from a %s sign-in', async (provider) => {
+    await assertFails(
+      setDoc(doc(signedIn('new-social', 'x@privaterelay.appleid.com', provider), 'users/new-social'), pending('x@privaterelay.appleid.com'))
+    );
+  });
+});
+
 describe('Existing portal rules still hold', () => {
   it('lets a user read their own profile but not another user', async () => {
     await assertSucceeds(getDoc(doc(repDb(), 'users/rep')));

@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 
 const fake = vi.hoisted(() => ({
   providers: ['apple.com'] as string[],
+  profileExists: true,
   store: vi.fn(),
   adminAuth: {
     verifyIdToken: vi.fn(async (token: string) => {
@@ -13,7 +14,10 @@ const fake = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@/lib/firebase/admin', () => ({ adminDb: { fake: true }, adminAuth: fake.adminAuth }));
+vi.mock('@/lib/firebase/admin', () => ({
+  adminDb: { doc: () => ({ get: async () => ({ exists: fake.profileExists }) }) },
+  adminAuth: fake.adminAuth,
+}));
 vi.mock('@/lib/auth/appleSignIn', () => ({ storeAppleRefreshToken: fake.store }));
 
 import { POST } from './route';
@@ -29,6 +33,7 @@ function request(body: unknown, token: string | null = 'token-u1') {
 beforeEach(() => {
   vi.clearAllMocks();
   fake.providers = ['apple.com'];
+  fake.profileExists = true;
   fake.adminAuth.getUser.mockImplementation(async () => ({ providerData: fake.providers.map((providerId) => ({ providerId })) }));
   fake.store.mockResolvedValue({ status: 'stored' });
 });
@@ -55,7 +60,7 @@ describe('POST /api/portal/auth/apple-token', () => {
     const res = await POST(request({ authorizationCode: ' code-abc ', uid: 'someone-else' }));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ stored: true });
-    expect(fake.store).toHaveBeenCalledWith({ fake: true }, 'u1', 'code-abc');
+    expect(fake.store).toHaveBeenCalledWith(expect.anything(), 'u1', 'code-abc');
   });
 
   it('answers 200 stored:false when the Apple key is not configured', async () => {
@@ -68,5 +73,11 @@ describe('POST /api/portal/auth/apple-token', () => {
   it('answers 502 when Apple refuses the code', async () => {
     fake.store.mockResolvedValue({ status: 'failed', error: 'invalid_grant' });
     expect((await POST(request({ authorizationCode: 'c' }))).status).toBe(502);
+  });
+
+  it('stores nothing for a sign-in with no portal account (rejected and deleted)', async () => {
+    fake.profileExists = false;
+    expect((await POST(request({ authorizationCode: 'c' }))).status).toBe(404);
+    expect(fake.store).not.toHaveBeenCalled();
   });
 });

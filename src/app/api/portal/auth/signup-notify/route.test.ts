@@ -166,10 +166,6 @@ describe('POST /api/portal/auth/signup-notify', () => {
       expect(createAlertTaskMock).toHaveBeenCalledWith(expect.objectContaining({ subjectUserId: 'new-user' }));
     });
 
-    it('still accepts a Google first sign-in, which never sees the captcha', async () => {
-      expect((await POST(request({ token: 'token-google-user' }))).status).toBe(200);
-      expect(createAlertTaskMock).toHaveBeenCalled();
-    });
   });
 
   it('fails closed in production when the reCAPTCHA secret is unset', async () => {
@@ -180,43 +176,29 @@ describe('POST /api/portal/auth/signup-notify', () => {
     expect(createAlertTaskMock).not.toHaveBeenCalled();
   });
 
-  it('accepts a Sign in with Apple first sign-in (3C iOS app) without a code', async () => {
-    const response = await POST(request({ token: 'token-apple-user' }));
-
-    expect(response.status).toBe(200);
-    expect(createAlertTaskMock).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'pending_assignment', subjectUserId: 'new-user' })
-    );
-  });
-
-  it('accepts a Google first sign-in without a code', async () => {
-    const response = await POST(request({ token: 'token-google-user' }));
-
-    expect(response.status).toBe(200);
-    expect(createAlertTaskMock).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'pending_assignment', subjectUserId: 'new-user' })
-    );
-  });
-
   it.each(['token-apple-user', 'token-google-user'])(
-    'skips bot scoring for a provider-verified sign-in (%s), even a gibberish address',
+    'refuses a social sign-in (%s): it never creates an account, so no owner alert',
     async (token) => {
-      userGetMock.mockResolvedValue(
-        pendingUser({ status: 'pending', email: 'xk7qzv9wmb2pq@gmail.com', displayName: 'xkqzvwmbrt' })
-      );
       const response = await POST(request({ token }));
-      expect(response.status).toBe(200);
-      expect(userUpdateMock).not.toHaveBeenCalledWith(expect.objectContaining({ suspectedBot: true }));
-      expect(createAlertTaskMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'pending_assignment' }));
+      expect(response.status).toBe(403);
+      expect(createAlertTaskMock).not.toHaveBeenCalled();
+      expect(userUpdateMock).not.toHaveBeenCalled();
     }
   );
 
+  it('refuses a social sign-in even with the team code', async () => {
+    const response = await POST(request({ token: 'token-apple-user', body: { code: TEAM_CODE } }));
+    expect(response.status).toBe(403);
+    expect(createAlertTaskMock).not.toHaveBeenCalled();
+  });
+
   it('rate-limits one IP', async () => {
+    const gated = { code: TEAM_CODE };
     for (let i = 0; i < 10; i++) {
-      expect((await POST(request({ token: 'token-google-user', ip: '198.51.100.7' }))).status).toBe(200);
+      expect((await POST(request({ token: 'token-new-user', body: gated, ip: '198.51.100.7' }))).status).toBe(200);
     }
-    const limited = await POST(request({ token: 'token-google-user', ip: '198.51.100.7' }));
+    const limited = await POST(request({ token: 'token-new-user', body: gated, ip: '198.51.100.7' }));
     expect(limited.status).toBe(429);
-    expect((await POST(request({ token: 'token-google-user', ip: '198.51.100.8' }))).status).toBe(200);
+    expect((await POST(request({ token: 'token-new-user', body: gated, ip: '198.51.100.8' }))).status).toBe(200);
   });
 });

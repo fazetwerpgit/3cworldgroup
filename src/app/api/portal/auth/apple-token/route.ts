@@ -45,6 +45,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This account does not use Sign in with Apple' }, { status: 409 });
     }
 
+    // A Sign in with Apple that matched no portal account is rejected and its
+    // Auth user deleted (/api/portal/auth/unlinked-social): keep no token for it.
+    if (!(await adminDb.doc(`users/${uid}`).get()).exists) {
+      return NextResponse.json({ error: 'No portal account for this sign-in' }, { status: 404 });
+    }
+
     const result = await storeAppleRefreshToken(adminDb, uid, code);
     if (result.status === 'stored') return NextResponse.json({ stored: true });
     if (result.status === 'not_configured') return NextResponse.json({ stored: false, reason: 'not_configured' });
