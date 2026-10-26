@@ -107,10 +107,46 @@ these collections. Do not read "rules locked down" as "sales are secure":
   *exists*, never that `status == 'active'`. The rules layer is stricter than
   the API layer. See the findings report.
 
-## No automated safety net
+## Automated rules tests
 
-This repo has no Firestore rules tests and no emulator: `firebase.json` has no
-`emulators` block, and neither `firebase-tools` nor
-`@firebase/rules-unit-testing` is a dependency. Standing that up is real scope,
-not a one-liner. Until then, the grep evidence above plus the smoke test are
-the verification.
+`firebase.json` has a Firestore emulator block (127.0.0.1:8099), and
+`@firebase/rules-unit-testing` + `firebase-tools` are dev dependencies. Run:
+
+```
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk npm run test:rules
+```
+
+That wraps vitest (`vitest.rules.config.ts`) in
+`firebase emulators:exec --only firestore --project demo-cwg`, so it never
+touches production. The emulator needs **JDK 21+**. It runs `tests/rules/`
+(Chompen `config/app` gate, campaign archive, representative portal
+chat/sales/onboarding rules) plus the older `src/**/*.rules.test.ts` suites,
+which plain `npm test` skips because `FIRESTORE_EMULATOR_HOST` is unset.
+
+## 2026-10-24/26 — Chompen store gate + campaign soft delete
+
+`firestore.rules` changes (hand edits on top of the 3c-knock-logic merge; they
+must be carried back into `scripts/merge-prod-rules.ts` there, or the next
+regenerate drops them):
+
+- `match /config/{docId}`: public `get` only for `docId == 'app'`; list and all
+  client writes denied. `config/fiberRepMap` stays denied.
+- `campaigns` update allow-list accepts `archived`, `archivedAt`, `archivedBy`,
+  judged by `archiveValid()` on what the write changes:
+  - not archived: the stamp may change only by archiving
+    (`archived == true`, `archivedAt is number`, `archivedBy == request.auth.uid`);
+  - archived (`resource.data.archived == true`): all three fields are frozen;
+    editing or deleting any of them (un-archive) is denied. Other campaign
+    edits still work, for any owner. Restoring is Admin SDK only.
+  - `allow delete: if false` is unchanged (no hard delete).
+
+**Deploy state (2026-10-26): production is BEHIND master.** On 2026-10-24 a
+first version was deployed to cworldgroup-cca68 via the Rules API (service
+account; CLI auth had expired) from a stale branch; backup of the previous
+live ruleset in `.qa-backups/firestore-rules-2026-10-24/`. That version had an
+un-archive hole: a client could delete `archived` (or restamp
+`archivedAt`/`archivedBy`), and its whole-doc `archivedBy == uid` check blocked
+other owners from editing an archived campaign. The fix is on master only;
+the ruleset on master must be redeployed
+(`firebase deploy --only firestore:rules` after `firebase login --reauth`)
+and this note updated.
