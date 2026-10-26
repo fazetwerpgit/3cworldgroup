@@ -106,7 +106,9 @@ export function Everyone() {
       setLoadError('');
     }
     try {
-      const response = await fetch('/api/portal/auth/users', {
+      // includeHidden: the directory is where demo/test accounts stay findable
+      // (the API honours it for admin and owner only; operations gets the roster).
+      const response = await fetch('/api/portal/auth/users?includeHidden=1', {
         headers: await authHeaders(),
       });
       const data = await response.json();

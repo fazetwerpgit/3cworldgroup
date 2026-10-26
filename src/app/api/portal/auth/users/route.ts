@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { User, resolveRoles, getEffectiveRole } from '@/types';
 import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { isDemoAccount, isHiddenUser, isTestAccount } from '@/lib/users/demoAccount';
 
 // GET /api/portal/auth/users - Get all users (management only)
 export async function GET(request: NextRequest) {
@@ -23,6 +24,11 @@ export async function GET(request: NextRequest) {
 
     const role = searchParams.get('role');
     const status = searchParams.get('status');
+    // Demo and QA test accounts (lib/users/demoAccount isHiddenUser) are real user
+    // docs but not colleagues: they stay out of every roster and picker built on
+    // this list. Only the admin People directory opts in, and only for an
+    // admin-level caller (admin or owner).
+    const includeHidden = gate.isAdmin && searchParams.get('includeHidden') === '1';
 
     const query = adminDb.collection('users').orderBy('createdAt', 'desc');
 
@@ -31,6 +37,7 @@ export async function GET(request: NextRequest) {
 
     snapshot.forEach((doc) => {
       const data = doc.data();
+      if (!includeHidden && isHiddenUser(data)) return;
       users.push({
         uid: doc.id,
         email: data.email,
@@ -38,6 +45,8 @@ export async function GET(request: NextRequest) {
         ...resolveRoles(data.role, data.fieldRole),
         isIBO: data.isIBO ?? false,
         suspectedBot: data.suspectedBot,
+        ...(isDemoAccount(data) ? { demoAccount: true } : {}),
+        ...(isTestAccount(data) ? { testAccount: true } : {}),
         // TODO: migrate Firestore managerId -> reportsToId
         reportsToId: data.reportsToId ?? data.managerId,
         territoryId: data.territoryId,

@@ -462,6 +462,9 @@ export interface User {
   suspectedBot?: boolean;
   // users/{uid}.demoAccount === true (App Review demo account; lib/users/demoAccount).
   demoAccount?: boolean;
+  // users/{uid}.testAccount === true (QA login; lib/users/demoAccount). Hidden
+  // from rosters and pickers; the admin People directory still lists it.
+  testAccount?: boolean;
   // IBO fields link the user to an IBO business entity for LLC/document
   // ownership. They are independent of ibo_level_* field roles, which are sales
   // role / pay tier / team-lead levels.
