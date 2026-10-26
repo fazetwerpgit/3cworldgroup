@@ -146,7 +146,7 @@ account; CLI auth had expired) from a stale branch; backup of the previous
 live ruleset in `.qa-backups/firestore-rules-2026-10-24/`. That version had an
 un-archive hole: a client could delete `archived` (or restamp
 `archivedAt`/`archivedBy`), and its whole-doc `archivedBy == uid` check blocked
-other owners from editing an archived campaign. The fix is on master only;
-the ruleset on master must be redeployed
+other owners from editing an archived campaign. The fix is in this file only;
+the repo ruleset must be redeployed once merged
 (`firebase deploy --only firestore:rules` after `firebase login --reauth`)
 and this note updated.
