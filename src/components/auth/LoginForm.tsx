@@ -151,8 +151,8 @@ export function LoginForm() {
   };
 
   // In-app only: the shell runs the native sheet, the web signs in with the
-  // returned credential. AuthContext then loads the profile (or creates the
-  // pending users doc on a first sign-in) exactly as for the web popup.
+  // returned credential. AuthContext then loads the profile exactly as for the
+  // web popup; with no profile it rejects the sign-in (no new account).
   const handleNativeSignIn = async (provider: NativeSignInProvider) => {
     // A second tap while the sheet is open does nothing.
     if (isNativeSignInPending()) return;

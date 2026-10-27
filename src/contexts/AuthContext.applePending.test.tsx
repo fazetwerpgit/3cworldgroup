@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 //
-// First sign-in with Apple or Google (no profile yet), an Apple ID that shared
-// no email, and the pending account's ID token parked for "Delete my request"
-// (App Store 5.1.1(v)) once the pending account is signed out.
+// A social sign-in (Apple or Google) that matches no portal account is
+// rejected (never creates a profile), and the pending account's ID token is
+// parked for "Delete my request" (App Store 5.1.1(v)) once it is signed out.
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -135,82 +135,92 @@ afterEach(async () => {
   vi.restoreAllMocks();
 });
 
-describe('first sign-in with Apple (no profile yet)', () => {
-  it("creates the pending profile with the name Apple shared, alerts the owner, parks the token and signs out", async () => {
-    fb.appleName = 'Pat Rivera';
+describe('a social sign-in with no portal account (no profile)', () => {
+  it('Apple (Hide My Email): writes nothing, sends no owner alert, asks the server to delete the new Auth user, signs out with a message', async () => {
+    fb.appleName = 'Connor Crouse';
     await mount();
-    await signInAs(session());
-    expect(setDoc).toHaveBeenCalledWith('users/u-new', {
-      email: 'pat@privaterelay.appleid.com',
-      displayName: 'Pat Rivera',
-      status: 'pending',
-      createdAt: 'SERVER_TS',
-    });
-    // The Google/Apple first sign-in sends no team code.
-    expect(fetchMock).toHaveBeenCalledWith('/api/portal/auth/signup-notify', {
+    await signInAs(session({ email: 'd9v9yw5wd8@privaterelay.appleid.com' }));
+    expect(setDoc).not.toHaveBeenCalled();
+    expect(fetchedUrls()).not.toContain('/api/portal/auth/signup-notify');
+    expect(fetchMock).toHaveBeenCalledWith('/api/portal/auth/unlinked-social', {
       method: 'POST',
       headers: { Authorization: 'Bearer id-token-1' },
     });
-    expect(pendingIdTokenForDelete()).toBe('id-token-1');
     expect(firebaseSignOut).toHaveBeenCalledTimes(1);
-    expect(ctx.current).toMatchObject({ user: null, loading: false, error: null, pendingApproval: true });
-  });
-
-  it("prefers the account's own name, and falls back to Apple's when that is blank", async () => {
-    fb.appleName = 'Apple Name';
-    await mount();
-    await signInAs(session({ displayName: 'Firebase Name' }));
-    expect(vi.mocked(setDoc).mock.calls[0][1]).toMatchObject({ displayName: 'Firebase Name' });
-
-    fb.appleName = 'Apple Name';
-    await signInAs(session({ uid: 'u-2', displayName: '   ' }));
-    expect(vi.mocked(setDoc).mock.calls[1][1]).toMatchObject({ displayName: 'Apple Name' });
-  });
-
-  it('caps the name at 100 characters and leaves it off when there is none', async () => {
-    await mount();
-    await signInAs(session({ displayName: 'N'.repeat(150) }));
-    expect((vi.mocked(setDoc).mock.calls[0][1] as { displayName: string }).displayName).toHaveLength(100);
-
-    await signInAs(session({ uid: 'u-3' }));
-    expect(vi.mocked(setDoc).mock.calls[1][1]).toEqual({ email: 'pat@privaterelay.appleid.com', status: 'pending', createdAt: 'SERVER_TS' });
-  });
-
-  it('still lands on the pending screen when the token cannot be read (nothing parked, no alert)', async () => {
-    await mount();
-    await signInAs(session({ getIdToken: vi.fn(async () => Promise.reject(new Error('network'))) }));
     expect(pendingIdTokenForDelete()).toBeNull();
-    expect(fetchedUrls()).not.toContain('/api/portal/auth/signup-notify');
-    expect(ctx.current).toMatchObject({ pendingApproval: true, error: null });
+    expect(ctx.current).toMatchObject({
+      user: null,
+      loading: false,
+      pendingApproval: false,
+      error: 'No 3C account is linked to this Apple ID. Sign in with your email and password.',
+    });
+    // The parked Apple name is dropped, not carried to a later sign-in.
+    expect(fb.appleName).toBeUndefined();
+  });
+
+  it('Google: same rejection, naming Google', async () => {
+    await mount();
+    await signInAs(session({ email: 'pat@gmail.com', providerData: [{ providerId: 'google.com' }] }));
+    expect(setDoc).not.toHaveBeenCalled();
+    expect(fetchedUrls()).toEqual(['/api/portal/auth/unlinked-social']);
+    expect(ctx.current?.error).toBe('No 3C account is linked to this Google account. Sign in with your email and password.');
+  });
+
+  it('an Apple ID that shared no email is rejected the same way', async () => {
+    await mount();
+    await signInAs(session({ email: null }));
+    expect(setDoc).not.toHaveBeenCalled();
+    expect(firebaseSignOut).toHaveBeenCalledTimes(1);
+    expect(ctx.current?.error).toBe('No 3C account is linked to this Apple ID. Sign in with your email and password.');
+  });
+
+  it('still signs out with the message when the cleanup call fails', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    await mount();
+    await signInAs(session());
+    expect(firebaseSignOut).toHaveBeenCalledTimes(1);
+    expect(ctx.current?.error).toBe('No 3C account is linked to this Apple ID. Sign in with your email and password.');
+  });
+
+  it('an existing profile signed in with Apple is unaffected', async () => {
+    fb.profile = { email: 'connor@x.com', displayName: 'Connor', status: 'active', fieldRole: 'office_manager' };
+    await mount();
+    await signInAs(session());
+    expect(fetchedUrls()).not.toContain('/api/portal/auth/unlinked-social');
+    expect(firebaseSignOut).not.toHaveBeenCalled();
+    expect(ctx.current?.user?.uid).toBe('u-new');
+  });
+});
+
+describe('a password session with no profile', () => {
+  it('keeps the old path: writes a pending doc and the ungated alert call (refused server-side)', async () => {
+    await mount();
+    await signInAs(session({ email: 'Sam@X.com', providerData: [{ providerId: 'password' }] }));
+    expect(setDoc).toHaveBeenCalledWith('users/u-new', { email: 'sam@x.com', status: 'pending', createdAt: 'SERVER_TS' });
+    expect(fetchedUrls()).not.toContain('/api/portal/auth/unlinked-social');
+    expect(ctx.current?.pendingApproval).toBe(true);
+  });
+
+  it('a session with both a password and Apple is treated as a password session', async () => {
+    await mount();
+    await signInAs(session({ providerData: [{ providerId: 'apple.com' }, { providerId: 'password' }] }));
+    expect(fetchedUrls()).not.toContain('/api/portal/auth/unlinked-social');
+    expect(setDoc).toHaveBeenCalled();
   });
 
   it('signs out with the missing-profile message when the profile write is refused', async () => {
     fb.setDocFails = true;
     await mount();
-    await signInAs(session());
+    await signInAs(session({ providerData: [{ providerId: 'password' }] }));
     expect(firebaseSignOut).toHaveBeenCalledTimes(1);
-    expect(pendingIdTokenForDelete()).toBeNull();
     expect(ctx.current).toMatchObject({
       user: null,
       pendingApproval: false,
       error: 'User profile not found. Please contact an administrator.',
     });
   });
-});
 
-describe('an Apple ID that shared no email', () => {
-  it('cannot start an account: signed out with a message naming Apple, nothing written', async () => {
-    await mount();
-    await signInAs(session({ email: null }));
-    expect(setDoc).not.toHaveBeenCalled();
-    expect(firebaseSignOut).toHaveBeenCalledTimes(1);
-    expect(ctx.current?.error).toBe(
-      "Your Apple ID didn't share an email address, so we can't set up your account. Use Google or your company email instead."
-    );
-    expect(ctx.current?.pendingApproval).toBe(false);
-  });
-
-  it('gives any other provider the plain missing-profile message', async () => {
+  it('gives a session with no email and no social provider the plain missing-profile message', async () => {
     await mount();
     await signInAs(session({ email: null, providerData: [{ providerId: 'phone' }] }));
     expect(ctx.current?.error).toBe('User profile not found. Please contact an administrator.');

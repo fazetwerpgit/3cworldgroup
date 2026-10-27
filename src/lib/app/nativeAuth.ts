@@ -239,8 +239,8 @@ export async function completePendingLink(
 }
 
 // Apple shares the person's name only on the first authorization, before the
-// Firebase user exists. The sign-in flow parks it here and AuthContext's
-// first-sign-in path (pending users doc) takes it.
+// Firebase user exists. The sign-in flow parks it here; AuthContext takes
+// (and drops) it when a sign-in matches no portal account.
 let pendingDisplayName: string | null = null;
 
 export function rememberPendingDisplayName(name: string | undefined): void {

@@ -62,8 +62,11 @@ type FetchUserDataResult =
   | { status: 'error'; error: unknown };
 
 const missingProfileMessage = 'User profile not found. Please contact an administrator.';
-const appleNoEmailMessage =
-  "Your Apple ID didn't share an email address, so we can't set up your account. Use Google or your company email instead.";
+// A Sign in with Apple / Google that matched no portal account.
+function unlinkedSocialMessage(provider: 'apple.com' | 'google.com'): string {
+  const what = provider === 'apple.com' ? 'this Apple ID' : 'this Google account';
+  return `No 3C account is linked to ${what}. Sign in with your email and password.`;
+}
 // Same words Firebase's auth/user-disabled maps to: deactivating also disables the auth account.
 const disabledAccountMessage = 'This account has been disabled. Contact your manager.';
 const profileLoadErrorMessage =
@@ -127,8 +130,8 @@ function syncAvatarFromAuth(firebaseUser: FirebaseUser) {
 
 // Fire-and-forget owner alert for a new pending self-signup. The route reads
 // the uid from the ID token, never from the body. A team-code signup sends its
-// code (checked server-side); the Google first sign-in sends none and is
-// accepted by its google.com sign-in provider. A password signup also sends the
+// code (checked server-side); a password session that lost its profile sends
+// none and is refused (flagged). A password signup also sends the
 // captcha pass the signup form earned. The token is fetched before the
 // caller signs out.
 async function notifyPendingSignup(firebaseUser: FirebaseUser, gate?: { code: string; inviteToken?: string; captchaPass?: string }) {
@@ -154,6 +157,32 @@ async function parkPendingIdToken(firebaseUser: FirebaseUser) {
     rememberPendingIdToken(await firebaseUser.getIdToken());
   } catch {
     rememberPendingIdToken(null);
+  }
+}
+
+// The social provider of a session with no password method (Apple or
+// Google), or null. A session that also has a password keeps the password path.
+function unlinkedSocialProvider(firebaseUser: FirebaseUser): 'apple.com' | 'google.com' | null {
+  const ids = firebaseUser.providerData.map((info) => info.providerId);
+  if (ids.includes('password')) return null;
+  if (ids.includes('apple.com')) return 'apple.com';
+  if (ids.includes('google.com')) return 'google.com';
+  return null;
+}
+
+// Asks the server to delete the Auth user a social sign-in just created with
+// no portal account (/api/portal/auth/unlinked-social re-checks every guard).
+// Best-effort: the sign-out and message happen whatever it answers.
+async function discardUnlinkedSocialSignIn(firebaseUser: FirebaseUser) {
+  try {
+    const idToken = await firebaseUser.getIdToken();
+    const res = await fetch('/api/portal/auth/unlinked-social', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    if (!res.ok) console.warn('[auth] unlinked social sign-in cleanup failed', res.status);
+  } catch (error) {
+    console.warn('[auth] unlinked social sign-in cleanup failed', error);
   }
 }
 
@@ -438,21 +467,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         }
       } else if (userDataResult.status === 'missing') {
-        if (firebaseUser.email) {
+        const socialProvider = unlinkedSocialProvider(firebaseUser);
+        if (socialProvider) {
+          // Sign in with Apple / Google never starts an account (new reps sign
+          // up with the team code). No profile means this sign-in matched no
+          // portal account (e.g. Apple's Hide My Email) and Firebase just made
+          // a new Auth user: the server deletes it, nothing is written, no
+          // owner alert, and the rep is told to use email and password.
           bootstrappingPendingProfile.current = true;
-          // A first sign-in with Google or Apple (no team code, no signup
-          // form): keep the provider's name and raise the same owner alert a
-          // signup does. Apple shares a name only on the first authorization
-          // (parked by the in-app sign-in) and may share a private-relay email
-          // or no name at all; both are fine here, displayName is optional.
-          const appleName = takePendingDisplayName();
-          const googleName = (firebaseUser.displayName?.trim() || appleName)?.slice(0, 100);
+          takePendingDisplayName();
           try {
-            // firestore.rules: exactly these keys, and the email must be this
-            // account's own sign-in address.
+            await discardUnlinkedSocialSignIn(firebaseUser);
+            if (auth) await firebaseSignOut(auth);
+          } catch (signOutError) {
+            console.error('Error signing out an unlinked social sign-in:', signOutError);
+          } finally {
+            bootstrappingPendingProfile.current = false;
+          }
+          setState({
+            user: null,
+            loading: false,
+            error: unlinkedSocialMessage(socialProvider),
+            pendingApproval: false,
+          });
+        } else if (firebaseUser.email) {
+          bootstrappingPendingProfile.current = true;
+          try {
+            // firestore.rules: exactly these keys, a password sign-in, and the
+            // email must be this account's own sign-in address.
             await setDoc(doc(firestore, 'users', firebaseUser.uid), {
               email: firebaseUser.email.toLowerCase(),
-              ...(googleName ? { displayName: googleName } : {}),
+              ...(firebaseUser.displayName?.trim() ? { displayName: firebaseUser.displayName.trim().slice(0, 100) } : {}),
               status: 'pending',
               createdAt: serverTimestamp(),
             });
@@ -474,13 +519,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } else {
           if (auth) await firebaseSignOut(auth);
-          // firestore.rules needs the sign-in email on the pending doc; an
-          // Apple ID that shared none cannot start an account.
-          const viaApple = firebaseUser.providerData.some((info) => info.providerId === 'apple.com');
           setState({
             user: null,
             loading: false,
-            error: viaApple ? appleNoEmailMessage : missingProfileMessage,
+            error: missingProfileMessage,
             pendingApproval: false,
           });
         }

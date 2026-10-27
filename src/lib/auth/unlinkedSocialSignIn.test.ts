@@ -73,7 +73,7 @@ describe('classifySocialOrphan', () => {
   });
 });
 
-function deps(opts: { profileExists?: boolean; providers?: string[]; createdMsAgo?: number; claims?: Record<string, unknown> }) {
+function deps(opts: { profileExists?: boolean; providers?: readonly string[]; createdMsAgo?: number; claims?: Record<string, unknown> }) {
   const deleteUser = vi.fn(async () => undefined);
   const getUser = vi.fn(async () => ({
     providerData: (opts.providers ?? ['apple.com']).map((providerId) => ({ providerId })),
