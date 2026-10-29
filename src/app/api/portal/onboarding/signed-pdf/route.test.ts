@@ -32,7 +32,7 @@ const {
   };
 });
 
-vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));
+vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedRecruiting: gateMock }));
 vi.mock('@/lib/firebase/admin', () => ({
   adminDb: { collection: vi.fn(() => ({ doc: docMock, add: logAddMock })) },
   adminStorage: { bucket: vi.fn(() => bucketMock) },

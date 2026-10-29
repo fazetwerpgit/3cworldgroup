@@ -11,7 +11,7 @@ import {
   type OnboardingStatus,
 } from '@/types';
 import { isStorageItem } from '@/lib/onboarding/uploads';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
 import { dispatchToUser } from '@/lib/alerts/dispatch';
 import { appBaseUrl, itemRejectedEmail } from '@/lib/email/templates';
 import { onboardingFrom } from '@/lib/email/sendEmail';
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     // The review queue exposes other users' submissions; management only.
     // Files on sensitive items (driver's-license photos, ...) are signed only
     // for admin/owner callers; operations sees the item with no file URLs.
-    const gate = await requireVerifiedManagement(request);
+    const gate = await requireVerifiedRecruiting(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -279,7 +279,7 @@ export async function POST(request: NextRequest) {
     // Only admin/operations may approve/reject onboarding submissions. Gate
     // before reading the body: the reviewer is whoever holds the token, never a
     // reviewerId the client names.
-    const gate = await requireVerifiedManagement(request);
+    const gate = await requireVerifiedRecruiting(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

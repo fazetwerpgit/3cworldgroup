@@ -419,13 +419,53 @@ export const SolarRolePermissions: Record<SolarRole, string[]> = {
  * Pure: works on the client User and on a resolved users doc.
  */
 export function permissionsFor(
-  user: { role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown } | null | undefined
+  user: { role?: PlatformRole; fieldRole?: FieldRole; solarRole?: unknown; recruiter?: unknown } | null | undefined
 ): string[] {
   if (!user) return [];
   const roleKey = user.role ?? user.fieldRole;
-  const base = (roleKey && RolePermissions[roleKey]) || [];
-  if (!isSolarRole(user.solarRole)) return base;
-  return [...new Set([...base, ...SolarRolePermissions[user.solarRole]])];
+  let perms = (roleKey && RolePermissions[roleKey]) || [];
+  if (isRecruiter(user)) perms = [...new Set([...perms, ...RECRUITER_PERMISSIONS])];
+  if (!isSolarRole(user.solarRole)) return perms;
+  return [...new Set([...perms, ...SolarRolePermissions[user.solarRole]])];
+}
+
+/**
+ * The hidden recruiter grant: users/{uid}.recruiter === true, set only with the
+ * Admin SDK (scripts/set-recruiter.mjs; no client can write it, see
+ * firestore.rules). It opens everything recruiting (the Hiring hub's To do,
+ * Recruits and Pipeline tabs and their APIs) on top of the user's own role,
+ * which stays exactly what it was everywhere it is shown. It never carries a
+ * label, a chip or a role name: nothing outside the gates reads it.
+ */
+export function isRecruiter(user: { recruiter?: unknown } | null | undefined): boolean {
+  return !!user && user.recruiter === true;
+}
+
+const RECRUITER_PERMISSIONS = ['recruiting:read', 'recruiting:write', 'recruiting:convert'];
+
+/**
+ * A gate token for the recruiter grant in role lists (hub tabs, nav items,
+ * AdminGate). Not a role: no user has it as role or fieldRole, and it has no
+ * display name. userSatisfiesRoles admits a recruiter wherever it is listed.
+ */
+export const RECRUITER_GATE = 'recruiter' as const;
+export type GateRole = UserRole | typeof RECRUITER_GATE;
+
+/**
+ * Does `user` pass a role list? Their role or field role is listed, an owner
+ * where 'admin' is listed (the tier sits above admin), or a recruiter where
+ * RECRUITER_GATE is listed. The one reading of a role gate for isRole and
+ * ProtectedRoute.
+ */
+export function userSatisfiesRoles(
+  user: { role?: PlatformRole; fieldRole?: FieldRole; recruiter?: unknown } | null | undefined,
+  roles: readonly GateRole[]
+): boolean {
+  if (!user) return false;
+  const { role, fieldRole } = user;
+  if (roles.some((r) => r === role || r === fieldRole)) return true;
+  if (isOwner(role) && roles.includes('admin')) return true;
+  return isRecruiter(user) && roles.includes(RECRUITER_GATE);
 }
 
 /** A solar rep with no fiber field role and no platform role: gets the solar tab set (Solar in the center). */
@@ -495,6 +535,9 @@ export interface User {
   // get push, a required person sees a full-screen setup sheet on every open
   // instead of the dismissible banner. Written only by /api/portal/admin/push.
   pushRequired?: boolean;
+  // Hidden recruiting grant (isRecruiter). Set only by scripts/set-recruiter.mjs;
+  // never shown, never returned by the user list/profile APIs.
+  recruiter?: boolean;
 }
 
 // Auth context state type

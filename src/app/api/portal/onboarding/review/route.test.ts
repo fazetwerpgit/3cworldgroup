@@ -60,7 +60,7 @@ vi.mock('@/types', () => {
   };
 });
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: vi.fn(() => false) }));
-vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));
+vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedRecruiting: gateMock }));
 vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: vi.fn(async () => undefined) }));
 vi.mock('@/lib/email/templates', () => ({
   appBaseUrl: vi.fn(() => 'http://localhost'),

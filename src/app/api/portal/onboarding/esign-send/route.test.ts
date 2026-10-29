@@ -19,7 +19,7 @@ vi.mock('@/lib/firebase/admin', () => ({
     })),
   },
 }));
-vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));
+vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedRecruiting: gateMock }));
 vi.mock('@/lib/esign/autoSend', () => ({ sendPendingEsignDocs: sendMock }));
 vi.mock('@/lib/esign/inhouse', () => ({ envelopeExists: envelopeExistsMock }));
 vi.mock('firebase-admin/firestore', () => ({ FieldValue: { delete: vi.fn(() => '__DELETE__') } }));

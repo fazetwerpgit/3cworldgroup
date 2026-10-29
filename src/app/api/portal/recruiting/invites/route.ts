@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
     }
     // A field manager hires only below their own tier: regional manager and
     // director hires are invited (and activated) by management.
-    if (!canHireAtFieldRole(requester.role, intendedFieldRole)) {
+    if (!requester.canHireAnyRole && !canHireAtFieldRole(requester.role, intendedFieldRole)) {
       return NextResponse.json(
         { error: 'Only management can invite a hire at that role.' },
         { status: 403 }

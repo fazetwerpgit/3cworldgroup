@@ -7,6 +7,7 @@ import {
   isAdminLevel,
   isManagementRole,
   isOwner,
+  isRecruiter,
   isSolarRole,
   MANAGEMENT_FIELD_ROLES,
   resolveRoles,
@@ -163,6 +164,34 @@ export async function requireVerifiedManagement(
   if (!c.ok) return c;
   const { role } = resolveRoles(c.data.role, c.data.fieldRole);
   if (!isManagementRole(role)) {
+    return { ok: false, error: 'Forbidden: management access required', status: 403 };
+  }
+  return {
+    ok: true,
+    uid: c.uid,
+    name: c.data.displayName || callerEmail(c.data) || 'Manager',
+    isAdmin: isAdminLevel(role),
+    isOwner: isOwner(role),
+  };
+}
+
+// The recruiting-scoped twin of requireVerifiedManagement: management OR the
+// hidden recruiter grant (users/{uid}.recruiter === true, isRecruiter). Used
+// ONLY by the recruiting / onboarding-review / pipeline routes; every other
+// management route keeps requireVerifiedManagement. A recruiter who is not
+// management comes back isAdmin false and isOwner false, so the per-item
+// checks behind it (sensitive files admin/owner, W-9 and direct deposit owner)
+// refuse them exactly as they refuse operations.
+export async function requireVerifiedRecruiting(
+  request: NextRequest
+): Promise<
+  | { ok: true; uid: string; name: string; isAdmin: boolean; isOwner: boolean }
+  | { ok: false; error: string; status: number }
+> {
+  const c = await verifyCaller(request);
+  if (!c.ok) return c;
+  const { role } = resolveRoles(c.data.role, c.data.fieldRole);
+  if (!isManagementRole(role) && !isRecruiter(c.data)) {
     return { ok: false, error: 'Forbidden: management access required', status: 403 };
   }
   return {

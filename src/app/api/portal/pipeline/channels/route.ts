@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
 import { CHANNELS, ChannelOnboardingStatus } from '@/types';
 
 // GET /api/portal/pipeline/channels?userId=xxx - Per-channel credentialing
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const gate = await requireVerifiedManagement(request);
+    const gate = await requireVerifiedRecruiting(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const gate = await requireVerifiedManagement(request);
+    const gate = await requireVerifiedRecruiting(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

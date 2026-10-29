@@ -32,7 +32,7 @@ vi.mock('@/lib/firebase/admin', () => {
   };
 });
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
-  requireVerifiedManagement: vi.fn(async () => ({ ok: true, uid: 'admin-1' })),
+  requireVerifiedRecruiting: vi.fn(async () => ({ ok: true, uid: 'admin-1' })),
 }));
 
 import { GET } from './route';

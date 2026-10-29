@@ -28,7 +28,7 @@ vi.mock('@/types', () => ({
   isOwnerOnlyOnboardingDocument: (id: unknown) => id === 'w9' || id === 'direct_deposit' || id === 'contract',
 }));
 vi.mock('@/lib/onboarding/uploads', () => ({ isStorageItem: (id: string) => id !== 'contract' }));
-vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedManagement: gateMock }));
+vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({ requireVerifiedRecruiting: gateMock }));
 vi.mock('@/lib/onboarding/signFiles', () => ({ signFolderFiles: signMock }));
 
 import { GET } from './route';

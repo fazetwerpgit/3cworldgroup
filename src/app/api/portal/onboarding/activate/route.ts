@@ -1,5 +1,5 @@
 import { after, NextRequest, NextResponse } from 'next/server';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
 import { activateUser, getActivationReadiness, sendOnboardingPacketOnce } from '@/lib/onboarding/activation';
 
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
 
     // Activating a rep is management-only. Gate before reading the body: the
     // activator is whoever holds the token, never a requestedBy the client names.
-    const gate = await requireVerifiedManagement(request);
+    const gate = await requireVerifiedRecruiting(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

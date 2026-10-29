@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
 
 // POST /api/portal/pipeline/field-train - "Message manager to field train".
 // Sends an in-app notification to the rep's manager (reportsToId, legacy
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const gate = await requireVerifiedManagement(request);
+    const gate = await requireVerifiedRecruiting(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

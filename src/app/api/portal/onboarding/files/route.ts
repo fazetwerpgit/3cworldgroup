@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { ONBOARDING_ITEMS } from '@/types';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
 import { isStorageItem } from '@/lib/onboarding/uploads';
 import { canOpenOnboardingItem, isOwnerOnlyOnboardingItem, logSensitiveFileAccess } from '@/lib/onboarding/sensitiveAccess';
 import { signFolderFiles } from '@/lib/onboarding/signFiles';
@@ -12,7 +12,7 @@ import { signFolderFiles } from '@/lib/onboarding/signFiles';
 // later, on demand. Management only; a sensitive item's files are admin/owner
 // only (tax and banking items owner only) and every opening is audited in sensitiveAccessLog (fail closed).
 export async function GET(request: NextRequest) {
-  const gate = await requireVerifiedManagement(request);
+  const gate = await requireVerifiedRecruiting(request);
   if (!gate.ok) return NextResponse.json({ error: gate.error }, { status: gate.status });
   if (!adminDb) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
 

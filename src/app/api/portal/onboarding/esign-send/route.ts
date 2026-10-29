@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { adminDb } from '@/lib/firebase/admin';
 import { getOnboardingItemsForUser, resolveRoles } from '@/types';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
 import { isEsignItem } from '@/lib/onboarding/esign';
 import { sendPendingEsignDocs } from '@/lib/esign/autoSend';
 import { envelopeExists } from '@/lib/esign/inhouse';
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
     }
 
-    const gate = await requireVerifiedManagement(request);
+    const gate = await requireVerifiedRecruiting(request);
     if (!gate.ok) {
       return NextResponse.json({ error: gate.error }, { status: gate.status });
     }

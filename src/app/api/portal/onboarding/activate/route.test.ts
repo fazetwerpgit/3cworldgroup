@@ -32,7 +32,7 @@ vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { delete: vi.fn(() => '__DELETE__'), serverTimestamp: vi.fn(() => '__SERVER_TS__') },
 }));
 vi.mock('@/lib/auth/requireVerifiedAdmin', () => ({
-  requireVerifiedManagement: vi.fn(),
+  requireVerifiedRecruiting: vi.fn(),
 }));
 const { packetOnceMock, afterMock } = vi.hoisted(() => ({
   packetOnceMock: vi.fn<(userId: string) => Promise<boolean>>(async () => true),
@@ -52,10 +52,10 @@ vi.mock('@/lib/alerts/dispatch', () => ({ dispatchToUser: vi.fn(async () => unde
 vi.mock('@/lib/email/templates', () => ({ activationEmail: vi.fn(() => ({ subject: 'Welcome', html: 'Welcome' })) }));
 
 import { POST } from './route';
-import { requireVerifiedManagement } from '@/lib/auth/requireVerifiedAdmin';
+import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
 import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
 
-const mockGate = requireVerifiedManagement as unknown as ReturnType<typeof vi.fn>;
+const mockGate = requireVerifiedRecruiting as unknown as ReturnType<typeof vi.fn>;
 const mockReadiness = getActivationReadiness as unknown as ReturnType<typeof vi.fn>;
 const mockActivateUser = activateUser as unknown as ReturnType<typeof vi.fn>;
 

@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
     const hireRoles = [invite.intendedFieldRole, targetUser.get('fieldRole')].filter(
       (role): role is string => typeof role === 'string'
     );
-    if (hireRoles.some((role) => !canHireAtFieldRole(requester.role, role))) {
+    if (!requester.canHireAnyRole && hireRoles.some((role) => !canHireAtFieldRole(requester.role, role))) {
       return NextResponse.json(
         { error: 'Only management can activate a hire at this role.' },
         { status: 403 }
