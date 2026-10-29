@@ -150,6 +150,11 @@ export async function GET(request: NextRequest) {
         carrierOrders,
         lastSignInAt,
         hireDate: data.hireDate?.toDate(),
+        // For Hiring > People: which invite made this account, when it was
+        // made and when it was activated (how long someone has been in a stage).
+        inviteId: typeof data.onboardingInviteId === 'string' ? data.onboardingInviteId : null,
+        createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
+        activatedAt: data.activatedAt?.toDate?.()?.toISOString?.() ?? null,
         decommission: decommission
           ? {
               ...decommission,

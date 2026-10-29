@@ -1,26 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  CheckCircle2,
-  ChevronDown,
-  ExternalLink,
-  Link2,
-  Loader2,
-  Mail,
-  Search,
-  Send,
-  UserPlus,
-  XCircle,
-} from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { CheckCircle2, ChevronDown, ExternalLink, Link2, Loader2, Send } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getIdToken } from '@/lib/firebase/getIdToken';
-import { downloadCsv, toCsv } from '@/lib/export/csv';
-import { displayPhone, telHref } from '@/lib/phone';
 import { invitableFieldRolesFor } from '@/lib/recruiting/roleCeiling';
-import { AdminEmpty, AdminFailed, AdminNotice, AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
-import { hubTabHref, ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
+import { AdminNotice } from '@/components/portal/admin-d/AdminUi';
+import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import { shareLinkViaApp, shouldShareViaApp } from '@/lib/app/shareLink';
@@ -34,20 +20,15 @@ import {
   RoleDisplayNames,
 } from '@/types';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
-import {
-  emailProblem,
-  EXPORT_COLUMNS,
-  exportRow,
-  matchesSearch,
-  needsAction,
-  recruitRows,
-  recruitSentence,
-  type RecruitRow,
-} from './recruitList';
+
+// Invites as Hiring uses them: the invite record the recruiting API sends,
+// the invite actions (copy or share the link, resend, activate or reject the
+// paperwork) and the Send an invite form. People runs them all; To do runs
+// Activate on its own.
 
 // The recruiting routes verify the caller from the ID token — the acting
 // identity is never sent in the query string or body.
-async function authHeaders(json = false): Promise<Record<string, string>> {
+export async function authHeaders(json = false): Promise<Record<string, string>> {
   const token = await getIdToken();
   return {
     ...(json ? { 'Content-Type': 'application/json' } : {}),
@@ -76,17 +57,13 @@ export interface InviteView {
   expiresAt: string | null;
   submittedAt: string | null;
   createdAt: string | null;
+  updatedAt?: string | null;
 }
 
-const emptyForm = {
-  candidateName: '',
-  candidateEmail: '',
-  candidatePhone: '',
-  candidateCity: '',
-  intendedFieldRole: 'entry_level_rep' as FieldRole,
-  isIBO: false,
-  applicationId: '',
-};
+export interface Notice {
+  tone: 'ok' | 'error' | 'warn';
+  text: string;
+}
 
 /**
  * Copies a link that is still being fetched. Safari only lets a click write to
@@ -107,7 +84,7 @@ function formatDate(value: string | null) {
   return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function formatMissingItems(missing: unknown): string {
+export function formatMissingItems(missing: unknown): string {
   return Array.isArray(missing) && missing.length > 0
     ? missing
         .map(String)
@@ -117,113 +94,237 @@ function formatMissingItems(missing: unknown): string {
 }
 
 /**
- * The Recruits tab: "Send an invite" (opens the form in place) and a search
- * box, then everyone being recruited as one list (see recruitList), each row
- * with its one or two actions, then "Export list". Recruits loads the data and
- * gates the tab; `reload` refetches it after every action. `onChanged` runs
- * after each action that changes the recruits, so the hub's tab counts follow.
+ * The invite actions, each one call to the recruiting API it always used.
+ * Results go to `notify`; `reload` refetches after a change and `onChanged`
+ * tells the hub (its tab counts) that something moved.
  */
-export function Invites({
-  invites,
-  applications,
-  loading,
-  loadFailed,
+export function useInviteActions({
   reload,
   onChanged,
+  notify,
 }: {
-  invites: InviteView[];
-  applications: ApplicationRecord[];
-  loading: boolean;
-  loadFailed: boolean;
-  reload: () => Promise<void>;
+  reload: () => Promise<unknown>;
   onChanged?: () => void;
+  notify: (notice: Notice | null) => void;
 }) {
-  const { user } = useAuth();
-  const router = useRouter();
-  const prefillApplicationId = useSearchParams().get('application');
-  const [formOpen, setFormOpen] = useState(false);
-  // Bumped each time the form is asked for; the effect below scrolls to it
-  // once it has rendered.
-  const [formCalls, setFormCalls] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [rejectConfirmId, setRejectConfirmId] = useState<string | null>(null);
-  const [replaceConfirmId, setReplaceConfirmId] = useState<string | null>(null);
   const [linkBusy, setLinkBusy] = useState<{ id: string; action: 'copy' | 'resend' } | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  // A link copied or re-sent by hand shows under the person so it can be selected.
   const [shownLink, setShownLink] = useState<{ id: string; url: string } | null>(null);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [warning, setWarning] = useState('');
-  const [latestInviteUrl, setLatestInviteUrl] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [query, setQuery] = useState('');
-  const [showAll, setShowAll] = useState(false);
-  const [exporting, setExporting] = useState(false);
 
-  const clearNotices = () => {
-    setError('');
-    setSuccess('');
-    setWarning('');
-  };
-
-  const openForm = () => {
-    setFormOpen(true);
-    setFormCalls((count) => count + 1);
-  };
-
-  const closeForm = () => {
-    setFormOpen(false);
-    setForm(emptyForm);
-    setLatestInviteUrl('');
-  };
-
-  useEffect(() => {
-    if (formCalls === 0) return;
-    document.getElementById('invite-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    document.getElementById('invite-name')?.focus({ preventScroll: true });
-  }, [formCalls]);
-
-  const fillFromApplication = (applicationId: string) => {
-    const application = applications.find((item) => item.id === applicationId);
-    if (!application) {
-      setForm((prev) => ({ ...prev, applicationId }));
+  const copyInviteLink = async (invite: InviteView) => {
+    notify(null);
+    setLinkBusy({ id: invite.id, action: 'copy' });
+    const url = (async () => {
+      const response = await fetch(`/api/portal/recruiting/invites/${invite.id}`, { headers: await authHeaders() });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Could not load the link');
+      return json.inviteUrl as string;
+    })();
+    if (shouldShareViaApp()) {
+      // In the app the share sheet replaces the clipboard (Copy is one of its actions).
+      try {
+        let link: string;
+        try {
+          link = await url;
+        } catch {
+          notify({ tone: 'error', text: "Couldn't load the link. Try again." });
+          return;
+        }
+        setShownLink({ id: invite.id, url: link });
+        try {
+          await shareLinkViaApp(link, `Invite for ${invite.candidateName}`);
+        } catch {
+          // The share sheet didn't open: copy instead, in plain words.
+          try {
+            await navigator.clipboard.writeText(link);
+            notify({ tone: 'ok', text: `Link for ${invite.candidateName} copied.` });
+          } catch {
+            notify({ tone: 'warn', text: "Couldn't open sharing. Select the link below and copy it." });
+          }
+        }
+      } finally {
+        setLinkBusy(null);
+      }
       return;
     }
-    setForm((prev) => ({
-      ...prev,
-      applicationId,
-      candidateName: application.name,
-      candidateEmail: application.email,
-      candidatePhone: application.phone,
-      candidateCity: application.city,
-    }));
-  };
-
-  /** A row's Invite button (and the ?application= link): the form opens filled from that application. */
-  const inviteApplicant = (applicationId: string) => {
-    fillFromApplication(applicationId);
-    setLatestInviteUrl('');
-    openForm();
-  };
-
-  // A link from elsewhere in the portal sets ?application=<id>: once the
-  // applications load, open the form filled from it, then drop the param so a
-  // reload starts clean.
-  useEffect(() => {
-    if (!prefillApplicationId || loading) return;
-    if (applications.some((application) => application.id === prefillApplicationId)) {
-      inviteApplicant(prefillApplicationId);
+    try {
+      await copyPendingText(url);
+      setShownLink({ id: invite.id, url: await url });
+      notify({ tone: 'ok', text: `Link for ${invite.candidateName} copied.` });
+    } catch {
+      // Either the link failed to load or the browser refused the clipboard.
+      try {
+        setShownLink({ id: invite.id, url: await url });
+        notify({ tone: 'warn', text: 'Your browser blocked copying. Select the link below and copy it.' });
+      } catch (err) {
+        notify({ tone: 'error', text: err instanceof Error ? err.message : 'Could not load the link' });
+      }
+    } finally {
+      setLinkBusy(null);
     }
-    router.replace(hubTabHref(ONBOARDING_HUB, 'recruits'), { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per handed-over applicant
-  }, [prefillApplicationId, loading]);
+  };
+
+  const resendInvite = async (invite: InviteView, replaceOpenedLink = false) => {
+    notify(null);
+    setLinkBusy({ id: invite.id, action: 'resend' });
+    try {
+      const response = await fetch(`/api/portal/recruiting/invites/${invite.id}`, {
+        method: 'POST',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ replaceOpenedLink }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to re-send the invite');
+      const until = formatDate(json.expiresAt);
+      const fresh = json.newLink ? ' This is a new link; the one sent before no longer works.' : '';
+      if (json.emailSent) {
+        notify({ tone: 'ok', text: `Invite re-sent to ${invite.candidateEmail}. The link works until ${until}.${fresh}` });
+      } else if (typeof json.inviteUrl !== 'string') {
+        notify({ tone: 'warn', text: "The email didn't go out. Try Resend again in a minute." });
+      } else {
+        setShownLink({ id: invite.id, url: json.inviteUrl });
+        notify({
+          tone: 'warn',
+          text: `The email didn't go out. Copy the link below and send it yourself (works until ${until}).${fresh}`,
+        });
+      }
+      await reload();
+    } catch (err) {
+      notify({ tone: 'error', text: err instanceof Error ? err.message : 'Failed to re-send the invite' });
+    } finally {
+      setLinkBusy(null);
+    }
+  };
+
+  /** Activate or Reject a recruit whose paperwork is in. Resolves true when it went through. */
+  const convertInvite = async (invite: InviteView, action: 'approved' | 'rejected'): Promise<boolean> => {
+    setProcessingId(invite.id);
+    notify(null);
+    try {
+      const response = await fetch('/api/portal/recruiting/convert', {
+        method: 'POST',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ inviteId: invite.id, action }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (response.status === 409) {
+          const missing = formatMissingItems(json.missing);
+          throw new Error(
+            missing
+              ? `Can't activate ${invite.candidateName} yet. Missing: ${missing}`
+              : `Can't activate ${invite.candidateName} yet. Required onboarding items are missing.`
+          );
+        }
+        throw new Error(typeof json.error === 'string' ? json.error : 'Failed to update recruit');
+      }
+      notify({
+        tone: 'ok',
+        text: action === 'approved' ? `${invite.candidateName} is activated.` : `${invite.candidateName} was rejected.`,
+      });
+      await reload();
+      onChanged?.();
+      return true;
+    } catch (err) {
+      notify({ tone: 'error', text: err instanceof Error ? err.message : 'Failed to update recruit' });
+      return false;
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  return { linkBusy, processingId, shownLink, setShownLink, copyInviteLink, resendInvite, convertInvite };
+}
+
+/** A link shown under someone (copied or re-sent by hand): selectable, with Open. */
+export function ShownLink({ url }: { url: string }) {
+  return (
+    <div className={r.rowLink}>
+      <p className={r.readyUrl}>{url}</p>
+      <a className={`${s.btnSecondary} ${u.sm}`} href={url} target="_blank" rel="noreferrer">
+        <ExternalLink size={16} aria-hidden="true" />
+        Open
+      </a>
+    </div>
+  );
+}
+
+const emptyForm = {
+  candidateName: '',
+  candidateEmail: '',
+  candidatePhone: '',
+  candidateCity: '',
+  intendedFieldRole: 'entry_level_rep' as FieldRole,
+  isIBO: false,
+  applicationId: '',
+};
+
+/**
+ * Send an invite, in a sheet: filled from a website application (picked here,
+ * or handed in as `applicationId`) or typed by hand. `pickable` is who the
+ * picker offers (applicants not invited yet). After it sends, the sheet shows
+ * the link (when there is one) until it is closed.
+ */
+export function InviteFormSheet({
+  applications,
+  pickable,
+  applicationId,
+  onClose,
+  onCreated,
+}: {
+  applications: ApplicationRecord[];
+  pickable: ApplicationRecord[];
+  applicationId?: string | null;
+  onClose: () => void;
+  onCreated: () => Promise<unknown> | void;
+}) {
+  const { user } = useAuth();
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [latestInviteUrl, setLatestInviteUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+  // Sent: the sheet shows the result (and the link) instead of the form.
+  const [sent, setSent] = useState(false);
+
+  const fillFromApplication = useCallback(
+    (id: string) => {
+      const application = applications.find((item) => item.id === id);
+      setForm((prev) =>
+        application
+          ? {
+              ...prev,
+              applicationId: id,
+              candidateName: application.name,
+              candidateEmail: application.email,
+              candidatePhone: application.phone,
+              candidateCity: application.city,
+            }
+          : { ...prev, applicationId: id }
+      );
+    },
+    [applications]
+  );
+
+  // Opened for an applicant: fill from them once, then focus the name.
+  useEffect(() => {
+    if (applicationId) fillFromApplication(applicationId);
+    // AdminSheet focuses Close first; the form wants the name.
+    const timer = window.setTimeout(() => document.getElementById('invite-name')?.focus({ preventScroll: true }), 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per opening
+  }, []);
+
+  const options = [...pickable];
+  const filled = applications.find((application) => application.id === form.applicationId);
+  if (filled && !options.includes(filled)) options.unshift(filled);
 
   const createInvite = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!user) return;
     setSaving(true);
-    clearNotices();
+    setNotice(null);
     setLatestInviteUrl('');
     try {
       const response = await fetch('/api/portal/recruiting/invites', {
@@ -239,102 +340,19 @@ export function Invites({
       // ever goes to that inbox.
       setLatestInviteUrl(typeof json.inviteUrl === 'string' ? json.inviteUrl : '');
       setForm(emptyForm);
+      setSent(true);
       if (json.emailSent) {
-        setSuccess(`Invite emailed to ${json.invite.candidateEmail} from the onboarding department.`);
+        setNotice({ tone: 'ok', text: `Invite emailed to ${json.invite.candidateEmail} from the onboarding department.` });
       } else if (typeof json.inviteUrl === 'string') {
-        setWarning("Invite created, but the email didn't go out. Copy the link below and send it yourself.");
+        setNotice({ tone: 'warn', text: "Invite created, but the email didn't go out. Copy the link below and send it yourself." });
       } else {
-        setWarning("Invite created, but the email didn't go out. Use Resend to try again.");
+        setNotice({ tone: 'warn', text: "Invite created, but the email didn't go out. Use Resend to try again." });
       }
-      await reload();
-      onChanged?.();
+      await onCreated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create invite');
+      setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'Failed to create invite' });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const copyInviteLink = async (invite: InviteView) => {
-    clearNotices();
-    setLinkBusy({ id: invite.id, action: 'copy' });
-    const url = (async () => {
-      const response = await fetch(`/api/portal/recruiting/invites/${invite.id}`, { headers: await authHeaders() });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Could not load the link');
-      return json.inviteUrl as string;
-    })();
-    if (shouldShareViaApp()) {
-      // In the app the share sheet replaces the clipboard (Copy is one of its actions).
-      try {
-        let link: string;
-        try {
-          link = await url;
-        } catch {
-          setError("Couldn't load the link. Try again.");
-          return;
-        }
-        setShownLink({ id: invite.id, url: link });
-        try {
-          await shareLinkViaApp(link, `Invite for ${invite.candidateName}`);
-        } catch {
-          // The share sheet didn't open: copy instead, in plain words.
-          try {
-            await navigator.clipboard.writeText(link);
-            setSuccess(`Link for ${invite.candidateName} copied.`);
-          } catch {
-            setWarning("Couldn't open sharing. Select the link under their name and copy it.");
-          }
-        }
-      } finally {
-        setLinkBusy(null);
-      }
-      return;
-    }
-    try {
-      await copyPendingText(url);
-      setShownLink({ id: invite.id, url: await url });
-      setSuccess(`Link for ${invite.candidateName} copied.`);
-    } catch {
-      // Either the link failed to load or the browser refused the clipboard.
-      try {
-        setShownLink({ id: invite.id, url: await url });
-        setWarning('Your browser blocked copying. Select the link under their name and copy it.');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Could not load the link');
-      }
-    } finally {
-      setLinkBusy(null);
-    }
-  };
-
-  const resendInvite = async (invite: InviteView, replaceOpenedLink = false) => {
-    clearNotices();
-    setReplaceConfirmId(null);
-    setLinkBusy({ id: invite.id, action: 'resend' });
-    try {
-      const response = await fetch(`/api/portal/recruiting/invites/${invite.id}`, {
-        method: 'POST',
-        headers: await authHeaders(true),
-        body: JSON.stringify({ replaceOpenedLink }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to re-send the invite');
-      const until = formatDate(json.expiresAt);
-      const fresh = json.newLink ? ' This is a new link; the one sent before no longer works.' : '';
-      if (json.emailSent) {
-        setSuccess(`Invite re-sent to ${invite.candidateEmail}. The link works until ${until}.${fresh}`);
-      } else if (typeof json.inviteUrl !== 'string') {
-        setWarning("The email didn't go out. Try Resend again in a minute.");
-      } else {
-        setShownLink({ id: invite.id, url: json.inviteUrl });
-        setWarning(`The email didn't go out. Copy the link under their name and send it yourself (works until ${until}).${fresh}`);
-      }
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to re-send the invite');
-    } finally {
-      setLinkBusy(null);
     }
   };
 
@@ -351,453 +369,157 @@ export function Invites({
     try {
       await navigator.clipboard.writeText(latestInviteUrl);
     } catch {
-      setWarning("Couldn't copy the link. Select it and copy it.");
+      setNotice({ tone: 'warn', text: "Couldn't copy the link. Select it and copy it." });
       return;
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const convertInvite = async (invite: InviteView, action: 'approved' | 'rejected') => {
-    if (!user) return;
-    setProcessingId(invite.id);
-    clearNotices();
-    try {
-      const response = await fetch('/api/portal/recruiting/convert', {
-        method: 'POST',
-        headers: await authHeaders(true),
-        body: JSON.stringify({ inviteId: invite.id, action }),
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        if (response.status === 409) {
-          const missing = formatMissingItems(json.missing);
-          throw new Error(
-            missing
-              ? `Cannot activate yet. Missing: ${missing}`
-              : 'Cannot activate yet. Required onboarding items are missing.'
-          );
-        }
-        throw new Error(
-          typeof json.error === 'string' ? json.error : 'Failed to update recruit'
-        );
-      }
-      setSuccess(action === 'approved' ? 'Recruit activated.' : 'Recruit rejected.');
-      setRejectConfirmId(null);
-      await reload();
-      onChanged?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update recruit');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const rows = recruitRows(applications, invites);
-  const actionCount = rows.filter(needsAction).length;
-  const visible = rows.filter((row) => (showAll || needsAction(row)) && matchesSearch(row, query));
-  const ready = !loading && !loadFailed;
-  // The form's picker offers people not invited yet, plus whichever application is filled in.
-  const pickableApplications = rows.flatMap((row) => (row.state === 'new' && row.application ? [row.application] : []));
-  const filledApplication = applications.find((application) => application.id === form.applicationId);
-  if (filledApplication && !pickableApplications.includes(filledApplication)) {
-    pickableApplications.unshift(filledApplication);
-  }
-
-  /** One or two buttons for what the row is waiting on; none once it's settled. */
-  const rowActions = (row: RecruitRow) => {
-    const { invite, application } = row;
-    if (row.state === 'new' && application) {
-      return (
-        <button
-          type="button"
-          className={`${s.btnSecondary} ${u.sm}`}
-          aria-label={`Invite ${row.name}`}
-          onClick={() => inviteApplicant(application.id)}
-        >
-          <UserPlus size={16} aria-hidden="true" />
-          Invite
-        </button>
-      );
-    }
-    if (!invite) return null;
-    if (row.state === 'finished') {
-      const busy = processingId === invite.id;
-      return (
-        <>
-          <button
-            type="button"
-            className={`${s.btnSecondary} ${u.sm} ${r.activate}`}
-            disabled={busy}
-            onClick={() => convertInvite(invite, 'approved')}
-          >
-            {busy && rejectConfirmId !== invite.id ? (
-              <Loader2 size={16} className={u.spin} aria-hidden="true" />
-            ) : (
-              <CheckCircle2 size={16} aria-hidden="true" />
-            )}
-            Activate
-          </button>
-          <button
-            type="button"
-            className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
-            disabled={busy}
-            aria-expanded={rejectConfirmId === invite.id}
-            onClick={() => setRejectConfirmId(invite.id)}
-          >
-            <XCircle size={16} aria-hidden="true" />
-            Reject
-          </button>
-        </>
-      );
-    }
-    if (row.state !== 'invited' && row.state !== 'started' && row.state !== 'expired') return null;
-    const linkAction = linkBusy?.id === invite.id ? linkBusy.action : null;
-    // An older invite (no saved link) the recruit already opened: a new link
-    // replaces the one in the page they may have open, so it asks first.
-    const openedLegacy = !invite.linkSaved && row.state === 'started';
-    return (
-      <>
-        {invite.linkSaved && !invite.existingAccount && row.state !== 'expired' ? (
-          <button
-            type="button"
-            className={`${s.btnSecondary} ${u.sm}`}
-            disabled={linkAction !== null}
-            aria-label={`Copy invite link for ${row.name}`}
-            onClick={() => copyInviteLink(invite)}
-          >
-            {linkAction === 'copy' ? (
-              <Loader2 size={16} className={u.spin} aria-hidden="true" />
-            ) : (
-              <Link2 size={16} aria-hidden="true" />
-            )}
-            Copy link
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className={`${s.btnSecondary} ${u.sm}`}
-          disabled={linkAction !== null}
-          aria-label={`Resend invite email to ${row.name}`}
-          title={
-            invite.linkSaved
-              ? 'Emails the same link again and gives it 14 more days'
-              : 'This invite predates saved links: emails a new link (the old one stops working)'
-          }
-          onClick={() => (openedLegacy ? setReplaceConfirmId(invite.id) : resendInvite(invite))}
-        >
-          {linkAction === 'resend' ? (
-            <Loader2 size={16} className={u.spin} aria-hidden="true" />
-          ) : (
-            <Mail size={16} aria-hidden="true" />
-          )}
-          Resend
-        </button>
-      </>
-    );
-  };
-
-  const renderRow = (row: RecruitRow) => {
-    const { invite } = row;
-    const actions = rowActions(row);
-    const busy = !!invite && processingId === invite.id;
-    return (
-      <li key={row.key}>
-        <div className={`${u.row} ${r.recruit} ${row.state === 'finished' ? u.rowHot : ''}`}>
-          <span className={`${u.cellMain} ${u.personText}`}>
-            <span className={u.personName}>
-              <span>{row.name}</span>
-            </span>
-            <span className={u.personSub}>
-              {row.city}
-              {row.city && row.phone ? ' · ' : ''}
-              {row.phone ? (
-                <a className={`${u.num} ${r.contact}`} href={telHref(row.phone)}>
-                  {displayPhone(row.phone)}
-                </a>
-              ) : null}
-            </span>
-          </span>
-          <span className={`${r.sentence} ${emailProblem(row) ? u.toneAmber : needsAction(row) ? '' : u.toneMuted}`}>
-            {recruitSentence(row)}
-          </span>
-          {actions ? <span className={`${u.btnRow} ${r.actions}`}>{actions}</span> : null}
-        </div>
-        {invite && shownLink?.id === invite.id ? (
-          <div className={r.rowLink}>
-            <p className={r.readyUrl}>{shownLink.url}</p>
-            <a className={`${s.btnSecondary} ${u.sm}`} href={shownLink.url} target="_blank" rel="noreferrer">
-              <ExternalLink size={16} aria-hidden="true" />
-              Open
-            </a>
-          </div>
-        ) : null}
-        {invite && replaceConfirmId === invite.id ? (
-          <div className={u.confirm} role="alert">
-            <span>
-              {row.name} already opened their first link. A new link replaces it: if their onboarding page is
-              still open, they&apos;ll need the new email. Files they uploaded are kept.
-            </span>
-            <span className={u.btnRow}>
-              <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setReplaceConfirmId(null)}>
-                Cancel
-              </button>
-              <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => resendInvite(invite, true)}>
-                Yes, send a new link
-              </button>
-            </span>
-          </div>
-        ) : null}
-        {invite && rejectConfirmId === invite.id ? (
-          <div className={u.confirm} role="alert">
-            <span>Reject this recruit? This deactivates their account.</span>
-            <span className={u.btnRow}>
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${u.sm}`}
-                onClick={() => setRejectConfirmId(null)}
-                disabled={busy}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-                onClick={() => convertInvite(invite, 'rejected')}
-                disabled={busy}
-              >
-                {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
-                {busy ? 'Rejecting…' : 'Yes, reject'}
-              </button>
-            </span>
-          </div>
-        ) : null}
-      </li>
-    );
-  };
-
   return (
-    <>
-      {error ? (
-        <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice>
-      ) : null}
-      {success ? (
-        <AdminNotice tone="ok" onDismiss={() => setSuccess('')}>{success}</AdminNotice>
-      ) : null}
-      {warning ? (
-        <AdminNotice tone="warn" onDismiss={() => setWarning('')}>{warning}</AdminNotice>
-      ) : null}
-
-      <div className={r.topBar}>
-        {formOpen ? null : (
-          <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={openForm}>
-            <UserPlus size={18} aria-hidden="true" />
-            Send an invite
+    <AdminSheet
+      title="Send an invite"
+      onClose={onClose}
+      footer={
+        sent ? (
+          <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={onClose}>
+            Done
           </button>
-        )}
-        <label className={`${u.search} ${r.search}`}>
-          <Search size={18} aria-hidden="true" />
-          <input
-            className={u.input}
-            type="search"
-            placeholder="Search name, city, email, phone"
-            aria-label="Search recruits"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-      </div>
-
-      {formOpen ? (
-        <div className={r.formWrap}>
-          <section className={`${s.panel} ${r.formPanel}`} id="invite-form" aria-labelledby="recruiting-form-heading">
-            <div className={`${s.panelHead} ${u.band}`}>
-              <h2 id="recruiting-form-heading" className={u.sectionTitle}>Send an invite</h2>
-              <button type="button" className={`${s.btnSecondary} ${u.sm} ${u.quiet}`} onClick={closeForm}>
-                {latestInviteUrl ? 'Close' : 'Cancel'}
-              </button>
-            </div>
-            <div className={u.panelBody}>
-              <form onSubmit={createInvite} className={u.formGrid}>
-                {pickableApplications.length > 0 && (
-                  <div className={u.field}>
-                    <label htmlFor="invite-application" className={u.label}>Use website application</label>
-                    <span className={u.selectWrap}>
-                      <select
-                        id="invite-application"
-                        className={u.input}
-                        value={form.applicationId}
-                        onChange={(event) => fillFromApplication(event.target.value)}
-                      >
-                        <option value="">Manual entry</option>
-                        {pickableApplications.map((application) => (
-                          <option key={application.id} value={application.id}>
-                            {application.name} - {application.city}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={18} aria-hidden="true" />
-                    </span>
-                  </div>
-                )}
-
-                <div className={u.field}>
-                  <label htmlFor="invite-name" className={u.label}>Name</label>
-                  <input
-                    id="invite-name"
-                    className={u.input}
-                    autoComplete="off"
-                    value={form.candidateName}
-                    onChange={(event) => setForm((prev) => ({ ...prev, candidateName: event.target.value }))}
-                    required
-                  />
-                </div>
-                <div className={u.field}>
-                  <label htmlFor="invite-email" className={u.label}>Email</label>
-                  <input
-                    id="invite-email"
-                    className={u.input}
-                    type="email"
-                    autoComplete="off"
-                    value={form.candidateEmail}
-                    onChange={(event) => setForm((prev) => ({ ...prev, candidateEmail: event.target.value }))}
-                    required
-                  />
-                </div>
-                <div className={`${u.formGrid} ${u.formGrid2}`}>
-                  <div className={u.field}>
-                    <label htmlFor="invite-phone" className={u.label}>Phone</label>
-                    <input
-                      id="invite-phone"
-                      className={u.input}
-                      inputMode="tel"
-                      autoComplete="off"
-                      value={form.candidatePhone}
-                      onChange={(event) => setForm((prev) => ({ ...prev, candidatePhone: event.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className={u.field}>
-                    <label htmlFor="invite-city" className={u.label}>City</label>
-                    <input
-                      id="invite-city"
-                      className={u.input}
-                      autoComplete="off"
-                      value={form.candidateCity}
-                      onChange={(event) => setForm((prev) => ({ ...prev, candidateCity: event.target.value }))}
-                    />
-                  </div>
-                </div>
-                <div className={u.field}>
-                  <label htmlFor="invite-role" className={u.label}>Role</label>
-                  <span className={u.selectWrap}>
-                    <select
-                      id="invite-role"
-                      className={u.input}
-                      value={form.intendedFieldRole}
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))
-                      }
-                    >
-                      {invitableFieldRolesFor(user?.role, { recruiter: isRecruiter(user) }).map((role) => (
-                        <option key={role} value={role}>
-                          {RoleDisplayNames[role]}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown size={18} aria-hidden="true" />
-                  </span>
-                </div>
-                <label className={u.check}>
-                  <input
-                    type="checkbox"
-                    checked={form.isIBO}
-                    onChange={(event) => setForm((prev) => ({ ...prev, isIBO: event.target.checked }))}
-                  />
-                  Include IBO business items
-                </label>
-                <button type="submit" className={`${s.btnPrimary} ${r.submit}`} disabled={saving}>
-                  {saving ? <Loader2 size={20} className={u.spin} aria-hidden="true" /> : <Send size={20} aria-hidden="true" />}
-                  {saving ? 'Sending…' : 'Send invite'}
-                </button>
-              </form>
-
-              {latestInviteUrl && (
-                <div className={r.ready} role="status">
-                  <p className={r.readyTitle}>
-                    <CheckCircle2 size={18} aria-hidden="true" />
-                    Invite link ready
-                  </p>
-                  <p className={r.readyUrl}>{latestInviteUrl}</p>
-                  <div className={u.btnRow}>
-                    <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={copyLatestInvite}>
-                      <Link2 size={18} aria-hidden="true" />
-                      {copied ? 'Copied' : 'Copy Link'}
-                    </button>
-                    <a
-                      className={`${s.btnSecondary} ${u.sm}`}
-                      href={latestInviteUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <ExternalLink size={16} aria-hidden="true" />
-                      Open
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-      ) : null}
-
-      <section className={s.panel} id="recruits" aria-label="Recruits">
-        <div className={`${s.panelHead} ${r.filterBar}`}>
-          <div className={u.segmented} role="group" aria-label="Show">
-            <button type="button" aria-pressed={!showAll} onClick={() => setShowAll(false)}>
-              Needs action
-              {ready ? <span className={r.segCount}>{actionCount}</span> : null}
-            </button>
-            <button type="button" aria-pressed={showAll} onClick={() => setShowAll(true)}>
-              All
-            </button>
-          </div>
-        </div>
-        {loading ? (
-          <AdminSkeletonRows rows={4} label="Loading recruits" />
-        ) : loadFailed ? (
-          <AdminFailed what="recruits" onRetry={reload} />
-        ) : rows.length === 0 ? (
-          <AdminEmpty title="No recruits yet" />
-        ) : visible.length === 0 ? (
-          <AdminEmpty title={query.trim() ? 'No one matches' : 'Nothing waiting on you'} />
         ) : (
-          <ul className={`${u.rows} ${r.list}`}>{visible.map(renderRow)}</ul>
-        )}
-      </section>
+          <button type="submit" form="invite-form" className={`${s.btnPrimary} ${r.submit}`} disabled={saving}>
+            {saving ? <Loader2 size={20} className={u.spin} aria-hidden="true" /> : <Send size={20} aria-hidden="true" />}
+            {saving ? 'Sending…' : 'Send invite'}
+          </button>
+        )
+      }
+    >
+      <div className={u.sheetPad}>
+        {notice ? (
+          <AdminNotice tone={notice.tone} onDismiss={() => setNotice(null)}>
+            {notice.text}
+          </AdminNotice>
+        ) : null}
 
-      {ready && visible.length > 0 ? (
-        <button
-          type="button"
-          className={r.exportLink}
-          disabled={exporting}
-          aria-busy={exporting || undefined}
-          onClick={async () => {
-            if (exporting) return;
-            setExporting(true);
-            setError('');
-            try {
-              await downloadCsv('recruits.csv', toCsv(EXPORT_COLUMNS, visible.map(exportRow)));
-            } catch {
-              setError("Couldn't save the CSV. Try again.");
-            } finally {
-              setExporting(false);
-            }
-          }}
-        >
-          Export list
-        </button>
-      ) : null}
-    </>
+        {latestInviteUrl ? (
+          <div className={r.ready} role="status">
+            <p className={r.readyTitle}>
+              <CheckCircle2 size={18} aria-hidden="true" />
+              Invite link ready
+            </p>
+            <p className={r.readyUrl}>{latestInviteUrl}</p>
+            <div className={u.btnRow}>
+              <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} onClick={copyLatestInvite}>
+                <Link2 size={18} aria-hidden="true" />
+                {copied ? 'Copied' : 'Copy link'}
+              </button>
+              <a className={`${s.btnSecondary} ${u.sm}`} href={latestInviteUrl} target="_blank" rel="noreferrer">
+                <ExternalLink size={16} aria-hidden="true" />
+                Open
+              </a>
+            </div>
+          </div>
+        ) : null}
+
+        {sent ? null : (
+          <form id="invite-form" onSubmit={createInvite} className={u.formGrid}>
+            {options.length > 0 && (
+              <div className={u.field}>
+                <label htmlFor="invite-application" className={u.label}>Use website application</label>
+                <span className={u.selectWrap}>
+                  <select
+                    id="invite-application"
+                    className={u.input}
+                    value={form.applicationId}
+                    onChange={(event) => fillFromApplication(event.target.value)}
+                  >
+                    <option value="">Manual entry</option>
+                    {options.map((application) => (
+                      <option key={application.id} value={application.id}>
+                        {application.name} - {application.city}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={18} aria-hidden="true" />
+                </span>
+              </div>
+            )}
+
+            <div className={u.field}>
+              <label htmlFor="invite-name" className={u.label}>Name</label>
+              <input
+                id="invite-name"
+                className={u.input}
+                autoComplete="off"
+                value={form.candidateName}
+                onChange={(event) => setForm((prev) => ({ ...prev, candidateName: event.target.value }))}
+                required
+              />
+            </div>
+            <div className={u.field}>
+              <label htmlFor="invite-email" className={u.label}>Email</label>
+              <input
+                id="invite-email"
+                className={u.input}
+                type="email"
+                autoComplete="off"
+                value={form.candidateEmail}
+                onChange={(event) => setForm((prev) => ({ ...prev, candidateEmail: event.target.value }))}
+                required
+              />
+            </div>
+            <div className={`${u.formGrid} ${u.formGrid2}`}>
+              <div className={u.field}>
+                <label htmlFor="invite-phone" className={u.label}>Phone</label>
+                <input
+                  id="invite-phone"
+                  className={u.input}
+                  inputMode="tel"
+                  autoComplete="off"
+                  value={form.candidatePhone}
+                  onChange={(event) => setForm((prev) => ({ ...prev, candidatePhone: event.target.value }))}
+                  required
+                />
+              </div>
+              <div className={u.field}>
+                <label htmlFor="invite-city" className={u.label}>City</label>
+                <input
+                  id="invite-city"
+                  className={u.input}
+                  autoComplete="off"
+                  value={form.candidateCity}
+                  onChange={(event) => setForm((prev) => ({ ...prev, candidateCity: event.target.value }))}
+                />
+              </div>
+            </div>
+            <div className={u.field}>
+              <label htmlFor="invite-role" className={u.label}>Role</label>
+              <span className={u.selectWrap}>
+                <select
+                  id="invite-role"
+                  className={u.input}
+                  value={form.intendedFieldRole}
+                  onChange={(event) => setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))}
+                >
+                  {invitableFieldRolesFor(user?.role, { recruiter: isRecruiter(user) }).map((role) => (
+                    <option key={role} value={role}>
+                      {RoleDisplayNames[role]}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={18} aria-hidden="true" />
+              </span>
+            </div>
+            <label className={u.check}>
+              <input
+                type="checkbox"
+                checked={form.isIBO}
+                onChange={(event) => setForm((prev) => ({ ...prev, isIBO: event.target.checked }))}
+              />
+              Include IBO business items
+            </label>
+          </form>
+        )}
+      </div>
+    </AdminSheet>
   );
 }

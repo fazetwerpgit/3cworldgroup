@@ -71,6 +71,8 @@ export interface ApplicationRecord {
   /** Set when someone marks them "Not a fit" (status 'not_selected') from Hiring > To do. */
   notSelectedAt?: Date | null;
   notSelectedByName?: string | null;
+  /** The account their invite made (set when the invite is sent back, and on activation). */
+  convertedUserId?: string | null;
 }
 
 /**

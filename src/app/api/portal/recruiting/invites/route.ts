@@ -64,6 +64,8 @@ function serializeApplication(doc: FirebaseFirestore.QueryDocumentSnapshot): App
     updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,
     notSelectedAt: data.notSelectedAt?.toDate?.()?.toISOString?.() ?? null,
     notSelectedByName: typeof data.notSelectedByName === 'string' ? data.notSelectedByName : null,
+    // Set once their invite made an account: Hiring > People joins them on it.
+    convertedUserId: typeof data.convertedUserId === 'string' ? data.convertedUserId : null,
   } as unknown as ApplicationRecord;
 }
 

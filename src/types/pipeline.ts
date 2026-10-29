@@ -95,4 +95,10 @@ export interface PipelineRep {
   lastSignInAt: string | null;
   hireDate?: Date;
   decommission?: DecommissionRecord;
+  /** The invite that made this account (users.onboardingInviteId), if any. */
+  inviteId?: string | null;
+  /** When the account was made (ISO). */
+  createdAt?: string | null;
+  /** When the account was activated (ISO). Absent for reps activated before it was stamped. */
+  activatedAt?: string | null;
 }
