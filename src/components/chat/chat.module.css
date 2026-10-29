@@ -39,7 +39,7 @@
     padding-bottom: 0;
   }
 
-  :global(#rep-main):has(.app) > div {
+  :global(#rep-main):has(.app) > div:not([data-ptr-rail]) {
     padding-bottom: var(--s5);
   }
 }
@@ -64,7 +64,10 @@
     overflow: hidden;
   }
 
-  :global(#rep-main):has(.thread) > div {
+  /* The content wrapper only: in the app <main> also holds the zero-height
+     pull-to-refresh rail (PullToRefresh), which must stay out of the column
+     or it takes half of it. */
+  :global(#rep-main):has(.thread) > div:not([data-ptr-rail]) {
     display: flex;
     flex: 1;
     flex-direction: column;

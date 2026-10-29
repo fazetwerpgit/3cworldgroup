@@ -253,7 +253,7 @@ export function PullToRefresh({
 
   return (
     <>
-      <div className={s.ptrRail} aria-hidden="true">
+      <div className={s.ptrRail} aria-hidden="true" data-ptr-rail="">
         <div ref={indicatorRef} className={s.ptr} data-state={phase}>
           <svg ref={arcRef} className={s.ptrArc} viewBox="0 0 24 24" focusable="false">
             <circle cx="12" cy="12" r="9" />
