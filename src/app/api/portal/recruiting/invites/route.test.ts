@@ -259,6 +259,20 @@ describe('an email that already has an account', () => {
     expect(state.sendEmail).not.toHaveBeenCalled();
   });
 
+  it('is refused to a recruiter-flag holder (not admin), with the clear message', async () => {
+    state.requester = { fieldRole: 'general_manager', displayName: 'Rec', recruiter: true };
+    state.gate.mockResolvedValue({ ok: true, uid: 'rec-1', name: 'Rec', email: 'r@example.com' });
+    state.anyAccount = { uid: 'former-rep' };
+
+    const response = await POST(inviteRequest('regional_manager'));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: 'That email already has an account. Ask an admin to re-invite them.',
+    });
+    expect(state.created).toBeNull();
+  });
+
   it('is refused to operations (below admin)', async () => {
     state.requester = { role: 'operations' };
     state.anyAccount = { uid: 'former-rep' };

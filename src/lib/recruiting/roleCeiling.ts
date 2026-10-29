@@ -11,9 +11,14 @@ import {
  * operations) may use every invitable role. A field manager (L1/L2 or IBO)
  * may only hire below management: the manager-tier roles (regional manager,
  * director) sit above their own, so management invites and activates those.
+ * The hidden recruiter grant (`recruiter: true`) hires like management, as the
+ * server does (requester.canHireAnyRole).
  */
-export function invitableFieldRolesFor(inviterRole: PlatformRole | FieldRole | undefined): readonly FieldRole[] {
-  if (isManagementRole(inviterRole)) return INVITABLE_FIELD_ROLES;
+export function invitableFieldRolesFor(
+  inviterRole: PlatformRole | FieldRole | undefined,
+  options: { recruiter?: boolean } = {}
+): readonly FieldRole[] {
+  if (isManagementRole(inviterRole) || options.recruiter === true) return INVITABLE_FIELD_ROLES;
   return INVITABLE_FIELD_ROLES.filter((role) => !MANAGEMENT_FIELD_ROLES.includes(role));
 }
 

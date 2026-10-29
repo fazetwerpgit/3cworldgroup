@@ -173,6 +173,19 @@ describe('activateUser', () => {
     expect(updates).toHaveLength(0);
   });
 
+  it.each([
+    ['inactive', { status: 'inactive', fieldRole: 'entry_rep' }],
+    ['decommissioned', { status: 'pending', fieldRole: 'entry_rep', decommission: { reason: 'quit' } }],
+  ])('refuses a %s account without writing', async (_label, doc) => {
+    store.set('users/gone', doc);
+
+    await expect(activateUser('gone')).resolves.toEqual({ alreadyActive: false, deactivated: true });
+
+    expect(updates).toHaveLength(0);
+    expect(dispatchMock).not.toHaveBeenCalled();
+    expect(sendPacketMock).not.toHaveBeenCalled();
+  });
+
   it('returns null when the user document is missing', async () => {
     await expect(activateUser('missing-user')).resolves.toBeNull();
 

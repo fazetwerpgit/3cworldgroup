@@ -149,6 +149,12 @@ export async function POST(request: NextRequest) {
     if (!activation) {
       return NextResponse.json({ error: 'user not found' }, { status: 404 });
     }
+    if (activation.deactivated) {
+      return NextResponse.json(
+        { error: 'This recruit was deactivated. Reinstate them from Pipeline instead.' },
+        { status: 409 }
+      );
+    }
     // Owner packet after the response; its stamp keeps it to one per rep.
     if (activation.packetDue) {
       const hireId = invite.convertedUserId as string;

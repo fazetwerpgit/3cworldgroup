@@ -40,7 +40,16 @@ import {
   canOpenHubTab,
   hubRoles,
 } from '@/components/portal/admin-d/adminHubs';
-import { isRecruiter, permissionsFor, RECRUITER_GATE, userSatisfiesRoles, type GateRole } from '@/types';
+import {
+  INVITABLE_FIELD_ROLES,
+  isRecruiter,
+  MANAGEMENT_FIELD_ROLES,
+  permissionsFor,
+  RECRUITER_GATE,
+  userSatisfiesRoles,
+  type GateRole,
+} from '@/types';
+import { invitableFieldRolesFor } from '@/lib/recruiting/roleCeiling';
 
 const MASON = { status: 'active', fieldRole: 'general_manager', displayName: 'Mason', recruiter: true };
 const PLAIN_GM = { status: 'active', fieldRole: 'general_manager', displayName: 'Gina' };
@@ -170,6 +179,22 @@ describe('client gates', () => {
     expect(userSatisfiesRoles(mason, ['admin', 'operations'])).toBe(false);
     expect(userSatisfiesRoles(gm, [RECRUITER_GATE])).toBe(false);
     expect(userSatisfiesRoles({ role: 'owner' as const }, ['admin'])).toBe(true);
+  });
+
+  it('a literal role or field role equal to the gate token never satisfies it', () => {
+    // Only the boolean flag opens RECRUITER_GATE, whatever string a doc carries.
+    const forgedRole = { role: RECRUITER_GATE } as unknown as Parameters<typeof userSatisfiesRoles>[0];
+    const forgedFieldRole = { fieldRole: RECRUITER_GATE } as unknown as Parameters<typeof userSatisfiesRoles>[0];
+    expect(userSatisfiesRoles(forgedRole, [RECRUITER_GATE])).toBe(false);
+    expect(userSatisfiesRoles(forgedFieldRole, [RECRUITER_GATE])).toBe(false);
+    expect(userSatisfiesRoles({ ...(forgedRole as object), recruiter: true }, [RECRUITER_GATE])).toBe(true);
+  });
+
+  it('offers a recruiter every invitable role, like management', () => {
+    expect(invitableFieldRolesFor(undefined, { recruiter: isRecruiter(mason) })).toEqual(INVITABLE_FIELD_ROLES);
+    expect(invitableFieldRolesFor('admin')).toEqual(INVITABLE_FIELD_ROLES);
+    const plain = invitableFieldRolesFor(undefined, { recruiter: isRecruiter(gm as { recruiter?: unknown }) });
+    for (const role of MANAGEMENT_FIELD_ROLES) expect(plain).not.toContain(role);
   });
 
   it('adds the recruiting permissions and nothing else', () => {

@@ -463,7 +463,9 @@ export function userSatisfiesRoles(
 ): boolean {
   if (!user) return false;
   const { role, fieldRole } = user;
-  if (roles.some((r) => r === role || r === fieldRole)) return true;
+  // A literal role/fieldRole equal to the gate token never matches it: only the
+  // boolean recruiter flag opens RECRUITER_GATE.
+  if (roles.some((r) => r !== RECRUITER_GATE && (r === role || r === fieldRole))) return true;
   if (isOwner(role) && roles.includes('admin')) return true;
   return isRecruiter(user) && roles.includes(RECRUITER_GATE);
 }

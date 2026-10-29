@@ -1,7 +1,13 @@
 import { after, NextRequest, NextResponse } from 'next/server';
 import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
 import { adminDb } from '@/lib/firebase/admin';
-import { activateUser, getActivationReadiness, sendOnboardingPacketOnce } from '@/lib/onboarding/activation';
+import {
+  activateUser,
+  DEACTIVATED_ACTIVATION_ERROR,
+  getActivationReadiness,
+  isDeactivatedAccount,
+  sendOnboardingPacketOnce,
+} from '@/lib/onboarding/activation';
 
 export async function POST(request: NextRequest) {
   try {
@@ -25,6 +31,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
 
+    // Deactivated or decommissioned accounts come back only through the
+    // management-only reinstate route, never through Activate (for anyone).
+    const target = await adminDb.doc(`users/${userId}`).get();
+    if (target.exists && isDeactivatedAccount(target.get('status'), target.get('decommission'))) {
+      return NextResponse.json({ error: DEACTIVATED_ACTIVATION_ERROR }, { status: 409 });
+    }
+
     const readiness = await getActivationReadiness(userId);
     if (!readiness.ready) {
       return NextResponse.json(
@@ -36,6 +49,9 @@ export async function POST(request: NextRequest) {
     const activation = await activateUser(userId, { deferPacket: true });
     if (!activation) {
       return NextResponse.json({ error: 'user not found' }, { status: 404 });
+    }
+    if (activation.deactivated) {
+      return NextResponse.json({ error: DEACTIVATED_ACTIVATION_ERROR }, { status: 409 });
     }
     // The owner packet (attachments, several sends) goes out after the
     // response; its stamp keeps it to one per rep.

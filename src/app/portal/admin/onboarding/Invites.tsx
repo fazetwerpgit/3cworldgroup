@@ -25,7 +25,14 @@ import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import { shareLinkViaApp, shouldShareViaApp } from '@/lib/app/shareLink';
 import r from './recruiting.module.css';
-import { ApplicationRecord, FieldRole, InviteEmailStatus, OnboardingInviteStatus, RoleDisplayNames } from '@/types';
+import {
+  ApplicationRecord,
+  FieldRole,
+  InviteEmailStatus,
+  isRecruiter,
+  OnboardingInviteStatus,
+  RoleDisplayNames,
+} from '@/types';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
 import {
   emailProblem,
@@ -224,8 +231,10 @@ export function Invites({
         headers: await authHeaders(true),
         body: JSON.stringify(form),
       });
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'Failed to create invite');
+      const json = await response.json().catch(() => ({}));
+      // Server refusals (an email that already has an account is admin-only to
+      // re-invite, a role above the inviter's tier) carry their own message.
+      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to create invite');
       // No link comes back for an email that already has an account: it only
       // ever goes to that inbox.
       setLatestInviteUrl(typeof json.inviteUrl === 'string' ? json.inviteUrl : '');
@@ -690,7 +699,7 @@ export function Invites({
                         setForm((prev) => ({ ...prev, intendedFieldRole: event.target.value as FieldRole }))
                       }
                     >
-                      {invitableFieldRolesFor(user?.role).map((role) => (
+                      {invitableFieldRolesFor(user?.role, { recruiter: isRecruiter(user) }).map((role) => (
                         <option key={role} value={role}>
                           {RoleDisplayNames[role]}
                         </option>

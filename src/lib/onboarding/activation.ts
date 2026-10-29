@@ -140,6 +140,18 @@ export async function sendOnboardingPacketOnce(userId: string): Promise<boolean>
   }
 }
 
+/** Refusal message when Activate targets a deactivated or decommissioned account. */
+export const DEACTIVATED_ACTIVATION_ERROR =
+  'This account was deactivated. Reinstate it from Pipeline instead of activating it.';
+
+/**
+ * Deactivated (status 'inactive') or decommissioned accounts never activate:
+ * only the management reinstate route brings them back.
+ */
+export function isDeactivatedAccount(status: unknown, decommission: unknown): boolean {
+  return status === 'inactive' || !!decommission;
+}
+
 /**
  * Activate a ready user and send the single active-account notification.
  * The owner packet is sent here too, unless `deferPacket` is set: then
@@ -149,7 +161,7 @@ export async function sendOnboardingPacketOnce(userId: string): Promise<boolean>
 export async function activateUser(
   userId: string,
   options: { deferPacket?: boolean } = {}
-): Promise<{ alreadyActive: boolean; packetDue?: boolean } | null> {
+): Promise<{ alreadyActive: boolean; packetDue?: boolean; deactivated?: boolean } | null> {
   if (!adminDb) throw new Error('Database not configured');
 
   const db = adminDb;
@@ -162,6 +174,12 @@ export async function activateUser(
     const snap = await tx.get(userRef);
     if (!snap.exists) return null;
     if (snap.get('status') === 'active') return { alreadyActive: true as const };
+    // A deactivated or decommissioned account comes back only through the
+    // management reinstate route; activating it here would bypass that (and
+    // leave the auth account disabled and the decommission record in place).
+    if (isDeactivatedAccount(snap.get('status'), snap.get('decommission'))) {
+      return { deactivated: true as const };
+    }
     const role = snap.get('fieldRole') as FieldRole | undefined;
     tx.update(userRef, {
       status: 'active',
@@ -179,6 +197,7 @@ export async function activateUser(
     };
   });
   if (!flip) return null;
+  if ('deactivated' in flip) return { alreadyActive: false, deactivated: true };
   if (flip.alreadyActive) return { alreadyActive: true };
   const { fieldRole, name } = flip;
 

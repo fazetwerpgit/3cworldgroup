@@ -42,7 +42,8 @@ vi.mock('next/server', async (importOriginal) => ({
   ...(await importOriginal<typeof import('next/server')>()),
   after: afterMock,
 }));
-vi.mock('@/lib/onboarding/activation', () => ({
+vi.mock('@/lib/onboarding/activation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/onboarding/activation')>()),
   activateUser: vi.fn(),
   getActivationReadiness: vi.fn(),
   sendOnboardingPacketOnce: packetOnceMock,
@@ -53,7 +54,7 @@ vi.mock('@/lib/email/templates', () => ({ activationEmail: vi.fn(() => ({ subjec
 
 import { POST } from './route';
 import { requireVerifiedRecruiting } from '@/lib/auth/requireVerifiedAdmin';
-import { activateUser, getActivationReadiness } from '@/lib/onboarding/activation';
+import { activateUser, DEACTIVATED_ACTIVATION_ERROR, getActivationReadiness } from '@/lib/onboarding/activation';
 
 const mockGate = requireVerifiedRecruiting as unknown as ReturnType<typeof vi.fn>;
 const mockReadiness = getActivationReadiness as unknown as ReturnType<typeof vi.fn>;
@@ -140,6 +141,31 @@ describe('POST /api/portal/onboarding/activate', () => {
     expect(res.status).toBe(404);
     await expect(res.json()).resolves.toEqual({ error: 'user not found' });
     expect(mockActivateUser).toHaveBeenCalledWith('missing-user', { deferPacket: true });
+  });
+
+  it.each([
+    ['an inactive account', { status: 'inactive', fieldRole: 'entry_rep' }],
+    ['a decommissioned account', { status: 'pending', decommission: { reason: 'quit' } }],
+  ])('refuses %s with 409 and never activates it', async (_label, doc) => {
+    firestore.users.set('gone', doc);
+
+    const res = await POST(req('gone'));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: DEACTIVATED_ACTIVATION_ERROR });
+    expect(mockActivateUser).not.toHaveBeenCalled();
+    expect(mockReadiness).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the account is deactivated between the check and the flip', async () => {
+    firestore.users.set('raced', { status: 'pending' });
+    mockActivateUser.mockResolvedValue({ alreadyActive: false, deactivated: true });
+
+    const res = await POST(req('raced'));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({ error: DEACTIVATED_ACTIVATION_ERROR });
+    expect(packetOnceMock).not.toHaveBeenCalled();
   });
 
   it('preserves the readiness response and does not activate an incomplete hire', async () => {
