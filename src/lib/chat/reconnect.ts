@@ -44,3 +44,83 @@ export function connectionNotice(input: { online: boolean; fromCache: boolean; r
   if (input.rendered && input.fromCache) return 'reconnecting';
   return null;
 }
+
+// A listener that keeps serving from the cache while the device is online and
+// the page is visible has a dead watch target (seen in the iOS app's WebView on
+// a cold open from a push: "Reconnecting…" never cleared). The watchdog
+// resubscribes it after STALE_LISTENER_MS, backing off per attempt up to
+// STALE_LISTENER_MAX_MS, so it never loops tightly. Coming back to the
+// foreground or online while still stale resubscribes after a short grace
+// (Firestore usually reconnects by itself within it).
+export const STALE_LISTENER_MS = 8_000;
+export const STALE_LISTENER_MAX_MS = 60_000;
+export const STALE_LISTENER_NUDGE_GRACE_MS = 2_000;
+
+export function staleListenerDelay(attempt: number): number {
+  return Math.min(STALE_LISTENER_MAX_MS, STALE_LISTENER_MS * 2 ** attempt);
+}
+
+export interface StaleListenerWatchdog {
+  /** Each snapshot's metadata.fromCache. */
+  update: (fromCache: boolean) => void;
+  /** The page became visible or the device came online. */
+  nudge: () => void;
+  dispose: () => void;
+}
+
+export function createStaleListenerWatchdog(options: {
+  /** Tear down and resubscribe the listener. */
+  resubscribe: () => void;
+  online?: () => boolean;
+  visible?: () => boolean;
+}): StaleListenerWatchdog {
+  const online = options.online ?? (() => typeof navigator === 'undefined' || navigator.onLine !== false);
+  const visible = options.visible ?? (() => typeof document === 'undefined' || document.visibilityState !== 'hidden');
+  let stale = false;
+  let attempt = 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let disposed = false;
+
+  const clear = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+
+  const schedule = (delay: number) => {
+    clear();
+    timer = setTimeout(fire, delay);
+  };
+
+  function fire() {
+    timer = null;
+    if (disposed || !stale) return;
+    // Offline or in the background: wait for the nudge instead of polling.
+    if (!online() || !visible()) return;
+    attempt += 1;
+    options.resubscribe();
+    // Still stale after the resubscribe: try again, further apart each time.
+    if (stale && !disposed && !timer) schedule(staleListenerDelay(attempt));
+  }
+
+  return {
+    update(fromCache) {
+      if (disposed) return;
+      if (!fromCache) {
+        stale = false;
+        attempt = 0;
+        clear();
+        return;
+      }
+      stale = true;
+      if (!timer) schedule(staleListenerDelay(attempt));
+    },
+    nudge() {
+      if (disposed || !stale || !online() || !visible()) return;
+      schedule(STALE_LISTENER_NUDGE_GRACE_MS);
+    },
+    dispose() {
+      disposed = true;
+      clear();
+    },
+  };
+}

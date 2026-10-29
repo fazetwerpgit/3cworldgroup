@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { collection, limit, onSnapshot, orderBy, query, Timestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase/config';
+import { createStaleListenerWatchdog, type StaleListenerWatchdog } from '@/lib/chat/reconnect';
 import type { ChatAttachment, ChatReplySnippet } from '@/types';
 
 export interface ChatMessageView {
@@ -213,6 +214,10 @@ export function useMessages(channelId: string | null, { followingLatest = true }
   // Set while the current listener has failed: whether a foreground/online
   // event may resubscribe early (not for permission-denied; see RETRY_*).
   const failedRef = useRef<{ permissionDenied: boolean } | null>(null);
+  // Resubscribes a listener stuck on the cache while online and visible (see
+  // createStaleListenerWatchdog). One per channel, so its backoff survives the
+  // resubscribes it causes.
+  const staleWatchdogRef = useRef<StaleListenerWatchdog | null>(null);
 
   // Oldest createdAt (ms) of the RAW window (before the deletedAt filter) as of
   // the last committed snapshot. Used to detect the sliding window evicting
@@ -264,7 +269,18 @@ export function useMessages(channelId: string | null, { followingLatest = true }
   }, [channelId]);
 
   useEffect(() => {
+    if (!db || !channelId) return;
+    const watchdog = createStaleListenerWatchdog({ resubscribe: () => setRetryNonce((n) => n + 1) });
+    staleWatchdogRef.current = watchdog;
+    return () => {
+      watchdog.dispose();
+      if (staleWatchdogRef.current === watchdog) staleWatchdogRef.current = null;
+    };
+  }, [channelId]);
+
+  useEffect(() => {
     const retryNow = () => {
+      staleWatchdogRef.current?.nudge();
       if (!failedRef.current || failedRef.current.permissionDenied) return;
       if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       setRetryNonce((n) => n + 1);
@@ -296,6 +312,7 @@ export function useMessages(channelId: string | null, { followingLatest = true }
       { includeMetadataChanges: true },
       (snapshot) => {
         setFromCache(snapshot.metadata.fromCache);
+        staleWatchdogRef.current?.update(snapshot.metadata.fromCache);
         // Metadata-only snapshot (connection dropped or came back, nothing in
         // the window changed): committing it would bump snapshotVersion and
         // churn the scroll-anchor effects for no visible change.

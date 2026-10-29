@@ -54,6 +54,7 @@ vi.mock('firebase/firestore', () => ({
   Timestamp: class {},
 }));
 
+import { STALE_LISTENER_MS } from '@/lib/chat/reconnect';
 import { MAX_WINDOW, RETRY_BASE_MS, messagesRetryDelay, useMessages } from './useMessages';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -328,6 +329,36 @@ describe('useMessages listener recovery', () => {
     expect(listeners).toHaveLength(1);
     act(() => vi.advanceTimersByTime(messagesRetryDelay(0, true)));
     expect(listeners).toHaveLength(2);
+  });
+
+  it('resubscribes a listener stuck on the cache, without duplicating messages', () => {
+    const text = (id: string) => container.querySelector(`[data-testid="${id}"]`)?.textContent;
+    act(() => root.render(<Probe channelId="c1" />));
+    const docs = makeDocs(3, 10_000);
+    act(() => listeners[0].raw({ docs, metadata: { fromCache: true }, docChanges: () => docs }));
+    expect(text('fromCache')).toBe('true');
+    act(() => vi.advanceTimersByTime(STALE_LISTENER_MS - 1));
+    expect(listeners).toHaveLength(1);
+    act(() => vi.advanceTimersByTime(1));
+    expect(listeners).toHaveLength(2);
+    // Same channel: the thread never blanks while the new listener attaches.
+    expect(readProbe()).toEqual({ loading: 'false', count: '3' });
+
+    act(() => listeners[1].raw({ docs, metadata: { fromCache: false }, docChanges: () => docs }));
+    expect(text('fromCache')).toBe('false');
+    expect(readProbe()).toEqual({ loading: 'false', count: '3' });
+    act(() => vi.advanceTimersByTime(STALE_LISTENER_MS * 10));
+    expect(listeners).toHaveLength(2);
+  });
+
+  it('leaves a listener alone that the server confirms in time', () => {
+    act(() => root.render(<Probe channelId="c1" />));
+    const docs = makeDocs(3, 10_000);
+    act(() => listeners[0].raw({ docs, metadata: { fromCache: true }, docChanges: () => docs }));
+    act(() => vi.advanceTimersByTime(STALE_LISTENER_MS / 2));
+    act(() => listeners[0].raw({ docs, metadata: { fromCache: false }, docChanges: () => [] }));
+    act(() => vi.advanceTimersByTime(STALE_LISTENER_MS * 10));
+    expect(listeners).toHaveLength(1);
   });
 
   it('caps the backoff', () => {
