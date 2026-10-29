@@ -1,4 +1,4 @@
-import type { UserRole } from '@/types';
+import { RECRUITER_GATE, type GateRole, type UserRole } from '@/types';
 import { CHAT_REPORTS_PATH } from '@/lib/chat/moderationShared';
 
 // The admin hubs: pages that host several of the old admin pages as tabs.
@@ -9,7 +9,7 @@ import { CHAT_REPORTS_PATH } from '@/lib/chat/moderationShared';
 export interface HubTab {
   key: string;
   label: string;
-  roles: UserRole[];
+  roles: GateRole[];
   permissions?: string[];
   /** One plain sentence under the tabs saying what this tab is for. */
   hint?: string;
@@ -30,7 +30,9 @@ const PLATFORM_ROLES: UserRole[] = ['admin', 'operations'];
 // Who may use Invites: exactly the roles the invites API accepts (canManage in
 // api/portal/recruiting/invites). Directors and regional managers were offered
 // the tab but every call answered 403.
-export const RECRUITING_ROLES: UserRole[] = [
+// RECRUITER_GATE admits the hidden recruiter grant (users/{uid}.recruiter): it
+// opens the recruiting tabs (Recruits, To do, Pipeline) and nothing else here.
+export const RECRUITING_ROLES: GateRole[] = [
   'admin',
   'operations',
   'l1_manager',
@@ -39,7 +41,11 @@ export const RECRUITING_ROLES: UserRole[] = [
   'ibo_level_2',
   'ibo_level_3',
   'ibo_level_4',
+  RECRUITER_GATE,
 ];
+
+/** To do and Pipeline: back office, plus the recruiter grant. */
+const HIRING_ROLES: GateRole[] = [...PLATFORM_ROLES, RECRUITER_GATE];
 
 export const PEOPLE_HUB = {
   href: '/portal/admin/people',
@@ -63,7 +69,7 @@ export const ONBOARDING_HUB = {
     {
       key: 'todo',
       label: 'To do',
-      roles: PLATFORM_ROLES,
+      roles: HIRING_ROLES,
       hint: 'Everything waiting on you: sign-ups to approve, documents to check, applicants to invite.',
     },
     // Website applications are served by the invites API, so they share its gate.
@@ -76,7 +82,7 @@ export const ONBOARDING_HUB = {
     {
       key: 'pipeline',
       label: 'Pipeline',
-      roles: PLATFORM_ROLES,
+      roles: HIRING_ROLES,
       hint: 'Where every hire is, from paperwork to selling.',
     },
   ],
@@ -171,13 +177,13 @@ export function hubTabHref(hub: HubConfig, key: string): string {
 }
 
 /** Everyone any tab admits: the hub's own nav gate. */
-export function hubRoles(hub: HubConfig): UserRole[] {
+export function hubRoles(hub: HubConfig): GateRole[] {
   return [...new Set(hub.tabs.flatMap((tab) => tab.roles))];
 }
 
 export function canOpenHubTab(
   tab: HubTab,
-  isRole: (...roles: UserRole[]) => boolean,
+  isRole: (...roles: GateRole[]) => boolean,
   hasPermission: (permission: string) => boolean
 ): boolean {
   if (!isRole(...tab.roles)) return false;

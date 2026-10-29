@@ -3,10 +3,10 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { isOwner, UserRole, type FieldRole, type PlatformRole } from '@/types';
+import { userSatisfiesRoles, type FieldRole, type GateRole, type PlatformRole } from '@/types';
 
 interface UseRequireAuthOptions {
-  requiredRoles?: UserRole[];
+  requiredRoles?: GateRole[];
   requiredPermissions?: string[];
   redirectTo?: string;
   redirectIfFound?: string;
@@ -15,16 +15,14 @@ interface UseRequireAuthOptions {
 // The role check the redirect effect and isAuthorized() below share. It used to
 // be written out twice, so a gate fixed in one copy stayed broken in the other.
 // An owner satisfies any gate asking for 'admin': the tier sits above it, and
-// every ProtectedRoute in the portal admits admin.
+// every ProtectedRoute in the portal admits admin. A gate listing
+// RECRUITER_GATE also admits the hidden recruiter grant (userSatisfiesRoles).
 function satisfiesRoles(
-  user: { role?: PlatformRole; fieldRole?: FieldRole },
-  requiredRoles?: UserRole[]
+  user: { role?: PlatformRole; fieldRole?: FieldRole; recruiter?: unknown },
+  requiredRoles?: GateRole[]
 ): boolean {
   if (!requiredRoles || requiredRoles.length === 0) return true;
-  const roleKey = user.role ?? user.fieldRole;
-  if (!roleKey) return false;
-  if (requiredRoles.includes(roleKey)) return true;
-  return isOwner(roleKey) && requiredRoles.includes('admin');
+  return userSatisfiesRoles(user, requiredRoles);
 }
 
 export function useRequireAuth(options: UseRequireAuthOptions = {}) {

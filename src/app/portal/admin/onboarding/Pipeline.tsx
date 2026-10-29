@@ -26,6 +26,7 @@ import {
   RoleDisplayNames,
   Channel,
   ChannelOnboardingStatus,
+  RECRUITER_GATE,
 } from '@/types';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
@@ -82,7 +83,10 @@ function whereTheyAre(rep: PipelineRep): string {
 }
 
 export function Pipeline() {
-  const { user } = useAuth();
+  const { user, isRole } = useAuth();
+  // Decommission and Reinstate switch an account off and on: user management,
+  // which the recruiter grant does not carry (the route stays management only).
+  const canDecommission = isRole('admin', 'operations');
   const [reps, setReps] = useState<PipelineRep[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -337,7 +341,7 @@ export function Pipeline() {
   ];
 
   return (
-    <AdminGate roles={['admin', 'operations']}>
+    <AdminGate roles={['admin', 'operations', RECRUITER_GATE]}>
       <div className={u.page}>
         {error ? (
           <AdminNotice tone="error" onDismiss={() => setError('')}>{error}</AdminNotice>
@@ -451,23 +455,27 @@ export function Pipeline() {
                 <button type="button" className={`${s.btnSecondary} ${u.sm}`} disabled={busy} onClick={() => openChannels(selectedRep)}>
                   Channels
                 </button>
-                <button
-                  type="button"
-                  className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-                  disabled={busy}
-                  onClick={() => openDecommission(selectedRep)}
-                >
-                  Decommission
-                </button>
+                {canDecommission ? (
+                  <button
+                    type="button"
+                    className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                    disabled={busy}
+                    onClick={() => openDecommission(selectedRep)}
+                  >
+                    Decommission
+                  </button>
+                ) : null}
                 <button type="button" className={`${s.btnSecondary} ${u.sm} ${u.quiet}`} onClick={() => setSelectedRep(null)}>
                   Close
                 </button>
               </div>
             ) : (
               <div className={p.detailActions}>
-                <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} disabled={busy} onClick={() => void reinstate(selectedRep)}>
-                  Reinstate
-                </button>
+                {canDecommission ? (
+                  <button type="button" className={`${s.btnPrimary} ${u.primarySm}`} disabled={busy} onClick={() => void reinstate(selectedRep)}>
+                    Reinstate
+                  </button>
+                ) : null}
                 <button type="button" className={`${s.btnSecondary} ${u.sm} ${u.quiet}`} onClick={() => setSelectedRep(null)}>
                   Close
                 </button>

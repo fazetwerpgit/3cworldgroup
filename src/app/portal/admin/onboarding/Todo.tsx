@@ -28,7 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase/config';
 import { getIdToken } from '@/lib/firebase/getIdToken';
 import { ONBOARDING_ITEMS } from '@/types/onboarding';
-import type { ApplicationRecord } from '@/types';
+import { RECRUITER_GATE, type ApplicationRecord } from '@/types';
 import { CheckDocumentsSheet } from './CheckDocumentsSheet';
 import { personName, type ChecklistPerson } from './checklist';
 import type { InviteView } from './Invites';
@@ -184,6 +184,9 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
   const canSeeSignups =
     isRole('admin') && (everyoneTab ? canOpenHubTab(everyoneTab, isRole, hasPermission) : false);
   const canSeeApplicants = isRole(...RECRUITING_ROLES);
+  // Portal alerts are back-office work, not recruiting: the recruiter grant
+  // opens this tab but not the alerts API, so it never loads them.
+  const canSeeAlerts = isRole('admin', 'operations');
 
   const signups = useSignups(canSeeSignups);
   const { people, load: loadChecklists } = useChecklists();
@@ -308,7 +311,7 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
   };
 
   return (
-    <AdminGate roles={['admin', 'operations']}>
+    <AdminGate roles={['admin', 'operations', RECRUITER_GATE]}>
       <div className={u.page}>
         <AdminPageHead
           title="To do"
@@ -353,10 +356,12 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
           </div>
         )}
 
-        <details className={t.fold} hidden={alerts === 0}>
-          <summary>Portal alerts{alerts ? ` (${alerts})` : ''}</summary>
-          <ActionQueue onCount={setAlerts} />
-        </details>
+        {canSeeAlerts ? (
+          <details className={t.fold} hidden={alerts === 0}>
+            <summary>Portal alerts{alerts ? ` (${alerts})` : ''}</summary>
+            <ActionQueue onCount={setAlerts} />
+          </details>
+        ) : null}
       </div>
 
       {sheetPerson ? (

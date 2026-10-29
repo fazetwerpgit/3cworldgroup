@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, ChevronLeft, CircleAlert, RotateCw, X } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
-import type { UserRole } from '@/types';
+import type { GateRole } from '@/types';
 import s from '@/components/portal/rep/rep.module.css';
 import p from '@/components/portal/rep/rep-page.module.css';
 import u from './admin-ui.module.css';
@@ -166,7 +166,7 @@ export function StatusDot({ tone, children }: { tone: Tone; children: ReactNode 
  * waited for auth, so the fallback only shows for a beat, and never flashes the
  * light spinner.
  */
-export function AdminGate({ roles, children }: { roles?: UserRole[]; children: ReactNode }) {
+export function AdminGate({ roles, children }: { roles?: GateRole[]; children: ReactNode }) {
   return (
     <ProtectedRoute roles={roles} fallback={<AdminSkeletonRows rows={3} />}>
       {children}

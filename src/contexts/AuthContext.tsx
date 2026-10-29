@@ -27,7 +27,7 @@ import { takePendingDisplayName } from '@/lib/app/nativeAuth';
 import { clearPendingIdToken, rememberPendingIdToken } from '@/lib/auth/pendingSession';
 import { unregisterNativePush } from '@/lib/app/nativePush';
 import { clearViewAs } from '@/lib/viewAs/storage';
-import { User, AuthState, UserRole, isOwner, permissionsFor, resolveRoles, isSolarRole, isMainLine } from '@/types';
+import { User, AuthState, GateRole, isOwner, permissionsFor, resolveRoles, isSolarRole, isMainLine, userSatisfiesRoles } from '@/types';
 import { setDataCacheOwner } from '@/lib/cache/dataCache';
 import { clearDashboardSnapshots } from '@/lib/cache/dashboardSnapshot';
 import { clearSessionProfile, readSessionProfile, writeSessionProfile } from '@/lib/auth/sessionProfile';
@@ -40,7 +40,7 @@ export interface AuthContextType extends AuthState {
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   hasPermission: (permission: string) => boolean;
-  isRole: (...roles: UserRole[]) => boolean;
+  isRole: (...roles: GateRole[]) => boolean;
   refreshUser: () => Promise<void>;
   clearPendingApproval: () => void;
   // True when the Firebase session is valid but the profile read kept failing
@@ -211,6 +211,9 @@ function toUser(uid: string, userData: DocumentData): User {
     updatedAt: userData.updatedAt?.toDate(),
     pushRequired: userData.pushRequired === true,
     demoAccount: userData.demoAccount === true,
+    // The hidden recruiting grant: only its gates read it (isRecruiter); the
+    // key is absent unless granted so nothing else ever sees a value.
+    ...(userData.recruiter === true ? { recruiter: true } : {}),
   } as User;
 }
 
@@ -747,13 +750,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // An owner satisfies a check for 'admin' as well as for 'owner': the tier sits
   // above admin, so every isRole('admin') call site in the portal admits it
-  // without each one having to name both roles.
-  const isRole = (...roles: UserRole[]): boolean => {
-    if (!state.user) return false;
-    const { role, fieldRole } = state.user;
-    if (roles.some((r) => r === role || r === fieldRole)) return true;
-    return isOwner(role) && roles.includes('admin');
-  };
+  // without each one having to name both roles. A list naming RECRUITER_GATE
+  // also admits the hidden recruiter grant (userSatisfiesRoles).
+  const isRole = (...roles: GateRole[]): boolean => userSatisfiesRoles(state.user, roles);
 
   return (
     <AuthContext.Provider
@@ -813,8 +812,7 @@ export function subjectAuthValue(parent: AuthContextType, user: User): AuthConte
     user,
     pendingApproval: false,
     hasPermission: (permission: string) => isReadPermission(permission) && permissions.includes(permission),
-    isRole: (...roles: UserRole[]) =>
-      roles.some((r) => r === user.role || r === user.fieldRole) || (isOwner(user.role) && roles.includes('admin')),
+    isRole: (...roles: GateRole[]) => userSatisfiesRoles(user, roles),
   };
 }
 

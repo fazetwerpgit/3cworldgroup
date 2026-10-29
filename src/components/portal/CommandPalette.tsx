@@ -27,7 +27,7 @@ import { auth } from '@/lib/firebase/config';
 import { isOnboardingAllowedPage, isOnboardingUser } from '@/lib/auth/onboardingAccess';
 import { askOpenTo } from '@/lib/ask/flag';
 import { openNativeChatForHref } from '@/lib/app/nativeChat';
-import { PlatformRole, Sale, UserRole } from '@/types';
+import { GateRole, PlatformRole, Sale } from '@/types';
 import {
   CHAT_REPORTS_HUB,
   ONBOARDING_HUB,
@@ -51,7 +51,7 @@ export interface PortalNavItem {
   href: string;
   icon: LucideIcon;
   permissions?: string[];
-  roles?: UserRole[];
+  roles?: GateRole[];
   onboardingOnly?: boolean;
   /** A hub page: its tabs are searchable in the palette under their own names. */
   hub?: HubConfig;
@@ -61,7 +61,7 @@ export interface PortalNavItem {
 
 export interface PortalNavGroup {
   label?: string;
-  roles?: UserRole[];
+  roles?: GateRole[];
   // Sidebar-only: renders the group label as a collapse toggle. The mobile
   // sheet and palette ignore it and keep listing every item.
   collapsible?: boolean;

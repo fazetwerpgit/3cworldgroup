@@ -1,11 +1,11 @@
 'use client';
 
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { UserRole } from '@/types';
+import type { GateRole } from '@/types';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  roles?: UserRole[];
+  roles?: GateRole[];
   permissions?: string[];
   fallback?: React.ReactNode;
 }
