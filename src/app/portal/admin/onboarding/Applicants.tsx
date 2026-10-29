@@ -23,12 +23,13 @@ export function inviteHref(applicationId: string): string {
   return `${hubTabHref(ONBOARDING_HUB, 'recruits')}&application=${encodeURIComponent(applicationId)}`;
 }
 
+/** "Oct 6", with the year once it isn't this year. */
 function longDate(value: unknown): string {
   if (!value) return '';
   const date = new Date(value as string);
-  return Number.isNaN(date.getTime())
-    ? ''
-    : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  if (Number.isNaN(date.getTime())) return '';
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) });
 }
 
 const telHref = (phone: string) => `tel:${phone.replace(/[^\d+]/g, '')}`;
@@ -75,7 +76,7 @@ function ApplicantCard({ row, actions, archived }: { row: ApplicantRow; actions:
     .join(' · ');
 
   return (
-    <li className={t.card}>
+    <li className={`${u.row} ${t.card}`}>
       <button
         type="button"
         className={t.cardMain}
@@ -215,6 +216,7 @@ export function ApplicantSheet({
                   disabled={busy}
                   onClick={() => actions.onNotFit?.(application)}
                 >
+                  {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
                   Not a fit
                 </button>
               ) : null}

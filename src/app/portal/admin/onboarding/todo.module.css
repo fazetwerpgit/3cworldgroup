@@ -54,6 +54,7 @@
 .fold > summary {
   display: flex;
   align-items: center;
+  gap: 0.3em;
   min-height: var(--tap);
   color: var(--c-text-2);
   font-size: var(--t-ui);
@@ -92,11 +93,11 @@
 }
 
 /* ---------- applicant card: who, how to reach them, Invite / Not a fit ---------- */
-.card {
-  display: grid;
+/* Built on the shared admin .row (same padding and divider as the rows above). */
+.card.card {
   grid-template-columns: minmax(0, 1fr);
-  gap: var(--s3);
-  padding: var(--s4);
+  align-items: stretch;
+  gap: var(--s2);
 }
 
 .cardMain {
@@ -143,11 +144,16 @@
   white-space: nowrap;
 }
 
+/* Phone left, email taking the rest of the line (ellipsized), on every phone width. */
 .contact {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 0 var(--s4);
   min-width: 0;
+}
+
+.contact > :only-child {
+  grid-column: 1 / -1;
 }
 
 .contactLink {
@@ -209,15 +215,14 @@
 }
 
 @media (min-width: 900px) {
-  .card {
+  .card.card {
     grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) auto;
     align-items: center;
     gap: var(--s4);
   }
 
   .contact {
-    flex-direction: column;
-    gap: 0;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .contactLink {
@@ -263,7 +268,7 @@
   padding: 4px 4px 4px var(--s4);
   border-radius: var(--r-panel);
   background: var(--c-panel-hi);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45); /* taste-skill-ignore: floating toast overlay */
   color: var(--c-text);
   font: 500 var(--t-ui) / 1.3 var(--f-ui);
   animation: toastIn 180ms ease-out;
