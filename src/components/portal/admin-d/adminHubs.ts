@@ -70,7 +70,6 @@ export const ONBOARDING_HUB = {
       key: 'todo',
       label: 'To do',
       roles: HIRING_ROLES,
-      hint: 'What needs you, most urgent first.',
     },
     // Website applications are served by the invites API, so they share its gate.
     {

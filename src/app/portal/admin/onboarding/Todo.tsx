@@ -30,7 +30,8 @@ import { RECRUITER_GATE, type ApplicationRecord } from '@/types';
 import { CheckDocumentsSheet } from './CheckDocumentsSheet';
 import { personName, type ChecklistPerson } from './checklist';
 import type { InviteView } from './Invites';
-import { buildTodoSections, type Signup, type TodoRow } from './todoRows';
+import { buildTodoSections, type Signup, type TodoRow, type TodoSections } from './todoRows';
+import { TodoFold, TodoList } from './TodoList';
 import { ApplicantList, ApplicantSheet, UndoToast, type ApplicantActions } from './Applicants';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
@@ -175,7 +176,7 @@ function formatMissingItems(missing: unknown): string {
     : '';
 }
 
-/** A section of To do: a heading with its count over a list. Empty sections render nothing. */
+/** A section of To do: a heading with its count over a panel. Empty sections render nothing. */
 function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
   const id = useId();
   if (count === 0) return null;
@@ -185,8 +186,96 @@ function Section({ title, count, children }: { title: string; count: number; chi
         {title}
         <small className={u.num}>{count}</small>
       </h3>
-      {children}
+      <div className={s.panel}>{children}</div>
     </section>
+  );
+}
+
+export interface TodoViewProps {
+  sections: TodoSections;
+  applicantActions: ApplicantActions;
+  onCheck: (userId: string) => void;
+  onActivate: (invite: InviteView) => void;
+  activatingId: string | null;
+}
+
+/** The sections and folds of To do (no loading or failures): the page renders it, so does the design lab. */
+export function TodoView({ sections, applicantActions, onCheck, onActivate, activatingId }: TodoViewProps) {
+  const button = `${s.btnSecondary} ${u.sm}`;
+  const action = (row: TodoRow): ReactNode => {
+    switch (row.kind) {
+      case 'signup':
+        return (
+          <Link href={PEOPLE_HUB.href} className={button} aria-label={`Assign a role to ${row.name}`}>
+            Assign role
+          </Link>
+        );
+      case 'documents':
+        return (
+          <button
+            type="button"
+            className={button}
+            aria-label={`Check ${row.name}'s documents`}
+            onClick={() => onCheck(row.userId)}
+          >
+            Check
+          </button>
+        );
+      case 'activate': {
+        const busy = activatingId === row.invite.id;
+        return (
+          <button
+            type="button"
+            className={button}
+            disabled={busy}
+            aria-label={`Activate ${row.name}`}
+            onClick={() => onActivate(row.invite)}
+          >
+            {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
+            Activate
+          </button>
+        );
+      }
+      case 'applicant':
+        return null;
+    }
+  };
+  const list = (rows: TodoRow[]) => (
+    <TodoList
+      items={rows.map((row) => ({ key: row.key, name: row.name, detail: row.detail, when: row.when, action: action(row) }))}
+    />
+  );
+
+  return (
+    <>
+      {sections.waiting === 0 ? <AdminEmpty title="Nothing waiting on you." /> : null}
+      <Section title="Sign-ups to approve" count={sections.signups.length}>
+        {list(sections.signups)}
+      </Section>
+      <Section title="Documents to check" count={sections.documents.length}>
+        {list(sections.documents)}
+      </Section>
+      <Section title="Ready to activate" count={sections.activate.length}>
+        {list(sections.activate)}
+      </Section>
+      <Section title="New applicants" count={sections.applicants.length}>
+        <ApplicantList rows={sections.applicants} actions={applicantActions} />
+      </Section>
+      {sections.older.length > 0 ? (
+        <TodoFold
+          title="Older applicants"
+          count={sections.older.length}
+          hint="Applied more than 30 days ago. Not counted in To do."
+        >
+          <ApplicantList rows={sections.older} actions={applicantActions} />
+        </TodoFold>
+      ) : null}
+      {sections.archived.length > 0 ? (
+        <TodoFold title="Archived" count={sections.archived.length} hint="Marked not a fit. Restore puts them back.">
+          <ApplicantList rows={sections.archived} actions={applicantActions} archived />
+        </TodoFold>
+      ) : null}
+    </>
   );
 }
 
@@ -334,75 +423,10 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
   };
   const dismissUndo = useCallback(() => setUndo(null), []);
 
-  const button = `${s.btnSecondary} ${u.sm}`;
-  const action = (row: TodoRow) => {
-    switch (row.kind) {
-      case 'signup':
-        return (
-          <Link href={PEOPLE_HUB.href} className={button} aria-label={`Assign a role to ${row.name}`}>
-            Assign role
-          </Link>
-        );
-      case 'documents':
-        return (
-          <button
-            type="button"
-            className={button}
-            aria-label={`Check ${row.name}'s documents`}
-            onClick={() => setOpenPerson(row.userId)}
-          >
-            Check
-          </button>
-        );
-      case 'activate': {
-        const busy = activatingId === row.invite.id;
-        return (
-          <button
-            type="button"
-            className={button}
-            disabled={busy}
-            aria-label={`Activate ${row.name}`}
-            onClick={() => void activate(row.invite)}
-          >
-            {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
-            Activate
-          </button>
-        );
-      }
-      case 'applicant':
-        return null;
-    }
-  };
-
-  const list = (rows: TodoRow[]) => (
-    <div className={s.panel}>
-      <ul className={u.rows}>
-        {rows.map((row) => (
-          <li key={row.key} className={`${u.row} ${t.row}`}>
-            <span className={t.text}>
-              <strong className={t.name}>{row.name}</strong>
-              <span className={t.line}>{row.line}</span>
-            </span>
-            <span className={t.rowAction}>{action(row)}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-
   return (
     <AdminGate roles={['admin', 'operations', RECRUITER_GATE]}>
       <div className={u.page}>
-        <AdminPageHead
-          title="To do"
-          meta={
-            loading || sections.waiting === 0 ? null : (
-              <>
-                <b>{sections.waiting}</b> waiting on you
-              </>
-            )
-          }
-        />
+        <AdminPageHead title="To do" />
 
         {notice ? (
           <AdminNotice tone={notice.tone} onDismiss={() => setNotice(null)}>
@@ -419,51 +443,19 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
         {loading ? (
           <AdminSkeletonRows rows={3} label="Loading what's waiting" />
         ) : (
-          <>
-            {sections.waiting === 0 ? <AdminEmpty title="Nothing waiting on you." /> : null}
-            <Section title="Sign-ups to approve" count={sections.signups.length}>
-              {list(sections.signups)}
-            </Section>
-            <Section title="Documents to check" count={sections.documents.length}>
-              {list(sections.documents)}
-            </Section>
-            <Section title="Ready to activate" count={sections.activate.length}>
-              {list(sections.activate)}
-            </Section>
-            <Section title="New applicants" count={sections.applicants.length}>
-              <ApplicantList rows={sections.applicants} actions={applicantActions} />
-            </Section>
-
-            {sections.older.length > 0 || sections.archived.length > 0 ? (
-              <div className={t.folds}>
-                {sections.older.length > 0 ? (
-                  <details className={t.fold}>
-                    <summary>
-                      Older applicants <span className={u.num}>({sections.older.length})</span>
-                    </summary>
-                    <p className={`${u.hint} ${t.foldHint}`}>Applied more than 30 days ago. Not counted in To do.</p>
-                    <ApplicantList rows={sections.older} actions={applicantActions} />
-                  </details>
-                ) : null}
-                {sections.archived.length > 0 ? (
-                  <details className={t.fold}>
-                    <summary>
-                      Archived <span className={u.num}>({sections.archived.length})</span>
-                    </summary>
-                    <p className={`${u.hint} ${t.foldHint}`}>Marked not a fit. Restore puts them back.</p>
-                    <ApplicantList rows={sections.archived} actions={applicantActions} archived />
-                  </details>
-                ) : null}
-              </div>
-            ) : null}
-          </>
+          <TodoView
+            sections={sections}
+            applicantActions={applicantActions}
+            onCheck={setOpenPerson}
+            onActivate={(invite) => void activate(invite)}
+            activatingId={activatingId}
+          />
         )}
 
         {canSeeAlerts ? (
-          <details className={t.fold} hidden={alerts === 0}>
-            <summary>Portal alerts{alerts ? ` (${alerts})` : ''}</summary>
+          <TodoFold title="Portal alerts" count={alerts} hidden={alerts === 0}>
             <ActionQueue onCount={setAlerts} />
-          </details>
+          </TodoFold>
         ) : null}
       </div>
 

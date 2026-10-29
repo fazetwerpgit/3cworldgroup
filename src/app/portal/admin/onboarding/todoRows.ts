@@ -1,5 +1,4 @@
 import { interestLabels } from '@/lib/forms/applicationInterests';
-import { sourceLabel } from '@/lib/forms/applicationSource';
 import { isFreshApplicant, isWaitingApplication } from '@/lib/recruiting/applicantAging';
 import type { ApplicationRecord } from '@/types';
 import { oldestUpload, personName, timeAgo, type ChecklistPerson } from './checklist';
@@ -20,6 +19,11 @@ export interface Signup {
 interface RowBase {
   key: string;
   name: string;
+  /** What is waiting: "2 documents to check", "Fiber, Solar · Austin, TX". */
+  detail: string;
+  /** How long it has waited: "3 days ago" ('' when unknown). */
+  when: string;
+  /** detail · when, the one line under the name on a phone. */
   line: string;
   /** When the wait started (ms); null sorts last. */
   since: number | null;
@@ -69,12 +73,8 @@ const oldestFirst = (a: RowBase, b: RowBase) =>
   (a.since ?? Number.MAX_SAFE_INTEGER) - (b.since ?? Number.MAX_SAFE_INTEGER);
 const newestFirst = (a: RowBase, b: RowBase) => (b.since ?? 0) - (a.since ?? 0);
 
-/** "via Google", "came in direct", '' for applications from before source tracking. */
-export function sourcePhrase(application: ApplicationRecord): string {
-  const label = sourceLabel(application.source);
-  if (!label) return '';
-  return application.source?.channel === 'direct' ? 'came in direct' : `via ${label}`;
-}
+/** The text of a row: what is waiting, how long, and both as one line. */
+const facts = (detail: string, when: string) => ({ detail, when, line: sentence(detail, when) });
 
 /** What they want to sell, then where they are: "Fiber, Solar · Austin, TX". */
 export function applicantHeadline(application: ApplicationRecord): string {
@@ -82,25 +82,24 @@ export function applicantHeadline(application: ApplicationRecord): string {
 }
 
 function applicantRow(application: ApplicationRecord, now: number): ApplicantRow {
-  const ago = timeAgo(application.createdAt, now);
   return {
     kind: 'applicant',
     key: `applicant-${application.id}`,
     application,
     name: application.name || 'Unnamed applicant',
-    line: sentence(ago ? `Applied ${ago}` : 'Applied', sourcePhrase(application)),
+    // What they want to sell and where: what triage needs. Contact and source live in the sheet.
+    ...facts(applicantHeadline(application) || 'Applied on the website', timeAgo(application.createdAt, now)),
     since: millis(application.createdAt),
   };
 }
 
 export function buildTodoSections(sources: TodoSources, now = Date.now()): TodoSections {
   const signups: TodoRow[] = (sources.signups ?? []).map((signup) => {
-    const ago = timeAgo(signup.createdAt, now);
     return {
       kind: 'signup',
       key: `signup-${signup.uid}`,
       name: signup.name,
-      line: ago ? `Signed up ${ago}` : 'Signed up',
+      ...facts('Needs a role', timeAgo(signup.createdAt, now)),
       since: millis(signup.createdAt),
     };
   });
@@ -115,7 +114,7 @@ export function buildTodoSections(sources: TodoSources, now = Date.now()): TodoS
       key: `documents-${person.userId}`,
       userId: person.userId,
       name: personName(person),
-      line: sentence(`${count} document${count === 1 ? '' : 's'} to check`, timeAgo(since, now)),
+      ...facts(`${count} document${count === 1 ? '' : 's'} to check`, timeAgo(since, now)),
       since: millis(since),
     });
   }
@@ -125,7 +124,7 @@ export function buildTodoSections(sources: TodoSources, now = Date.now()): TodoS
     key: `activate-${invite.id}`,
     invite,
     name: invite.candidateName,
-    line: sentence('Finished their paperwork', timeAgo(invite.submittedAt, now)),
+    ...facts('Finished their paperwork', timeAgo(invite.submittedAt, now)),
     since: millis(invite.submittedAt),
   }));
 

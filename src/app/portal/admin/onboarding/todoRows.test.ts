@@ -98,18 +98,18 @@ describe('buildTodoSections', () => {
     expect(sections.waiting).toBe(0);
   });
 
-  it('says when they applied and where they came from', () => {
+  it('says what they want to sell, where, and when they applied', () => {
     const [row] = buildTodoSections(
       {
         applications: [
-          app('a1', 3, 'applied', {
-            source: { channel: 'google', referrerHost: '', landingPath: '/', utmSource: '', utmMedium: '', utmCampaign: '' },
-          }),
+          app('a1', 3, 'applied', { interests: ['fiber', 'solar'], city: 'Austin, TX' }),
         ],
       },
       NOW
     ).applicants;
-    expect(row.line).toBe('Applied 3 days ago · via Google');
+    expect(row.detail).toBe('Fiber, Solar · Austin, TX');
+    expect(row.when).toBe('3 days ago');
+    expect(row.line).toBe('Fiber, Solar · Austin, TX · 3 days ago');
   });
 
   it('skips sources that are missing', () => {

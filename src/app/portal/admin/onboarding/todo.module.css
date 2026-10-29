@@ -1,73 +1,183 @@
 /* Hiring > To do and its Check sheet. Shared pieces are admin-ui.module.css and rep.module.css. */
 
-/* ---------- one row per thing: words over the button on a phone, side by side above ---------- */
-.row.row {
-  grid-template-columns: minmax(0, 1fr);
+/* ---------- a To do row (TodoList): the shared admin .row, name over one line, action at the end ---------- */
+/* Desktop columns, like the People table: who | what | how long | action. Fixed
+   columns line the ages and buttons up from one section to the next. */
+.cols {
+  --cols: minmax(0, 0.9fr) minmax(0, 1.3fr) 128px 120px;
 }
 
-.text {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.name {
+.sub {
+  display: -webkit-box;
   overflow: hidden;
-  font-size: var(--t-ui);
-  font-weight: 600;
-  line-height: 1.25;
-  text-overflow: ellipsis;
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.nowrap {
   white-space: nowrap;
 }
 
-.line {
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
-  line-height: 1.35;
+/* What and how long are their own columns on desktop (doubled to beat the shared .cell). */
+.detail.detail,
+.when.when {
+  display: none;
 }
 
-.rowAction {
-  display: flex;
-}
-
-.rowAction > :is(a, button) {
+.action > :is(a, button) {
   display: inline-flex;
-  flex: 1 1 auto;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  min-width: 88px;
   text-decoration: none;
+  white-space: nowrap;
 }
 
-@media (min-width: 640px) {
-  .row.row {
-    grid-template-columns: minmax(0, 1fr) auto;
+/* A row that opens a sheet: the name's button stretches over the whole row,
+   the action sits above it. */
+.open {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.open:focus-visible {
+  outline: none;
+}
+
+.open:focus-visible::after {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+.tappable .action {
+  position: relative;
+  z-index: 1;
+}
+
+@media (hover: hover) {
+  .tappable:has(.open:hover) {
+    background: var(--c-raised);
+  }
+}
+
+@media (max-width: 1023px) {
+  .tappable:has(.open:active) {
+    transform: scale(0.98);
+  }
+}
+
+@media (min-width: 1024px) {
+  .sub {
+    display: none;
   }
 
-  .rowAction > :is(a, button) {
-    flex: none;
+  .detail.detail {
+    display: block;
+    overflow: hidden;
+    color: var(--c-text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .when.when {
+    display: block;
+    color: var(--c-text-2);
+  }
+
+  .action > :is(a, button) {
     min-width: 104px;
   }
 }
 
-/* ---------- something quiet, folded away (portal alerts, the rest of a checklist) ---------- */
-.fold > summary {
-  display: flex;
-  align-items: center;
-  gap: 0.3em;
-  min-height: var(--tap);
-  color: var(--c-text-2);
-  font-size: var(--t-ui);
-  font-weight: 600;
-  cursor: pointer;
+/* ---------- sections: heading + count over a panel ---------- */
+.section {
+  display: grid;
+  gap: var(--s3);
+  min-width: 0;
 }
 
-.fold[open] > summary {
-  margin-bottom: var(--s2);
+/* ---------- folds: older applicants, archived, portal alerts ---------- */
+.fold {
+  overflow: hidden;
 }
 
 .fold[hidden] {
   display: none;
+}
+
+.foldHead {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 56px;
+  padding: 0 var(--s4);
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.foldHead::-webkit-details-marker {
+  display: none;
+}
+
+.foldCount {
+  color: var(--c-text-3);
+  font-weight: 500;
+}
+
+.foldChev {
+  margin-left: auto;
+  transition: rotate 160ms ease-out;
+}
+
+.fold[open] .foldChev {
+  rotate: 90deg;
+}
+
+.foldHead:focus-visible {
+  outline: 2px solid var(--c-lime-hi);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) {
+  .foldHead:hover {
+    background: var(--c-raised);
+  }
+}
+
+.foldHint {
+  margin: calc(var(--s1) * -1) 0 0;
+  padding: 0 var(--s4) var(--s3);
+}
+
+.foldBody {
+  border-top: 1px solid var(--c-line); /* taste-skill-ignore: list rows keep their dividers */
+}
+
+@media (min-width: 1024px) {
+  .foldHead,
+  .foldHint {
+    padding-inline: var(--s5);
+  }
 }
 
 /* ---------- Check sheet ---------- */
@@ -76,179 +186,39 @@
   gap: var(--s3);
 }
 
-/* ---------- sections: heading + count over a list ---------- */
-.section {
+/* ---------- applicant sheet: a plain list of what they gave, label beside value ---------- */
+.details {
   display: grid;
   gap: var(--s3);
-  min-width: 0;
+  margin: 0;
 }
 
-.folds {
+.details > div {
   display: grid;
-  gap: var(--s2);
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--s3);
+  align-items: baseline;
 }
 
-.foldHint {
-  margin-bottom: var(--s3);
-}
-
-/* ---------- applicant card: who, how to reach them, Invite / Not a fit ---------- */
-/* Built on the shared admin .row (same padding and divider as the rows above). */
-.card.card {
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-  gap: var(--s2);
-}
-
-.cardMain {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  margin: calc(var(--s2) * -1);
-  padding: var(--s2);
-  border: 0;
-  border-radius: var(--r-control);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background-color 140ms ease,
-    transform 120ms ease-out;
-}
-
-.cardMain:focus-visible {
-  outline: 2px solid var(--c-lime-hi);
-  outline-offset: 0;
-}
-
-@media (hover: hover) {
-  .cardMain:hover {
-    background: var(--c-raised);
-  }
-}
-
-@media (max-width: 1023px) {
-  .cardMain:active {
-    transform: scale(0.98);
-  }
-}
-
-.headline {
-  overflow: hidden;
-  color: var(--c-text);
-  font-size: var(--t-ui);
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Phone left, email taking the rest of the line (ellipsized), on every phone width. */
-.contact {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 0 var(--s4);
-  min-width: 0;
-}
-
-.contact > :only-child {
-  grid-column: 1 / -1;
-}
-
-.contactLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  max-width: 100%;
-  min-height: var(--tap);
-  color: var(--c-text-2);
+.details dt {
+  color: var(--c-text-3);
   font-size: var(--t-sm);
   font-weight: 500;
-  text-decoration: none;
 }
 
-.contactLink > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.details dd {
+  margin: 0;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  overflow-wrap: anywhere;
 }
 
-.contactLink > svg {
-  flex: none;
-  color: var(--c-text-3);
-}
-
-@media (hover: hover) {
-  .contactLink:hover {
-    color: var(--c-text);
-  }
-}
-
-.contactLink:focus-visible {
-  outline: 2px solid var(--c-lime-hi);
-  outline-offset: 2px;
-}
-
-.cardActions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--s2);
-}
-
-.cardActions > :only-child {
-  grid-column: 1 / -1;
-}
-
-.cardActions > :is(a, button) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-decoration: none;
-}
-
-/* Invite is the main action: lime text on the quiet secondary fill. */
-.invite.invite {
-  color: var(--c-lime);
-}
-
-@media (min-width: 900px) {
-  .card.card {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr) auto;
-    align-items: center;
-    gap: var(--s4);
-  }
-
-  .contact {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .contactLink {
-    min-height: 32px;
-  }
-
-  .cardActions {
-    grid-template-columns: auto auto;
-  }
-
-  .cardActions > :is(a, button) {
-    min-width: 104px;
-  }
-}
-
-/* ---------- applicant sheet ---------- */
-.factWide {
-  grid-column: 1 / -1;
-}
-
-.factLink {
+.detailLink {
   color: var(--c-lime);
   text-decoration: none;
 }
 
-.factLink:focus-visible {
+.detailLink:focus-visible {
   outline: 2px solid var(--c-lime-hi);
   outline-offset: 2px;
 }
@@ -320,7 +290,11 @@
     animation: none;
   }
 
-  .cardMain:active {
+  .tappable:has(.open:active) {
     transform: none;
+  }
+
+  .foldChev {
+    transition: none;
   }
 }

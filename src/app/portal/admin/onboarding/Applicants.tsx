@@ -2,22 +2,23 @@
 
 import Link from 'next/link';
 import { useEffect, type ReactNode } from 'react';
-import { Loader2, Mail, Phone } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
 import { hubTabHref, ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 import { BodyLayer } from '@/components/portal/rep/BodyLayer';
 import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import t from './todo.module.css';
-import { interestLabels } from '@/lib/forms/applicationInterests';
 import { sourceLabel } from '@/lib/forms/applicationSource';
 import type { ApplicationRecord } from '@/types';
 import { timeAgo } from './checklist';
 import { applicantHeadline, type ApplicantRow } from './todoRows';
+import { TodoList, type TodoListItem } from './TodoList';
 
-// Website applicants in Hiring > To do: a card with who they are and how to
-// reach them, Invite as the main action and "Not a fit" beside it. Tapping the
-// card opens the whole application in a sheet. Archived applicants get Restore.
+// Website applicants in Hiring > To do: a row each (what they want to sell,
+// where, when they applied) with Invite at the end. Tapping the row opens the
+// application in a sheet: how to reach them, where they came from, and Not a
+// fit. Archived applicants get Restore instead.
 
 export function inviteHref(applicationId: string): string {
   return `${hubTabHref(ONBOARDING_HUB, 'recruits')}&application=${encodeURIComponent(applicationId)}`;
@@ -43,85 +44,15 @@ export interface ApplicantActions {
   onOpen: (application: ApplicationRecord) => void;
 }
 
-function Contact({ application }: { application: ApplicationRecord }) {
-  if (!application.phone && !application.email) return null;
-  return (
-    <div className={t.contact}>
-      {application.phone ? (
-        <a className={t.contactLink} href={telHref(application.phone)} aria-label={`Call ${application.name}`}>
-          <Phone size={15} aria-hidden="true" />
-          <span>{application.phone}</span>
-        </a>
-      ) : null}
-      {application.email ? (
-        <a className={t.contactLink} href={`mailto:${application.email}`} aria-label={`Email ${application.name}`}>
-          <Mail size={15} aria-hidden="true" />
-          <span>{application.email}</span>
-        </a>
-      ) : null}
-    </div>
-  );
-}
-
-function ApplicantCard({ row, actions, archived }: { row: ApplicantRow; actions: ApplicantActions; archived: boolean }) {
-  const { application } = row;
-  const busy = actions.busyId === application.id;
-  const headline = applicantHeadline(application);
-  const archivedLine = [
+/** "Not a fit · Oct 20 · by Jacob Myers". */
+function archivedLine(application: ApplicationRecord): string {
+  return [
     'Not a fit',
     longDate(application.notSelectedAt),
     application.notSelectedByName ? `by ${application.notSelectedByName}` : '',
   ]
     .filter(Boolean)
     .join(' · ');
-
-  return (
-    <li className={`${u.row} ${t.card}`}>
-      <button
-        type="button"
-        className={t.cardMain}
-        onClick={() => actions.onOpen(application)}
-        aria-label={`Open ${row.name}'s application`}
-      >
-        <strong className={t.name}>{row.name}</strong>
-        {headline ? <span className={t.headline}>{headline}</span> : null}
-        <span className={t.line}>{archived ? archivedLine : row.line}</span>
-      </button>
-      <Contact application={application} />
-      <div className={t.cardActions}>
-        {archived ? (
-          actions.onRestore ? (
-            <button
-              type="button"
-              className={`${s.btnSecondary} ${u.sm}`}
-              disabled={busy}
-              onClick={() => actions.onRestore?.(application)}
-            >
-              {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
-              Restore
-            </button>
-          ) : null
-        ) : (
-          <>
-            <Link href={inviteHref(application.id)} className={`${s.btnSecondary} ${u.sm} ${t.invite}`}>
-              Invite
-            </Link>
-            {actions.onNotFit ? (
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${u.sm} ${u.quiet}`}
-                disabled={busy}
-                onClick={() => actions.onNotFit?.(application)}
-              >
-                {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
-                Not a fit
-              </button>
-            ) : null}
-          </>
-        )}
-      </div>
-    </li>
-  );
 }
 
 export function ApplicantList({
@@ -133,18 +64,40 @@ export function ApplicantList({
   actions: ApplicantActions;
   archived?: boolean;
 }) {
-  return (
-    <div className={s.panel}>
-      <ul className={u.rows}>
-        {rows.map((row) => (
-          <ApplicantCard key={row.key} row={row} actions={actions} archived={archived} />
-        ))}
-      </ul>
-    </div>
-  );
+  const button = `${s.btnSecondary} ${u.sm}`;
+  const items: TodoListItem[] = rows.map((row) => {
+    const { application } = row;
+    const busy = actions.busyId === application.id;
+    return {
+      key: row.key,
+      name: row.name,
+      detail: archived ? archivedLine(application) : row.detail,
+      when: archived ? '' : row.when,
+      open: { label: `Open ${row.name}'s application`, onOpen: () => actions.onOpen(application) },
+      action: archived ? (
+        actions.onRestore ? (
+          <button
+            type="button"
+            className={button}
+            disabled={busy}
+            aria-label={`Restore ${row.name}`}
+            onClick={() => actions.onRestore?.(application)}
+          >
+            {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
+            Restore
+          </button>
+        ) : null
+      ) : (
+        <Link href={inviteHref(application.id)} className={button} aria-label={`Invite ${row.name}`}>
+          Invite
+        </Link>
+      ),
+    };
+  });
+  return <TodoList items={items} />;
 }
 
-/** The whole application: every answer they gave on /apply and where they came from. */
+/** The application: who, how to reach them, where they came from. Only answers they gave. */
 export function ApplicantSheet({
   application,
   actions,
@@ -156,91 +109,73 @@ export function ApplicantSheet({
 }) {
   const archived = application.status === 'not_selected';
   const busy = actions.busyId === application.id;
-  const applied = longDate(application.createdAt);
-  const ago = timeAgo(application.createdAt);
-  const source = application.source;
-  const facts: { label: string; value: ReactNode; wide?: boolean }[] = [
-    { label: 'Wants to sell', value: interestLabels(application.interests) },
-    { label: 'City', value: application.city },
+  const applied = [longDate(application.createdAt), timeAgo(application.createdAt)].filter(Boolean).join(', ');
+  const details: { label: string; value: ReactNode }[] = [
     {
       label: 'Phone',
       value: application.phone ? (
-        <a className={t.factLink} href={telHref(application.phone)}>
+        <a className={t.detailLink} href={telHref(application.phone)}>
           {application.phone}
         </a>
-      ) : (
-        ''
-      ),
+      ) : null,
     },
-    { label: 'Applied', value: [applied, ago].filter(Boolean).join(' · ') },
     {
       label: 'Email',
-      wide: true,
       value: application.email ? (
-        <a className={t.factLink} href={`mailto:${application.email}`}>
+        <a className={t.detailLink} href={`mailto:${application.email}`}>
           {application.email}
         </a>
-      ) : (
-        ''
-      ),
+      ) : null,
     },
-    { label: 'Referred by', value: application.referredBy ?? '' },
-    { label: 'Found us', value: sourceLabel(source) },
-    { label: 'First page', value: source?.landingPath ?? '' },
-    { label: 'Campaign', value: [source?.utmCampaign, source?.utmMedium].filter(Boolean).join(' · ') },
-  ].filter((fact) => fact.value);
+    { label: 'Applied', value: applied || null },
+    { label: 'Referred by', value: application.referredBy?.trim() || null },
+    { label: 'Found us', value: sourceLabel(application.source) || null },
+  ].filter((detail) => detail.value);
 
   return (
     <AdminSheet
       title={application.name || 'Applicant'}
+      description={applicantHeadline(application) || undefined}
       onClose={onClose}
       footer={
-        <>
-          {archived ? (
-            actions.onRestore ? (
+        archived ? (
+          actions.onRestore ? (
+            <button
+              type="button"
+              className={`${s.btnPrimary} ${u.primarySm}`}
+              disabled={busy}
+              onClick={() => actions.onRestore?.(application)}
+            >
+              Restore
+            </button>
+          ) : null
+        ) : (
+          <>
+            {actions.onNotFit ? (
               <button
                 type="button"
-                className={`${s.btnPrimary} ${u.primarySm}`}
+                className={`${s.btnSecondary} ${u.sm}`}
                 disabled={busy}
-                onClick={() => actions.onRestore?.(application)}
+                onClick={() => actions.onNotFit?.(application)}
               >
-                Restore
+                {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
+                Not a fit
               </button>
-            ) : null
-          ) : (
-            <>
-              {actions.onNotFit ? (
-                <button
-                  type="button"
-                  className={s.btnSecondary}
-                  disabled={busy}
-                  onClick={() => actions.onNotFit?.(application)}
-                >
-                  {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
-                  Not a fit
-                </button>
-              ) : null}
-              <Link href={inviteHref(application.id)} className={`${s.btnPrimary} ${u.primarySm}`}>
-                Invite
-              </Link>
-            </>
-          )}
-        </>
+            ) : null}
+            <Link href={inviteHref(application.id)} className={`${s.btnPrimary} ${u.primarySm}`}>
+              Invite
+            </Link>
+          </>
+        )
       }
     >
       <div className={u.sheetPad}>
-        {archived ? (
-          <p className={u.hint}>
-            Marked not a fit
-            {application.notSelectedAt ? ` on ${longDate(application.notSelectedAt)}` : ''}
-            {application.notSelectedByName ? ` by ${application.notSelectedByName}` : ''}.
-          </p>
-        ) : null}
-        <dl className={u.facts}>
-          {facts.map((fact) => (
-            <div key={fact.label} className={fact.wide ? t.factWide : undefined}>
-              <dt>{fact.label}</dt>
-              <dd>{fact.value}</dd>
+        {archived ? <p className={u.hint}>{archivedLine(application)}.</p> : null}
+        <dl className={t.details}>
+          {details.map((detail) => (
+            <div key={detail.label}>
+              <dt>{detail.label}</dt>
+              <dd>{detail.value}</dd>
             </div>
           ))}
         </dl>
