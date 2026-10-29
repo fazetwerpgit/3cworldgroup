@@ -30,7 +30,14 @@ import { RECRUITER_GATE, type ApplicationRecord } from '@/types';
 import { CheckDocumentsSheet } from './CheckDocumentsSheet';
 import { personName, type ChecklistPerson } from './checklist';
 import type { InviteView } from './Invites';
-import { buildTodoSections, type Signup, type TodoRow, type TodoSections } from './todoRows';
+import {
+  applyApplicationOverrides,
+  buildTodoSections,
+  type ApplicationOverride,
+  type Signup,
+  type TodoRow,
+  type TodoSections,
+} from './todoRows';
 import { TodoFold, TodoList } from './TodoList';
 import { ApplicantList, ApplicantSheet, UndoToast, type ApplicantActions } from './Applicants';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
@@ -135,22 +142,31 @@ interface Recruiting {
   ready: InviteView[];
   /** Every website application (any status): To do sorts them into sections. */
   applications: ApplicationRecord[];
+  /** Which load this list came from (loads are numbered as they start). */
+  load: number;
 }
 
 /** One read of the recruiting API the Recruits tab uses. */
 function useRecruiting() {
   const { user } = useAuth();
   const [data, setData] = useState<Loaded<Recruiting>>();
+  // Loads are numbered as they start; a response older than the one on screen is dropped.
+  const started = useRef(0);
+  const shown = useRef(0);
 
   const load = useCallback(async (background = false) => {
     if (!user) return;
+    const number = ++started.current;
     try {
       const response = await fetch('/api/portal/recruiting/invites', { headers: await authHeaders() });
       const json = await response.json();
       if (!response.ok) throw new Error(json.error || 'Failed to load recruiting');
       const invites: InviteView[] = Array.isArray(json.invites) ? json.invites : [];
       const applications: ApplicationRecord[] = Array.isArray(json.applications) ? json.applications : [];
+      if (number < shown.current) return;
+      shown.current = number;
       setData({
+        load: number,
         ready: invites.filter((invite) => invite.status === 'submitted'),
         applications,
       });
@@ -164,7 +180,10 @@ function useRecruiting() {
     void load();
   }, [load]);
 
-  return { data, load };
+  /** The newest load started so far: a change saved now shows until a later one lands. */
+  const latestStarted = useCallback(() => started.current, []);
+
+  return { data, load, latestStarted };
 }
 
 function formatMissingItems(missing: unknown): string {
@@ -279,7 +298,6 @@ export function TodoView({ sections, applicantActions, onCheck, onActivate, acti
   );
 }
 
-type Override = Pick<ApplicationRecord, 'status' | 'notSelectedAt' | 'notSelectedByName'>;
 
 export function Todo({ onChanged }: { onChanged?: () => void }) {
   const { user, isRole, hasPermission } = useAuth();
@@ -299,7 +317,7 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
 
   const signups = useSignups(canSeeSignups);
   const { people, load: loadChecklists } = useChecklists();
-  const { data: recruitingData, load: loadRecruiting } = useRecruiting();
+  const { data: recruitingData, load: loadRecruiting, latestStarted } = useRecruiting();
   // Back from the background (throttled): quiet reloads that keep the list on a failure.
   useRefreshOnResume(() => {
     void loadChecklists(true);
@@ -309,8 +327,8 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
   const [openApplication, setOpenApplication] = useState<string | null>(null);
   const [activatingId, setActivatingId] = useState<string | null>(null);
   const [archivingId, setArchivingId] = useState<string | null>(null);
-  // Not a fit / Restore show at once; the next reload from the API replaces these.
-  const [overrides, setOverrides] = useState<Record<string, Override>>({});
+  // Not a fit / Restore show at once; any load started after the change replaces them.
+  const [overrides, setOverrides] = useState<Record<string, ApplicationOverride>>({});
   const [undo, setUndo] = useState<{ application: ApplicationRecord; text: string } | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error' | 'warn'; text: string } | null>(null);
   const [alerts, setAlerts] = useState<number | null>(0);
@@ -319,9 +337,7 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
   const applications = useMemo(
     () =>
       canSeeApplicants
-        ? (recruitingData?.applications ?? []).map((application) =>
-            overrides[application.id] ? { ...application, ...overrides[application.id] } : application
-          )
+        ? applyApplicationOverrides(recruitingData?.applications ?? [], overrides, recruitingData?.load ?? 0)
         : [],
     [canSeeApplicants, recruitingData, overrides]
   );
@@ -395,13 +411,12 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
       if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to update');
       setOverrides((current) => ({
         ...current,
-        [application.id]: archive
-          ? {
-              status: 'not_selected',
-              notSelectedAt: new Date(),
-              notSelectedByName: user?.displayName || null,
-            }
-          : { status: json.status === 'contacted' ? 'contacted' : 'applied', notSelectedAt: null, notSelectedByName: null },
+        [application.id]: {
+          afterLoad: latestStarted(),
+          patch: archive
+            ? { status: 'not_selected', notSelectedAt: new Date(), notSelectedByName: user?.displayName || null }
+            : { status: 'applied', notSelectedAt: null, notSelectedByName: null },
+        },
       }));
       setOpenApplication(null);
       setUndo(archive ? { application, text: `${application.name || 'Applicant'} moved to Archived.` } : null);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ApplicationRecord } from '@/types';
 import type { ChecklistItem, ChecklistPerson } from './checklist';
 import type { InviteView } from './Invites';
-import { buildTodoSections } from './todoRows';
+import { applyApplicationOverrides, buildTodoSections } from './todoRows';
 
 const NOW = Date.parse('2026-10-07T12:00:00Z');
 const daysAgo = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
@@ -115,5 +115,29 @@ describe('buildTodoSections', () => {
   it('skips sources that are missing', () => {
     const sections = buildTodoSections({ signups: null, people: undefined, ready: null, applications: null }, NOW);
     expect(sections.waiting).toBe(0);
+  });
+});
+
+describe('applyApplicationOverrides', () => {
+  const loaded = [
+    { id: 'a1', name: 'Ann', status: 'applied' },
+    { id: 'a2', name: 'Ben', status: 'applied' },
+  ] as unknown as ApplicationRecord[];
+  const notFit = {
+    a1: {
+      afterLoad: 3,
+      patch: { status: 'not_selected' as const, notSelectedAt: new Date(NOW), notSelectedByName: 'Olive' },
+    },
+  };
+
+  it('shows a Not a fit at once over a list from an older load', () => {
+    const shown = applyApplicationOverrides(loaded, notFit, 3);
+    expect(shown.map((row) => row.status)).toEqual(['not_selected', 'applied']);
+    expect(shown[0].notSelectedByName).toBe('Olive');
+  });
+
+  it('lets any load started after the change replace it, e.g. a restore from another device', () => {
+    const shown = applyApplicationOverrides(loaded, notFit, 4);
+    expect(shown).toEqual(loaded);
   });
 });

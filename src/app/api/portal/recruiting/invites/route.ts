@@ -1,3 +1,4 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import {
@@ -214,6 +215,12 @@ export async function POST(request: NextRequest) {
           status: 'invited',
           inviteId: inviteRef.id,
           updatedAt: now,
+          // Inviting works from any status, Archived included: an invited
+          // applicant is no longer "Not a fit", so the archive stamp goes.
+          notSelectedAt: FieldValue.delete(),
+          notSelectedBy: FieldValue.delete(),
+          notSelectedByName: FieldValue.delete(),
+          statusBeforeNotSelected: FieldValue.delete(),
         },
         { merge: true }
       );

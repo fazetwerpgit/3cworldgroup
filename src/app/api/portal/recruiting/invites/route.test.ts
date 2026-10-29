@@ -10,6 +10,7 @@ const state = vi.hoisted(() => ({
   anyAccount: null as { uid: string } | null,
   sendEmail: vi.fn(),
   created: null as Record<string, unknown> | null,
+  applicationSet: null as { id: string; data: Record<string, unknown>; options: unknown } | null,
 }));
 
 // A Firestore stand-in for GET: users/{uid}, onboardingInvites and applications,
@@ -37,7 +38,16 @@ vi.mock('@/lib/firebase/admin', () => {
             }),
           };
         }
-        if (name === 'applications') return query(() => state.applications);
+        if (name === 'applications') {
+          return {
+            ...query(() => state.applications),
+            doc: (id: string) => ({
+              set: async (data: Record<string, unknown>, options: unknown) => {
+                state.applicationSet = { id, data, options };
+              },
+            }),
+          };
+        }
         if (name === 'onboardingInvites') {
           return {
             ...query(() => state.invites),
@@ -108,6 +118,7 @@ beforeEach(() => {
   state.anyAccount = null;
   state.sendEmail.mockReset().mockResolvedValue({ ok: true, messageId: 'pm-1' });
   state.created = null;
+  state.applicationSet = null;
 });
 
 it('returns every application, not just the newest 50', async () => {
@@ -322,4 +333,28 @@ describe('role ceiling', () => {
   it('lets management invite a director', async () => {
     expect((await POST(inviteRequest('director'))).status).toBe(200);
   });
+});
+
+it('marks the linked application invited and clears any Not a fit stamp', async () => {
+  const request = new NextRequest('http://localhost/api/portal/recruiting/invites', {
+    method: 'POST',
+    body: JSON.stringify({
+      candidateName: 'Rex',
+      candidateEmail: 'rex@example.com',
+      candidatePhone: '555-0100',
+      intendedFieldRole: 'entry_level_rep',
+      applicationId: 'app-7',
+    }),
+    headers: { 'content-type': 'application/json' },
+  });
+  expect((await POST(request)).status).toBe(200);
+  expect(state.applicationSet).toMatchObject({
+    id: 'app-7',
+    data: { status: 'invited', inviteId: 'inv-new' },
+    options: { merge: true },
+  });
+  const data = state.applicationSet?.data ?? {};
+  for (const field of ['notSelectedAt', 'notSelectedBy', 'notSelectedByName', 'statusBeforeNotSelected']) {
+    expect(sentinel(data[field])).toBe('FieldValue.delete');
+  }
 });

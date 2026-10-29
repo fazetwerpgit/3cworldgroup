@@ -157,3 +157,27 @@ export function buildTodoSections(sources: TodoSources, now = Date.now()): TodoS
     waiting: signups.length + documents.length + activate.length + applicants.length,
   };
 }
+
+/** An optimistic Not a fit / Restore, shown until a reload that started after it lands. */
+export interface ApplicationOverride {
+  patch: Pick<ApplicationRecord, 'status' | 'notSelectedAt' | 'notSelectedByName'>;
+  /** The newest recruiting load already started when the change was saved. */
+  afterLoad: number;
+}
+
+/**
+ * Lays the optimistic overrides over the loaded applications. An override only
+ * wins while the list on screen came from a load started before the change;
+ * any later load (the follow-up reload, a resume refresh, another device's
+ * change) is the truth and replaces it.
+ */
+export function applyApplicationOverrides(
+  applications: ApplicationRecord[],
+  overrides: Record<string, ApplicationOverride>,
+  loadedFrom: number
+): ApplicationRecord[] {
+  return applications.map((application) => {
+    const override = overrides[application.id];
+    return override && override.afterLoad >= loadedFrom ? { ...application, ...override.patch } : application;
+  });
+}

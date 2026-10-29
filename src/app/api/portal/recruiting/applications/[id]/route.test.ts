@@ -11,24 +11,44 @@ const updateMock = vi.fn();
 vi.mock('firebase-admin/firestore', () => ({
   FieldValue: { delete: vi.fn(() => '__DELETE__') },
 }));
+type Ref = { name: string; id: string; get: () => Promise<unknown>; update: (patch: Record<string, unknown>) => Promise<void> };
+const transactionMock = vi.fn();
+
 vi.mock('@/lib/firebase/admin', () => ({
   adminAuth: { verifyIdToken: (...args: unknown[]) => verifyIdToken(...args) },
   adminDb: {
     collection: vi.fn((name: string) => ({
-      doc: vi.fn((id: string) => ({
-        get: async () => {
-          const data = (name === 'users' ? userDocs : applications).get(id);
-          return { exists: data !== undefined, data: () => data };
-        },
-        update: async (patch: Record<string, unknown>) => {
-          updateMock(name, id, patch);
-          const current = applications.get(id) ?? {};
-          const next = { ...current, ...patch };
-          for (const [key, value] of Object.entries(patch)) if (value === '__DELETE__') delete next[key];
-          applications.set(id, next);
-        },
-      })),
+      doc: vi.fn(
+        (id: string): Ref => ({
+          name,
+          id,
+          get: async () => {
+            const data = (name === 'users' ? userDocs : applications).get(id);
+            return { exists: data !== undefined, data: () => data };
+          },
+          update: async (patch: Record<string, unknown>) => {
+            updateMock(name, id, patch);
+            const current = applications.get(id) ?? {};
+            const next = { ...current, ...patch };
+            for (const [key, value] of Object.entries(patch)) if (value === '__DELETE__') delete next[key];
+            applications.set(id, next);
+          },
+        })
+      ),
     })),
+    // Reads and writes go through the transaction; writes apply when it commits.
+    runTransaction: async <T,>(run: (tx: unknown) => Promise<T>) => {
+      transactionMock();
+      const writes: Array<() => Promise<void>> = [];
+      const result = await run({
+        get: (ref: Ref) => ref.get(),
+        update: (ref: Ref, patch: Record<string, unknown>) => {
+          writes.push(() => ref.update(patch));
+        },
+      });
+      for (const write of writes) await write();
+      return result;
+    },
   },
 }));
 
@@ -52,6 +72,7 @@ beforeEach(() => {
   applications.clear();
   updateMock.mockReset();
   verifyIdToken.mockReset();
+  transactionMock.mockReset();
   verifyIdToken.mockResolvedValue({ uid: 'u1' });
   applications.set('app1', { name: 'Brenden', status: 'applied' });
 });
@@ -90,15 +111,31 @@ describe('PATCH /api/portal/recruiting/applications/[id]', () => {
     expect(applications.get('app1')?.name).toBe('Brenden');
   });
 
-  it('lets management restore it to the status it had', async () => {
+  it('lets management restore it to the status it had, inside a transaction', async () => {
     userDocs.set('u1', OPS);
-    applications.set('app1', { name: 'B', status: 'contacted' });
     await call('not_fit');
     const response = await call('restore');
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ ok: true, status: 'contacted' });
-    expect(applications.get('app1')).toEqual(expect.objectContaining({ status: 'contacted' }));
+    expect(await response.json()).toEqual({ ok: true, status: 'applied' });
+    expect(applications.get('app1')).toEqual(expect.objectContaining({ status: 'applied' }));
     expect(applications.get('app1')).not.toHaveProperty('notSelectedAt');
+    expect(applications.get('app1')).not.toHaveProperty('statusBeforeNotSelected');
+    expect(transactionMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('only turns down applicants still waiting, the same rule as To do', async () => {
+    userDocs.set('u1', OPS);
+    applications.set('app1', { status: 'contacted' });
+    expect((await call('not_fit')).status).toBe(409);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects reserved or path-like ids with 400 before touching Firestore', async () => {
+    userDocs.set('u1', OPS);
+    for (const id of ['.', '..', '__name__', '__x__', 'a/b']) {
+      expect((await call('not_fit', id)).status).toBe(400);
+    }
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
   it('will not turn down someone already invited, or restore someone not archived', async () => {
