@@ -52,7 +52,7 @@ export function connectionNotice(input: { online: boolean; fromCache: boolean; r
 // STALE_LISTENER_MAX_MS, so it never loops tightly. Coming back to the
 // foreground or online while still stale resubscribes after a short grace
 // (Firestore usually reconnects by itself within it).
-export const STALE_LISTENER_MS = 8_000;
+export const STALE_LISTENER_MS = 15_000;
 export const STALE_LISTENER_MAX_MS = 60_000;
 export const STALE_LISTENER_NUDGE_GRACE_MS = 2_000;
 
