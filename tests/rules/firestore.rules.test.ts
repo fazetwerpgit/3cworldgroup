@@ -375,3 +375,72 @@ describe('Existing portal rules still hold', () => {
     );
   });
 });
+
+// users/{uid}.recruiter is the hidden recruiting grant (isRecruiter in
+// src/types/auth.ts). Only the Admin SDK may write it (scripts/set-recruiter.mjs);
+// no client, the user's own included, may set, change or clear it.
+describe('Hidden recruiter grant', () => {
+  const recruiterDb = () => testEnv.authenticatedContext('mason', { email: 'mason@example.com' }).firestore();
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await Promise.all([
+        setDoc(doc(db, 'users/mason'), {
+          email: 'mason@example.com',
+          displayName: 'Mason',
+          fieldRole: 'general_manager',
+          status: 'active',
+          recruiter: true,
+        }),
+        setDoc(doc(db, 'users/teamrep'), {
+          email: 'teamrep@example.com',
+          displayName: 'Team Rep',
+          fieldRole: 'entry_level_rep',
+          status: 'active',
+          managerId: 'rep',
+          campaignIds: [],
+        }),
+        setDoc(doc(db, 'userOnboarding/o3'), { userId: 'other', itemId: 'dl_photos', status: 'submitted' }),
+      ]);
+    });
+  });
+
+  it('refuses a self-signup that sets recruiter on create', async () => {
+    const db = testEnv
+      .authenticatedContext('new-r', { email: 'newr@example.com', firebase: { sign_in_provider: 'password' } })
+      .firestore();
+    await assertFails(
+      setDoc(doc(db, 'users/new-r'), {
+        email: 'newr@example.com',
+        displayName: 'New',
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        recruiter: true,
+      })
+    );
+  });
+
+  it('refuses a user setting recruiter on their own profile, alone or with an allowed key', async () => {
+    await assertFails(updateDoc(doc(repDb(), 'users/rep'), { recruiter: true }));
+    await assertFails(updateDoc(doc(repDb(), 'users/rep'), { campaignNoticeAckAt: 1, recruiter: true }));
+    await assertFails(updateDoc(doc(repDb(), 'users/rep'), { activeCampaignId: null, recruiter: true }));
+    await assertFails(setDoc(doc(repDb(), 'users/rep'), { recruiter: true }, { merge: true }));
+  });
+
+  it('refuses a recruiter changing or clearing their own grant', async () => {
+    await assertFails(updateDoc(doc(recruiterDb(), 'users/mason'), { recruiter: false }));
+    await assertFails(updateDoc(doc(recruiterDb(), 'users/mason'), { recruiter: deleteField() }));
+  });
+
+  it('refuses a manager or an owner setting recruiter on someone else', async () => {
+    await assertFails(updateDoc(doc(repDb(), 'users/teamrep'), { recruiter: true }));
+    await assertFails(updateDoc(doc(ownerDb(), 'users/rep'), { recruiter: true }));
+  });
+
+  it('grants a recruiter no client read of other users or their onboarding (recruiting reads go through the APIs)', async () => {
+    await assertSucceeds(getDoc(doc(recruiterDb(), 'users/mason')));
+    await assertFails(getDoc(doc(recruiterDb(), 'users/other')));
+    await assertFails(getDoc(doc(recruiterDb(), 'userOnboarding/o3')));
+  });
+});
