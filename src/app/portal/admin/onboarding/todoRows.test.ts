@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ApplicationRecord } from '@/types';
 import type { ChecklistItem, ChecklistPerson } from './checklist';
 import type { InviteView } from './Invites';
-import { buildTodoRows } from './todoRows';
+import { buildTodoSections } from './todoRows';
 
 const NOW = Date.parse('2026-10-07T12:00:00Z');
 const daysAgo = (days: number) => new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
@@ -38,35 +38,82 @@ const person = (userId: string, toReview: number, submittedAt: string): Checklis
   toReview,
 });
 
-describe('buildTodoRows', () => {
-  it('lists one row per thing waiting, oldest first', () => {
-    const rows = buildTodoRows(
+const app = (id: string, days: number | null, status = 'applied', extra: Partial<ApplicationRecord> = {}) =>
+  ({
+    id,
+    name: id.toUpperCase(),
+    status,
+    createdAt: (days === null ? null : daysAgo(days)) as unknown as Date,
+    ...extra,
+  }) as ApplicationRecord;
+
+describe('buildTodoSections', () => {
+  it('splits the waiting things into sections, each oldest first', () => {
+    const sections = buildTodoSections(
       {
-        signups: [{ uid: 's1', name: 'Sam', createdAt: new Date(daysAgo(1)) }],
+        signups: [
+          { uid: 's1', name: 'Sam', createdAt: new Date(daysAgo(1)) },
+          { uid: 's2', name: 'Sue', createdAt: new Date(daysAgo(3)) },
+        ],
         people: [person('p1', 2, daysAgo(4)), person('p2', 0, daysAgo(9))],
         ready: [{ id: 'i1', candidateName: 'Ida', submittedAt: daysAgo(2) } as InviteView],
-        applied: [{ id: 'a1', name: 'Al', createdAt: daysAgo(6) as unknown as Date } as ApplicationRecord],
+        applications: [app('a1', 6)],
       },
       NOW
     );
-    expect(rows.map((row) => [row.kind, row.key])).toEqual([
-      ['applicant', 'applicant-a1'],
-      ['documents', 'documents-p1'],
-      ['activate', 'activate-i1'],
-      ['signup', 'signup-s1'],
-    ]);
+    expect(sections.signups.map((row) => row.key)).toEqual(['signup-s2', 'signup-s1']);
+    expect(sections.documents.map((row) => row.key)).toEqual(['documents-p1']);
+    expect(sections.documents[0].line).toBe('2 documents to check · 4 days ago');
+    expect(sections.activate.map((row) => row.key)).toEqual(['activate-i1']);
+    expect(sections.applicants.map((row) => row.key)).toEqual(['applicant-a1']);
+    expect(sections.waiting).toBe(5);
   });
 
-  it('puts anything without a date last and skips sources that are missing', () => {
-    const rows = buildTodoRows(
+  it('folds applicants older than 30 days (or undated) away and leaves them out of the count', () => {
+    const sections = buildTodoSections(
+      { applications: [app('fresh', 2), app('edge', 30), app('old', 31), app('ancient', 115), app('undated', null)] },
+      NOW
+    );
+    expect(sections.applicants.map((row) => row.application.id)).toEqual(['fresh', 'edge']);
+    expect(sections.older.map((row) => row.application.id)).toEqual(['old', 'ancient', 'undated']);
+    expect(sections.waiting).toBe(2);
+  });
+
+  it('keeps invited, joined and archived applicants out of the waiting lists', () => {
+    const sections = buildTodoSections(
       {
-        signups: [{ uid: 's1', name: 'Sam', createdAt: null }],
-        people: null,
-        ready: [{ id: 'i1', candidateName: 'Ida', submittedAt: daysAgo(1) } as InviteView],
-        applied: undefined,
+        applications: [
+          app('inv', 1, 'invited'),
+          app('joined', 1, 'converted'),
+          app('nf1', 3, 'not_selected', { notSelectedAt: daysAgo(2) as unknown as Date }),
+          app('nf2', 40, 'not_selected', { notSelectedAt: daysAgo(1) as unknown as Date }),
+        ],
       },
       NOW
     );
-    expect(rows.map((row) => row.key)).toEqual(['activate-i1', 'signup-s1']);
+    expect(sections.applicants).toEqual([]);
+    expect(sections.older).toEqual([]);
+    // Most recently archived first, whatever their age.
+    expect(sections.archived.map((row) => row.application.id)).toEqual(['nf2', 'nf1']);
+    expect(sections.waiting).toBe(0);
+  });
+
+  it('says when they applied and where they came from', () => {
+    const [row] = buildTodoSections(
+      {
+        applications: [
+          app('a1', 3, 'applied', {
+            source: { channel: 'google', referrerHost: '', landingPath: '/', utmSource: '', utmMedium: '', utmCampaign: '' },
+          }),
+        ],
+      },
+      NOW
+    ).applicants;
+    expect(row.line).toBe('Applied 3 days ago · via Google');
+  });
+
+  it('skips sources that are missing', () => {
+    const sections = buildTodoSections({ signups: null, people: undefined, ready: null, applications: null }, NOW);
+    expect(sections.waiting).toBe(0);
   });
 });

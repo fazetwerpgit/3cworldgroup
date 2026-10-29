@@ -68,6 +68,9 @@ export interface ApplicationRecord {
   status: ApplicationStatus;
   createdAt: Date;
   updatedAt: Date;
+  /** Set when someone marks them "Not a fit" (status 'not_selected') from Hiring > To do. */
+  notSelectedAt?: Date | null;
+  notSelectedByName?: string | null;
 }
 
 /**

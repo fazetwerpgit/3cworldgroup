@@ -187,6 +187,19 @@ describe('useOpsQueues', () => {
     expect(applicants.oldestWaitMs).toBe(18 * HOUR);
   });
 
+  it('leaves applicants older than 30 days out of the To do count and the Hiring badge', async () => {
+    vi.setSystemTime(new Date('2026-10-29T12:00:00.000Z'));
+    state.applications = [
+      { status: 'applied', createdAt: '2026-10-27T12:00:00.000Z' },
+      { status: 'applied', createdAt: '2026-09-29T12:00:00.000Z' },
+      { status: 'applied', createdAt: '2026-07-06T12:00:00.000Z' },
+      { status: 'not_selected', createdAt: '2026-10-28T12:00:00.000Z' },
+    ];
+    const { queues } = await renderAs({ role: 'admin' });
+    const applicants = queues.cards!.find((card) => card.key === 'applicants')!;
+    expect(applicants.count).toBe(2);
+  });
+
   it('asks a manager for nothing: their Recruits tab shows no count', async () => {
     const { queues, counts } = await renderAs({ fieldRole: 'l1_manager' });
     expect(fetchMock).not.toHaveBeenCalled();

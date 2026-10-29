@@ -7,6 +7,7 @@ import { usePendingSignupsCount } from '@/hooks/admin/usePendingSignupsCount';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 import { chicagoDayBounds } from '@/lib/leaderboard/periods';
 import { chicagoTodayKey } from '@/lib/sales/saleDate';
+import { countsAsWaitingApplicant } from '@/lib/recruiting/applicantAging';
 import {
   CHAT_REPORTS_HUB,
   ONBOARDING_HUB,
@@ -133,8 +134,12 @@ const SOURCES: QueueSource[] = [
       const applications: { status?: string; createdAt?: string | null }[] = Array.isArray(json.applications)
         ? json.applications
         : [];
+      // Only applicants from the last 30 days wait on anyone; older ones fold away in To do.
+      const now = Date.now();
       return figuresFrom(
-        applications.filter((application) => application.status === 'applied').map((application) => application.createdAt)
+        applications
+          .filter((application) => countsAsWaitingApplicant(application, now))
+          .map((application) => application.createdAt)
       );
     },
   },

@@ -61,6 +61,8 @@ function serializeApplication(doc: FirebaseFirestore.QueryDocumentSnapshot): App
     status: data.status ?? 'applied',
     createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
     updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,
+    notSelectedAt: data.notSelectedAt?.toDate?.()?.toISOString?.() ?? null,
+    notSelectedByName: typeof data.notSelectedByName === 'string' ? data.notSelectedByName : null,
   } as unknown as ApplicationRecord;
 }
 

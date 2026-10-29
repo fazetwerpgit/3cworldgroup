@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { collection, onSnapshot, query, Timestamp, where } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import ActionQueue from '@/components/admin/ActionQueue';
@@ -16,8 +16,6 @@ import {
 } from '@/components/portal/admin-d/AdminUi';
 import {
   canOpenHubTab,
-  hubTabHref,
-  ONBOARDING_HUB,
   PEOPLE_HUB,
   RECRUITING_ROLES,
 } from '@/components/portal/admin-d/adminHubs';
@@ -32,13 +30,16 @@ import { RECRUITER_GATE, type ApplicationRecord } from '@/types';
 import { CheckDocumentsSheet } from './CheckDocumentsSheet';
 import { personName, type ChecklistPerson } from './checklist';
 import type { InviteView } from './Invites';
-import { buildTodoRows, type Signup, type TodoRow } from './todoRows';
+import { buildTodoSections, type Signup, type TodoRow } from './todoRows';
+import { ApplicantList, ApplicantSheet, UndoToast, type ApplicantActions } from './Applicants';
 import { useRefreshOnResume } from '@/hooks/useRefreshOnResume';
 
-// To do: everything in hiring that waits on you, as one list, oldest first.
-// One row is one thing with one button. The rows are exactly what the Hiring
-// badge counts (opsQueues). The portal's alerts sit folded at the bottom and
-// are not counted.
+// To do: everything in hiring that waits on you, in sections, most urgent
+// first (sign-ups, documents, paperwork to activate, new applicants). Empty
+// sections don't show. The waiting count is exactly what the Hiring badge
+// counts (opsQueues): applicants older than 30 days fold into "Older
+// applicants" and archived ("Not a fit") ones into "Archived", neither counted.
+// The portal's alerts sit folded at the bottom and are not counted.
 
 /** undefined while loading, null when it failed to load. */
 type Loaded<T> = T | null | undefined;
@@ -131,8 +132,8 @@ function useChecklists() {
 interface Recruiting {
   /** Invites whose paperwork is in: waiting on Activate. */
   ready: InviteView[];
-  /** Website applications not invited yet. */
-  applied: ApplicationRecord[];
+  /** Every website application (any status): To do sorts them into sections. */
+  applications: ApplicationRecord[];
 }
 
 /** One read of the recruiting API the Recruits tab uses. */
@@ -150,7 +151,7 @@ function useRecruiting() {
       const applications: ApplicationRecord[] = Array.isArray(json.applications) ? json.applications : [];
       setData({
         ready: invites.filter((invite) => invite.status === 'submitted'),
-        applied: applications.filter((application) => application.status === 'applied'),
+        applications,
       });
     } catch {
       // A background refresh keeps what is on screen.
@@ -174,8 +175,25 @@ function formatMissingItems(missing: unknown): string {
     : '';
 }
 
+/** A section of To do: a heading with its count over a list. Empty sections render nothing. */
+function Section({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  const id = useId();
+  if (count === 0) return null;
+  return (
+    <section className={t.section} aria-labelledby={id}>
+      <h3 id={id} className={u.sectionTitle}>
+        {title}
+        <small className={u.num}>{count}</small>
+      </h3>
+      {children}
+    </section>
+  );
+}
+
+type Override = Pick<ApplicationRecord, 'status' | 'notSelectedAt' | 'notSelectedByName'>;
+
 export function Todo({ onChanged }: { onChanged?: () => void }) {
-  const { isRole, hasPermission } = useAuth();
+  const { user, isRole, hasPermission } = useAuth();
   // ?person=<uid> opens that person's Check sheet.
   const linkedPerson = useSearchParams().get('person');
   // Sign-ups: the badge's gate (admins approve sign-ups) on top of the People
@@ -184,6 +202,8 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
   const canSeeSignups =
     isRole('admin') && (everyoneTab ? canOpenHubTab(everyoneTab, isRole, hasPermission) : false);
   const canSeeApplicants = isRole(...RECRUITING_ROLES);
+  // "Not a fit" writes through the recruiting review gate: management or the recruiter grant.
+  const canArchive = isRole('admin', 'operations', RECRUITER_GATE);
   // Portal alerts are back-office work, not recruiting: the recruiter grant
   // opens this tab but not the alerts API, so it never loads them.
   const canSeeAlerts = isRole('admin', 'operations');
@@ -197,17 +217,26 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
     void loadRecruiting(true);
   });
   const [openPerson, setOpenPerson] = useState<string | null>(null);
+  const [openApplication, setOpenApplication] = useState<string | null>(null);
   const [activatingId, setActivatingId] = useState<string | null>(null);
+  const [archivingId, setArchivingId] = useState<string | null>(null);
+  // Not a fit / Restore show at once; the next reload from the API replaces these.
+  const [overrides, setOverrides] = useState<Record<string, Override>>({});
+  const [undo, setUndo] = useState<{ application: ApplicationRecord; text: string } | null>(null);
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error' | 'warn'; text: string } | null>(null);
   const [alerts, setAlerts] = useState<number | null>(0);
 
   const loading = signups === undefined || people === undefined || recruitingData === undefined;
-  const rows = buildTodoRows({
-    signups,
-    people,
-    ready: recruitingData?.ready,
-    applied: canSeeApplicants ? recruitingData?.applied : [],
-  });
+  const applications = useMemo(
+    () =>
+      canSeeApplicants
+        ? (recruitingData?.applications ?? []).map((application) =>
+            overrides[application.id] ? { ...application, ...overrides[application.id] } : application
+          )
+        : [],
+    [canSeeApplicants, recruitingData, overrides]
+  );
+  const sections = buildTodoSections({ signups, people, ready: recruitingData?.ready, applications });
 
   // A ?person= link opens their sheet once the checklists are in (once per link).
   const linkedHandled = useRef<string | null>(null);
@@ -219,6 +248,7 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
   }, [linkedPerson, people]);
 
   const sheetPerson = people?.find((person) => person.userId === openPerson) ?? null;
+  const sheetApplication = applications.find((application) => application.id === openApplication) ?? null;
 
   const refreshChecklists = useCallback(async () => {
     const ok = await loadChecklists(true);
@@ -262,6 +292,48 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
     }
   };
 
+  /** Not a fit (archive) or Restore, shown at once and saved on the application. */
+  const setArchived = async (application: ApplicationRecord, archive: boolean) => {
+    setArchivingId(application.id);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/portal/recruiting/applications/${encodeURIComponent(application.id)}`, {
+        method: 'PATCH',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ action: archive ? 'not_fit' : 'restore' }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to update');
+      setOverrides((current) => ({
+        ...current,
+        [application.id]: archive
+          ? {
+              status: 'not_selected',
+              notSelectedAt: new Date(),
+              notSelectedByName: user?.displayName || null,
+            }
+          : { status: json.status === 'contacted' ? 'contacted' : 'applied', notSelectedAt: null, notSelectedByName: null },
+      }));
+      setOpenApplication(null);
+      setUndo(archive ? { application, text: `${application.name || 'Applicant'} moved to Archived.` } : null);
+      if (!archive) setNotice({ tone: 'ok', text: `${application.name || 'Applicant'} is restored.` });
+      void loadRecruiting(true);
+      onChanged?.();
+    } catch (err) {
+      setNotice({ tone: 'error', text: err instanceof Error ? err.message : 'Failed to update' });
+    } finally {
+      setArchivingId(null);
+    }
+  };
+
+  const applicantActions: ApplicantActions = {
+    busyId: archivingId,
+    onNotFit: canArchive ? (application) => void setArchived(application, true) : null,
+    onRestore: canArchive ? (application) => void setArchived(application, false) : null,
+    onOpen: (application) => setOpenApplication(application.id),
+  };
+  const dismissUndo = useCallback(() => setUndo(null), []);
+
   const button = `${s.btnSecondary} ${u.sm}`;
   const action = (row: TodoRow) => {
     switch (row.kind) {
@@ -298,17 +370,25 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
         );
       }
       case 'applicant':
-        return (
-          <Link
-            href={`${hubTabHref(ONBOARDING_HUB, 'recruits')}&application=${encodeURIComponent(row.applicationId)}`}
-            className={button}
-            aria-label={`Invite ${row.name}`}
-          >
-            Invite
-          </Link>
-        );
+        return null;
     }
   };
+
+  const list = (rows: TodoRow[]) => (
+    <div className={s.panel}>
+      <ul className={u.rows}>
+        {rows.map((row) => (
+          <li key={row.key} className={`${u.row} ${t.row}`}>
+            <span className={t.text}>
+              <strong className={t.name}>{row.name}</strong>
+              <span className={t.line}>{row.line}</span>
+            </span>
+            <span className={t.rowAction}>{action(row)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 
   return (
     <AdminGate roles={['admin', 'operations', RECRUITER_GATE]}>
@@ -316,9 +396,9 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
         <AdminPageHead
           title="To do"
           meta={
-            loading || rows.length === 0 ? null : (
+            loading || sections.waiting === 0 ? null : (
               <>
-                <b>{rows.length}</b> {rows.length === 1 ? 'thing' : 'things'} waiting on you
+                <b>{sections.waiting}</b> waiting on you
               </>
             )
           }
@@ -338,22 +418,45 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
 
         {loading ? (
           <AdminSkeletonRows rows={3} label="Loading what's waiting" />
-        ) : rows.length === 0 ? (
-          <AdminEmpty title="Nothing waiting on you." />
         ) : (
-          <div className={s.panel}>
-            <ul className={u.rows}>
-              {rows.map((row) => (
-                <li key={row.key} className={`${u.row} ${t.row}`}>
-                  <span className={t.text}>
-                    <strong className={t.name}>{row.name}</strong>
-                    <span className={t.line}>{row.line}</span>
-                  </span>
-                  <span className={t.rowAction}>{action(row)}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <>
+            {sections.waiting === 0 ? <AdminEmpty title="Nothing waiting on you." /> : null}
+            <Section title="Sign-ups to approve" count={sections.signups.length}>
+              {list(sections.signups)}
+            </Section>
+            <Section title="Documents to check" count={sections.documents.length}>
+              {list(sections.documents)}
+            </Section>
+            <Section title="Ready to activate" count={sections.activate.length}>
+              {list(sections.activate)}
+            </Section>
+            <Section title="New applicants" count={sections.applicants.length}>
+              <ApplicantList rows={sections.applicants} actions={applicantActions} />
+            </Section>
+
+            {sections.older.length > 0 || sections.archived.length > 0 ? (
+              <div className={t.folds}>
+                {sections.older.length > 0 ? (
+                  <details className={t.fold}>
+                    <summary>
+                      Older applicants <span className={u.num}>({sections.older.length})</span>
+                    </summary>
+                    <p className={`${u.hint} ${t.foldHint}`}>Applied more than 30 days ago. Not counted in To do.</p>
+                    <ApplicantList rows={sections.older} actions={applicantActions} />
+                  </details>
+                ) : null}
+                {sections.archived.length > 0 ? (
+                  <details className={t.fold}>
+                    <summary>
+                      Archived <span className={u.num}>({sections.archived.length})</span>
+                    </summary>
+                    <p className={`${u.hint} ${t.foldHint}`}>Marked not a fit. Restore puts them back.</p>
+                    <ApplicantList rows={sections.archived} actions={applicantActions} archived />
+                  </details>
+                ) : null}
+              </div>
+            ) : null}
+          </>
         )}
 
         {canSeeAlerts ? (
@@ -371,6 +474,27 @@ export function Todo({ onChanged }: { onChanged?: () => void }) {
           onClose={() => setOpenPerson(null)}
           onChanged={refreshChecklists}
           onFinished={finishPerson}
+        />
+      ) : null}
+
+      {sheetApplication ? (
+        <ApplicantSheet
+          key={sheetApplication.id}
+          application={sheetApplication}
+          actions={applicantActions}
+          onClose={() => setOpenApplication(null)}
+        />
+      ) : null}
+
+      {undo ? (
+        <UndoToast
+          text={undo.text}
+          onDone={dismissUndo}
+          onUndo={() => {
+            const { application } = undo;
+            setUndo(null);
+            void setArchived(application, false);
+          }}
         />
       ) : null}
     </AdminGate>
