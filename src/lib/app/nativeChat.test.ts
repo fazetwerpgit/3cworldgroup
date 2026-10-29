@@ -6,6 +6,7 @@ vi.mock('@/lib/firebase/config', () => ({ auth: fakeAuth }));
 import { __resetBridgeForTests, installNativeReceiver, parseNativeMessage, receiveNativeMessage } from './bridge';
 import {
   CHAT_FALLBACK_PATH,
+  CHAT_HOLD_COLD_MAX_MS,
   CHAT_HOLD_MAX_MS,
   NATIVE_CHAT_REFUSAL_MS,
   __resetNativeChatForTests,
@@ -314,6 +315,60 @@ describe('chat visit (decided once, holding capped)', () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(nativeChatPending()).toBe(false);
     expect(chatVisitDecision()).toBe('web');
+  });
+
+  it('holds up to CHAT_HOLD_COLD_MAX_MS on a cold open into chat, then the normal hold', async () => {
+    vi.useFakeTimers();
+    waitingForAuth();
+    const getEntries = vi
+      .spyOn(performance, 'getEntriesByType')
+      .mockReturnValue([{ name: 'https://www.3cworldgroup.com/portal/chat?channel=c1' }] as unknown as PerformanceEntryList);
+    try {
+      const end = beginChatVisit();
+      await vi.advanceTimersByTimeAsync(CHAT_HOLD_MAX_MS);
+      expect(nativeChatPending()).toBe(true);
+      await vi.advanceTimersByTimeAsync(CHAT_HOLD_COLD_MAX_MS - CHAT_HOLD_MAX_MS);
+      expect(nativeChatPending()).toBe(false);
+      expect(chatVisitDecision()).toBe('web');
+      end();
+      // A later visit in the same document is not a cold open.
+      beginChatVisit();
+      await vi.advanceTimersByTimeAsync(CHAT_HOLD_MAX_MS);
+      expect(chatVisitDecision()).toBe('web');
+    } finally {
+      getEntries.mockRestore();
+    }
+  });
+
+  it('keeps the normal hold when the document was loaded on another page', async () => {
+    vi.useFakeTimers();
+    waitingForAuth();
+    const getEntries = vi
+      .spyOn(performance, 'getEntriesByType')
+      .mockReturnValue([{ name: 'https://www.3cworldgroup.com/portal/dashboard' }] as unknown as PerformanceEntryList);
+    try {
+      beginChatVisit();
+      await vi.advanceTimersByTimeAsync(CHAT_HOLD_MAX_MS);
+      expect(chatVisitDecision()).toBe('web');
+    } finally {
+      getEntries.mockRestore();
+    }
+  });
+
+  it('a cold open still ends the hold early once the native sign-in fails', async () => {
+    vi.useFakeTimers();
+    waitingForAuth();
+    const getEntries = vi
+      .spyOn(performance, 'getEntriesByType')
+      .mockReturnValue([{ name: 'https://www.3cworldgroup.com/portal/chat' }] as unknown as PerformanceEntryList);
+    try {
+      beginChatVisit();
+      setNativeAuth('failed');
+      expect(nativeChatPending()).toBe(false);
+      expect(chatVisitDecision()).toBe('web');
+    } finally {
+      getEntries.mockRestore();
+    }
   });
 
   it('a late native sign-in after the web chat showed does not open native chat', async () => {

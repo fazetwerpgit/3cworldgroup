@@ -127,7 +127,7 @@ export default function AppBridgeHost() {
   }, [router]);
 
   // One chat visit per stay on /portal/chat: native or web is decided once
-  // (the holding screen waits at most 3 s). Declared before the deep-link
+  // (the holding screen waits at most 3 s, 6 s on a cold open into chat). Declared before the deep-link
   // effect so the visit exists when it runs. App only.
   useEffect(() => {
     if (!chatOpen || !isNativeApp()) return;

@@ -267,7 +267,8 @@ answered the current web user's `nativeAuth` with ok. It replaces every way into
 any in-page chat link, and a direct load of `/portal/chat?channel=<id>` (a push
 tap). On a direct load the web shows a short "Opening chat…" screen while the
 native sign-in and the open are under way (no flash of the web chat), but waits
-at most 3 s for the sign-in before showing the web chat; after the ok reply it
+at most 3 s for the sign-in (6 s when the document itself was loaded at
+`/portal/chat`, a cold launch from a push) before showing the web chat; after the ok reply it
 steps back in history, or replaces its page with `/portal/dashboard` on a cold
 load, so that page stays behind the native screen. If the open fails the web
 chat shows. Native or web is decided once per stay on `/portal/chat`: once the

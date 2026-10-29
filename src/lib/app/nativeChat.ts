@@ -26,6 +26,13 @@ export const CHAT_PATH = '/portal/chat';
 export const CHAT_FALLBACK_PATH = '/portal/dashboard';
 /** Longest the holding screen waits for the native sign-in on one chat visit. */
 export const CHAT_HOLD_MAX_MS = 3000;
+/**
+ * The hold on a cold open straight into /portal/chat (a push tap launching the
+ * app): the shell is still starting and its native sign-in routinely takes
+ * longer than CHAT_HOLD_MAX_MS, which dropped people into the web chat. App
+ * only, like every hold, and it ends early once the sign-in settles.
+ */
+export const CHAT_HOLD_COLD_MAX_MS = 6000;
 /** After a failed or unanswered openNativeChat, chat stays on the web this long. */
 export const NATIVE_CHAT_REFUSAL_MS = 45_000;
 
@@ -46,6 +53,26 @@ interface ChatVisit {
   timer: ReturnType<typeof setTimeout> | null;
 }
 let chatVisit: ChatVisit | null = null;
+// Whether a chat visit already began in this document (the cold hold is for
+// the first one only).
+let chatVisitBegun = false;
+
+/** True when this document was loaded directly at /portal/chat (a cold open or a full reload). */
+function documentLoadedAtChat(): boolean {
+  if (typeof performance === 'undefined' || typeof performance.getEntriesByType !== 'function') return false;
+  const entry = performance.getEntriesByType('navigation')[0];
+  if (!entry?.name) return false;
+  try {
+    return new URL(entry.name).pathname.replace(/\/+$/, '') === CHAT_PATH;
+  } catch {
+    return false;
+  }
+}
+
+/** How long this chat visit may hold for the native sign-in. */
+export function chatHoldMaxMs(): number {
+  return !chatVisitBegun && documentLoadedAtChat() ? CHAT_HOLD_COLD_MAX_MS : CHAT_HOLD_MAX_MS;
+}
 
 function decideVisit(visit: ChatVisit, decision: 'native' | 'web'): void {
   visit.decision = decision;
@@ -123,7 +150,7 @@ export function supportsNativeChat(): boolean {
  * nativeChat is advertised and the native sign-in or the open is still under
  * way (or native chat is usable and the visit is about to open it). False once
  * the visit has settled on the web chat, so the hold lasts at most
- * CHAT_HOLD_MAX_MS plus one open. Never true on the web.
+ * chatHoldMaxMs() plus one open. Never true on the web.
  */
 export function nativeChatPending(): boolean {
   if (refusalTimer !== null || !nativeChatAdvertised()) return false;
@@ -136,10 +163,12 @@ export function nativeChatPending(): boolean {
  * Starts a visit to /portal/chat (AppBridgeHost, on entering the page; app
  * only). Native or web is decided once per visit: the web chat if nothing
  * native is coming, or if the native sign-in has not confirmed within
- * CHAT_HOLD_MAX_MS. Returns the function that ends the visit (on leaving).
+ * CHAT_HOLD_MAX_MS (CHAT_HOLD_COLD_MAX_MS on a cold open into chat). Returns the function that ends the visit (on leaving).
  */
 export function beginChatVisit(): () => void {
   endChatVisit();
+  const holdMs = chatHoldMaxMs();
+  chatVisitBegun = true;
   const visit: ChatVisit = { decision: null, timer: null };
   chatVisit = visit;
   visit.timer = setTimeout(() => {
@@ -147,7 +176,7 @@ export function beginChatVisit(): () => void {
     if (chatVisit !== visit || visit.decision !== null) return;
     decideVisit(visit, 'web');
     notify();
-  }, CHAT_HOLD_MAX_MS);
+  }, holdMs);
   notify();
   return () => {
     if (chatVisit === visit) endChatVisit();
@@ -326,6 +355,7 @@ export function __resetNativeChatForTests(): void {
   listening = false;
   if (chatVisit?.timer) clearTimeout(chatVisit.timer);
   chatVisit = null;
+  chatVisitBegun = false;
   if (refusalTimer) clearTimeout(refusalTimer);
   refusalTimer = null;
   subscribers.clear();
