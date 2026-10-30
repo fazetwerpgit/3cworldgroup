@@ -50,7 +50,11 @@ function serializeInvite(doc: FirebaseFirestore.QueryDocumentSnapshot) {
   };
 }
 
-function serializeApplication(doc: FirebaseFirestore.QueryDocumentSnapshot): ApplicationRecord {
+/**
+ * `canViewAll` (management and the recruiter grant) also gets the account an
+ * application turned into; field managers can't see accounts, so they don't.
+ */
+function serializeApplication(doc: FirebaseFirestore.QueryDocumentSnapshot, canViewAll: boolean): ApplicationRecord {
   const data = doc.data();
   return {
     id: doc.id,
@@ -67,7 +71,7 @@ function serializeApplication(doc: FirebaseFirestore.QueryDocumentSnapshot): App
     notSelectedAt: data.notSelectedAt?.toDate?.()?.toISOString?.() ?? null,
     notSelectedByName: typeof data.notSelectedByName === 'string' ? data.notSelectedByName : null,
     // Set once their invite made an account: Hiring > People joins them on it.
-    convertedUserId: typeof data.convertedUserId === 'string' ? data.convertedUserId : null,
+    ...(canViewAll ? { convertedUserId: typeof data.convertedUserId === 'string' ? data.convertedUserId : null } : {}),
   } as unknown as ApplicationRecord;
 }
 
@@ -114,7 +118,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       invites,
-      applications: applicationSnapshot.docs.map(serializeApplication),
+      applications: applicationSnapshot.docs.map((doc) => serializeApplication(doc, requester.canViewAll)),
       canViewAll: requester.canViewAll,
     });
   } catch (error) {

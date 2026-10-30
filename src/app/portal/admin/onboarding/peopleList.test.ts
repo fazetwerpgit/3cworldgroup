@@ -161,6 +161,52 @@ describe('merging records into people', () => {
     expect(person.application?.id).toBe('a1');
   });
 
+  it('keeps two applicants who share an email apart unless the names match', () => {
+    const people = mergePeople(
+      {
+        applications: [
+          application({ id: 'a1', name: 'Maya Torres', email: 'family@example.com', createdAt: daysAgo(1) }),
+          application({ id: 'a2', name: 'Luis Torres', email: 'family@example.com', createdAt: daysAgo(2) }),
+          // The same person again (first name, any case or accents): one row with Maya.
+          application({ id: 'a3', name: 'MAYA', email: 'Family@example.com ', createdAt: daysAgo(3) }),
+        ],
+        invites: [],
+      },
+      NOW
+    );
+    expect(people).toHaveLength(2);
+    expect(people.find((p) => p.name === 'Maya Torres')?.applications.map((a) => a.id)).toEqual(['a1', 'a3']);
+    expect(people.find((p) => p.name === 'Luis Torres')?.applications.map((a) => a.id)).toEqual(['a2']);
+  });
+
+  it("doesn't join an unlinked application to an invite on email when the names differ", () => {
+    const people = mergePeople(
+      {
+        applications: [application({ name: 'Luis Torres', email: 'family@example.com' })],
+        invites: [invite({ candidateName: 'Maya Torres', candidateEmail: 'family@example.com' })],
+      },
+      NOW
+    );
+    expect(people.map((p) => p.stage).sort()).toEqual(['applied', 'invited']);
+  });
+
+  it('a linked application follows its link, not its email', () => {
+    const people = mergePeople(
+      {
+        applications: [
+          application({ id: 'a1', name: 'Maya Torres', email: 'family@example.com' }),
+          application({ id: 'a2', name: 'Luis Torres', email: 'family@example.com', status: 'invited' }),
+        ],
+        // Luis's invite carries the shared email and his application id.
+        invites: [invite({ candidateName: 'Luis Torres', candidateEmail: 'family@example.com', applicationId: 'a2' })],
+      },
+      NOW
+    );
+    expect(people).toHaveLength(2);
+    expect(people.find((p) => p.invite)?.application?.id).toBe('a2');
+    expect(people.find((p) => !p.invite)?.application?.id).toBe('a1');
+  });
+
   it('keeps different people apart', () => {
     const people = mergePeople(
       {
@@ -354,6 +400,23 @@ describe('actions and who gets them', () => {
     expect(personActions(p, RECRUITER, NOW)).toEqual(['restore']);
     expect(personActions(p, FIELD_MANAGER, NOW)).toEqual([]);
     expect(rowAction(p, ADMIN, NOW)).toBeNull();
+  });
+
+  it('not a fit with an invite that went nowhere: Restore too; never while the invite is open', () => {
+    for (const status of ['cancelled', 'rejected'] as const) {
+      const p = person({
+        applications: [application({ status: 'not_selected' })],
+        invites: [invite({ status, applicationId: 'a1' })],
+      });
+      expect(p.stage).toBe('notFit');
+      expect(personActions(p, RECRUITER, NOW)).toContain('restore');
+      expect(personActions(p, FIELD_MANAGER, NOW)).not.toContain('restore');
+    }
+    const open = person({
+      applications: [application({ status: 'not_selected' })],
+      invites: [invite({ applicationId: 'a1' })],
+    });
+    expect(personActions(open, ADMIN, NOW)).not.toContain('restore');
   });
 
   it('invited: Copy link and Resend in the sheet; Resend on the row only when stuck', () => {

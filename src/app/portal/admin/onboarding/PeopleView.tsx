@@ -223,7 +223,7 @@ export function PersonSheet({
   shownLink,
   now,
 }: PersonSheetProps) {
-  const [confirm, setConfirm] = useState<'reject' | 'replace' | 'cancelInvite' | null>(null);
+  const [confirm, setConfirm] = useState<'reject' | 'replace' | 'cancelInvite' | 'reinstate' | null>(null);
   const confirmRef = useRef<HTMLDivElement | null>(null);
   // A confirm opens beside the row or button that asked for it: bring it into view.
   useEffect(() => {
@@ -289,6 +289,7 @@ export function PersonSheet({
   const run = (action: PersonAction) => {
     if (action === 'reject') return setConfirm('reject');
     if (action === 'cancelInvite') return setConfirm('cancelInvite');
+    if (action === 'reinstate') return setConfirm('reinstate');
     if (action === 'resend' && invite && opensLegacyLink(invite)) return setConfirm('replace');
     onAction(person, action);
   };
@@ -370,6 +371,26 @@ export function PersonSheet({
             }}
           >
             Yes, cancel invite
+          </button>
+        </span>
+      </div>
+    ) : confirm === 'reinstate' && rep ? (
+      <div className={u.confirm} role="alert" ref={confirmRef}>
+        <span>Reinstate {person.name}? Their account is turned back on.</span>
+        <span className={u.btnRow}>
+          <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setConfirm(null)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={`${s.btnSecondary} ${u.sm}`}
+            disabled={busy !== null}
+            onClick={() => {
+              setConfirm(null);
+              onAction(person, 'reinstate');
+            }}
+          >
+            Yes, reinstate
           </button>
         </span>
       </div>

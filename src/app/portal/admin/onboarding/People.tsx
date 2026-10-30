@@ -59,10 +59,11 @@ interface Recruiting {
   applications: ApplicationRecord[];
 }
 
-interface Team {
-  reps: PipelineRep[];
-  checklists: ChecklistPerson[];
-}
+/** A resume within this long of the last load doesn't refetch (an action just reloaded what it touched). */
+export const RESUME_SKIP_MS = 30_000;
+
+/** What an action changed, so only that is fetched again. */
+type Source = 'recruiting' | 'pipeline' | 'review';
 
 function useNumberedLoad<T>(enabled: boolean, read: () => Promise<T>) {
   const { user } = useAuth();
@@ -112,20 +113,20 @@ async function readRecruiting(): Promise<Recruiting> {
   };
 }
 
-/** Accounts and their checklists: management and the recruiter grant only (both routes check). */
-async function readTeam(): Promise<Team> {
-  const [pipeline, review] = await Promise.all([
-    getJson('/api/portal/pipeline'),
-    getJson('/api/portal/onboarding/review'),
-  ]);
+/** Accounts: management and the recruiter grant only (the route checks). */
+async function readPipeline(): Promise<PipelineRep[]> {
+  const pipeline = await getJson('/api/portal/pipeline');
+  return Array.isArray(pipeline.reps) ? pipeline.reps : [];
+}
+
+/** Paperwork checklists: management and the recruiter grant only (the route checks). */
+async function readReview(): Promise<ChecklistPerson[]> {
+  const review = await getJson('/api/portal/onboarding/review');
   // Stamped so the documents sheet knows when the signed file links run out.
   const signedAt = Date.now();
-  return {
-    reps: Array.isArray(pipeline.reps) ? pipeline.reps : [],
-    checklists: Array.isArray(review.people)
-      ? (review.people as ChecklistPerson[]).map((person) => ({ ...person, filesSignedAt: signedAt }))
-      : [],
-  };
+  return Array.isArray(review.people)
+    ? (review.people as ChecklistPerson[]).map((person) => ({ ...person, filesSignedAt: signedAt }))
+    : [];
 }
 
 function PeopleBody({ onChanged }: { onChanged?: () => void }) {
@@ -144,21 +145,47 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
   };
 
   const recruiting = useNumberedLoad(true, readRecruiting);
-  const team = useNumberedLoad(caps.canSeeTeam, readTeam);
+  const pipeline = useNumberedLoad(caps.canSeeTeam, readPipeline);
+  const review = useNumberedLoad(caps.canSeeTeam, readReview);
   const loadRecruiting = recruiting.load;
-  const loadTeam = team.load;
+  const loadPipeline = pipeline.load;
+  const loadReview = review.load;
   // "3 days ago" and the 14-day window are read against the time of the last load.
   const [now, setNow] = useState(() => Date.now());
-  const reloadAll = useCallback(
-    async (background = true) => {
-      await Promise.all([loadRecruiting(background), loadTeam(background)]);
+  const lastLoad = useRef(0);
+  /** Quietly refetches only what an action changed. */
+  const reload = useCallback(
+    async (sources: readonly Source[]) => {
+      lastLoad.current = Date.now();
+      const loads: Record<Source, (background: boolean) => Promise<void>> = {
+        recruiting: loadRecruiting,
+        pipeline: loadPipeline,
+        review: loadReview,
+      };
+      await Promise.all(sources.map((source) => loads[source](true)));
       setNow(Date.now());
     },
-    [loadRecruiting, loadTeam]
+    [loadRecruiting, loadPipeline, loadReview]
   );
-  useRefreshOnResume(() => void reloadAll(true));
+  const reloadAll = useCallback(() => reload(['recruiting', 'pipeline', 'review']), [reload]);
+  // Back in the app: one full refresh, unless something just loaded. Pull to refresh always refetches.
+  const refreshOnResume = useCallback(() => {
+    if (Date.now() - lastLoad.current < RESUME_SKIP_MS) return;
+    return reloadAll();
+  }, [reloadAll]);
+  useRefreshOnResume(refreshOnResume, { onPull: reloadAll });
+  useEffect(() => {
+    // The first loads (useNumberedLoad's mount effect) count as a load.
+    lastLoad.current = Date.now();
+  }, []);
 
-  const loading = recruiting.data === undefined || (caps.canSeeTeam && team.data === undefined);
+  const team =
+    pipeline.data === undefined || review.data === undefined
+      ? undefined
+      : pipeline.data === null || review.data === null
+        ? null
+        : { reps: pipeline.data, checklists: review.data };
+  const loading = recruiting.data === undefined || (caps.canSeeTeam && team === undefined);
   const failed = recruiting.data === null;
 
   const people = useMemo(
@@ -167,11 +194,11 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
         ? mergePeople({
             applications: recruiting.data.applications,
             invites: recruiting.data.invites,
-            reps: team.data?.reps ?? null,
-            checklists: team.data?.checklists ?? null,
+            reps: pipeline.data ?? null,
+            checklists: review.data ?? null,
           }, now)
         : [],
-    [recruiting.data, team.data, now]
+    [recruiting.data, pipeline.data, review.data, now]
   );
 
   const [filter, setFilter] = useState<PeopleFilter>(() => parseFilter(askedStage));
@@ -225,13 +252,28 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
     router.replace(hubTabHref(ONBOARDING_HUB, 'people'), { scroll: false });
   }, [askedApplication, recruiting.data, router]);
 
-  const afterChange = useCallback(async () => {
-    await reloadAll(true);
-    onChanged?.();
-  }, [reloadAll, onChanged]);
+  /** After a change: refetch what it touched, then let the hub recount its tabs. */
+  const afterChange = useCallback(
+    async (sources: readonly Source[]) => {
+      await reload(sources);
+      onChanged?.();
+    },
+    [reload, onChanged]
+  );
 
-  const invites = useInviteActions({ reload: () => reloadAll(true), onChanged, notify: setNotice });
-  const teamActions = useTeamActions({ reload: () => reloadAll(true), onChanged, notify: setNotice });
+  // Invite actions change the invites (and, for Activate / Reject, the account: see onAction).
+  const invites = useInviteActions({ reload: () => reload(['recruiting']), onChanged, notify: setNotice });
+  const teamActions = useTeamActions({ reload: () => reload(['pipeline']), onChanged, notify: setNotice });
+  // Checking documents reloads the checklists after each one; the account's
+  // done count (the pipeline) follows once, when the sheet closes.
+  const checkedSome = useRef(false);
+  const closeCheck = () => {
+    setCheckUser(null);
+    if (checkedSome.current) {
+      checkedSome.current = false;
+      void reload(['pipeline']);
+    }
+  };
 
   /** Not a fit (archive) or Restore, saved on the application, then the list reloads. */
   const setArchived = async (application: ApplicationRecord, archive: boolean) => {
@@ -243,7 +285,7 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
     });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to update');
-    await afterChange();
+    await afterChange(['recruiting']);
     if (archive) setUndo({ application, text: `${application.name || 'Applicant'} marked not a fit.` });
     else setNotice({ tone: 'ok', text: `${application.name || 'Applicant'} is restored.` });
   };
@@ -291,11 +333,13 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
           if (invite) await invites.resendInvite(invite, options?.replaceOpenedLink ?? false);
           return;
         case 'activate':
-          if (invite?.status === 'submitted') await invites.convertInvite(invite, 'approved');
-          else if (rep) await teamActions.activateRep(rep);
+          if (invite?.status === 'submitted') {
+            // Activate turns the account on too: the team follows.
+            if ((await invites.convertInvite(invite, 'approved')) && caps.canSeeTeam) await reload(['pipeline']);
+          } else if (rep) await teamActions.activateRep(rep);
           return;
         case 'reject':
-          if (invite) await invites.convertInvite(invite, 'rejected');
+          if (invite && (await invites.convertInvite(invite, 'rejected')) && caps.canSeeTeam) await reload(['pipeline']);
           return;
         case 'cancelInvite':
           if (invite) await invites.cancelInvite(invite);
@@ -335,7 +379,7 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
       ? [person.application]
       : []
   );
-  const checkPerson = team.data?.checklists.find((person) => person.userId === checkUser) ?? null;
+  const checkPerson = review.data?.find((person) => person.userId === checkUser) ?? null;
   const sheetBusy: PersonAction | null =
     invites.linkBusy?.action === 'copy'
       ? 'copyLink'
@@ -356,8 +400,14 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
           {notice.text}
         </AdminNotice>
       ) : null}
-      {caps.canSeeTeam && team.data === null && !failed ? (
-        <AdminFailed what="the team" onRetry={() => void loadTeam()} />
+      {caps.canSeeTeam && team === null && !failed ? (
+        <AdminFailed
+          what="the team"
+          onRetry={() => {
+            if (pipeline.data === null) void loadPipeline();
+            if (review.data === null) void loadReview();
+          }}
+        />
       ) : null}
 
       <PeopleView
@@ -415,7 +465,7 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
           pickable={pickable}
           applicationId={inviteFor.applicationId}
           onClose={() => setInviteFor(null)}
-          onCreated={afterChange}
+          onCreated={() => afterChange(['recruiting'])}
         />
       ) : null}
 
@@ -423,17 +473,20 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
         <CheckDocumentsSheet
           key={checkPerson.userId}
           person={checkPerson}
-          onClose={() => setCheckUser(null)}
-          onChanged={afterChange}
+          onClose={closeCheck}
+          onChanged={async () => {
+            checkedSome.current = true;
+            await afterChange(['review']);
+          }}
           onFinished={() => {
             setNotice({ tone: 'ok', text: `All of ${personName(checkPerson)}'s documents are checked.` });
-            setCheckUser(null);
+            closeCheck();
           }}
         />
       ) : null}
 
       {channelsFor ? (
-        <ChannelsSheet key={channelsFor.uid} rep={channelsFor} onClose={() => setChannelsFor(null)} onChanged={() => reloadAll(true)} />
+        <ChannelsSheet key={channelsFor.uid} rep={channelsFor} onClose={() => setChannelsFor(null)} onChanged={() => reload(['pipeline'])} />
       ) : null}
 
       {decommissionFor ? (
@@ -444,7 +497,7 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
           onDone={async (message) => {
             setDecommissionFor(null);
             setNotice({ tone: 'ok', text: message });
-            await reloadAll(true);
+            await reload(['pipeline']);
           }}
         />
       ) : null}

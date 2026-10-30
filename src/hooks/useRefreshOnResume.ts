@@ -14,9 +14,16 @@ export const RESUME_REFRESH_STALE_MS = 60_000;
  * last resume refresh, and on pull to refresh. `refresh` must reload quietly: keep the data on screen
  * and swap it when the new data arrives, never back to a skeleton.
  */
-export function useRefreshOnResume(refresh: () => unknown, { enabled = true, staleMs = RESUME_REFRESH_STALE_MS } = {}) {
-  // The same quiet refetch answers pull to refresh in the app.
-  useRevalidateOnPull(refresh, enabled);
+export function useRefreshOnResume(
+  refresh: () => unknown,
+  {
+    enabled = true,
+    staleMs = RESUME_REFRESH_STALE_MS,
+    onPull,
+  }: { enabled?: boolean; staleMs?: number; /** Pull to refresh, when it differs from `refresh`. */ onPull?: () => unknown } = {}
+) {
+  // The same quiet refetch answers pull to refresh in the app (unless `onPull` is given).
+  useRevalidateOnPull(onPull ?? refresh, enabled);
   const refreshRef = useRef(refresh);
   useEffect(() => {
     refreshRef.current = refresh;

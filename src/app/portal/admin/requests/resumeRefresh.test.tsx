@@ -129,8 +129,14 @@ describe.each(screens)('%s resume refresh', (_name, render) => {
 
     state.failing = true;
     const calls = fetchMock.mock.calls.length;
-    await act(async () => { await state.resume?.(); });
-    await flush();
+    // Back a while later (People skips a resume within 30s of its last load).
+    const later = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 31_000);
+    try {
+      await act(async () => { await state.resume?.(); });
+      await flush();
+    } finally {
+      later.mockRestore();
+    }
 
     expect(fetchMock.mock.calls.length).toBeGreaterThan(calls);
     expect(container.textContent).toContain('Sam Queue');

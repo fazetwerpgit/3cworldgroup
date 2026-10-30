@@ -86,8 +86,8 @@ export function useTeamActions({
     }
   };
 
+  /** The caller confirms first (the person sheet asks inline). */
   const reinstate = async (rep: PipelineRep): Promise<boolean> => {
-    if (!window.confirm(`Reinstate ${rep.displayName}?`)) return false;
     setBusy(true);
     notify(null);
     try {
@@ -248,9 +248,15 @@ export function DecommissionSheet({
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Confirm asks once more inline, like the person sheet's other destructive actions.
+  const [asking, setAsking] = useState(false);
+  const askRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (asking) askRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [asking]);
 
   const confirm = async () => {
-    if (!window.confirm(`Decommission ${rep.displayName}?`)) return;
+    setAsking(false);
     setBusy(true);
     setError('');
     try {
@@ -279,7 +285,12 @@ export function DecommissionSheet({
           <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className={`${s.btnSecondary} ${u.sm} ${u.danger}`} disabled={busy} onClick={confirm}>
+          <button
+            type="button"
+            className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+            disabled={busy || asking}
+            onClick={() => setAsking(true)}
+          >
             {busy ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
             {busy ? 'Working…' : 'Confirm'}
           </button>
@@ -315,6 +326,24 @@ export function DecommissionSheet({
             rows={3}
           />
         </div>
+        {asking ? (
+          <div className={u.confirm} role="alert" ref={askRef}>
+            <span>Decommission {rep.displayName}? Their account is turned off until someone reinstates it.</span>
+            <span className={u.btnRow}>
+              <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setAsking(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+                disabled={busy}
+                onClick={() => void confirm()}
+              >
+                Yes, decommission
+              </button>
+            </span>
+          </div>
+        ) : null}
       </div>
     </AdminSheet>
   );

@@ -15,7 +15,9 @@ import type { InviteView } from './Invites';
 //     that made them (`users.onboardingInviteId`); an application points at
 //     the account too (`convertedUserId`) once its invite is sent back.
 // Records joined by those links, or sharing an email (trimmed, lower case),
-// are one person. The person's stage is the furthest any of their records got.
+// are one person. An application with no link of its own joins on email only
+// when the name also matches loosely (one inbox can be shared by two
+// applicants). The person's stage is the furthest any of their records got.
 
 export type PeopleStage = 'applied' | 'invited' | 'paperwork' | 'ready' | 'selling' | 'notFit' | 'deactivated';
 
@@ -310,34 +312,74 @@ export function placePerson(
   return { stage: 'applied', detail: '', since: null };
 }
 
+/** A name's words, lower case, accents and punctuation dropped. */
+function nameWords(name: string | null | undefined): string[] {
+  return (name ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+}
+
+/**
+ * Loosely the same name: the same first name (which covers first + last), or
+ * either one blank (nothing to tell them apart by).
+ */
+export function namesMatch(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = nameWords(a);
+  const right = nameWords(b);
+  if (!left.length || !right.length) return true;
+  return left[0] === right[0];
+}
+
 /** Everyone, one row per person, most recently moved first. */
 export function mergePeople(sources: PeopleSources, now = Date.now()): Person[] {
   const links = new Links();
   const emailNode = (email: string) => `e:${email}`;
-  const linkEmail = (node: string, email: string | null | undefined) => {
+  // The names on each email, so an unlinked application can check it is the same person.
+  const namesByEmail = new Map<string, string[]>();
+  const linkEmail = (node: string, email: string | null | undefined, name: string | null | undefined) => {
     const key = normalEmail(email);
-    if (key) links.join(node, emailNode(key));
+    if (!key) return;
+    links.join(node, emailNode(key));
+    namesByEmail.set(key, [...(namesByEmail.get(key) ?? []), name ?? '']);
   };
 
   const reps = sources.reps ?? [];
-  for (const application of sources.applications) {
-    const node = `a:${application.id}`;
-    links.find(node);
-    linkEmail(node, application.email);
-    if (application.convertedUserId) links.join(node, `r:${application.convertedUserId}`);
-  }
+  const linkedApplications = new Set<string>();
   for (const invite of sources.invites) {
     const node = `i:${invite.id}`;
     links.find(node);
-    linkEmail(node, invite.candidateEmail);
-    if (invite.applicationId) links.join(node, `a:${invite.applicationId}`);
+    linkEmail(node, invite.candidateEmail, invite.candidateName);
+    if (invite.applicationId) {
+      links.join(node, `a:${invite.applicationId}`);
+      linkedApplications.add(invite.applicationId);
+    }
     if (invite.convertedUserId) links.join(node, `r:${invite.convertedUserId}`);
   }
   for (const rep of reps) {
     const node = `r:${rep.uid}`;
     links.find(node);
-    linkEmail(node, rep.email);
+    linkEmail(node, rep.email, rep.displayName);
     if (rep.inviteId) links.join(node, `i:${rep.inviteId}`);
+  }
+  for (const application of sources.applications) {
+    const node = `a:${application.id}`;
+    links.find(node);
+    if (application.convertedUserId) {
+      links.join(node, `r:${application.convertedUserId}`);
+      linkedApplications.add(application.id);
+    }
+    // Linked to an invite or an account: that link places it, not the email.
+    if (linkedApplications.has(application.id)) continue;
+    // Unlinked: the email joins only the same name (two applicants can share an inbox).
+    const names = namesByEmail.get(normalEmail(application.email)) ?? [];
+    if (names.length === 0 || names.some((name) => namesMatch(name, application.name))) {
+      linkEmail(node, application.email, application.name);
+    }
   }
 
   interface Group {
@@ -585,7 +627,11 @@ export function personActions(person: Person, caps: PeopleCaps, now = Date.now()
     actions.push('invite');
     if (caps.canArchive && application.status === 'applied') actions.push('notFit');
   }
-  if (stage === 'notFit' && application?.status === 'not_selected' && caps.canArchive && !invite) {
+  // Restore puts the application back in Applied: only when no invite is still
+  // open for them (none, or the one they had was cancelled, turned down or ran out).
+  const inviteClosed =
+    !invite || invite.status === 'cancelled' || invite.status === 'rejected' || shownStatus(invite, now) === 'expired';
+  if (stage === 'notFit' && application?.status === 'not_selected' && caps.canArchive && inviteClosed) {
     actions.push('restore');
   }
   if (invite?.status === 'submitted' && onTheWay) {
