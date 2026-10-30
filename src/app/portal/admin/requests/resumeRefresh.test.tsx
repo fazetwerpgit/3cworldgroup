@@ -43,7 +43,7 @@ import { FiberReports } from './FiberReports';
 import { LeadsRequests } from './LeadsRequests';
 import { ManagerInterviews } from './ManagerInterviews';
 import { PayrollDisputes } from './PayrollDisputes';
-import { Pipeline } from '../onboarding/Pipeline';
+import { People } from '../onboarding/People';
 
 const submission = {
   id: 's1',
@@ -66,11 +66,19 @@ const pipelineRep = {
   approvedSales: 2,
   carrierOrders: 0,
   lastSignInAt: null,
+  // Activated just now, so Hiring > People shows them under its default filter.
+  activatedAt: new Date().toISOString(),
 };
 
 const fetchMock = vi.fn(async (url: string) => {
   if (state.failing) return { ok: false, json: async () => ({ error: 'offline' }) } as Response;
-  const body = url.startsWith('/api/portal/pipeline') ? { reps: [pipelineRep] } : { submissions: [submission] };
+  const body = url.startsWith('/api/portal/pipeline')
+    ? { reps: [pipelineRep] }
+    : url.startsWith('/api/portal/recruiting/invites')
+      ? { invites: [], applications: [] }
+      : url.startsWith('/api/portal/onboarding/review')
+        ? { people: [] }
+        : { submissions: [submission] };
   return { ok: true, json: async () => body } as Response;
 });
 
@@ -104,7 +112,7 @@ afterEach(() => {
 });
 
 const screens: Array<[string, () => ReactElement]> = [
-  ['Pipeline', () => <Pipeline />],
+  ['People', () => <People />],
   ['PayrollDisputes', () => <PayrollDisputes />],
   ['ExpediteOrders', () => <ExpediteOrders />],
   ['FiberReports', () => <FiberReports />],

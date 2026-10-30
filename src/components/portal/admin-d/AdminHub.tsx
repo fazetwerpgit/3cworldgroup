@@ -42,13 +42,20 @@ function Hub({ hub, title, sub, panels, counts, landOnWork = false }: AdminHubPr
   const askedTab = tabs.find((tab) => tab.key === asked);
   // An old tab key (a bookmark or an old notification link) opens its new tab,
   // keeping the rest of the query (?application= and the like).
-  const aliasOf = asked ? hub.aliases?.[asked] : undefined;
+  const alias = asked ? hub.aliases?.[asked] : undefined;
+  const aliasOf = typeof alias === 'string' ? alias : alias?.tab;
   useEffect(() => {
-    if (!aliasOf) return;
+    if (!alias) return;
     const next = new URLSearchParams(params.toString());
-    next.set(hub.param, aliasOf);
+    if (typeof alias === 'string') {
+      next.set(hub.param, alias);
+    } else {
+      next.set(hub.param, alias.tab);
+      // The alias's parameters fill in what the old link didn't say.
+      for (const [key, value] of Object.entries(alias.params ?? {})) if (!next.has(key)) next.set(key, value);
+    }
     router.replace(`${hub.href}?${next.toString()}`, { scroll: false });
-  }, [aliasOf, params, hub, router]);
+  }, [alias, params, hub, router]);
 
   const [landed, setLanded] = useState<string | null>(null);
   // The counts load every queue; past the wait, land without them rather than

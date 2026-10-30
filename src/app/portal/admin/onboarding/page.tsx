@@ -6,17 +6,16 @@ import { AdminHub } from '@/components/portal/admin-d/AdminHub';
 import { AdminSkeletonRows } from '@/components/portal/admin-d/AdminUi';
 import { ONBOARDING_HUB } from '@/components/portal/admin-d/adminHubs';
 import { useHubTabCounts, useOpsQueues } from '@/components/portal/admin-d/opsQueues';
-import { Pipeline } from './Pipeline';
-import { Recruits } from './Recruits';
+import { People } from './People';
 import { Todo } from './Todo';
 
-// Hiring: To do (everything waiting on the owner), Recruits (invites and
-// website applicants) and Pipeline, each under its old gate, so a manager sees
-// only Recruits. Only To do carries a count: the things waiting on you, the
-// same figure as the Hiring nav badge (opsQueues); Recruits and Pipeline wait
-// on no one. Old tab keys (review, invites, applicants) redirect via
+// Hiring: To do (everything waiting on the owner) and People (everyone from
+// website application to selling, one row per person), so a field manager
+// sees only People. Only To do carries a count: the things waiting on you, the
+// same figure as the Hiring nav badge (opsQueues). Old tab keys (review,
+// recruits, invites, applicants, pipeline) redirect via
 // ONBOARDING_HUB.aliases; /portal/admin/recruiting and /pipeline redirect to
-// their tab (next.config.ts).
+// their old tab (next.config.ts) and on from there.
 function Hiring() {
   const tab = useSearchParams().get(ONBOARDING_HUB.param);
   const { refresh } = useOpsQueues();
@@ -40,8 +39,7 @@ function Hiring() {
       landOnWork
       panels={{
         todo: () => <Todo onChanged={refresh} />,
-        recruits: () => <Recruits onChanged={refresh} />,
-        pipeline: () => <Pipeline />,
+        people: () => <People onChanged={refresh} />,
       }}
     />
   );

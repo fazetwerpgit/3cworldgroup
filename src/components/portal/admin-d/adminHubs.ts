@@ -15,13 +15,21 @@ export interface HubTab {
   hint?: string;
 }
 
+export interface HubAlias {
+  tab: string;
+  params?: Readonly<Record<string, string>>;
+}
+
 export interface HubConfig {
   href: string;
   /** The query parameter that picks the tab. */
   param: 'tab' | 'type';
   tabs: readonly HubTab[];
-  /** Old tab keys that now open another tab (old links keep working). */
-  aliases?: Readonly<Record<string, string>>;
+  /**
+   * Old tab keys that now open another tab (old links keep working), with any
+   * query parameters the new tab needs to show what the old one did.
+   */
+  aliases?: Readonly<Record<string, string | HubAlias>>;
 }
 
 const PLATFORM_ROLES: UserRole[] = ['admin', 'operations'];
@@ -31,7 +39,7 @@ const PLATFORM_ROLES: UserRole[] = ['admin', 'operations'];
 // api/portal/recruiting/invites). Directors and regional managers were offered
 // the tab but every call answered 403.
 // RECRUITER_GATE admits the hidden recruiter grant (users/{uid}.recruiter): it
-// opens the recruiting tabs (Recruits, To do, Pipeline) and nothing else here.
+// opens the recruiting tabs (To do, People) and nothing else here.
 export const RECRUITING_ROLES: GateRole[] = [
   'admin',
   'operations',
@@ -44,7 +52,7 @@ export const RECRUITING_ROLES: GateRole[] = [
   RECRUITER_GATE,
 ];
 
-/** To do and Pipeline: back office, plus the recruiter grant. */
+/** To do: back office, plus the recruiter grant. */
 const HIRING_ROLES: GateRole[] = [...PLATFORM_ROLES, RECRUITER_GATE];
 
 export const PEOPLE_HUB = {
@@ -71,21 +79,24 @@ export const ONBOARDING_HUB = {
       label: 'To do',
       roles: HIRING_ROLES,
     },
-    // Website applications are served by the invites API, so they share its gate.
+    // One list per person, application to selling. Field managers open it
+    // under the invites API's gate and see recruiting only; the team data
+    // (paperwork, channels, decommission) loads for To do's roles.
     {
-      key: 'recruits',
-      label: 'Recruits',
+      key: 'people',
+      label: 'People',
       roles: RECRUITING_ROLES,
-      hint: 'Send invites and see everyone who applied on the website.',
-    },
-    {
-      key: 'pipeline',
-      label: 'Pipeline',
-      roles: HIRING_ROLES,
-      hint: 'Where every hire is, from paperwork to selling.',
     },
   ],
-  aliases: { review: 'todo', invites: 'recruits', applicants: 'recruits' },
+  // The old Recruits and Pipeline tabs (and their old keys) open People, on
+  // the filter that matches what they showed.
+  aliases: {
+    review: 'todo',
+    recruits: 'people',
+    invites: 'people',
+    applicants: { tab: 'people', params: { stage: 'applied' } },
+    pipeline: { tab: 'people', params: { stage: 'all' } },
+  },
 } as const satisfies HubConfig;
 
 export interface RequestTab extends HubTab {

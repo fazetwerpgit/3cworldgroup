@@ -348,7 +348,7 @@ function ChatReports() {
                     {report.authorId ? (
                       <span className={r.links}>
                         <Link href={`/portal/admin/users/${encodeURIComponent(report.authorId)}`}>View person</Link>
-                        <Link href="/portal/admin/onboarding?tab=pipeline">Decommission in Pipeline</Link>
+                        <Link href="/portal/admin/onboarding?tab=people&stage=all">Decommission in Hiring</Link>
                       </span>
                     ) : (
                       <span />

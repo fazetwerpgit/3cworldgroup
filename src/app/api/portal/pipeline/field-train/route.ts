@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       message:
         `${repName} is ready for field training.` +
         (note ? ` Note from ${gate.name}: ${String(note).trim().slice(0, 500)}` : ''),
-      link: '/portal/admin/onboarding?tab=pipeline',
+      link: '/portal/admin/onboarding?tab=people&stage=all',
       metadata: { repId: userId, requestedBy: gate.uid },
       read: false,
       createdAt: now,

@@ -520,3 +520,83 @@ export function peopleExportRow(person: Person): Record<string, unknown> {
     source: sourceLabel(person.application?.source),
   };
 }
+
+// ---------- actions ----------
+
+/** What the viewer may do, from their role (People reads these from useAuth). */
+export interface PeopleCaps {
+  /** Management or the recruiter grant: the team (accounts, paperwork, channels, field training). */
+  canSeeTeam: boolean;
+  /** Not a fit / Restore on an application: management or the recruiter grant. */
+  canArchive: boolean;
+  /** Decommission / Reinstate: management only (never the recruiter grant). */
+  canDecommission: boolean;
+}
+
+export type PersonAction =
+  | 'invite'
+  | 'notFit'
+  | 'restore'
+  | 'copyLink'
+  | 'resend'
+  | 'activate'
+  | 'reject'
+  | 'review'
+  | 'channels'
+  | 'fieldTrain'
+  | 'decommission'
+  | 'reinstate';
+
+/** Every action the person sheet offers for this person, primary first. */
+export function personActions(person: Person, caps: PeopleCaps, now = Date.now()): PersonAction[] {
+  const { application, invite, rep, stage } = person;
+  const actions: PersonAction[] = [];
+  const onTheWay = stage === 'paperwork' || stage === 'ready';
+
+  if (stage === 'applied' && application && (application.status === 'applied' || application.status === 'contacted')) {
+    actions.push('invite');
+    if (caps.canArchive && application.status === 'applied') actions.push('notFit');
+  }
+  if (stage === 'notFit' && application?.status === 'not_selected' && caps.canArchive && !invite) {
+    actions.push('restore');
+  }
+  if (invite?.status === 'submitted' && onTheWay) {
+    actions.push('activate', 'reject');
+  } else if (stage === 'ready' && rep && caps.canSeeTeam) {
+    actions.push('activate');
+  }
+  if (invite && !rep && (stage === 'invited' || stage === 'paperwork') && canResend(invite, now)) {
+    if (canCopyLink(invite, now)) actions.push('copyLink');
+    actions.push('resend');
+  }
+  if (rep && caps.canSeeTeam && person.checklist && person.checklist.items.length > 0) actions.push('review');
+  if (rep && caps.canSeeTeam && rep.stage !== 'decommissioned') actions.push('fieldTrain', 'channels');
+  if (rep && caps.canDecommission) actions.push(rep.stage === 'decommissioned' ? 'reinstate' : 'decommission');
+  // Uploads still waiting on a check: checking them comes before Activate.
+  if (stage === 'paperwork' && person.toCheck > 0 && actions.includes('review')) {
+    return ['review', ...actions.filter((action) => action !== 'review')];
+  }
+  return actions;
+}
+
+/** The one action on the row, when the person is waiting on the viewer for it. */
+export function rowAction(person: Person, caps: PeopleCaps, now = Date.now()): PersonAction | null {
+  const actions = personActions(person, caps, now);
+  const has = (action: PersonAction) => actions.includes(action);
+  switch (person.stage) {
+    case 'applied':
+      return has('invite') ? 'invite' : null;
+    case 'invited': {
+      const { invite } = person;
+      if (!invite || opensLegacyLink(invite)) return null;
+      const stuck = shownStatus(invite, now) === 'expired' || emailProblem(invite);
+      return stuck && has('resend') ? 'resend' : null;
+    }
+    case 'paperwork':
+      return person.toCheck > 0 && has('review') ? 'review' : null;
+    case 'ready':
+      return has('activate') ? 'activate' : null;
+    default:
+      return null;
+  }
+}

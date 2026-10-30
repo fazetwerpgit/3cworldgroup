@@ -1,48 +1,4 @@
-/* Hiring → Pipeline. Shared pieces are admin-ui.module.css. */
-
-/* ---------- stage chips + the picked stage's one line ---------- */
-.picker {
-  display: grid;
-  gap: var(--s2);
-  min-width: 0;
-}
-
-/* ---------- manager select beside the search ---------- */
-.manager {
-  flex: 0 1 220px;
-  min-width: 160px;
-}
-
-.manager select {
-  height: 48px;
-}
-
-/* ---------- rep rows: name + role, one sentence, chevron ---------- */
-.cols {
-  --cols: minmax(0, 1fr) minmax(0, 1.4fr) 24px;
-}
-
-.where {
-  color: var(--c-text-2);
-}
-
-/* ---------- detail sheet ---------- */
-.detailActions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s2);
-}
-
-@media (min-width: 1024px) {
-  .detailActions {
-    display: flex;
-    flex-wrap: wrap;
-  }
-
-  .detailActions > * {
-    flex: 1 1 auto;
-  }
-}
+/* Channels and Decommission sheets (TeamActions). Shared pieces are admin-ui.module.css. */
 
 /* ---------- channels sheet ---------- */
 .channelList {

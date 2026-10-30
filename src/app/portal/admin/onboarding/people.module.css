@@ -1,0 +1,173 @@
+/* Hiring > People. Rows are the To do row (TodoList, todo.module.css); shared
+   pieces are admin-ui.module.css and rep.module.css. */
+
+/* ---------- top: Send an invite, search, manager ---------- */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.send:is(button) {
+  flex: none;
+}
+
+.search {
+  flex: 1 1 240px;
+}
+
+.manager {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.manager select {
+  height: 48px;
+}
+
+/* Phone: the button spans the row, search and manager share the next. */
+@media (max-width: 719px) {
+  .send:is(button) {
+    flex: 1 1 100%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .search {
+    flex: 0 1 360px;
+    margin-left: auto;
+  }
+
+  .manager {
+    flex: 0 1 220px;
+  }
+}
+
+/* "Export list": a small text link under the list. */
+.exportLink {
+  align-self: flex-start;
+  margin-top: calc(var(--s3) * -1);
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text-2);
+  font: 500 var(--t-ui) / 1 var(--f-ui);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .exportLink:hover {
+    color: var(--c-text);
+  }
+}
+
+/* ---------- person sheet ---------- */
+.block {
+  display: grid;
+  gap: var(--s2);
+  padding-top: var(--s2);
+}
+
+.blockTitle {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  margin: 0;
+  color: var(--c-text);
+  font: 650 var(--t-ui) / 1.3 var(--f-ui);
+}
+
+.blockTitle small {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+/* What happened, oldest first: the date beside the event, like the details list. */
+.timeline {
+  display: grid;
+  gap: var(--s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline > li {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: var(--s3);
+  align-items: baseline;
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  line-height: 1.4;
+}
+
+.when {
+  color: var(--c-text-3);
+  font-size: var(--t-sm);
+  font-weight: 500;
+}
+
+/* Paperwork: each item over its one line; done ones step back. */
+.paperwork {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  border-radius: var(--r-control);
+}
+
+.paperwork > li {
+  display: grid;
+  gap: 2px;
+  padding: 10px var(--s3);
+  background: var(--c-well);
+}
+
+.itemName {
+  color: var(--c-text);
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.itemLine {
+  color: var(--c-text-2);
+  font-size: var(--t-sm);
+  line-height: 1.4;
+}
+
+.paperwork > li[data-status='approved'] .itemName {
+  color: var(--c-text-2);
+  font-weight: 500;
+}
+
+.paperwork > li[data-status='rejected'] .itemLine {
+  color: var(--c-amber);
+}
+
+/* Footer actions: an even grid, two to a row on a phone, three on desktop.
+   An odd count on a phone gives the primary the whole first row. */
+.actions {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--s2);
+}
+
+@media (max-width: 1023px) {
+  .actions > :first-child:nth-last-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

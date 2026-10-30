@@ -211,8 +211,7 @@ describe('client gates', () => {
     const hasPermission = (p: string) => permissionsFor(mason).includes(p);
     expect(ONBOARDING_HUB.tabs.filter((tab) => canOpenHubTab(tab, isRole, hasPermission)).map((t) => t.key)).toEqual([
       'todo',
-      'recruits',
-      'pipeline',
+      'people',
     ]);
     for (const hub of [PEOPLE_HUB, REQUESTS_HUB, SETTINGS_HUB, SOLAR_HUB, CHAT_REPORTS_HUB]) {
       expect(hub.tabs.some((tab) => canOpenHubTab(tab, isRole, hasPermission))).toBe(false);

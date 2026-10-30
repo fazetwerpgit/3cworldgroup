@@ -21,7 +21,7 @@ import { TodoList, type TodoListItem } from './TodoList';
 // fit. Archived applicants get Restore instead.
 
 export function inviteHref(applicationId: string): string {
-  return `${hubTabHref(ONBOARDING_HUB, 'recruits')}&application=${encodeURIComponent(applicationId)}`;
+  return `${hubTabHref(ONBOARDING_HUB, 'people')}&application=${encodeURIComponent(applicationId)}`;
 }
 
 /** "Oct 6", with the year once it isn't this year. */
