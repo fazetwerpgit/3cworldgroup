@@ -358,14 +358,14 @@ describe('actions and who gets them', () => {
 
   it('invited: Copy link and Resend in the sheet; Resend on the row only when stuck', () => {
     const fine = person({ applications: [], invites: [invite()] });
-    expect(personActions(fine, FIELD_MANAGER, NOW)).toEqual(['copyLink', 'resend']);
+    expect(personActions(fine, FIELD_MANAGER, NOW)).toEqual(['copyLink', 'resend', 'cancelInvite']);
     expect(rowAction(fine, FIELD_MANAGER, NOW)).toBeNull();
     const expired = person({ applications: [], invites: [invite({ expiresAt: daysAgo(1) })] });
-    expect(personActions(expired, FIELD_MANAGER, NOW)).toEqual(['resend']);
+    expect(personActions(expired, FIELD_MANAGER, NOW)).toEqual(['resend', 'cancelInvite']);
     expect(rowAction(expired, FIELD_MANAGER, NOW)).toBe('resend');
     // An account-holder's link only ever goes to their inbox.
     const existing = person({ applications: [], invites: [invite({ existingAccount: true })] });
-    expect(personActions(existing, ADMIN, NOW)).toEqual(['resend']);
+    expect(personActions(existing, ADMIN, NOW)).toEqual(['resend', 'cancelInvite']);
   });
 
   it('paperwork sent back: Activate and Reject (any recruiting role), team actions only for the team', () => {
@@ -467,7 +467,12 @@ describe('the person sheet: one lead action, quiet rows, destructive last', () =
 
   it('invited: Resend beside nothing, Copy link under More', () => {
     const p = one({ applications: [], invites: [invite()] });
-    expect(sheetActions(p, personActions(p, FIELD_MANAGER, NOW))).toMatchObject({ primary: null, secondary: 'resend', more: ['copyLink'] });
+    expect(sheetActions(p, personActions(p, FIELD_MANAGER, NOW))).toMatchObject({
+      primary: null,
+      secondary: 'resend',
+      more: ['copyLink'],
+      danger: ['cancelInvite'],
+    });
   });
 
   it('selling: no lead, team rows, Decommission last', () => {
@@ -478,5 +483,59 @@ describe('the person sheet: one lead action, quiet rows, destructive last', () =
       more: ['fieldTrain', 'channels'],
       danger: ['decommission'],
     });
+  });
+});
+
+describe('a cancelled invite', () => {
+  const cancelled = (overrides: Partial<InviteView> = {}) =>
+    invite({ status: 'cancelled', cancelledAt: daysAgo(1), cancelledByName: 'Dana Ruiz', ...overrides });
+
+  it('is offered in the sheet (red, last) while the invite is open, and never once it is back or closed', () => {
+    const opened = one({ applications: [], invites: [invite({ status: 'in_progress' })] });
+    expect(personActions(opened, FIELD_MANAGER, NOW)).toContain('cancelInvite');
+    expect(sheetActions(opened, personActions(opened, FIELD_MANAGER, NOW)).danger).toEqual(['cancelInvite']);
+    for (const status of ['submitted', 'rejected', 'cancelled'] as const) {
+      const p = one({ applications: [], invites: [invite({ status, convertedUserId: status === 'submitted' ? 'u1' : null })] });
+      expect(personActions(p, ADMIN, NOW)).not.toContain('cancelInvite');
+    }
+    // Paperwork made an account: Reject, not Cancel.
+    const withAccount = one({ applications: [], invites: [invite({ status: 'in_progress', convertedUserId: 'u1' })], reps: [rep()] });
+    expect(personActions(withAccount, ADMIN, NOW)).not.toContain('cancelInvite');
+  });
+
+  it('typed in by hand: Not a fit with "Invite cancelled", in All and Not a fit but never in Now', () => {
+    const p = one({ applications: [], invites: [cancelled()] });
+    expect(p.stage).toBe('notFit');
+    expect(personLine(p)).toBe('Not a fit · Invite cancelled');
+    expect(inFilter(p, 'current', NOW)).toBe(false);
+    expect(inFilter(p, 'all', NOW)).toBe(true);
+    expect(inFilter(p, 'notFit', NOW)).toBe(true);
+    expect(stageCounts([p], NOW)).toMatchObject({ current: 0, all: 1, notFit: 1, invited: 0 });
+    expect(personActions(p, ADMIN, NOW)).toEqual([]);
+    expect(rowAction(p, ADMIN, NOW)).toBeNull();
+  });
+
+  it('from an application: the application (back to applied) leads, with Invite again', () => {
+    const p = one({
+      applications: [application({ status: 'applied', createdAt: daysAgo(5) })],
+      invites: [cancelled({ applicationId: 'a1', createdAt: daysAgo(3) })],
+    });
+    expect(p.stage).toBe('applied');
+    expect(inFilter(p, 'current', NOW)).toBe(true);
+    expect(rowAction(p, ADMIN, NOW)).toBe('invite');
+  });
+
+  it('a new invite after the cancelled one decides the stage', () => {
+    const p = one({
+      applications: [],
+      invites: [cancelled({ createdAt: daysAgo(3) }), invite({ id: 'i2', createdAt: daysAgo(1) })],
+    });
+    expect(p.stage).toBe('invited');
+    expect(p.invite?.id).toBe('i2');
+  });
+
+  it('shows in the timeline with who cancelled it', () => {
+    const p = one({ applications: [], invites: [cancelled()] });
+    expect(personTimeline(p, NOW).map((entry) => entry.text)).toContain('Invite cancelled · by Dana Ruiz');
   });
 });

@@ -52,7 +52,9 @@ export type OnboardingInviteStatus =
   | 'approved'
   | 'rejected'
   | 'expired'
-  | 'converted';
+  | 'converted'
+  /** Called off by a manager before the paperwork came back: the link stops working. */
+  | 'cancelled';
 
 export interface ApplicationRecord {
   id: string;
@@ -116,6 +118,10 @@ export interface OnboardingInvite {
   emailError?: string;
   deliveredAt?: Date;
   bouncedAt?: Date;
+  /** Set when a manager cancels the invite (status 'cancelled') before it came back. */
+  cancelledAt?: Date;
+  cancelledBy?: string;
+  cancelledByName?: string;
 }
 
 export interface CandidateOnboardingItem {
@@ -150,4 +156,5 @@ export const RecruitingStatusLabels: Record<OnboardingInviteStatus, string> = {
   rejected: 'Rejected',
   expired: 'Expired',
   converted: 'Converted',
+  cancelled: 'Cancelled',
 };

@@ -1,8 +1,9 @@
+import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { requireVerifiedUser } from '@/lib/auth/requireVerifiedAdmin';
 import { createInviteToken, getInviteExpiration } from '@/lib/recruiting/tokens';
-import { getRecruitingRequester } from '@/lib/recruiting/requester';
+import { getRecruitingRequester, type RecruitingRequester } from '@/lib/recruiting/requester';
 import { isInviteExpired } from '@/lib/recruiting/inviteLookup';
 import { inviteEmailFields, inviteUrlFor, openInviteToken, sealInviteToken, sendInviteEmail } from '@/lib/recruiting/inviteLink';
 import { saveInviteEmailStatus } from '@/lib/recruiting/inviteEmailStatus';
@@ -16,14 +17,29 @@ import { saveInviteEmailStatus } from '@/lib/recruiting/inviteEmailStatus';
 //           If the recruit already opened the old one, a fresh token breaks
 //           the page they have open (uploads are kept: they are stored by
 //           invite id), so that needs { replaceOpenedLink: true }.
-// Only invites the recruit can still fill in qualify: a submitted, activated or
-// rejected invite has no use for its link.
+//   PATCH { action: 'cancel' } -> calls the invite off before the paperwork
+//           comes back: status 'cancelled', and the link stops working. An
+//           invite made from a website application puts that application back
+//           to 'applied', so it shows in To do again.
+// Only invites the recruit can still fill in qualify: a submitted, activated,
+// rejected or cancelled invite has no use for its link.
 
 const OPEN_STATUSES = ['invited', 'in_progress', 'expired'];
 
+function closedMessage(status: unknown) {
+  return status === 'cancelled'
+    ? 'This invite was cancelled.'
+    : 'This recruit already submitted their onboarding, so the link is closed.';
+}
+
 type Loaded =
   | { ok: false; response: NextResponse }
-  | { ok: true; ref: FirebaseFirestore.DocumentReference; data: FirebaseFirestore.DocumentData };
+  | {
+      ok: true;
+      ref: FirebaseFirestore.DocumentReference;
+      data: FirebaseFirestore.DocumentData;
+      requester: RecruitingRequester;
+    };
 
 async function loadOpenInvite(request: NextRequest, id: string): Promise<Loaded> {
   const fail = (error: string, status: number): Loaded => ({
@@ -43,10 +59,8 @@ async function loadOpenInvite(request: NextRequest, id: string): Promise<Loaded>
   if (!doc.exists) return fail('Invite not found', 404);
   const data = doc.data() ?? {};
   if (!requester.canViewAll && data.ownerId !== gate.uid) return fail('Forbidden', 403);
-  if (!OPEN_STATUSES.includes(data.status)) {
-    return fail('This recruit already submitted their onboarding, so the link is closed.', 409);
-  }
-  return { ok: true, ref, data };
+  if (!OPEN_STATUSES.includes(data.status)) return fail(closedMessage(data.status), 409);
+  return { ok: true, ref, data, requester };
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -138,5 +152,69 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (error) {
     console.error('Error re-sending invite:', error);
     return NextResponse.json({ error: 'Failed to re-send the invite' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    // Same gate as the link and Resend: management and recruiters on any
+    // invite, a field manager only on the ones they sent.
+    const invite = await loadOpenInvite(request, id);
+    if (!invite.ok) return invite.response;
+    const body: unknown = await request.json().catch(() => null);
+    const action = typeof body === 'object' && body !== null && 'action' in body ? body.action : null;
+    if (action !== 'cancel') {
+      return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    }
+    const db = adminDb;
+    if (!db) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+    const { ref, requester } = invite;
+
+    // Read again inside the transaction: the recruit may send the packet back
+    // (or another manager cancel it) between the check above and this write.
+    const outcome = await db.runTransaction(async (tx) => {
+      const fresh = await tx.get(ref);
+      const data = fresh.data() ?? {};
+      if (!fresh.exists) return { ok: false as const, status: 404, error: 'Invite not found' };
+      if (!OPEN_STATUSES.includes(data.status)) {
+        return { ok: false as const, status: 409, error: closedMessage(data.status) };
+      }
+      const applicationId = typeof data.applicationId === 'string' && data.applicationId ? data.applicationId : null;
+      const applicationRef = applicationId ? db.collection('applications').doc(applicationId) : null;
+      const application = applicationRef ? await tx.get(applicationRef) : null;
+
+      const now = new Date();
+      tx.update(ref, {
+        status: 'cancelled',
+        cancelledAt: now,
+        cancelledBy: requester.uid,
+        cancelledByName: requester.name,
+        updatedAt: now,
+      });
+      // The application this invite came from goes back to waiting in To do,
+      // unless it has moved on since (another invite, Not a fit, a hire).
+      let applicationReopened = false;
+      if (applicationRef && application?.exists) {
+        const app = application.data() ?? {};
+        const linkedHere = app.inviteId === undefined || app.inviteId === id;
+        if (app.status === 'invited' && linkedHere && !app.convertedUserId) {
+          tx.update(applicationRef, { status: 'applied', inviteId: FieldValue.delete(), updatedAt: now });
+          applicationReopened = true;
+        }
+      }
+      return { ok: true as const, cancelledAt: now, applicationReopened };
+    });
+
+    if (!outcome.ok) return NextResponse.json({ error: outcome.error }, { status: outcome.status });
+    return NextResponse.json({
+      status: 'cancelled',
+      cancelledAt: outcome.cancelledAt.toISOString(),
+      cancelledByName: requester.name,
+      applicationReopened: outcome.applicationReopened,
+    });
+  } catch (error) {
+    console.error('Error cancelling invite:', error);
+    return NextResponse.json({ error: 'Failed to cancel the invite' }, { status: 500 });
   }
 }

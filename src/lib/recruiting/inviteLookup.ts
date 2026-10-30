@@ -23,7 +23,10 @@ export function isInviteExpired(expiresAt: FirebaseFirestore.Timestamp | undefin
 export const SUBMITTED_INVITE_STATUSES = ['submitted', 'approved', 'converted'];
 
 /** Closed for good: the packet can no longer be filled in or sent. */
-export const CLOSED_INVITE_STATUSES = ['rejected', 'expired'];
+export const CLOSED_INVITE_STATUSES = ['rejected', 'expired', 'cancelled'];
+
+/** What the hire sees on a link whose invite a manager cancelled. */
+export const CANCELLED_INVITE_MESSAGE = 'This invite was cancelled. Ask your manager for a new one.';
 
 /**
  * Where a hire holding this invite stands, coarse enough to hand the client:

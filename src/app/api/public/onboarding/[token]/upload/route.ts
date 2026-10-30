@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb, getOnboardingBucket } from '@/lib/firebase/admin';
 import {
+  CANCELLED_INVITE_MESSAGE,
   CLOSED_INVITE_STATUSES,
   getInviteByToken,
   isInviteExpired,
@@ -26,6 +27,9 @@ export async function POST(
     const invite = await getInviteByToken(token);
     if (!invite) {
       return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
+    }
+    if (invite.data.status === 'cancelled') {
+      return NextResponse.json({ error: CANCELLED_INVITE_MESSAGE }, { status: 410 });
     }
     if (isInviteExpired(invite.data.expiresAt) || invite.data.status === 'expired') {
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });

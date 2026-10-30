@@ -58,6 +58,9 @@ export interface InviteView {
   submittedAt: string | null;
   createdAt: string | null;
   updatedAt?: string | null;
+  /** Set on a cancelled invite (status 'cancelled'). */
+  cancelledAt?: string | null;
+  cancelledByName?: string | null;
 }
 
 export interface Notice {
@@ -234,7 +237,42 @@ export function useInviteActions({
     }
   };
 
-  return { linkBusy, processingId, shownLink, setShownLink, copyInviteLink, resendInvite, convertInvite };
+  /** Cancel an invite that hasn't come back yet: its link stops working. Resolves true when it went through. */
+  const cancelInvite = async (invite: InviteView): Promise<boolean> => {
+    setProcessingId(invite.id);
+    notify(null);
+    try {
+      const response = await fetch(`/api/portal/recruiting/invites/${invite.id}`, {
+        method: 'PATCH',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ action: 'cancel' }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof json.error === 'string' ? json.error : 'Failed to cancel the invite');
+      const back = json.applicationReopened ? ' Their application is back in To do.' : '';
+      notify({ tone: 'ok', text: `${invite.candidateName}'s invite is cancelled. The link no longer works.${back}` });
+      setShownLink((shown) => (shown?.id === invite.id ? null : shown));
+      await reload();
+      onChanged?.();
+      return true;
+    } catch (err) {
+      notify({ tone: 'error', text: err instanceof Error ? err.message : 'Failed to cancel the invite' });
+      return false;
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  return {
+    linkBusy,
+    processingId,
+    shownLink,
+    setShownLink,
+    copyInviteLink,
+    resendInvite,
+    convertInvite,
+    cancelInvite,
+  };
 }
 
 /** A link shown under someone (copied or re-sent by hand): selectable, with Open. */

@@ -49,6 +49,14 @@ describe('POST /api/public/onboarding/[token]/upload', () => {
     expect(saveMock).not.toHaveBeenCalled();
   });
 
+  it('refuses files for a cancelled invite with the cancelled message', async () => {
+    getInviteByTokenMock.mockResolvedValue({ id: 'inv1', data: { status: 'cancelled' } });
+    const response = await upload(new File([PDF], 'w9.pdf', { type: 'application/pdf' }));
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining('cancelled') });
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
   it('refuses a file declared as a PDF whose bytes are not an accepted type', async () => {
     const response = await upload(new File([HTML], 'w9.pdf', { type: 'application/pdf' }));
     expect(response.status).toBe(400);

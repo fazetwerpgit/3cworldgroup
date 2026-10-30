@@ -45,6 +45,8 @@ function serializeInvite(doc: FirebaseFirestore.QueryDocumentSnapshot) {
     submittedAt: data.submittedAt?.toDate?.()?.toISOString?.() ?? null,
     createdAt: data.createdAt?.toDate?.()?.toISOString?.() ?? null,
     updatedAt: data.updatedAt?.toDate?.()?.toISOString?.() ?? null,
+    cancelledAt: data.cancelledAt?.toDate?.()?.toISOString?.() ?? null,
+    cancelledByName: typeof data.cancelledByName === 'string' ? data.cancelledByName : null,
   };
 }
 

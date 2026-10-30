@@ -358,3 +358,26 @@ it('marks the linked application invited and clears any Not a fit stamp', async 
     expect(sentinel(data[field])).toBe('FieldValue.delete');
   }
 });
+
+it('invites the same email again after its earlier invite was cancelled', async () => {
+  state.invites = [
+    invite(1, { candidateEmail: 'rex@example.com', status: 'cancelled', applicationId: 'app-7' }),
+  ];
+  const response = await POST(inviteRequest());
+  expect(response.status).toBe(200);
+  expect(state.created).toMatchObject({ candidateEmail: 'rex@example.com', status: 'invited' });
+});
+
+it('lists a cancelled invite with when and by whom', async () => {
+  state.invites = [
+    invite(1, { status: 'cancelled', cancelledAt: at(0), cancelledByName: 'Mia Manager' }),
+    invite(2),
+  ];
+  const json = await (await GET(getRequest())).json();
+  expect(json.invites[0]).toMatchObject({
+    status: 'cancelled',
+    cancelledAt: new Date(Date.UTC(2026, 8, 1)).toISOString(),
+    cancelledByName: 'Mia Manager',
+  });
+  expect(json.invites[1]).toMatchObject({ cancelledAt: null, cancelledByName: null });
+});

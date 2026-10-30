@@ -245,6 +245,24 @@ describe('GET /api/public/onboarding/[token]', () => {
     await expect(response.json()).resolves.toMatchObject({ items: [], locked: true, closed: true });
   });
 
+  it('refuses a cancelled invite with a clear message, even before its expiry', async () => {
+    inviteData.status = 'cancelled';
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toEqual({
+      error: 'This invite was cancelled. Ask your manager for a new one.',
+    });
+    expect(inviteRef.set).not.toHaveBeenCalled();
+  });
+
+  it('refuses a cancelled invite past its expiry without rewriting it to expired', async () => {
+    inviteData.status = 'cancelled';
+    inviteData.expiresAt = { toDate: () => new Date('2020-01-01T00:00:00.000Z') };
+    const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
+    expect(response.status).toBe(410);
+    expect(inviteRef.set).not.toHaveBeenCalled();
+  });
+
   it('marks a lapsed open invite expired', async () => {
     inviteData.expiresAt = { toDate: () => new Date('2020-01-01T00:00:00.000Z') };
     const response = await GET(new NextRequest('http://localhost/api/public/onboarding/token-1', { body: '{}' }), params());
@@ -377,6 +395,18 @@ describe('POST /api/public/onboarding/[token]', () => {
       expect(batchSetMock).not.toHaveBeenCalled();
     }
   );
+
+  it('refuses a packet on a cancelled invite: no account, no write', async () => {
+    inviteData.status = 'cancelled';
+    const response = await POST(request({ onboarding_submission: 'completed' }), params());
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'This invite was cancelled. Ask your manager for a new one.',
+    });
+    expect(createUserMock).not.toHaveBeenCalled();
+    expect(batchSetMock).not.toHaveBeenCalled();
+    expect(inviteRef.set).not.toHaveBeenCalled();
+  });
 
   it.each(['rejected', 'expired'])('refuses a %s invite without touching the account', async (status) => {
     inviteData.status = status;

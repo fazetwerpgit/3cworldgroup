@@ -297,6 +297,9 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
         case 'reject':
           if (invite) await invites.convertInvite(invite, 'rejected');
           return;
+        case 'cancelInvite':
+          if (invite) await invites.cancelInvite(invite);
+          return;
         case 'fieldTrain':
           if (rep) await teamActions.requestFieldTraining(rep);
           return;
@@ -326,9 +329,11 @@ function PeopleBody({ onChanged }: { onChanged?: () => void }) {
     }
   };
 
-  // The invite form offers applicants nobody has invited yet.
+  // The invite form offers applicants nobody has invited yet (or whose invite was cancelled).
   const pickable = people.flatMap((person) =>
-    person.stage === 'applied' && person.application && !person.invite ? [person.application] : []
+    person.stage === 'applied' && person.application && (!person.invite || person.invite.status === 'cancelled')
+      ? [person.application]
+      : []
   );
   const checkPerson = team.data?.checklists.find((person) => person.userId === checkUser) ?? null;
   const sheetBusy: PersonAction | null =

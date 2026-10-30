@@ -173,6 +173,13 @@ function latestReview(checklist: ChecklistPerson | null): number | null {
   return latest;
 }
 
+const INVITE_CANCELLED = 'Invite cancelled';
+
+/** Their invite was cancelled and nothing newer leads: shown in All and Not a fit, never in Now. */
+export function isCancelledInvite(person: Pick<Person, 'stage' | 'invite'>): boolean {
+  return person.stage === 'notFit' && person.invite?.status === 'cancelled';
+}
+
 interface Placed {
   stage: PeopleStage;
   detail: string;
@@ -231,13 +238,17 @@ export function placePerson(
     return { stage: 'selling', detail: sold.join(' · '), since };
   }
 
+  const waitingApplication =
+    !!application && (application.status === 'applied' || application.status === 'contacted');
   // Re-applied after an invite that went nowhere: the new application leads.
+  // So does the application a cancelled invite came from (it goes back to
+  // 'applied' and waits in To do again).
   const reapplied =
     !!invite &&
-    !!application &&
-    (invite.status === 'rejected' || shownStatus(invite, now) === 'expired') &&
-    (application.status === 'applied' || application.status === 'contacted') &&
-    (toMs(application.createdAt) ?? 0) > (toMs(invite.createdAt) ?? 0);
+    waitingApplication &&
+    (invite.status === 'cancelled' ||
+      ((invite.status === 'rejected' || shownStatus(invite, now) === 'expired') &&
+        (toMs(application!.createdAt) ?? 0) > (toMs(invite.createdAt) ?? 0)));
 
   if (invite && !reapplied) {
     switch (shownStatus(invite, now)) {
@@ -263,6 +274,13 @@ export function placePerson(
         return { stage: 'selling', detail: 'Joined the team', since: toMs(invite.updatedAt) };
       case 'rejected':
         return { stage: 'notFit', detail: 'Paperwork turned down', since: toMs(invite.updatedAt) };
+      case 'cancelled':
+        // Off the way in, like Not a fit, but never in Now (see inFilter).
+        return {
+          stage: 'notFit',
+          detail: INVITE_CANCELLED,
+          since: toMs(invite.cancelledAt) ?? toMs(invite.updatedAt),
+        };
     }
   }
 
@@ -385,6 +403,7 @@ const ON_THE_WAY: ReadonlySet<PeopleStage> = new Set(['invited', 'paperwork', 'r
 export function inFilter(person: Person, filter: PeopleFilter, now = Date.now()): boolean {
   if (filter === 'all') return true;
   if (filter !== 'current') return person.stage === filter;
+  if (isCancelledInvite(person)) return false;
   if (ON_THE_WAY.has(person.stage)) return true;
   if (person.stage === 'applied') return isFreshApplicant(person.application?.createdAt ?? null, now);
   return person.since !== null && now - person.since <= RECENT_DAYS * DAY_MS;
@@ -473,6 +492,14 @@ export function personTimeline(person: Person, now = Date.now()): TimelineEntry[
     if (status === 'expired') add(`expired-${invite.id}`, invite.expiresAt, 'The link ran out');
     if (invite.submittedAt) add(`sent-${invite.id}`, invite.submittedAt, 'Sent their paperwork back');
     if (invite.status === 'rejected') add(`rejected-${invite.id}`, invite.updatedAt, 'Paperwork turned down');
+    if (invite.status === 'cancelled') {
+      add(
+        `cancelled-${invite.id}`,
+        invite.cancelledAt ?? invite.updatedAt,
+        INVITE_CANCELLED,
+        invite.cancelledByName ? `by ${invite.cancelledByName}` : ''
+      );
+    }
   }
   const { rep } = person;
   if (rep?.activatedAt) add('activated', rep.activatedAt, 'Activated');
@@ -539,6 +566,7 @@ export type PersonAction =
   | 'restore'
   | 'copyLink'
   | 'resend'
+  | 'cancelInvite'
   | 'activate'
   | 'reject'
   | 'review'
@@ -567,7 +595,7 @@ export function personActions(person: Person, caps: PeopleCaps, now = Date.now()
   }
   if (invite && !rep && (stage === 'invited' || stage === 'paperwork') && canResend(invite, now)) {
     if (canCopyLink(invite, now)) actions.push('copyLink');
-    actions.push('resend');
+    actions.push('resend', 'cancelInvite');
   }
   if (rep && caps.canSeeTeam && person.checklist && person.checklist.items.length > 0) actions.push('review');
   if (rep && caps.canSeeTeam && rep.stage !== 'decommissioned') actions.push('fieldTrain', 'channels');
@@ -615,7 +643,7 @@ export interface SheetActions {
 }
 
 const LEADS: readonly PersonAction[] = ['invite', 'activate', 'restore', 'reinstate'];
-const DANGER: readonly PersonAction[] = ['reject', 'decommission'];
+const DANGER: readonly PersonAction[] = ['reject', 'cancelInvite', 'decommission'];
 
 /**
  * How the person sheet lays out personActions: one lead action for where they

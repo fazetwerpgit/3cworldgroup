@@ -3,6 +3,7 @@ import { notifyOnboardingSubmitted } from '@/lib/onboarding/ownerNotify';
 import { DISPLAY_NAME_TAKEN_ERROR, isDisplayNameTaken } from '@/lib/users/displayNameTaken';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import {
+  CANCELLED_INVITE_MESSAGE,
   CLOSED_INVITE_STATUSES,
   getInviteByToken,
   isInviteExpired,
@@ -61,6 +62,10 @@ export async function GET(
     }
 
     const data = invite.data;
+    // A manager called the invite off: the link is dead, whatever its date.
+    if (data.status === 'cancelled') {
+      return NextResponse.json({ error: CANCELLED_INVITE_MESSAGE }, { status: 410 });
+    }
     if (data.status === 'expired') {
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });
     }
@@ -159,6 +164,9 @@ export async function POST(
     }
 
     const data = invite.data;
+    if (data.status === 'cancelled') {
+      return NextResponse.json({ error: CANCELLED_INVITE_MESSAGE }, { status: 410 });
+    }
     if (lapsedOpenInvite(data)) {
       await invite.ref.set({ status: 'expired', updatedAt: new Date() }, { merge: true });
       return NextResponse.json({ error: 'This onboarding link has expired' }, { status: 410 });

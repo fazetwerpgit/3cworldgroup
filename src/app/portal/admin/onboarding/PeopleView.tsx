@@ -31,6 +31,7 @@ const ACTION_LABEL: Record<PersonAction, string> = {
   restore: 'Restore',
   copyLink: 'Copy link',
   resend: 'Resend',
+  cancelInvite: 'Cancel invite',
   activate: 'Activate',
   reject: 'Reject',
   review: 'Check',
@@ -48,7 +49,7 @@ const SHEET_LABEL: Partial<Record<PersonAction, string>> = {
   fieldTrain: 'Request field training',
 };
 
-const DANGER_ROWS: ReadonlySet<PersonAction> = new Set(['reject', 'decommission']);
+const DANGER_ROWS: ReadonlySet<PersonAction> = new Set(['reject', 'cancelInvite', 'decommission']);
 
 /** "Oct 6", with the year once it isn't this year. */
 function shortDate(ms: number | null, now: number): string {
@@ -222,7 +223,7 @@ export function PersonSheet({
   shownLink,
   now,
 }: PersonSheetProps) {
-  const [confirm, setConfirm] = useState<'reject' | 'replace' | null>(null);
+  const [confirm, setConfirm] = useState<'reject' | 'replace' | 'cancelInvite' | null>(null);
   const confirmRef = useRef<HTMLDivElement | null>(null);
   // A confirm opens beside the row or button that asked for it: bring it into view.
   useEffect(() => {
@@ -287,6 +288,7 @@ export function PersonSheet({
 
   const run = (action: PersonAction) => {
     if (action === 'reject') return setConfirm('reject');
+    if (action === 'cancelInvite') return setConfirm('cancelInvite');
     if (action === 'resend' && invite && opensLegacyLink(invite)) return setConfirm('replace');
     onAction(person, action);
   };
@@ -348,6 +350,26 @@ export function PersonSheet({
             }}
           >
             Yes, reject
+          </button>
+        </span>
+      </div>
+    ) : confirm === 'cancelInvite' && invite ? (
+      <div className={u.confirm} role="alert" ref={confirmRef}>
+        <span>Cancel {person.name}&apos;s invite? The link they were sent stops working.</span>
+        <span className={u.btnRow}>
+          <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setConfirm(null)}>
+            Keep it
+          </button>
+          <button
+            type="button"
+            className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+            disabled={busy !== null}
+            onClick={() => {
+              setConfirm(null);
+              onAction(person, 'cancelInvite');
+            }}
+          >
+            Yes, cancel invite
           </button>
         </span>
       </div>
