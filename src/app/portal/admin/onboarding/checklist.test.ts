@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canCheck, isWaitingOnYou, itemLine, oldestUpload, signedWithoutCopy, type ChecklistItem } from './checklist';
+import { canCheck, isWaitingOnYou, itemLine, itemState, oldestUpload, signedWithoutCopy, type ChecklistItem } from './checklist';
 
 function item(overrides: Partial<ChecklistItem> = {}): ChecklistItem {
   return {
@@ -84,5 +84,19 @@ describe('a sensitive upload the caller cannot approve (operations)', () => {
     const now = new Date('2026-07-26T00:00:00.000Z').getTime();
     expect(itemLine(license({ adminOnly: true }), now)).toBe('Uploaded just now · waiting on an admin');
     expect(itemLine(license(), now)).toBe('Uploaded just now');
+  });
+});
+
+describe('itemState', () => {
+  const now = new Date('2026-10-29T12:00:00Z').getTime();
+  it('says where an item stands in a few words', () => {
+    expect(itemState(item({ esignEnvelopeId: null, hasSignedPdf: true, reviewedAt: '2026-10-28T15:00:00Z' }), now)).toBe('Approved Oct 28');
+    expect(itemState(item({ reviewedAt: '2025-03-02T15:00:00Z' }), now)).toBe('Approved Mar 2, 2025');
+    expect(itemState(item({ status: 'pending' as ChecklistItem['status'] }), now)).toBe('Not started');
+    expect(itemState(item({ status: 'rejected' }), now)).toBe('Sent back');
+    const upload = item({ itemId: 'drivers_license', referenceKind: 'storage', status: 'submitted', esignEnvelopeId: null });
+    expect(itemState(upload, now)).toBe('To check');
+    expect(itemState({ ...upload, adminOnly: true }, now)).toBe('Waiting on an admin');
+    expect(itemState({ ...upload, onHold: true }, now)).toBe('On hold');
   });
 });

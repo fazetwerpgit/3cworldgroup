@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Loader2, Search, UserPlus } from 'lucide-react';
 import { AdminEmpty, AdminNotice } from '@/components/portal/admin-d/AdminUi';
 import { AdminSheet } from '@/components/portal/admin-d/AdminSheet';
@@ -8,8 +8,8 @@ import s from '@/components/portal/rep/rep.module.css';
 import u from '@/components/portal/admin-d/admin-ui.module.css';
 import { displayPhone, telHref } from '@/lib/phone';
 import { RoleDisplayNames } from '@/types';
-import { itemLine, timeAgo } from './checklist';
-import { opensLegacyLink, PEOPLE_STAGES, personLine, personTimeline, STAGE_FILTER_LABEL } from './peopleList';
+import { itemState, timeAgo } from './checklist';
+import { opensLegacyLink, PEOPLE_STAGES, personLine, personTimeline, sheetActions, STAGE_FILTER_LABEL } from './peopleList';
 import type { PeopleFilter, Person, PersonAction } from './peopleList';
 import { ShownLink, type Notice } from './Invites';
 import { TodoList } from './TodoList';
@@ -39,6 +39,16 @@ const ACTION_LABEL: Record<PersonAction, string> = {
   decommission: 'Decommission',
   reinstate: 'Reinstate',
 };
+
+/** The sheet spells out what the row's one-word button means. */
+const SHEET_LABEL: Partial<Record<PersonAction, string>> = {
+  review: 'Review documents',
+  resend: 'Resend invite',
+  copyLink: 'Copy invite link',
+  fieldTrain: 'Request field training',
+};
+
+const DANGER_ROWS: ReadonlySet<PersonAction> = new Set(['reject', 'decommission']);
 
 /** "Oct 6", with the year once it isn't this year. */
 function shortDate(ms: number | null, now: number): string {
@@ -121,24 +131,35 @@ export function PeopleView({
   return (
     <>
       <div className={pp.top}>
-        <button type="button" className={`${s.btnPrimary} ${u.primarySm} ${pp.send}`} onClick={onSendInvite}>
-          <UserPlus size={18} aria-hidden="true" />
-          Send an invite
-        </button>
         <label className={`${u.search} ${pp.search}`}>
           <Search size={18} aria-hidden="true" />
           <input
             className={u.input}
             type="search"
-            placeholder="Search name, email, phone"
+            placeholder="Name, email or phone"
             aria-label="Search people"
             value={query}
             onChange={(event) => onQuery(event.target.value)}
           />
         </label>
+        <button type="button" className={`${s.btnPrimary} ${u.primarySm} ${pp.send}`} onClick={onSendInvite}>
+          <UserPlus size={18} aria-hidden="true" />
+          <span className={pp.sendShort}>Invite</span>
+          <span className={pp.sendLong}>Send an invite</span>
+        </button>
+      </div>
+
+      <div className={u.chips} role="group" aria-label="Filter people">
+        {FILTER_ORDER.map((key) => (
+          <button key={key} type="button" className={u.chip} aria-pressed={filter === key} onClick={() => onFilter(key)}>
+            {FILTER_LABEL[key]}
+            {counts ? <span className={`${u.chipCount} ${u.num}`}>{counts[key]}</span> : null}
+          </button>
+        ))}
+        {/* Managers sit with the other filters, as one more chip (team viewers with two or more). */}
         {managers.length > 1 ? (
-          <span className={`${u.selectWrap} ${pp.manager}`}>
-            <select className={u.input} value={manager} onChange={(e) => onManager(e.target.value)} aria-label="Manager">
+          <span className={pp.managerChip} data-picked={manager !== 'all' || undefined}>
+            <select value={manager} onChange={(e) => onManager(e.target.value)} aria-label="Manager">
               <option value="all">All managers</option>
               {managers.map((name) => (
                 <option key={name} value={name}>
@@ -146,18 +167,9 @@ export function PeopleView({
                 </option>
               ))}
             </select>
-            <ChevronDown size={18} aria-hidden="true" />
+            <ChevronDown size={16} aria-hidden="true" />
           </span>
         ) : null}
-      </div>
-
-      <div className={u.chips} role="group" aria-label="Stage">
-        {FILTER_ORDER.map((key) => (
-          <button key={key} type="button" className={u.chip} aria-pressed={filter === key} onClick={() => onFilter(key)}>
-            {FILTER_LABEL[key]}
-            {counts ? <span className={`${u.chipCount} ${u.num}`}>{counts[key]}</span> : null}
-          </button>
-        ))}
       </div>
 
       <section className={s.panel} id="people" aria-label="People">
@@ -211,6 +223,11 @@ export function PersonSheet({
   now,
 }: PersonSheetProps) {
   const [confirm, setConfirm] = useState<'reject' | 'replace' | null>(null);
+  const confirmRef = useRef<HTMLDivElement | null>(null);
+  // A confirm opens beside the row or button that asked for it: bring it into view.
+  useEffect(() => {
+    if (confirm) confirmRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [confirm]);
   const { rep, invite, checklist } = person;
 
   const facts: { label: string; value: ReactNode }[] = [
@@ -274,35 +291,96 @@ export function PersonSheet({
     onAction(person, action);
   };
 
-  // The stage's own action (personActions lists it first) leads in lime; the rest are secondary.
-  const primary =
-    actions[0] === 'review' && person.toCheck > 0
-      ? 'review'
-      : actions.find((action) => ['invite', 'activate', 'restore', 'reinstate'].includes(action));
-  const button = (action: PersonAction) => (
+  // One lead action for where they are (plus at most one beside it) at the
+  // foot; everything else as quiet rows under More, the destructive ones last.
+  const sheet = sheetActions(person, actions);
+  const label = (action: PersonAction) => SHEET_LABEL[action] ?? ACTION_LABEL[action];
+  const spinner = (action: PersonAction) =>
+    busy === action ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null;
+  const footButton = (action: PersonAction, lead: boolean) => (
     <button
       key={action}
       type="button"
-      className={
-        action === primary
-          ? `${s.btnPrimary} ${u.primarySm}`
-          : `${s.btnSecondary} ${u.sm} ${action === 'decommission' || action === 'reject' ? u.danger : ''}`
-      }
+      className={lead ? `${s.btnPrimary} ${u.primarySm}` : `${s.btnSecondary} ${u.sm}`}
       disabled={busy !== null}
       onClick={() => run(action)}
     >
-      {busy === action ? <Loader2 size={16} className={u.spin} aria-hidden="true" /> : null}
-      {action === 'review' ? 'Review documents' : ACTION_LABEL[action]}
+      {spinner(action)}
+      {label(action)}
     </button>
   );
-  const ordered = primary ? [primary, ...actions.filter((action) => action !== primary)] : actions;
+  const row = (action: PersonAction) => (
+    <li key={action}>
+      <button
+        type="button"
+        className={pp.moreRow}
+        data-danger={DANGER_ROWS.has(action) || undefined}
+        disabled={busy !== null}
+        onClick={() => run(action)}
+      >
+        <span>{label(action)}</span>
+        {spinner(action)}
+      </button>
+    </li>
+  );
+  const footer =
+    sheet.primary || sheet.secondary ? (
+      <>
+        {sheet.secondary ? footButton(sheet.secondary, false) : null}
+        {sheet.primary ? footButton(sheet.primary, true) : null}
+      </>
+    ) : undefined;
+  const confirmBox =
+    confirm === 'reject' && invite ? (
+      <div className={u.confirm} role="alert" ref={confirmRef}>
+        <span>Reject {person.name}? This deactivates their account.</span>
+        <span className={u.btnRow}>
+          <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setConfirm(null)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
+            disabled={busy !== null}
+            onClick={() => {
+              setConfirm(null);
+              onAction(person, 'reject');
+            }}
+          >
+            Yes, reject
+          </button>
+        </span>
+      </div>
+    ) : confirm === 'replace' && invite ? (
+      <div className={u.confirm} role="alert" ref={confirmRef}>
+        <span>
+          {person.name} already opened their first link. A new link replaces it: if their onboarding page is still
+          open, they&apos;ll need the new email. Files they uploaded are kept.
+        </span>
+        <span className={u.btnRow}>
+          <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setConfirm(null)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={`${s.btnSecondary} ${u.sm}`}
+            onClick={() => {
+              setConfirm(null);
+              onAction(person, 'resend', { replaceOpenedLink: true });
+            }}
+          >
+            Yes, send a new link
+          </button>
+        </span>
+      </div>
+    ) : null;
 
   return (
     <AdminSheet
       title={person.name}
       description={personLine(person)}
       onClose={onClose}
-      footer={ordered.length ? <div className={pp.actions}>{ordered.map(button)}</div> : undefined}
+      footer={footer}
     >
       <div className={u.sheetPad}>
         {notice ? (
@@ -311,51 +389,6 @@ export function PersonSheet({
           </AdminNotice>
         ) : null}
         {shownLink ? <ShownLink url={shownLink} /> : null}
-        {confirm === 'reject' && invite ? (
-          <div className={u.confirm} role="alert">
-            <span>Reject {person.name}? This deactivates their account.</span>
-            <span className={u.btnRow}>
-              <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setConfirm(null)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${u.sm} ${u.danger}`}
-                disabled={busy !== null}
-                onClick={() => {
-                  setConfirm(null);
-                  onAction(person, 'reject');
-                }}
-              >
-                Yes, reject
-              </button>
-            </span>
-          </div>
-        ) : null}
-        {confirm === 'replace' && invite ? (
-          <div className={u.confirm} role="alert">
-            <span>
-              {person.name} already opened their first link. A new link replaces it: if their onboarding page is still
-              open, they&apos;ll need the new email. Files they uploaded are kept.
-            </span>
-            <span className={u.btnRow}>
-              <button type="button" className={`${s.btnSecondary} ${u.sm}`} onClick={() => setConfirm(null)}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={`${s.btnSecondary} ${u.sm}`}
-                onClick={() => {
-                  setConfirm(null);
-                  onAction(person, 'resend', { replaceOpenedLink: true });
-                }}
-              >
-                Yes, send a new link
-              </button>
-            </span>
-          </div>
-        ) : null}
-
         {facts.length ? (
           <dl className={t.details}>
             {facts.map((fact) => (
@@ -393,13 +426,34 @@ export function PersonSheet({
                 </small>
               ) : null}
             </h3>
-            <ul className={pp.paperwork}>
+            <dl className={pp.paperwork}>
               {items.map((item) => (
-                <li key={item.id} data-status={item.status}>
-                  <span className={pp.itemName}>{item.itemLabel}</span>
-                  <span className={pp.itemLine}>{itemLine(item, now)}</span>
-                </li>
+                <div key={item.id} data-status={item.status}>
+                  <dt>
+                    {item.itemLabel}
+                    {item.status === 'rejected' && item.rejectionReason ? (
+                      <span className={pp.itemNote}>{item.rejectionReason}</span>
+                    ) : null}
+                  </dt>
+                  <dd className={u.num}>{itemState(item, now)}</dd>
+                </div>
               ))}
+            </dl>
+          </section>
+        ) : null}
+
+        {sheet.activateNote ? <p className={u.hint}>{sheet.activateNote}</p> : null}
+
+        {confirmBox}
+
+        {sheet.more.length || sheet.danger.length ? (
+          <section className={pp.block} aria-labelledby="person-more">
+            <h3 id="person-more" className={pp.blockTitle}>
+              More
+            </h3>
+            <ul className={pp.more}>
+              {sheet.more.map(row)}
+              {sheet.danger.map(row)}
             </ul>
           </section>
         ) : null}

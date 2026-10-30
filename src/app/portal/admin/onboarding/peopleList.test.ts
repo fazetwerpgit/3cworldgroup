@@ -12,6 +12,7 @@ import {
   personLine,
   personTimeline,
   rowAction,
+  sheetActions,
   stageCounts,
   type PeopleCaps,
   type Person,
@@ -433,5 +434,49 @@ describe('timeline and export', () => {
   it('exports the stage in words', () => {
     const p = one({ applications: [application()], invites: [] });
     expect(peopleExportRow(p)).toMatchObject({ name: 'Maya Torres', stage: 'Applied', detail: 'Fiber · Austin, TX' });
+  });
+});
+
+describe('the person sheet: one lead action, quiet rows, destructive last', () => {
+  const submitted = { applications: [], invites: [invite({ status: 'submitted', convertedUserId: 'u1', submittedAt: daysAgo(1) })] };
+
+  it('uploads to check: Review leads and Activate waits, with the reason', () => {
+    const p = one({ ...submitted, reps: [rep()], checklists: [checklist('u1', 1, [{}])] });
+    expect(sheetActions(p, personActions(p, ADMIN, NOW))).toEqual({
+      primary: 'review',
+      secondary: null,
+      more: ['fieldTrain', 'channels'],
+      danger: ['reject', 'decommission'],
+      activateNote: 'Activate once every document is checked.',
+    });
+  });
+
+  it('all checked: Activate leads, documents move to More', () => {
+    const p = one({ ...submitted, reps: [rep()], checklists: [checklist('u1', 0, [{ status: 'approved' }])] });
+    const sheet = sheetActions(p, personActions(p, RECRUITER, NOW));
+    expect(sheet.primary).toBe('activate');
+    expect(sheet.more).toEqual(['review', 'fieldTrain', 'channels']);
+    expect(sheet.danger).toEqual(['reject']);
+    expect(sheet.activateNote).toBeNull();
+  });
+
+  it('applicant: Invite with Not a fit beside it', () => {
+    const p = one({ applications: [application()], invites: [] });
+    expect(sheetActions(p, personActions(p, ADMIN, NOW))).toMatchObject({ primary: 'invite', secondary: 'notFit', more: [], danger: [] });
+  });
+
+  it('invited: Resend beside nothing, Copy link under More', () => {
+    const p = one({ applications: [], invites: [invite()] });
+    expect(sheetActions(p, personActions(p, FIELD_MANAGER, NOW))).toMatchObject({ primary: null, secondary: 'resend', more: ['copyLink'] });
+  });
+
+  it('selling: no lead, team rows, Decommission last', () => {
+    const p = one({ applications: [], invites: [], reps: [rep({ stage: 'active', approvedSales: 2 })] });
+    expect(sheetActions(p, personActions(p, ADMIN, NOW))).toMatchObject({
+      primary: null,
+      secondary: null,
+      more: ['fieldTrain', 'channels'],
+      danger: ['decommission'],
+    });
   });
 });

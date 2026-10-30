@@ -1,46 +1,90 @@
 /* Hiring > People. Rows are the To do row (TodoList, todo.module.css); shared
    pieces are admin-ui.module.css and rep.module.css. */
 
-/* ---------- top: Send an invite, search, manager ---------- */
+/* ---------- top: search with Send an invite beside it, one line at every width ---------- */
 .top {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s3);
+  gap: var(--s2);
+}
+
+.search {
+  flex: 1 1 auto;
 }
 
 .send:is(button) {
   flex: none;
+  gap: var(--s2);
+  min-height: 48px;
 }
 
-.search {
-  flex: 1 1 240px;
+/* Phone: the button says "Invite"; from a tablet up, the whole phrase. */
+.sendLong {
+  display: none;
 }
 
-.manager {
-  flex: 1 1 180px;
-  min-width: 160px;
-}
-
-.manager select {
-  height: 48px;
-}
-
-/* Phone: the button spans the row, search and manager share the next. */
-@media (max-width: 719px) {
-  .send:is(button) {
-    flex: 1 1 100%;
+@media (min-width: 720px) {
+  .sendShort {
+    display: none;
   }
-}
 
-@media (min-width: 1024px) {
+  .sendLong {
+    display: inline;
+  }
+
   .search {
-    flex: 0 1 360px;
+    flex: 0 1 420px;
+  }
+
+  .send:is(button) {
     margin-left: auto;
   }
+}
 
-  .manager {
-    flex: 0 1 220px;
+/* Manager: one more chip at the end of the filter row; a native select under it. */
+.managerChip {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--c-panel);
+  color: var(--c-text-2);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.managerChip select {
+  min-height: var(--tap);
+  padding: 0 40px 0 16px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: 600 15px / 1 var(--f-ui);
+  appearance: none;
+  cursor: pointer;
+}
+
+.managerChip select:focus-visible {
+  outline: 2px solid var(--c-lime);
+  outline-offset: 2px;
+}
+
+.managerChip svg {
+  position: absolute;
+  right: 14px;
+  pointer-events: none;
+}
+
+.managerChip[data-picked] {
+  background: var(--c-text);
+  color: var(--c-ground);
+}
+
+@media (hover: hover) {
+  .managerChip:not([data-picked]):hover {
+    background: var(--c-panel-hi);
+    color: var(--c-text);
   }
 }
 
@@ -112,62 +156,102 @@
   font-weight: 500;
 }
 
-/* Paperwork: each item over its one line; done ones step back. */
+/* Paperwork: the details list's rhythm, item on the left and where it stands on the right. */
 .paperwork {
   display: grid;
-  gap: 4px;
+  gap: var(--s3);
   margin: 0;
-  padding: 0;
-  overflow: hidden;
-  list-style: none;
-  border-radius: var(--r-control);
 }
 
-.paperwork > li {
+.paperwork > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+}
+
+.paperwork dt {
   display: grid;
   gap: 2px;
-  padding: 10px var(--s3);
-  background: var(--c-well);
-}
-
-.itemName {
+  min-width: 0;
   color: var(--c-text);
   font-size: var(--t-ui);
-  font-weight: 600;
 }
 
-.itemLine {
+.paperwork dd {
+  flex: none;
+  margin: 0;
   color: var(--c-text-2);
+  font-size: var(--t-sm);
+  font-weight: 500;
+  text-align: right;
+}
+
+/* Done items step back; what waits on someone keeps the full ink. */
+.paperwork > [data-status='approved'] dt {
+  color: var(--c-text-2);
+}
+
+.paperwork > [data-status='submitted'] dd {
+  color: var(--c-text);
+}
+
+.paperwork > [data-status='rejected'] dd {
+  color: var(--c-amber);
+}
+
+.itemNote {
+  color: var(--c-text-3);
   font-size: var(--t-sm);
   line-height: 1.4;
 }
 
-.paperwork > li[data-status='approved'] .itemName {
-  color: var(--c-text-2);
-  font-weight: 500;
-}
-
-.paperwork > li[data-status='rejected'] .itemLine {
-  color: var(--c-amber);
-}
-
-/* Footer actions: an even grid, two to a row on a phone, three on desktop.
-   An odd count on a phone gives the primary the whole first row. */
-.actions {
+/* More: quiet full-width text rows; Reject and Decommission last, in red. */
+.more {
   display: grid;
-  flex: 1 1 100%;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--s2);
+  margin: 0 calc(var(--s3) * -1);
+  padding: 0;
+  list-style: none;
 }
 
-@media (max-width: 1023px) {
-  .actions > :first-child:nth-last-child(odd) {
-    grid-column: 1 / -1;
-  }
+.moreRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--s3);
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--c-text);
+  font: 500 var(--t-ui) / 1.2 var(--f-ui);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 140ms ease;
 }
 
-@media (min-width: 1024px) {
-  .actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+.moreRow[data-danger] {
+  color: var(--c-red);
+}
+
+.moreRow:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.moreRow:focus-visible {
+  outline: 2px solid var(--c-lime);
+  outline-offset: -2px;
+}
+
+.moreRow:active:not(:disabled) {
+  background: var(--c-panel-hi);
+}
+
+@media (hover: hover) {
+  .moreRow:hover:not(:disabled) {
+    background: var(--c-panel-hi);
   }
 }

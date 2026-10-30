@@ -600,3 +600,46 @@ export function rowAction(person: Person, caps: PeopleCaps, now = Date.now()): P
       return null;
   }
 }
+
+export interface SheetActions {
+  /** The stage's own action, in lime at the foot of the sheet. */
+  primary: PersonAction | null;
+  /** At most one quieter button beside it. */
+  secondary: PersonAction | null;
+  /** Everything else, as plain rows under "More". */
+  more: PersonAction[];
+  /** Turning someone down or off: last, in red, each behind its own confirm. */
+  danger: PersonAction[];
+  /** Why Activate is not offered yet, when it was held back. */
+  activateNote: string | null;
+}
+
+const LEADS: readonly PersonAction[] = ['invite', 'activate', 'restore', 'reinstate'];
+const DANGER: readonly PersonAction[] = ['reject', 'decommission'];
+
+/**
+ * How the person sheet lays out personActions: one lead action for where they
+ * are (plus at most one beside it), the rest as quiet rows, the destructive
+ * ones last. While uploads still wait on a check, checking leads and Activate
+ * waits (the activate route would refuse anyway until the paperwork is in).
+ */
+export function sheetActions(person: Person, actions: readonly PersonAction[]): SheetActions {
+  const checkFirst = person.stage === 'paperwork' && person.toCheck > 0 && actions.includes('review');
+  const offered = checkFirst ? actions.filter((action) => action !== 'activate') : [...actions];
+  const activateNote =
+    checkFirst && actions.includes('activate') ? 'Activate once every document is checked.' : null;
+
+  const primary = checkFirst ? 'review' : (LEADS.find((action) => offered.includes(action)) ?? null);
+  let secondary: PersonAction | null = null;
+  if (offered.includes('notFit')) secondary = 'notFit';
+  else if (offered.includes('resend')) secondary = 'resend';
+
+  const rest = offered.filter((action) => action !== primary && action !== secondary);
+  return {
+    primary,
+    secondary,
+    more: rest.filter((action) => !DANGER.includes(action)),
+    danger: rest.filter((action) => DANGER.includes(action)),
+    activateNote,
+  };
+}

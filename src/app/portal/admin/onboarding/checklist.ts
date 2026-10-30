@@ -116,6 +116,33 @@ export function signedWithoutCopy(item: ChecklistItem): boolean {
   );
 }
 
+/**
+ * Where an item stands in two or three words, for a row that puts the item on
+ * the left and its state on the right ("Approved Oct 28", "To check").
+ */
+export function itemState(item: ChecklistItem, now = Date.now()): string {
+  if (item.onHold) return 'On hold';
+  switch (item.status) {
+    case 'approved': {
+      if (item.manualCompletion) return 'Marked complete';
+      if (!item.reviewedAt) return 'Approved';
+      const date = new Date(item.reviewedAt);
+      if (Number.isNaN(date.getTime())) return 'Approved';
+      const sameYear = date.getFullYear() === new Date(now).getFullYear();
+      return `Approved ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }) })}`;
+    }
+    case 'rejected':
+      return 'Sent back';
+    case 'submitted':
+      if (needsSending(item)) return 'Not sent yet';
+      if (isEsignItem(item.itemId)) return 'Out to sign';
+      if (canCheck(item)) return 'To check';
+      return needsCheck(item) ? 'Waiting on an admin' : 'Uploaded';
+    default:
+      return 'Not started';
+  }
+}
+
 /** One plain sentence saying where an item stands. */
 export function itemLine(item: ChecklistItem, now = Date.now()): string {
   const by = (name: string | null) => (name ? ` by ${name}` : '');
